@@ -34,6 +34,9 @@ libraryDependencies += "io.circe" %% "circe-parser"  % circeVersion
 
 libraryDependencies += "io.sentry" % "sentry-logback" % "4.3.0"
 
+val skunkVersion = "0.0.24"
+libraryDependencies += "org.tpolecat" %% "skunk-core" % skunkVersion
+
 val http4sVersion = "0.21.22"
 libraryDependencies += "org.http4s" %% "http4s-blaze-client"       % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-blaze-server"       % http4sVersion
@@ -41,11 +44,6 @@ libraryDependencies += "org.http4s" %% "http4s-circe"              % http4sVersi
 libraryDependencies += "org.http4s" %% "http4s-dsl"                % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-prometheus-metrics" % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-server"             % http4sVersion
-
-val doobieVersion = "0.12.1"
-libraryDependencies += "org.tpolecat" %% "doobie-core"     % doobieVersion
-libraryDependencies += "org.tpolecat" %% "doobie-hikari"   % doobieVersion
-libraryDependencies += "org.tpolecat" %% "doobie-postgres" % doobieVersion
 
 val catsVersion = "2.5.0"
 libraryDependencies += "org.typelevel" %% "cats-core"   % catsVersion
@@ -55,9 +53,9 @@ libraryDependencies += "org.typelevel" %% "cats-effect" % "2.4.1"
 libraryDependencies += "org.typelevel" %% "log4cats-core" % "2.0.1"
 
 // Test dependencies
-val testContainersScalaVersion = "0.38.8"
-libraryDependencies += "com.dimafeng" %% "testcontainers-scala-postgresql" % testContainersScalaVersion % Test
+val testContainersScalaVersion = "0.39.3"
 libraryDependencies += "com.dimafeng" %% "testcontainers-scala-scalatest"  % testContainersScalaVersion % Test
+libraryDependencies += "com.dimafeng" %% "testcontainers-scala-postgresql" % testContainersScalaVersion % Test
 
 libraryDependencies += "com.github.tomakehurst" % "wiremock" % "2.27.2" % Test
 
@@ -70,6 +68,3 @@ libraryDependencies += "org.scalacheck"    %% "scalacheck"      % "1.14.3"  % Te
 libraryDependencies += "org.scalamock"     %% "scalamock"       % "5.1.0"   % Test
 libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.6"   % Test
 libraryDependencies += "org.scalatestplus" %% "scalacheck-1-14" % "3.2.2.0" % Test
-
-libraryDependencies += "org.tpolecat" %% "doobie-h2"        % doobieVersion % Test
-libraryDependencies += "org.tpolecat" %% "doobie-scalatest" % doobieVersion % Test

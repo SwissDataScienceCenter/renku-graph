@@ -53,6 +53,6 @@ class EventDetailsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
   private trait TestCase {
     val eventId            = compoundEventIds.generateOne
     val queriesExecTimes   = TestLabeledHistogram[SqlQuery.Name]("query_id")
-    val eventDetailsFinder = new EventDetailsFinderImpl(transactor, queriesExecTimes)
+    val eventDetailsFinder = new EventDetailsFinderImpl(sessionResource, queriesExecTimes)
   }
 }

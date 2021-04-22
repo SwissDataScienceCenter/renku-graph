@@ -94,14 +94,14 @@ object GraphServices {
     tokenrepository.Microservice,
     tokenRepositoryClient,
     preServiceStart = List(TokenRepository.startDB()),
-    serviceArgsList = List(() => s"${DBConfigProvider.JdbcUrl}=${TokenRepository.jdbcUrl}")
+    serviceArgsList = List()
   )
   private val eventLog = ServiceRun(
     "event-log",
     eventlog.Microservice,
     eventLogClient,
     preServiceStart = List(EventLog.startDB()),
-    serviceArgsList = List(() => s"${DBConfigProvider.JdbcUrl}=${EventLog.jdbcUrl}")
+    serviceArgsList = List()
   )
   private val triplesGenerator = ServiceRun(
     "triples-generator",

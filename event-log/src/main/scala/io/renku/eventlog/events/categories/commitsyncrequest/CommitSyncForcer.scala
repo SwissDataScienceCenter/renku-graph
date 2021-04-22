@@ -18,15 +18,19 @@
 
 package io.renku.eventlog.events.categories.commitsyncrequest
 
-import cats.effect.{Bracket, IO}
-import cats.free.Free
-import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
+import cats.data.Kleisli
+import cats.effect.{Async, Bracket, IO}
+import cats.syntax.all._
+import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
+import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
-import doobie.free.connection.ConnectionOp
 import eu.timepit.refined.api.Refined
-import io.renku.eventlog.subscriptions.commitsync
-import io.renku.eventlog.{EventLogDB, TypeSerializers}
+import io.renku.eventlog.subscriptions.{SubscriptionTypeSerializers, commitsync}
+import io.renku.eventlog.{EventDate, EventLogDB, TypeSerializers}
+import skunk._
+import skunk.data.Completion
+import skunk.implicits._
 
 import java.time.Instant
 
@@ -34,52 +38,66 @@ private trait CommitSyncForcer[Interpretation[_]] {
   def forceCommitSync(projectId: projects.Id, projectPath: projects.Path): Interpretation[Unit]
 }
 
-private class CommitSyncForcerImpl(
-    transactor:       DbTransactor[IO, EventLogDB],
-    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
+private class CommitSyncForcerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+    sessionResource:  SessionResource[Interpretation, EventLogDB],
+    queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name],
     now:              () => Instant = () => Instant.now
-)(implicit ME:        Bracket[IO, Throwable])
-    extends DbClient(Some(queriesExecTimes))
-    with CommitSyncForcer[IO]
-    with TypeSerializers {
+) extends DbClient(Some(queriesExecTimes))
+    with CommitSyncForcer[Interpretation]
+    with TypeSerializers
+    with SubscriptionTypeSerializers {
 
-  import doobie.implicits._
+  override def forceCommitSync(projectId: projects.Id, projectPath: projects.Path): Interpretation[Unit] =
+    sessionResource.useK {
+      deleteLastSyncedDate(projectId) flatMap {
+        case true  => upsertProject(projectId, projectPath).void
+        case false => Kleisli.pure(())
+      }
+    }
 
-  override def forceCommitSync(projectId: projects.Id, projectPath: projects.Path): IO[Unit] = {
-    deleteLastSyncedDate(projectId) flatMap {
-      case 0 => upsertProject(projectId, projectPath)
-      case _ => Free.pure[ConnectionOp, Int](1)
-    } transact transactor.get
-  }.void
-
-  private def deleteLastSyncedDate(projectId: projects.Id) = measureExecutionTime {
-    SqlQuery(
-      sql"""|DELETE FROM subscription_category_sync_time
-            |WHERE project_id = $projectId AND category_name = ${commitsync.categoryName}
-            |""".stripMargin.update.run,
-      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - delete last_synced")
-    )
-  }
+  private def deleteLastSyncedDate(projectId: projects.Id) =
+    measureExecutionTime {
+      SqlQuery(
+        Kleisli { session =>
+          val query: Command[projects.Id ~ CategoryName] =
+            sql"""
+            DELETE FROM subscription_category_sync_time
+            WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
+          """.command
+          session.prepare(query).use(_.execute(projectId ~ commitsync.categoryName)).map {
+            case Completion.Delete(0) => true
+            case _                    => false
+          }
+        },
+        name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - delete last_synced")
+      )
+    }
 
   private def upsertProject(projectId: projects.Id, projectPath: projects.Path) = measureExecutionTime {
     SqlQuery(
-      sql"""|INSERT INTO
-            |project (project_id, project_path, latest_event_date)
-            |VALUES ($projectId, $projectPath, ${now()})
-            |ON CONFLICT (project_id)
-            |DO NOTHING
-      """.stripMargin.update.run,
+      Kleisli { session =>
+        val query: Command[projects.Id ~ projects.Path ~ EventDate] =
+          sql"""
+          INSERT INTO
+          project (project_id, project_path, latest_event_date)
+          VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
+          ON CONFLICT (project_id)
+          DO NOTHING
+      """.command
+        session.prepare(query).use(_.execute(projectId ~ projectPath ~ EventDate(now())))
+      },
       name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - insert project")
     )
   }
 }
 
 private object CommitSyncForcer {
+
   import cats.effect.IO
 
-  def apply(transactor:       DbTransactor[IO, EventLogDB],
+  def apply(sessionResource:  SessionResource[IO, EventLogDB],
             queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
   ): IO[CommitSyncForcer[IO]] = IO {
-    new CommitSyncForcerImpl(transactor, queriesExecTimes)
+    new CommitSyncForcerImpl(sessionResource, queriesExecTimes)
   }
 }

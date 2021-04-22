@@ -18,20 +18,19 @@
 
 package io.renku.eventlog.statuschange.commands
 
-import cats.data.NonEmptyList
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import cats.data.{Kleisli, NonEmptyList}
+import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import io.renku.eventlog.{EventLogDB, TypeSerializers}
+import skunk.Session
 
 trait ChangeStatusCommand[Interpretation[_]] extends Product with Serializable with TypeSerializers {
   def eventId: CompoundEventId
   def status:  EventStatus
-  def queries: NonEmptyList[SqlQuery[Int]]
-  def updateGauges(updateResult: UpdateResult)(implicit
-      transactor:                DbTransactor[Interpretation, EventLogDB]
-  ): Interpretation[Unit]
+  def queries: NonEmptyList[SqlQuery[Interpretation, Int]]
+  def updateGauges(updateResult: UpdateResult): Kleisli[Interpretation, Session[Interpretation], Unit]
 
   def maybeProcessingTime: Option[EventProcessingTime]
 }

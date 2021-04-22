@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.effect.Effect
 import cats.syntax.all._
 import ch.datascience.http.ErrorMessage._
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.ErrorMessage
 import ch.datascience.http.client.AccessToken
@@ -77,7 +77,7 @@ object IOAssociateTokenEndpoint {
   import scala.concurrent.ExecutionContext
 
   def apply(
-      transactor:       DbTransactor[IO, ProjectsTokensDB],
+      sessionResource:  SessionResource[IO, ProjectsTokensDB],
       queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
       logger:           Logger[IO]
   )(implicit
@@ -86,6 +86,6 @@ object IOAssociateTokenEndpoint {
       timer:            Timer[IO]
   ): IO[AssociateTokenEndpoint[IO]] =
     for {
-      tokenAssociator <- IOTokenAssociator(transactor, queriesExecTimes, logger)
+      tokenAssociator <- IOTokenAssociator(sessionResource, queriesExecTimes, logger)
     } yield new AssociateTokenEndpoint[IO](tokenAssociator, logger)
 }

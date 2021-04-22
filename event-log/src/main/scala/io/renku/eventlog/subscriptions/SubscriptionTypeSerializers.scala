@@ -18,16 +18,19 @@
 
 package io.renku.eventlog.subscriptions
 import ch.datascience.graph.model.events.{CategoryName, LastSyncedDate}
-import doobie.util.{Get, Put}
 import io.renku.eventlog.TypeSerializers
+import skunk.codec.all.{timestamptz, varchar}
+import skunk.{Decoder, Encoder}
 
-import java.time.Instant
+import java.time.{OffsetDateTime, ZoneId}
 
 trait SubscriptionTypeSerializers extends TypeSerializers {
 
-  private[subscriptions] implicit val lastSyncedDateGet: Get[LastSyncedDate] = Get[Instant].tmap(LastSyncedDate.apply)
-  private[subscriptions] implicit val lastSyncedDatePut: Put[LastSyncedDate] = Put[Instant].contramap(_.value)
+  val lastSyncedDateDecoder: Decoder[LastSyncedDate] =
+    timestamptz.map(timestamp => LastSyncedDate(timestamp.toInstant))
+  val lastSyncedDateEncoder: Encoder[LastSyncedDate] =
+    timestamptz.values.contramap((b: LastSyncedDate) => OffsetDateTime.ofInstant(b.value, ZoneId.systemDefault()))
 
-  private[subscriptions] implicit val categoryNameGet: Get[CategoryName] = Get[String].tmap(CategoryName.apply)
-  private[subscriptions] implicit val categoryNamePut: Put[CategoryName] = Put[String].contramap(_.value)
+  val categoryNameDecoder: Decoder[CategoryName] = varchar.map(CategoryName.apply)
+  val categoryNameEncoder: Encoder[CategoryName] = varchar.contramap(_.value)
 }

@@ -18,67 +18,85 @@
 
 package io.renku.eventlog.statuschange.commands
 
-import cats.MonadError
 import cats.data.{Kleisli, NonEmptyList}
-import cats.effect.{Bracket, Sync}
+import cats.effect.{Async, Bracket}
 import cats.syntax.all._
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.SqlQuery
 import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
+import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
-import doobie.implicits._
 import eu.timepit.refined.auto._
+import io.renku.eventlog.statuschange.{ChangeStatusRequest, CommandFindingResult}
 import io.renku.eventlog.statuschange.ChangeStatusRequest.EventOnlyRequest
 import io.renku.eventlog.statuschange.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
-import io.renku.eventlog.statuschange.{ChangeStatusRequest, CommandFindingResult}
-import io.renku.eventlog.{EventLogDB, EventMessage}
+import io.renku.eventlog.{EventMessage, ExecutionDate, TypeSerializers}
+import skunk._
+import skunk.data.Completion
+import skunk.implicits._
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit.MINUTES
 
-final case class ToGenerationRecoverableFailure[Interpretation[_]](
+final case class ToGenerationRecoverableFailure[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     eventId:                        CompoundEventId,
     message:                        EventMessage,
     awaitingTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
     underTriplesGenerationGauge:    LabeledGauge[Interpretation, projects.Path],
     maybeProcessingTime:            Option[EventProcessingTime],
     now:                            () => Instant = () => Instant.now
-)(implicit ME:                      Bracket[Interpretation, Throwable])
-    extends ChangeStatusCommand[Interpretation] {
+) extends ChangeStatusCommand[Interpretation]
+    with TypeSerializers {
 
   override lazy val status: EventStatus = GenerationRecoverableFailure
 
-  override def queries: NonEmptyList[SqlQuery[Int]] = NonEmptyList.of(
+  override def queries: NonEmptyList[SqlQuery[Interpretation, Int]] = NonEmptyList.of(
     SqlQuery(
-      sql"""|UPDATE event
-            |SET status = $status, execution_date = ${now().plus(10, MINUTES)}, message = $message
-            |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${GeneratingTriples: EventStatus}
-            |""".stripMargin.update.run,
+      Kleisli { session =>
+        val query: Command[EventStatus ~ ExecutionDate ~ EventMessage ~ EventId ~ projects.Id ~ EventStatus] =
+          sql"""UPDATE event
+                SET status = $eventStatusEncoder, execution_date = $executionDateEncoder, message = $eventMessageEncoder
+                WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND status = $eventStatusEncoder
+          """.command
+        session
+          .prepare(query)
+          .use {
+            _.execute(
+              status ~ ExecutionDate(
+                now().plus(10, MINUTES)
+              ) ~ message ~ eventId.id ~ eventId.projectId ~ GeneratingTriples
+            )
+          }
+          .flatMap {
+            case Completion.Update(n) => n.pure[Interpretation]
+            case completion =>
+              new RuntimeException(
+                s"generating_triples->generation_recoverable_fail time query failed with completion status $completion"
+              ).raiseError[Interpretation, Int]
+          }
+      },
       name = "generating_triples->generation_recoverable_fail"
     )
   )
 
   override def updateGauges(
-      updateResult:      UpdateResult
-  )(implicit transactor: DbTransactor[Interpretation, EventLogDB]): Interpretation[Unit] = updateResult match {
+      updateResult: UpdateResult
+  ): Kleisli[Interpretation, Session[Interpretation], Unit] = updateResult match {
     case UpdateResult.Updated =>
       for {
         path <- findProjectPath(eventId)
-        _    <- awaitingTriplesGenerationGauge increment path
-        _    <- underTriplesGenerationGauge decrement path
+        _    <- Kleisli.liftF(awaitingTriplesGenerationGauge increment path)
+        _    <- Kleisli.liftF(underTriplesGenerationGauge decrement path)
       } yield ()
-    case _ => ME.unit
+    case _ => Kleisli.pure(())
   }
 }
 
 private[statuschange] object ToGenerationRecoverableFailure {
-  def factory[Interpretation[_]: Sync](
+  def factory[Interpretation[_]: Async: Bracket[*[_], Throwable]](
       awaitingTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
       underTriplesGenerationGauge:    LabeledGauge[Interpretation, projects.Path]
-  )(implicit
-      ME: MonadError[Interpretation, Throwable]
   ): Kleisli[Interpretation, ChangeStatusRequest, CommandFindingResult] = Kleisli.fromFunction {
     case EventOnlyRequest(eventId, GenerationRecoverableFailure, maybeProcessingTime, Some(message)) =>
       CommandFound(

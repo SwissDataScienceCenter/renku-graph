@@ -18,16 +18,17 @@
 
 package ch.datascience.tokenrepository.repository
 
+import cats.data.Kleisli
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.SessionResource
 import com.dimafeng.testcontainers._
-import doobie.free.connection.ConnectionIO
-import doobie.implicits._
-import doobie.util.fragment.Fragment
-import doobie.util.transactor.Transactor
+import natchez.Trace.Implicits.noop
 import org.scalatest.Suite
 import org.testcontainers.utility.DockerImageName
+import skunk._
+import skunk.codec.all._
+import skunk.implicits._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -38,49 +39,58 @@ trait InMemoryProjectsTokensDb extends ForAllTestContainer {
 
   private val dbConfig = new ProjectsTokensDbConfigProvider[IO].get().unsafeRunSync()
 
-  override val container: Container with JdbcDatabaseContainer = PostgreSQLContainer(
+  override val container: PostgreSQLContainer = PostgreSQLContainer(
     dockerImageNameOverride = DockerImageName.parse("postgres:9.6.19-alpine"),
     databaseName = "projects_tokens",
     username = dbConfig.user.value,
-    password = dbConfig.pass
+    password = dbConfig.pass.value
   )
 
-  lazy val transactor: DbTransactor[IO, ProjectsTokensDB] = DbTransactor[IO, ProjectsTokensDB] {
-    Transactor.fromDriverManager[IO](
-      dbConfig.driver.value,
-      container.jdbcUrl,
-      dbConfig.user.value,
-      dbConfig.pass
+  lazy val sessionResource: SessionResource[IO, ProjectsTokensDB] = new SessionResource[IO, ProjectsTokensDB](
+    Session.single(
+      host = container.host,
+      database = dbConfig.name.value,
+      user = dbConfig.user.value,
+      password = Some(dbConfig.pass.value),
+      port = container.container.getMappedPort(dbConfig.port.value)
     )
-  }
+  )
 
-  def execute[O](query: ConnectionIO[O]): O =
-    query
-      .transact(transactor.get)
-      .unsafeRunSync()
+  def execute[O](query: Kleisli[IO, Session[IO], O]): O =
+    sessionResource.useK(query).unsafeRunSync()
 
   protected def tableExists(): Boolean =
-    sql"""select exists (select * from projects_tokens);""".query.option
-      .transact(transactor.get)
-      .recover { case _ => None }
+    sessionResource
+      .useK {
+        val query: Query[Void, Boolean] = sql"""select exists (select * from projects_tokens);""".query(bool)
+        Kleisli[IO, Session[IO], Option[Boolean]](_.option(query).recover { case _ => None })
+      }
       .unsafeRunSync()
       .isDefined
 
   protected def createTable(): Unit = execute {
-    sql"""
-         |CREATE TABLE projects_tokens(
-         | project_id int4 PRIMARY KEY,
-         | project_path VARCHAR NOT NULL,
-         | token VARCHAR NOT NULL
-         |);
-       """.stripMargin.update.run.map(_ => ())
+    Kleisli[IO, Session[IO], Unit] { session =>
+      val query: Command[Void] =
+        sql"""CREATE TABLE projects_tokens(
+              project_id int4 PRIMARY KEY,
+              project_path VARCHAR NOT NULL,
+              token VARCHAR NOT NULL
+             );
+        """.command
+      session.execute(query).map(_ => ())
+    }
   }
 
   protected def dropTable(): Unit = execute {
-    sql"DROP TABLE IF EXISTS projects_tokens".update.run.map(_ => ())
+    Kleisli[IO, Session[IO], Unit] { session =>
+      val query: Command[Void] = sql"DROP TABLE IF EXISTS projects_tokens".command
+      session.execute(query).map(_ => ())
+    }
   }
 
-  protected def verifyTrue(sql: Fragment): Unit = execute {
-    sql.update.run.map(_ => ())
+  protected def verifyTrue(sql: Command[Void]): Unit = execute {
+    Kleisli[IO, Session[IO], Unit] { session =>
+      session.execute(sql).map(_ => ())
+    }
   }
 }

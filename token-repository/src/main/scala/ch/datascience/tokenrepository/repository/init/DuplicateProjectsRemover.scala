@@ -18,45 +18,54 @@
 
 package ch.datascience.tokenrepository.repository.init
 
+import cats.data.Kleisli
 import cats.effect.Bracket
 import cats.syntax.all._
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.SessionResource
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
-import doobie.implicits._
 import org.typelevel.log4cats.Logger
+import skunk.{Command, Session}
+import skunk.data.Completion
+import skunk.implicits._
 
 private trait DuplicateProjectsRemover[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
 private object DuplicateProjectsRemover {
-  def apply[Interpretation[_]](
-      transactor: DbTransactor[Interpretation, ProjectsTokensDB],
-      logger:     Logger[Interpretation]
-  )(implicit ME:  Bracket[Interpretation, Throwable]): DuplicateProjectsRemover[Interpretation] =
-    new DuplicateProjectsRemoverImpl(transactor, logger)
+  def apply[Interpretation[_]: Bracket[*[_], Throwable]](
+      sessionResource: SessionResource[Interpretation, ProjectsTokensDB],
+      logger:          Logger[Interpretation]
+  ): DuplicateProjectsRemover[Interpretation] =
+    new DuplicateProjectsRemoverImpl(sessionResource, logger)
 }
 
-private class DuplicateProjectsRemoverImpl[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, ProjectsTokensDB],
-    logger:     Logger[Interpretation]
-)(implicit ME:  Bracket[Interpretation, Throwable])
-    extends DuplicateProjectsRemover[Interpretation] {
+private class DuplicateProjectsRemoverImpl[Interpretation[_]: Bracket[*[_], Throwable]](
+    sessionResource: SessionResource[Interpretation, ProjectsTokensDB],
+    logger:          Logger[Interpretation]
+) extends DuplicateProjectsRemover[Interpretation] {
 
-  override def run(): Interpretation[Unit] = for {
-    _ <- deduplicateProjects()
-    _ <- logger info "Projects de-duplicated"
-  } yield ()
+  override def run(): Interpretation[Unit] = sessionResource.useK {
+    for {
+      _ <- deduplicateProjects()
+      _ <- Kleisli.liftF(logger info "Projects de-duplicated")
+    } yield ()
+  }
 
-  private def deduplicateProjects() =
-    sql"""|DELETE FROM projects_tokens WHERE project_id IN (
-          |  SELECT project_id
-          |  FROM projects_tokens pt
-          |  JOIN (
-          |    SELECT project_path, MAX(distinct project_id) AS id_to_stay
-          |    FROM projects_tokens
-          |    GROUP BY project_path
-          |    HAVING COUNT(distinct project_id) > 1
-          |  ) pr_to_stay ON pr_to_stay.project_path = pt.project_path AND pr_to_stay.id_to_stay <> pt.project_id
-          |)""".stripMargin.update.run.transact(transactor.get).void
+  private def deduplicateProjects(): Kleisli[Interpretation, Session[Interpretation], Unit] = {
+
+    val query: Command[skunk.Void] =
+      sql"""DELETE FROM projects_tokens WHERE project_id IN (
+                                       SELECT project_id
+                                       FROM projects_tokens pt
+                                       JOIN (
+                                         SELECT project_path, MAX(distinct project_id) AS id_to_stay
+                                         FROM projects_tokens
+                                         GROUP BY project_path
+                                         HAVING COUNT(distinct project_id) > 1
+                                       ) pr_to_stay ON pr_to_stay.project_path = pt.project_path AND pr_to_stay.id_to_stay <> pt.project_id
+                                     )""".command
+
+    Kleisli(_.execute(query).void)
+  }
 }

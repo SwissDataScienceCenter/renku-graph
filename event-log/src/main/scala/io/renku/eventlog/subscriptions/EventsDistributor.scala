@@ -22,12 +22,10 @@ import cats.MonadError
 import cats.data.OptionT
 import cats.effect.{ContextShift, Effect, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.db.DbTransactor
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.events.CategoryName
-import org.typelevel.log4cats.Logger
-import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -120,7 +118,6 @@ private object IOEventsDistributor {
 
   def apply[CategoryEvent](
       categoryName:         CategoryName,
-      transactor:           DbTransactor[IO, EventLogDB],
       subscribers:          Subscribers[IO],
       eventsFinder:         EventFinder[IO, CategoryEvent],
       eventDelivery:        EventDelivery[IO, CategoryEvent],

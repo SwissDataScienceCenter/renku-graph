@@ -19,18 +19,12 @@
 package ch.datascience.tokenrepository.repository.fetching
 
 import cats.effect.{Bracket, IO}
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB}
 import org.typelevel.log4cats.Logger
 
 import scala.util.Try
-
-private class TryPersistedTokensFinder(
-    transactor:       DbTransactor[Try, ProjectsTokensDB],
-    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
-)(implicit ME:        Bracket[Try, Throwable])
-    extends PersistedTokensFinder[Try](transactor, queriesExecTimes)
 
 private class IOTokenFinder(
     tokenInRepoFinder: PersistedTokensFinder[IO],

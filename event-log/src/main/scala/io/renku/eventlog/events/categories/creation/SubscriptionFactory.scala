@@ -19,7 +19,7 @@
 package io.renku.eventlog.events.categories.creation
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.events.consumers.EventHandler
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
 import ch.datascience.graph.model.projects
@@ -31,7 +31,7 @@ import scala.concurrent.ExecutionContext
 
 object SubscriptionFactory {
 
-  def apply(transactor:         DbTransactor[IO, EventLogDB],
+  def apply(sessionResource:    SessionResource[IO, EventLogDB],
             waitingEventsGauge: LabeledGauge[IO, projects.Path],
             queriesExecTimes:   LabeledHistogram[IO, SqlQuery.Name],
             logger:             Logger[IO]
@@ -40,6 +40,6 @@ object SubscriptionFactory {
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[(EventHandler[IO], SubscriptionMechanism[IO])] = for {
-    handler <- EventHandler(transactor, waitingEventsGauge, queriesExecTimes, logger)
+    handler <- EventHandler(sessionResource, waitingEventsGauge, queriesExecTimes, logger)
   } yield handler -> SubscriptionMechanism.noOpSubscriptionMechanism(categoryName)
 }

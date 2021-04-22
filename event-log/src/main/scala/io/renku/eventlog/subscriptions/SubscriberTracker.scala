@@ -18,59 +18,85 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.effect.{Bracket, IO}
-import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
-import ch.datascience.events.consumers.subscriptions.SubscriberUrl
+import cats.data.Kleisli
+import cats.effect.{Async, Bracket, IO}
+import cats.syntax.all._
+import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
+import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
-import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.{EventLogDB, Microservice, TypeSerializers}
+import skunk._
+import skunk.data.Completion
+import skunk.implicits._
 
 private trait SubscriberTracker[Interpretation[_]] {
   def add(subscriptionInfo: SubscriptionInfo): Interpretation[Boolean]
-  def remove(subscriberUrl: SubscriberUrl):    Interpretation[Boolean]
+
+  def remove(subscriberUrl: SubscriberUrl): Interpretation[Boolean]
 }
 
-private class SubscriberTrackerImpl(transactor:       DbTransactor[IO, EventLogDB],
-                                    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
-                                    sourceUrl:        MicroserviceBaseUrl
-)(implicit ME:                                        Bracket[IO, Throwable])
-    extends DbClient(Some(queriesExecTimes))
-    with SubscriberTracker[IO]
+private class SubscriberTrackerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+    sessionResource:  SessionResource[Interpretation, EventLogDB],
+    queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name],
+    sourceUrl:        MicroserviceBaseUrl
+) extends DbClient(Some(queriesExecTimes))
+    with SubscriberTracker[Interpretation]
     with TypeSerializers {
 
-  override def add(subscriptionInfo: SubscriptionInfo): IO[Boolean] = measureExecutionTime(
-    SqlQuery(
-      sql"""|INSERT INTO subscriber (delivery_id, delivery_url, source_url)
-            |VALUES (${subscriptionInfo.subscriberId}, ${subscriptionInfo.subscriberUrl}, $sourceUrl)
-            |ON CONFLICT (delivery_url, source_url)
-            |DO UPDATE SET delivery_id = ${subscriptionInfo.subscriberId}, delivery_url = EXCLUDED.delivery_url, source_url = EXCLUDED.source_url
-            |""".stripMargin.update.run,
-      name = "subscriber - add"
-    )
-  ) transact transactor.get map mapToTableResult
+  override def add(subscriptionInfo: SubscriptionInfo): Interpretation[Boolean] = sessionResource.useK {
+    measureExecutionTime(
+      SqlQuery(
+        Kleisli { session =>
+          val query: Command[SubscriberId ~ SubscriberUrl ~ MicroserviceBaseUrl ~ SubscriberId] =
+            sql"""INSERT INTO subscriber (delivery_id, delivery_url, source_url)
+                  VALUES ($subscriberIdEncoder, $subscriberUrlEncoder, $microserviceBaseUrlEncoder)
+                  ON CONFLICT (delivery_url, source_url)
+                  DO UPDATE SET delivery_id = $subscriberIdEncoder, delivery_url = EXCLUDED.delivery_url, source_url = EXCLUDED.source_url
+               """.command
+          session.prepare(query).use {
+            _.execute(
+              subscriptionInfo.subscriberId ~ subscriptionInfo.subscriberUrl ~ sourceUrl ~ subscriptionInfo.subscriberId
+            )
+          }
+        },
+        name = "subscriber - add"
+      )
+    ) map insertToTableResult
+  }
 
-  override def remove(subscriberUrl: SubscriberUrl): IO[Boolean] = measureExecutionTime(
-    SqlQuery(
-      sql"""|DELETE FROM subscriber
-            |WHERE delivery_url = $subscriberUrl AND source_url = $sourceUrl
-            |""".stripMargin.update.run,
-      name = "subscriber - delete"
-    )
-  ) transact transactor.get map mapToTableResult
+  override def remove(subscriberUrl: SubscriberUrl): Interpretation[Boolean] = sessionResource.useK {
+    measureExecutionTime(
+      SqlQuery(
+        Kleisli { session =>
+          val query: Command[SubscriberUrl ~ MicroserviceBaseUrl] =
+            sql"""DELETE FROM subscriber
+                  WHERE delivery_url = $subscriberUrlEncoder AND source_url = $microserviceBaseUrlEncoder
+            """.command
+          session.prepare(query).use(_.execute(subscriberUrl ~ sourceUrl))
+        },
+        name = "subscriber - delete"
+      )
+    ) map deleteToTableResult
+  }
 
-  private lazy val mapToTableResult: Int => Boolean = {
-    case 0 | 1 => true
-    case _     => false
+  private lazy val deleteToTableResult: Completion => Boolean = {
+    case Completion.Delete(0 | 1) => true
+    case _                        => false
+  }
+
+  private lazy val insertToTableResult: Completion => Boolean = {
+    case Completion.Insert(0 | 1) => true
+    case _                        => false
   }
 }
 
 private object SubscriberTracker {
-  def apply(transactor:       DbTransactor[IO, EventLogDB],
+  def apply(sessionResource:  SessionResource[IO, EventLogDB],
             queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
   ): IO[SubscriberTracker[IO]] = for {
     microserviceUrlFinder <- MicroserviceUrlFinder(Microservice.ServicePort)
     sourceUrl             <- microserviceUrlFinder.findBaseUrl()
-  } yield new SubscriberTrackerImpl(transactor, queriesExecTimes, sourceUrl)
+  } yield new SubscriberTrackerImpl(sessionResource, queriesExecTimes, sourceUrl)
 }

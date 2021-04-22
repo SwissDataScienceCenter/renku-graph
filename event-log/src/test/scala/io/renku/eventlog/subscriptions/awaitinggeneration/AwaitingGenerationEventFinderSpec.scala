@@ -196,7 +196,7 @@ private class AwaitingGenerationEventFinderSpec
     "return events from all the projects - case with projectsFetchingLimit > 1" in new TestCaseCommons {
 
       val eventLogFind = new AwaitingGenerationEventFinderImpl(
-        transactor,
+        sessionResource,
         waitingEventsGauge,
         underProcessingGauge,
         queriesExecTimes,
@@ -272,7 +272,7 @@ private class AwaitingGenerationEventFinderSpec
   private trait TestCase extends TestCaseCommons {
 
     val finder = new AwaitingGenerationEventFinderImpl(
-      transactor,
+      sessionResource,
       waitingEventsGauge,
       underProcessingGauge,
       queriesExecTimes,

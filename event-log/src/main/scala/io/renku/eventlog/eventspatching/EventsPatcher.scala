@@ -18,11 +18,11 @@
 
 package io.renku.eventlog.eventspatching
 
-import cats.effect.{Bracket, IO}
+import cats.data.Kleisli
+import cats.effect.{Async, Bracket, IO}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
 import ch.datascience.metrics.LabeledHistogram
-import doobie.implicits._
 import org.typelevel.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 
@@ -32,37 +32,37 @@ private trait EventsPatcher[Interpretation[_]] {
   def applyToAllEvents(eventsPatch: EventsPatch[Interpretation]): Interpretation[Unit]
 }
 
-private class EventsPatcherImpl(
-    transactor:       DbTransactor[IO, EventLogDB],
-    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
-    logger:           Logger[IO]
-)(implicit ME:        Bracket[IO, Throwable])
-    extends DbClient(Some(queriesExecTimes))
-    with EventsPatcher[IO] {
+private class EventsPatcherImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+    sessionResource:  SessionResource[Interpretation, EventLogDB],
+    queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name],
+    logger:           Logger[Interpretation]
+) extends DbClient(Some(queriesExecTimes))
+    with EventsPatcher[Interpretation] {
 
-  def applyToAllEvents(eventsPatch: EventsPatch[IO]): IO[Unit] = {
+  def applyToAllEvents(eventsPatch: EventsPatch[Interpretation]): Interpretation[Unit] = sessionResource.useK {
     for {
-      _ <- measureExecutionTime(eventsPatch.query) transact transactor.get
-      _ <- eventsPatch.updateGauges()
-      _ <- logger.info(s"All events patched with ${eventsPatch.name}")
+      _ <- measureExecutionTime(eventsPatch.query)
+      _ <- Kleisli.liftF(eventsPatch.updateGauges())
+      _ <- Kleisli.liftF(logger.info(s"All events patched with ${eventsPatch.name}"))
     } yield ()
   } recoverWith loggedError(eventsPatch)
 
-  private def loggedError(patch: EventsPatch[IO]): PartialFunction[Throwable, IO[Unit]] = { case NonFatal(exception) =>
-    val message = s"Patching all events with ${patch.name} failed"
-    logger.error(exception)(message)
-    ME.raiseError {
-      new Exception(message, exception)
-    }
+  private def loggedError(patch: EventsPatch[Interpretation]): PartialFunction[Throwable, Interpretation[Unit]] = {
+    case NonFatal(exception) =>
+      val message = s"Patching all events with ${patch.name} failed"
+      logger.error(exception)(message)
+      Bracket[Interpretation, Throwable].raiseError {
+        new Exception(message, exception)
+      }
   }
 }
 
 private object IOEventsPatcher {
   def apply(
-      transactor:       DbTransactor[IO, EventLogDB],
+      sessionResource:  SessionResource[IO, EventLogDB],
       queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
       logger:           Logger[IO]
   ): IO[EventsPatcher[IO]] = IO {
-    new EventsPatcherImpl(transactor, queriesExecTimes, logger)
+    new EventsPatcherImpl[IO](sessionResource, queriesExecTimes, logger)
   }
 }

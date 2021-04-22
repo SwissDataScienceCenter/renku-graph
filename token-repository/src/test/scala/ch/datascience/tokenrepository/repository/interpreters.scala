@@ -25,5 +25,4 @@ import ch.datascience.generators.Generators.Implicits._
 
 import scala.util.Try
 
-private class TryAccessTokenCrypto extends AccessTokenCrypto[Try](aesCryptoSecrets.generateOne)
-private class IOAccessTokenCrypto  extends AccessTokenCrypto[IO](aesCryptoSecrets.generateOne)
+private class IOAccessTokenCrypto extends AccessTokenCrypto[IO](aesCryptoSecrets.generateOne)

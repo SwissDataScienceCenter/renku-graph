@@ -60,6 +60,6 @@ class PersistedTokensFinderSpec extends AnyWordSpec with InMemoryProjectsTokensD
     val projectPath = projectPaths.generateOne
 
     private val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
-    val finder                   = new PersistedTokensFinder(transactor, queriesExecTimes)
+    val finder                   = new PersistedTokensFinder(sessionResource, queriesExecTimes)
   }
 }

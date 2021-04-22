@@ -18,18 +18,14 @@
 
 package io.renku.eventlog
 
+import cats.data.Kleisli
 import cats.effect.Bracket
 import cats.syntax.all._
-import ch.datascience.db.DbTransactor
-import doobie.implicits._
-import doobie.util.fragment.Fragment
+import skunk._
 
 package object init {
 
-  def execute[Interpretation[_]](
-      sql: Fragment
-  )(implicit
-      transactor: DbTransactor[Interpretation, EventLogDB],
-      ME:         Bracket[Interpretation, Throwable]
-  ): Interpretation[Unit] = sql.update.run.transact(transactor.get).void
+  def execute[Interpretation[_]: Bracket[*[_], Throwable]](
+      sql: Command[Void]
+  ): Kleisli[Interpretation, Session[Interpretation], Unit] = Kleisli(session => session.execute(sql).void)
 }

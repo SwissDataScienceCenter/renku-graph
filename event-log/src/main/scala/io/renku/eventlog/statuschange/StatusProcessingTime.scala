@@ -18,23 +18,38 @@
 
 package io.renku.eventlog.statuschange
 
+import cats.data.Kleisli
+import cats.effect.{Async, Bracket}
+import cats.syntax.all._
 import ch.datascience.db.SqlQuery
-import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
-import doobie.implicits._
+import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
+import ch.datascience.graph.model.projects
 import eu.timepit.refined.auto._
 import io.renku.eventlog.TypeSerializers
+import skunk._
+import skunk.implicits._
+import skunk.codec.all._
+import skunk.data.Completion
 
 trait StatusProcessingTime extends TypeSerializers {
-  def upsertStatusProcessingTime(eventId:             CompoundEventId,
-                                 status:              EventStatus,
-                                 maybeProcessingTime: Option[EventProcessingTime]
-  ): Option[SqlQuery[Int]] = maybeProcessingTime.map { processingTime =>
-    SqlQuery[Int](
-      query = sql"""|INSERT INTO status_processing_time(event_id, project_id, status, processing_time)
-                    |VALUES(${eventId.id}, ${eventId.projectId}, $status, $processingTime)
-                    |ON CONFLICT (event_id, project_id, status)
-                    |DO UPDATE SET processing_time = EXCLUDED.processing_time;
-                    |""".stripMargin.update.run.map(_ => 1),
+  def upsertStatusProcessingTime[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+      eventId:             CompoundEventId,
+      status:              EventStatus,
+      maybeProcessingTime: Option[EventProcessingTime]
+  ): Option[SqlQuery[Interpretation, Int]] = maybeProcessingTime.map { processingTime =>
+    SqlQuery[Interpretation, Int](
+      Kleisli { session =>
+        val query: Command[EventId ~ projects.Id ~ EventStatus ~ EventProcessingTime] =
+          sql"""INSERT INTO status_processing_time(event_id, project_id, status, processing_time)
+                VALUES($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $eventProcessingTimeEncoder)
+                ON CONFLICT (event_id, project_id, status)
+                DO UPDATE SET processing_time = EXCLUDED.processing_time;
+                """.command
+        session
+          .prepare(query)
+          .use(_.execute(eventId.id ~ eventId.projectId ~ status ~ processingTime))
+          .map(_ => 1)
+      },
       name = "upsert_processing_time"
     )
   }

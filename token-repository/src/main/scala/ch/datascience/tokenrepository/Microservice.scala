@@ -21,7 +21,7 @@ package ch.datascience.tokenrepository
 import cats.effect._
 import ch.datascience.config.certificates.CertificateLoader
 import ch.datascience.config.sentry.SentryInitializer
-import ch.datascience.db.DbTransactorResource
+import ch.datascience.db.{SessionPoolResource, SessionResource}
 import ch.datascience.http.server.HttpServer
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
@@ -32,6 +32,7 @@ import ch.datascience.tokenrepository.repository.fetching.IOFetchTokenEndpoint
 import ch.datascience.tokenrepository.repository.init.{DbInitializer, IODbInitializer}
 import ch.datascience.tokenrepository.repository.metrics.QueriesExecutionTimes
 import ch.datascience.tokenrepository.repository.{ProjectsTokensDB, ProjectsTokensDbConfigProvider}
+import natchez.Trace.Implicits.noop
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -39,39 +40,41 @@ object Microservice extends IOMicroservice {
 
   override def run(args: List[String]): IO[ExitCode] =
     for {
-      transactorResource <- new ProjectsTokensDbConfigProvider[IO](args) map DbTransactorResource[IO, ProjectsTokensDB]
-      exitCode           <- runMicroservice(transactorResource, args)
+      sessionPoolResource <- new ProjectsTokensDbConfigProvider[IO]() map SessionPoolResource[IO, ProjectsTokensDB]
+      exitCode            <- runMicroservice(sessionPoolResource, args)
     } yield exitCode
 
-  private def runMicroservice(transactorResource: DbTransactorResource[IO, ProjectsTokensDB], args: List[String]) =
-    transactorResource.use { transactor =>
-      for {
-        certificateLoader      <- CertificateLoader[IO](ApplicationLogger)
-        sentryInitializer      <- SentryInitializer[IO]()
-        metricsRegistry        <- MetricsRegistry()
-        queriesExecTimes       <- QueriesExecutionTimes(metricsRegistry)
-        fetchTokenEndpoint     <- IOFetchTokenEndpoint(transactor, queriesExecTimes, ApplicationLogger)
-        associateTokenEndpoint <- IOAssociateTokenEndpoint(transactor, queriesExecTimes, ApplicationLogger)
-        dbInitializer          <- IODbInitializer(transactor, queriesExecTimes, ApplicationLogger)
-        deleteTokenEndpoint    <- IODeleteTokenEndpoint(transactor, queriesExecTimes, ApplicationLogger)
-        microserviceRoutes = new MicroserviceRoutes[IO](
-                               fetchTokenEndpoint,
-                               associateTokenEndpoint,
-                               deleteTokenEndpoint,
-                               new RoutesMetrics[IO](metricsRegistry)
-                             ).routes
-        exitcode <- microserviceRoutes.use { routes =>
-                      val httpServer = new HttpServer[IO](serverPort = 9003, routes)
+  private def runMicroservice(
+      sessionPoolResource: Resource[IO, SessionResource[IO, ProjectsTokensDB]],
+      args:                List[String]
+  ) = sessionPoolResource.use { sessionResource =>
+    for {
+      certificateLoader      <- CertificateLoader[IO](ApplicationLogger)
+      sentryInitializer      <- SentryInitializer[IO]()
+      metricsRegistry        <- MetricsRegistry()
+      queriesExecTimes       <- QueriesExecutionTimes(metricsRegistry)
+      fetchTokenEndpoint     <- IOFetchTokenEndpoint(sessionResource, queriesExecTimes, ApplicationLogger)
+      associateTokenEndpoint <- IOAssociateTokenEndpoint(sessionResource, queriesExecTimes, ApplicationLogger)
+      dbInitializer          <- IODbInitializer(sessionResource, queriesExecTimes, ApplicationLogger)
+      deleteTokenEndpoint    <- IODeleteTokenEndpoint(sessionResource, queriesExecTimes, ApplicationLogger)
+      microserviceRoutes = new MicroserviceRoutes[IO](
+                             fetchTokenEndpoint,
+                             associateTokenEndpoint,
+                             deleteTokenEndpoint,
+                             new RoutesMetrics[IO](metricsRegistry)
+                           ).routes
+      exitcode <- microserviceRoutes.use { routes =>
+                    val httpServer = new HttpServer[IO](serverPort = 9003, routes)
 
-                      new MicroserviceRunner(
-                        certificateLoader,
-                        sentryInitializer,
-                        dbInitializer,
-                        httpServer
-                      ).run()
-                    }
-      } yield exitcode
-    }
+                    new MicroserviceRunner(
+                      certificateLoader,
+                      sentryInitializer,
+                      dbInitializer,
+                      httpServer
+                    ).run()
+                  }
+    } yield exitcode
+  }
 }
 
 private class MicroserviceRunner(

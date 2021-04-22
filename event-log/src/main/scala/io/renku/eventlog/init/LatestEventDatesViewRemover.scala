@@ -18,39 +18,42 @@
 
 package io.renku.eventlog.init
 
-import cats.effect.Bracket
+import cats.data.Kleisli
+import cats.effect.{Async, Bracket}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, DbTransactor}
-import doobie.implicits._
+import ch.datascience.db.{DbClient, SessionResource}
 import org.typelevel.log4cats.Logger
 import io.renku.eventlog.EventLogDB
+import skunk.{Command, Session}
+import skunk.implicits.toStringOps
 
 private[eventlog] trait LatestEventDatesViewRemover[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
 private[eventlog] object LatestEventDatesViewRemover {
-  def apply[Interpretation[_]](
-      transactor: DbTransactor[Interpretation, EventLogDB],
-      logger:     Logger[Interpretation]
-  )(implicit ME:  Bracket[Interpretation, Throwable]): LatestEventDatesViewRemover[Interpretation] =
-    new LatestEventDatesViewRemoverImpl(transactor, logger)
+  def apply[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+      sessionResource: SessionResource[Interpretation, EventLogDB],
+      logger:          Logger[Interpretation]
+  )(implicit ME:       Bracket[Interpretation, Throwable]): LatestEventDatesViewRemover[Interpretation] =
+    new LatestEventDatesViewRemoverImpl(sessionResource, logger)
 }
 
-private[eventlog] class LatestEventDatesViewRemoverImpl[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB],
-    logger:     Logger[Interpretation]
-)(implicit ME:  Bracket[Interpretation, Throwable])
-    extends DbClient(maybeHistogram = None)
+private[eventlog] class LatestEventDatesViewRemoverImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+    sessionResource: SessionResource[Interpretation, EventLogDB],
+    logger:          Logger[Interpretation]
+) extends DbClient[Interpretation](maybeHistogram = None)
     with LatestEventDatesViewRemover[Interpretation] {
 
-  private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
+  override def run(): Interpretation[Unit] = sessionResource.useK {
+    Kleisli[Interpretation, Session[Interpretation], Unit] { session =>
+      for {
+        _ <- session.execute(dropView)
+        _ <- logger.info("'project_latest_event_date' view dropped")
+      } yield ()
+    }
+  }
 
-  override def run(): Interpretation[Unit] = for {
-    _ <- dropView.run transact transactor.get
-    _ <- logger.info("'project_latest_event_date' view dropped")
-  } yield ()
-
-  private lazy val dropView =
-    sql"""DROP MATERIALIZED VIEW IF EXISTS project_latest_event_date""".update
+  private lazy val dropView: Command[skunk.Void] =
+    sql"""DROP MATERIALIZED VIEW IF EXISTS project_latest_event_date""".command
 }

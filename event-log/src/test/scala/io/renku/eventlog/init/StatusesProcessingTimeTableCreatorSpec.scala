@@ -21,9 +21,9 @@ package io.renku.eventlog.init
 import cats.effect.IO
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
-import doobie.implicits._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk.implicits._
 
 class StatusesProcessingTimeTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
   protected override lazy val migrationsToRun: List[Migration] = List(
@@ -68,16 +68,16 @@ class StatusesProcessingTimeTableCreatorSpec extends AnyWordSpec with DbInitSpec
 
       tableExists("status_processing_time") shouldBe true
 
-      verifyTrue(sql"DROP INDEX idx_event_id;")
-      verifyTrue(sql"DROP INDEX idx_project_id;")
-      verifyTrue(sql"DROP INDEX idx_status;")
+      verifyTrue(sql"DROP INDEX idx_event_id;".command)
+      verifyTrue(sql"DROP INDEX idx_project_id;".command)
+      verifyTrue(sql"DROP INDEX idx_status;".command)
 
     }
   }
 
   private trait TestCase {
     val logger       = TestLogger[IO]()
-    val tableCreator = new StatusesProcessingTimeTableCreatorImpl[IO](transactor, logger)
+    val tableCreator = new StatusesProcessingTimeTableCreatorImpl[IO](sessionResource, logger)
   }
 
 }

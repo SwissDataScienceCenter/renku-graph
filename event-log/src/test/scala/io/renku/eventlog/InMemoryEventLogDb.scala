@@ -18,16 +18,17 @@
 
 package io.renku.eventlog
 
+import cats.data.Kleisli
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.SessionResource
 import com.dimafeng.testcontainers._
-import doobie.Transactor
-import doobie.free.connection.ConnectionIO
-import doobie.implicits._
-import doobie.util.fragment.Fragment
+import natchez.Trace.Implicits.noop
 import org.scalatest.Suite
 import org.testcontainers.utility.DockerImageName
+import skunk._
+import skunk.codec.all._
+import skunk.implicits._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -38,49 +39,56 @@ trait InMemoryEventLogDb extends ForAllTestContainer with TypeSerializers {
 
   private val dbConfig = new EventLogDbConfigProvider[IO].get().unsafeRunSync()
 
-  override val container: Container with JdbcDatabaseContainer = PostgreSQLContainer(
+  override val container: PostgreSQLContainer = PostgreSQLContainer(
     dockerImageNameOverride = DockerImageName.parse("postgres:9.6.19-alpine"),
-    databaseName = "event_log",
+    databaseName = dbConfig.name.value,
     username = dbConfig.user.value,
-    password = dbConfig.pass
+    password = dbConfig.pass.value
   )
 
-  lazy val transactor: DbTransactor[IO, EventLogDB] = DbTransactor[IO, EventLogDB] {
-    Transactor.fromDriverManager[IO](
-      dbConfig.driver.value,
-      container.jdbcUrl,
-      dbConfig.user.value,
-      dbConfig.pass
+  lazy val sessionResource: SessionResource[IO, EventLogDB] = new SessionResource[IO, EventLogDB](
+    Session.single(
+      host = container.host,
+      port = container.container.getMappedPort(dbConfig.port.value),
+      user = dbConfig.user.value,
+      database = dbConfig.name.value,
+      password = Some(dbConfig.pass.value)
     )
+  )
+
+  def execute[O](query: Kleisli[IO, Session[IO], O]): O =
+    sessionResource.useK(query).unsafeRunSync()
+
+  def verifyTrue(sql: Command[Void]): Unit = execute[Unit](Kleisli(session => session.execute(sql).void))
+
+  def verify(column: String, hasType: String) = execute[Boolean] {
+    Kleisli { session =>
+      val query: Query[String, String] =
+        sql"""SELECT data_type FROM information_schema.columns WHERE
+         table_name = event AND column_name = $varchar;""".query(varchar)
+      session.prepare(query).use(_.unique(column)).map(dataType => dataType == hasType).recover { case _ => false }
+    }
   }
 
-  def execute[O](query: ConnectionIO[O]): O =
-    query
-      .transact(transactor.get)
-      .unsafeRunSync()
-
-  def verifyTrue(sql: Fragment): Unit = execute {
-    sql.update.run.map(_ => ())
+  def tableExists(tableName: String): Boolean = execute[Boolean] {
+    Kleisli { session =>
+      val query: Query[String, Boolean] =
+        sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = $varchar)".query(bool)
+      session.prepare(query).use(_.unique(tableName)).recover { case _ => false }
+    }
   }
 
-  def tableExists(tableName: String): Boolean =
-    sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = $tableName)"
-      .query[Boolean]
-      .unique
-      .transact(transactor.get)
-      .recover { case _ => false }
-      .unsafeRunSync()
+  def viewExists(viewName: String): Boolean = execute[Boolean] {
+    Kleisli { session =>
+      val query: Query[Void, Boolean] = sql"select exists (select * from #$viewName)".query(bool)
+      session.unique(query).recover { case _ => false }
+    }
+  }
 
-  def viewExists(viewName: String): Boolean =
-    Fragment
-      .const(s"select exists (select * from $viewName)")
-      .query[Boolean]
-      .unique
-      .transact(transactor.get)
-      .recover { case _ => false }
-      .unsafeRunSync()
-
-  def dropTable(tableName: String): Unit = execute {
-    Fragment.const(s"DROP TABLE IF EXISTS $tableName CASCADE").update.run.map(_ => ())
+  def dropTable(tableName: String): Unit = execute[Unit] {
+    Kleisli { session =>
+      val query: Command[Void] = sql"DROP TABLE IF EXISTS #$tableName CASCADE".command
+      session.execute(query).void
+    }
   }
 }

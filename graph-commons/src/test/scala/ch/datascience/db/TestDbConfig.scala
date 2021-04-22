@@ -19,10 +19,9 @@
 package ch.datascience.db
 
 import ch.datascience.db.DBConfigProvider.DBConfig
-import ch.datascience.db.DBConfigProvider.DBConfig.Url
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.nonEmptyStrings
-import eu.timepit.refined.api.RefType
+import ch.datascience.generators.Generators.{nonEmptyStrings, positiveInts}
+import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.auto._
 
 import scala.concurrent.duration._
@@ -33,17 +32,13 @@ object TestDbConfig {
   def newDbConfig[TargetDb]: DBConfig[TargetDb] = {
     val dbName = nonEmptyStrings().map(suffix => s"db_$suffix").generateOne
     DBConfig[TargetDb](
-      driver = "org.h2.Driver",
-      url = toUrl(s"jdbc:h2:mem:$dbName;DB_CLOSE_DELAY=-1;MODE=PostgreSQL"),
+      name = Refined.unsafeApply(dbName),
+      host = "localhost",
+      port = 5432,
       user = "user",
-      pass = "",
+      pass = "test",
       connectionPool = 20,
       maxLifetime = 5 seconds
     )
   }
-
-  private def toUrl(value: String): Url =
-    RefType
-      .applyRef[Url](value)
-      .getOrElse(throw new IllegalArgumentException("Invalid db driver url value"))
 }

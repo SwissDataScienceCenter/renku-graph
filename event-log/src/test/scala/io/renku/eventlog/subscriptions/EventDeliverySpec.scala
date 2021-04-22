@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.subscriptions
 
+import cats.effect.IO
 import ch.datascience.db.SqlQuery
 import ch.datascience.events.consumers.subscriptions._
 import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
@@ -90,7 +91,7 @@ class EventDeliverySpec extends AnyWordSpec with InMemoryEventLogDbSpec with Moc
     val compoundIdExtractor: TestCompoundIdEvent => CompoundEventId = _.compoundEventId
     val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
     val delivery =
-      new EventDeliveryImpl[TestCompoundIdEvent](transactor, compoundIdExtractor, queriesExecTimes, sourceUrl)
+      new EventDeliveryImpl[IO, TestCompoundIdEvent](sessionResource, compoundIdExtractor, queriesExecTimes, sourceUrl)
   }
 
   private def addEvent(eventId: CompoundEventId): Unit = storeEvent(eventId,

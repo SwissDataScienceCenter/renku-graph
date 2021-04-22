@@ -18,23 +18,23 @@
 
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
-import cats.effect.{Bracket, IO, Timer}
+import cats.effect.{Async, Bracket, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import org.typelevel.log4cats.Logger
 import io.renku.eventlog.statuschange.commands._
 import io.renku.eventlog.statuschange.{IOUpdateCommandsRunner, StatusUpdatesRunner}
 import io.renku.eventlog.subscriptions.DispatchRecovery
 import io.renku.eventlog.{EventLogDB, EventMessage, subscriptions}
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.control.NonFatal
 
-private class DispatchRecoveryImpl[Interpretation[_]: Bracket[*[_], Throwable]](
+private class DispatchRecoveryImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     awaitingTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
     underTriplesGenerationGauge:    LabeledGauge[Interpretation, projects.Path],
     statusUpdatesRunner:            StatusUpdatesRunner[Interpretation],
@@ -85,13 +85,13 @@ private object DispatchRecovery {
 
   private val OnErrorSleep: FiniteDuration = 1 seconds
 
-  def apply(transactor:                     DbTransactor[IO, EventLogDB],
+  def apply(sessionResource:                SessionResource[IO, EventLogDB],
             awaitingTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
             underTriplesGenerationGauge:    LabeledGauge[IO, projects.Path],
             queriesExecTimes:               LabeledHistogram[IO, SqlQuery.Name],
             logger:                         Logger[IO]
   )(implicit timer:                         Timer[IO]): IO[DispatchRecovery[IO, AwaitingGenerationEvent]] = for {
-    updateCommandRunner <- IOUpdateCommandsRunner(transactor, queriesExecTimes, logger)
+    updateCommandRunner <- IOUpdateCommandsRunner(sessionResource, queriesExecTimes, logger)
   } yield new DispatchRecoveryImpl[IO](awaitingTriplesGenerationGauge,
                                        underTriplesGenerationGauge,
                                        updateCommandRunner,

@@ -21,7 +21,7 @@ package io.renku.eventlog
 import cats.effect._
 import ch.datascience.config.certificates.CertificateLoader
 import ch.datascience.config.sentry.SentryInitializer
-import ch.datascience.db.DbTransactorResource
+import ch.datascience.db.{SessionPoolResource, SessionResource}
 import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventConsumersRegistry
 import ch.datascience.http.server.HttpServer
@@ -39,6 +39,7 @@ import io.renku.eventlog.metrics._
 import io.renku.eventlog.processingstatus.IOProcessingStatusEndpoint
 import io.renku.eventlog.statuschange.IOStatusChangeEndpoint
 import io.renku.eventlog.subscriptions._
+import natchez.Trace.Implicits.noop
 import pureconfig.ConfigSource
 
 import java.util.concurrent.ConcurrentHashMap
@@ -57,19 +58,19 @@ object Microservice extends IOMicroservice {
   protected implicit override def timer: Timer[IO] = IO.timer(executionContext)
 
   override def run(args: List[String]): IO[ExitCode] = for {
-    transactorResource <- new EventLogDbConfigProvider[IO](args) map DbTransactorResource[IO, EventLogDB]
-    exitCode           <- runMicroservice(transactorResource)
+    sessionPoolResource <- new EventLogDbConfigProvider[IO]() map SessionPoolResource[IO, EventLogDB]
+    exitCode            <- runMicroservice(sessionPoolResource)
   } yield exitCode
 
-  private def runMicroservice(transactorResource: DbTransactorResource[IO, EventLogDB]) =
-    transactorResource.use { transactor =>
+  private def runMicroservice(sessionPoolResource: Resource[IO, SessionResource[IO, EventLogDB]]) =
+    sessionPoolResource.use { sessionResource =>
       for {
         certificateLoader           <- CertificateLoader[IO](ApplicationLogger)
         sentryInitializer           <- SentryInitializer[IO]()
-        dbInitializer               <- DbInitializer(transactor, ApplicationLogger)
+        dbInitializer               <- DbInitializer(sessionResource, ApplicationLogger)
         metricsRegistry             <- MetricsRegistry()
         queriesExecTimes            <- QueriesExecutionTimes(metricsRegistry)
-        statsFinder                 <- IOStatsFinder(transactor, queriesExecTimes)
+        statsFinder                 <- IOStatsFinder(sessionResource, queriesExecTimes)
         eventLogMetrics             <- IOEventLogMetrics(statsFinder, ApplicationLogger, metricsRegistry)
         awaitingGenerationGauge     <- AwaitingGenerationGauge(metricsRegistry, statsFinder, ApplicationLogger)
         awaitingTransformationGauge <- AwaitingTransformationGauge(metricsRegistry, statsFinder, ApplicationLogger)
@@ -84,13 +85,13 @@ object Microservice extends IOMicroservice {
                                    MetricsConfigProvider(),
                                    ApplicationLogger
                                  )
-        creationSubscription <- events.categories.creation.SubscriptionFactory(transactor,
+        creationSubscription <- events.categories.creation.SubscriptionFactory(sessionResource,
                                                                                awaitingGenerationGauge,
                                                                                queriesExecTimes,
                                                                                ApplicationLogger
                                 )
         zombieEventsSubscription <- events.categories.zombieevents.SubscriptionFactory(
-                                      transactor,
+                                      sessionResource,
                                       awaitingGenerationGauge,
                                       underTriplesGenerationGauge,
                                       awaitingTransformationGauge,
@@ -99,7 +100,7 @@ object Microservice extends IOMicroservice {
                                       ApplicationLogger
                                     )
         commitSyncRequestSubscription <- events.categories.commitsyncrequest.SubscriptionFactory(
-                                           transactor,
+                                           sessionResource,
                                            queriesExecTimes,
                                            ApplicationLogger
                                          )
@@ -109,15 +110,15 @@ object Microservice extends IOMicroservice {
                                                                    commitSyncRequestSubscription
                                   )
         eventEndpoint            <- EventEndpoint(eventConsumersRegistry)
-        processingStatusEndpoint <- IOProcessingStatusEndpoint(transactor, queriesExecTimes, ApplicationLogger)
-        eventsPatchingEndpoint <- IOEventsPatchingEndpoint(transactor,
+        processingStatusEndpoint <- IOProcessingStatusEndpoint(sessionResource, queriesExecTimes, ApplicationLogger)
+        eventsPatchingEndpoint <- IOEventsPatchingEndpoint(sessionResource,
                                                            awaitingGenerationGauge,
                                                            underTriplesGenerationGauge,
                                                            queriesExecTimes,
                                                            ApplicationLogger
                                   )
         statusChangeEndpoint <- IOStatusChangeEndpoint(
-                                  transactor,
+                                  sessionResource,
                                   awaitingGenerationGauge,
                                   underTriplesGenerationGauge,
                                   awaitingTransformationGauge,
@@ -126,7 +127,7 @@ object Microservice extends IOMicroservice {
                                   ApplicationLogger
                                 )
         eventProducersRegistry <- EventProducersRegistry(
-                                    transactor,
+                                    sessionResource,
                                     awaitingGenerationGauge,
                                     underTriplesGenerationGauge,
                                     awaitingTransformationGauge,
@@ -136,7 +137,7 @@ object Microservice extends IOMicroservice {
                                     ApplicationLogger
                                   )
         subscriptionsEndpoint <- IOSubscriptionsEndpoint(eventProducersRegistry, ApplicationLogger)
-        eventDetailsEndpoint  <- EventDetailsEndpoint(transactor, queriesExecTimes, ApplicationLogger)
+        eventDetailsEndpoint  <- EventDetailsEndpoint(sessionResource, queriesExecTimes, ApplicationLogger)
         microserviceRoutes = new MicroserviceRoutes[IO](
                                eventEndpoint,
                                processingStatusEndpoint,

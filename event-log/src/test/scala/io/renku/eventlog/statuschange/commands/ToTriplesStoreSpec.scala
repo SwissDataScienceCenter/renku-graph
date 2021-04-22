@@ -191,7 +191,7 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
     val processingTime              = eventProcessingTimes.generateSome
     val eventBatchDate              = batchDates.generateOne
 
-    val commandRunner = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
+    val commandRunner = new StatusUpdatesRunnerImpl(sessionResource, histogram, TestLogger[IO]())
 
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()

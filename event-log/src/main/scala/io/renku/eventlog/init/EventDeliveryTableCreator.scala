@@ -18,66 +18,69 @@
 
 package io.renku.eventlog.init
 
-import cats.effect.Bracket
-import ch.datascience.db.DbTransactor
+import cats.data.Kleisli
+import cats.effect.{Async, Bracket}
+import ch.datascience.db.SessionResource
 import org.typelevel.log4cats.Logger
 import io.renku.eventlog.EventLogDB
+import skunk._
+import skunk.codec.all.bool
+import skunk.implicits._
 
 private trait EventDeliveryTableCreator[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
-private class EventDeliveryTableCreatorImpl[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB],
-    logger:     Logger[Interpretation]
-)(implicit ME:  Bracket[Interpretation, Throwable])
-    extends EventDeliveryTableCreator[Interpretation] {
+private class EventDeliveryTableCreatorImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+    sessionResource: SessionResource[Interpretation, EventLogDB],
+    logger:          Logger[Interpretation]
+) extends EventDeliveryTableCreator[Interpretation] {
 
   import cats.syntax.all._
-  import doobie.implicits._
-  private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
 
-  override def run(): Interpretation[Unit] =
-    checkTableExists flatMap {
-      case true  => logger info "'event_delivery' table exists"
-      case false => createTable
+  override def run(): Interpretation[Unit] = sessionResource.useK {
+    checkTableExists >>= {
+      case true  => Kleisli.liftF(logger info "'event_delivery' table exists")
+      case false => createTable()
     }
+  }
 
-  private def checkTableExists: Interpretation[Boolean] =
-    sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_delivery')"
-      .query[Boolean]
-      .unique
-      .transact(transactor.get)
-      .recover { case _ => false }
+  private lazy val checkTableExists: Kleisli[Interpretation, Session[Interpretation], Boolean] = {
+    val query: Query[skunk.Void, Boolean] =
+      sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_delivery')"
+        .query(bool)
+    Kleisli(_.unique(query).recover { case _ => false })
+  }
 
-  private def createTable = for {
-    _ <- createTableSql.run transact transactor.get
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id    ON event_delivery(event_id)")
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id  ON event_delivery(project_id)")
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_delivery_id ON event_delivery(delivery_id)")
-    _ <- logger info "'event_delivery' table created"
-    _ <- foreignKeySql.run transact transactor.get
-  } yield ()
+  private def createTable(): Kleisli[Interpretation, Session[Interpretation], Unit] =
+    for {
+      _ <- execute(createTableSql)
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id    ON event_delivery(event_id)".command)
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id  ON event_delivery(project_id)".command)
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_delivery_id ON event_delivery(delivery_id)".command)
+      _ <- Kleisli.liftF(logger info "'event_delivery' table created")
+      _ <- execute(foreignKeySql)
+    } yield ()
 
-  private lazy val createTableSql = sql"""
+  private lazy val createTableSql: Command[Void] = sql"""
     CREATE TABLE IF NOT EXISTS event_delivery(
       event_id     VARCHAR     NOT NULL,
       project_id   INT4        NOT NULL,
       delivery_id  VARCHAR(19) NOT NULL,
       PRIMARY KEY (event_id, project_id)
     )
-    """.update
+    """.command
 
-  private lazy val foreignKeySql = sql"""
+  private lazy val foreignKeySql: Command[Void] = sql"""
     ALTER TABLE event_delivery
     ADD CONSTRAINT fk_event FOREIGN KEY (event_id, project_id) REFERENCES event (event_id, project_id)
-  """.update
+  """.command
 }
 
 private object EventDeliveryTableCreator {
-  def apply[Interpretation[_]](
-      transactor: DbTransactor[Interpretation, EventLogDB],
-      logger:     Logger[Interpretation]
-  )(implicit ME:  Bracket[Interpretation, Throwable]): EventDeliveryTableCreator[Interpretation] =
-    new EventDeliveryTableCreatorImpl(transactor, logger)
+  def apply[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+      sessionResource: SessionResource[Interpretation, EventLogDB],
+      logger:          Logger[Interpretation]
+  ): EventDeliveryTableCreator[Interpretation] =
+    new EventDeliveryTableCreatorImpl(sessionResource, logger)
 }

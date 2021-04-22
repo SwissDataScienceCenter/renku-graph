@@ -18,16 +18,21 @@
 
 package io.renku.eventlog.init
 
-import cats.effect.Bracket
+import cats.data.Kleisli
+import cats.effect.{Async, Bracket}
 import cats.syntax.all._
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.SessionResource
+import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
-import doobie.implicits._
 import org.typelevel.log4cats.Logger
 import io.circe.parser._
 import io.circe.{Decoder, HCursor}
-import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.{EventLogDB, TypeSerializers}
+import skunk._
+import skunk.implicits._
+import skunk.codec.all._
+import skunk.data.Completion
 
 import scala.util.control.NonFatal
 
@@ -36,66 +41,66 @@ private trait ProjectPathAdder[Interpretation[_]] {
 }
 
 private object ProjectPathAdder {
-  def apply[Interpretation[_]](
-      transactor: DbTransactor[Interpretation, EventLogDB],
-      logger:     Logger[Interpretation]
-  )(implicit ME:  Bracket[Interpretation, Throwable]): ProjectPathAdder[Interpretation] =
-    new ProjectPathAdderImpl(transactor, logger)
+  def apply[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+      sessionResource: SessionResource[Interpretation, EventLogDB],
+      logger:          Logger[Interpretation]
+  ): ProjectPathAdder[Interpretation] =
+    new ProjectPathAdderImpl(sessionResource, logger)
 }
 
-private class ProjectPathAdderImpl[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB],
-    logger:     Logger[Interpretation]
-)(implicit ME:  Bracket[Interpretation, Throwable])
-    extends ProjectPathAdder[Interpretation]
-    with EventTableCheck[Interpretation] {
+private class ProjectPathAdderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+    sessionResource: SessionResource[Interpretation, EventLogDB],
+    logger:          Logger[Interpretation]
+) extends ProjectPathAdder[Interpretation]
+    with EventTableCheck
+    with TypeSerializers {
 
-  private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
-
-  override def run(): Interpretation[Unit] =
+  override def run(): Interpretation[Unit] = sessionResource.useK {
     whenEventTableExists(
-      logger info "'project_path' column adding skipped",
-      otherwise = checkColumnExists flatMap {
-        case true  => logger info "'project_path' column exists"
+      Kleisli.liftF(logger info "'project_path' column adding skipped"),
+      otherwise = checkColumnExists >>= {
+        case true  => Kleisli.liftF(logger info "'project_path' column exists")
         case false => addColumn()
       }
     )
+  }
 
-  private def checkColumnExists: Interpretation[Boolean] =
-    sql"select project_path from event_log limit 1"
-      .query[String]
-      .option
-      .transact(transactor.get)
-      .map(_ => true)
-      .recover { case _ => false }
+  private lazy val checkColumnExists: Kleisli[Interpretation, Session[Interpretation], Boolean] = {
+    val query: Query[Void, String] = sql"select project_path from event_log limit 1".query(varchar)
+    Kleisli(
+      _.option(query)
+        .map(_ => true)
+        .recover { case _ => false }
+    )
+  }
 
-  private def addColumn() = {
+  private def addColumn(): Kleisli[Interpretation, Session[Interpretation], Unit] = {
     for {
-      _                  <- execute(sql"ALTER TABLE event_log ADD COLUMN IF NOT EXISTS project_path VARCHAR")
+      _                  <- execute(sql"ALTER TABLE event_log ADD COLUMN IF NOT EXISTS project_path VARCHAR".command)
       projectIdsAndPaths <- findDistinctProjects
       _                  <- updatePaths(projectIdsAndPaths)
-      _                  <- execute(sql"ALTER TABLE event_log ALTER COLUMN project_path SET NOT NULL")
-      _                  <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_path ON event_log(project_path)")
-      _                  <- logger.info("'project_path' column added")
+      _                  <- execute(sql"ALTER TABLE event_log ALTER COLUMN project_path SET NOT NULL".command)
+      _                  <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_path ON event_log(project_path)".command)
+      _                  <- Kleisli.liftF(logger.info("'project_path' column added"))
     } yield ()
   } recoverWith logging
 
-  private def findDistinctProjects: Interpretation[List[(Id, Path)]] =
-    sql"select min(event_body) from event_log group by project_id;"
-      .query[String]
-      .to[List]
-      .transact(transactor.get)
-      .flatMap(toListOfProjectIdAndPath)
+  private lazy val findDistinctProjects: Kleisli[Interpretation, Session[Interpretation], List[(Id, Path)]] = {
+
+    val query: Query[Void, String] = sql"select min(event_body) from event_log group by project_id;".query(text)
+    Kleisli(_.execute(query).flatMap(toListOfProjectIdAndPath))
+  }
 
   private def toListOfProjectIdAndPath(bodies: List[String]): Interpretation[List[(Id, Path)]] =
     bodies.map(parseToProjectIdAndPath).sequence
 
-  private def parseToProjectIdAndPath(body: String): Interpretation[(Id, Path)] = ME.fromEither {
-    for {
-      json  <- parse(body)
-      tuple <- json.as[(Id, Path)]
-    } yield tuple
-  }
+  private def parseToProjectIdAndPath(body: String): Interpretation[(Id, Path)] =
+    Bracket[Interpretation, Throwable].fromEither {
+      for {
+        json  <- parse(body)
+        tuple <- json.as[(Id, Path)]
+      } yield tuple
+    }
 
   private implicit lazy val projectIdAndPathDecoder: Decoder[(Id, Path)] = (cursor: HCursor) =>
     for {
@@ -103,20 +108,27 @@ private class ProjectPathAdderImpl[Interpretation[_]](
       path <- cursor.downField("project").downField("path").as[Path]
     } yield id -> path
 
-  private def updatePaths(projectIdsAndPaths: List[(Id, Path)]): Interpretation[Unit] =
+  private def updatePaths(
+      projectIdsAndPaths: List[(Id, Path)]
+  ): Kleisli[Interpretation, Session[Interpretation], Unit] =
     projectIdsAndPaths
       .map(toSqlUpdate)
       .sequence
       .map(_ => ())
 
-  private def toSqlUpdate: ((Id, Path)) => Interpretation[Unit] = { case (projectId, projectPath) =>
-    sql"update event_log set project_path = ${projectPath.value} where project_id = ${projectId.value}".update.run
-      .transact(transactor.get)
-      .map(_ => ())
+  private lazy val toSqlUpdate: ((Id, Path)) => Kleisli[Interpretation, Session[Interpretation], Unit] = {
+    case (projectId, projectPath) =>
+      val query: Command[projects.Path ~ projects.Id] =
+        sql"update event_log set project_path = $projectPathEncoder where project_id = $projectIdEncoder".command
+      Kleisli(_.prepare(query).use(_.execute(projectPath ~ projectId)).void)
   }
 
-  private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    logger.error(exception)("'project_path' column adding failure")
-    ME.raiseError(exception)
+  private lazy val logging: PartialFunction[Throwable, Kleisli[Interpretation, Session[Interpretation], Unit]] = {
+    case NonFatal(exception) =>
+      Kleisli.liftF(
+        logger
+          .error(exception)("'project_path' column adding failure")
+          .flatMap(_ => exception.raiseError[Interpretation, Unit])
+      )
   }
 }

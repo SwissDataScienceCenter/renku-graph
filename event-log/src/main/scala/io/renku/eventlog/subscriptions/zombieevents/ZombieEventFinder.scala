@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.data.OptionT
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 import io.renku.eventlog.EventLogDB
@@ -54,7 +54,7 @@ private class ZombieEventFinder[Interpretation[_]: MonadError[*[_], Throwable]](
 private object ZombieEventFinder {
 
   def apply(
-      transactor:       DbTransactor[IO, EventLogDB],
+      sessionResource:  SessionResource[IO, EventLogDB],
       queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
       logger:           Logger[IO]
   )(implicit
@@ -62,10 +62,10 @@ private object ZombieEventFinder {
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[EventFinder[IO, ZombieEvent]] = for {
-    longProcessingEventFinder <- LongProcessingEventFinder(transactor, queriesExecTimes)
-    lostSubscriberEventFinder <- LostSubscriberEventFinder(transactor, queriesExecTimes)
-    zombieNodesCleaner        <- ZombieNodesCleaner(transactor, queriesExecTimes, logger)
-    lostZombieEventFinder     <- LostZombieEventFinder(transactor, queriesExecTimes)
+    longProcessingEventFinder <- LongProcessingEventFinder(sessionResource, queriesExecTimes)
+    lostSubscriberEventFinder <- LostSubscriberEventFinder(sessionResource, queriesExecTimes)
+    zombieNodesCleaner        <- ZombieNodesCleaner(sessionResource, queriesExecTimes, logger)
+    lostZombieEventFinder     <- LostZombieEventFinder(sessionResource, queriesExecTimes)
   } yield new ZombieEventFinder[IO](longProcessingEventFinder,
                                     lostSubscriberEventFinder,
                                     zombieNodesCleaner,

@@ -18,32 +18,29 @@
 
 package io.renku.eventlog.init
 
-import cats.effect.Bracket
+import cats.data.Kleisli
+import cats.effect.{Async, Bracket}
 import cats.syntax.all._
-import ch.datascience.db.DbTransactor
-import doobie.implicits._
-import io.renku.eventlog.EventLogDB
+import skunk.codec.all._
+import skunk.implicits.toStringOps
+import skunk.{Query, Session}
 
-private trait EventTableCheck[Interpretation[_]] {
+private trait EventTableCheck {
 
-  def whenEventTableExists(
-      eventTableExistsMessage: => Interpretation[Unit],
-      otherwise:               => Interpretation[Unit]
-  )(implicit
-      transactor: DbTransactor[Interpretation, EventLogDB],
-      ME:         Bracket[Interpretation, Throwable]
-  ): Interpretation[Unit] = checkTableExists flatMap {
+  def whenEventTableExists[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+      eventTableExistsMessage: => Kleisli[Interpretation, Session[Interpretation], Unit],
+      otherwise:               => Kleisli[Interpretation, Session[Interpretation], Unit]
+  ): Kleisli[Interpretation, Session[Interpretation], Unit] = checkTableExists flatMap {
     case true  => eventTableExistsMessage
     case false => otherwise
   }
 
-  private def checkTableExists(implicit
-      transactor: DbTransactor[Interpretation, EventLogDB],
-      ME:         Bracket[Interpretation, Throwable]
-  ): Interpretation[Boolean] =
-    sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event')"
-      .query[Boolean]
-      .unique
-      .transact(transactor.get)
-      .recover { case _ => false }
+  private def checkTableExists[Interpretation[_]: Async: Bracket[*[_], Throwable]]
+      : Kleisli[Interpretation, Session[Interpretation], Boolean] = {
+    val query: Query[skunk.Void, Boolean] = sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event')"
+      .query(bool)
+    Kleisli[Interpretation, Session[Interpretation], Boolean] { session =>
+      session.unique(query).recover { case _ => false }
+    }
+  }
 }

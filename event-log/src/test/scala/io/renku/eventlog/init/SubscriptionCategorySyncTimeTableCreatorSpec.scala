@@ -23,7 +23,7 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import doobie.implicits._
+import skunk.implicits._
 
 class SubscriptionCategorySyncTimeTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
   protected override lazy val migrationsToRun: List[Migration] = List(
@@ -67,16 +67,16 @@ class SubscriptionCategorySyncTimeTableCreatorSpec extends AnyWordSpec with DbIn
 
       tableExists("subscription_category_sync_time") shouldBe true
 
-      verifyTrue(sql"DROP INDEX idx_project_id;")
-      verifyTrue(sql"DROP INDEX idx_category_name;")
-      verifyTrue(sql"DROP INDEX idx_last_synced;")
+      verifyTrue(sql"DROP INDEX idx_project_id;".command)
+      verifyTrue(sql"DROP INDEX idx_category_name;".command)
+      verifyTrue(sql"DROP INDEX idx_last_synced;".command)
 
     }
   }
 
   private trait TestCase {
     val logger       = TestLogger[IO]()
-    val tableCreator = new SubscriptionCategorySyncTimeTableCreatorImpl[IO](transactor, logger)
+    val tableCreator = new SubscriptionCategorySyncTimeTableCreatorImpl[IO](sessionResource, logger)
   }
 
 }

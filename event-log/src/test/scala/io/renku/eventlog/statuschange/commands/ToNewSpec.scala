@@ -172,7 +172,7 @@ class ToNewSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory
     val eventBatchDate = batchDates.generateOne
     val processingTime = eventProcessingTimes.generateSome
 
-    val commandRunner = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
+    val commandRunner = new StatusUpdatesRunnerImpl(sessionResource, histogram, TestLogger[IO]())
 
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()

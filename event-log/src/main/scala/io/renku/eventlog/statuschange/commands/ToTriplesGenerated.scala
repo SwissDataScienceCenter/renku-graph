@@ -20,27 +20,29 @@ package io.renku.eventlog.statuschange.commands
 
 import cats.data.EitherT.fromEither
 import cats.data.{EitherT, Kleisli, NonEmptyList}
-import cats.effect.{Bracket, Sync}
+import cats.effect.{Async, Bracket, Sync}
 import cats.syntax.all._
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples, TriplesGenerated}
-import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
+import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.{SchemaVersion, events, projects}
 import ch.datascience.metrics.LabeledGauge
-import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.circe._
 import io.renku.eventlog.statuschange.ChangeStatusRequest.{EventAndPayloadRequest, EventOnlyRequest}
 import io.renku.eventlog.statuschange.CommandFindingResult._
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 import io.renku.eventlog.statuschange.{ChangeStatusRequest, CommandFindingResult}
-import io.renku.eventlog.{EventLogDB, EventPayload, TypeSerializers}
+import io.renku.eventlog.{EventLogDB, EventPayload, ExecutionDate, TypeSerializers}
+import skunk.data.Completion
+import skunk.implicits._
+import skunk.{Command, Session, ~, _}
 
 import java.time.Instant
 
 trait ToTriplesGenerated[Interpretation[_]] extends ChangeStatusCommand[Interpretation]
 
-final case class GeneratingToTriplesGenerated[Interpretation[_]: Bracket[*[_], Throwable]](
+final case class GeneratingToTriplesGenerated[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     eventId:                     CompoundEventId,
     payload:                     EventPayload,
     schemaVersion:               SchemaVersion,
@@ -52,8 +54,8 @@ final case class GeneratingToTriplesGenerated[Interpretation[_]: Bracket[*[_], T
 
   override lazy val status: events.EventStatus = TriplesGenerated
 
-  override def queries: NonEmptyList[SqlQuery[Int]] = NonEmptyList(
-    SqlQuery(
+  override def queries: NonEmptyList[SqlQuery[Interpretation, Int]] = NonEmptyList(
+    SqlQuery[Interpretation, Int](
       query = updateStatus,
       name = "generating_triples->triples_generated"
     ),
@@ -65,31 +67,52 @@ final case class GeneratingToTriplesGenerated[Interpretation[_]: Bracket[*[_], T
     )
   )
 
-  private lazy val updateStatus = sql"""|UPDATE event
-                                        |SET status = $status, execution_date = ${now()}
-                                        |WHERE event_id = ${eventId.id} 
-                                        |  AND project_id = ${eventId.projectId} 
-                                        |  AND status = ${GeneratingTriples: EventStatus}
-                                        |""".stripMargin.update.run
-
-  private lazy val upsertEventPayload = sql"""|INSERT INTO
-                                              |event_payload (event_id, project_id, payload, schema_version)
-                                              |VALUES (${eventId.id},  ${eventId.projectId}, $payload, $schemaVersion)
-                                              |ON CONFLICT (event_id, project_id, schema_version)
-                                              |DO UPDATE SET payload = EXCLUDED.payload;
-                                              |""".stripMargin.update.run
-
-  override def updateGauges(updateResult: UpdateResult)(implicit
-      transactor:                         DbTransactor[Interpretation, EventLogDB]
-  ): Interpretation[Unit] = updateResult match {
-    case UpdateResult.Updated =>
-      for {
-        path <- findProjectPath(eventId)
-        _    <- awaitingTransformationGauge increment path
-        _    <- underTriplesGenerationGauge decrement path
-      } yield ()
-    case _ => ().pure[Interpretation]
+  private lazy val updateStatus = Kleisli[Interpretation, Session[Interpretation], Int] { session =>
+    val query: Command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus] =
+      sql"""UPDATE event
+            SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
+            WHERE event_id = $eventIdEncoder
+              AND project_id = $projectIdEncoder
+              AND status = $eventStatusEncoder;
+      """.command
+    session
+      .prepare(query)
+      .use(_.execute(status ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ GeneratingTriples))
+      .flatMap {
+        case Completion.Update(n) => n.pure[Interpretation]
+        case completion =>
+          new RuntimeException(
+            s"generating_triples->triples_generated time query failed with completion status $completion"
+          ).raiseError[Interpretation, Int]
+      }
   }
+
+  private lazy val upsertEventPayload = Kleisli[Interpretation, Session[Interpretation], Int] { session =>
+    val query: Command[EventId ~ projects.Id ~ EventPayload ~ SchemaVersion] =
+      sql"""
+            INSERT INTO event_payload (event_id, project_id, payload, schema_version)
+            VALUES ($eventIdEncoder,  $projectIdEncoder, $eventPayloadEncoder, $schemaVersionEncoder)
+            ON CONFLICT (event_id, project_id, schema_version)
+            DO UPDATE SET payload = EXCLUDED.payload;
+          """.command
+    session.prepare(query).use(_.execute(eventId.id ~ eventId.projectId ~ payload ~ schemaVersion)).flatMap {
+      case Completion.Insert(n) => n.pure[Interpretation]
+      case completion =>
+        new RuntimeException(s"upsert_generated_triples time query failed with completion status $completion")
+          .raiseError[Interpretation, Int]
+    }
+  }
+
+  override def updateGauges(updateResult: UpdateResult): Kleisli[Interpretation, Session[Interpretation], Unit] =
+    updateResult match {
+      case UpdateResult.Updated =>
+        for {
+          path <- findProjectPath(eventId)
+          _    <- Kleisli.liftF(awaitingTransformationGauge increment path)
+          _    <- Kleisli.liftF(underTriplesGenerationGauge decrement path)
+        } yield ()
+      case _ => Kleisli.pure(())
+    }
 }
 
 final case class TransformingToTriplesGenerated[Interpretation[_]: Bracket[*[_], Throwable]](
@@ -101,39 +124,52 @@ final case class TransformingToTriplesGenerated[Interpretation[_]: Bracket[*[_],
 
   override lazy val status: events.EventStatus = TriplesGenerated
 
-  override def queries: NonEmptyList[SqlQuery[Int]] = NonEmptyList.of(
+  override def queries: NonEmptyList[SqlQuery[Interpretation, Int]] = NonEmptyList.of(
     SqlQuery(
       query = updateStatus,
       name = "transforming_triples->triples_generated"
     )
   )
 
-  private lazy val updateStatus = sql"""|UPDATE event
-                                        |SET status = $status, execution_date = ${now()}
-                                        |WHERE event_id = ${eventId.id} 
-                                        |  AND project_id = ${eventId.projectId} 
-                                        |  AND status = ${TransformingTriples: EventStatus}
-                                        |""".stripMargin.update.run
-
-  override def updateGauges(updateResult: UpdateResult)(implicit
-      transactor:                         DbTransactor[Interpretation, EventLogDB]
-  ): Interpretation[Unit] = updateResult match {
-    case UpdateResult.Updated =>
-      for {
-        path <- findProjectPath(eventId)
-        _    <- awaitingTransformationGauge increment path
-        _    <- underTriplesTransformationGauge decrement path
-      } yield ()
-    case _ => ().pure[Interpretation]
+  private lazy val updateStatus = Kleisli[Interpretation, Session[Interpretation], Int] { session =>
+    val query: Command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus] =
+      sql"""
+      UPDATE event
+      SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
+      WHERE event_id = $eventIdEncoder
+        AND project_id = $projectIdEncoder
+        AND status = $eventStatusEncoder;
+      """.command
+    session
+      .prepare(query)
+      .use(_.execute(status ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ TransformingTriples))
+      .flatMap {
+        case Completion.Update(n) => n.pure[Interpretation]
+        case completion =>
+          new RuntimeException(
+            s"generating_triples->triples_generated time query failed with completion status $completion"
+          ).raiseError[Interpretation, Int]
+      }
   }
+
+  override def updateGauges(updateResult: UpdateResult): Kleisli[Interpretation, Session[Interpretation], Unit] =
+    updateResult match {
+      case UpdateResult.Updated =>
+        for {
+          path <- findProjectPath(eventId)
+          _    <- Kleisli.liftF(awaitingTransformationGauge increment path)
+          _    <- Kleisli.liftF(underTriplesTransformationGauge decrement path)
+        } yield ()
+      case _ => Kleisli.pure(())
+    }
 
   override val maybeProcessingTime: Option[EventProcessingTime] = None
 }
 
 private[statuschange] object ToTriplesGenerated extends TypeSerializers {
 
-  def factory[Interpretation[_]: Sync: Bracket[*[_], Throwable]](
-      transactor:                      DbTransactor[Interpretation, EventLogDB],
+  def factory[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+      sessionResource:                 SessionResource[Interpretation, EventLogDB],
       underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
       underTriplesGenerationGauge:     LabeledGauge[Interpretation, projects.Path],
       awaitingTransformationGauge:     LabeledGauge[Interpretation, projects.Path]
@@ -141,7 +177,7 @@ private[statuschange] object ToTriplesGenerated extends TypeSerializers {
     case EventAndPayloadRequest(_, TriplesGenerated, None, _) =>
       (PayloadMalformed("No processing time provided"): CommandFindingResult).pure[Interpretation]
     case EventAndPayloadRequest(eventId, TriplesGenerated, Some(processingTime), payload) =>
-      findEventStatus[Interpretation](eventId, transactor).flatMap {
+      findEventStatus[Interpretation](eventId, sessionResource).flatMap {
         case GeneratingTriples =>
           {
             for {
@@ -161,7 +197,7 @@ private[statuschange] object ToTriplesGenerated extends TypeSerializers {
         case _ => NotSupported.pure[Interpretation].widen[CommandFindingResult]
       }
     case EventOnlyRequest(eventId, TriplesGenerated, _, _) =>
-      findEventStatus[Interpretation](eventId, transactor).map {
+      findEventStatus[Interpretation](eventId, sessionResource).map {
         case TransformingTriples =>
           CommandFound(
             TransformingToTriplesGenerated[Interpretation](eventId,
@@ -184,22 +220,25 @@ private[statuschange] object ToTriplesGenerated extends TypeSerializers {
   ): EitherT[Interpretation, CommandFindingResult, Json] =
     EitherT.fromEither[Interpretation](parser.parse(payloadPartBody).leftMap(e => PayloadMalformed(e.getMessage)))
 
-  private implicit val payloadDecoder: Decoder[(SchemaVersion, EventPayload)] = (cursor: HCursor) =>
+  private implicit val payloadDecoder: io.circe.Decoder[(SchemaVersion, EventPayload)] = (cursor: HCursor) =>
     for {
       schemaVersion <- cursor.downField("schemaVersion").as[SchemaVersion]
       payload       <- cursor.downField("payload").as[EventPayload]
     } yield (schemaVersion, payload)
 
   private def findEventStatus[Interpretation[_]: Sync: Bracket[*[_], Throwable]](
-      eventId:    CompoundEventId,
-      transactor: DbTransactor[Interpretation, EventLogDB]
-  ): Interpretation[EventStatus] =
-    sql"""|SELECT status
-          |FROM event
-          |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId}
-          |""".stripMargin
-      .query[EventStatus]
-      .unique
-      .transact(transactor.get)
+      eventId:         CompoundEventId,
+      sessionResource: SessionResource[Interpretation, EventLogDB]
+  ): Interpretation[EventStatus] = sessionResource.useK {
+    val query: Query[EventId ~ projects.Id, EventStatus] =
+      sql"""
+            SELECT status
+            FROM event
+            WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
+            """.query(eventStatusDecoder)
+    Kleisli[Interpretation, Session[Interpretation], EventStatus](session =>
+      session.prepare(query).use(_.unique(eventId.id ~ eventId.projectId))
+    )
+  }
 
 }

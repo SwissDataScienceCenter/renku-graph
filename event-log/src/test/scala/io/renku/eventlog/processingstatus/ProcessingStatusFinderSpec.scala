@@ -123,7 +123,7 @@ class ProcessingStatusFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec
   private trait TestCase {
     val projectId              = projectIds.generateOne
     val queriesExecTimes       = TestLabeledHistogram[SqlQuery.Name]("query_id")
-    val processingStatusFinder = new ProcessingStatusFinderImpl(transactor, queriesExecTimes)
+    val processingStatusFinder = new ProcessingStatusFinderImpl(sessionResource, queriesExecTimes)
 
     def storeEvents(projectId: Id, batchDate: BatchDate, statuses: NonEmptyList[EventStatus]) =
       statuses map {

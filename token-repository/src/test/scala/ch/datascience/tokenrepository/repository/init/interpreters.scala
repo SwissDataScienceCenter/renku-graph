@@ -19,12 +19,12 @@
 package ch.datascience.tokenrepository.repository.init
 
 import cats.effect.IO
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.SessionResource
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import org.typelevel.log4cats.Logger
 
 abstract class IODbInitializer(projectPathAdder:         ProjectPathAdder[IO],
                                duplicateProjectsRemover: DuplicateProjectsRemover[IO],
-                               transactor:               DbTransactor[IO, ProjectsTokensDB],
+                               sessionResource:          SessionResource[IO, ProjectsTokensDB],
                                logger:                   Logger[IO]
-) extends DbInitializer(projectPathAdder, duplicateProjectsRemover, transactor, logger)
+) extends DbInitializer(projectPathAdder, duplicateProjectsRemover, sessionResource, logger)

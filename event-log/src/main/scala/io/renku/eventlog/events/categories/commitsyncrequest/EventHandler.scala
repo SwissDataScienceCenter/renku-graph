@@ -22,15 +22,15 @@ import cats.MonadError
 import cats.data.EitherT.fromEither
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult}
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.metrics.LabeledHistogram
-import org.typelevel.log4cats.Logger
 import io.circe.Decoder
 import io.renku.eventlog.EventLogDB
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
@@ -74,7 +74,7 @@ private class EventHandler[Interpretation[_]: MonadError[*[_], Throwable]](
 }
 
 private object EventHandler {
-  def apply(transactor:       DbTransactor[IO, EventLogDB],
+  def apply(sessionResource:  SessionResource[IO, EventLogDB],
             queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
             logger:           Logger[IO]
   )(implicit
@@ -82,6 +82,6 @@ private object EventHandler {
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[EventHandler[IO]] = for {
-    commitSyncForcer <- CommitSyncForcer(transactor, queriesExecTimes)
+    commitSyncForcer <- CommitSyncForcer(sessionResource, queriesExecTimes)
   } yield new EventHandler[IO](categoryName, commitSyncForcer, logger)
 }

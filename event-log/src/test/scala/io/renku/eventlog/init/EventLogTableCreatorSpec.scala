@@ -21,9 +21,9 @@ package io.renku.eventlog.init
 import cats.effect.IO
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
-import doobie.implicits._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk.implicits._
 
 class EventLogTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
 
@@ -78,17 +78,17 @@ class EventLogTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.M
 
       tableExists("event_log") shouldBe true
 
-      verifyTrue(sql"DROP INDEX idx_project_id;")
-      verifyTrue(sql"DROP INDEX idx_event_id;")
-      verifyTrue(sql"DROP INDEX idx_status;")
-      verifyTrue(sql"DROP INDEX idx_execution_date;")
-      verifyTrue(sql"DROP INDEX idx_event_date;")
-      verifyTrue(sql"DROP INDEX idx_created_date;")
+      verifyTrue(sql"DROP INDEX idx_project_id;".command)
+      verifyTrue(sql"DROP INDEX idx_event_id;".command)
+      verifyTrue(sql"DROP INDEX idx_status;".command)
+      verifyTrue(sql"DROP INDEX idx_execution_date;".command)
+      verifyTrue(sql"DROP INDEX idx_event_date;".command)
+      verifyTrue(sql"DROP INDEX idx_created_date;".command)
     }
   }
 
   private trait TestCase {
     val logger       = TestLogger[IO]()
-    val tableCreator = new EventLogTableCreatorImpl[IO](transactor, logger)
+    val tableCreator = new EventLogTableCreatorImpl[IO](sessionResource, logger)
   }
 }

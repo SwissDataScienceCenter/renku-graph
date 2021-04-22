@@ -18,26 +18,27 @@
 
 package io.renku.eventlog.statuschange.commands
 
-import cats.MonadError
 import cats.data.{Kleisli, NonEmptyList}
-import cats.effect.{Bracket, Sync}
+import cats.effect.{Async, Bracket}
 import cats.syntax.all._
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.SqlQuery
 import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
+import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
-import doobie.implicits._
 import eu.timepit.refined.auto._
-import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.ExecutionDate
 import io.renku.eventlog.statuschange.ChangeStatusRequest.EventOnlyRequest
 import io.renku.eventlog.statuschange.CommandFindingResult.{CommandFound, NotSupported}
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 import io.renku.eventlog.statuschange.{ChangeStatusRequest, CommandFindingResult}
+import skunk._
+import skunk.data.Completion
+import skunk.implicits._
 
 import java.time.Instant
 
-final case class ToNew[Interpretation[_]: Bracket[*[_], Throwable]](
+final case class ToNew[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     eventId:                        CompoundEventId,
     awaitingTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
     underTriplesGenerationGauge:    LabeledGauge[Interpretation, projects.Path],
@@ -47,31 +48,44 @@ final case class ToNew[Interpretation[_]: Bracket[*[_], Throwable]](
 
   override lazy val status: EventStatus = New
 
-  override def queries: NonEmptyList[SqlQuery[Int]] = NonEmptyList.of(
+  override def queries: NonEmptyList[SqlQuery[Interpretation, Int]] = NonEmptyList.of(
     SqlQuery(
-      sql"""|UPDATE event 
-            |SET status = $status, execution_date = ${now()}
-            |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${GeneratingTriples: EventStatus}
-            |""".stripMargin.update.run,
+      Kleisli { session =>
+        val query: Command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus] =
+          sql"""UPDATE event
+                SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
+                WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND status = $eventStatusEncoder
+             """.command
+        session
+          .prepare(query)
+          .use(_.execute(status ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ GeneratingTriples))
+          .flatMap {
+            case Completion.Update(n) => n.pure[Interpretation]
+            case completion =>
+              new RuntimeException(
+                s"generating_triples->new time query failed with completion status $completion"
+              ).raiseError[Interpretation, Int]
+          }
+      },
       name = "generating_triples->new"
     )
   )
 
   override def updateGauges(
-      updateResult:      UpdateResult
-  )(implicit transactor: DbTransactor[Interpretation, EventLogDB]): Interpretation[Unit] = updateResult match {
+      updateResult: UpdateResult
+  ): Kleisli[Interpretation, Session[Interpretation], Unit] = updateResult match {
     case UpdateResult.Updated =>
       for {
         path <- findProjectPath(eventId)
-        _    <- awaitingTriplesGenerationGauge increment path
-        _    <- underTriplesGenerationGauge decrement path
+        _    <- Kleisli.liftF(awaitingTriplesGenerationGauge increment path)
+        _    <- Kleisli.liftF(underTriplesGenerationGauge decrement path)
       } yield ()
-    case _ => ().pure[Interpretation]
+    case _ => Kleisli.pure(())
   }
 }
 
 object ToNew {
-  def factory[Interpretation[_]: Sync: MonadError[*[_], Throwable]](
+  def factory[Interpretation[_]: Async: Bracket[*[_], Throwable]](
       awaitingTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
       underTriplesGenerationGauge:    LabeledGauge[Interpretation, projects.Path]
   ): Kleisli[Interpretation, ChangeStatusRequest, CommandFindingResult] = Kleisli.fromFunction {

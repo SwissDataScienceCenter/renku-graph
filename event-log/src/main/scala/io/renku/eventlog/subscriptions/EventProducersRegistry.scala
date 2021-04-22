@@ -21,7 +21,7 @@ package io.renku.eventlog.subscriptions
 import cats._
 import cats.effect.{ContextShift, Effect, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import eu.timepit.refined.api.Refined
@@ -67,7 +67,7 @@ object EventProducersRegistry {
   final case class UnsupportedPayload(message: String) extends SubscriptionResult
 
   def apply(
-      transactor:                     DbTransactor[IO, EventLogDB],
+      sessionResource:                SessionResource[IO, EventLogDB],
       awaitingTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
       underTriplesGenerationGauge:    LabeledGauge[IO, projects.Path],
       awaitingTransformationGauge:    LabeledGauge[IO, projects.Path],
@@ -80,24 +80,25 @@ object EventProducersRegistry {
       timer:            Timer[IO],
       executionContext: ExecutionContext
   ): IO[EventProducersRegistry[IO]] = for {
-    subscriberTracker <- SubscriberTracker(transactor, queriesExecTimes)
-    awaitingGenerationCategory <- awaitinggeneration.SubscriptionCategory(transactor,
+    subscriberTracker <- SubscriberTracker(sessionResource, queriesExecTimes)
+    awaitingGenerationCategory <- awaitinggeneration.SubscriptionCategory(sessionResource,
                                                                           awaitingTriplesGenerationGauge,
                                                                           underTriplesGenerationGauge,
                                                                           queriesExecTimes,
                                                                           subscriberTracker,
                                                                           logger
                                   )
-    memberSyncCategory <- membersync.SubscriptionCategory(transactor, queriesExecTimes, subscriberTracker, logger)
-    commitSyncCategory <- commitsync.SubscriptionCategory(transactor, queriesExecTimes, subscriberTracker, logger)
-    triplesGeneratedCategory <- triplesgenerated.SubscriptionCategory(transactor,
+    memberSyncCategory <- membersync.SubscriptionCategory(sessionResource, queriesExecTimes, subscriberTracker, logger)
+    commitSyncCategory <- commitsync.SubscriptionCategory(sessionResource, queriesExecTimes, subscriberTracker, logger)
+    triplesGeneratedCategory <- triplesgenerated.SubscriptionCategory(sessionResource,
                                                                       awaitingTransformationGauge,
                                                                       underTransformationGauge,
                                                                       queriesExecTimes,
                                                                       subscriberTracker,
                                                                       logger
                                 )
-    zombieEventsCategory <- zombieevents.SubscriptionCategory(transactor, queriesExecTimes, subscriberTracker, logger)
+    zombieEventsCategory <-
+      zombieevents.SubscriptionCategory(sessionResource, queriesExecTimes, subscriberTracker, logger)
   } yield new EventProducersRegistryImpl(
     Set[SubscriptionCategory[IO]](
       awaitingGenerationCategory,

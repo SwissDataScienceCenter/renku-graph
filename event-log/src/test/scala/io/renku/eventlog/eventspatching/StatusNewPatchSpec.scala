@@ -99,7 +99,7 @@ class StatusNewPatchSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
     currentTimeProvider.expects().returning(currentTime)
     val patch = StatusNewPatch(waitingEventsGauge, underProcessingGauge, currentTimeProvider)
 
-    val patcher = new EventsPatcherImpl(transactor, queriesExecTimes, TestLogger[IO]())
+    val patcher = new EventsPatcherImpl(sessionResource, queriesExecTimes, TestLogger[IO]())
 
     def addEvent(commitEventId: CompoundEventId,
                  status:        EventStatus,

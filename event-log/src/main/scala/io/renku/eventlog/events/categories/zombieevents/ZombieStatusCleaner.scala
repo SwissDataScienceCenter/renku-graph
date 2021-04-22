@@ -18,16 +18,19 @@
 
 package io.renku.eventlog.events.categories.zombieevents
 
-import cats.effect.{Bracket, IO}
+import cats.data.Kleisli
+import cats.effect.{Async, Bracket}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
 import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, New, TransformingTriples, TriplesGenerated}
-import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
+import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventStatus}
+import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
-import doobie.ConnectionIO
-import doobie.implicits._
 import eu.timepit.refined.auto._
-import io.renku.eventlog.{EventLogDB, TypeSerializers}
+import io.renku.eventlog.{EventLogDB, ExecutionDate, TypeSerializers}
+import skunk._
+import skunk.data.Completion
+import skunk.implicits._
 
 import java.time.Instant
 
@@ -35,35 +38,36 @@ private trait ZombieStatusCleaner[Interpretation[_]] {
   def cleanZombieStatus(event: ZombieEvent): Interpretation[UpdateResult]
 }
 
-private class ZombieStatusCleanerImpl(
-    transactor:       DbTransactor[IO, EventLogDB],
-    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
+private class ZombieStatusCleanerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+    sessionResource:  SessionResource[Interpretation, EventLogDB],
+    queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name],
     now:              () => Instant = () => Instant.now
-)(implicit ME:        Bracket[IO, Throwable])
-    extends DbClient(Some(queriesExecTimes))
-    with ZombieStatusCleaner[IO]
+) extends DbClient(Some(queriesExecTimes))
+    with ZombieStatusCleaner[Interpretation]
     with TypeSerializers {
 
-  override def cleanZombieStatus(event: ZombieEvent): IO[UpdateResult] = {
-    for {
-      _      <- cleanEventualDeliveries(event.eventId)
-      result <- updateEventStatus(event)
-    } yield result
-  } transact transactor.get flatMap toResult
+  override def cleanZombieStatus(event: ZombieEvent): Interpretation[UpdateResult] = sessionResource.useK {
+    cleanEventualDeliveries(event.eventId) >> updateEventStatus(event)
+  }
 
-  private lazy val updateEventStatus: ZombieEvent => ConnectionIO[Int] = {
+  private lazy val updateEventStatus: ZombieEvent => Kleisli[Interpretation, Session[Interpretation], UpdateResult] = {
     case GeneratingTriplesZombieEvent(eventId, _)   => updateStatusQuery(eventId, GeneratingTriples, New)
     case TransformingTriplesZombieEvent(eventId, _) => updateStatusQuery(eventId, TransformingTriples, TriplesGenerated)
   }
 
-  private def cleanEventualDeliveries(eventId: CompoundEventId) = measureExecutionTime {
-    SqlQuery(
-      sql"""|DELETE FROM event_delivery
-            |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId}
-            |""".stripMargin.update.run,
-      name = "zombie_chasing - clean deliveries"
-    )
-  }
+  private def cleanEventualDeliveries(eventId: CompoundEventId) =
+    measureExecutionTime {
+      SqlQuery(
+        Kleisli { session =>
+          val query: Command[EventId ~ projects.Id] =
+            sql"""DELETE FROM event_delivery
+                  WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
+            """.command
+          session.prepare(query).use(_ execute (eventId.id ~ eventId.projectId))
+        },
+        name = "zombie_chasing - clean deliveries"
+      )
+    }
 
   private def updateStatusQuery(
       eventId:   CompoundEventId,
@@ -71,27 +75,32 @@ private class ZombieStatusCleanerImpl(
       newStatus: EventStatus
   ) = measureExecutionTime {
     SqlQuery(
-      sql"""|UPDATE event
-            |SET status = $newStatus, execution_date = ${now()}, message = NULL
-            |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = $oldStatus
-            |""".stripMargin.update.run,
+      Kleisli { session =>
+        val query: Command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus] =
+          sql"""UPDATE event
+                SET status = $eventStatusEncoder, execution_date = $executionDateEncoder, message = NULL
+                WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND status = $eventStatusEncoder
+          """.command
+        session.prepare(query).use {
+          _.execute(newStatus ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ oldStatus).flatMap {
+            case Completion.Update(1) => (Updated: UpdateResult).pure[Interpretation]
+            case Completion.Update(0) => (NotUpdated: UpdateResult).pure[Interpretation]
+            case _ =>
+              new Exception(s"${categoryName.value} - zombie_chasing - update status- More than one row updated")
+                .raiseError[Interpretation, UpdateResult]
+          }
+        }
+      },
       name = "zombie_chasing - update status"
     )
-  }
-
-  private lazy val toResult: Int => IO[UpdateResult] = {
-    case 1 => Updated.pure[IO]
-    case 0 => NotUpdated.pure[IO]
-    case _ => new Exception("More than one row updated").raiseError[IO, UpdateResult]
   }
 }
 
 private object ZombieStatusCleaner {
+
   import cats.effect.IO
 
-  def apply(transactor:       DbTransactor[IO, EventLogDB],
+  def apply(sessionResource:  SessionResource[IO, EventLogDB],
             queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
-  ): IO[ZombieStatusCleaner[IO]] = IO {
-    new ZombieStatusCleanerImpl(transactor, queriesExecTimes)
-  }
+  ): IO[ZombieStatusCleaner[IO]] = IO(new ZombieStatusCleanerImpl(sessionResource, queriesExecTimes))
 }

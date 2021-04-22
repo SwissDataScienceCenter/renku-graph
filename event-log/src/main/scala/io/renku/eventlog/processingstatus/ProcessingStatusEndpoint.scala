@@ -19,7 +19,7 @@
 package io.renku.eventlog.processingstatus
 
 import cats.MonadError
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
@@ -83,11 +83,11 @@ object IOProcessingStatusEndpoint {
   import io.renku.eventlog.EventLogDB
 
   def apply(
-      transactor:          DbTransactor[IO, EventLogDB],
+      sessionResource:     SessionResource[IO, EventLogDB],
       queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name],
       logger:              Logger[IO]
   )(implicit contextShift: ContextShift[IO]): IO[ProcessingStatusEndpoint[IO]] =
     for {
-      statusFinder <- IOProcessingStatusFinder(transactor, queriesExecTimes)
+      statusFinder <- IOProcessingStatusFinder(sessionResource, queriesExecTimes)
     } yield new ProcessingStatusEndpoint[IO](statusFinder, logger)
 }

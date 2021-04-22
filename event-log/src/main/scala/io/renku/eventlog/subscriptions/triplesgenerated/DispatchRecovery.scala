@@ -18,9 +18,9 @@
 
 package io.renku.eventlog.subscriptions.triplesgenerated
 
-import cats.effect.{Bracket, IO, Timer}
+import cats.effect.{Async, Bracket, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
@@ -34,7 +34,7 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.control.NonFatal
 
-private class DispatchRecoveryImpl[Interpretation[_]: Bracket[*[_], Throwable]](
+private class DispatchRecoveryImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     awaitingTransformationGauge:     LabeledGauge[Interpretation, projects.Path],
     underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
     statusUpdatesRunner:             StatusUpdatesRunner[Interpretation],
@@ -84,13 +84,13 @@ private object DispatchRecovery {
 
   private val OnErrorSleep: FiniteDuration = 1 seconds
 
-  def apply(transactor:                      DbTransactor[IO, EventLogDB],
+  def apply(sessionResource:                 SessionResource[IO, EventLogDB],
             awaitingTransformationGauge:     LabeledGauge[IO, projects.Path],
             underTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
             queriesExecTimes:                LabeledHistogram[IO, SqlQuery.Name],
             logger:                          Logger[IO]
   )(implicit timer:                          Timer[IO]): IO[DispatchRecovery[IO, TriplesGeneratedEvent]] = for {
-    updateCommandRunner <- IOUpdateCommandsRunner(transactor, queriesExecTimes, logger)
+    updateCommandRunner <- IOUpdateCommandsRunner(sessionResource, queriesExecTimes, logger)
   } yield new DispatchRecoveryImpl[IO](awaitingTransformationGauge,
                                        underTriplesTransformationGauge,
                                        updateCommandRunner,

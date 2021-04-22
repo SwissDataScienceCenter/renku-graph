@@ -27,20 +27,23 @@ import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplicits, RDFStore}
 import ch.datascience.graph.model.EventsGenerators.commitIds
+import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
 import ch.datascience.webhookservice.model.HookToken
-import doobie.implicits._
+import io.renku.eventlog.TypeSerializers
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.Eventually
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
+import skunk.Command
 
 import java.lang.Thread.sleep
 import scala.concurrent.duration._
 import scala.language.postfixOps
+import skunk.implicits._
 
 class CommitSyncFlowsSpec
     extends AnyFeatureSpec
@@ -49,7 +52,8 @@ class CommitSyncFlowsSpec
     with GraphServices
     with Eventually
     with AcceptanceTestPatience
-    with should.Matchers {
+    with should.Matchers
+    with TypeSerializers {
 
   Feature("Missed GitLab events should be synchronised") {
 
@@ -106,10 +110,12 @@ class CommitSyncFlowsSpec
       RDFStore.commitTriplesCount(nonMissedCommitId) should be > 0
 
       When("commit synchronisation process kicks-off")
-      db.EventLog.execute {
-        sql"""|DELETE FROM subscription_category_sync_time 
-              |WHERE project_id = ${projectId.value} AND category_name = 'COMMIT_SYNC'
-              |""".stripMargin.update.run
+      db.EventLog.execute { session =>
+        val query: Command[Id] = sql"""
+          DELETE FROM subscription_category_sync_time 
+          WHERE project_id = $projectIdEncoder AND category_name = 'COMMIT_SYNC'
+          """.command
+        session.prepare(query).use(_.execute(projectId))
       }
       sleep((4 seconds).toMillis)
 

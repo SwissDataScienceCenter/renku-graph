@@ -22,7 +22,7 @@ import cats.data.EitherT.fromEither
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
 import cats.{Applicative, MonadError}
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult}
@@ -115,7 +115,7 @@ private class EventHandler[Interpretation[_]](
 }
 
 private object EventHandler {
-  def apply(transactor:                         DbTransactor[IO, EventLogDB],
+  def apply(sessionResource:                    SessionResource[IO, EventLogDB],
             queriesExecTimes:                   LabeledHistogram[IO, SqlQuery.Name],
             awaitingTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],
             underTriplesGenerationGauge:        LabeledGauge[IO, projects.Path],
@@ -127,7 +127,7 @@ private object EventHandler {
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[EventHandler[IO]] = for {
-    zombieStatusCleaner <- ZombieStatusCleaner(transactor, queriesExecTimes)
+    zombieStatusCleaner <- ZombieStatusCleaner(sessionResource, queriesExecTimes)
   } yield new EventHandler[IO](categoryName,
                                zombieStatusCleaner,
                                awaitingTriplesGenerationGauge,

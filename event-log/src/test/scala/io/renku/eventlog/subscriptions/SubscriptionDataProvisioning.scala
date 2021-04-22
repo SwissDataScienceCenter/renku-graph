@@ -18,30 +18,40 @@
 
 package io.renku.eventlog.subscriptions
 
+import cats.data.Kleisli
 import cats.syntax.all._
 import ch.datascience.graph.model.events.{CategoryName, LastSyncedDate}
 import ch.datascience.graph.model.projects
-import doobie.implicits._
 import io.renku.eventlog.{EventLogDataProvisioning, InMemoryEventLogDb}
+import skunk._
+import skunk.implicits._
 
 trait SubscriptionDataProvisioning extends EventLogDataProvisioning with SubscriptionTypeSerializers {
   self: InMemoryEventLogDb =>
 
   protected def upsertLastSynced(projectId: projects.Id, categoryName: CategoryName, lastSynced: LastSyncedDate): Unit =
-    execute {
-      sql"""|INSERT INTO
-            |subscription_category_sync_time (project_id, category_name, last_synced)
-            |VALUES ($projectId, $categoryName, $lastSynced)
-            |ON CONFLICT (project_id, category_name)
-            |DO UPDATE SET last_synced = excluded.last_synced 
-      """.stripMargin.update.run.void
+    execute[Unit] {
+      Kleisli { session =>
+        val query: Command[projects.Id ~ CategoryName ~ LastSyncedDate] = sql"""
+        INSERT INTO
+        subscription_category_sync_time (project_id, category_name, last_synced)
+        VALUES ($projectIdEncoder, $categoryNameEncoder, $lastSyncedDateEncoder)
+        ON CONFLICT (project_id, category_name)
+        DO UPDATE SET  last_synced = excluded.last_synced
+      """.command
+        session.prepare(query).use(_.execute(projectId ~ categoryName ~ lastSynced)).void
+      }
     }
 
   protected def findSyncTime(projectId: projects.Id, categoryName: CategoryName): Option[LastSyncedDate] =
     execute {
-      sql"""|SELECT last_synced
-            |FROM subscription_category_sync_time
-            |WHERE project_id = $projectId AND category_name = $categoryName
-      """.stripMargin.query[LastSyncedDate].option
+      Kleisli { session =>
+        val query: Query[projects.Id ~ CategoryName, LastSyncedDate] = sql"""
+        SELECT last_synced
+        FROM subscription_category_sync_time
+        WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
+      """.query(lastSyncedDateDecoder)
+        session.prepare(query).use(_.option(projectId ~ categoryName))
+      }
     }
 }

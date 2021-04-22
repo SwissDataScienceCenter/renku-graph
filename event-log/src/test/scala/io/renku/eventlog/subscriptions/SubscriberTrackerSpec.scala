@@ -18,20 +18,21 @@
 
 package io.renku.eventlog.subscriptions
 
-import Generators._
-import cats.syntax.all._
+import cats.data.Kleisli
 import ch.datascience.db.SqlQuery
 import ch.datascience.events.consumers.subscriptions._
 import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.metrics.TestLabeledHistogram
 import ch.datascience.microservices.MicroserviceBaseUrl
-import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.InMemoryEventLogDbSpec
+import io.renku.eventlog.subscriptions.Generators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk._
+import skunk.implicits._
 
 class SubscriberTrackerSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory with should.Matchers {
 
@@ -69,7 +70,7 @@ class SubscriberTrackerSpec extends AnyWordSpec with InMemoryEventLogDbSpec with
     "insert a new row in the subscriber table " +
       "if the subscriber exists but the source_url is different" in new TestCase {
         val otherSource  = microserviceBaseUrls.generateOne
-        val otherTracker = new SubscriberTrackerImpl(transactor, queriesExecTimes, otherSource)
+        val otherTracker = new SubscriberTrackerImpl(sessionResource, queriesExecTimes, otherSource)
         (otherTracker add subscriptionInfo).unsafeRunSync() shouldBe true
 
         findSubscriber(subscriptionInfo.subscriberUrl, otherSource) shouldBe Some(
@@ -141,24 +142,37 @@ class SubscriberTrackerSpec extends AnyWordSpec with InMemoryEventLogDbSpec with
     val subscriptionInfo = subscriptionInfos.generateOne
     val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
     val sourceUrl        = microserviceBaseUrls.generateOne
-    val tracker          = new SubscriberTrackerImpl(transactor, queriesExecTimes, sourceUrl)
+    val tracker          = new SubscriberTrackerImpl(sessionResource, queriesExecTimes, sourceUrl)
   }
 
   private def findSubscriber(subscriberUrl: SubscriberUrl,
                              sourceUrl:     MicroserviceBaseUrl
   ): Option[(SubscriberId, SubscriberUrl, MicroserviceBaseUrl)] = execute {
-    sql"""|SELECT delivery_id, delivery_url, source_url
-          |FROM subscriber
-          |WHERE delivery_url = ${subscriberUrl.value} AND source_url = ${sourceUrl.value}""".stripMargin
-      .query[(SubscriberId, SubscriberUrl, MicroserviceBaseUrl)]
-      .option
+    Kleisli { session =>
+      val query: Query[SubscriberUrl ~ MicroserviceBaseUrl, (SubscriberId, SubscriberUrl, MicroserviceBaseUrl)] =
+        sql"""SELECT delivery_id, delivery_url, source_url
+            FROM subscriber
+            WHERE delivery_url = $subscriberUrlEncoder AND source_url = $microserviceBaseUrlEncoder"""
+          .query(subscriberIdDecoder ~ subscriberUrlDecoder ~ microserviceBaseUrlDecoder)
+          .map { case subscriberId ~ subscriberUrl ~ microserviceBaseUrl =>
+            (subscriberId, subscriberUrl, microserviceBaseUrl)
+          }
+      session.prepare(query).use(_.option(subscriberUrl ~ sourceUrl))
+    }
   }
 
   private def storeSubscriptionInfo(subscriptionInfo: SubscriptionInfo, sourceUrl: MicroserviceBaseUrl): Unit =
-    execute {
-      sql"""|INSERT INTO
-            |subscriber (delivery_id, delivery_url, source_url)
-            |VALUES (${subscriptionInfo.subscriberId}, ${subscriptionInfo.subscriberUrl}, $sourceUrl)
-      """.stripMargin.update.run.void
+    execute[Unit] {
+      Kleisli { session =>
+        val query: Command[SubscriberId ~ SubscriberUrl ~ MicroserviceBaseUrl] =
+          sql"""INSERT INTO
+                subscriber (delivery_id, delivery_url, source_url)
+                VALUES ($subscriberIdEncoder, $subscriberUrlEncoder, $microserviceBaseUrlEncoder)
+          """.command
+        session
+          .prepare(query)
+          .use(_.execute(subscriptionInfo.subscriberId ~ subscriptionInfo.subscriberUrl ~ sourceUrl))
+          .void
+      }
     }
 }

@@ -18,12 +18,15 @@
 
 package io.renku.eventlog.init
 
+import cats.data.Kleisli
 import cats.effect.IO
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
-import doobie.implicits._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk._
+import skunk.implicits._
+import skunk.codec.all._
 
 class LatestEventDatesViewRemoverSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
 
@@ -56,13 +59,18 @@ class LatestEventDatesViewRemoverSpec extends AnyWordSpec with DbInitSpec with s
 
   private trait TestCase {
     val logger      = TestLogger[IO]()
-    val viewCreator = new LatestEventDatesViewRemoverImpl[IO](transactor, logger)
+    val viewCreator = new LatestEventDatesViewRemoverImpl[IO](sessionResource, logger)
   }
 
-  private def createView(): Unit = execute {
-    sql"""
+  private def createView(): Unit = execute[Unit] {
+    Kleisli { session =>
+      val query: Command[Void] = sql"""
     CREATE MATERIALIZED VIEW IF NOT EXISTS project_latest_event_date AS
     select 1;
-    """.update.run.map(_ => ())
+    """.command
+      session
+        .execute(query)
+        .map(_ => ())
+    }
   }
 }

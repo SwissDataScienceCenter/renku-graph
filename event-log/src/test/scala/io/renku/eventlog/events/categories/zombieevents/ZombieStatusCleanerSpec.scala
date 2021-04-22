@@ -126,7 +126,7 @@ class ZombieStatusCleanerSpec
   private trait TestCase {
     val currentTime      = mockFunction[Instant]
     val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
-    val updater          = new ZombieStatusCleanerImpl(transactor, queriesExecTimes, currentTime)
+    val updater          = new ZombieStatusCleanerImpl(sessionResource, queriesExecTimes, currentTime)
 
     val eventId       = compoundEventIds.generateOne
     val projectPath   = projectPaths.generateOne

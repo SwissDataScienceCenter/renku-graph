@@ -18,12 +18,15 @@
 
 package io.renku.eventlog.init
 
-import cats.effect.Bracket
+import cats.data.Kleisli
+import cats.effect.{Async, Bracket}
 import cats.syntax.all._
-import ch.datascience.db.DbTransactor
-import doobie.implicits._
+import ch.datascience.db.SessionResource
 import org.typelevel.log4cats.Logger
 import io.renku.eventlog.EventLogDB
+import skunk._
+import skunk.implicits._
+import skunk.codec.all._
 
 import scala.util.control.NonFatal
 
@@ -31,37 +34,41 @@ trait EventStatusRenamer[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
-private case class EventStatusRenamerImpl[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB],
-    logger:     Logger[Interpretation]
-)(implicit ME:  Bracket[Interpretation, Throwable])
-    extends EventStatusRenamer[Interpretation] {
+private case class EventStatusRenamerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+    sessionResource: SessionResource[Interpretation, EventLogDB],
+    logger:          Logger[Interpretation]
+) extends EventStatusRenamer[Interpretation] {
   override def run(): Interpretation[Unit] = {
-    for {
-      _ <- renameAllStatuses(from = "PROCESSING", to = "GENERATING_TRIPLES")
-      _ <- logger.info(s"'PROCESSING' event status renamed to 'GENERATING_TRIPLES'")
-      _ <- renameAllStatuses(from = "RECOVERABLE_FAILURE", to = "GENERATION_RECOVERABLE_FAILURE")
-      _ <- logger.info(s"'RECOVERABLE_FAILURE' event status renamed to 'GENERATION_RECOVERABLE_FAILURE'")
-      _ <- renameAllStatuses(from = "NON_RECOVERABLE_FAILURE", to = "GENERATION_NON_RECOVERABLE_FAILURE")
-      _ <- logger.info(s"'NON_RECOVERABLE_FAILURE' event status renamed to 'GENERATION_NON_RECOVERABLE_FAILURE'")
-    } yield ()
-  } recoverWith logging
+    val remaneStatuses = {
+      for {
+        _ <- renameAllStatuses(from = "PROCESSING", to = "GENERATING_TRIPLES")
+        _ <- logger.info(s"'PROCESSING' event status renamed to 'GENERATING_TRIPLES'")
+        _ <- renameAllStatuses(from = "RECOVERABLE_FAILURE", to = "GENERATION_RECOVERABLE_FAILURE")
+        _ <- logger.info(s"'RECOVERABLE_FAILURE' event status renamed to 'GENERATION_RECOVERABLE_FAILURE'")
+        _ <- renameAllStatuses(from = "NON_RECOVERABLE_FAILURE", to = "GENERATION_NON_RECOVERABLE_FAILURE")
+        _ <- logger.info(s"'NON_RECOVERABLE_FAILURE' event status renamed to 'GENERATION_NON_RECOVERABLE_FAILURE'")
+      } yield ()
+    } recoverWith logging
+    remaneStatuses
+  }
 
-  private def renameAllStatuses(from: String, to: String) =
-    sql"""UPDATE event SET status = $to WHERE status = $from""".update.run
-      .transact(transactor.get)
-      .void
+  private def renameAllStatuses(from: String, to: String) = sessionResource.useK {
+    val query: Command[String ~ String] = sql"""UPDATE event SET status = $varchar WHERE status = $varchar""".command
+    Kleisli[Interpretation, Session[Interpretation], Unit](session =>
+      session.prepare(query).use(_.execute(to ~ from)).void
+    )
+  }
 
   private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
     logger.error(exception)(s"Renaming of events failed")
-    ME.raiseError(exception)
+    exception.raiseError[Interpretation, Unit]
   }
 }
 
 private object EventStatusRenamer {
-  def apply[Interpretation[_]](
-      transactor: DbTransactor[Interpretation, EventLogDB],
-      logger:     Logger[Interpretation]
-  )(implicit ME:  Bracket[Interpretation, Throwable]): EventStatusRenamer[Interpretation] =
-    EventStatusRenamerImpl(transactor, logger)
+  def apply[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+      sessionResource: SessionResource[Interpretation, EventLogDB],
+      logger:          Logger[Interpretation]
+  ): EventStatusRenamer[Interpretation] =
+    EventStatusRenamerImpl(sessionResource, logger)
 }

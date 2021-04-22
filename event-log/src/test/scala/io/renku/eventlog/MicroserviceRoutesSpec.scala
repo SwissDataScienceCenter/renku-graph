@@ -20,7 +20,7 @@ package io.renku.eventlog
 
 import cats.effect.{Clock, IO}
 import cats.syntax.all._
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.SessionResource
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.compoundEventIds
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
@@ -31,7 +31,6 @@ import ch.datascience.http.server.EndpointTester._
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.interpreters.TestRoutesMetrics
 import ch.datascience.metrics.LabeledGauge
-import org.typelevel.log4cats.Logger
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.EventEndpoint
 import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
@@ -48,6 +47,7 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.language.reflectiveCalls
@@ -197,7 +197,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
   ) extends SubscriptionsEndpoint[IO](subscriptionCategoryRegistry, logger)
 
   class TestStatusChangeEndpoint(
-      transactor:                      DbTransactor[IO, EventLogDB],
+      sessionResource:                 SessionResource[IO, EventLogDB],
       updateCommandsRunner:            StatusUpdatesRunner[IO],
       awaitingTriplesGenerationGauge:  LabeledGauge[IO, projects.Path],
       underTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],

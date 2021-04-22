@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions.commitsync
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 import io.renku.eventlog.subscriptions._
@@ -29,7 +29,7 @@ import scala.concurrent.ExecutionContext
 
 private[subscriptions] object SubscriptionCategory {
 
-  def apply(transactor:        DbTransactor[IO, EventLogDB],
+  def apply(sessionResource:   SessionResource[IO, EventLogDB],
             queriesExecTimes:  LabeledHistogram[IO, SqlQuery.Name],
             subscriberTracker: SubscriberTracker[IO],
             logger:            Logger[IO]
@@ -39,11 +39,10 @@ private[subscriptions] object SubscriptionCategory {
       timer:            Timer[IO]
   ): IO[subscriptions.SubscriptionCategory[IO]] = for {
     subscribers      <- Subscribers(categoryName, subscriberTracker, logger)
-    eventsFinder     <- CommitSyncEventFinder(transactor, queriesExecTimes)
+    eventsFinder     <- CommitSyncEventFinder(sessionResource, queriesExecTimes)
     dispatchRecovery <- LoggingDispatchRecovery[IO, CommitSyncEvent](categoryName, logger)
     eventDelivery    <- EventDelivery.noOp[IO, CommitSyncEvent]
     eventsDistributor <- IOEventsDistributor(categoryName,
-                                             transactor,
                                              subscribers,
                                              eventsFinder,
                                              eventDelivery,

@@ -19,19 +19,21 @@
 package io.renku.eventlog.processingstatus
 
 import cats.MonadError
-import cats.data.OptionT
-import cats.effect.{Bracket, ContextShift, IO}
+import cats.data.{Kleisli, OptionT}
+import cats.effect.{Async, Bracket, ContextShift, IO}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
 import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.metrics.LabeledHistogram
-import doobie.implicits._
 import eu.timepit.refined.api.RefType.applyRef
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.eventlog.EventLogDB
+import skunk._
+import skunk.implicits._
+import skunk.codec.all._
 
 import scala.math.BigDecimal.RoundingMode
 
@@ -39,32 +41,37 @@ trait ProcessingStatusFinder[Interpretation[_]] {
   def fetchStatus(projectId: Id): OptionT[Interpretation, ProcessingStatus]
 }
 
-class ProcessingStatusFinderImpl(
-    transactor:       DbTransactor[IO, EventLogDB],
-    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
-)(implicit ME:        Bracket[IO, Throwable])
-    extends DbClient(Some(queriesExecTimes))
-    with ProcessingStatusFinder[IO] {
+class ProcessingStatusFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+    sessionResource:  SessionResource[Interpretation, EventLogDB],
+    queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name]
+) extends DbClient(Some(queriesExecTimes))
+    with ProcessingStatusFinder[Interpretation] {
 
   import eu.timepit.refined.auto._
   import io.renku.eventlog.TypeSerializers._
 
-  override def fetchStatus(projectId: Id): OptionT[IO, ProcessingStatus] = OptionT {
-    measureExecutionTime(latestBatchStatues(projectId)) transact transactor.get flatMap toProcessingStatus
+  override def fetchStatus(projectId: Id): OptionT[Interpretation, ProcessingStatus] = OptionT {
+    sessionResource.useK {
+      measureExecutionTime(latestBatchStatues(projectId))
+    } flatMap toProcessingStatus
   }
 
-  private def latestBatchStatues(projectId: Id) = SqlQuery(
-    query = sql"""|SELECT evt.status
-                  |FROM event evt
-                  |INNER JOIN (
-                  |    SELECT batch_date
-                  |    FROM event
-                  |    WHERE project_id = $projectId
-                  |    ORDER BY batch_date DESC
-                  |    LIMIT 1
-                  |  ) max_batch_date ON evt.batch_date = max_batch_date.batch_date
-                  |WHERE evt.project_id = $projectId
-                  |""".stripMargin.query[EventStatus].to[List],
+  private def latestBatchStatues(projectId: Id) = SqlQuery[Interpretation, List[EventStatus]](
+    Kleisli { session =>
+      val query: Query[Id ~ Id, EventStatus] =
+        sql"""SELECT evt.status
+              FROM event evt
+              INNER JOIN (
+                SELECT batch_date
+                FROM event
+                WHERE project_id = $projectIdEncoder
+                ORDER BY batch_date DESC
+                LIMIT 1
+              ) max_batch_date ON evt.batch_date = max_batch_date.batch_date
+              WHERE evt.project_id = $projectIdEncoder
+           """.query(eventStatusDecoder)
+      session.prepare(query).use(pq => pq.stream(projectId ~ projectId, chunkSize = 32).compile.toList)
+    },
     name = "processing status"
   )
 
@@ -74,17 +81,17 @@ class ProcessingStatusFinderImpl(
         (done + 1) -> (total + 1)
       case ((done, total), _) => done -> (total + 1)
     } match {
-      case (0, 0)        => Option.empty[ProcessingStatus].pure[IO]
-      case (done, total) => ProcessingStatus.from(done, total)(ME) map Option.apply
+      case (0, 0)        => Option.empty[ProcessingStatus].pure[Interpretation]
+      case (done, total) => ProcessingStatus.from[Interpretation](done, total) map Option.apply
     }
 }
 
 object IOProcessingStatusFinder {
   def apply(
-      transactor:          DbTransactor[IO, EventLogDB],
+      sessionResource:     SessionResource[IO, EventLogDB],
       queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
   )(implicit contextShift: ContextShift[IO]): IO[ProcessingStatusFinder[IO]] = IO {
-    new ProcessingStatusFinderImpl(transactor, queriesExecTimes)
+    new ProcessingStatusFinderImpl(sessionResource, queriesExecTimes)
   }
 }
 
@@ -102,10 +109,10 @@ object ProcessingStatus {
   type Total    = Int Refined NonNegative
   type Progress = Double Refined NonNegative
 
-  def from[Interpretation[_]](
-      done:      Int,
-      total:     Int
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[ProcessingStatus] =
+  def from[Interpretation[_]: MonadError[*[_], Throwable]](
+      done:  Int,
+      total: Int
+  ): Interpretation[ProcessingStatus] =
     for {
       validDone  <- applyRef[Done](done) getOrError [Interpretation] "ProcessingStatus's 'done' cannot be negative"
       validTotal <- applyRef[Total](total) getOrError [Interpretation] "ProcessingStatus's 'total' cannot be negative"

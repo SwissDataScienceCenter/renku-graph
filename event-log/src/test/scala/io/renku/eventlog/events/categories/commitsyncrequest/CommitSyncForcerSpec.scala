@@ -105,6 +105,6 @@ class CommitSyncForcerSpec
 
   private trait TestCase {
     val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
-    val forcer           = new CommitSyncForcerImpl(transactor, queriesExecTimes)
+    val forcer           = new CommitSyncForcerImpl(sessionResource, queriesExecTimes)
   }
 }

@@ -102,8 +102,8 @@ class DbInitializerSpec
 
   private trait TestCase {
     val logger                   = TestLogger[IO]()
-    val projectPathAdder         = mock[IOProjectPathAdder]
+    val projectPathAdder         = mock[ProjectPathAdder[IO]]
     val duplicateProjectsRemover = mock[DuplicateProjectsRemover[IO]]
-    val dbInitializer            = new DbInitializer[IO](projectPathAdder, duplicateProjectsRemover, transactor, logger)
+    val dbInitializer            = new DbInitializer[IO](projectPathAdder, duplicateProjectsRemover, sessionResource, logger)
   }
 }

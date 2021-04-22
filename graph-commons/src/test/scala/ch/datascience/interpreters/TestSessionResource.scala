@@ -16,10 +16,11 @@
  * limitations under the License.
  */
 
-package ch.datascience.db
+package ch.datascience.interpreters
 
-import doobie.util.transactor.Transactor
+import cats.effect.{IO, Resource}
+import ch.datascience.db.SessionResource
+import skunk.Session
 
-import scala.language.existentials
-
-case class DbTransactor[Interpretation[_], TargetDB](get: Transactor.Aux[Interpretation, _])
+class TestSessionResource[TargetDB](sessionResource: Resource[IO, Session[IO]])
+    extends SessionResource[IO, TargetDB](sessionResource)

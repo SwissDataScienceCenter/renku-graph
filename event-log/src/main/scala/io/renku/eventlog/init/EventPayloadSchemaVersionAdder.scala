@@ -18,59 +18,66 @@
 
 package io.renku.eventlog.init
 
-import cats.effect.Bracket
-import ch.datascience.db.DbTransactor
+import cats.data.Kleisli
+import cats.effect.{Async, Bracket}
+import ch.datascience.db.SessionResource
 import org.typelevel.log4cats.Logger
 import io.renku.eventlog.EventLogDB
+import skunk._
+import skunk.implicits._
+import skunk.codec.all._
 
 private trait EventPayloadSchemaVersionAdder[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
 private object EventPayloadSchemaVersionAdder {
-  def apply[Interpretation[_]](
-      transactor: DbTransactor[Interpretation, EventLogDB],
-      logger:     Logger[Interpretation]
-  )(implicit ME:  Bracket[Interpretation, Throwable]): EventPayloadSchemaVersionAdder[Interpretation] =
-    new EventPayloadSchemaVersionAdderImpl(transactor, logger)
+  def apply[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+      sessionResource: SessionResource[Interpretation, EventLogDB],
+      logger:          Logger[Interpretation]
+  ): EventPayloadSchemaVersionAdder[Interpretation] =
+    new EventPayloadSchemaVersionAdderImpl(sessionResource, logger)
 }
 
-private class EventPayloadSchemaVersionAdderImpl[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB],
-    logger:     Logger[Interpretation]
-)(implicit ME:  Bracket[Interpretation, Throwable])
-    extends EventPayloadSchemaVersionAdder[Interpretation]
-    with EventTableCheck[Interpretation] {
+private class EventPayloadSchemaVersionAdderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+    sessionResource: SessionResource[Interpretation, EventLogDB],
+    logger:          Logger[Interpretation]
+) extends EventPayloadSchemaVersionAdder[Interpretation]
+    with EventTableCheck {
 
   import cats.syntax.all._
-  import doobie.implicits._
 
-  private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
-
-  override def run(): Interpretation[Unit] =
-    checkTableExists flatMap {
-      case true  => alterTable
-      case false => ME.raiseError(new Exception("Event payload table missing; alteration is not possible"))
+  override def run(): Interpretation[Unit] = sessionResource.useK {
+    checkTableExists >>= {
+      case true => alterTable()
+      case false =>
+        Kleisli.liftF(
+          new Exception("Event payload table missing; alteration is not possible").raiseError[Interpretation, Unit]
+        )
     }
+  }
 
-  private def checkTableExists: Interpretation[Boolean] =
-    sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_payload')"
-      .query[Boolean]
-      .unique
-      .transact(transactor.get)
-      .recover { case _ => false }
+  private lazy val checkTableExists: Kleisli[Interpretation, Session[Interpretation], Boolean] = {
+    val query: Query[Void, Boolean] =
+      sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_payload')"
+        .query(bool)
 
-  private def alterTable = for {
-    _ <- alterTableSql.update.run transact transactor.get
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_schema_version ON event_payload(schema_version)")
-    _ <- logger info "'event_payload' table altered"
-  } yield ()
+    Kleisli(_.unique(query).recover { case _ => false })
+  }
 
-  private lazy val alterTableSql = sql"""
-    ALTER TABLE event_payload
-    ALTER COLUMN payload SET NOT NULL,
-    ADD COLUMN IF NOT EXISTS schema_version text NOT NULL,
-    DROP CONSTRAINT IF EXISTS event_payload_pkey,
-    ADD PRIMARY KEY (event_id, project_id, schema_version)
-    """
+  private def alterTable(): Kleisli[Interpretation, Session[Interpretation], Unit] =
+    for {
+      _ <- execute(alterTableSql)
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_schema_version ON event_payload(schema_version)".command)
+      _ <- Kleisli.liftF(logger info "'event_payload' table altered")
+    } yield ()
+
+  private lazy val alterTableSql: Command[Void] =
+    sql"""
+      ALTER TABLE event_payload
+      ALTER COLUMN payload SET NOT NULL,
+      ADD COLUMN IF NOT EXISTS schema_version text NOT NULL,
+      DROP CONSTRAINT IF EXISTS event_payload_pkey,
+      ADD PRIMARY KEY (event_id, project_id, schema_version)
+    """.command
 }
