@@ -35,14 +35,11 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import io.renku.jsonld.JsonLDEncoder._
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{EntityId, EntityIdEncoder, EntityTypes, JsonLD, JsonLDEncoder}
+import io.renku.jsonld._
 
-import java.util.UUID.randomUUID
 import scala.language.postfixOps
 
-sealed abstract class CommandParameter(val runPlan: RunPlan, val maybePrefix: Option[Prefix]) {
-  val value: Value
-}
+sealed abstract class CommandParameter(val runPlan: RunPlan, val maybePrefix: Option[Prefix])
 
 object CommandParameter {
 
@@ -98,23 +95,17 @@ object CommandParameter {
       case object StdOut extends IOStream("stdout") with Out
       case object StdErr extends IOStream("stderr") with Out
 
-      private[entities] implicit def converter[IO <: IOStream](implicit
-          renkuBaseUrl: RenkuBaseUrl
-      ): PartialEntityConverter[IO] =
-        new PartialEntityConverter[IO] {
-          override def convert[T <: IO]: T => Either[Exception, PartialEntity] =
-            stream =>
-              PartialEntity(
-                EntityTypes of renku / "IOStream",
-                renku / "streamType" -> stream.name.toString().asJsonLD
-              ).asRight
-
-          override def toEntityId: IO => Option[EntityId] =
-            e => EntityId.of(renkuBaseUrl / "iostreams" / e.name.toString()).some
+      implicit def encoder[IO <: IOStream](implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[IO] =
+        JsonLDEncoder.instance[IO] { stream =>
+          JsonLD.entity(
+            stream.asEntityId,
+            EntityTypes of renku / "IOStream",
+            renku / "streamType" -> stream.name.toString().asJsonLD
+          )
         }
 
-      implicit def encoder[IO <: IOStream](implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[IO] =
-        JsonLDEncoder.instance[IO](_.asPartialJsonLD[IO].getOrFail)
+      implicit def entityIdEncoder[IO <: IOStream](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[IO] =
+        EntityIdEncoder.instance(stream => EntityId.of(renkuBaseUrl / "iostreams" / stream.name.toString()))
     }
 
     private[entities] implicit def converter[M <: Mapping](implicit
@@ -131,9 +122,7 @@ object CommandParameter {
   sealed abstract class EntityCommandParameter(override val runPlan:     RunPlan,
                                                override val maybePrefix: Option[Prefix],
                                                val entity:               Entity
-  ) extends CommandParameter(runPlan, maybePrefix) {
-    override lazy val value: Value = Value(entity.location)
-  }
+  ) extends CommandParameter(runPlan, maybePrefix)
 
   final class Value private (val value: String) extends AnyVal with StringTinyType
   implicit object Value extends TinyTypeFactory[Value](new Value(_)) with NonBlank {
@@ -158,7 +147,7 @@ object CommandParameter {
                        override val runPlan:     RunPlan
   ) extends CommandParameter(runPlan, maybePrefix)
       with PositionInfo {
-    override val value:         Value  = Value("input_path")
+    val value:                  Value  = Value("input_path")
     override lazy val toString: String = s"argument_$position"
   }
 
@@ -233,7 +222,7 @@ object CommandParameter {
           override val role: Role = Role("input")
         }
 
-    implicit def argumentEncoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[CommandParameter with Input] =
+    implicit def inputEncoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[CommandParameter with Input] =
       JsonLDEncoder.instance { input =>
         JsonLD.entity(
           input.asEntityId,
@@ -241,7 +230,6 @@ object CommandParameter {
           rdfs / "label"     -> s"""Command Input Template "${input.value}"""".asJsonLD,
           renku / "position" -> input.position.asJsonLD,
           renku / "prefix"   -> input.maybePrefix.asJsonLD,
-          renku / "value"    -> input.value.asJsonLD,
           renku / "consumes" -> input.entity.asJsonLD
         )
       }
@@ -250,24 +238,6 @@ object CommandParameter {
       EntityIdEncoder.instance(input =>
         EntityId of renkuBaseUrl / "runs" / input.runPlan.id / "inputs" / input.position
       )
-
-    private implicit def converter(implicit
-        renkuBaseUrl: RenkuBaseUrl,
-        gitLabApiUrl: GitLabApiUrl
-    ): PartialEntityConverter[CommandParameter with Input] =
-      new PartialEntityConverter[CommandParameter with Input] {
-        override def convert[T <: CommandParameter with Input]: T => Either[Exception, PartialEntity] = {
-          case input: EntityCommandParameter with Input =>
-            PartialEntity(
-              EntityTypes of renku / "CommandInput",
-              rdfs / "label"     -> s"""Command Input "${input.value}"""".asJsonLD,
-              renku / "consumes" -> input.entity.asJsonLD
-            ).asRight
-          case other => throw new IllegalStateException(s"$other not supported")
-        }
-
-        override lazy val toEntityId: CommandParameter with Input => Option[EntityId] = ???
-      }
 
     implicit def inputEncoder(implicit
         renkuBaseUrl: RenkuBaseUrl,
@@ -364,7 +334,7 @@ object CommandParameter {
             override val outputFolderCreation: FolderCreation = folderCreation
           }
 
-    implicit def argumentEncoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[CommandParameter with Output] =
+    implicit def outputEncoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[CommandParameter with Output] =
       JsonLDEncoder.instance { output =>
         JsonLD.entity(
           output.asEntityId,
@@ -373,8 +343,7 @@ object CommandParameter {
           renku / "createFolder" -> output.outputFolderCreation.asJsonLD,
           renku / "produces"     -> output.entity.asJsonLD,
           renku / "position"     -> output.position.asJsonLD,
-          renku / "prefix"       -> output.maybePrefix.asJsonLD,
-          renku / "value"        -> output.value.asJsonLD
+          renku / "prefix"       -> output.maybePrefix.asJsonLD
         )
       }
 
@@ -382,25 +351,6 @@ object CommandParameter {
       EntityIdEncoder.instance(output =>
         EntityId of renkuBaseUrl / "runs" / output.runPlan.id / "outputs" / output.position
       )
-
-    private implicit def converter(implicit
-        renkuBaseUrl: RenkuBaseUrl,
-        gitLabApiUrl: GitLabApiUrl
-    ): PartialEntityConverter[CommandParameter with Output] =
-      new PartialEntityConverter[CommandParameter with Output] {
-        override def convert[T <: CommandParameter with Output]: T => Either[Exception, PartialEntity] = {
-          case output: EntityCommandParameter with Output =>
-            PartialEntity(
-              EntityTypes of renku / "CommandOutput",
-              rdfs / "label"         -> s"""Command Output "${output.value}"""".asJsonLD,
-              renku / "createFolder" -> output.outputFolderCreation.asJsonLD,
-              renku / "produces"     -> output.entity.asJsonLD
-            ).asRight
-          case other => throw new IllegalStateException(s"$other not supported")
-        }
-
-        override lazy val toEntityId: CommandParameter with Output => Option[EntityId] = ???
-      }
 
     implicit def outputEncoder(implicit
         renkuBaseUrl:  RenkuBaseUrl,

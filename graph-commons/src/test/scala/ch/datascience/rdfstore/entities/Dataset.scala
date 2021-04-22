@@ -25,8 +25,7 @@ import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.DataSetPart.DataSetPartArtifact
 import io.renku.jsonld.EntityId
 
-trait DataSet {
-  self: Artifact with Entity =>
+trait Dataset {
 
   val datasetId:               Identifier
   val datasetTitle:            Title
@@ -57,15 +56,13 @@ trait DataSet {
   def entityId(implicit renkuBaseUrl: RenkuBaseUrl): EntityId = DataSet.entityId(datasetId)
 }
 
-object DataSet {
+object Dataset {
 
   import ch.datascience.graph.config.RenkuBaseUrl
   import ch.datascience.graph.model.datasets.DerivedFrom._
   import io.renku.jsonld.JsonLDEncoder._
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
-
-  type DataSetEntity = Entity with DataSet with Artifact
 
   def nonModifiedFactory(identifier:                 Identifier,
                          title:                      Title,
@@ -80,7 +77,7 @@ object DataSet {
                          images:                     List[ImageUri] = Nil,
                          overrideTopmostSameAs:      Option[TopmostSameAs] = None,
                          overrideTopmostDerivedFrom: Option[TopmostDerivedFrom] = None
-  )(activity:                                        Activity): DataSetEntity =
+  ): Dataset =
     new Entity(activity.id,
                Location(".renku") / "datasets" / identifier,
                activity.project,
