@@ -49,8 +49,6 @@ private class ZombieNodesCleanerImpl[Interpretation[_]: Async: Parallel: Bracket
     with ZombieNodesCleaner[Interpretation]
     with TypeSerializers {
 
-  import serviceHealthChecker._
-
   override def removeZombieNodes(): Interpretation[Unit] = sessionResource.useK {
     for {
       maybeZombieRecords <- findPotentialZombieRecords
@@ -76,14 +74,18 @@ private class ZombieNodesCleanerImpl[Interpretation[_]: Async: Parallel: Bracket
     case (sourceUrl, subscriberUrl) =>
       for {
         subscriberAsBaseUrl <- subscriberUrl.as[Interpretation, MicroserviceBaseUrl]
-        subscriberHealthy   <- ping(subscriberAsBaseUrl)
-        sourceHealthy       <- ping(sourceUrl)
+        subscriberHealthy   <- ping(subscriberAsBaseUrl, ifNot = microserviceBaseUrl)
+        sourceHealthy       <- ping(sourceUrl, ifNot = microserviceBaseUrl)
       } yield sourceHealthy -> subscriberHealthy match {
         case (true, true)  => NoAction
         case (false, true) => Upsert(sourceUrl, subscriberUrl)
         case (_, false)    => Delete(sourceUrl, subscriberUrl)
       }
   }
+
+  private def ping(url: MicroserviceBaseUrl, ifNot: MicroserviceBaseUrl) =
+    if (url == ifNot) true.pure[Interpretation]
+    else serviceHealthChecker.ping(url)
 
   private lazy val toQuery: Action => Kleisli[Interpretation, Session[Interpretation], Completion] = {
     case Delete(sourceUrl, subscriberUrl, _) =>
