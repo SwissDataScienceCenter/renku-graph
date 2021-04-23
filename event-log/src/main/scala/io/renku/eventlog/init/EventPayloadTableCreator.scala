@@ -20,7 +20,7 @@ package io.renku.eventlog.init
 
 import cats.MonadError
 import cats.data.Kleisli
-import cats.effect.{Async, Bracket}
+import cats.effect.{Async, Bracket, BracketThrow}
 import ch.datascience.db.SessionResource
 import org.typelevel.log4cats.Logger
 import io.renku.eventlog.EventLogDB
@@ -33,14 +33,14 @@ private trait EventPayloadTableCreator[Interpretation[_]] {
 }
 
 private object EventPayloadTableCreator {
-  def apply[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+  def apply[Interpretation[_]: BracketThrow](
       sessionResource: SessionResource[Interpretation, EventLogDB],
       logger:          Logger[Interpretation]
   ): EventPayloadTableCreator[Interpretation] =
     new EventPayloadTableCreatorImpl(sessionResource, logger)
 }
 
-private class EventPayloadTableCreatorImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+private class EventPayloadTableCreatorImpl[Interpretation[_]: BracketThrow](
     sessionResource: SessionResource[Interpretation, EventLogDB],
     logger:          Logger[Interpretation]
 ) extends EventPayloadTableCreator[Interpretation]

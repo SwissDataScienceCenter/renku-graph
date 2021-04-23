@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.statuschange
 
-import cats.effect.{Async, Bracket}
+import cats.effect.BracketThrow
 import ch.datascience.db.SqlStatement
 import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
@@ -28,7 +28,7 @@ import skunk._
 import skunk.implicits._
 
 trait StatusProcessingTime extends TypeSerializers {
-  def upsertStatusProcessingTime[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+  def upsertStatusProcessingTime[Interpretation[_]: BracketThrow](
       eventId:             CompoundEventId,
       status:              EventStatus,
       maybeProcessingTime: Option[EventProcessingTime]

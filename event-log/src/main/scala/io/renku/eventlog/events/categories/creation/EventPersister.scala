@@ -18,13 +18,10 @@
 
 package io.renku.eventlog.events.categories.creation
 
-import EventPersister.Result
-import Result._
 import cats.Applicative
 import cats.data.{Kleisli, NonEmptyList}
-import cats.effect.{Async, Bracket, IO, Resource}
+import cats.effect.{BracketThrow, IO}
 import cats.syntax.all._
-import cats.free.Free
 import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events._
@@ -32,19 +29,19 @@ import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import eu.timepit.refined.auto._
 import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
-import io.renku.eventlog.{CreatedDate, Event, EventDate, EventLogDB, EventMessage, ExecutionDate}
+import io.renku.eventlog.events.categories.creation.EventPersister.Result
+import io.renku.eventlog.events.categories.creation.EventPersister.Result._
+import io.renku.eventlog._
 import skunk._
 import skunk.implicits._
-import skunk.codec.all._
 
-import java.time.{Instant, LocalDateTime, OffsetDateTime, ZoneId}
-import scala.util.control.NonFatal
+import java.time.Instant
 
 trait EventPersister[Interpretation[_]] {
   def storeNewEvent(event: Event): Interpretation[Result]
 }
 
-class EventPersisterImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+class EventPersisterImpl[Interpretation[_]: BracketThrow](
     sessionResource:    SessionResource[Interpretation, EventLogDB],
     waitingEventsGauge: LabeledGauge[Interpretation, projects.Path],
     queriesExecTimes:   LabeledHistogram[Interpretation, SqlStatement.Name],
@@ -104,13 +101,13 @@ class EventPersisterImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     SqlStatement(name = "new - find batch")
       .select[projects.Id, BatchDate](
         sql"""SELECT batch_date
-                FROM event
-                WHERE project_id = $projectIdEncoder AND #${`status IN`(New,
-                                                                        GenerationRecoverableFailure,
-                                                                        GeneratingTriples
+              FROM event
+              WHERE project_id = $projectIdEncoder AND #${`status IN`(New,
+                                                                      GenerationRecoverableFailure,
+                                                                      GeneratingTriples
         )}
-                ORDER BY batch_date DESC
-                LIMIT 1
+              ORDER BY batch_date DESC
+              LIMIT 1
           """.query(batchDateDecoder)
       )
       .arguments(event.project.id)

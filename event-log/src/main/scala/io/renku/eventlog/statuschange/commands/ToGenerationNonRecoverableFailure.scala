@@ -20,7 +20,7 @@ package io.renku.eventlog.statuschange
 package commands
 
 import cats.data.{Kleisli, NonEmptyList}
-import cats.effect.{Async, Bracket}
+import cats.effect.BracketThrow
 import cats.syntax.all._
 import ch.datascience.db.SqlStatement
 import ch.datascience.graph.model.events.EventStatus._
@@ -35,7 +35,7 @@ import skunk.implicits._
 
 import java.time.Instant
 
-final case class ToGenerationNonRecoverableFailure[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+final case class ToGenerationNonRecoverableFailure[Interpretation[_]: BracketThrow](
     eventId:                     CompoundEventId,
     message:                     EventMessage,
     underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
@@ -80,7 +80,7 @@ object ToGenerationNonRecoverableFailure {
   import ChangeStatusRequest.EventOnlyRequest
   import CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
 
-  def factory[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+  def factory[Interpretation[_]: BracketThrow](
       underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path]
   ): Kleisli[Interpretation, ChangeStatusRequest, CommandFindingResult] = Kleisli.fromFunction {
     case EventOnlyRequest(eventId, GenerationNonRecoverableFailure, maybeProcessingTime, Some(message)) =>

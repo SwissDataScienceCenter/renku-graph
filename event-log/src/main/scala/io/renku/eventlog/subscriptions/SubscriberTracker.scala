@@ -18,9 +18,7 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.data.Kleisli
-import cats.effect.{Async, Bracket, IO}
-import cats.syntax.all._
+import cats.effect.{BracketThrow, IO}
 import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import ch.datascience.metrics.LabeledHistogram
@@ -37,7 +35,7 @@ private trait SubscriberTracker[Interpretation[_]] {
   def remove(subscriberUrl: SubscriberUrl): Interpretation[Boolean]
 }
 
-private class SubscriberTrackerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+private class SubscriberTrackerImpl[Interpretation[_]: BracketThrow](
     sessionResource:  SessionResource[Interpretation, EventLogDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
     sourceUrl:        MicroserviceBaseUrl

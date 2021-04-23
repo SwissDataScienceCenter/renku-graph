@@ -19,7 +19,7 @@
 package io.renku.eventlog.metrics
 
 import cats.data.NonEmptyList
-import cats.effect.{Async, Bracket, ContextShift, IO}
+import cats.effect.{BracketThrow, ContextShift, IO, Sync}
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.{CategoryName, EventStatus, LastSyncedDate}
@@ -46,7 +46,7 @@ trait StatsFinder[Interpretation[_]] {
   ): Interpretation[Map[Path, Long]]
 }
 
-class StatsFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+class StatsFinderImpl[Interpretation[_]: Sync: BracketThrow](
     sessionResource:  SessionResource[Interpretation, EventLogDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
     now:              () => Instant = () => Instant.now

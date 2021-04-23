@@ -19,8 +19,7 @@
 package io.renku.eventlog.subscriptions.zombieevents
 
 import cats.data.Kleisli
-import cats.effect.{Async, Bracket, ContextShift, IO}
-import cats.free.Free
+import cats.effect.{BracketThrow, IO}
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples}
@@ -31,14 +30,14 @@ import eu.timepit.refined.api.Refined
 import io.renku.eventlog.subscriptions.EventFinder
 import io.renku.eventlog.{EventLogDB, TypeSerializers}
 import skunk._
-import skunk.implicits._
 import skunk.codec.all._
 import skunk.data.Completion
+import skunk.implicits._
 
 import java.time.Instant.now
 import java.time.{OffsetDateTime, ZoneId}
 
-private class LostSubscriberEventFinder[Interpretation[_]: Async: Bracket[*[_], Throwable]: ContextShift](
+private class LostSubscriberEventFinder[Interpretation[_]: BracketThrow](
     sessionResource:  SessionResource[Interpretation, EventLogDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
 ) extends DbClient(Some(queriesExecTimes))
@@ -48,7 +47,6 @@ private class LostSubscriberEventFinder[Interpretation[_]: Async: Bracket[*[_], 
 
   override def popEvent(): Interpretation[Option[ZombieEvent]] = sessionResource.useK {
     findEvents >>= markEventTaken()
-
   }
 
   private lazy val findEvents = measureExecutionTime {
@@ -115,9 +113,9 @@ private class LostSubscriberEventFinder[Interpretation[_]: Async: Bracket[*[_], 
 
 private object LostSubscriberEventFinder {
   def apply(
-      sessionResource:     SessionResource[IO, EventLogDB],
-      queriesExecTimes:    LabeledHistogram[IO, SqlStatement.Name]
-  )(implicit contextShift: ContextShift[IO]): IO[EventFinder[IO, ZombieEvent]] = IO {
+      sessionResource:  SessionResource[IO, EventLogDB],
+      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
+  ): IO[EventFinder[IO, ZombieEvent]] = IO {
     new LostSubscriberEventFinder[IO](sessionResource, queriesExecTimes)
   }
 }

@@ -25,11 +25,10 @@ import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import org.typelevel.log4cats.Logger
-import skunk.data.Completion
 
 import scala.util.control.NonFatal
 
-class DbInitializer[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+class DbInitializer[Interpretation[_]: BracketThrow](
     projectPathAdder:         ProjectPathAdder[Interpretation],
     duplicateProjectsRemover: DuplicateProjectsRemover[Interpretation],
     sessionResource:          SessionResource[Interpretation, ProjectsTokensDB],

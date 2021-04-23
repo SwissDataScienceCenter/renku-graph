@@ -20,10 +20,10 @@ package io.renku.eventlog.subscriptions.zombieevents
 
 import cats.Parallel
 import cats.data.Kleisli
-import cats.effect.{Async, Bracket, ContextShift, IO, Timer}
+import cats.effect.{BracketThrow, ConcurrentEffect, IO, Sync, Timer}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.db.implicits._
+import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
@@ -40,7 +40,7 @@ private trait ZombieNodesCleaner[Interpretation[_]] {
   def removeZombieNodes(): Interpretation[Unit]
 }
 
-private class ZombieNodesCleanerImpl[Interpretation[_]: Async: Parallel: Bracket[*[_], Throwable]: ContextShift](
+private class ZombieNodesCleanerImpl[Interpretation[_]: Sync: Parallel: BracketThrow](
     sessionResource:      SessionResource[Interpretation, EventLogDB],
     queriesExecTimes:     LabeledHistogram[Interpretation, SqlStatement.Name],
     microserviceBaseUrl:  MicroserviceBaseUrl,
@@ -160,7 +160,8 @@ private object ZombieNodesCleaner {
       logger:           Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
+      concurrentEffect: ConcurrentEffect[IO],
+      parallel:         Parallel[IO],
       timer:            Timer[IO]
   ): IO[ZombieNodesCleaner[IO]] = for {
     serviceUrlFinder     <- MicroserviceUrlFinder(Microservice.ServicePort)

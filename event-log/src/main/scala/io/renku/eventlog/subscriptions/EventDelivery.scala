@@ -19,8 +19,7 @@
 package io.renku.eventlog.subscriptions
 
 import cats.MonadError
-import cats.data.Kleisli
-import cats.effect.{Async, Bracket, IO}
+import cats.effect.{BracketThrow, IO}
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
@@ -38,7 +37,7 @@ private[subscriptions] trait EventDelivery[Interpretation[_], CategoryEvent] {
   def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): Interpretation[Unit]
 }
 
-private class EventDeliveryImpl[Interpretation[_]: Async: Bracket[*[_], Throwable], CategoryEvent](
+private class EventDeliveryImpl[Interpretation[_]: BracketThrow, CategoryEvent](
     sessionResource:          SessionResource[Interpretation, EventLogDB],
     compoundEventIdExtractor: CategoryEvent => CompoundEventId,
     queriesExecTimes:         LabeledHistogram[Interpretation, SqlStatement.Name],

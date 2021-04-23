@@ -20,7 +20,6 @@ package ch.datascience.graph.acceptancetests.tooling
 
 import cats.effect._
 import cats.effect.concurrent.Semaphore
-import ch.datascience.db.DBConfigProvider
 import ch.datascience.graph.acceptancetests.db.{EventLog, TokenRepository}
 import ch.datascience.graph.acceptancetests.stubs.{GitLab, RemoteTriplesGenerator}
 import ch.datascience.graph.acceptancetests.tooling.KnowledgeGraphClient.KnowledgeGraphClient
@@ -33,9 +32,10 @@ import scala.concurrent.ExecutionContext
 trait GraphServices extends BeforeAndAfterAll {
   this: Suite =>
 
-  protected implicit lazy val executionContext: ExecutionContext = GraphServices.executionContext
-  protected implicit lazy val contextShift:     ContextShift[IO] = GraphServices.contextShift
-  protected implicit lazy val timer:            Timer[IO]        = GraphServices.timer
+  protected implicit lazy val executionContext: ExecutionContext     = GraphServices.executionContext
+  protected implicit lazy val contextShift:     ContextShift[IO]     = GraphServices.contextShift
+  protected implicit lazy val concurrent:       ConcurrentEffect[IO] = GraphServices.concurrent
+  protected implicit lazy val timer:            Timer[IO]            = GraphServices.timer
 
   protected val restClient:             RestClient           = new RestClient()
   protected val webhookServiceClient:   WebhookServiceClient = GraphServices.webhookServiceClient
@@ -71,9 +71,10 @@ object GraphServices {
   import ch.datascience._
   import ch.datascience.graph.acceptancetests.stubs.RdfStoreStub
 
-  implicit lazy val executionContext: ExecutionContext = ExecutionContext.global
-  implicit lazy val contextShift:     ContextShift[IO] = IO.contextShift(executionContext)
-  implicit lazy val timer:            Timer[IO]        = IO.timer(executionContext)
+  implicit lazy val executionContext: ExecutionContext     = ExecutionContext.global
+  implicit lazy val contextShift:     ContextShift[IO]     = IO.contextShift(executionContext)
+  implicit lazy val concurrent:       ConcurrentEffect[IO] = IO.ioConcurrentEffect
+  implicit lazy val timer:            Timer[IO]            = IO.timer(executionContext)
 
   val webhookServiceClient:     WebhookServiceClient          = WebhookServiceClient()
   val commitEventServiceClient: ServiceClient                 = CommitEventServiceClient()

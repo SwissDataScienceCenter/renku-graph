@@ -19,7 +19,7 @@
 package io.renku.eventlog.events.categories.zombieevents
 
 import cats.data.Kleisli
-import cats.effect.{Async, Bracket}
+import cats.effect.BracketThrow
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, New, TransformingTriples, TriplesGenerated}
@@ -38,7 +38,7 @@ private trait ZombieStatusCleaner[Interpretation[_]] {
   def cleanZombieStatus(event: ZombieEvent): Interpretation[UpdateResult]
 }
 
-private class ZombieStatusCleanerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+private class ZombieStatusCleanerImpl[Interpretation[_]: BracketThrow](
     sessionResource:  SessionResource[Interpretation, EventLogDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
     now:              () => Instant = () => Instant.now

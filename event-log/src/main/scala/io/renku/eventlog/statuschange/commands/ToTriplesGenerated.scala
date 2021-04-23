@@ -18,9 +18,10 @@
 
 package io.renku.eventlog.statuschange.commands
 
+import cats.Applicative
 import cats.data.EitherT.fromEither
 import cats.data.{EitherT, Kleisli, NonEmptyList}
-import cats.effect.{Async, Bracket, Sync}
+import cats.effect.{Bracket, BracketThrow}
 import cats.syntax.all._
 import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples, TriplesGenerated}
@@ -42,7 +43,7 @@ import java.time.Instant
 
 trait ToTriplesGenerated[Interpretation[_]] extends ChangeStatusCommand[Interpretation]
 
-final case class GeneratingToTriplesGenerated[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+final case class GeneratingToTriplesGenerated[Interpretation[_]: BracketThrow](
     eventId:                     CompoundEventId,
     payload:                     EventPayload,
     schemaVersion:               SchemaVersion,
@@ -108,7 +109,7 @@ final case class GeneratingToTriplesGenerated[Interpretation[_]: Async: Bracket[
     }
 }
 
-final case class TransformingToTriplesGenerated[Interpretation[_]: Bracket[*[_], Throwable]](
+final case class TransformingToTriplesGenerated[Interpretation[_]: BracketThrow](
     eventId:                         CompoundEventId,
     awaitingTransformationGauge:     LabeledGauge[Interpretation, projects.Path],
     underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
@@ -161,7 +162,7 @@ final case class TransformingToTriplesGenerated[Interpretation[_]: Bracket[*[_],
 
 private[statuschange] object ToTriplesGenerated extends TypeSerializers {
 
-  def factory[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+  def factory[Interpretation[_]: Bracket[*[_], Throwable]](
       sessionResource:                 SessionResource[Interpretation, EventLogDB],
       underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
       underTriplesGenerationGauge:     LabeledGauge[Interpretation, projects.Path],
@@ -208,7 +209,7 @@ private[statuschange] object ToTriplesGenerated extends TypeSerializers {
       either.leftMap(e => PayloadMalformed(e.getMessage)).leftWiden[CommandFindingResult]
   }
 
-  private def stringToJson[Interpretation[_]: Sync](
+  private def stringToJson[Interpretation[_]: Applicative](
       payloadPartBody: String
   ): EitherT[Interpretation, CommandFindingResult, Json] =
     EitherT.fromEither[Interpretation](parser.parse(payloadPartBody).leftMap(e => PayloadMalformed(e.getMessage)))
@@ -219,7 +220,7 @@ private[statuschange] object ToTriplesGenerated extends TypeSerializers {
       payload       <- cursor.downField("payload").as[EventPayload]
     } yield (schemaVersion, payload)
 
-  private def findEventStatus[Interpretation[_]: Sync: Bracket[*[_], Throwable]](
+  private def findEventStatus[Interpretation[_]: BracketThrow](
       eventId:         CompoundEventId,
       sessionResource: SessionResource[Interpretation, EventLogDB]
   ): Interpretation[EventStatus] = sessionResource.useK {

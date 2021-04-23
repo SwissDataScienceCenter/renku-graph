@@ -38,7 +38,7 @@ import skunk.implicits._
 
 import java.time.Instant
 
-final case class ToNew[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+final case class ToNew[Interpretation[_]: Bracket[*[_], Throwable]](
     eventId:                        CompoundEventId,
     awaitingTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
     underTriplesGenerationGauge:    LabeledGauge[Interpretation, projects.Path],
@@ -81,7 +81,7 @@ final case class ToNew[Interpretation[_]: Async: Bracket[*[_], Throwable]](
 }
 
 object ToNew {
-  def factory[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+  def factory[Interpretation[_]: Bracket[*[_], Throwable]](
       awaitingTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
       underTriplesGenerationGauge:    LabeledGauge[Interpretation, projects.Path]
   ): Kleisli[Interpretation, ChangeStatusRequest, CommandFindingResult] = Kleisli.fromFunction {

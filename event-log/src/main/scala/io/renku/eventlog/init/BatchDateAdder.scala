@@ -19,14 +19,14 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.{Async, Bracket}
+import cats.effect.BracketThrow
 import cats.syntax.all._
 import ch.datascience.db.SessionResource
 import ch.datascience.graph.model.events.BatchDate
-import org.typelevel.log4cats.Logger
 import io.renku.eventlog.EventLogDB
+import org.typelevel.log4cats.Logger
 import skunk._
-import skunk.codec.all.{bool, timestamp}
+import skunk.codec.all.timestamp
 import skunk.implicits._
 
 import java.time.{LocalDateTime, ZoneOffset}
@@ -37,14 +37,14 @@ private trait BatchDateAdder[Interpretation[_]] {
 }
 
 private object BatchDateAdder {
-  def apply[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+  def apply[Interpretation[_]: BracketThrow](
       sessionResource: SessionResource[Interpretation, EventLogDB],
       logger:          Logger[Interpretation]
   ): BatchDateAdder[Interpretation] =
     new BatchDateAdderImpl(sessionResource, logger)
 }
 
-private class BatchDateAdderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+private class BatchDateAdderImpl[Interpretation[_]: BracketThrow](
     sessionResource: SessionResource[Interpretation, EventLogDB],
     logger:          Logger[Interpretation]
 ) extends BatchDateAdder[Interpretation]

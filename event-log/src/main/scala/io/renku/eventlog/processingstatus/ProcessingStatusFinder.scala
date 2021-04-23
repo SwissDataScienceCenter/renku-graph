@@ -20,7 +20,7 @@ package io.renku.eventlog.processingstatus
 
 import cats.MonadError
 import cats.data.OptionT
-import cats.effect.{Async, Bracket, ContextShift, IO}
+import cats.effect.{BracketThrow, IO, Sync}
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.EventStatus
@@ -40,7 +40,7 @@ trait ProcessingStatusFinder[Interpretation[_]] {
   def fetchStatus(projectId: Id): OptionT[Interpretation, ProcessingStatus]
 }
 
-class ProcessingStatusFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+class ProcessingStatusFinderImpl[Interpretation[_]: Sync: BracketThrow](
     sessionResource:  SessionResource[Interpretation, EventLogDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
 ) extends DbClient(Some(queriesExecTimes))
@@ -85,9 +85,9 @@ class ProcessingStatusFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwab
 
 object IOProcessingStatusFinder {
   def apply(
-      sessionResource:     SessionResource[IO, EventLogDB],
-      queriesExecTimes:    LabeledHistogram[IO, SqlStatement.Name]
-  )(implicit contextShift: ContextShift[IO]): IO[ProcessingStatusFinder[IO]] = IO {
+      sessionResource:  SessionResource[IO, EventLogDB],
+      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
+  ): IO[ProcessingStatusFinder[IO]] = IO {
     new ProcessingStatusFinderImpl(sessionResource, queriesExecTimes)
   }
 }

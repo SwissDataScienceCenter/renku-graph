@@ -19,7 +19,7 @@
 package io.renku.eventlog.statuschange.commands
 
 import cats.data.{Kleisli, NonEmptyList}
-import cats.effect.{Async, Bracket}
+import cats.effect.BracketThrow
 import cats.syntax.all._
 import ch.datascience.db.SqlStatement
 import ch.datascience.graph.model.events.EventStatus._
@@ -32,13 +32,13 @@ import io.renku.eventlog.statuschange.CommandFindingResult.{CommandFound, NotSup
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 import io.renku.eventlog.statuschange.{ChangeStatusRequest, CommandFindingResult}
 import io.renku.eventlog.{EventMessage, ExecutionDate}
+import skunk._
 import skunk.data.Completion
 import skunk.implicits._
-import skunk.{Command, _}
 
 import java.time.Instant
 
-final case class ToTransformationNonRecoverableFailure[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+final case class ToTransformationNonRecoverableFailure[Interpretation[_]: BracketThrow](
     eventId:                         CompoundEventId,
     message:                         EventMessage,
     underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
@@ -77,7 +77,7 @@ final case class ToTransformationNonRecoverableFailure[Interpretation[_]: Async:
 }
 
 object ToTransformationNonRecoverableFailure {
-  def factory[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+  def factory[Interpretation[_]: BracketThrow](
       underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path]
   ): Kleisli[Interpretation, ChangeStatusRequest, CommandFindingResult] = Kleisli.fromFunction {
     case EventOnlyRequest(eventId, TransformationNonRecoverableFailure, maybeProcessingTime, Some(message)) =>

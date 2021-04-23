@@ -19,7 +19,7 @@
 package io.renku.eventlog.events.categories.commitsyncrequest
 
 import cats.data.Kleisli
-import cats.effect.{Async, Bracket, IO}
+import cats.effect.BracketThrow
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.CategoryName
@@ -38,7 +38,7 @@ private trait CommitSyncForcer[Interpretation[_]] {
   def forceCommitSync(projectId: projects.Id, projectPath: projects.Path): Interpretation[Unit]
 }
 
-private class CommitSyncForcerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+private class CommitSyncForcerImpl[Interpretation[_]: BracketThrow](
     sessionResource:  SessionResource[Interpretation, EventLogDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
     now:              () => Instant = () => Instant.now

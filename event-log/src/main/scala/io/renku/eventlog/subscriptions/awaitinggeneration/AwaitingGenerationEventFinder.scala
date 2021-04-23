@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
 import cats.data.{Kleisli, NonEmptyList}
-import cats.effect.{Async, Bracket, ContextShift, IO}
+import cats.effect.{BracketThrow, IO, Sync}
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.db.implicits._
@@ -43,7 +43,7 @@ import scala.language.postfixOps
 import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
 
-private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]: ContextShift](
+private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Sync: BracketThrow](
     sessionResource:       SessionResource[Interpretation, EventLogDB],
     waitingEventsGauge:    LabeledGauge[Interpretation, projects.Path],
     underProcessingGauge:  LabeledGauge[Interpretation, projects.Path],
@@ -198,7 +198,7 @@ private object IOAwaitingGenerationEventFinder {
       waitingEventsGauge:   LabeledGauge[IO, projects.Path],
       underProcessingGauge: LabeledGauge[IO, projects.Path],
       queriesExecTimes:     LabeledHistogram[IO, SqlStatement.Name]
-  )(implicit contextShift:  ContextShift[IO]): IO[EventFinder[IO, AwaitingGenerationEvent]] = for {
+  ): IO[EventFinder[IO, AwaitingGenerationEvent]] = for {
     projectPrioritisation <- ProjectPrioritisation(subscribers)
   } yield new AwaitingGenerationEventFinderImpl(sessionResource,
                                                 waitingEventsGauge,

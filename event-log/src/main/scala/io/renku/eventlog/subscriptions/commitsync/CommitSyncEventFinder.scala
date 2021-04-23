@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions.commitsync
 
 import cats.data.Kleisli
-import cats.effect.{Async, Bracket, ContextShift, IO}
+import cats.effect.{BracketThrow, IO}
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, LastSyncedDate}
@@ -34,7 +34,7 @@ import skunk.implicits._
 
 import java.time.Instant
 
-private class CommitSyncEventFinderImpl[Interpretation[_]: Async: ContextShift: Bracket[*[_], Throwable]](
+private class CommitSyncEventFinderImpl[Interpretation[_]: BracketThrow](
     sessionResource:  SessionResource[Interpretation, EventLogDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
     now:              () => Instant = () => Instant.now
@@ -147,7 +147,7 @@ private object CommitSyncEventFinder {
   def apply(
       sessionResource:  SessionResource[IO, EventLogDB],
       queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
-  )(implicit ME:        Bracket[IO, Throwable], contextShift: ContextShift[IO]): IO[EventFinder[IO, CommitSyncEvent]] = IO {
+  ): IO[EventFinder[IO, CommitSyncEvent]] = IO {
     new CommitSyncEventFinderImpl(sessionResource, queriesExecTimes)
   }
 }

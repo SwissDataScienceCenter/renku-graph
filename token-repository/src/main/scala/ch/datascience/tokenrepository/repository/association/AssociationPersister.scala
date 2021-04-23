@@ -31,7 +31,7 @@ import skunk.data.Completion
 import skunk.data.Completion.{Insert, Update}
 import skunk.implicits._
 
-private class AssociationPersister[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+private class AssociationPersister[Interpretation[_]: BracketThrow](
     sessionResource:  SessionResource[Interpretation, ProjectsTokensDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
 ) extends DbClient[Interpretation](Some(queriesExecTimes))

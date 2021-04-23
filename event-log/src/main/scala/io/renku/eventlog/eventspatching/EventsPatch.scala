@@ -18,23 +18,22 @@
 
 package io.renku.eventlog.eventspatching
 
-import java.time.Instant
-import cats.{Monad, MonadError}
 import cats.data.Kleisli
-import cats.effect.Async
+import cats.effect.BracketThrow
 import cats.syntax.all._
 import ch.datascience.db.SqlStatement
-import ch.datascience.graph.model.events.{BatchDate, EventStatus}
 import ch.datascience.graph.model.events.EventStatus.New
+import ch.datascience.graph.model.events.{BatchDate, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import io.renku.eventlog.TypeSerializers
 import skunk._
-import skunk.codec.all._
 import skunk.data.Completion
 import skunk.implicits._
+
+import java.time.Instant
 
 private trait EventsPatch[Interpretation[_]] extends Product with Serializable with TypeSerializers {
   def name:               String Refined NonEmpty
@@ -43,7 +42,7 @@ private trait EventsPatch[Interpretation[_]] extends Product with Serializable w
   lazy val query: SqlStatement[Interpretation, Completion] = SqlStatement(sqlQuery, name)
 }
 
-private case class StatusNewPatch[Interpretation[_]: Async: MonadError[*[_], Throwable]](
+private case class StatusNewPatch[Interpretation[_]: BracketThrow](
     waitingEventsGauge:   LabeledGauge[Interpretation, projects.Path],
     underProcessingGauge: LabeledGauge[Interpretation, projects.Path],
     now:                  () => Instant = () => Instant.now

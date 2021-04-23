@@ -19,7 +19,7 @@
 package ch.datascience.db
 
 import cats.data.Kleisli
-import cats.effect.Bracket
+import cats.effect.{Bracket, BracketThrow}
 import cats.syntax.all._
 import cats.{Functor, Monad}
 import ch.datascience.db.SqlStatement.Name
@@ -47,25 +47,25 @@ final case class SqlStatement[Interpretation[_], ResultType](
 object SqlStatement {
   type Name = String Refined NonEmpty
 
-  def apply[Interpretation[_]: Bracket[*[_], Throwable]](name: Name): QueryBuilder[Interpretation] =
+  def apply[Interpretation[_]: BracketThrow](name: Name): QueryBuilder[Interpretation] =
     new QueryBuilder[Interpretation](name)
 
-  class QueryBuilder[Interpretation[_]: Bracket[*[_], Throwable]](val name: Name) {
+  class QueryBuilder[Interpretation[_]: BracketThrow](val name: Name) {
     def select[In, Out](query: Query[In, Out]): SelectBuilder[Interpretation, In, Out] =
       SelectBuilder[Interpretation, In, Out](query, name)
 
     def command[In](command: skunk.Command[In]): CommandBuilder[Interpretation, In] = CommandBuilder(command, name)
   }
 
-  case class SelectBuilder[Interpretation[_]: Bracket[*[_], Throwable], In, Out](query: Query[In, Out], name: Name) {
+  case class SelectBuilder[Interpretation[_]: BracketThrow, In, Out](query: Query[In, Out], name: Name) {
     def arguments(args: In): Select[Interpretation, In, Out] = Select(query, name, args = args)
   }
 
-  case class CommandBuilder[Interpretation[_]: Bracket[*[_], Throwable], In](command: skunk.Command[In], name: Name) {
+  case class CommandBuilder[Interpretation[_]: BracketThrow, In](command: skunk.Command[In], name: Name) {
     def arguments(args: In): Command[Interpretation, In] = Command(command, name, args = args)
   }
 
-  case class Select[Interpretation[_]: Bracket[*[_], Throwable], In, Out](query: Query[In, Out], name: Name, args: In) {
+  case class Select[Interpretation[_]: BracketThrow, In, Out](query: Query[In, Out], name: Name, args: In) {
     def build[F[_]](
         queryExecution: PreparedQuery[Interpretation, In, Out] => In => Interpretation[F[Out]]
     ): SqlStatement[Interpretation, F[Out]] = SqlStatement[Interpretation, F[Out]](
@@ -74,7 +74,7 @@ object SqlStatement {
     )
   }
 
-  case class Command[Interpretation[_]: Bracket[*[_], Throwable], In](
+  case class Command[Interpretation[_]: BracketThrow, In](
       command: skunk.Command[In],
       name:    Name,
       args:    In

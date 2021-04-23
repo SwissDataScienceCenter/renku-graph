@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions.zombieevents
 
 import cats.data.Kleisli
-import cats.effect.{Async, Bracket, ContextShift, IO}
+import cats.effect.{BracketThrow, IO}
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples}
@@ -38,7 +38,7 @@ import java.time.Duration
 import java.time.Instant.now
 import scala.language.postfixOps
 
-private class LostZombieEventFinder[Interpretation[_]: Async: Bracket[*[_], Throwable]: ContextShift](
+private class LostZombieEventFinder[Interpretation[_]: BracketThrow](
     sessionResource:  SessionResource[Interpretation, EventLogDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
 ) extends DbClient(Some(queriesExecTimes))
@@ -109,9 +109,9 @@ private class LostZombieEventFinder[Interpretation[_]: Async: Bracket[*[_], Thro
 
 private object LostZombieEventFinder {
   def apply(
-      sessionResource:     SessionResource[IO, EventLogDB],
-      queriesExecTimes:    LabeledHistogram[IO, SqlStatement.Name]
-  )(implicit contextShift: ContextShift[IO]): IO[EventFinder[IO, ZombieEvent]] = IO {
+      sessionResource:  SessionResource[IO, EventLogDB],
+      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
+  ): IO[EventFinder[IO, ZombieEvent]] = IO {
     new LostZombieEventFinder(sessionResource, queriesExecTimes)
   }
 }

@@ -19,7 +19,7 @@
 package io.renku.eventlog.statuschange
 
 import cats.data.Kleisli
-import cats.effect.{Async, Bracket}
+import cats.effect.BracketThrow
 import cats.syntax.all._
 import ch.datascience.data.ErrorMessage
 import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
@@ -42,7 +42,7 @@ trait StatusUpdatesRunner[Interpretation[_]] {
   def run(command: ChangeStatusCommand[Interpretation]): Interpretation[UpdateResult]
 }
 
-class StatusUpdatesRunnerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+class StatusUpdatesRunnerImpl[Interpretation[_]: BracketThrow](
     sessionResource:  SessionResource[Interpretation, EventLogDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
     logger:           Logger[Interpretation]
@@ -139,7 +139,7 @@ class StatusUpdatesRunnerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]
 
   private def logInfo(command: ChangeStatusCommand[Interpretation], updateResult: UpdateResult) = updateResult match {
     case Updated => logger.info(s"Event ${command.eventId} got ${command.status}")
-    case _       => Bracket[Interpretation, Throwable].unit
+    case _       => ().pure[Interpretation]
   }
   private def maybeUpdateProcessingTimeQuery(command: ChangeStatusCommand[Interpretation]) =
     upsertStatusProcessingTime(command.eventId, command.status, command.maybeProcessingTime)

@@ -23,9 +23,10 @@ import skunk.PreparedQuery
 
 object implicits {
 
-  implicit class PreparedQueryOps[Interpretation[_]: Sync, In, Out](
+  implicit class PreparedQueryOps[Interpretation[_], In, Out](
       preparedQuery: PreparedQuery[Interpretation, In, Out]
   ) {
-    lazy val toList: In => Interpretation[List[Out]] = args => preparedQuery.stream(args, chunkSize = 32).compile.toList
+    def toList(implicit sync: Sync[Interpretation]): In => Interpretation[List[Out]] = args =>
+      preparedQuery.stream(args, chunkSize = 32).compile.toList
   }
 }

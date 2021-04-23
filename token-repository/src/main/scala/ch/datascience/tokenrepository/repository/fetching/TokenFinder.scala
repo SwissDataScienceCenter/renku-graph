@@ -20,14 +20,14 @@ package ch.datascience.tokenrepository.repository.fetching
 
 import cats.MonadError
 import cats.data.OptionT
-import cats.effect.{Async, ContextShift, IO}
+import cats.effect.{ContextShift, IO}
 import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository._
 
-private class TokenFinder[Interpretation[_]: Async: MonadError[*[_], Throwable]](
+private class TokenFinder[Interpretation[_]: MonadError[*[_], Throwable]](
     tokenInRepoFinder: PersistedTokensFinder[Interpretation],
     accessTokenCrypto: AccessTokenCrypto[Interpretation]
 ) {

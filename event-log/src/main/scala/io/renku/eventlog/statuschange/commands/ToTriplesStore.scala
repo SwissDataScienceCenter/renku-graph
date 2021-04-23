@@ -19,7 +19,7 @@
 package io.renku.eventlog.statuschange.commands
 
 import cats.data.{Kleisli, NonEmptyList}
-import cats.effect.{Async, Bracket}
+import cats.effect.BracketThrow
 import cats.syntax.all._
 import ch.datascience.db.SqlStatement
 import ch.datascience.graph.model.events.EventStatus._
@@ -38,7 +38,7 @@ import skunk.implicits._
 
 import java.time.Instant
 
-final case class ToTriplesStore[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+final case class ToTriplesStore[Interpretation[_]: BracketThrow](
     eventId:                         CompoundEventId,
     underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
     maybeProcessingTime:             Option[EventProcessingTime],
@@ -76,7 +76,7 @@ final case class ToTriplesStore[Interpretation[_]: Async: Bracket[*[_], Throwabl
 }
 
 private[statuschange] object ToTriplesStore {
-  def factory[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+  def factory[Interpretation[_]: BracketThrow](
       underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path]
   ): Kleisli[Interpretation, ChangeStatusRequest, CommandFindingResult] = Kleisli.fromFunction {
     case EventOnlyRequest(eventId, TriplesStore, someTime @ Some(_), _) =>
