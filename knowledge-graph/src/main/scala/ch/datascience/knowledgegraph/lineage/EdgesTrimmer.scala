@@ -136,7 +136,7 @@ private class EdgesTrimmerImpl[Interpretation[_]]()(implicit ME: MonadError[Inte
 
 }
 
-private object IOLineageDataTrimmer {
+private object LineageDataTrimmer {
   def apply(): IO[EdgesTrimmer[IO]] = new EdgesTrimmerImpl[IO]().pure[IO]
 
   implicit class EntityIdOps(entityId: EntityId) {

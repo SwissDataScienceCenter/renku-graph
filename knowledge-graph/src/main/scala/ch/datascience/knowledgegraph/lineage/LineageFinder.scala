@@ -25,8 +25,8 @@ import ch.datascience.graph.model.projects.Path
 import ch.datascience.knowledgegraph.lineage.model.Node.Location
 import ch.datascience.knowledgegraph.lineage.model.{Edge, Lineage, Node}
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import org.typelevel.log4cats.Logger
 import io.renku.jsonld.EntityId
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
@@ -34,18 +34,17 @@ trait LineageFinder[Interpretation[_]] {
   def find(projectPath: Path, location: Location): Interpretation[Option[Lineage]]
 }
 
-class LineageFinderImpl[Interpretation[_]](
-    edgesFinder:        EdgesFinder[Interpretation],
-    edgesTrimmer:       EdgesTrimmer[Interpretation],
-    nodesDetailsFinder: NodesDetailsFinder[Interpretation],
-    logger:             Logger[Interpretation]
-)(implicit ME:          MonadError[Interpretation, Throwable])
-    extends LineageFinder[Interpretation] {
+class LineageFinderImpl[Interpretation[_]: MonadError[*[_], Throwable]](
+    edgesFinder:       EdgesFinder[Interpretation],
+    edgesTrimmer:      EdgesTrimmer[Interpretation],
+    nodeDetailsFinder: NodeDetailsFinder[Interpretation],
+    logger:            Logger[Interpretation]
+) extends LineageFinder[Interpretation] {
 
-  import NodesDetailsFinder._
+  import NodeDetailsFinder._
   import edgesFinder._
   import edgesTrimmer._
-  import nodesDetailsFinder._
+  import nodeDetailsFinder._
 
   import scala.util.control.NonFatal
 
@@ -92,7 +91,7 @@ class LineageFinderImpl[Interpretation[_]](
   }
 }
 
-object IOLineageFinder {
+object LineageFinder {
 
   def apply(
       timeRecorder: SparqlQueryTimeRecorder[IO],
@@ -101,15 +100,14 @@ object IOLineageFinder {
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[LineageFinderImpl[IO]] =
-    for {
-      lineageEdgesFinder        <- IOEdgesFinder(timeRecorder, logger = logger)
-      lineageDataTrimmer        <- IOLineageDataTrimmer()
-      lineageNodesDetailsFinder <- IOLineageNodeDetailsFinder(timeRecorder, logger = logger)
-    } yield new LineageFinderImpl[IO](
-      lineageEdgesFinder,
-      lineageDataTrimmer,
-      lineageNodesDetailsFinder,
-      logger
-    )
+  ): IO[LineageFinder[IO]] = for {
+    lineageEdgesFinder <- EdgesFinder(timeRecorder, logger)
+    lineageDataTrimmer <- LineageDataTrimmer()
+    nodeDetailsFinder  <- NodeDetailsFinder(timeRecorder, logger)
+  } yield new LineageFinderImpl[IO](
+    lineageEdgesFinder,
+    lineageDataTrimmer,
+    nodeDetailsFinder,
+    logger
+  )
 }

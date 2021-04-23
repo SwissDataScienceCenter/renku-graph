@@ -20,21 +20,23 @@ package ch.datascience.knowledgegraph.lineage
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
+import ch.datascience.graph.Schemas.{prov, rdf, schema}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.ResourceId
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.knowledgegraph.lineage.model.Node
+import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
 import ch.datascience.tinytypes.json.TinyTypeDecoders
 import eu.timepit.refined.auto._
-import org.typelevel.log4cats.Logger
 import io.circe.Decoder
 import io.renku.jsonld.EntityId
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private trait NodesDetailsFinder[Interpretation[_]] {
+private trait NodeDetailsFinder[Interpretation[_]] {
 
   def findDetails[T](
       location:     Set[T],
@@ -42,16 +44,84 @@ private trait NodesDetailsFinder[Interpretation[_]] {
   )(implicit query: (T, ResourceId) => SparqlQuery): Interpretation[Set[Node]]
 }
 
-private object NodesDetailsFinder {
+private class NodeDetailsFinderImpl(
+    rdfStoreConfig:          RdfStoreConfig,
+    renkuBaseUrl:            RenkuBaseUrl,
+    logger:                  Logger[IO],
+    timeRecorder:            SparqlQueryTimeRecorder[IO]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+    extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
+    with NodeDetailsFinder[IO] {
+
+  override def findDetails[T](
+      ids:          Set[T],
+      projectPath:  projects.Path
+  )(implicit query: (T, ResourceId) => SparqlQuery): IO[Set[Node]] =
+    ids.toList
+      .map { id =>
+        queryExpecting[Option[Node]](using = query(id, ResourceId(renkuBaseUrl, projectPath))) flatMap failIf(no = id)
+      }
+      .parSequence
+      .map(_.toSet)
+
+  private implicit val nodeDecoder: Decoder[Option[Node]] = {
+    implicit val locationDecoder: Decoder[Node.Location] = TinyTypeDecoders.stringDecoder(Node.Location)
+    implicit val labelDecoder:    Decoder[Node.Label]    = TinyTypeDecoders.stringDecoder(Node.Label)
+    implicit val typeDecoder:     Decoder[Node.Type]     = TinyTypeDecoders.stringDecoder(Node.Type)
+
+    implicit lazy val fieldsDecoder: Decoder[Option[(Node.Location, Node.Type, Node.Label)]] = { cursor =>
+      for {
+        maybeNodeType <- cursor.downField("type").downField("value").as[Option[Node.Type]]
+        maybeLocation <- cursor.downField("location").downField("value").as[Option[Node.Location]]
+        maybeLabel    <- cursor.downField("label").downField("value").as[Option[Node.Label]].map(trimValue)
+      } yield (maybeLocation, maybeNodeType, maybeLabel) mapN ((_, _, _))
+    }
+
+    lazy val trimValue: Option[Node.Label] => Option[Node.Label] = _.map(l => Node.Label(l.value.trim))
+
+    lazy val maybeToNode: List[(Node.Location, Node.Type, Node.Label)] => Option[Node] = {
+      case Nil => None
+      case (location, typ, label) :: tail =>
+        Some {
+          tail.foldLeft(Node(location, label, Set(typ))) {
+            case (node, (`location`, t, `label`)) => node.copy(types = node.types + t)
+            case (node, _)                        => node
+          }
+        }
+    }
+
+    _.downField("results")
+      .downField("bindings")
+      .as[List[Option[(Node.Location, Node.Type, Node.Label)]]]
+      .map(_.flatten)
+      .map(maybeToNode)
+  }
+
+  private def failIf[T](no: T): Option[Node] => IO[Node] = {
+    case Some(details) => details.pure[IO]
+    case _ =>
+      no match {
+        case _: Node.Location => new IllegalArgumentException(s"No entity with $no").raiseError[IO, Node]
+        case _: EntityId      => new IllegalArgumentException(s"No runPlan with $no").raiseError[IO, Node]
+      }
+  }
+}
+
+private object NodeDetailsFinder {
+
+  def apply(timeRecorder: SparqlQueryTimeRecorder[IO], logger: Logger[IO])(implicit
+      executionContext:   ExecutionContext,
+      contextShift:       ContextShift[IO],
+      timer:              Timer[IO]
+  ): IO[NodeDetailsFinder[IO]] = for {
+    config       <- RdfStoreConfig[IO]()
+    renkuBaseUrl <- RenkuBaseUrl[IO]()
+  } yield new NodeDetailsFinderImpl(config, renkuBaseUrl, logger, timeRecorder)
 
   implicit val locationQuery: (Node.Location, ResourceId) => SparqlQuery = (location, path) =>
-    SparqlQuery(
+    SparqlQuery.of(
       name = "lineage - entity details",
-      Set(
-        "PREFIX prov: <http://www.w3.org/ns/prov#>",
-        "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-        "PREFIX schema: <http://schema.org/>"
-      ),
+      Prefixes.of(prov -> "prov", rdf -> "rdf", schema -> "schema"),
       s"""|SELECT DISTINCT ?type ?location ?label
           |WHERE {
           |  ?entity prov:atLocation '$location';
@@ -65,13 +135,9 @@ private object NodesDetailsFinder {
     )
 
   implicit val runPlanIdQuery: (EntityId, ResourceId) => SparqlQuery = (runPlanId, _) =>
-    SparqlQuery(
+    SparqlQuery.of(
       name = "lineage - runPlan details",
-      Set(
-        "PREFIX prov: <http://www.w3.org/ns/prov#>",
-        "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-        "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>"
-      ),
+      Prefixes.of(prov -> "prov", rdf -> "rdf", schema -> "schema"),
       s"""|SELECT DISTINCT  ?type (CONCAT(STR(?command), STR(' '), (GROUP_CONCAT(?commandParameter; separator=' '))) AS ?label) ?location
           |WHERE {
           |  {
@@ -145,91 +211,5 @@ private object NodesDetailsFinder {
           |}
           |GROUP BY ?command ?type ?location
           |""".stripMargin
-    )
-}
-
-private class IONodesDetailsFinder(
-    rdfStoreConfig:          RdfStoreConfig,
-    renkuBaseUrl:            RenkuBaseUrl,
-    logger:                  Logger[IO],
-    timeRecorder:            SparqlQueryTimeRecorder[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
-    with NodesDetailsFinder[IO] {
-
-  override def findDetails[T](
-      ids:          Set[T],
-      projectPath:  projects.Path
-  )(implicit query: (T, ResourceId) => SparqlQuery): IO[Set[Node]] =
-    ids.toList
-      .map { id =>
-        queryExpecting[Option[Node]](using = query(id, ResourceId(renkuBaseUrl, projectPath))) flatMap failIf(no = id)
-      }
-      .parSequence
-      .map(_.toSet)
-
-  private implicit val nodeDecoder: Decoder[Option[Node]] = {
-    implicit val locationDecoder: Decoder[Node.Location] = TinyTypeDecoders.stringDecoder(Node.Location)
-    implicit val labelDecoder:    Decoder[Node.Label]    = TinyTypeDecoders.stringDecoder(Node.Label)
-    implicit val typeDecoder:     Decoder[Node.Type]     = TinyTypeDecoders.stringDecoder(Node.Type)
-
-    implicit lazy val fieldsDecoder: Decoder[Option[(Node.Location, Node.Type, Node.Label)]] = { cursor =>
-      for {
-        maybeNodeType <- cursor.downField("type").downField("value").as[Option[Node.Type]]
-        maybeLocation <- cursor.downField("location").downField("value").as[Option[Node.Location]]
-        maybeLabel    <- cursor.downField("label").downField("value").as[Option[Node.Label]].map(trimValue)
-      } yield (maybeLocation, maybeNodeType, maybeLabel) mapN ((_, _, _))
-    }
-
-    lazy val trimValue: Option[Node.Label] => Option[Node.Label] = _.map(l => Node.Label(l.value.trim))
-
-    lazy val maybeToNode: List[(Node.Location, Node.Type, Node.Label)] => Option[Node] = {
-      case Nil => None
-      case (location, typ, label) :: tail =>
-        Some {
-          tail.foldLeft(Node(location, label, Set(typ))) {
-            case (node, (`location`, t, `label`)) => node.copy(types = node.types + t)
-            case (node, _)                        => node
-          }
-        }
-    }
-
-    _.downField("results")
-      .downField("bindings")
-      .as[List[Option[(Node.Location, Node.Type, Node.Label)]]]
-      .map(_.flatten)
-      .map(maybeToNode)
-  }
-
-  private def failIf[T](no: T): Option[Node] => IO[Node] = {
-    case Some(details) => details.pure[IO]
-    case _ =>
-      no match {
-        case _: Node.Location => new IllegalArgumentException(s"No entity with $no").raiseError[IO, Node]
-        case _: EntityId      => new IllegalArgumentException(s"No runPlan with $no").raiseError[IO, Node]
-      }
-  }
-}
-
-private object IOLineageNodeDetailsFinder {
-
-  def apply(
-      timeRecorder:   SparqlQueryTimeRecorder[IO],
-      rdfStoreConfig: IO[RdfStoreConfig] = RdfStoreConfig[IO](),
-      renkuBaseUrl:   IO[RenkuBaseUrl] = RenkuBaseUrl[IO](),
-      logger:         Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[NodesDetailsFinder[IO]] =
-    for {
-      config       <- rdfStoreConfig
-      renkuBaseUrl <- renkuBaseUrl
-    } yield new IONodesDetailsFinder(
-      config,
-      renkuBaseUrl,
-      logger,
-      timeRecorder
     )
 }

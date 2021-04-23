@@ -19,27 +19,31 @@
 package ch.datascience.knowledgegraph.lineage
 
 import cats.MonadError
+import cats.syntax.all._
 import ch.datascience.knowledgegraph.lineage.model.Node.Location
 import io.renku.jsonld.EntityId
 
+import java.time.Instant
+
 object model {
 
-  private[lineage] type EdgeMap = Map[EntityId, (Set[Node.Location], Set[Node.Location])]
+  private[lineage] final case class RunInfo(entityId: EntityId, date: Instant)
+  private[lineage] type EdgeMap = Map[RunInfo, (Set[Node.Location], Set[Node.Location])]
 
   final case class Lineage private (edges: Set[Edge], nodes: Set[Node]) extends LineageOps
 
   object Lineage {
 
-    def from[Interpretation[_]](edges: Set[Edge], nodes: Set[Node])(implicit
-        ME:                            MonadError[Interpretation, Throwable]
+    def from[Interpretation[_]: MonadError[*[_], Throwable]](edges: Set[Edge],
+                                                             nodes: Set[Node]
     ): Interpretation[Lineage] = {
       val allEdgesLocations = collectLocations(edges)
       val allNodesLocations = nodes.map(_.location)
-      if (allEdgesLocations == allNodesLocations) ME.pure(Lineage(edges, nodes))
+      if (allEdgesLocations == allNodesLocations) Lineage(edges, nodes).pure[Interpretation]
       else if ((allNodesLocations diff allEdgesLocations).nonEmpty)
-        ME.raiseError(new IllegalArgumentException("There are orphan nodes"))
+        new IllegalArgumentException("There are orphan nodes").raiseError[Interpretation, Lineage]
       else
-        ME.raiseError(new IllegalArgumentException("There are edges with no nodes definitions"))
+        new IllegalArgumentException("There are edges with no nodes definitions").raiseError[Interpretation, Lineage]
     }
 
     private def collectLocations(edges: Set[Edge]): Set[Node.Location] =

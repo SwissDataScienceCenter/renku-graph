@@ -41,7 +41,7 @@ import io.renku.jsonld.EntityId
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class IOEdgesFinderSpec extends AnyWordSpec with InMemoryRdfStore with ExternalServiceStubbing with should.Matchers {
+class EdgesFinderSpec extends AnyWordSpec with InMemoryRdfStore with ExternalServiceStubbing with should.Matchers {
 
   "findEdges" should {
 
@@ -56,11 +56,11 @@ class IOEdgesFinderSpec extends AnyWordSpec with InMemoryRdfStore with ExternalS
       edgesFinder
         .findEdges(projectPath)
         .unsafeRunSync() shouldBe Map(
-        `sha8 renku run`.toEntityId -> (
+        RunInfo(`sha8 renku run`.toEntityId, `sha8 renku run date`) -> (
           Set(`sha3 zhbikes`.toNodeLocation, `sha7 clean_data`.toNodeLocation),
           Set(`sha8 parquet`.toNodeLocation)
         ),
-        `sha9 renku run`.toEntityId -> (
+        RunInfo(`sha9 renku run`.toEntityId, `sha9 renku run date`) -> (
           Set(`sha7 plot_data`.toNodeLocation, `sha8 parquet`.toNodeLocation),
           Set(`sha9 grid_plot`.toNodeLocation, `sha9 cumulative`.toNodeLocation)
         )
@@ -85,7 +85,7 @@ class IOEdgesFinderSpec extends AnyWordSpec with InMemoryRdfStore with ExternalS
 
     val logger                = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
-    val edgesFinder = new IOEdgesFinder(
+    val edgesFinder = new EdgesFinderImpl(
       rdfStoreConfig,
       renkuBaseUrl,
       logger,

@@ -44,13 +44,13 @@ import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class NodesDetailsFinderSpec
+class NodeDetailsFinderSpec
     extends AnyWordSpec
     with InMemoryRdfStore
     with ExternalServiceStubbing
     with should.Matchers {
 
-  import NodesDetailsFinder._
+  import NodeDetailsFinder._
 
   "findDetails - locations" should {
 
@@ -218,7 +218,7 @@ class NodesDetailsFinderSpec
 
     val logger                = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
-    val nodeDetailsFinder = new IONodesDetailsFinder(
+    val nodeDetailsFinder = new NodeDetailsFinderImpl(
       rdfStoreConfig,
       renkuBaseUrl,
       logger,
