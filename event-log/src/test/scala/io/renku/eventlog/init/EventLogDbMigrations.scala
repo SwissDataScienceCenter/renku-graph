@@ -27,15 +27,15 @@ trait EventLogDbMigrations {
 
   private val logger = TestLogger[IO]()
 
-  protected lazy val eventLogTableCreator:        Migration = EventLogTableCreator(sessionResource, logger)
-  protected lazy val projectPathAdder:            Migration = ProjectPathAdder(sessionResource, logger)
-  protected lazy val batchDateAdder:              Migration = BatchDateAdder(sessionResource, logger)
-  protected lazy val latestEventDatesViewRemover: Migration = LatestEventDatesViewRemover(sessionResource, logger)
-  protected lazy val projectTableCreator:         Migration = ProjectTableCreator(sessionResource, logger)
-  protected lazy val projectPathRemover:          Migration = ProjectPathRemover(sessionResource, logger)
-  protected lazy val eventLogTableRenamer:        Migration = EventLogTableRenamer(sessionResource, logger)
-  protected lazy val eventStatusRenamer:          Migration = EventStatusRenamer(sessionResource, logger)
-  protected lazy val eventPayloadTableCreator:    Migration = EventPayloadTableCreator(sessionResource, logger)
+  protected lazy val eventLogTableCreator: Migration = EventLogTableCreator(sessionResource, logger)
+  protected lazy val projectPathAdder:     Migration = ProjectPathAdder(sessionResource, logger)
+  protected lazy val batchDateAdder:       Migration = BatchDateAdder(sessionResource, logger)
+//  protected lazy val latestEventDatesViewRemover: Migration = LatestEventDatesViewRemover(sessionResource, logger)
+  protected lazy val projectTableCreator:      Migration = ProjectTableCreator(sessionResource, logger)
+  protected lazy val projectPathRemover:       Migration = ProjectPathRemover(sessionResource, logger)
+  protected lazy val eventLogTableRenamer:     Migration = EventLogTableRenamer(sessionResource, logger)
+  protected lazy val eventStatusRenamer:       Migration = EventStatusRenamer(sessionResource, logger)
+  protected lazy val eventPayloadTableCreator: Migration = EventPayloadTableCreator(sessionResource, logger)
   protected lazy val eventPayloadSchemaVersionAdder: Migration =
     EventPayloadSchemaVersionAdder(sessionResource, logger)
   protected lazy val subscriptionCategorySyncTimeTableCreator: Migration =
@@ -52,7 +52,7 @@ trait EventLogDbMigrations {
     eventLogTableCreator,
     projectPathAdder,
     batchDateAdder,
-    latestEventDatesViewRemover,
+//    latestEventDatesViewRemover,
     projectTableCreator,
     projectPathRemover,
     eventLogTableRenamer,

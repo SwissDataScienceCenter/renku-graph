@@ -42,7 +42,6 @@ class ProjectPathRemoverSpec
     eventLogTableCreator,
     projectPathAdder,
     batchDateAdder,
-    latestEventDatesViewRemover,
     projectTableCreator
   )
 

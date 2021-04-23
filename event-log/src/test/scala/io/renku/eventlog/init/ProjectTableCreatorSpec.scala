@@ -42,8 +42,7 @@ class ProjectTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Ma
   protected override lazy val migrationsToRun: List[Migration] = List(
     eventLogTableCreator,
     projectPathAdder,
-    batchDateAdder,
-    latestEventDatesViewRemover
+    batchDateAdder
   )
 
   "run" should {

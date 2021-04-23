@@ -31,7 +31,6 @@ class SubscriberTableCreatorSpec extends AnyWordSpec with DbInitSpec with should
     eventLogTableCreator,
     projectPathAdder,
     batchDateAdder,
-    latestEventDatesViewRemover,
     projectTableCreator,
     projectPathRemover,
     eventLogTableRenamer,

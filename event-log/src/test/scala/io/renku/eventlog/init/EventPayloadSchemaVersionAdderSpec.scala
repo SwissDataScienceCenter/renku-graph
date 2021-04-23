@@ -30,7 +30,6 @@ class EventPayloadSchemaVersionAdderSpec extends AnyWordSpec with DbInitSpec wit
     eventLogTableCreator,
     projectPathAdder,
     batchDateAdder,
-    latestEventDatesViewRemover,
     projectTableCreator,
     projectPathRemover,
     eventLogTableRenamer,
