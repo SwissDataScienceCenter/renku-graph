@@ -48,11 +48,6 @@ class ZombieNodesCleanerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
 
     "do nothing if all sources and subscribers listed in the subscriber table are up" in new TestCase {
 
-      (serviceHealthChecker.ping _)
-        .expects(microserviceBaseUrl)
-        .returning(true.pure[IO])
-        .atLeastOnce()
-
       val subscriber1Id  = subscriberIds.generateOne
       val subscriber1Url = subscriberUrls.generateOne
       (serviceHealthChecker.ping _)
@@ -85,11 +80,6 @@ class ZombieNodesCleanerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
 
     "remove rows from the subscriber table if both the sources and the deliveries are inactive " +
       "but move active subscribers on inactive source to the current source" in new TestCase {
-
-        (serviceHealthChecker.ping _)
-          .expects(microserviceBaseUrl)
-          .returning(true.pure[IO])
-          .atLeastOnce()
 
         val activeSubscriberId  = subscriberIds.generateOne
         val activeSubscriberUrl = subscriberUrls.generateOne
@@ -140,11 +130,6 @@ class ZombieNodesCleanerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
       }
 
     "remove rows from the subscriber table if there are inactive subscriber on the current source" in new TestCase {
-
-      (serviceHealthChecker.ping _)
-        .expects(microserviceBaseUrl)
-        .returning(true.pure[IO])
-        .atLeastOnce()
 
       val activeSubscriberId  = subscriberIds.generateOne
       val activeSubscriberUrl = subscriberUrls.generateOne
