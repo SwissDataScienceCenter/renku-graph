@@ -20,9 +20,9 @@ package io.renku.eventlog.subscriptions.awaitinggeneration
 
 import cats.data.{Kleisli, NonEmptyList}
 import cats.effect.{Async, Bracket, ContextShift, IO}
-import cats.free.Free
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
+import ch.datascience.db.implicits._
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventStatus}
 import ch.datascience.graph.model.projects
@@ -34,9 +34,9 @@ import io.renku.eventlog._
 import io.renku.eventlog.subscriptions.awaitinggeneration.ProjectPrioritisation.{Priority, ProjectInfo}
 import io.renku.eventlog.subscriptions.{EventFinder, ProjectIds, Subscribers, SubscriptionTypeSerializers}
 import skunk._
-import skunk.implicits._
 import skunk.codec.all._
 import skunk.data.Completion
+import skunk.implicits._
 
 import java.time.Instant
 import scala.language.postfixOps
@@ -47,7 +47,7 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Async: Bracke
     sessionResource:       SessionResource[Interpretation, EventLogDB],
     waitingEventsGauge:    LabeledGauge[Interpretation, projects.Path],
     underProcessingGauge:  LabeledGauge[Interpretation, projects.Path],
-    queriesExecTimes:      LabeledHistogram[Interpretation, SqlQuery.Name],
+    queriesExecTimes:      LabeledHistogram[Interpretation, SqlStatement.Name],
     now:                   () => Instant = () => Instant.now,
     projectsFetchingLimit: Int Refined Positive,
     projectPrioritisation: ProjectPrioritisation[Interpretation],
@@ -76,12 +76,10 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Async: Bracke
     maybeBody <- markAsProcessing(maybeIdAndProjectAndBody)
   } yield maybeProject -> maybeBody
 
-  // format: off
-  private def findProjectsWithEventsInQueue =  
-    SqlQuery(Kleisli[Interpretation, Session[Interpretation], List[ProjectInfo]] {
-      session =>
-        val query: Query[EventStatus ~ ExecutionDate ~ Int, ProjectInfo] =
-          sql"""
+  private def findProjectsWithEventsInQueue = SqlStatement(
+    name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find projects")
+  ).select[EventStatus ~ ExecutionDate ~ Int, ProjectInfo](
+    sql"""
       SELECT
         proj.project_id,
         proj.project_path,
@@ -98,19 +96,19 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Async: Bracke
         ORDER BY proj.latest_event_date DESC
         LIMIT $int4
       ) proj
-      """.query(projectIdDecoder ~ projectPathDecoder ~ eventDateDecoder ~ int8)
-            .map { case projectId ~ projectPath ~ eventDate ~ (currentOccupancy: Long) => ProjectInfo(projectId, projectPath, eventDate, Refined.unsafeApply(currentOccupancy.toInt)) }
-        session.prepare(query).use {
-          _.stream(GeneratingTriples ~ ExecutionDate(now()) ~ projectsFetchingLimit.value, 32).compile.toList
-        }
-    },
-      name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find projects")
-    )
-  // format: on
+      """
+      .query(projectIdDecoder ~ projectPathDecoder ~ eventDateDecoder ~ int8)
+      .map { case projectId ~ projectPath ~ eventDate ~ (currentOccupancy: Long) =>
+        ProjectInfo(projectId, projectPath, eventDate, Refined.unsafeApply(currentOccupancy.toInt))
+      }
+  ).arguments(GeneratingTriples ~ ExecutionDate(now()) ~ projectsFetchingLimit.value)
+    .build(_.toList)
 
-  // format: off
-  private def findOldestEvent(idAndPath: ProjectIds) = SqlQuery[Interpretation, Option[AwaitingGenerationEvent]](Kleisli { session =>
-    val query: Query[projects.Path ~ projects.Id ~ ExecutionDate ~ ExecutionDate, AwaitingGenerationEvent] =
+  private def findOldestEvent(idAndPath: ProjectIds) = {
+    val executionDate = ExecutionDate(now())
+    SqlStatement(
+      name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find oldest")
+    ).select[projects.Path ~ projects.Id ~ ExecutionDate ~ ExecutionDate, AwaitingGenerationEvent](
       sql"""
        SELECT evt.event_id, evt.project_id, $projectPathEncoder AS project_path, evt.event_body
        FROM (
@@ -128,13 +126,9 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Async: Bracke
        LIMIT 1
        """
         .query(awaitingGenerationEventGet)
-    val executionDate = ExecutionDate(now())
-    session.prepare(query).use(_.option(idAndPath.path ~ idAndPath.id ~ executionDate ~ executionDate))
-
-  },
-    name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find oldest")
-  )
-  // format: on
+    ).arguments(idAndPath.path ~ idAndPath.id ~ executionDate ~ executionDate)
+      .build(_.option)
+  }
 
   private def `status IN`(status: EventStatus, otherStatuses: EventStatus*) =
     s"status IN (${NonEmptyList.of(status, otherStatuses: _*).toList.map(el => s"'$el'").mkString(",")})"
@@ -159,26 +153,19 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Async: Bracke
       measureExecutionTime(updateStatus(id)) map toNoneIfEventAlreadyTaken(event)
   }
 
-  private def updateStatus(commitEventId: CompoundEventId) = SqlQuery[Interpretation, Completion](
-    Kleisli { session =>
-      val query: Command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus] =
-        sql"""
+  private def updateStatus(commitEventId: CompoundEventId) = SqlStatement[Interpretation](name =
+    Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - update status")
+  ).command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus](
+    sql"""
         UPDATE event 
         SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
         WHERE event_id = $eventIdEncoder
           AND project_id = $projectIdEncoder
           AND status <> $eventStatusEncoder
         """.command
-      session
-        .prepare(query)
-        .use(
-          _.execute(
-            GeneratingTriples ~ ExecutionDate(now()) ~ commitEventId.id ~ commitEventId.projectId ~ GeneratingTriples
-          )
-        )
-    },
-    name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - update status")
-  )
+  ).arguments(
+    GeneratingTriples ~ ExecutionDate(now()) ~ commitEventId.id ~ commitEventId.projectId ~ GeneratingTriples
+  ).build
 
   private def toNoneIfEventAlreadyTaken(
       event: AwaitingGenerationEvent
@@ -210,7 +197,7 @@ private object IOAwaitingGenerationEventFinder {
       subscribers:          Subscribers[IO],
       waitingEventsGauge:   LabeledGauge[IO, projects.Path],
       underProcessingGauge: LabeledGauge[IO, projects.Path],
-      queriesExecTimes:     LabeledHistogram[IO, SqlQuery.Name]
+      queriesExecTimes:     LabeledHistogram[IO, SqlStatement.Name]
   )(implicit contextShift:  ContextShift[IO]): IO[EventFinder[IO, AwaitingGenerationEvent]] = for {
     projectPrioritisation <- ProjectPrioritisation(subscribers)
   } yield new AwaitingGenerationEventFinderImpl(sessionResource,

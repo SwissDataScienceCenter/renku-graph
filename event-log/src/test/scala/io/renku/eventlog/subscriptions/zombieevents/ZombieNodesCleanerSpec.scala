@@ -21,7 +21,7 @@ package io.renku.eventlog.subscriptions.zombieevents
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.db.SqlQuery
+import ch.datascience.db.SqlStatement
 import ch.datascience.events.consumers.subscriptions._
 import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
 import ch.datascience.generators.Generators.Implicits._
@@ -171,7 +171,7 @@ class ZombieNodesCleanerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
   }
 
   private trait TestCase {
-    val queriesExecTimes     = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val queriesExecTimes     = TestLabeledHistogram[SqlStatement.Name]("query_id")
     val microserviceBaseUrl  = microserviceBaseUrls.generateOne
     val serviceHealthChecker = mock[ServiceHealthChecker[IO]]
     val cleaner =

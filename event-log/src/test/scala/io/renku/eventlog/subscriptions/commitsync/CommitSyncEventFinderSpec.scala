@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions
 package commitsync
 
-import ch.datascience.db.SqlQuery
+import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
@@ -182,7 +182,7 @@ class CommitSyncEventFinderSpec
   }
 
   private trait TestCase {
-    val finder = new CommitSyncEventFinderImpl(sessionResource, TestLabeledHistogram[SqlQuery.Name]("query_id"))
+    val finder = new CommitSyncEventFinderImpl(sessionResource, TestLabeledHistogram[SqlStatement.Name]("query_id"))
   }
 
   private def addEvent(eventId:     CompoundEventId,

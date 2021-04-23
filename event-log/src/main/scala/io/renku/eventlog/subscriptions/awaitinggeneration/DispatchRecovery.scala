@@ -20,7 +20,7 @@ package io.renku.eventlog.subscriptions.awaitinggeneration
 
 import cats.effect.{Async, Bracket, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.db.{SessionResource, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
@@ -88,7 +88,7 @@ private object DispatchRecovery {
   def apply(sessionResource:                SessionResource[IO, EventLogDB],
             awaitingTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
             underTriplesGenerationGauge:    LabeledGauge[IO, projects.Path],
-            queriesExecTimes:               LabeledHistogram[IO, SqlQuery.Name],
+            queriesExecTimes:               LabeledHistogram[IO, SqlStatement.Name],
             logger:                         Logger[IO]
   )(implicit timer:                         Timer[IO]): IO[DispatchRecovery[IO, AwaitingGenerationEvent]] = for {
     updateCommandRunner <- IOUpdateCommandsRunner(sessionResource, queriesExecTimes, logger)

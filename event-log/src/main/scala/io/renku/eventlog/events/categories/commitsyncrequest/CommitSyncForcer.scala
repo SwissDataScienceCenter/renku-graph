@@ -21,7 +21,7 @@ package io.renku.eventlog.events.categories.commitsyncrequest
 import cats.data.Kleisli
 import cats.effect.{Async, Bracket, IO}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
@@ -40,7 +40,7 @@ private trait CommitSyncForcer[Interpretation[_]] {
 
 private class CommitSyncForcerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     sessionResource:  SessionResource[Interpretation, EventLogDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name],
+    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with CommitSyncForcer[Interpretation]
@@ -57,37 +57,30 @@ private class CommitSyncForcerImpl[Interpretation[_]: Async: Bracket[*[_], Throw
 
   private def deleteLastSyncedDate(projectId: projects.Id) =
     measureExecutionTime {
-      SqlQuery(
-        Kleisli { session =>
-          val query: Command[projects.Id ~ CategoryName] =
-            sql"""
+      SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - delete last_synced"))
+        .command[projects.Id ~ CategoryName](sql"""
             DELETE FROM subscription_category_sync_time
             WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
-          """.command
-          session.prepare(query).use(_.execute(projectId ~ commitsync.categoryName)).map {
-            case Completion.Delete(0) => true
-            case _                    => false
-          }
-        },
-        name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - delete last_synced")
-      )
+          """.command)
+        .arguments(projectId ~ commitsync.categoryName)
+        .build
+        .mapResult {
+          case Completion.Delete(0) => true
+          case _                    => false
+        }
     }
 
   private def upsertProject(projectId: projects.Id, projectPath: projects.Path) = measureExecutionTime {
-    SqlQuery(
-      Kleisli { session =>
-        val query: Command[projects.Id ~ projects.Path ~ EventDate] =
-          sql"""
+    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - insert project"))
+      .command[projects.Id ~ projects.Path ~ EventDate](sql"""
           INSERT INTO
           project (project_id, project_path, latest_event_date)
           VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
           ON CONFLICT (project_id)
           DO NOTHING
-      """.command
-        session.prepare(query).use(_.execute(projectId ~ projectPath ~ EventDate(now())))
-      },
-      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - insert project")
-    )
+      """.command)
+      .arguments(projectId ~ projectPath ~ EventDate(now()))
+      .build
   }
 }
 
@@ -96,7 +89,7 @@ private object CommitSyncForcer {
   import cats.effect.IO
 
   def apply(sessionResource:  SessionResource[IO, EventLogDB],
-            queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
+            queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
   ): IO[CommitSyncForcer[IO]] = IO {
     new CommitSyncForcerImpl(sessionResource, queriesExecTimes)
   }

@@ -21,7 +21,7 @@ package io.renku.eventlog.statuschange.commands
 import cats.data.{Kleisli, NonEmptyList}
 import cats.effect.{Async, Bracket}
 import cats.syntax.all._
-import ch.datascience.db.SqlQuery
+import ch.datascience.db.SqlStatement
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
@@ -48,27 +48,23 @@ final case class ToNew[Interpretation[_]: Async: Bracket[*[_], Throwable]](
 
   override lazy val status: EventStatus = New
 
-  override def queries: NonEmptyList[SqlQuery[Interpretation, Int]] = NonEmptyList.of(
-    SqlQuery(
-      Kleisli { session =>
-        val query: Command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus] =
-          sql"""UPDATE event
+  override def queries: NonEmptyList[SqlStatement[Interpretation, Int]] = NonEmptyList.of(
+    SqlStatement[Interpretation](
+      name = "generating_triples->new"
+    ).command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus](
+      sql"""UPDATE event
                 SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
                 WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND status = $eventStatusEncoder
              """.command
-        session
-          .prepare(query)
-          .use(_.execute(status ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ GeneratingTriples))
-          .flatMap {
-            case Completion.Update(n) => n.pure[Interpretation]
-            case completion =>
-              new RuntimeException(
-                s"generating_triples->new time query failed with completion status $completion"
-              ).raiseError[Interpretation, Int]
-          }
-      },
-      name = "generating_triples->new"
-    )
+    ).arguments(status ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ GeneratingTriples)
+      .build
+      .flatMapResult {
+        case Completion.Update(n) => n.pure[Interpretation]
+        case completion =>
+          new RuntimeException(
+            s"generating_triples->new time query failed with completion status $completion"
+          ).raiseError[Interpretation, Int]
+      }
   )
 
   override def updateGauges(

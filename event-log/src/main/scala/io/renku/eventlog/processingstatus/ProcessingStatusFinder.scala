@@ -19,10 +19,10 @@
 package io.renku.eventlog.processingstatus
 
 import cats.MonadError
-import cats.data.{Kleisli, OptionT}
+import cats.data.OptionT
 import cats.effect.{Async, Bracket, ContextShift, IO}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.projects.Id
@@ -33,7 +33,6 @@ import eu.timepit.refined.numeric.NonNegative
 import io.renku.eventlog.EventLogDB
 import skunk._
 import skunk.implicits._
-import skunk.codec.all._
 
 import scala.math.BigDecimal.RoundingMode
 
@@ -43,7 +42,7 @@ trait ProcessingStatusFinder[Interpretation[_]] {
 
 class ProcessingStatusFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     sessionResource:  SessionResource[Interpretation, EventLogDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name]
+    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
 ) extends DbClient(Some(queriesExecTimes))
     with ProcessingStatusFinder[Interpretation] {
 
@@ -56,10 +55,9 @@ class ProcessingStatusFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwab
     } flatMap toProcessingStatus
   }
 
-  private def latestBatchStatues(projectId: Id) = SqlQuery[Interpretation, List[EventStatus]](
-    Kleisli { session =>
-      val query: Query[Id ~ Id, EventStatus] =
-        sql"""SELECT evt.status
+  private def latestBatchStatues(projectId: Id) = SqlStatement[Interpretation](name = "processing status")
+    .select[Id ~ Id, EventStatus](
+      sql"""SELECT evt.status
               FROM event evt
               INNER JOIN (
                 SELECT batch_date
@@ -70,10 +68,9 @@ class ProcessingStatusFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwab
               ) max_batch_date ON evt.batch_date = max_batch_date.batch_date
               WHERE evt.project_id = $projectIdEncoder
            """.query(eventStatusDecoder)
-      session.prepare(query).use(pq => pq.stream(projectId ~ projectId, chunkSize = 32).compile.toList)
-    },
-    name = "processing status"
-  )
+    )
+    .arguments(projectId ~ projectId)
+    .build(p => p.stream(_, 32).compile.toList)
 
   private def toProcessingStatus(statuses: List[EventStatus]) =
     statuses.foldLeft(0 -> 0) {
@@ -89,7 +86,7 @@ class ProcessingStatusFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwab
 object IOProcessingStatusFinder {
   def apply(
       sessionResource:     SessionResource[IO, EventLogDB],
-      queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
+      queriesExecTimes:    LabeledHistogram[IO, SqlStatement.Name]
   )(implicit contextShift: ContextShift[IO]): IO[ProcessingStatusFinder[IO]] = IO {
     new ProcessingStatusFinderImpl(sessionResource, queriesExecTimes)
   }
@@ -121,26 +118,29 @@ object ProcessingStatus {
     } yield new ProcessingStatus(validDone, validTotal, progress)
 
   private implicit class RefTypeOps[V](maybeValue: Either[String, V]) {
-    def getOrError[Interpretation[_]](
-        message:   String
-    )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[V] =
+    def getOrError[Interpretation[_]: MonadError[*[_], Throwable]](
+        message: String
+    ): Interpretation[V] =
       maybeValue.fold(
-        _ => ME.raiseError[V](new IllegalArgumentException(message)),
-        ME.pure
+        _ => MonadError[Interpretation, Throwable].raiseError[V](new IllegalArgumentException(message)),
+        MonadError[Interpretation, Throwable].pure
       )
   }
 
-  private def checkDoneLessThanTotal[Interpretation[_]](
-      done:      Done,
-      total:     Total
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[Unit] =
-    if (done.value <= total.value) ME.unit
-    else ME.raiseError(new IllegalArgumentException("ProcessingStatus with 'done' > 'total' makes no sense"))
+  private def checkDoneLessThanTotal[Interpretation[_]: MonadError[*[_], Throwable]](
+      done:  Done,
+      total: Total
+  ): Interpretation[Unit] =
+    if (done.value <= total.value) MonadError[Interpretation, Throwable].unit
+    else
+      MonadError[Interpretation, Throwable].raiseError(
+        new IllegalArgumentException("ProcessingStatus with 'done' > 'total' makes no sense")
+      )
 
-  private def progressFrom[Interpretation[_]](
-      done:      Done,
-      total:     Total
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[Progress] = {
+  private def progressFrom[Interpretation[_]: MonadError[*[_], Throwable]](
+      done:  Done,
+      total: Total
+  ): Interpretation[Progress] = {
     val progress =
       if (total.value == 0) 100d
       else BigDecimal((done.value.toDouble / total.value) * 100).setScale(2, RoundingMode.HALF_DOWN).toDouble

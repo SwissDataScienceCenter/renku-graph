@@ -67,7 +67,7 @@ object EventLog extends TypeSerializers {
   def execute[O](query: Session[IO] => IO[O]): O =
     sessionResource
       .use(_.useK(Kleisli[IO, Session[IO], O](session => query(session))))
-      .unsafeRunSync()
+      .unsafeRunAsync()
 
   private val dbConfig: DBConfigProvider.DBConfig[EventLogDB] =
     new EventLogDbConfigProvider[IO].get().unsafeRunSync()

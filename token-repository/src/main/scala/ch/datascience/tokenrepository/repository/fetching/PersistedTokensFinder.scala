@@ -21,7 +21,7 @@ package ch.datascience.tokenrepository.repository.fetching
 import cats.data.{Kleisli, OptionT}
 import cats.effect._
 import cats.implicits._
-import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
@@ -33,37 +33,33 @@ import skunk.implicits._
 
 private class PersistedTokensFinder[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     sessionResource:  SessionResource[Interpretation, ProjectsTokensDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name]
+    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
 ) extends DbClient[Interpretation](Some(queriesExecTimes))
     with TokenRepositoryTypeSerializers {
 
   def findToken(projectId: Id): OptionT[Interpretation, EncryptedAccessToken] = run {
-    SqlQuery[Interpretation, Option[EncryptedAccessToken]](
-      query = Kleisli { session =>
-        val query: Query[Id, EncryptedAccessToken] =
-          sql"""select token from projects_tokens where project_id = $projectIdEncoder""".query(
-            encryptedAccessTokenDecoder
-          )
-        session.prepare(query).use(_.option(projectId))
-      },
-      name = "find token - id"
-    )
+    SqlStatement(name = "find token - id")
+      .select[Id, EncryptedAccessToken](
+        sql"""select token from projects_tokens where project_id = $projectIdEncoder""".query(
+          encryptedAccessTokenDecoder
+        )
+      )
+      .arguments(projectId)
+      .build(_.option)
   }
 
   def findToken(projectPath: Path): OptionT[Interpretation, EncryptedAccessToken] = run {
-    SqlQuery[Interpretation, Option[EncryptedAccessToken]](
-      Kleisli { session =>
-        val query: Query[Path, EncryptedAccessToken] =
-          sql"select token from projects_tokens where project_path = $projectPathEncoder".query(
-            encryptedAccessTokenDecoder
-          )
-        session.prepare(query).use(_.option(projectPath))
-      },
-      name = "find token - path"
-    )
+    SqlStatement(name = "find token - path")
+      .select[Path, EncryptedAccessToken](
+        sql"select token from projects_tokens where project_path = $projectPathEncoder".query(
+          encryptedAccessTokenDecoder
+        )
+      )
+      .arguments(projectPath)
+      .build(_.option)
   }
 
-  private def run(query: SqlQuery[Interpretation, Option[EncryptedAccessToken]]) =
+  private def run(query: SqlStatement[Interpretation, Option[EncryptedAccessToken]]) =
     OptionT {
       sessionResource.useK(measureExecutionTime(query))
     }
@@ -71,5 +67,5 @@ private class PersistedTokensFinder[Interpretation[_]: Async: Bracket[*[_], Thro
 
 private class IOPersistedTokensFinder(
     sessionResource:  SessionResource[IO, ProjectsTokensDB],
-    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
+    queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
 ) extends PersistedTokensFinder[IO](sessionResource, queriesExecTimes)

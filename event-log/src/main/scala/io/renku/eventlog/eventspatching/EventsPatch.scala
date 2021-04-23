@@ -19,11 +19,11 @@
 package io.renku.eventlog.eventspatching
 
 import java.time.Instant
-import cats.MonadError
+import cats.{Monad, MonadError}
 import cats.data.Kleisli
 import cats.effect.Async
 import cats.syntax.all._
-import ch.datascience.db.SqlQuery
+import ch.datascience.db.SqlStatement
 import ch.datascience.graph.model.events.{BatchDate, EventStatus}
 import ch.datascience.graph.model.events.EventStatus.New
 import ch.datascience.graph.model.projects
@@ -40,7 +40,7 @@ private trait EventsPatch[Interpretation[_]] extends Product with Serializable w
   def name:               String Refined NonEmpty
   def updateGauges():     Interpretation[Unit]
   protected def sqlQuery: Kleisli[Interpretation, Session[Interpretation], Completion]
-  lazy val query: SqlQuery[Interpretation, Completion] = SqlQuery(sqlQuery, name)
+  lazy val query: SqlStatement[Interpretation, Completion] = SqlStatement(sqlQuery, name)
 }
 
 private case class StatusNewPatch[Interpretation[_]: Async: MonadError[*[_], Throwable]](

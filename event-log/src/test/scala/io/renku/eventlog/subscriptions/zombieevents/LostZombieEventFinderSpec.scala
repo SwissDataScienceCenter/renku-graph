@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions.zombieevents
 
 import cats.syntax.all._
-import ch.datascience.db.SqlQuery
+import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.relativeTimestamps
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventStatuses}
@@ -91,7 +91,7 @@ class LostZombieEventFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec 
 
     val projectPath = projectPaths.generateOne
 
-    val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
 
     val finder = new LostZombieEventFinder(sessionResource, queriesExecTimes)
 

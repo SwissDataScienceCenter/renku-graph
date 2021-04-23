@@ -20,7 +20,7 @@ package io.renku.eventlog.eventdetails
 
 import cats.effect.{Effect, IO}
 import cats.syntax.all._
-import ch.datascience.db.{SessionResource, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.http.InfoMessage._
@@ -70,7 +70,7 @@ class EventDetailsEndpointImpl[Interpretation[_]: Effect](eventDetailsFinder: Ev
 
 object EventDetailsEndpoint {
   def apply(sessionResource:  SessionResource[IO, EventLogDB],
-            queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
+            queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name],
             logger:           Logger[IO]
   ): IO[EventDetailsEndpoint[IO]] = for {
     eventDetailFinder <- EventDetailsFinder(sessionResource, queriesExecTimes)

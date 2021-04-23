@@ -22,7 +22,8 @@ import cats.Parallel
 import cats.data.Kleisli
 import cats.effect.{Async, Bracket, ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
+import ch.datascience.db.implicits._
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
@@ -41,7 +42,7 @@ private trait ZombieNodesCleaner[Interpretation[_]] {
 
 private class ZombieNodesCleanerImpl[Interpretation[_]: Async: Parallel: Bracket[*[_], Throwable]: ContextShift](
     sessionResource:      SessionResource[Interpretation, EventLogDB],
-    queriesExecTimes:     LabeledHistogram[Interpretation, SqlQuery.Name],
+    queriesExecTimes:     LabeledHistogram[Interpretation, SqlStatement.Name],
     microserviceBaseUrl:  MicroserviceBaseUrl,
     serviceHealthChecker: ServiceHealthChecker[Interpretation]
 ) extends DbClient(Some(queriesExecTimes))
@@ -59,18 +60,16 @@ private class ZombieNodesCleanerImpl[Interpretation[_]: Async: Parallel: Bracket
   }
 
   private lazy val findPotentialZombieRecords = measureExecutionTime {
-    SqlQuery(
-      Kleisli { session =>
-        val query: Query[Void, (MicroserviceBaseUrl, SubscriberUrl)] =
-          sql"""SELECT DISTINCT source_url, delivery_url
+    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find zombie sources"))
+      .select[Void, (MicroserviceBaseUrl, SubscriberUrl)](
+        sql"""SELECT DISTINCT source_url, delivery_url
                 FROM subscriber
           """
-            .query(microserviceBaseUrlDecoder ~ subscriberUrlDecoder)
-            .map { case sourceUrl ~ subscriberUrl => (sourceUrl, subscriberUrl) }
-        session.prepare(query).use(_.stream(Void, 32).compile.toList)
-      },
-      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find zombie sources")
-    )
+          .query(microserviceBaseUrlDecoder ~ subscriberUrlDecoder)
+          .map { case sourceUrl ~ subscriberUrl => (sourceUrl, subscriberUrl) }
+      )
+      .arguments(Void)
+      .build(_.toList)
   }
 
   private lazy val toAction: ((MicroserviceBaseUrl, SubscriberUrl)) => Interpretation[Action] = {
@@ -98,48 +97,39 @@ private class ZombieNodesCleanerImpl[Interpretation[_]: Async: Parallel: Bracket
   }
 
   private def checkIfExist(sourceUrl: MicroserviceBaseUrl, subscriberUrl: SubscriberUrl) = measureExecutionTime {
-    SqlQuery(
-      Kleisli { session =>
-        val query: Query[MicroserviceBaseUrl ~ SubscriberUrl, MicroserviceBaseUrl] =
-          sql"""
+    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - check source & delivery exists"))
+      .select[MicroserviceBaseUrl ~ SubscriberUrl, MicroserviceBaseUrl](
+        sql"""
             SELECT source_url
             FROM subscriber
             WHERE source_url = $microserviceBaseUrlEncoder AND delivery_url = $subscriberUrlEncoder
           """.query(microserviceBaseUrlDecoder)
-        session.prepare(query).use(_.option(sourceUrl ~ subscriberUrl)).map(_.isDefined)
-      },
-      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - check source & delivery exists")
-    )
+      )
+      .arguments(sourceUrl ~ subscriberUrl)
+      .build(_.option)
+      .mapResult(_.isDefined)
   }
 
   private def delete(sourceUrl: MicroserviceBaseUrl, subscriberUrl: SubscriberUrl) = measureExecutionTime {
-    SqlQuery(
-      Kleisli { session =>
-        val query: Command[MicroserviceBaseUrl ~ SubscriberUrl] =
-          sql"""
+    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - delete zombie source"))
+      .command[MicroserviceBaseUrl ~ SubscriberUrl](sql"""
           DELETE
           FROM subscriber
           WHERE source_url = $microserviceBaseUrlEncoder AND delivery_url = $subscriberUrlEncoder
-          """.command
-        session.prepare(query).use(_.execute(sourceUrl ~ subscriberUrl))
-      },
-      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - delete zombie source")
-    )
+          """.command)
+      .arguments(sourceUrl ~ subscriberUrl)
+      .build
   }
 
   private def move(sourceUrl: MicroserviceBaseUrl, subscriberUrl: SubscriberUrl) = measureExecutionTime {
-    SqlQuery(
-      Kleisli { session =>
-        val query: Command[MicroserviceBaseUrl ~ MicroserviceBaseUrl ~ SubscriberUrl] =
-          sql"""
+    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - move subscriber"))
+      .command[MicroserviceBaseUrl ~ MicroserviceBaseUrl ~ SubscriberUrl](sql"""
          UPDATE subscriber
          SET source_url = $microserviceBaseUrlEncoder
          WHERE source_url = $microserviceBaseUrlEncoder AND delivery_url = $subscriberUrlEncoder
-        """.command
-        session.prepare(query).use(_.execute(microserviceBaseUrl ~ sourceUrl ~ subscriberUrl))
-      },
-      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - move subscriber")
-    )
+        """.command)
+      .arguments(microserviceBaseUrl ~ sourceUrl ~ subscriberUrl)
+      .build
   }
 
   private def execute(
@@ -164,7 +154,7 @@ private class ZombieNodesCleanerImpl[Interpretation[_]: Async: Parallel: Bracket
 private object ZombieNodesCleaner {
   def apply(
       sessionResource:  SessionResource[IO, EventLogDB],
-      queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
+      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name],
       logger:           Logger[IO]
   )(implicit
       executionContext: ExecutionContext,

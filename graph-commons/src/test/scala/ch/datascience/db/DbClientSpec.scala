@@ -20,7 +20,7 @@ package ch.datascience.db
 
 import cats.data.Kleisli
 import cats.effect.{ContextShift, IO, Resource}
-import ch.datascience.db.SqlQuery.Name
+import ch.datascience.db.SqlStatement.Name
 import ch.datascience.db.TestDbConfig.newDbConfig
 import ch.datascience.metrics.{LabeledHistogram, TestLabeledHistogram}
 import com.dimafeng.testcontainers.{ForAllTestContainer, PostgreSQLContainer}
@@ -49,7 +49,7 @@ class DbClientSpec extends AnyWordSpec with should.Matchers with ContainerTestDb
 
     "execute the query and measure execution time with the given histogram" in {
 
-      val histogram = TestLabeledHistogram[SqlQuery.Name]("query_id")
+      val histogram = TestLabeledHistogram[SqlStatement.Name]("query_id")
 
       val dbClient = new TestDbClient(maybeHistogram = Some(histogram))
 
@@ -62,16 +62,16 @@ class DbClientSpec extends AnyWordSpec with should.Matchers with ContainerTestDb
 }
 
 private class TestDbClient(maybeHistogram: Option[LabeledHistogram[IO, Name]]) extends DbClient(maybeHistogram) {
-  val queryName: SqlQuery.Name = "some_id"
+  val queryName: SqlStatement.Name = "some_id"
 
-  private def query(expected: Int) = SqlQuery[IO, Int](Kleisli { session =>
-                                                         val query: Query[Int, Int] =
-                                                           sql"""select $int4;""".query(int4)
-                                                         session.prepare(query).use { pq =>
-                                                           pq.unique(expected)
-                                                         }
-                                                       },
-                                                       queryName
+  private def query(expected: Int) = SqlStatement[IO, Int](Kleisli { session =>
+                                                             val query: Query[Int, Int] =
+                                                               sql"""select $int4;""".query(int4)
+                                                             session.prepare(query).use { pq =>
+                                                               pq.unique(expected)
+                                                             }
+                                                           },
+                                                           queryName
   )
 
   def executeQuery(expected: Int)(sessionPoolResource: Resource[IO, Resource[IO, Session[IO]]]): IO[Int] =

@@ -19,7 +19,7 @@
 package ch.datascience.tokenrepository.repository.fetching
 
 import cats.effect.{Bracket, IO}
-import ch.datascience.db.{SessionResource, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB}
 import org.typelevel.log4cats.Logger

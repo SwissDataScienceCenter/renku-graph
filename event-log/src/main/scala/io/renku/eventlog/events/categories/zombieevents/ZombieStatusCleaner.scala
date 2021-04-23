@@ -21,7 +21,7 @@ package io.renku.eventlog.events.categories.zombieevents
 import cats.data.Kleisli
 import cats.effect.{Async, Bracket}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, New, TransformingTriples, TriplesGenerated}
 import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventStatus}
 import ch.datascience.graph.model.projects
@@ -40,7 +40,7 @@ private trait ZombieStatusCleaner[Interpretation[_]] {
 
 private class ZombieStatusCleanerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     sessionResource:  SessionResource[Interpretation, EventLogDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name],
+    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with ZombieStatusCleaner[Interpretation]
@@ -57,16 +57,14 @@ private class ZombieStatusCleanerImpl[Interpretation[_]: Async: Bracket[*[_], Th
 
   private def cleanEventualDeliveries(eventId: CompoundEventId) =
     measureExecutionTime {
-      SqlQuery(
-        Kleisli { session =>
-          val query: Command[EventId ~ projects.Id] =
-            sql"""DELETE FROM event_delivery
-                  WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
+      SqlStatement(name = "zombie_chasing - clean deliveries")
+        .command[EventId ~ projects.Id](
+          sql"""DELETE FROM event_delivery
+                WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
             """.command
-          session.prepare(query).use(_ execute (eventId.id ~ eventId.projectId))
-        },
-        name = "zombie_chasing - clean deliveries"
-      )
+        )
+        .arguments(eventId.id ~ eventId.projectId)
+        .build
     }
 
   private def updateStatusQuery(
@@ -74,25 +72,22 @@ private class ZombieStatusCleanerImpl[Interpretation[_]: Async: Bracket[*[_], Th
       oldStatus: EventStatus,
       newStatus: EventStatus
   ) = measureExecutionTime {
-    SqlQuery(
-      Kleisli { session =>
-        val query: Command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus] =
-          sql"""UPDATE event
-                SET status = $eventStatusEncoder, execution_date = $executionDateEncoder, message = NULL
-                WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND status = $eventStatusEncoder
+    SqlStatement(name = "zombie_chasing - update status")
+      .command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus](
+        sql"""UPDATE event
+              SET status = $eventStatusEncoder, execution_date = $executionDateEncoder, message = NULL
+              WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND status = $eventStatusEncoder
           """.command
-        session.prepare(query).use {
-          _.execute(newStatus ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ oldStatus).flatMap {
-            case Completion.Update(1) => (Updated: UpdateResult).pure[Interpretation]
-            case Completion.Update(0) => (NotUpdated: UpdateResult).pure[Interpretation]
-            case _ =>
-              new Exception(s"${categoryName.value} - zombie_chasing - update status- More than one row updated")
-                .raiseError[Interpretation, UpdateResult]
-          }
-        }
-      },
-      name = "zombie_chasing - update status"
-    )
+      )
+      .arguments(newStatus ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ oldStatus)
+      .build
+      .flatMapResult {
+        case Completion.Update(1) => (Updated: UpdateResult).pure[Interpretation]
+        case Completion.Update(0) => (NotUpdated: UpdateResult).pure[Interpretation]
+        case _ =>
+          new Exception(s"${categoryName.value} - zombie_chasing - update status- More than one row updated")
+            .raiseError[Interpretation, UpdateResult]
+      }
   }
 }
 
@@ -101,6 +96,6 @@ private object ZombieStatusCleaner {
   import cats.effect.IO
 
   def apply(sessionResource:  SessionResource[IO, EventLogDB],
-            queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
+            queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
   ): IO[ZombieStatusCleaner[IO]] = IO(new ZombieStatusCleanerImpl(sessionResource, queriesExecTimes))
 }

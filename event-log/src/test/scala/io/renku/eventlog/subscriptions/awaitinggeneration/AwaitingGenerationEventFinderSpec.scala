@@ -22,7 +22,7 @@ import java.time.temporal.ChronoUnit.{HOURS => H}
 import java.time.Instant
 
 import cats.effect.IO
-import ch.datascience.db.SqlQuery
+import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
@@ -246,7 +246,7 @@ private class AwaitingGenerationEventFinderSpec
     val waitingEventsGauge    = mock[LabeledGauge[IO, Path]]
     val underProcessingGauge  = mock[LabeledGauge[IO, Path]]
     val projectPrioritisation = mock[ProjectPrioritisation[IO]]
-    val queriesExecTimes      = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val queriesExecTimes      = TestLabeledHistogram[SqlStatement.Name]("query_id")
 
     def expectWaitingEventsGaugeDecrement(projectPath: Path) =
       (waitingEventsGauge.decrement _)

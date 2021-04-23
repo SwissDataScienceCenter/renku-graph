@@ -20,7 +20,7 @@ package io.renku.eventlog.subscriptions.triplesgenerated
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.db.SqlQuery
+import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
@@ -250,7 +250,7 @@ private class TriplesGeneratedEventFinderSpec
     val awaitingTransformationGauge = mock[LabeledGauge[IO, Path]]
     val underTransformationGauge    = mock[LabeledGauge[IO, Path]]
     val projectPrioritisation       = mock[ProjectPrioritisation]
-    val queriesExecTimes            = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val queriesExecTimes            = TestLabeledHistogram[SqlStatement.Name]("query_id")
 
     def expectAwaitingTransformationGaugeDecrement(projectPath: Path) =
       (awaitingTransformationGauge.decrement _)

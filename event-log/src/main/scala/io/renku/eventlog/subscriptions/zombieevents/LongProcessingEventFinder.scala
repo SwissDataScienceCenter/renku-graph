@@ -21,7 +21,8 @@ package io.renku.eventlog.subscriptions.zombieevents
 import cats.data.{Kleisli, Nested}
 import cats.effect.{Async, Bracket, ContextShift, IO}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
+import ch.datascience.db.implicits._
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
@@ -38,7 +39,7 @@ import java.time.{Duration, Instant}
 
 private class LongProcessingEventFinder[Interpretation[_]: Async: Bracket[*[_], Throwable]: ContextShift](
     sessionResource:  SessionResource[Interpretation, EventLogDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name],
+    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with EventFinder[Interpretation, ZombieEvent]
@@ -54,21 +55,19 @@ private class LongProcessingEventFinder[Interpretation[_]: Async: Bracket[*[_], 
     Nested(queryProjectsToCheck).map { case (id, currentStatus) => id -> currentStatus.toEventStatus }.value
 
   private def queryProjectsToCheck = measureExecutionTime {
-    SqlQuery[Interpretation, List[(projects.Id, TransformationStatus)]](
-      Kleisli { session =>
-        val query: Query[EventStatus ~ EventStatus, (projects.Id, TransformationStatus)] =
-          sql"""SELECT DISTINCT evt.project_id, evt.status
+    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lpe - find projects"))
+      .select[EventStatus ~ EventStatus, (projects.Id, TransformationStatus)](
+        sql"""SELECT DISTINCT evt.project_id, evt.status
                 FROM event evt
                 WHERE evt.status = $eventStatusEncoder
                   OR evt.status = $eventStatusEncoder
           """
-            .query(projectIdDecoder ~ transformationStatusGet)
-            .map { case id ~ status => (id, status) }
+          .query(projectIdDecoder ~ transformationStatusGet)
+          .map { case id ~ status => (id, status) }
+      )
+      .arguments(GeneratingTriples ~ TransformingTriples)
+      .build(_.toList)
 
-        session.prepare(query).use(_.stream(GeneratingTriples ~ TransformingTriples, 32).compile.toList)
-      },
-      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lpe - find projects")
-    )
   }
 
   private lazy val lookForZombie
@@ -83,10 +82,9 @@ private class LongProcessingEventFinder[Interpretation[_]: Async: Bracket[*[_], 
 
   private def queryZombieEvent(projectId: projects.Id, status: EventStatus) =
     measureExecutionTime {
-      SqlQuery[Interpretation, Option[ZombieEvent]](
-        Kleisli { session =>
-          val query: Query[projects.Id ~ EventStatus ~ String ~ ExecutionDate ~ EventProcessingTime, ZombieEvent] =
-            sql"""SELECT evt.event_id, evt.project_id, proj.project_path, evt.status
+      SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lpe - find"))
+        .select[projects.Id ~ EventStatus ~ String ~ ExecutionDate ~ EventProcessingTime, ZombieEvent](
+          sql"""SELECT evt.event_id, evt.project_id, proj.project_path, evt.status
                   FROM event evt
                   JOIN project proj ON proj.project_id = evt.project_id
                   LEFT JOIN event_delivery ed ON ed.project_id = evt.project_id AND ed.event_id = evt.event_id
@@ -98,19 +96,13 @@ private class LongProcessingEventFinder[Interpretation[_]: Async: Bracket[*[_], 
                     )
                   LIMIT 1
                   """
-              .query(compoundEventIdDecoder ~ projectPathDecoder ~ eventStatusDecoder)
-              .map { case id ~ path ~ status => ZombieEvent(processName, id, path, status) }
-
-          session
-            .prepare(query)
-            .use(
-              _.option(
-                projectId ~ status ~ zombieMessage ~ ExecutionDate(now()) ~ EventProcessingTime(Duration.ofMinutes(5))
-              )
-            )
-        },
-        name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lpe - find")
-      )
+            .query(compoundEventIdDecoder ~ projectPathDecoder ~ eventStatusDecoder)
+            .map { case id ~ path ~ status => ZombieEvent(processName, id, path, status) }
+        )
+        .arguments(
+          projectId ~ status ~ zombieMessage ~ ExecutionDate(now()) ~ EventProcessingTime(Duration.ofMinutes(5))
+        )
+        .build(_.option)
     }
 
   private lazy val markEventTaken
@@ -121,17 +113,15 @@ private class LongProcessingEventFinder[Interpretation[_]: Async: Bracket[*[_], 
 
   private def updateMessage(eventId: CompoundEventId) =
     measureExecutionTime {
-      SqlQuery(
-        Kleisli { session =>
-          val query: Command[String ~ ExecutionDate ~ EventId ~ projects.Id] =
-            sql"""UPDATE event
+      SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lpe - update message"))
+        .command[String ~ ExecutionDate ~ EventId ~ projects.Id](
+          sql"""UPDATE event
                   SET message = $text, execution_date = $executionDateEncoder
                   WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
             """.command
-          session.prepare(query).use(_.execute(zombieMessage ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId))
-        },
-        name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lpe - update message")
-      )
+        )
+        .arguments(zombieMessage ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId)
+        .build
     }
 
   private def toNoneIfEventAlreadyTaken(event: ZombieEvent): Completion => Option[ZombieEvent] = {
@@ -179,7 +169,7 @@ private object LongProcessingEventFinder {
 
   def apply(
       sessionResource:     SessionResource[IO, EventLogDB],
-      queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
+      queriesExecTimes:    LabeledHistogram[IO, SqlStatement.Name]
   )(implicit contextShift: ContextShift[IO]): IO[EventFinder[IO, ZombieEvent]] = IO {
     new LongProcessingEventFinder(sessionResource, queriesExecTimes)
   }

@@ -19,7 +19,7 @@
 package io.renku.eventlog.events.categories.zombieevents
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.db.{SessionResource, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.events.consumers.EventHandler
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
 import ch.datascience.events.consumers.subscriptions.SubscriptionPayloadComposer.categoryAndUrlPayloadsComposerFactory
@@ -37,7 +37,7 @@ object SubscriptionFactory {
             underTriplesGenerationGauge:        LabeledGauge[IO, projects.Path],
             awaitingTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
             underTriplesTransformationGauge:    LabeledGauge[IO, projects.Path],
-            queriesExecTimes:                   LabeledHistogram[IO, SqlQuery.Name],
+            queriesExecTimes:                   LabeledHistogram[IO, SqlStatement.Name],
             logger:                             Logger[IO]
   )(implicit
       executionContext: ExecutionContext,

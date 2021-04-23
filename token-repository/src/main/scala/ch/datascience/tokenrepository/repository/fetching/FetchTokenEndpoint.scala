@@ -21,7 +21,7 @@ package ch.datascience.tokenrepository.repository.fetching
 import cats.data.OptionT
 import cats.effect.{ContextShift, Effect, IO}
 import cats.syntax.all._
-import ch.datascience.db.{SessionResource, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.graph.model.projects
 import ch.datascience.http.ErrorMessage._
 import ch.datascience.http.client.AccessToken
@@ -72,7 +72,7 @@ class FetchTokenEndpoint[Interpretation[_]: Effect](
 object IOFetchTokenEndpoint {
   def apply(
       sessionResource:     SessionResource[IO, ProjectsTokensDB],
-      queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name],
+      queriesExecTimes:    LabeledHistogram[IO, SqlStatement.Name],
       logger:              Logger[IO]
   )(implicit contextShift: ContextShift[IO]): IO[FetchTokenEndpoint[IO]] =
     for {

@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.data.OptionT
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.db.{SessionResource, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 import io.renku.eventlog.EventLogDB
@@ -55,7 +55,7 @@ private object ZombieEventFinder {
 
   def apply(
       sessionResource:  SessionResource[IO, EventLogDB],
-      queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
+      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name],
       logger:           Logger[IO]
   )(implicit
       executionContext: ExecutionContext,

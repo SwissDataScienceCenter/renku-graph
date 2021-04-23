@@ -18,18 +18,14 @@
 
 package ch.datascience.db
 
-import cats.data.Kleisli
-import ch.datascience.db.SqlQuery.Name
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.collection.NonEmpty
-import skunk._
-import skunk.Query
+import cats.effect.Sync
+import skunk.PreparedQuery
 
-final case class SqlQuery[Interpretation[_], ResultType](
-    query: Kleisli[Interpretation, Session[Interpretation], ResultType],
-    name:  Name
-)
+object implicits {
 
-object SqlQuery {
-  type Name = String Refined NonEmpty
+  implicit class PreparedQueryOps[Interpretation[_]: Sync, In, Out](
+      preparedQuery: PreparedQuery[Interpretation, In, Out]
+  ) {
+    lazy val toList: In => Interpretation[List[Out]] = args => preparedQuery.stream(args, chunkSize = 32).compile.toList
+  }
 }

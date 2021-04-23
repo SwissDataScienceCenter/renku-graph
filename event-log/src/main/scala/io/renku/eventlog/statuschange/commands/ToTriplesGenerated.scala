@@ -22,7 +22,7 @@ import cats.data.EitherT.fromEither
 import cats.data.{EitherT, Kleisli, NonEmptyList}
 import cats.effect.{Async, Bracket, Sync}
 import cats.syntax.all._
-import ch.datascience.db.{SessionResource, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples, TriplesGenerated}
 import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.{SchemaVersion, events, projects}
@@ -54,54 +54,47 @@ final case class GeneratingToTriplesGenerated[Interpretation[_]: Async: Bracket[
 
   override lazy val status: events.EventStatus = TriplesGenerated
 
-  override def queries: NonEmptyList[SqlQuery[Interpretation, Int]] = NonEmptyList(
-    SqlQuery[Interpretation, Int](
-      query = updateStatus,
-      name = "generating_triples->triples_generated"
-    ),
-    List(
-      SqlQuery(
-        query = upsertEventPayload,
-        name = "upsert_generated_triples"
-      )
-    )
-  )
-
-  private lazy val updateStatus = Kleisli[Interpretation, Session[Interpretation], Int] { session =>
-    val query: Command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus] =
-      sql"""UPDATE event
-            SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
-            WHERE event_id = $eventIdEncoder
-              AND project_id = $projectIdEncoder
-              AND status = $eventStatusEncoder;
-      """.command
-    session
-      .prepare(query)
-      .use(_.execute(status ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ GeneratingTriples))
-      .flatMap {
+  override def queries: NonEmptyList[SqlStatement[Interpretation, Int]] = NonEmptyList(
+    SqlStatement[Interpretation](name = "generating_triples->triples_generated")
+      .command(updateStatus)
+      .arguments(status ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ GeneratingTriples)
+      .build
+      .flatMapResult {
         case Completion.Update(n) => n.pure[Interpretation]
         case completion =>
           new RuntimeException(
             s"generating_triples->triples_generated time query failed with completion status $completion"
           ).raiseError[Interpretation, Int]
-      }
-  }
+      },
+    List(
+      SqlStatement[Interpretation](name = "upsert_generated_triples")
+        .command(upsertEventPayload)
+        .arguments(eventId.id ~ eventId.projectId ~ payload ~ schemaVersion)
+        .build
+        .flatMapResult {
+          case Completion.Insert(n) => n.pure[Interpretation]
+          case completion =>
+            new RuntimeException(s"upsert_generated_triples time query failed with completion status $completion")
+              .raiseError[Interpretation, Int]
+        }
+    )
+  )
 
-  private lazy val upsertEventPayload = Kleisli[Interpretation, Session[Interpretation], Int] { session =>
-    val query: Command[EventId ~ projects.Id ~ EventPayload ~ SchemaVersion] =
-      sql"""
+  private lazy val updateStatus: Command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus] =
+    sql"""UPDATE event
+            SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
+            WHERE event_id = $eventIdEncoder
+              AND project_id = $projectIdEncoder
+              AND status = $eventStatusEncoder;
+      """.command
+
+  private lazy val upsertEventPayload: Command[EventId ~ projects.Id ~ EventPayload ~ SchemaVersion] =
+    sql"""
             INSERT INTO event_payload (event_id, project_id, payload, schema_version)
             VALUES ($eventIdEncoder,  $projectIdEncoder, $eventPayloadEncoder, $schemaVersionEncoder)
             ON CONFLICT (event_id, project_id, schema_version)
             DO UPDATE SET payload = EXCLUDED.payload;
           """.command
-    session.prepare(query).use(_.execute(eventId.id ~ eventId.projectId ~ payload ~ schemaVersion)).flatMap {
-      case Completion.Insert(n) => n.pure[Interpretation]
-      case completion =>
-        new RuntimeException(s"upsert_generated_triples time query failed with completion status $completion")
-          .raiseError[Interpretation, Int]
-    }
-  }
 
   override def updateGauges(updateResult: UpdateResult): Kleisli[Interpretation, Session[Interpretation], Unit] =
     updateResult match {
@@ -124,9 +117,9 @@ final case class TransformingToTriplesGenerated[Interpretation[_]: Bracket[*[_],
 
   override lazy val status: events.EventStatus = TriplesGenerated
 
-  override def queries: NonEmptyList[SqlQuery[Interpretation, Int]] = NonEmptyList.of(
-    SqlQuery(
-      query = updateStatus,
+  override def queries: NonEmptyList[SqlStatement[Interpretation, Int]] = NonEmptyList.of(
+    SqlStatement(
+      queryExecution = updateStatus,
       name = "transforming_triples->triples_generated"
     )
   )

@@ -22,7 +22,7 @@ import cats.data.Kleisli
 import cats.effect.{Async, Bracket}
 import cats.syntax.all._
 import ch.datascience.data.ErrorMessage
-import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
@@ -44,7 +44,7 @@ trait StatusUpdatesRunner[Interpretation[_]] {
 
 class StatusUpdatesRunnerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     sessionResource:  SessionResource[Interpretation, EventLogDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name],
+    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
     logger:           Logger[Interpretation]
 ) extends DbClient(Some(queriesExecTimes))
     with StatusUpdatesRunner[Interpretation]
@@ -107,18 +107,15 @@ class StatusUpdatesRunnerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]
 
   private def deleteDelivery(command: ChangeStatusCommand[Interpretation]) =
     measureExecutionTime {
-      SqlQuery(
-        Kleisli { session =>
-          val query: Command[EventId ~ projects.Id] =
-            sql"""DELETE FROM event_delivery
+      SqlStatement(name = "status update - delivery info remove")
+        .command[EventId ~ projects.Id](
+          sql"""DELETE FROM event_delivery
                   WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
                """.command
-          session
-            .prepare(query)
-            .use(_.execute(command.eventId.id ~ command.eventId.projectId).map(_ => UpdateResult.Updated: UpdateResult))
-        },
-        name = "status update - delivery info remove"
-      )
+        )
+        .arguments(command.eventId.id ~ command.eventId.projectId)
+        .build
+        .mapResult(_ => UpdateResult.Updated: UpdateResult)
     }
 
   private def toUpdateResult: UpdateResult => Kleisli[Interpretation, Session[Interpretation], UpdateResult] = {
@@ -128,17 +125,16 @@ class StatusUpdatesRunnerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]
 
   private def checkIfPersisted(eventId: CompoundEventId) =
     measureExecutionTime {
-      SqlQuery(
-        Kleisli { session =>
-          val query: Query[EventId ~ projects.Id, EventId] =
-            sql"""SELECT event_id
+      SqlStatement(name = "event update check existence")
+        .select[EventId ~ projects.Id, EventId](
+          sql"""SELECT event_id
                   FROM event
                   WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder"""
-              .query(eventIdDecoder)
-          session.prepare(query).use(_.option(eventId.id ~ eventId.projectId)).map(_.isDefined)
-        },
-        name = "event update check existence"
-      )
+            .query(eventIdDecoder)
+        )
+        .arguments(eventId.id ~ eventId.projectId)
+        .build(_.option)
+        .mapResult(_.isDefined)
     }
 
   private def logInfo(command: ChangeStatusCommand[Interpretation], updateResult: UpdateResult) = updateResult match {
@@ -148,7 +144,7 @@ class StatusUpdatesRunnerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]
   private def maybeUpdateProcessingTimeQuery(command: ChangeStatusCommand[Interpretation]) =
     upsertStatusProcessingTime(command.eventId, command.status, command.maybeProcessingTime)
 
-  private def executeQueries(queries: List[SqlQuery[Interpretation, Int]],
+  private def executeQueries(queries: List[SqlStatement[Interpretation, Int]],
                              command: ChangeStatusCommand[Interpretation]
   ) =
     queries
@@ -172,7 +168,7 @@ object IOUpdateCommandsRunner {
   import cats.effect.IO
 
   def apply(sessionResource:  SessionResource[IO, EventLogDB],
-            queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
+            queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name],
             logger:           Logger[IO]
   ): IO[StatusUpdatesRunner[IO]] = IO {
     new StatusUpdatesRunnerImpl(sessionResource, queriesExecTimes, logger)

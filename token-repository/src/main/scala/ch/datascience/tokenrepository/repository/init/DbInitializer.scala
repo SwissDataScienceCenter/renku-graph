@@ -21,7 +21,7 @@ package ch.datascience.tokenrepository.repository.init
 import cats.data.Kleisli
 import cats.effect._
 import cats.syntax.all._
-import ch.datascience.db.{SessionResource, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import org.typelevel.log4cats.Logger
@@ -71,7 +71,7 @@ object IODbInitializer {
 
   def apply(
       sessionResource:  SessionResource[IO, ProjectsTokensDB],
-      queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
+      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name],
       logger:           Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
