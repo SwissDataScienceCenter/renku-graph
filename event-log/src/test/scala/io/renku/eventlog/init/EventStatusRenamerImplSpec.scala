@@ -20,9 +20,10 @@ package io.renku.eventlog.init
 
 import cats.data.Kleisli
 import cats.effect.IO
+import ch.datascience.db.implicits._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventId, EventStatus}
 import ch.datascience.graph.model.events.EventStatus._
+import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
@@ -33,10 +34,8 @@ import io.renku.eventlog._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk._
+import skunk.codec.all._
 import skunk.implicits._
-import skunk.codec.all.{timestamp, _}
-
-import java.time.{LocalDateTime, ZoneId, ZoneOffset}
 
 class EventStatusRenamerImplSpec
     extends AnyWordSpec
@@ -48,7 +47,6 @@ class EventStatusRenamerImplSpec
     eventLogTableCreator,
     projectPathAdder,
     batchDateAdder,
-    latestEventDatesViewRemover,
     projectTableCreator,
     projectPathRemover,
     eventLogTableRenamer

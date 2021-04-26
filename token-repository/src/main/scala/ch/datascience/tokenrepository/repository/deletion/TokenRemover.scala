@@ -18,35 +18,31 @@
 
 package ch.datascience.tokenrepository.repository.deletion
 
-import cats.Monad
-import cats.data.Kleisli
-import cats.effect.Async
+import cats.effect.BracketThrow
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.{ProjectsTokensDB, TokenRepositoryTypeSerializers}
 import eu.timepit.refined.auto._
-import skunk._
 import skunk.data.Completion
 import skunk.implicits._
 
-private[repository] class TokenRemover[Interpretation[_]: Async: Monad](
+private[repository] class TokenRemover[Interpretation[_]: BracketThrow](
     sessionResource:  SessionResource[Interpretation, ProjectsTokensDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name]
+    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
 ) extends DbClient[Interpretation](Some(queriesExecTimes))
     with TokenRepositoryTypeSerializers {
 
   def delete(projectId: Id): Interpretation[Unit] = sessionResource.useK {
     measureExecutionTime {
-      val command: Command[Id] =
-        sql"""delete from projects_tokens
+      SqlStatement(name = "remove token")
+        .command[Id](sql"""delete from projects_tokens
               where project_id = $projectIdEncoder
-        """.command
-      SqlQuery[Interpretation, Unit](
-        Kleisli(_.prepare(command).use(_.execute(projectId).flatMap(failIfMultiUpdate(projectId)))),
-        name = "remove token"
-      )
+        """.command)
+        .arguments(projectId)
+        .build
+        .flatMapResult(failIfMultiUpdate(projectId))
     }
   }
 

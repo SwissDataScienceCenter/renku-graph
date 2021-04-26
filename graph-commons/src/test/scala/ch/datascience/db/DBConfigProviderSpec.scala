@@ -23,8 +23,8 @@ import ch.datascience.db.DBConfigProvider.DBConfig._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import com.typesafe.config.ConfigFactory
+import eu.timepit.refined.api.RefType
 import eu.timepit.refined.api.RefType.refinedRefType
-import eu.timepit.refined.api.{RefType, Refined}
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -49,12 +49,11 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
       val config = ConfigFactory.parseMap(
         Map(
           namespace -> Map(
-            "db-host"                 -> host.value,
-            "db-port"                 -> port.value,
-            "db-user"                 -> user,
-            "db-pass"                 -> password,
-            "connection-pool"         -> connectionPool.value,
-            "max-connection-lifetime" -> maxLifetime.toString()
+            "db-host"         -> host.value,
+            "db-port"         -> port.value,
+            "db-user"         -> user,
+            "db-pass"         -> password,
+            "connection-pool" -> connectionPool.value
           ).asJava
         ).asJava
       )
@@ -66,7 +65,6 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
       dbConfig.port           shouldBe port
       dbConfig.pass.value     shouldBe password
       dbConfig.connectionPool shouldBe connectionPool
-      dbConfig.maxLifetime    shouldBe maxLifetime
     }
 
     "fail if there is no db config namespace in the config" in new TestCase {
@@ -80,12 +78,11 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
       val config = ConfigFactory.parseMap(
         Map(
           namespace -> Map(
-            "db-host"                 -> "",
-            "db-port"                 -> positiveInts().generateOne.value,
-            "db-user"                 -> nonEmptyStrings().generateOne,
-            "db-pass"                 -> nonEmptyStrings().generateOne,
-            "connection-pool"         -> positiveInts().generateOne.value,
-            "max-connection-lifetime" -> durations(max = 30 minutes).generateOne.toString()
+            "db-host"         -> "",
+            "db-port"         -> positiveInts().generateOne.value,
+            "db-user"         -> nonEmptyStrings().generateOne,
+            "db-pass"         -> nonEmptyStrings().generateOne,
+            "connection-pool" -> positiveInts().generateOne.value
           ).asJava
         ).asJava
       )
@@ -99,11 +96,10 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
       val config = ConfigFactory.parseMap(
         Map(
           namespace -> Map(
-            "db-host"                 -> nonEmptyStrings().generateOne,
-            "db-user"                 -> nonEmptyStrings().generateOne,
-            "db-pass"                 -> nonEmptyStrings().generateOne,
-            "connection-pool"         -> positiveInts().generateOne.value,
-            "max-connection-lifetime" -> durations(max = 30 minutes).generateOne.toString()
+            "db-host"         -> nonEmptyStrings().generateOne,
+            "db-user"         -> nonEmptyStrings().generateOne,
+            "db-pass"         -> nonEmptyStrings().generateOne,
+            "connection-pool" -> positiveInts().generateOne.value
           ).asJava
         ).asJava
       )
@@ -117,12 +113,11 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
       val config = ConfigFactory.parseMap(
         Map(
           namespace -> Map(
-            "db-host"                 -> hosts.generateOne.value,
-            "db-user"                 -> "",
-            "db-port"                 -> positiveInts().generateOne.value,
-            "db-pass"                 -> nonEmptyStrings().generateOne,
-            "connection-pool"         -> positiveInts().generateOne.value,
-            "max-connection-lifetime" -> durations(max = 30 minutes).generateOne.toString()
+            "db-host"         -> hosts.generateOne.value,
+            "db-user"         -> "",
+            "db-port"         -> positiveInts().generateOne.value,
+            "db-pass"         -> nonEmptyStrings().generateOne,
+            "connection-pool" -> positiveInts().generateOne.value
           ).asJava
         ).asJava
       )
@@ -136,11 +131,10 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
       val config = ConfigFactory.parseMap(
         Map(
           namespace -> Map(
-            "db-host"                 -> hosts.generateOne.value,
-            "db-user"                 -> nonEmptyStrings().generateOne,
-            "db-port"                 -> positiveInts().generateOne.value,
-            "connection-pool"         -> positiveInts().generateOne.value,
-            "max-connection-lifetime" -> durations(max = 30 minutes).generateOne.toString()
+            "db-host"         -> hosts.generateOne.value,
+            "db-user"         -> nonEmptyStrings().generateOne,
+            "db-port"         -> positiveInts().generateOne.value,
+            "connection-pool" -> positiveInts().generateOne.value
           ).asJava
         ).asJava
       )
@@ -154,29 +148,10 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
       val config = ConfigFactory.parseMap(
         Map(
           namespace -> Map(
-            "db-host"                 -> hosts.generateOne.value,
-            "db-port"                 -> positiveInts().generateOne.value,
-            "db-user"                 -> nonEmptyStrings().generateOne,
-            "db-pass"                 -> nonEmptyStrings().generateOne,
-            "max-connection-lifetime" -> durations(max = 30 minutes).generateOne.toString()
-          ).asJava
-        ).asJava
-      )
-
-      val Failure(exception) = new DBConfigProvider[Try, TestDB](namespace, dbName, config).get()
-
-      exception shouldBe a[ConfigLoadingException]
-    }
-
-    "fail if there is no '<config-namespace>.max-connection-lifetime' in the config" in new TestCase {
-      val config = ConfigFactory.parseMap(
-        Map(
-          namespace -> Map(
-            "db-host"         -> hosts.generateOne.value,
-            "db-user"         -> nonEmptyStrings().generateOne,
-            "db-port"         -> positiveInts().generateOne.value,
-            "db-pass"         -> nonEmptyStrings().generateOne,
-            "connection-pool" -> positiveInts().generateOne.value
+            "db-host" -> hosts.generateOne.value,
+            "db-port" -> positiveInts().generateOne.value,
+            "db-user" -> nonEmptyStrings().generateOne,
+            "db-pass" -> nonEmptyStrings().generateOne
           ).asJava
         ).asJava
       )

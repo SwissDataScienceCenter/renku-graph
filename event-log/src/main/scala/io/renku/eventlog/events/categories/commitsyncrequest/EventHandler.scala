@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.data.EitherT.fromEither
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.db.{SessionResource, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult}
@@ -75,7 +75,7 @@ private class EventHandler[Interpretation[_]: MonadError[*[_], Throwable]](
 
 private object EventHandler {
   def apply(sessionResource:  SessionResource[IO, EventLogDB],
-            queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
+            queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name],
             logger:           Logger[IO]
   )(implicit
       executionContext: ExecutionContext,

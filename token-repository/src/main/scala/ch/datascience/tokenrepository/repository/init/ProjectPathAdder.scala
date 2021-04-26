@@ -21,7 +21,7 @@ package ch.datascience.tokenrepository.repository.init
 import cats.data.Kleisli
 import cats.effect._
 import cats.syntax.all._
-import ch.datascience.db.{SessionResource, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.metrics.LabeledHistogram
@@ -143,7 +143,7 @@ private object IOProjectPathAdder {
 
   def apply(
       sessionResource:  SessionResource[IO, ProjectsTokensDB],
-      queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
+      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name],
       logger:           Logger[IO]
   )(implicit
       executionContext: ExecutionContext,

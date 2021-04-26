@@ -19,20 +19,19 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.{Async, Bracket}
+import cats.effect.{Bracket, BracketThrow}
 import cats.syntax.all._
 import ch.datascience.db.SessionResource
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
-import org.typelevel.log4cats.Logger
 import io.circe.parser._
 import io.circe.{Decoder, HCursor}
 import io.renku.eventlog.{EventLogDB, TypeSerializers}
+import org.typelevel.log4cats.Logger
 import skunk._
-import skunk.implicits._
 import skunk.codec.all._
-import skunk.data.Completion
+import skunk.implicits._
 
 import scala.util.control.NonFatal
 
@@ -41,14 +40,14 @@ private trait ProjectPathAdder[Interpretation[_]] {
 }
 
 private object ProjectPathAdder {
-  def apply[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+  def apply[Interpretation[_]: BracketThrow](
       sessionResource: SessionResource[Interpretation, EventLogDB],
       logger:          Logger[Interpretation]
   ): ProjectPathAdder[Interpretation] =
     new ProjectPathAdderImpl(sessionResource, logger)
 }
 
-private class ProjectPathAdderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+private class ProjectPathAdderImpl[Interpretation[_]: BracketThrow](
     sessionResource: SessionResource[Interpretation, EventLogDB],
     logger:          Logger[Interpretation]
 ) extends ProjectPathAdder[Interpretation]

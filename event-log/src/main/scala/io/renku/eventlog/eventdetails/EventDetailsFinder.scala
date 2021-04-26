@@ -18,9 +18,8 @@
 
 package io.renku.eventlog.eventdetails
 
-import cats.data.Kleisli
-import cats.effect.{Async, IO}
-import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
+import cats.effect.{BracketThrow, IO}
+import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.{CompoundEventId, EventId}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
@@ -32,9 +31,9 @@ private trait EventDetailsFinder[Interpretation[_]] {
   def findDetails(eventId: CompoundEventId): Interpretation[Option[CompoundEventId]]
 }
 
-private class EventDetailsFinderImpl[Interpretation[_]: Async](
+private class EventDetailsFinderImpl[Interpretation[_]: BracketThrow](
     sessionResource:  SessionResource[Interpretation, EventLogDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name]
+    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
 ) extends DbClient[Interpretation](Some(queriesExecTimes))
     with EventDetailsFinder[Interpretation]
     with TypeSerializers {
@@ -45,22 +44,20 @@ private class EventDetailsFinderImpl[Interpretation[_]: Async](
     sessionResource.useK(measureExecutionTime(find(eventId)))
 
   private def find(eventId: CompoundEventId) =
-    SqlQuery[Interpretation, Option[CompoundEventId]](
-      Kleisli { session =>
-        val query: Query[EventId ~ projects.Id, CompoundEventId] =
-          sql"""SELECT evt.event_id, evt.project_id
+    SqlStatement[Interpretation](name = "find event details")
+      .select[EventId ~ projects.Id, CompoundEventId](
+        sql"""SELECT evt.event_id, evt.project_id
                 FROM event evt WHERE evt.event_id = $eventIdEncoder and evt.project_id = $projectIdEncoder
           """.query(compoundEventIdDecoder)
-        session.prepare(query).use(_.option(eventId.id ~ eventId.projectId))
-      },
-      name = "find event details"
-    )
+      )
+      .arguments(eventId.id ~ eventId.projectId)
+      .build(_.option)
 }
 
 private object EventDetailsFinder {
   def apply(
       sessionResource:  SessionResource[IO, EventLogDB],
-      queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
+      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
   ): IO[EventDetailsFinder[IO]] = IO {
     new EventDetailsFinderImpl(sessionResource, queriesExecTimes)
   }

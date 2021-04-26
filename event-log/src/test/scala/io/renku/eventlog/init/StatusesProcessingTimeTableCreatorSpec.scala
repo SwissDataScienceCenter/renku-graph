@@ -30,7 +30,6 @@ class StatusesProcessingTimeTableCreatorSpec extends AnyWordSpec with DbInitSpec
     eventLogTableCreator,
     projectPathAdder,
     batchDateAdder,
-    latestEventDatesViewRemover,
     projectTableCreator,
     projectPathRemover,
     eventLogTableRenamer,

@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.metrics
 
-import ch.datascience.db.SqlQuery
+import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{nonEmptyList, timestamps}
 import ch.datascience.graph.model.EventsGenerators._
@@ -175,7 +175,7 @@ class StatsFinderSpec
     }
   }
 
-  private lazy val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
+  private lazy val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
   private lazy val stats            = new StatsFinderImpl(sessionResource, queriesExecTimes)
 
   private def store: ((Path, EventId, EventStatus, EventDate)) => Unit = {

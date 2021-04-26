@@ -21,7 +21,7 @@ package io.renku.eventlog.subscriptions
 import cats._
 import cats.effect.{ContextShift, Effect, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.db.{SessionResource, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import eu.timepit.refined.api.Refined
@@ -72,7 +72,7 @@ object EventProducersRegistry {
       underTriplesGenerationGauge:    LabeledGauge[IO, projects.Path],
       awaitingTransformationGauge:    LabeledGauge[IO, projects.Path],
       underTransformationGauge:       LabeledGauge[IO, projects.Path],
-      queriesExecTimes:               LabeledHistogram[IO, SqlQuery.Name],
+      queriesExecTimes:               LabeledHistogram[IO, SqlStatement.Name],
       microservicePort:               Int Refined Positive,
       logger:                         Logger[IO]
   )(implicit

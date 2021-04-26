@@ -20,7 +20,7 @@ package io.renku.eventlog.events.categories.creation
 
 import cats.data.Kleisli
 import cats.effect.IO
-import ch.datascience.db.SqlQuery
+import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
@@ -288,7 +288,7 @@ class EventPersisterSpec
 
     val currentTime        = mockFunction[Instant]
     val waitingEventsGauge = mock[LabeledGauge[IO, projects.Path]]
-    val queriesExecTimes   = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val queriesExecTimes   = TestLabeledHistogram[SqlStatement.Name]("query_id")
     val persister          = new EventPersisterImpl(sessionResource, waitingEventsGauge, queriesExecTimes, currentTime)
 
     val now = Instant.now()

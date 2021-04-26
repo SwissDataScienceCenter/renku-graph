@@ -19,14 +19,14 @@
 package io.renku.eventlog.metrics
 
 import cats.effect.IO
-import ch.datascience.db.SqlQuery
+import ch.datascience.db.SqlStatement
 import ch.datascience.metrics.{Histogram, LabeledHistogram, MetricsRegistry}
 import eu.timepit.refined.auto._
 
 object QueriesExecutionTimes {
 
-  def apply(metricsRegistry: MetricsRegistry[IO]): IO[LabeledHistogram[IO, SqlQuery.Name]] =
-    Histogram[IO, SqlQuery.Name](
+  def apply(metricsRegistry: MetricsRegistry[IO]): IO[LabeledHistogram[IO, SqlStatement.Name]] =
+    Histogram[IO, SqlStatement.Name](
       name = "event_log_queries_execution_times",
       help = "Event Log queries execution times",
       labelName = "query_id",

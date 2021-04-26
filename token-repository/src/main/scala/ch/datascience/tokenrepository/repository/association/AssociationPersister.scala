@@ -18,10 +18,9 @@
 
 package ch.datascience.tokenrepository.repository.association
 
-import cats.data.Kleisli
 import cats.effect._
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
@@ -32,9 +31,9 @@ import skunk.data.Completion
 import skunk.data.Completion.{Insert, Update}
 import skunk.implicits._
 
-private class AssociationPersister[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+private class AssociationPersister[Interpretation[_]: BracketThrow](
     sessionResource:  SessionResource[Interpretation, ProjectsTokensDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name]
+    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
 ) extends DbClient[Interpretation](Some(queriesExecTimes))
     with TokenRepositoryTypeSerializers {
 
@@ -48,61 +47,51 @@ private class AssociationPersister[Interpretation[_]: Async: Bracket[*[_], Throw
     }
 
   private def checkIfTokenExists(projectPath: Path) = measureExecutionTime {
-    SqlQuery(
-      Kleisli { session =>
-        val query: Query[Path, EncryptedAccessToken] =
-          sql"SELECT token FROM projects_tokens WHERE project_path = $projectPathEncoder".query(
-            encryptedAccessTokenDecoder
-          )
-        session.prepare(query).use(_.option(projectPath)).map(_.isDefined)
-      },
-      name = "associate token - check"
-    )
+    SqlStatement(name = "associate token - check")
+      .select[Path, EncryptedAccessToken](
+        sql"SELECT token FROM projects_tokens WHERE project_path = $projectPathEncoder".query(
+          encryptedAccessTokenDecoder
+        )
+      )
+      .arguments(projectPath)
+      .build(_.option)
+      .mapResult(_.isDefined)
   }
 
   private def update(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken) = measureExecutionTime {
-
-    SqlQuery(
-      Kleisli { session =>
-        val query: Command[EncryptedAccessToken ~ Id ~ Path] =
-          sql"""UPDATE projects_tokens
-                SET token = $encryptedAccessTokenEncoder, project_id = $projectIdEncoder
-                WHERE project_path = $projectPathEncoder 
+    SqlStatement(name = "associate token - update")
+      .command[EncryptedAccessToken ~ Id ~ Path](
+        sql"""UPDATE projects_tokens
+              SET token = $encryptedAccessTokenEncoder, project_id = $projectIdEncoder
+              WHERE project_path = $projectPathEncoder 
           """.command
-        session
-          .prepare(query)
-          .use(_.execute(encryptedToken ~ projectId ~ projectPath))
-          .map(failIfMultiUpdate(projectId, projectPath))
-
-      },
-      name = "associate token - update"
-    )
+      )
+      .arguments(encryptedToken ~ projectId ~ projectPath)
+      .build
+      .flatMapResult(failIfMultiUpdate(projectId, projectPath))
   }
 
   private def insert(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken) = measureExecutionTime {
-    SqlQuery(
-      Kleisli { session =>
-        val query: Command[Id ~ Path ~ EncryptedAccessToken] =
-          sql"""INSERT INTO projects_tokens (project_id, project_path, token)
-                VALUES ($projectIdEncoder, $projectPathEncoder, $encryptedAccessTokenEncoder)
+    SqlStatement(name = "associate token - insert")
+      .command[Id ~ Path ~ EncryptedAccessToken](
+        sql"""INSERT INTO projects_tokens (project_id, project_path, token)
+              VALUES ($projectIdEncoder, $projectPathEncoder, $encryptedAccessTokenEncoder)
           """.command
-        session
-          .prepare(query)
-          .use(_.execute(projectId ~ projectPath ~ encryptedToken))
-          .map(failIfMultiUpdate(projectId, projectPath))
-      },
-      name = "associate token - insert"
-    )
+      )
+      .arguments(projectId ~ projectPath ~ encryptedToken)
+      .build
+      .flatMapResult(failIfMultiUpdate(projectId, projectPath))
   }
 
-  private def failIfMultiUpdate(projectId: Id, projectPath: Path): Completion => Unit = {
-    case Insert(1) | Update(1) => ()
-    case _                     => throw new RuntimeException(s"Associating token for project $projectPath ($projectId)")
+  private def failIfMultiUpdate(projectId: Id, projectPath: Path): Completion => Interpretation[Unit] = {
+    case Insert(1) | Update(1) => ().pure[Interpretation]
+    case _ =>
+      new RuntimeException(s"Associating token for project $projectPath ($projectId)").raiseError[Interpretation, Unit]
   }
 }
 
 private class IOAssociationPersister(
     sessionResource:     SessionResource[IO, ProjectsTokensDB],
-    queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
+    queriesExecTimes:    LabeledHistogram[IO, SqlStatement.Name]
 )(implicit contextShift: ContextShift[IO])
     extends AssociationPersister[IO](sessionResource, queriesExecTimes)

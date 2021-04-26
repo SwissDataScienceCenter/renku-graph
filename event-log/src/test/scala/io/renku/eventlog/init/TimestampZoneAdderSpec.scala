@@ -29,7 +29,6 @@ class TimestampZoneAdderSpec extends AnyWordSpec with DbInitSpec with should.Mat
     eventLogTableCreator,
     projectPathAdder,
     batchDateAdder,
-    latestEventDatesViewRemover,
     projectTableCreator,
     projectPathRemover,
     eventLogTableRenamer,

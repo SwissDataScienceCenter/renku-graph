@@ -19,9 +19,9 @@
 package io.renku.eventlog.statuschange.commands
 
 import cats.data.{Kleisli, NonEmptyList}
-import cats.effect.{Async, Bracket}
+import cats.effect.BracketThrow
 import cats.syntax.all._
-import ch.datascience.db.SqlQuery
+import ch.datascience.db.SqlStatement
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
@@ -39,7 +39,7 @@ import skunk.implicits._
 import java.time.Instant
 import java.time.temporal.ChronoUnit.MINUTES
 
-final case class ToTransformationRecoverableFailure[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+final case class ToTransformationRecoverableFailure[Interpretation[_]: BracketThrow](
     eventId:                            CompoundEventId,
     message:                            EventMessage,
     awaitingTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
@@ -50,33 +50,27 @@ final case class ToTransformationRecoverableFailure[Interpretation[_]: Async: Br
 
   override lazy val status: EventStatus = TransformationRecoverableFailure
 
-  override def queries: NonEmptyList[SqlQuery[Interpretation, Int]] = NonEmptyList.of(
-    SqlQuery(
-      Kleisli { session =>
-        val query: Command[EventStatus ~ ExecutionDate ~ EventMessage ~ EventId ~ projects.Id ~ EventStatus] =
-          sql"""UPDATE event
-                SET status = $eventStatusEncoder, execution_date = $executionDateEncoder, message = $eventMessageEncoder
-                WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND status = $eventStatusEncoder
+  override def queries: NonEmptyList[SqlStatement[Interpretation, Int]] = NonEmptyList.of(
+    SqlStatement(name = "transforming_triples->transformation_recoverable_fail")
+      .command[EventStatus ~ ExecutionDate ~ EventMessage ~ EventId ~ projects.Id ~ EventStatus](
+        sql"""UPDATE event
+              SET status = $eventStatusEncoder, execution_date = $executionDateEncoder, message = $eventMessageEncoder
+              WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND status = $eventStatusEncoder
           """.command
-        session
-          .prepare(query)
-          .use {
-            _.execute(
-              status ~ ExecutionDate(
-                now().plus(10, MINUTES)
-              ) ~ message ~ eventId.id ~ eventId.projectId ~ TransformingTriples
-            )
-          }
-          .flatMap {
-            case Completion.Update(n) => n.pure[Interpretation]
-            case completion =>
-              new RuntimeException(
-                s"transforming_triples->transformation_recoverable_fail time query failed with completion status $completion"
-              ).raiseError[Interpretation, Int]
-          }
-      },
-      name = "transforming_triples->transformation_recoverable_fail"
-    )
+      )
+      .arguments(
+        status ~ ExecutionDate(
+          now().plus(10, MINUTES)
+        ) ~ message ~ eventId.id ~ eventId.projectId ~ TransformingTriples
+      )
+      .build
+      .flatMapResult {
+        case Completion.Update(n) => n.pure[Interpretation]
+        case completion =>
+          new RuntimeException(
+            s"transforming_triples->transformation_recoverable_fail time query failed with completion status $completion"
+          ).raiseError[Interpretation, Int]
+      }
   )
 
   override def updateGauges(
@@ -93,7 +87,7 @@ final case class ToTransformationRecoverableFailure[Interpretation[_]: Async: Br
 }
 
 private[statuschange] object ToTransformationRecoverableFailure {
-  def factory[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+  def factory[Interpretation[_]: BracketThrow](
       awaitingTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
       underTriplesTransformationGauge:    LabeledGauge[Interpretation, projects.Path]
   ): Kleisli[Interpretation, ChangeStatusRequest, CommandFindingResult] = Kleisli.fromFunction {
