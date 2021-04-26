@@ -63,10 +63,9 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Sync: Bracket
       (maybeProject, maybeAwaitingGenerationEvent) = maybeProjectAwaitingGenerationEvent
       _ <- maybeUpdateMetrics(maybeProject, maybeAwaitingGenerationEvent)
     } yield maybeAwaitingGenerationEvent
-
   }
 
-  private lazy val findEventAndUpdateForProcessing = for {
+  private def findEventAndUpdateForProcessing = for {
     maybeProject <- measureExecutionTime(findProjectsWithEventsInQueue)
                       .map(projectPrioritisation.prioritise)
                       .map(selectProject)
@@ -76,10 +75,11 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Sync: Bracket
     maybeBody <- markAsProcessing(maybeIdAndProjectAndBody)
   } yield maybeProject -> maybeBody
 
-  private def findProjectsWithEventsInQueue = SqlStatement(
-    name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find projects")
-  ).select[EventStatus ~ ExecutionDate ~ Int, ProjectInfo](
-    sql"""
+  private def findProjectsWithEventsInQueue =
+    SqlStatement(
+      name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find projects")
+    ).select[EventStatus ~ ExecutionDate ~ Int, ProjectInfo](
+      sql"""
       SELECT
         proj.project_id,
         proj.project_path,
@@ -97,12 +97,12 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Sync: Bracket
         LIMIT $int4
       ) proj
       """
-      .query(projectIdDecoder ~ projectPathDecoder ~ eventDateDecoder ~ int8)
-      .map { case projectId ~ projectPath ~ eventDate ~ (currentOccupancy: Long) =>
-        ProjectInfo(projectId, projectPath, eventDate, Refined.unsafeApply(currentOccupancy.toInt))
-      }
-  ).arguments(GeneratingTriples ~ ExecutionDate(now()) ~ projectsFetchingLimit.value)
-    .build(_.toList)
+        .query(projectIdDecoder ~ projectPathDecoder ~ eventDateDecoder ~ int8)
+        .map { case projectId ~ projectPath ~ eventDate ~ (currentOccupancy: Long) =>
+          ProjectInfo(projectId, projectPath, eventDate, Refined.unsafeApply(currentOccupancy.toInt))
+        }
+    ).arguments(GeneratingTriples ~ ExecutionDate(now()) ~ projectsFetchingLimit.value)
+      .build(_.toList)
 
   private def findOldestEvent(idAndPath: ProjectIds) = {
     val executionDate = ExecutionDate(now())

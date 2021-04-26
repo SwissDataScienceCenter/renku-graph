@@ -60,9 +60,7 @@ private class ZombieNodesCleanerImpl[Interpretation[_]: Sync: Parallel: BracketT
   private lazy val findPotentialZombieRecords = measureExecutionTime {
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find zombie sources"))
       .select[Void, (MicroserviceBaseUrl, SubscriberUrl)](
-        sql"""SELECT DISTINCT source_url, delivery_url
-                FROM subscriber
-          """
+        sql"""SELECT DISTINCT source_url, delivery_url FROM subscriber"""
           .query(microserviceBaseUrlDecoder ~ subscriberUrlDecoder)
           .map { case sourceUrl ~ subscriberUrl => (sourceUrl, subscriberUrl) }
       )

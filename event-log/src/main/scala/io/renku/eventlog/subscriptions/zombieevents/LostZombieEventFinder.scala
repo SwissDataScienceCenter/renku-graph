@@ -51,7 +51,7 @@ private class LostZombieEventFinder[Interpretation[_]: BracketThrow](
   }
   private val maxDurationForEvent = EventProcessingTime(Duration.ofMinutes(5))
 
-  private lazy val findEvent = measureExecutionTime {
+  private def findEvent = measureExecutionTime {
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lze - find event"))
       .select[EventStatus ~ EventStatus ~ String ~ ExecutionDate ~ EventProcessingTime, ZombieEvent](
         sql"""SELECT evt.event_id, evt.project_id, proj.project_path, evt.status

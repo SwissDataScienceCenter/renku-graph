@@ -18,13 +18,13 @@
 
 package ch.datascience.tinytypes.constraints
 
-import java.time.{Clock, Instant, ZoneId}
-
 import ch.datascience.generators.Generators._
 import ch.datascience.tinytypes.{InstantTinyType, TinyTypeFactory}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+
+import java.time.{Clock, Instant, ZoneId}
 
 class InstantInThePastSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
@@ -43,16 +43,14 @@ class InstantInThePastSpec extends AnyWordSpec with ScalaCheckPropertyChecks wit
     }
 
     "throw an IllegalArgumentException for instant equal to Instant.now" in {
-      val systemZone = ZoneId.systemDefault
-      val fixedNow   = Instant.now
+      val fixedNow = Instant.now
 
-      InstantInThePastType.clock = Clock.fixed(fixedNow, systemZone)
+      InstantInThePastType.clock = Clock.fixed(fixedNow, ZoneId.systemDefault)
 
       intercept[IllegalArgumentException] {
         InstantInThePastType(fixedNow)
       }.getMessage shouldBe "ch.datascience.tinytypes.constraints.InstantInThePastType has to be in the past"
 
-      InstantInThePastType.clock = Clock.system(systemZone)
     }
   }
 }

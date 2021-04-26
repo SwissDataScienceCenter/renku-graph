@@ -105,37 +105,35 @@ class StatusUpdatesRunnerImpl[Interpretation[_]: BracketThrow](
       case false => Kleisli.pure(NotFound).widen[commands.UpdateResult]
     }
 
-  private def deleteDelivery(command: ChangeStatusCommand[Interpretation]) =
-    measureExecutionTime {
-      SqlStatement(name = "status update - delivery info remove")
-        .command[EventId ~ projects.Id](
-          sql"""DELETE FROM event_delivery
+  private def deleteDelivery(command: ChangeStatusCommand[Interpretation]) = measureExecutionTime {
+    SqlStatement(name = "status update - delivery info remove")
+      .command[EventId ~ projects.Id](
+        sql"""DELETE FROM event_delivery
                   WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
                """.command
-        )
-        .arguments(command.eventId.id ~ command.eventId.projectId)
-        .build
-        .mapResult(_ => UpdateResult.Updated: UpdateResult)
-    }
+      )
+      .arguments(command.eventId.id ~ command.eventId.projectId)
+      .build
+      .mapResult(_ => UpdateResult.Updated: UpdateResult)
+  }
 
   private def toUpdateResult: UpdateResult => Kleisli[Interpretation, Session[Interpretation], UpdateResult] = {
     case UpdateResult.Failure(message) => Kleisli.liftF(new Exception(message).raiseError[Interpretation, UpdateResult])
     case result                        => Kleisli.pure(result)
   }
 
-  private def checkIfPersisted(eventId: CompoundEventId) =
-    measureExecutionTime {
-      SqlStatement(name = "event update check existence")
-        .select[EventId ~ projects.Id, EventId](
-          sql"""SELECT event_id
+  private def checkIfPersisted(eventId: CompoundEventId) = measureExecutionTime {
+    SqlStatement(name = "event update check existence")
+      .select[EventId ~ projects.Id, EventId](
+        sql"""SELECT event_id
                   FROM event
                   WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder"""
-            .query(eventIdDecoder)
-        )
-        .arguments(eventId.id ~ eventId.projectId)
-        .build(_.option)
-        .mapResult(_.isDefined)
-    }
+          .query(eventIdDecoder)
+      )
+      .arguments(eventId.id ~ eventId.projectId)
+      .build(_.option)
+      .mapResult(_.isDefined)
+  }
 
   private def logInfo(command: ChangeStatusCommand[Interpretation], updateResult: UpdateResult) = updateResult match {
     case Updated => logger.info(s"Event ${command.eventId} got ${command.status}")

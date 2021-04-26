@@ -55,20 +55,19 @@ private class CommitSyncForcerImpl[Interpretation[_]: BracketThrow](
       }
     }
 
-  private def deleteLastSyncedDate(projectId: projects.Id) =
-    measureExecutionTime {
-      SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - delete last_synced"))
-        .command[projects.Id ~ CategoryName](sql"""
+  private def deleteLastSyncedDate(projectId: projects.Id) = measureExecutionTime {
+    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - delete last_synced"))
+      .command[projects.Id ~ CategoryName](sql"""
             DELETE FROM subscription_category_sync_time
             WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
           """.command)
-        .arguments(projectId ~ commitsync.categoryName)
-        .build
-        .mapResult {
-          case Completion.Delete(0) => true
-          case _                    => false
-        }
-    }
+      .arguments(projectId ~ commitsync.categoryName)
+      .build
+      .mapResult {
+        case Completion.Delete(0) => true
+        case _                    => false
+      }
+  }
 
   private def upsertProject(projectId: projects.Id, projectPath: projects.Path) = measureExecutionTime {
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - insert project"))

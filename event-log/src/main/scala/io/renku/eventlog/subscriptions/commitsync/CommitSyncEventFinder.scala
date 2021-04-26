@@ -44,14 +44,14 @@ private class CommitSyncEventFinderImpl[Interpretation[_]: BracketThrow](
 
   override def popEvent(): Interpretation[Option[CommitSyncEvent]] = sessionResource.useK(findEventAndMarkTaken)
 
-  private lazy val findEventAndMarkTaken =
+  private def findEventAndMarkTaken =
     findEvent >>= {
       case Some((event, maybeSyncDate)) =>
         setSyncDate(event, maybeSyncDate) map toNoneIfEventAlreadyTaken(event)
       case None => Kleisli.pure(Option.empty[CommitSyncEvent])
     }
 
-  private lazy val findEvent = measureExecutionTime {
+  private def findEvent = measureExecutionTime {
     val (eventDate, lastSyncDate) = (EventDate.apply _ &&& LastSyncedDate.apply _)(now())
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find event"))
       .select[CategoryName ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate,

@@ -56,7 +56,7 @@ class EventPersisterImpl[Interpretation[_]: BracketThrow](
       for {
         sp <- transaction.savepoint
         result <- insertIfNotDuplicate(event)(session) recoverWith { case error =>
-                    transaction.rollback(sp).flatMap(_ => error.raiseError[Interpretation, Result])
+                    transaction.rollback(sp) >> error.raiseError[Interpretation, Result]
                   }
         _ <-
           Applicative[Interpretation].whenA(result == Created && event.status == New)(
@@ -68,7 +68,7 @@ class EventPersisterImpl[Interpretation[_]: BracketThrow](
   }
 
   private def insertIfNotDuplicate(event: Event) =
-    checkIfPersisted(event) flatMap {
+    checkIfPersisted(event) >>= {
       case true  => Kleisli.pure(Existed: Result)
       case false => persist(event)
     }

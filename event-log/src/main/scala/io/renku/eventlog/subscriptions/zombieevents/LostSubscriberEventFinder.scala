@@ -28,14 +28,13 @@ import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
 import eu.timepit.refined.api.Refined
 import io.renku.eventlog.subscriptions.EventFinder
-import io.renku.eventlog.{EventLogDB, TypeSerializers}
+import io.renku.eventlog.{EventLogDB, ExecutionDate, TypeSerializers}
 import skunk._
 import skunk.codec.all._
 import skunk.data.Completion
 import skunk.implicits._
 
 import java.time.Instant.now
-import java.time.{OffsetDateTime, ZoneId}
 
 private class LostSubscriberEventFinder[Interpretation[_]: BracketThrow](
     sessionResource:  SessionResource[Interpretation, EventLogDB],
@@ -83,14 +82,14 @@ private class LostSubscriberEventFinder[Interpretation[_]: BracketThrow](
   private def updateMessage(eventId: CompoundEventId) =
     measureExecutionTime {
       SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lse - update message"))
-        .command[String ~ OffsetDateTime ~ EventId ~ projects.Id](
+        .command[String ~ ExecutionDate ~ EventId ~ projects.Id](
           sql"""UPDATE event
-                  SET message = $text, execution_date = $timestamptz
+                  SET message = $text, execution_date = $executionDateEncoder
                   WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
             """.command
         )
         .arguments(
-          zombieMessage ~ OffsetDateTime.ofInstant(now(), ZoneId.systemDefault()) ~ eventId.id ~ eventId.projectId
+          zombieMessage ~ ExecutionDate(now) ~ eventId.id ~ eventId.projectId
         )
         .build
         .flatMapResult {

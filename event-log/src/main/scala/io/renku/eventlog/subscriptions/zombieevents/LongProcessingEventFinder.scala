@@ -50,8 +50,7 @@ private class LongProcessingEventFinder[Interpretation[_]: Sync: BracketThrow](
     findPotentialZombies >>= lookForZombie >>= markEventTaken
   }
 
-  private lazy val findPotentialZombies
-      : Kleisli[Interpretation, Session[Interpretation], List[(projects.Id, EventStatus)]] =
+  private def findPotentialZombies =
     Nested(queryProjectsToCheck).map { case (id, currentStatus) => id -> currentStatus.toEventStatus }.value
 
   private def queryProjectsToCheck = measureExecutionTime {

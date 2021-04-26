@@ -53,7 +53,7 @@ private class MemberSyncEventFinderImpl[Interpretation[_]: BracketThrow](
       case None => Kleisli.pure(Option.empty[MemberSyncEvent])
     }
 
-  private lazy val findEvent = measureExecutionTime {
+  private def findEvent = measureExecutionTime {
     val eventDate    = EventDate(now())
     val lastSyncDate = LastSyncedDate(now())
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find event"))

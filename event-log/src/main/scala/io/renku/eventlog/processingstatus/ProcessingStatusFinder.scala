@@ -23,6 +23,7 @@ import cats.data.OptionT
 import cats.effect.{BracketThrow, IO, Sync}
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
+import ch.datascience.db.implicits._
 import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.projects.Id
@@ -50,9 +51,7 @@ class ProcessingStatusFinderImpl[Interpretation[_]: Sync: BracketThrow](
   import io.renku.eventlog.TypeSerializers._
 
   override def fetchStatus(projectId: Id): OptionT[Interpretation, ProcessingStatus] = OptionT {
-    sessionResource.useK {
-      measureExecutionTime(latestBatchStatues(projectId))
-    } flatMap toProcessingStatus
+    sessionResource.useK(measureExecutionTime(latestBatchStatues(projectId))) >>= toProcessingStatus
   }
 
   private def latestBatchStatues(projectId: Id) = SqlStatement[Interpretation](name = "processing status")
@@ -70,7 +69,7 @@ class ProcessingStatusFinderImpl[Interpretation[_]: Sync: BracketThrow](
            """.query(eventStatusDecoder)
     )
     .arguments(projectId ~ projectId)
-    .build(p => p.stream(_, 32).compile.toList)
+    .build(_.toList)
 
   private def toProcessingStatus(statuses: List[EventStatus]) =
     statuses.foldLeft(0 -> 0) {

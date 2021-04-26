@@ -22,6 +22,7 @@ import cats.data.NonEmptyList
 import cats.effect.{BracketThrow, ContextShift, IO, Sync}
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
+import ch.datascience.db.implicits._
 import ch.datascience.graph.model.events.{CategoryName, EventStatus, LastSyncedDate}
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.metrics.LabeledHistogram
@@ -60,7 +61,7 @@ class StatsFinderImpl[Interpretation[_]: Sync: BracketThrow](
 
   // format: off
 
-  private lazy val countEventsPerCategoryName = {
+  private def countEventsPerCategoryName = {
     val (eventDate, lastSyncedDate) = (EventDate.apply _ &&& LastSyncedDate.apply _) (now())
     SqlStatement(name = "category name events count").select[CategoryName ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~
       CategoryName ~ CategoryName ~ CategoryName ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ CategoryName ~
@@ -109,7 +110,7 @@ class StatsFinderImpl[Interpretation[_]: Sync: BracketThrow](
           """.query(categoryNameDecoder ~ numeric).map { case categoryName ~ (count: BigDecimal) => (categoryName, count.longValue) }
     ).arguments(membersync.categoryName ~ eventDate ~ lastSyncedDate ~ eventDate ~ lastSyncedDate ~ eventDate ~
       lastSyncedDate ~ membersync.categoryName ~ membersync.categoryName ~ commitsync.categoryName ~ eventDate ~
-      lastSyncedDate ~ eventDate ~ lastSyncedDate ~ commitsync.categoryName ~ commitsync.categoryName).build(p => p.stream(_, 32).compile.toList)
+      lastSyncedDate ~ eventDate ~ lastSyncedDate ~ commitsync.categoryName ~ commitsync.categoryName).build(_.toList)
   }
 
   override def statuses(): Interpretation[Map[EventStatus, Long]] = sessionResource.useK { 
@@ -122,7 +123,7 @@ class StatsFinderImpl[Interpretation[_]: Sync: BracketThrow](
         sql"""SELECT status, COUNT(event_id) FROM event GROUP BY status;"""
           .query(eventStatusDecoder ~ int8)
           .map { case status ~ count => (status, count) }
-  ).arguments(Void).build(p => p.stream(_, 32).compile.toList)
+  ).arguments(Void).build(_.toList)
 
 
   private def addMissingStatues(stats: Map[EventStatus, Long]): Map[EventStatus, Long] =
@@ -158,7 +159,7 @@ class StatsFinderImpl[Interpretation[_]: Sync: BracketThrow](
                                               WHERE evt.project_id = prj.project_id AND status IN (#${statuses.toSql})
                                             )
               """.query(projectPathDecoder ~ int8).map { case path ~ count => (path, count) }
-  ).arguments(Void).build(p => p.stream(_, 32).compile.toList)
+  ).arguments(Void).build(_.toList)
 
   private def prepareQuery(statuses: NonEmptyList[EventStatus], limit: Int Refined Positive) =
     SqlStatement(name = "projects events count limit").select[Int, (Path, Long)](
@@ -178,7 +179,7 @@ class StatsFinderImpl[Interpretation[_]: Sync: BracketThrow](
               """
             .query(projectPathDecoder ~ int8)
             .map { case projectPath ~ count => (projectPath, count) }
-    ).arguments(limit).build(p => p.stream(_, 32).compile.toList)
+    ).arguments(limit).build(_.toList)
 
   private implicit class StatusesOps(statuses: NonEmptyList[EventStatus]) {
     lazy val toSql: String = statuses.map(status => s"'$status'").mkString_(", ")

@@ -18,14 +18,15 @@
 
 package ch.datascience.graph.model
 
-import java.time.{Instant, LocalDate, ZoneId}
-import java.util.UUID
 import cats.syntax.all._
 import ch.datascience.graph.Schemas._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
+
+import java.time.{Instant, LocalDate, ZoneOffset}
+import java.util.UUID
 
 object datasets {
 
@@ -180,7 +181,7 @@ object datasets {
     }
 
     final case class ImportedDatasetDates(publishedDate: PublishedDate) extends Dates {
-      override lazy val date:          Instant               = publishedDate.value.atStartOfDay(ZoneId.systemDefault).toInstant
+      override lazy val date:          Instant               = publishedDate.value.atStartOfDay().toInstant(ZoneOffset.UTC)
       override val maybeDatePublished: Option[PublishedDate] = Some(publishedDate)
     }
     final case class RenkuDatasetDates(dateCreated: DateCreated) extends Dates {
@@ -188,7 +189,7 @@ object datasets {
       override val maybeDateCreated: Option[DateCreated] = Some(dateCreated)
     }
     final case class AllDatasetDates(publishedDate: PublishedDate, dateCreated: DateCreated) extends Dates {
-      override lazy val date:          Instant               = publishedDate.value.atStartOfDay(ZoneId.systemDefault).toInstant
+      override lazy val date:          Instant               = publishedDate.value.atStartOfDay().toInstant(ZoneOffset.UTC)
       override val maybeDateCreated:   Option[DateCreated]   = Some(dateCreated)
       override val maybeDatePublished: Option[PublishedDate] = Some(publishedDate)
     }

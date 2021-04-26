@@ -45,7 +45,7 @@ private class CommitToEventLogImpl[Interpretation[_]: MonadError[*[_], Throwable
     eventDetailsFinder:    EventDetailsFinder[Interpretation],
     logger:                Logger[Interpretation],
     executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
-    clock:                 java.time.Clock = java.time.Clock.systemDefaultZone()
+    clock:                 java.time.Clock = java.time.Clock.systemUTC()
 ) extends CommitToEventLog[Interpretation] {
 
   import IOAccessTokenFinder._

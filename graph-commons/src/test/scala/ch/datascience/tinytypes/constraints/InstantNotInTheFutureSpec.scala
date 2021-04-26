@@ -18,13 +18,13 @@
 
 package ch.datascience.tinytypes.constraints
 
-import java.time.{Clock, Instant, ZoneId}
-
 import ch.datascience.generators.Generators._
 import ch.datascience.tinytypes.{InstantTinyType, TinyTypeFactory}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+
+import java.time.{Clock, Instant, ZoneId, ZoneOffset}
 
 class InstantNotInTheFutureSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
@@ -37,14 +37,12 @@ class InstantNotInTheFutureSpec extends AnyWordSpec with ScalaCheckPropertyCheck
     }
 
     "be instantiatable when values are Instants from now" in {
-      val systemZone = ZoneId.systemDefault
-      val fixedNow   = Instant.now
+      val fixedNow = Instant.now
 
-      InstantNotInTheFutureType.clock = Clock.fixed(fixedNow, systemZone)
+      InstantNotInTheFutureType.clock = Clock.fixed(fixedNow, ZoneId.systemDefault())
 
       InstantInThePastType(fixedNow).value shouldBe fixedNow
 
-      InstantNotInTheFutureType.clock = Clock.system(systemZone)
     }
 
     "throw an IllegalArgumentException for instants from the future" in {
