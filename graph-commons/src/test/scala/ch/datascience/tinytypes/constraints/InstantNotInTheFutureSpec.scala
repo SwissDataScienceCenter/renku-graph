@@ -37,12 +37,14 @@ class InstantNotInTheFutureSpec extends AnyWordSpec with ScalaCheckPropertyCheck
     }
 
     "be instantiatable when values are Instants from now" in {
-      val fixedNow = Instant.now
+      val systemZone = ZoneId.systemDefault
+      val fixedNow   = Instant.now
 
-      InstantNotInTheFutureType.clock = Clock.fixed(fixedNow, ZoneId.systemDefault())
+      InstantNotInTheFutureType.clock = Clock.fixed(fixedNow, systemZone)
 
       InstantInThePastType(fixedNow).value shouldBe fixedNow
 
+      InstantNotInTheFutureType.clock = Clock.system(systemZone)
     }
 
     "throw an IllegalArgumentException for instants from the future" in {

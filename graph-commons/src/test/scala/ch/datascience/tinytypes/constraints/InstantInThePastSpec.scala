@@ -43,14 +43,16 @@ class InstantInThePastSpec extends AnyWordSpec with ScalaCheckPropertyChecks wit
     }
 
     "throw an IllegalArgumentException for instant equal to Instant.now" in {
-      val fixedNow = Instant.now
+      val systemZone = ZoneId.systemDefault
+      val fixedNow   = Instant.now
 
-      InstantInThePastType.clock = Clock.fixed(fixedNow, ZoneId.systemDefault)
+      InstantInThePastType.clock = Clock.fixed(fixedNow, systemZone)
 
       intercept[IllegalArgumentException] {
         InstantInThePastType(fixedNow)
       }.getMessage shouldBe "ch.datascience.tinytypes.constraints.InstantInThePastType has to be in the past"
 
+      InstantInThePastType.clock = Clock.system(systemZone)
     }
   }
 }
