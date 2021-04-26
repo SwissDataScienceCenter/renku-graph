@@ -21,7 +21,6 @@ package ch.datascience.graph.acceptancetests.db
 import cats.data.{Kleisli, NonEmptyList}
 import cats.effect.{Concurrent, ContextShift, IO, Resource}
 import ch.datascience.db.{DBConfigProvider, SessionResource}
-import ch.datascience.db.implicits._
 import ch.datascience.graph.acceptancetests.tooling.TestLogger
 import ch.datascience.graph.model.events.{CommitId, EventId, EventStatus}
 import ch.datascience.graph.model.projects
@@ -97,9 +96,7 @@ object EventLog extends TypeSerializers {
         database = dbConfig.name.value,
         user = dbConfig.user.value,
         password = Some(dbConfig.pass.value),
-        max = dbConfig.connectionPool.value,
-        readTimeout = dbConfig.maxLifetime,
-        writeTimeout = dbConfig.maxLifetime
+        max = dbConfig.connectionPool.value
       )
       .map(new SessionResource(_))
 }

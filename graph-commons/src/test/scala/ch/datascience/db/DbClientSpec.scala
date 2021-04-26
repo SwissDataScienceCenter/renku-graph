@@ -103,9 +103,6 @@ trait ContainerTestDb extends ForAllTestContainer {
       user = dbConfig.user.value,
       database = dbConfig.name.value,
       password = Some(dbConfig.pass),
-      max = dbConfig.connectionPool.value,
-      readTimeout = dbConfig.maxLifetime,
-      writeTimeout = dbConfig.maxLifetime
+      max = dbConfig.connectionPool.value
     )
-
 }

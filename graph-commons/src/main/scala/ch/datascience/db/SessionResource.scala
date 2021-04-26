@@ -53,9 +53,7 @@ object SessionPoolResource {
         user = dbConfig.user.value,
         database = dbConfig.name.value,
         password = Some(dbConfig.pass.value),
-        max = dbConfig.connectionPool.value,
-        readTimeout = dbConfig.maxLifetime,
-        writeTimeout = dbConfig.maxLifetime
+        max = dbConfig.connectionPool.value
       )
       .map(new SessionResource(_))
 }
