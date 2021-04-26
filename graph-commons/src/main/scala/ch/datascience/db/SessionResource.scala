@@ -24,8 +24,6 @@ import ch.datascience.db.DBConfigProvider.DBConfig
 import natchez.Trace
 import skunk.{Session, Transaction}
 
-import scala.language.postfixOps
-
 class SessionResource[Interpretation[_]: Bracket[*[_], Throwable], TargetDB](
     resource: Resource[Interpretation, Session[Interpretation]]
 ) {

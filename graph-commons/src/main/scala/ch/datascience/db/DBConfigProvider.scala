@@ -19,13 +19,12 @@
 package ch.datascience.db
 
 import cats.MonadError
-import cats.data.OptionT
 import cats.syntax.all._
 import ch.datascience.config.ConfigLoader
 import ch.datascience.db.DBConfigProvider.DBConfig
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.W
-import eu.timepit.refined.api.{RefType, Refined}
+import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.Positive
 import eu.timepit.refined.pureconfig._

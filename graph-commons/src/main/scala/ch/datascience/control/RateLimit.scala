@@ -89,16 +89,16 @@ object RateLimit extends TypeName {
       config:    Config = ConfigFactory.load()
   )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[RateLimit[Target]] = {
     import ConfigLoader._
-    import pureconfig.ConfigReader
-    import pureconfig.error.CannotConvert
+//    import pureconfig.ConfigReader
+//    import pureconfig.error.CannotConvert
 
-    implicit val rateLimitReader: ConfigReader[RateLimit[Target]] =
-      ConfigReader.fromString[RateLimit[Target]] { value =>
-        RateLimit
-          .from[Try, Target](value)
-          .toEither
-          .leftMap(exception => CannotConvert(value, RateLimit.getClass.toString, exception.getMessage))
-      }
+//    implicit val rateLimitReader: ConfigReader[RateLimit[Target]] =
+//      ConfigReader.fromString[RateLimit[Target]] { value =>
+//        RateLimit
+//          .from[Try, Target](value)
+//          .toEither
+//          .leftMap(exception => CannotConvert(value, RateLimit.getClass.toString, exception.getMessage))
+//      }
 
     find[Interpretation, RateLimit[Target]](key, config)
   }
