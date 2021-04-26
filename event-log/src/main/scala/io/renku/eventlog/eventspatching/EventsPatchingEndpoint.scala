@@ -19,7 +19,7 @@
 package io.renku.eventlog.eventspatching
 
 import cats.effect.{ContextShift, IO}
-import ch.datascience.db.SqlQuery
+import ch.datascience.db.SqlStatement
 import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.graph.model.events.EventStatus.New
 import ch.datascience.graph.model.projects
@@ -96,7 +96,7 @@ object IOEventsPatchingEndpoint {
       sessionResource:      SessionResource[IO, EventLogDB],
       waitingEventsGauge:   LabeledGauge[IO, projects.Path],
       underProcessingGauge: LabeledGauge[IO, projects.Path],
-      queriesExecTimes:     LabeledHistogram[IO, SqlQuery.Name],
+      queriesExecTimes:     LabeledHistogram[IO, SqlStatement.Name],
       logger:               Logger[IO]
   )(implicit contextShift:  ContextShift[IO]): IO[EventsPatchingEndpoint[IO]] =
     for {

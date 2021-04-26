@@ -30,7 +30,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import java.time.temporal.ChronoUnit.{HOURS, SECONDS}
-import java.time.{Clock, Instant, ZoneId, Duration => JavaDuration}
+import java.time.{Clock, Instant, ZoneId, ZoneOffset, Duration => JavaDuration}
 
 class EventStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
@@ -152,14 +152,11 @@ class BatchDateSpec extends AnyWordSpec with should.Matchers {
   "apply()" should {
 
     "instantiate a new BatchDate with current timestamp" in {
-      val systemZone = ZoneId.systemDefault
-      val fixedNow   = Instant.now
+      val fixedNow = Instant.now
 
-      val clock = Clock.fixed(fixedNow, systemZone)
+      val clock = Clock.fixed(fixedNow, ZoneId.systemDefault())
 
       BatchDate(clock).value shouldBe fixedNow
-
-      Clock.system(systemZone)
     }
   }
 }

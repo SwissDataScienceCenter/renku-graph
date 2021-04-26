@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions.zombieevents
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.db.{SessionResource, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import ch.datascience.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
@@ -31,7 +31,7 @@ import scala.concurrent.ExecutionContext
 private[subscriptions] object SubscriptionCategory {
 
   def apply(sessionResource:   SessionResource[IO, EventLogDB],
-            queriesExecTimes:  LabeledHistogram[IO, SqlQuery.Name],
+            queriesExecTimes:  LabeledHistogram[IO, SqlStatement.Name],
             subscriberTracker: SubscriberTracker[IO],
             logger:            Logger[IO]
   )(implicit

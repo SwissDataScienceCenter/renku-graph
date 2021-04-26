@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.{Async, Bracket}
+import cats.effect.BracketThrow
 import ch.datascience.db.SessionResource
 import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.graph.model.events.EventStatus.GenerationRecoverableFailure
@@ -34,14 +34,14 @@ private trait EventLogTableCreator[Interpretation[_]] {
 }
 
 private object EventLogTableCreator {
-  def apply[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+  def apply[Interpretation[_]: BracketThrow](
       sessionResource: SessionResource[Interpretation, EventLogDB],
       logger:          Logger[Interpretation]
   ): EventLogTableCreator[Interpretation] =
     new EventLogTableCreatorImpl(sessionResource, logger)
 }
 
-private class EventLogTableCreatorImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+private class EventLogTableCreatorImpl[Interpretation[_]: BracketThrow](
     sessionResource: SessionResource[Interpretation, EventLogDB],
     logger:          Logger[Interpretation]
 ) extends EventLogTableCreator[Interpretation]

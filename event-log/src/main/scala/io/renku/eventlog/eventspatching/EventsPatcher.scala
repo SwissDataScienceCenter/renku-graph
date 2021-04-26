@@ -19,12 +19,12 @@
 package io.renku.eventlog.eventspatching
 
 import cats.data.Kleisli
-import cats.effect.{Async, Bracket, IO}
+import cats.effect.{Bracket, BracketThrow, IO}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.metrics.LabeledHistogram
-import org.typelevel.log4cats.Logger
 import io.renku.eventlog.EventLogDB
+import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
@@ -32,9 +32,9 @@ private trait EventsPatcher[Interpretation[_]] {
   def applyToAllEvents(eventsPatch: EventsPatch[Interpretation]): Interpretation[Unit]
 }
 
-private class EventsPatcherImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+private class EventsPatcherImpl[Interpretation[_]: BracketThrow](
     sessionResource:  SessionResource[Interpretation, EventLogDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name],
+    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
     logger:           Logger[Interpretation]
 ) extends DbClient(Some(queriesExecTimes))
     with EventsPatcher[Interpretation] {
@@ -60,7 +60,7 @@ private class EventsPatcherImpl[Interpretation[_]: Async: Bracket[*[_], Throwabl
 private object IOEventsPatcher {
   def apply(
       sessionResource:  SessionResource[IO, EventLogDB],
-      queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
+      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name],
       logger:           Logger[IO]
   ): IO[EventsPatcher[IO]] = IO {
     new EventsPatcherImpl[IO](sessionResource, queriesExecTimes, logger)

@@ -31,7 +31,6 @@ class EventPayloadTableCreatorSpec extends AnyWordSpec with DbInitSpec with shou
     eventLogTableCreator,
     projectPathAdder,
     batchDateAdder,
-    latestEventDatesViewRemover,
     projectTableCreator,
     projectPathRemover,
     eventLogTableRenamer,

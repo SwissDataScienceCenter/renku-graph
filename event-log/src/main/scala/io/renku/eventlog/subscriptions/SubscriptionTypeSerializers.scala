@@ -22,14 +22,16 @@ import io.renku.eventlog.TypeSerializers
 import skunk.codec.all.{timestamptz, varchar}
 import skunk.{Decoder, Encoder}
 
-import java.time.{OffsetDateTime, ZoneId}
+import java.time.{OffsetDateTime, ZoneOffset}
 
 trait SubscriptionTypeSerializers extends TypeSerializers {
 
   val lastSyncedDateDecoder: Decoder[LastSyncedDate] =
     timestamptz.map(timestamp => LastSyncedDate(timestamp.toInstant))
   val lastSyncedDateEncoder: Encoder[LastSyncedDate] =
-    timestamptz.values.contramap((b: LastSyncedDate) => OffsetDateTime.ofInstant(b.value, ZoneId.systemDefault()))
+    timestamptz.values.contramap((b: LastSyncedDate) =>
+      OffsetDateTime.ofInstant(b.value, b.value.atOffset(ZoneOffset.UTC).toZonedDateTime.getZone)
+    )
 
   val categoryNameDecoder: Decoder[CategoryName] = varchar.map(CategoryName.apply)
   val categoryNameEncoder: Encoder[CategoryName] = varchar.contramap(_.value)

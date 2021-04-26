@@ -18,7 +18,7 @@
 
 package ch.datascience.http.client
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
@@ -28,7 +28,6 @@ import ch.datascience.logging.ExecutionTimeRecorder
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.NonNegative
-import org.typelevel.log4cats.Logger
 import io.circe.Json
 import org.http4s.AuthScheme.Bearer
 import org.http4s.Credentials.Token
@@ -39,6 +38,7 @@ import org.http4s.client.{Client, ConnectionFailure}
 import org.http4s.headers.{Authorization, `Content-Type`}
 import org.http4s.multipart.{Multipart, Part}
 import org.http4s.util.CaseInsensitiveString
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.{Duration, FiniteDuration}
@@ -52,7 +52,7 @@ abstract class IORestClient[ThrottlingTarget](
     maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     idleTimeoutOverride:     Option[Duration] = None,
     requestTimeoutOverride:  Option[Duration] = None
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO]) {
+)(implicit executionContext: ExecutionContext, concurrent: ConcurrentEffect[IO], timer: Timer[IO]) {
 
   import HttpRequest._
 

@@ -25,7 +25,7 @@ import cats.data.EitherT.right
 import cats.data.{EitherT, Kleisli}
 import cats.effect.{ContextShift, Effect}
 import cats.syntax.all._
-import ch.datascience.db.{SessionResource, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.http.ErrorMessage
@@ -148,7 +148,7 @@ object IOStatusChangeEndpoint {
       underTriplesGenerationGauge:        LabeledGauge[IO, projects.Path],
       awaitingTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
       underTriplesTransformationGauge:    LabeledGauge[IO, projects.Path],
-      queriesExecTimes:                   LabeledHistogram[IO, SqlQuery.Name],
+      queriesExecTimes:                   LabeledHistogram[IO, SqlStatement.Name],
       logger:                             Logger[IO]
   )(implicit contextShift:                ContextShift[IO]): IO[StatusChangeEndpoint[IO]] =
     for {

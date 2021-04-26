@@ -34,7 +34,6 @@ class EventLogTableRenamerSpec extends AnyWordSpec with DbInitSpec with should.M
     eventLogTableCreator,
     projectPathAdder,
     batchDateAdder,
-    latestEventDatesViewRemover,
     projectTableCreator,
     projectPathRemover
   )

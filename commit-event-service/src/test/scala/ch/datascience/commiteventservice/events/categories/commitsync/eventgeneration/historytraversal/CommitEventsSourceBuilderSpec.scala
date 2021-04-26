@@ -19,10 +19,10 @@
 package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration
 package historytraversal
 
-import Generators._
 import cats.MonadError
 import cats.syntax.all._
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEvent._
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.Generators._
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.EventCreationResult._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
@@ -37,7 +37,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import java.time.{Clock, Instant, ZoneId}
+import java.time.{Clock, Instant, ZoneId, ZoneOffset}
 import scala.reflect.ClassTag
 import scala.util.{Success, Try}
 
@@ -247,7 +247,7 @@ class CommitEventsSourceBuilderSpec extends AnyWordSpec with MockFactory with sh
     val startCommit      = startCommits.generateOne
     val maybeAccessToken = Gen.option(accessTokens).generateOne
     val fixedNow         = Instant.now
-    private val clock    = Clock.fixed(fixedNow, ZoneId.systemDefault)
+    private val clock    = Clock.fixed(fixedNow, ZoneId.of(ZoneOffset.UTC.getId))
 
     def send(returning: SendExpectations[_ <: CommitEvent]*): CommitEvent => Try[EventCreationResult] =
       event => {

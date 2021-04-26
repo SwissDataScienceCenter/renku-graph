@@ -21,15 +21,14 @@ package ch.datascience.tokenrepository.repository.init
 import cats.data.Kleisli
 import cats.effect._
 import cats.syntax.all._
-import ch.datascience.db.{SessionResource, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import org.typelevel.log4cats.Logger
-import skunk.data.Completion
 
 import scala.util.control.NonFatal
 
-class DbInitializer[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+class DbInitializer[Interpretation[_]: BracketThrow](
     projectPathAdder:         ProjectPathAdder[Interpretation],
     duplicateProjectsRemover: DuplicateProjectsRemover[Interpretation],
     sessionResource:          SessionResource[Interpretation, ProjectsTokensDB],
@@ -71,7 +70,7 @@ object IODbInitializer {
 
   def apply(
       sessionResource:  SessionResource[IO, ProjectsTokensDB],
-      queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
+      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name],
       logger:           Logger[IO]
   )(implicit
       executionContext: ExecutionContext,

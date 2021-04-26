@@ -21,7 +21,7 @@ package ch.datascience.tokenrepository.repository.init
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.db.SqlQuery
+import ch.datascience.db.SqlStatement
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
@@ -143,7 +143,7 @@ class ProjectPathAdderSpec
     val logger            = TestLogger[IO]()
     val accessTokenCrypto = mock[IOAccessTokenCrypto]
     val pathFinder        = mock[ProjectPathFinder[IO]]
-    val queriesExecTimes  = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val queriesExecTimes  = TestLabeledHistogram[SqlStatement.Name]("query_id")
     val tokenRemover      = new TokenRemover[IO](sessionResource, queriesExecTimes)
     val projectPathAdder =
       new ProjectPathAdderImpl[IO](sessionResource, accessTokenCrypto, pathFinder, tokenRemover, logger)

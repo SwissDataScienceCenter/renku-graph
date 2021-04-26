@@ -31,7 +31,6 @@ class EventDeliveryTableCreatorSpec extends AnyWordSpec with DbInitSpec with sho
     eventLogTableCreator,
     projectPathAdder,
     batchDateAdder,
-    latestEventDatesViewRemover,
     projectTableCreator,
     projectPathRemover,
     eventLogTableRenamer,

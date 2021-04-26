@@ -19,9 +19,9 @@
 package io.renku.eventlog.subscriptions.zombieevents
 
 import cats.data.Kleisli
-import cats.effect.{Async, Bracket, ContextShift, IO}
+import cats.effect.{BracketThrow, IO}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples}
 import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
@@ -38,9 +38,9 @@ import java.time.Duration
 import java.time.Instant.now
 import scala.language.postfixOps
 
-private class LostZombieEventFinder[Interpretation[_]: Async: Bracket[*[_], Throwable]: ContextShift](
+private class LostZombieEventFinder[Interpretation[_]: BracketThrow](
     sessionResource:  SessionResource[Interpretation, EventLogDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name]
+    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
 ) extends DbClient(Some(queriesExecTimes))
     with EventFinder[Interpretation, ZombieEvent]
     with ZombieEventSubProcess
@@ -51,11 +51,10 @@ private class LostZombieEventFinder[Interpretation[_]: Async: Bracket[*[_], Thro
   }
   private val maxDurationForEvent = EventProcessingTime(Duration.ofMinutes(5))
 
-  private lazy val findEvent = measureExecutionTime {
-    SqlQuery(
-      Kleisli { session =>
-        val query: Query[EventStatus ~ EventStatus ~ String ~ ExecutionDate ~ EventProcessingTime, ZombieEvent] =
-          sql"""SELECT evt.event_id, evt.project_id, proj.project_path, evt.status
+  private def findEvent = measureExecutionTime {
+    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lze - find event"))
+      .select[EventStatus ~ EventStatus ~ String ~ ExecutionDate ~ EventProcessingTime, ZombieEvent](
+        sql"""SELECT evt.event_id, evt.project_id, proj.project_path, evt.status
                 FROM event evt
                 JOIN project proj ON evt.project_id = proj.project_id
                 WHERE (evt.status = $eventStatusEncoder
@@ -64,21 +63,13 @@ private class LostZombieEventFinder[Interpretation[_]: Async: Bracket[*[_], Thro
                   AND  (($executionDateEncoder - evt.execution_date) > $eventProcessingTimeEncoder)
                 LIMIT 1
           """
-            .query(eventIdDecoder ~ projectIdDecoder ~ projectPathDecoder ~ eventStatusDecoder)
-            .map { case eventId ~ projectId ~ path ~ status =>
-              ZombieEvent(processName, CompoundEventId(eventId, projectId), path, status)
-            }
-
-        session
-          .prepare(query)
-          .use(
-            _.option(
-              GeneratingTriples ~ TransformingTriples ~ zombieMessage ~ ExecutionDate(now()) ~ maxDurationForEvent
-            )
-          )
-      },
-      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lze - find event")
-    )
+          .query(eventIdDecoder ~ projectIdDecoder ~ projectPathDecoder ~ eventStatusDecoder)
+          .map { case eventId ~ projectId ~ path ~ status =>
+            ZombieEvent(processName, CompoundEventId(eventId, projectId), path, status)
+          }
+      )
+      .arguments(GeneratingTriples ~ TransformingTriples ~ zombieMessage ~ ExecutionDate(now()) ~ maxDurationForEvent)
+      .build(_.option)
   }
 
   private lazy val markEventTaken
@@ -94,27 +85,23 @@ private class LostZombieEventFinder[Interpretation[_]: Async: Bracket[*[_], Thro
 
   private def updateExecutionDate(eventId: CompoundEventId) =
     measureExecutionTime {
-      SqlQuery(
-        Kleisli { session =>
-          val query: Command[ExecutionDate ~ EventId ~ projects.Id ~ String] =
-            sql"""UPDATE event
+      SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lze - update execution date"))
+        .command[ExecutionDate ~ EventId ~ projects.Id ~ String](
+          sql"""UPDATE event
                   SET execution_date = $executionDateEncoder
                   WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND message = $text
             """.command
-          session
-            .prepare(query)
-            .use(_.execute(ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ zombieMessage))
-            .flatMap {
-              case Completion.Update(1) => true.pure[Interpretation]
-              case Completion.Update(0) => false.pure[Interpretation]
-              case completion =>
-                new Exception(
-                  s"${categoryName.value.toLowerCase} - lze - update execution date failed with status $completion"
-                ).raiseError[Interpretation, Boolean]
-            }
-        },
-        name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lze - update execution date")
-      )
+        )
+        .arguments(ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ zombieMessage)
+        .build
+        .flatMapResult {
+          case Completion.Update(1) => true.pure[Interpretation]
+          case Completion.Update(0) => false.pure[Interpretation]
+          case completion =>
+            new Exception(
+              s"${categoryName.value.toLowerCase} - lze - update execution date failed with status $completion"
+            ).raiseError[Interpretation, Boolean]
+        }
     }
 
   override val processName: ZombieEventProcess = ZombieEventProcess("lze")
@@ -122,9 +109,9 @@ private class LostZombieEventFinder[Interpretation[_]: Async: Bracket[*[_], Thro
 
 private object LostZombieEventFinder {
   def apply(
-      sessionResource:     SessionResource[IO, EventLogDB],
-      queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
-  )(implicit contextShift: ContextShift[IO]): IO[EventFinder[IO, ZombieEvent]] = IO {
+      sessionResource:  SessionResource[IO, EventLogDB],
+      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
+  ): IO[EventFinder[IO, ZombieEvent]] = IO {
     new LostZombieEventFinder(sessionResource, queriesExecTimes)
   }
 }
