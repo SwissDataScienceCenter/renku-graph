@@ -19,7 +19,7 @@
 package io.renku.eventlog.events.categories.creation
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.db.{SessionResource, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.events.consumers.EventHandler
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
 import ch.datascience.graph.model.projects
@@ -33,7 +33,7 @@ object SubscriptionFactory {
 
   def apply(sessionResource:    SessionResource[IO, EventLogDB],
             waitingEventsGauge: LabeledGauge[IO, projects.Path],
-            queriesExecTimes:   LabeledHistogram[IO, SqlQuery.Name],
+            queriesExecTimes:   LabeledHistogram[IO, SqlStatement.Name],
             logger:             Logger[IO]
   )(implicit
       executionContext: ExecutionContext,

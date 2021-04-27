@@ -30,7 +30,6 @@ class SubscriptionCategorySyncTimeTableCreatorSpec extends AnyWordSpec with DbIn
     eventLogTableCreator,
     projectPathAdder,
     batchDateAdder,
-    latestEventDatesViewRemover,
     projectTableCreator,
     projectPathRemover,
     eventLogTableRenamer,

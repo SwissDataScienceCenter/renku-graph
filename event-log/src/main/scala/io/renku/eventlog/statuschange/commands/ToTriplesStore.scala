@@ -19,9 +19,9 @@
 package io.renku.eventlog.statuschange.commands
 
 import cats.data.{Kleisli, NonEmptyList}
-import cats.effect.{Async, Bracket}
+import cats.effect.BracketThrow
 import cats.syntax.all._
-import ch.datascience.db.SqlQuery
+import ch.datascience.db.SqlStatement
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
@@ -38,7 +38,7 @@ import skunk.implicits._
 
 import java.time.Instant
 
-final case class ToTriplesStore[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+final case class ToTriplesStore[Interpretation[_]: BracketThrow](
     eventId:                         CompoundEventId,
     underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
     maybeProcessingTime:             Option[EventProcessingTime],
@@ -47,30 +47,24 @@ final case class ToTriplesStore[Interpretation[_]: Async: Bracket[*[_], Throwabl
 
   override lazy val status: EventStatus = TriplesStore
 
-  override def queries: NonEmptyList[SqlQuery[Interpretation, Int]] = NonEmptyList.of(
-    SqlQuery(
-      query = upsertEventStatus,
-      name = "transforming_triples->triples_store"
-    )
-  )
-
-  private lazy val upsertEventStatus = Kleisli[Interpretation, Session[Interpretation], Int] { session =>
-    val query: Command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus] =
-      sql"""UPDATE event
+  override def queries: NonEmptyList[SqlStatement[Interpretation, Int]] = NonEmptyList.of(
+    SqlStatement(name = "transforming_triples->triples_store")
+      .command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus](
+        sql"""UPDATE event
             SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
             WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND status = $eventStatusEncoder
             """.command
-    session
-      .prepare(query)
-      .use(_.execute(status ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ TransformingTriples))
-      .map {
-        case Completion.Update(n) => n
+      )
+      .arguments(status ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ TransformingTriples)
+      .build
+      .flatMapResult {
+        case Completion.Update(n) => n.pure[Interpretation]
         case completion =>
-          throw new RuntimeException(
+          new RuntimeException(
             s"transforming_triples->triples_store time query failed with completion status $completion"
-          )
+          ).raiseError[Interpretation, Int]
       }
-  }
+  )
 
   override def updateGauges(
       updateResult: UpdateResult
@@ -82,7 +76,7 @@ final case class ToTriplesStore[Interpretation[_]: Async: Bracket[*[_], Throwabl
 }
 
 private[statuschange] object ToTriplesStore {
-  def factory[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+  def factory[Interpretation[_]: BracketThrow](
       underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path]
   ): Kleisli[Interpretation, ChangeStatusRequest, CommandFindingResult] = Kleisli.fromFunction {
     case EventOnlyRequest(eventId, TriplesStore, someTime @ Some(_), _) =>

@@ -19,10 +19,10 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.{Async, Bracket}
+import cats.effect.BracketThrow
 import ch.datascience.db.SessionResource
-import org.typelevel.log4cats.Logger
 import io.renku.eventlog.EventLogDB
+import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.codec.all.bool
 import skunk.implicits._
@@ -31,7 +31,7 @@ private trait EventDeliveryTableCreator[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
-private class EventDeliveryTableCreatorImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+private class EventDeliveryTableCreatorImpl[Interpretation[_]: BracketThrow](
     sessionResource: SessionResource[Interpretation, EventLogDB],
     logger:          Logger[Interpretation]
 ) extends EventDeliveryTableCreator[Interpretation] {
@@ -78,7 +78,7 @@ private class EventDeliveryTableCreatorImpl[Interpretation[_]: Async: Bracket[*[
 }
 
 private object EventDeliveryTableCreator {
-  def apply[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+  def apply[Interpretation[_]: BracketThrow](
       sessionResource: SessionResource[Interpretation, EventLogDB],
       logger:          Logger[Interpretation]
   ): EventDeliveryTableCreator[Interpretation] =

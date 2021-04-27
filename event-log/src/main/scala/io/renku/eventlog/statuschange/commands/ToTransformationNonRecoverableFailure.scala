@@ -19,9 +19,9 @@
 package io.renku.eventlog.statuschange.commands
 
 import cats.data.{Kleisli, NonEmptyList}
-import cats.effect.{Async, Bracket}
+import cats.effect.BracketThrow
 import cats.syntax.all._
-import ch.datascience.db.SqlQuery
+import ch.datascience.db.SqlStatement
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
@@ -32,13 +32,13 @@ import io.renku.eventlog.statuschange.CommandFindingResult.{CommandFound, NotSup
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 import io.renku.eventlog.statuschange.{ChangeStatusRequest, CommandFindingResult}
 import io.renku.eventlog.{EventMessage, ExecutionDate}
+import skunk._
 import skunk.data.Completion
 import skunk.implicits._
-import skunk.{Command, _}
 
 import java.time.Instant
 
-final case class ToTransformationNonRecoverableFailure[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+final case class ToTransformationNonRecoverableFailure[Interpretation[_]: BracketThrow](
     eventId:                         CompoundEventId,
     message:                         EventMessage,
     underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
@@ -48,29 +48,23 @@ final case class ToTransformationNonRecoverableFailure[Interpretation[_]: Async:
 
   override lazy val status: EventStatus = TransformationNonRecoverableFailure
 
-  override def queries: NonEmptyList[SqlQuery[Interpretation, Int]] = NonEmptyList.of(
-    SqlQuery(
-      Kleisli { session =>
-        val query: Command[EventStatus ~ ExecutionDate ~ EventMessage ~ EventId ~ projects.Id ~ EventStatus] =
-          sql"""UPDATE event
-                SET status = $eventStatusEncoder, execution_date = $executionDateEncoder, message = $eventMessageEncoder
-                WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND status = $eventStatusEncoder
+  override def queries: NonEmptyList[SqlStatement[Interpretation, Int]] = NonEmptyList.of(
+    SqlStatement(name = "transforming_triples->transformation_non_recoverable_fail")
+      .command[EventStatus ~ ExecutionDate ~ EventMessage ~ EventId ~ projects.Id ~ EventStatus](
+        sql"""UPDATE event
+              SET status = $eventStatusEncoder, execution_date = $executionDateEncoder, message = $eventMessageEncoder
+              WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND status = $eventStatusEncoder
              """.command
-        session
-          .prepare(query)
-          .use(
-            _.execute(status ~ ExecutionDate(now()) ~ message ~ eventId.id ~ eventId.projectId ~ TransformingTriples)
-          )
-          .flatMap {
-            case Completion.Update(n) => n.pure[Interpretation]
-            case completion =>
-              new RuntimeException(
-                s"transforming_triples->transformation_non_recoverable_fail query failed with completion status $completion"
-              ).raiseError[Interpretation, Int]
-          }
-      },
-      name = "transforming_triples->transformation_non_recoverable_fail"
-    )
+      )
+      .arguments(status ~ ExecutionDate(now()) ~ message ~ eventId.id ~ eventId.projectId ~ TransformingTriples)
+      .build
+      .flatMapResult {
+        case Completion.Update(n) => n.pure[Interpretation]
+        case completion =>
+          new RuntimeException(
+            s"transforming_triples->transformation_non_recoverable_fail query failed with completion status $completion"
+          ).raiseError[Interpretation, Int]
+      }
   )
 
   override def updateGauges(
@@ -83,7 +77,7 @@ final case class ToTransformationNonRecoverableFailure[Interpretation[_]: Async:
 }
 
 object ToTransformationNonRecoverableFailure {
-  def factory[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+  def factory[Interpretation[_]: BracketThrow](
       underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path]
   ): Kleisli[Interpretation, ChangeStatusRequest, CommandFindingResult] = Kleisli.fromFunction {
     case EventOnlyRequest(eventId, TransformationNonRecoverableFailure, maybeProcessingTime, Some(message)) =>

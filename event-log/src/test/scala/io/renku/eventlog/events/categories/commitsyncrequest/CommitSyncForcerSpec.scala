@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.events.categories.commitsyncrequest
 
-import ch.datascience.db.SqlQuery
+import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
@@ -104,7 +104,7 @@ class CommitSyncForcerSpec
   }
 
   private trait TestCase {
-    val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
     val forcer           = new CommitSyncForcerImpl(sessionResource, queriesExecTimes)
   }
 }

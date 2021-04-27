@@ -18,10 +18,8 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.data.Kleisli
-import cats.effect.{Async, Bracket, IO}
-import cats.syntax.all._
-import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
+import cats.effect.{BracketThrow, IO}
+import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
@@ -37,9 +35,9 @@ private trait SubscriberTracker[Interpretation[_]] {
   def remove(subscriberUrl: SubscriberUrl): Interpretation[Boolean]
 }
 
-private class SubscriberTrackerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+private class SubscriberTrackerImpl[Interpretation[_]: BracketThrow](
     sessionResource:  SessionResource[Interpretation, EventLogDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name],
+    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
     sourceUrl:        MicroserviceBaseUrl
 ) extends DbClient(Some(queriesExecTimes))
     with SubscriberTracker[Interpretation]
@@ -47,37 +45,31 @@ private class SubscriberTrackerImpl[Interpretation[_]: Async: Bracket[*[_], Thro
 
   override def add(subscriptionInfo: SubscriptionInfo): Interpretation[Boolean] = sessionResource.useK {
     measureExecutionTime(
-      SqlQuery(
-        Kleisli { session =>
-          val query: Command[SubscriberId ~ SubscriberUrl ~ MicroserviceBaseUrl ~ SubscriberId] =
-            sql"""INSERT INTO subscriber (delivery_id, delivery_url, source_url)
+      SqlStatement(name = "subscriber - add")
+        .command[SubscriberId ~ SubscriberUrl ~ MicroserviceBaseUrl ~ SubscriberId](
+          sql"""INSERT INTO subscriber (delivery_id, delivery_url, source_url)
                   VALUES ($subscriberIdEncoder, $subscriberUrlEncoder, $microserviceBaseUrlEncoder)
                   ON CONFLICT (delivery_url, source_url)
                   DO UPDATE SET delivery_id = $subscriberIdEncoder, delivery_url = EXCLUDED.delivery_url, source_url = EXCLUDED.source_url
                """.command
-          session.prepare(query).use {
-            _.execute(
-              subscriptionInfo.subscriberId ~ subscriptionInfo.subscriberUrl ~ sourceUrl ~ subscriptionInfo.subscriberId
-            )
-          }
-        },
-        name = "subscriber - add"
-      )
+        )
+        .arguments(
+          subscriptionInfo.subscriberId ~ subscriptionInfo.subscriberUrl ~ sourceUrl ~ subscriptionInfo.subscriberId
+        )
+        .build
     ) map insertToTableResult
   }
 
   override def remove(subscriberUrl: SubscriberUrl): Interpretation[Boolean] = sessionResource.useK {
     measureExecutionTime(
-      SqlQuery(
-        Kleisli { session =>
-          val query: Command[SubscriberUrl ~ MicroserviceBaseUrl] =
-            sql"""DELETE FROM subscriber
-                  WHERE delivery_url = $subscriberUrlEncoder AND source_url = $microserviceBaseUrlEncoder
+      SqlStatement(name = "subscriber - delete")
+        .command[SubscriberUrl ~ MicroserviceBaseUrl](
+          sql"""DELETE FROM subscriber
+                WHERE delivery_url = $subscriberUrlEncoder AND source_url = $microserviceBaseUrlEncoder
             """.command
-          session.prepare(query).use(_.execute(subscriberUrl ~ sourceUrl))
-        },
-        name = "subscriber - delete"
-      )
+        )
+        .arguments(subscriberUrl ~ sourceUrl)
+        .build
     ) map deleteToTableResult
   }
 
@@ -94,7 +86,7 @@ private class SubscriberTrackerImpl[Interpretation[_]: Async: Bracket[*[_], Thro
 
 private object SubscriberTracker {
   def apply(sessionResource:  SessionResource[IO, EventLogDB],
-            queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
+            queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
   ): IO[SubscriberTracker[IO]] = for {
     microserviceUrlFinder <- MicroserviceUrlFinder(Microservice.ServicePort)
     sourceUrl             <- microserviceUrlFinder.findBaseUrl()

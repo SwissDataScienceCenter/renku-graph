@@ -21,7 +21,7 @@ package io.renku.eventlog.statuschange
 import cats.data.{Kleisli, NonEmptyList}
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.db.SqlQuery
+import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventProcessingTimes, eventStatuses}
@@ -320,10 +320,10 @@ class StatusChangeEndpointSpec
     private case class MockChangeStatusCommand() extends ChangeStatusCommand[IO] {
       val eventId: CompoundEventId = compoundEventIds.generateOne
       val status:  EventStatus     = eventStatuses.generateOne
-      val queries: NonEmptyList[SqlQuery[IO, Int]] =
+      val queries: NonEmptyList[SqlStatement[IO, Int]] =
         nonEmptyStrings()
           .generateNonEmptyList()
-          .map(s => SqlQuery[IO, Int](Kleisli(_ => 1.pure[IO]), Refined.unsafeApply(s)))
+          .map(s => SqlStatement[IO, Int](Kleisli(_ => 1.pure[IO]), Refined.unsafeApply(s)))
       def updateGauges(updateResult: UpdateResult): Kleisli[IO, Session[IO], Unit] = Kleisli.pure(())
 
       def maybeProcessingTime: Option[EventProcessingTime] = eventProcessingTimes.generateOption

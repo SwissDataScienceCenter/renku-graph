@@ -18,13 +18,13 @@
 
 package ch.datascience.tinytypes.constraints
 
-import java.time.LocalDate
-
 import ch.datascience.generators.Generators.localDatesNotInTheFuture
 import ch.datascience.tinytypes.{LocalDateTinyType, TinyTypeFactory}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+
+import java.time.LocalDate
 
 class LocalDateNotInTheFutureSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 

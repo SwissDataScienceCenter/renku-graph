@@ -21,7 +21,7 @@ package io.renku.eventlog.statuschange
 import cats.data.{Kleisli, NonEmptyList}
 import cats.syntax.all._
 import cats.effect.IO
-import ch.datascience.db.{SessionResource, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventProcessingTimes}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
@@ -136,7 +136,7 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
     val projectPath = projectPaths.generateOne
 
     val gauge     = mock[LabeledGauge[IO, projects.Path]]
-    val histogram = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val histogram = TestLabeledHistogram[SqlStatement.Name]("query_id")
     val logger    = TestLogger[IO]()
     val runner    = new StatusUpdatesRunnerImpl(sessionResource, histogram, logger)
   }
@@ -150,7 +150,7 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
     override def status: EventStatus = GeneratingTriples
 
     override def queries = NonEmptyList(
-      SqlQuery(
+      SqlStatement(
         Kleisli { session =>
           val query: Command[EventStatus ~ EventId ~ projects.Id ~ EventStatus] = sql"""
             UPDATE event
@@ -195,7 +195,7 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
     val queryResult: Int = 0
 
     override def queries = NonEmptyList.of(
-      SqlQuery(Kleisli(_ => 0.pure[IO]), name = "test_failure_status_update")
+      SqlStatement(Kleisli(_ => 0.pure[IO]), name = "test_failure_status_update")
     )
 
     override def updateGauges(

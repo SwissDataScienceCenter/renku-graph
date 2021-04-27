@@ -20,25 +20,21 @@ package ch.datascience.db
 
 import ch.datascience.db.DBConfigProvider.DBConfig
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.{nonEmptyStrings, positiveInts}
-import eu.timepit.refined.api.{RefType, Refined}
+import ch.datascience.generators.Generators.nonEmptyStrings
+import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 
-import scala.concurrent.duration._
 import scala.language.postfixOps
 
 object TestDbConfig {
 
-  def newDbConfig[TargetDb]: DBConfig[TargetDb] = {
-    val dbName = nonEmptyStrings().map(suffix => s"db_$suffix").generateOne
+  def newDbConfig[TargetDb]: DBConfig[TargetDb] =
     DBConfig[TargetDb](
-      name = Refined.unsafeApply(dbName),
+      name = Refined.unsafeApply(nonEmptyStrings().map(suffix => s"db_$suffix").generateOne),
       host = "localhost",
       port = 5432,
       user = "user",
       pass = "test",
-      connectionPool = 20,
-      maxLifetime = 5 seconds
+      connectionPool = 20
     )
-  }
 }

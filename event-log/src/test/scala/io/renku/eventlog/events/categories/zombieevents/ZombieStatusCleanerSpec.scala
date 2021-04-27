@@ -19,7 +19,7 @@
 package io.renku.eventlog.events.categories.zombieevents
 
 import cats.syntax.all._
-import ch.datascience.db.SqlQuery
+import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
@@ -125,7 +125,7 @@ class ZombieStatusCleanerSpec
 
   private trait TestCase {
     val currentTime      = mockFunction[Instant]
-    val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
     val updater          = new ZombieStatusCleanerImpl(sessionResource, queriesExecTimes, currentTime)
 
     val eventId       = compoundEventIds.generateOne

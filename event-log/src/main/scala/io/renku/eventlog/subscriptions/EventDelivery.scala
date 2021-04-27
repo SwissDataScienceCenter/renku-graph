@@ -19,10 +19,9 @@
 package io.renku.eventlog.subscriptions
 
 import cats.MonadError
-import cats.data.Kleisli
-import cats.effect.{Async, Bracket, IO}
+import cats.effect.{BracketThrow, IO}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.events.{CompoundEventId, EventId}
 import ch.datascience.graph.model.{events, projects}
@@ -38,10 +37,10 @@ private[subscriptions] trait EventDelivery[Interpretation[_], CategoryEvent] {
   def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): Interpretation[Unit]
 }
 
-private class EventDeliveryImpl[Interpretation[_]: Async: Bracket[*[_], Throwable], CategoryEvent](
+private class EventDeliveryImpl[Interpretation[_]: BracketThrow, CategoryEvent](
     sessionResource:          SessionResource[Interpretation, EventLogDB],
     compoundEventIdExtractor: CategoryEvent => CompoundEventId,
-    queriesExecTimes:         LabeledHistogram[Interpretation, SqlQuery.Name],
+    queriesExecTimes:         LabeledHistogram[Interpretation, SqlStatement.Name],
     sourceUrl:                MicroserviceBaseUrl
 ) extends DbClient(Some(queriesExecTimes))
     with EventDelivery[Interpretation, CategoryEvent]
@@ -57,33 +56,30 @@ private class EventDeliveryImpl[Interpretation[_]: Async: Bracket[*[_], Throwabl
 
   private def insert(eventId: events.EventId, projectId: projects.Id, subscriberUrl: SubscriberUrl) =
     measureExecutionTime {
-      SqlQuery(
-        Kleisli { session =>
-          val query: Command[EventId ~ projects.Id ~ SubscriberUrl ~ MicroserviceBaseUrl] =
-            sql"""INSERT INTO event_delivery (event_id, project_id, delivery_id)
-                    SELECT $eventIdEncoder, $projectIdEncoder, delivery_id
-                    FROM subscriber
-                    WHERE delivery_url = $subscriberUrlEncoder AND source_url = $microserviceBaseUrlEncoder
-                  ON CONFLICT (event_id, project_id)
-                  DO NOTHING
+      SqlStatement(name = "event delivery info - insert")
+        .command[EventId ~ projects.Id ~ SubscriberUrl ~ MicroserviceBaseUrl](
+          sql"""INSERT INTO event_delivery (event_id, project_id, delivery_id)
+                SELECT $eventIdEncoder, $projectIdEncoder, delivery_id
+                FROM subscriber
+                WHERE delivery_url = $subscriberUrlEncoder AND source_url = $microserviceBaseUrlEncoder
+                ON CONFLICT (event_id, project_id)
+                DO NOTHING
             """.command
-          session.prepare(query).use(_.execute(eventId ~ projectId ~ subscriberUrl ~ sourceUrl))
-        },
-        name = "event delivery info - insert"
-      )
+        )
+        .arguments(eventId ~ projectId ~ subscriberUrl ~ sourceUrl)
+        .build
     }
 
   private def deleteDelivery(eventId: events.EventId, projectId: projects.Id) = measureExecutionTime {
-    SqlQuery(
-      Kleisli { session =>
-        val query: Command[EventId ~ projects.Id] =
-          sql"""DELETE FROM event_delivery
-                WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
+    SqlStatement(name = "event delivery info - remove")
+      .command[EventId ~ projects.Id](
+        sql"""DELETE FROM event_delivery
+              WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
           """.command
-        session.prepare(query).use(_.execute(eventId ~ projectId)).void
-      },
-      name = "event delivery info - remove"
-    )
+      )
+      .arguments(eventId ~ projectId)
+      .build
+      .void
   }
 
   private lazy val toResult: Completion => Interpretation[Unit] = {
@@ -97,7 +93,7 @@ private[subscriptions] object EventDelivery {
   def apply[CategoryEvent](
       sessionResource:          SessionResource[IO, EventLogDB],
       compoundEventIdExtractor: CategoryEvent => CompoundEventId,
-      queriesExecTimes:         LabeledHistogram[IO, SqlQuery.Name]
+      queriesExecTimes:         LabeledHistogram[IO, SqlStatement.Name]
   ): IO[EventDelivery[IO, CategoryEvent]] = for {
     microserviceUrlFinder <- MicroserviceUrlFinder(Microservice.ServicePort)
     microserviceUrl       <- microserviceUrlFinder.findBaseUrl()

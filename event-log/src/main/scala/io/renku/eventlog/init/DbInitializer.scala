@@ -58,7 +58,6 @@ object DbInitializer {
         EventLogTableCreator(sessionResource, logger),
         ProjectPathAdder(sessionResource, logger),
         BatchDateAdder(sessionResource, logger),
-        LatestEventDatesViewRemover[IO](sessionResource, logger),
         ProjectTableCreator(sessionResource, logger),
         ProjectPathRemover(sessionResource, logger),
         EventLogTableRenamer(sessionResource, logger),

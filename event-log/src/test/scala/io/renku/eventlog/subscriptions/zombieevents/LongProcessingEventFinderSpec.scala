@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.subscriptions.zombieevents
 
-import ch.datascience.db.SqlQuery
+import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
@@ -92,7 +92,7 @@ class LongProcessingEventFinderSpec
 
     val projectPath = projectPaths.generateOne
 
-    val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
 
     val finder = new LongProcessingEventFinder(sessionResource, queriesExecTimes)
 

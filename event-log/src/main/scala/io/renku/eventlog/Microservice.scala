@@ -54,8 +54,7 @@ object Microservice extends IOMicroservice {
     ExecutionContext fromExecutorService newFixedThreadPool(ConfigSource.default.at("threads-number").loadOrThrow[Int])
 
   protected implicit override def contextShift: ContextShift[IO] = IO.contextShift(executionContext)
-
-  protected implicit override def timer: Timer[IO] = IO.timer(executionContext)
+  protected implicit override def timer:        Timer[IO]        = IO.timer(executionContext)
 
   override def run(args: List[String]): IO[ExitCode] = for {
     sessionPoolResource <- new EventLogDbConfigProvider[IO]() map SessionPoolResource[IO, EventLogDB]

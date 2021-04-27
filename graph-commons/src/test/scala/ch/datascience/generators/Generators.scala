@@ -261,7 +261,7 @@ object Generators {
 
   val zonedDateTimes: Gen[ZonedDateTime] =
     timestamps
-      .map(ZonedDateTime.ofInstant(_, ZoneId.systemDefault))
+      .map(ZonedDateTime.ofInstant(_, ZoneId.of(ZoneOffset.UTC.getId)))
 
   val localDates: Gen[LocalDate] =
     timestamps

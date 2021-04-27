@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions
 
 import cats.data.Kleisli
-import ch.datascience.db.SqlQuery
+import ch.datascience.db.SqlStatement
 import ch.datascience.events.consumers.subscriptions._
 import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
 import ch.datascience.generators.Generators.Implicits._
@@ -140,7 +140,7 @@ class SubscriberTrackerSpec extends AnyWordSpec with InMemoryEventLogDbSpec with
   private trait TestCase {
 
     val subscriptionInfo = subscriptionInfos.generateOne
-    val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
     val sourceUrl        = microserviceBaseUrls.generateOne
     val tracker          = new SubscriberTrackerImpl(sessionResource, queriesExecTimes, sourceUrl)
   }

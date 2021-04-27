@@ -20,7 +20,7 @@ package io.renku.eventlog.statuschange.commands
 
 import Generators._
 import cats.effect.IO
-import ch.datascience.db.SqlQuery
+import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies, eventProcessingTimes}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
@@ -185,7 +185,7 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
 
   private trait TestCase {
     val underTriplesGenerationGauge = mock[LabeledGauge[IO, projects.Path]]
-    val histogram                   = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val histogram                   = TestLabeledHistogram[SqlStatement.Name]("query_id")
     val currentTime                 = mockFunction[Instant]
     val eventId                     = compoundEventIds.generateOne
     val processingTime              = eventProcessingTimes.generateSome
