@@ -35,7 +35,6 @@ import org.typelevel.log4cats.Logger
 import io.circe.Json
 
 import scala.concurrent.ExecutionContext
-import scala.languageFeature.higherKinds
 
 // This TriplesGenerator supposed to be used by the acceptance-tests only
 

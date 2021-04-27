@@ -18,8 +18,6 @@
 
 package io.renku.eventlog.subscriptions.triplesgenerated
 
-import java.time.Duration
-import cats.data.NonEmptyList
 import ch.datascience.graph.model.projects
 import ch.datascience.tinytypes.{BigDecimalTinyType, TinyTypeFactory}
 import eu.timepit.refined.api.Refined
@@ -27,6 +25,8 @@ import eu.timepit.refined.numeric.NonNegative
 import io.renku.eventlog.EventDate
 import io.renku.eventlog.subscriptions.ProjectIds
 import io.renku.eventlog.subscriptions.triplesgenerated.ProjectPrioritisation.{Priority, ProjectInfo}
+
+import java.time.Duration
 
 private class ProjectPrioritisation {
   import ProjectPrioritisation.Priority._

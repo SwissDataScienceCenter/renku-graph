@@ -18,9 +18,7 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.data.Kleisli
 import cats.effect.{Async, Bracket, IO}
-import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import ch.datascience.metrics.LabeledHistogram

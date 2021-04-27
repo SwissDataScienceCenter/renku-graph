@@ -39,7 +39,6 @@ import skunk.data.Completion
 import skunk.implicits._
 
 import java.time.Instant
-import scala.language.postfixOps
 import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
 
@@ -51,7 +50,7 @@ private class TriplesGeneratedEventFinderImpl[Interpretation[_]: Async: Bracket[
     now:                         () => Instant = () => Instant.now,
     projectsFetchingLimit:       Int Refined Positive,
     projectPrioritisation:       ProjectPrioritisation,
-    pickRandomlyFrom:            List[ProjectIds] => Option[ProjectIds] = ids => ids.get(Random nextInt ids.size)
+    pickRandomlyFrom:            List[ProjectIds] => Option[ProjectIds] = ids => ids.get(Random nextInt ids.size toLong)
 ) extends DbClient(Some(queriesExecTimes))
     with EventFinder[Interpretation, TriplesGeneratedEvent]
     with SubscriptionTypeSerializers {

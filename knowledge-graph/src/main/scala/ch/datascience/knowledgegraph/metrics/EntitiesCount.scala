@@ -16,16 +16,17 @@
  * limitations under the License.
  */
 
-package ch.datascience.tokenrepository.repository
+package ch.datascience.knowledgegraph.metrics
 
-import cats.MonadError
-import ch.datascience.db.DBConfigProvider
-import eu.timepit.refined.auto._
+import ch.datascience.tinytypes.{LongTinyType, TinyTypeFactory}
+import io.circe.Decoder
+import ch.datascience.tinytypes.json.TinyTypeDecoders.longDecoder
 
-sealed trait ProjectsTokensDB
-
-class ProjectsTokensDbConfigProvider[Interpretation[_]: MonadError[*[_], Throwable]](
-) extends DBConfigProvider[Interpretation, ProjectsTokensDB](
-      namespace = "projects-tokens",
-      dbName = "projects_tokens"
-    )
+final class EntitiesCount private (val value: Long) extends AnyVal with LongTinyType
+object EntitiesCount extends TinyTypeFactory[EntitiesCount](new EntitiesCount(_)) {
+  implicit val decoder: Decoder[EntitiesCount] = longDecoder(EntitiesCount)
+  addConstraint(
+    check = _ >= 0L,
+    message = _ => s"$typeName has to be >= 0"
+  )
+}

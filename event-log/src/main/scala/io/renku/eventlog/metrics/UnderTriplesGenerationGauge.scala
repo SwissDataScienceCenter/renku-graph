@@ -24,14 +24,12 @@ import ch.datascience.graph.model.events.EventStatus.GeneratingTriples
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{Gauge, LabeledGauge, MetricsRegistry}
 import eu.timepit.refined.auto._
-import org.typelevel.log4cats.Logger
 
 object UnderTriplesGenerationGauge {
 
   def apply(
       metricsRegistry: MetricsRegistry[IO],
-      statsFinder:     StatsFinder[IO],
-      logger:          Logger[IO]
+      statsFinder:     StatsFinder[IO]
   ): IO[LabeledGauge[IO, projects.Path]] =
     Gauge[IO, projects.Path](
       name = "events_under_triples_generation_count",

@@ -30,9 +30,9 @@ import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import org.typelevel.log4cats.Logger
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.eventlog._
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal

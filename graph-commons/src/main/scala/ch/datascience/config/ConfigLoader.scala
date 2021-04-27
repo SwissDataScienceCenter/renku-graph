@@ -25,8 +25,6 @@ import com.typesafe.config.Config
 import pureconfig._
 import pureconfig.error.{CannotConvert, ConfigReaderFailures}
 
-//import scala.language.implicitConversions
-
 abstract class ConfigLoader[Interpretation[_]](implicit ME: MonadError[Interpretation, Throwable]) {
 
   protected def find[T](key: String, config: Config)(implicit reader: ConfigReader[T]): Interpretation[T] =
@@ -40,9 +38,9 @@ object ConfigLoader {
   }
 
   def find[Interpretation[_], T](
-      key:       String,
-      config:    Config
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[T] =
+      key:           String,
+      config:        Config
+  )(implicit reader: ConfigReader[T], ME: MonadError[Interpretation, Throwable]): Interpretation[T] =
     fromEither {
       ConfigSource.fromConfig(config).at(key).load[T]
     }

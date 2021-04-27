@@ -26,16 +26,16 @@ import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabApiUrl
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects
-import ch.datascience.http.client.RestClientError.{ConnectivityException, UnauthorizedException}
+import ch.datascience.http.client.RestClientError.ConnectivityException
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
-import org.typelevel.log4cats.Logger
 import org.http4s.Method.GET
 import org.http4s.Status.{Ok, Unauthorized}
 import org.http4s.circe.jsonOf
 import org.http4s.dsl.io.ServiceUnavailable
 import org.http4s.{EntityDecoder, Request, Response, Status}
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 

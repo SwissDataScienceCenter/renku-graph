@@ -32,9 +32,9 @@ import io.renku.eventlog.statuschange.CommandFindingResult.{CommandFound, NotSup
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 import io.renku.eventlog.statuschange.{ChangeStatusRequest, CommandFindingResult}
 import io.renku.eventlog.{EventMessage, ExecutionDate}
+import skunk._
 import skunk.data.Completion
 import skunk.implicits._
-import skunk.{Command, _}
 
 import java.time.Instant
 

@@ -84,10 +84,10 @@ object Microservice extends IOMicroservice {
                                                                                            sparqlTimeRecorder,
                                                                                            ApplicationLogger
                                     )
-    eventConsumersRegistry <- consumers.EventConsumersRegistry(ApplicationLogger,
-                                                               awaitingGenerationSubscription,
-                                                               membersSyncSubscription,
-                                                               triplesGeneratedSubscription
+    eventConsumersRegistry <- consumers.EventConsumersRegistry(
+                                awaitingGenerationSubscription,
+                                membersSyncSubscription,
+                                triplesGeneratedSubscription
                               )
     reProvisioningStatus    <- ReProvisioningStatus(eventConsumersRegistry, ApplicationLogger, sparqlTimeRecorder)
     reProvisioning          <- IOReProvisioning(reProvisioningStatus, renkuVersionPairs, sparqlTimeRecorder, ApplicationLogger)

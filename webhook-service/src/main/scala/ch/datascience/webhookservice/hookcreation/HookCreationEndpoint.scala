@@ -85,6 +85,6 @@ object IOHookCreationEndpoint {
       clock:            Clock[IO],
       timer:            Timer[IO]
   ): IO[HookCreationEndpoint[IO]] = for {
-    hookCreator <- HookCreator(projectHookUrl, gitLabThrottler, hookTokenCrypto, executionTimeRecorder, logger)
+    hookCreator <- HookCreator(projectHookUrl, gitLabThrottler, hookTokenCrypto, logger)
   } yield new HookCreationEndpointImpl[IO](hookCreator, logger)
 }

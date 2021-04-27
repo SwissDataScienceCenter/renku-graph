@@ -25,7 +25,6 @@ import ch.datascience.db.SessionResource
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import org.typelevel.log4cats.Logger
 import skunk.{Command, Session}
-import skunk.data.Completion
 import skunk.implicits._
 
 private trait DuplicateProjectsRemover[Interpretation[_]] {

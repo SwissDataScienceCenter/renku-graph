@@ -16,16 +16,18 @@
  * limitations under the License.
  */
 
-package ch.datascience.tokenrepository.repository
+package ch.datascience.knowledgegraph.metrics
 
-import cats.MonadError
-import ch.datascience.db.DBConfigProvider
-import eu.timepit.refined.auto._
+import ch.datascience.graph.Schemas
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.constraints.NonBlank
 
-sealed trait ProjectsTokensDB
-
-class ProjectsTokensDbConfigProvider[Interpretation[_]: MonadError[*[_], Throwable]](
-) extends DBConfigProvider[Interpretation, ProjectsTokensDB](
-      namespace = "projects-tokens",
-      dbName = "projects_tokens"
-    )
+final class EntityType private (val value: String) extends AnyVal with StringTinyType
+object EntityType extends TinyTypeFactory[EntityType](new EntityType(_)) with NonBlank {
+  private val allSchemas = Schemas.all.map(_.toString)
+  override val transform: String => Either[Throwable, String] = entityType =>
+    allSchemas
+      .find(schema => entityType.startsWith(schema))
+      .map(schema => entityType.replace(schema, ""))
+      .toRight(left = new IllegalArgumentException(s"$entityType not recognizable"))
+}

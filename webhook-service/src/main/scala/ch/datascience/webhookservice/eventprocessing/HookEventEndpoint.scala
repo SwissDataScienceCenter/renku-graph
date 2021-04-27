@@ -28,17 +28,16 @@ import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.http.ErrorMessage._
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.http.{ErrorMessage, InfoMessage}
-import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.webhookservice.CommitSyncRequestSender
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.model.{CommitSyncRequest, HookToken, Project}
-import org.typelevel.log4cats.Logger
 import io.circe.Decoder
 import org.http4s._
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.util.CaseInsensitiveString
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
@@ -142,10 +141,8 @@ private object HookEventEndpoint {
 
 object IOHookEventEndpoint {
   def apply(
-      gitLabThrottler:       Throttler[IO, GitLab],
-      hookTokenCrypto:       HookTokenCrypto[IO],
-      executionTimeRecorder: ExecutionTimeRecorder[IO],
-      logger:                Logger[IO]
+      hookTokenCrypto: HookTokenCrypto[IO],
+      logger:          Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],

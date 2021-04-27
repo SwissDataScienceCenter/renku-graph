@@ -39,7 +39,6 @@ import skunk.data.Completion
 import skunk.implicits._
 
 import java.time.Instant
-import scala.language.postfixOps
 import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
 

@@ -36,7 +36,6 @@ import skunk.implicits._
 
 import java.time.Duration
 import java.time.Instant.now
-import scala.language.postfixOps
 
 private class LostZombieEventFinder[Interpretation[_]: Async: Bracket[*[_], Throwable]: ContextShift](
     sessionResource:  SessionResource[Interpretation, EventLogDB],

@@ -21,11 +21,9 @@ package io.renku.eventlog.subscriptions
 import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import ch.datascience.graph.model.projects
 import ch.datascience.tinytypes._
-import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, NonNegativeInt, Url}
+import ch.datascience.tinytypes.constraints.{NonNegativeInt, Url}
 import ch.datascience.tinytypes.json.TinyTypeDecoders.{intDecoder, stringDecoder}
 import io.circe.Decoder
-
-import java.time.Instant
 
 private final case class ProjectIds(id: projects.Id, path: projects.Path)
 

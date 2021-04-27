@@ -36,6 +36,7 @@ final case class RdfStoreConfig(
 object RdfStoreConfig {
 
   import ch.datascience.config.ConfigLoader._
+  import ch.datascience.http.client.BasicAuthConfigReaders._
 
   def apply[Interpretation[_]](
       config:    Config = ConfigFactory.load()

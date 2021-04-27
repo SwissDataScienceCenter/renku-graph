@@ -19,7 +19,7 @@
 package io.renku.eventlog.events.categories.commitsyncrequest
 
 import cats.data.Kleisli
-import cats.effect.{Async, Bracket, IO}
+import cats.effect.{Async, Bracket}
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.CategoryName

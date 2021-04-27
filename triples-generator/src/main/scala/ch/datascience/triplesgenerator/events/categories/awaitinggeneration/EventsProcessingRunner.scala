@@ -105,8 +105,6 @@ private class EventsProcessingRunnerImpl(
 
 private object IOEventsProcessingRunner {
 
-  import scala.language.postfixOps
-
   def apply(
       metricsRegistry:       MetricsRegistry[IO],
       gitLabThrottler:       Throttler[IO, GitLab],
@@ -120,7 +118,7 @@ private object IOEventsProcessingRunner {
       timer:            Timer[IO]
   ): IO[EventsProcessingRunner[IO]] =
     for {
-      eventProcessor      <- IOCommitEventProcessor(metricsRegistry, gitLabThrottler, timeRecorder, logger)
+      eventProcessor      <- IOCommitEventProcessor(metricsRegistry, timeRecorder, logger)
       generationProcesses <- GenerationProcessesNumber(config)
       semaphore           <- Semaphore(generationProcesses.value)
     } yield new EventsProcessingRunnerImpl(eventProcessor,

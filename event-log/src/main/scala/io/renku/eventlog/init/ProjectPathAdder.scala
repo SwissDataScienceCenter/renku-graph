@@ -25,14 +25,13 @@ import ch.datascience.db.SessionResource
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
-import org.typelevel.log4cats.Logger
 import io.circe.parser._
 import io.circe.{Decoder, HCursor}
 import io.renku.eventlog.{EventLogDB, TypeSerializers}
+import org.typelevel.log4cats.Logger
 import skunk._
-import skunk.implicits._
 import skunk.codec.all._
-import skunk.data.Completion
+import skunk.implicits._
 
 import scala.util.control.NonFatal
 

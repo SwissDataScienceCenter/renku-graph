@@ -20,7 +20,6 @@ package io.renku.eventlog.subscriptions.zombieevents
 
 import cats.data.Kleisli
 import cats.effect.{Async, Bracket, ContextShift, IO}
-import cats.free.Free
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples}

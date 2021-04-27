@@ -19,7 +19,6 @@
 package io.renku.eventlog.subscriptions
 
 import cats.MonadError
-import cats.data.Kleisli
 import cats.effect.{Async, Bracket, IO}
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlStatement}

@@ -25,7 +25,6 @@ import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import org.typelevel.log4cats.Logger
-import skunk.data.Completion
 
 import scala.util.control.NonFatal
 

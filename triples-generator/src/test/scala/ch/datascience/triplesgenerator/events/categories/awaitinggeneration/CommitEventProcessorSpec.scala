@@ -206,7 +206,6 @@ class CommitEventProcessorSpec
       val logger = TestLogger[IO]()
       IOCommitEventProcessor(
         metricsRegistry,
-        Throttler.noThrottling,
         new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger)),
         logger
       ).unsafeRunSync()

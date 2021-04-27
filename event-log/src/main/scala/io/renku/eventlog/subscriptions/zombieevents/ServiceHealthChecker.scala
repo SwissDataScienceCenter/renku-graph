@@ -32,7 +32,6 @@ import org.http4s._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import scala.language.postfixOps
 import scala.util.control.NonFatal
 
 private trait ServiceHealthChecker[Interpretation[_]] {

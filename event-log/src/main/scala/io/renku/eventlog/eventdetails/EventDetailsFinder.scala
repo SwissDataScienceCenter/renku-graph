@@ -18,7 +18,6 @@
 
 package io.renku.eventlog.eventdetails
 
-import cats.data.Kleisli
 import cats.effect.{Async, IO}
 import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.{CompoundEventId, EventId}

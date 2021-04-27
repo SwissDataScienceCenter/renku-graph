@@ -16,16 +16,8 @@
  * limitations under the License.
  */
 
-package ch.datascience.tokenrepository.repository
+package io.renku.eventlog.events.categories.zombieevents
 
-import cats.MonadError
-import ch.datascience.db.DBConfigProvider
-import eu.timepit.refined.auto._
-
-sealed trait ProjectsTokensDB
-
-class ProjectsTokensDbConfigProvider[Interpretation[_]: MonadError[*[_], Throwable]](
-) extends DBConfigProvider[Interpretation, ProjectsTokensDB](
-      namespace = "projects-tokens",
-      dbName = "projects_tokens"
-    )
+private[zombieevents] sealed trait UpdateResult
+private[zombieevents] case object Updated    extends UpdateResult
+private[zombieevents] case object NotUpdated extends UpdateResult

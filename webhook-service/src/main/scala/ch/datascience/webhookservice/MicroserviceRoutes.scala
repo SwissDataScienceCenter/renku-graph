@@ -89,7 +89,7 @@ private object MicroserviceRoutes {
     projectHookUrl  <- ProjectHookUrl.fromConfig[IO]()
     hookTokenCrypto <- HookTokenCrypto[IO]()
     hookEventEndpoint <-
-      IOHookEventEndpoint(gitLabThrottler, hookTokenCrypto, executionTimeRecorder, logger)
+      IOHookEventEndpoint(hookTokenCrypto, logger)
     hookCreatorEndpoint <-
       IOHookCreationEndpoint(projectHookUrl, gitLabThrottler, hookTokenCrypto, executionTimeRecorder, logger)
     processingStatusEndpoint <-
