@@ -24,6 +24,7 @@ import ch.datascience.config.renku
 import ch.datascience.graph.model.datasets.{Identifier, PublishedDate}
 import ch.datascience.http.InfoMessage._
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
+import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
@@ -49,10 +50,10 @@ class DatasetEndpoint[Interpretation[_]: Effect](
   import executionTimeRecorder._
   import org.http4s.circe._
 
-  def getDataset(identifier: Identifier): Interpretation[Response[Interpretation]] =
+  def getDataset(identifier: Identifier, maybeUser: Option[AuthUser]): Interpretation[Response[Interpretation]] =
     measureExecutionTime {
       datasetFinder
-        .findDataset(identifier)
+        .findDataset(identifier, maybeUser)
         .flatMap(toHttpResult(identifier))
         .recoverWith(httpResult(identifier))
     } map logExecutionTimeWhen(finishedSuccessfully(identifier))

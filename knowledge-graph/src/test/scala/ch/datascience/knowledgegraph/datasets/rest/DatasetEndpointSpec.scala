@@ -35,6 +35,7 @@ import ch.datascience.http.rest.Links
 import ch.datascience.http.rest.Links.Rel.Self
 import ch.datascience.http.rest.Links.{Href, Rel}
 import ch.datascience.http.server.EndpointTester._
+import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
@@ -61,11 +62,11 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
     "respond with OK and the found dataset" in new TestCase {
       forAll(datasets) { dataset =>
         (datasetsFinder
-          .findDataset(_: Identifier))
-          .expects(dataset.id)
+          .findDataset(_: Identifier, _: Option[AuthUser]))
+          .expects(dataset.id, None)
           .returning(context.pure(Some(dataset)))
 
-        val response = getDataset(dataset.id).unsafeRunSync()
+        val response = getDataset(dataset.id, None).unsafeRunSync()
 
         response.status                      shouldBe Ok
         response.contentType                 shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -117,11 +118,11 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       val identifier = datasetIdentifiers.generateOne
 
       (datasetsFinder
-        .findDataset(_: Identifier))
-        .expects(identifier)
+        .findDataset(_: Identifier, _: Option[AuthUser]))
+        .expects(identifier, None)
         .returning(context.pure(None))
 
-      val response = getDataset(identifier).unsafeRunSync()
+      val response = getDataset(identifier, None).unsafeRunSync()
 
       response.status      shouldBe NotFound
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -137,11 +138,11 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
 
       val exception = exceptions.generateOne
       (datasetsFinder
-        .findDataset(_: Identifier))
-        .expects(identifier)
+        .findDataset(_: Identifier, _: Option[AuthUser]))
+        .expects(identifier, None)
         .returning(context.raiseError(exception))
 
-      val response = getDataset(identifier).unsafeRunSync()
+      val response = getDataset(identifier, None).unsafeRunSync()
 
       response.status      shouldBe InternalServerError
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))

@@ -34,6 +34,7 @@ import ch.datascience.http.rest.SortBy.Direction
 import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.http.rest.paging.model.{Page, PerPage}
 import ch.datascience.http.server.EndpointTester._
+import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.interpreters.TestRoutesMetrics
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.{Phrase, query}
@@ -85,10 +86,11 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
         val request =
           Request[IO](Method.GET, uri"knowledge-graph/datasets".withQueryParam(query.parameterName, phrase))
         (datasetsSearchEndpoint
-          .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest))
+          .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest, _: Option[AuthUser]))
           .expects(Phrase(phrase).some,
                    Sort.By(TitleProperty, Direction.Asc),
-                   PagingRequest(Page.first, PerPage.default)
+                   PagingRequest(Page.first, PerPage.default),
+                   maybeAuthUser
           )
           .returning(IO.pure(Response[IO](Ok)))
 
@@ -103,10 +105,11 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
         val request = Request[IO](Method.GET, uri"knowledge-graph/datasets")
 
         (datasetsSearchEndpoint
-          .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest))
+          .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest, _: Option[AuthUser]))
           .expects(Option.empty[Phrase],
                    Sort.By(TitleProperty, Direction.Asc),
-                   PagingRequest(Page.first, PerPage.default)
+                   PagingRequest(Page.first, PerPage.default),
+                   maybeAuthUser
           )
           .returning(IO.pure(Response[IO](Ok)))
 
@@ -128,8 +131,8 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
               .withQueryParam("sort", s"${sortBy.property}:${sortBy.direction}")
           )
           (datasetsSearchEndpoint
-            .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest))
-            .expects(phrase.some, sortBy, PagingRequest.default)
+            .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest, _: Option[AuthUser]))
+            .expects(phrase.some, sortBy, PagingRequest.default, maybeAuthUser)
             .returning(IO.pure(Response[IO](Ok)))
 
           val response = routes.call(request)
@@ -151,8 +154,8 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
               .withQueryParam("per_page", perPage.value)
           )
           (datasetsSearchEndpoint
-            .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest))
-            .expects(phrase.some, Sort.By(TitleProperty, Direction.Asc), PagingRequest(page, perPage))
+            .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest, _: Option[AuthUser]))
+            .expects(phrase.some, Sort.By(TitleProperty, Direction.Asc), PagingRequest(page, perPage), maybeAuthUser)
             .returning(IO.pure(Response[IO](Ok)))
 
           val response = routes.call(request)
@@ -213,7 +216,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
         .call(
           Request(Method.GET, uri"knowledge-graph/datasets/")
         )
-        .status shouldBe ServiceUnavailable
+        .status shouldBe NotFound
     }
 
     "define a GET /knowledge-graph/graphql endpoint" in new TestCase {

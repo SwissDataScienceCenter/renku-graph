@@ -20,6 +20,8 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.model.datasets.{Identifier, ImageUri, Keyword}
+import ch.datascience.graph.model.projects.Visibility
+import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
@@ -28,7 +30,7 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.ExecutionContext
 
 private trait DatasetFinder[Interpretation[_]] {
-  def findDataset(identifier: Identifier): Interpretation[Option[Dataset]]
+  def findDataset(identifier: Identifier, maybeUser: Option[AuthUser]): Interpretation[Option[Dataset]]
 }
 
 private class IODatasetFinder(
@@ -44,9 +46,9 @@ private class IODatasetFinder(
   import partsFinder._
   import projectsFinder._
 
-  def findDataset(identifier: Identifier): IO[Option[Dataset]] =
+  def findDataset(identifier: Identifier, maybeUser: Option[AuthUser]): IO[Option[Dataset]] =
     for {
-      usedIn            <- findUsedIn(identifier)
+      usedIn            <- findUsedIn(identifier, maybeUser)
       maybeDetailsFiber <- findBaseDetails(identifier, usedIn).start
       keywordsFiber     <- findKeywords(identifier).start
       imagesFiber       <- findImages(identifier).start
@@ -81,6 +83,7 @@ private class IODatasetFinder(
           ds.copy(creators = creators, parts = parts, usedIn = usedIn, keywords = keywords, images = images)
       }
   }
+
 }
 
 private object IODatasetFinder {

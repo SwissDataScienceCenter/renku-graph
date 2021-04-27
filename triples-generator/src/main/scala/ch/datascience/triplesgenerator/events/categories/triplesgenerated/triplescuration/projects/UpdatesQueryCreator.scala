@@ -144,7 +144,7 @@ private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitL
         name = "upsert - project visibility",
         Prefixes.of(schema -> "schema", renku -> "renku"),
         s"""|DELETE { $rdfResource renku:projectVisibility ?visibility }
-            |INSERT { $rdfResource renku:projectVisibility '$visibility' }
+            |INSERT { $rdfResource renku:projectVisibility '${visibility.value}' }
             |WHERE  {
             |  OPTIONAL { $rdfResource renku:projectVisibility ?maybeVisibility } 
             |  BIND (IF(BOUND(?maybeVisibility), ?maybeVisibility, "nonexisting") AS ?visibility)

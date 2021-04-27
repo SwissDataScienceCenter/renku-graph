@@ -22,7 +22,8 @@ import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.graph.model.datasets.{DateCreatedInProject, Identifier}
 import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.{Path, ResourceId}
+import ch.datascience.graph.model.projects.{Path, ResourceId, Visibility}
+import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.knowledgegraph.datasets.model.{AddedToProject, DatasetAgent, DatasetProject}
 import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
@@ -42,10 +43,10 @@ private class ProjectsFinder(
 
   import ProjectsFinder._
 
-  def findUsedIn(identifier: Identifier): IO[List[DatasetProject]] =
-    queryExpecting[List[DatasetProject]](using = query(identifier))
+  def findUsedIn(identifier: Identifier, maybeUser: Option[AuthUser]): IO[List[DatasetProject]] =
+    queryExpecting[List[DatasetProject]](using = query(identifier, maybeUser))
 
-  private def query(identifier: Identifier) = SparqlQuery(
+  private def query(identifier: Identifier, maybeUser: Option[AuthUser]) = SparqlQuery(
     name = "ds by id - projects",
     Set(
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
@@ -91,10 +92,36 @@ private class ProjectsFinder(
         |  ?associationId rdf:type <http://schema.org/Person>;
         |                 schema:name ?agentName.
         |  OPTIONAL { ?associationId schema:email ?maybeAgentEmail }
+        |  ${projectMemberFilterQuery(maybeUser)}
         |}
         |ORDER BY ASC(?projectName)
         |""".stripMargin
   )
+
+  private lazy val projectMemberFilterQuery: Option[AuthUser] => String = {
+    case Some(user) =>
+      s"""
+         |OPTIONAL { ?projectId renku:projectVisibility ?visibility;
+         |                schema:member/schema:sameAs ?memberId.
+         |           ?memberId schema:additionalType 'GitLab';
+         |              schema:identifier ?userGitlabId .
+         |}
+         |BIND (IF (BOUND (?visibility), ?visibility,  '${Visibility.Public.value}') as ?projectVisibility)
+         |FILTER (
+         |  ?projectVisibility = '${Visibility.Public.value}' || 
+         |  ((?projectVisibility = '${Visibility.Private.value}' || ?projectVisibility = '${Visibility.Internal.value}') && 
+         |  ?userGitlabId = ${user.id.value})
+         |)
+         |""".stripMargin
+    case _ =>
+      s"""
+         |OPTIONAL {
+         |  ?projectId renku:projectVisibility ?visibility .
+         |}
+         |BIND(IF (BOUND (?visibility), ?visibility, '${Visibility.Public.value}' ) as ?projectVisibility)
+         |FILTER(?projectVisibility = '${Visibility.Public.value}')
+         |""".stripMargin
+  }
 }
 
 private object ProjectsFinder {

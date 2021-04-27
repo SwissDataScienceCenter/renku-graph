@@ -65,10 +65,10 @@ class DatasetsSearchEndpointSpec
     "respond with OK and the found datasets" in new TestCase {
       forAll(pagingResponses(datasetSearchResultItems)) { pagingResponse =>
         (datasetsFinder.findDatasets _)
-          .expects(maybePhrase, sort, pagingRequest)
+          .expects(maybePhrase, sort, pagingRequest, None)
           .returning(pagingResponse.pure[IO])
 
-        val response = searchForDatasets(maybePhrase, sort, pagingRequest).unsafeRunSync()
+        val response = searchForDatasets(maybePhrase, sort, pagingRequest, None).unsafeRunSync()
 
         response.status       shouldBe Ok
         response.contentType  shouldBe Some(`Content-Type`(application.json))
@@ -87,10 +87,10 @@ class DatasetsSearchEndpointSpec
         .from[IO, DatasetSearchResult](Nil, pagingRequest, Total(0))
         .unsafeRunSync()
       (datasetsFinder.findDatasets _)
-        .expects(maybePhrase, sort, pagingRequest)
+        .expects(maybePhrase, sort, pagingRequest, None)
         .returning(pagingResponse.pure[IO])
 
-      val response = searchForDatasets(maybePhrase, sort, pagingRequest).unsafeRunSync()
+      val response = searchForDatasets(maybePhrase, sort, pagingRequest, None).unsafeRunSync()
 
       response.status                         shouldBe Ok
       response.contentType                    shouldBe Some(`Content-Type`(application.json))
@@ -103,10 +103,10 @@ class DatasetsSearchEndpointSpec
     "respond with INTERNAL_SERVER_ERROR when searching for datasets fails" in new TestCase {
       val exception = exceptions.generateOne
       (datasetsFinder.findDatasets _)
-        .expects(maybePhrase, sort, pagingRequest)
+        .expects(maybePhrase, sort, pagingRequest, None)
         .returning(context.raiseError(exception))
 
-      val response = searchForDatasets(maybePhrase, sort, pagingRequest).unsafeRunSync()
+      val response = searchForDatasets(maybePhrase, sort, pagingRequest, None).unsafeRunSync()
 
       response.status      shouldBe InternalServerError
       response.contentType shouldBe Some(`Content-Type`(application.json))

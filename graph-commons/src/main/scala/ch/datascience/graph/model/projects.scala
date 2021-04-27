@@ -93,15 +93,15 @@ object projects {
     val all: Set[Visibility] = Set(Public, Private, Internal)
 
     final case object Public extends Visibility {
-      override val value: String = "public"
+      override val value: String = "Public"
     }
 
     final case object Private extends Visibility {
-      override val value: String = "private"
+      override val value: String = "Private"
     }
 
     final case object Internal extends Visibility {
-      override val value: String = "internal"
+      override val value: String = "Internal"
     }
 
     import io.circe.Decoder

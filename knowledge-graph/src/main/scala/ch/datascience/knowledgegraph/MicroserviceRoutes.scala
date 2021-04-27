@@ -68,9 +68,14 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   import routesMetrics._
 
   // format: off
+  private lazy val authorizedRoutes: HttpRoutes[F] = authMiddleware {
+    AuthedRoutes.of {
+      case GET  -> Root / "knowledge-graph" /  "datasets" :? query(maybePhrase) +& sort(maybeSortBy) +& page(page) +& perPage(perPage) as maybeUser => searchForDatasets(maybePhrase, maybeSortBy,page, perPage, maybeUser)
+    }
+  }
+
   private lazy val nonAuthorizedRoutes: HttpRoutes[F] = HttpRoutes.of[F] {
     case         GET  -> Root / "ping"                                                                                                       => Ok("pong")
-    case         GET  -> Root / "knowledge-graph" /  "datasets" :? query(maybePhrase) +& sort(maybeSortBy) +& page(page) +& perPage(perPage) => searchForDatasets(maybePhrase, maybeSortBy,page, perPage)
     case         GET ->  Root / "knowledge-graph" /  "datasets" / DatasetId(id)                                                              => getDataset(id)
     case         GET ->  Root / "knowledge-graph" /  "graphql"                                                                               => schema()
     case request@POST -> Root / "knowledge-graph" /  "graphql"                                                                               => handleQuery(request)
@@ -78,19 +83,22 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   }
   // format: on
 
-  lazy val routes: Resource[F, HttpRoutes[F]] = nonAuthorizedRoutes.withMetrics
+  lazy val routes: Resource[F, HttpRoutes[F]] = (nonAuthorizedRoutes <+> authorizedRoutes).withMetrics
 
   private def searchForDatasets(
-      maybePhrase:  Option[ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Query.Phrase]],
-      maybeSort:    Option[ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Sort.By]],
-      maybePage:    Option[ValidatedNel[ParseFailure, Page]],
-      maybePerPage: Option[ValidatedNel[ParseFailure, PerPage]]
+      maybePhrase:   Option[ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Query.Phrase]],
+      maybeSort:     Option[ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Sort.By]],
+      maybePage:     Option[ValidatedNel[ParseFailure, Page]],
+      maybePerPage:  Option[ValidatedNel[ParseFailure, PerPage]],
+      maybeAuthUser: Option[AuthUser]
   ): F[Response[F]] =
     (maybePhrase.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Phrase])),
      maybeSort getOrElse Validated.validNel(Sort.By(TitleProperty, Direction.Asc)),
      PagingRequest(maybePage, maybePerPage)
     )
-      .mapN(datasetsSearchEndpoint.searchForDatasets)
+      .mapN { case (maybePhrase, sort, paging) =>
+        datasetsSearchEndpoint.searchForDatasets(maybePhrase, sort, paging, maybeAuthUser)
+      }
       .fold(toBadRequest(), identity)
 
   private def routeToProjectsEndpoints(

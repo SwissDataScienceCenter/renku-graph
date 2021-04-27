@@ -105,8 +105,8 @@ class VisibilitySpec extends AnyWordSpec with should.Matchers {
 
   "Visibility" should {
 
-    "define cases for 'private', 'public' and 'internal'" in {
-      Visibility.all.map(_.value) should contain.only("private", "public", "internal")
+    "define cases for 'Private', 'Public' and 'Internal'" in {
+      Visibility.all.map(_.value) should contain.only("Private", "Public", "Internal")
     }
   }
 
