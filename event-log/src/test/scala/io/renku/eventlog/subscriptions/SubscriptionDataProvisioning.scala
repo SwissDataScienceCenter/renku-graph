@@ -19,7 +19,6 @@
 package io.renku.eventlog.subscriptions
 
 import cats.data.Kleisli
-import cats.syntax.all._
 import ch.datascience.graph.model.events.{CategoryName, LastSyncedDate}
 import ch.datascience.graph.model.projects
 import io.renku.eventlog.{EventLogDataProvisioning, InMemoryEventLogDb}

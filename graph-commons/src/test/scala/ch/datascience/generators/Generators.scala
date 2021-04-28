@@ -37,7 +37,7 @@ import java.time.Instant.now
 import java.time.temporal.ChronoUnit.{DAYS => JAVA_DAYS, MINUTES => JAVA_MINS}
 import java.time.{Duration => JavaDuration, _}
 import scala.concurrent.duration._
-import scala.language.{implicitConversions, postfixOps}
+import scala.language.postfixOps
 
 object Generators {
 

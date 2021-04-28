@@ -28,11 +28,9 @@ import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Path
-import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.MetricsTools._
 import ch.datascience.metrics.{LabeledGauge, MetricsRegistry}
 import io.prometheus.client.{Gauge => LibGauge}
-import io.renku.eventlog.metrics.AwaitingGenerationGauge.NumberOfProjects
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -56,7 +54,7 @@ class UnderTransformationGaugeSpec extends AnyWordSpec with MockFactory with sho
           actual.pure[IO]
         }
 
-      val gauge = UnderTransformationGauge(metricsRegistry, statsFinder, TestLogger()).unsafeRunSync()
+      val gauge = UnderTransformationGauge(metricsRegistry, statsFinder).unsafeRunSync()
 
       gauge.isInstanceOf[LabeledGauge[IO, projects.Path]] shouldBe true
     }
@@ -74,7 +72,7 @@ class UnderTransformationGaugeSpec extends AnyWordSpec with MockFactory with sho
         .expects(Set[EventStatus](TransformingTriples), None)
         .returning(underTransformationEvents.pure[IO])
 
-      UnderTransformationGauge(metricsRegistry, statsFinder, TestLogger()).flatMap(_.reset()).unsafeRunSync()
+      UnderTransformationGauge(metricsRegistry, statsFinder).flatMap(_.reset()).unsafeRunSync()
 
       underlying.collectAllSamples should contain theSameElementsAs underTransformationEvents.map {
         case (project, count) =>

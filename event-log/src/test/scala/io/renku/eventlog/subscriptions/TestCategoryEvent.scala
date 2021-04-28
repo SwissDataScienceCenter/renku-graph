@@ -18,10 +18,10 @@
 
 package io.renku.eventlog.subscriptions
 
+import ch.datascience.graph.model.EventsGenerators.compoundEventIds
+import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.{events, projects}
 import org.scalacheck.{Arbitrary, Gen}
-import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventIds}
-import ch.datascience.graph.model.events.CompoundEventId
 
 private case class TestCategoryEvent(value: Int)
 

@@ -18,9 +18,6 @@
 
 package ch.datascience.rdfstore.entities
 
-import java.time.Instant
-import java.time.temporal.ChronoUnit._
-
 import cats.syntax.all._
 import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
@@ -51,8 +48,6 @@ object WorkflowRun {
       workflowFile:             WorkflowFile,
       informedBy:               Activity,
       associationFactory:       Project => Activity => WorkflowFile => WorkflowRunPlanAssociation,
-      startTime:                Instant = Instant.now(),
-      endTime:                  Instant = Instant.now().plus(10, SECONDS),
       maybeInfluenced:          Option[Activity] = None,
       processRunsFactories:     List[ActivityWorkflowRun => Step => Activity with ChildProcessRun],
       maybeInvalidation:        Option[Entity with Artifact] = None,

@@ -24,7 +24,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import java.time.{Clock, Instant, ZoneId, ZoneOffset}
+import java.time.{Clock, Instant, ZoneId}
 
 class InstantNotInTheFutureSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 

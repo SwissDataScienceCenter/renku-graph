@@ -118,20 +118,14 @@ class GaugeResetSchedulerSpec
         Option(givenResetMethodToReturn.poll()) getOrElse IO.unit
       }
 
-      override def set(labelValue: (Double, Double)): IO[Unit] = {
+      override def set(labelValue: (Double, Double)): IO[Unit] =
         fail("Spec shouldn't be calling that")
-        IO.unit
-      }
 
-      override def increment(labelValue: Double): IO[Unit] = {
+      override def increment(labelValue: Double): IO[Unit] =
         fail("Spec shouldn't be calling that")
-        IO.unit
-      }
 
-      override def decrement(labelValue: Double): IO[Unit] = {
+      override def decrement(labelValue: Double): IO[Unit] =
         fail("Spec shouldn't be calling that")
-        IO.unit
-      }
 
       protected override lazy val gauge: LibGauge = LibGauge
         .build()

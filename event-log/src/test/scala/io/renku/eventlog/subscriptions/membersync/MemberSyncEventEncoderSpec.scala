@@ -20,9 +20,7 @@ package io.renku.eventlog.subscriptions.membersync
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import io.circe.Encoder
 import io.circe.literal._
-import io.circe.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 

@@ -19,7 +19,6 @@
 package ch.datascience.http.server
 
 import cats.effect._
-import cats.implicits.catsSyntaxApplicativeId
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.httpPorts
 import ch.datascience.http.server.EndpointTester._

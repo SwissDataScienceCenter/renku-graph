@@ -23,7 +23,6 @@ import cats.data.EitherT.{leftT, rightT}
 import cats.data.{EitherT, NonEmptyList}
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.control.Throttler
 import ch.datascience.events.consumers.ConsumersModelGenerators._
 import ch.datascience.events.consumers.Project
 import ch.datascience.generators.CommonGraphGenerators._
@@ -41,7 +40,7 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.metrics.MetricsRegistry
-import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
+import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent.{CommitEventWithParent, CommitEventWithoutParent}
@@ -206,7 +205,6 @@ class CommitEventProcessorSpec
       val logger = TestLogger[IO]()
       IOCommitEventProcessor(
         metricsRegistry,
-        new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger)),
         logger
       ).unsafeRunSync()
     }

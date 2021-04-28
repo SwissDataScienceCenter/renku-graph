@@ -116,7 +116,7 @@ class GitLabInfoFinderSpec
       } getOrElse Json.obj())
       .addIfDefined("creator_id" -> maybeCreatorId.map(_.value))
 
-  private def userJson(creator: GitLabCreator, emailBlank: Boolean = false): Json =
+  private def userJson(creator: GitLabCreator): Json =
     json"""{
       "id":   ${creator.gitLabId.value},     
       "name": ${creator.name.value}
