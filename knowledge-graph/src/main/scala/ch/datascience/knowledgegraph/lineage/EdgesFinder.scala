@@ -90,6 +90,7 @@ private class EdgesFinderImpl(
         |    FILTER NOT EXISTS {?activity a wfprov:WorkflowRun}
         |  }
         |}
+        |ORDER BY ASC(?date)
         |""".stripMargin
   )
 
@@ -100,7 +101,7 @@ private class EdgesFinderImpl(
 
     implicit val locationDecoder: Decoder[Node.Location] = stringDecoder(Node.Location)
 
-    implicit lazy val edgeDecoder: Decoder[EdgeData] = { implicit cursor =>
+    implicit lazy val edgeDecoder: Decoder[EdgeData] = { cursor =>
       for {
         runPlanId      <- cursor.downField("runPlan").downField("value").as[EntityId]
         date           <- cursor.downField("date").downField("value").as[Instant]
@@ -113,19 +114,34 @@ private class EdgesFinderImpl(
   }
 
   private def toNodesLocations(edges: Set[EdgeData]): EdgeMap =
-    edges.foldLeft(Map.empty[RunInfo, (Set[Node.Location], Set[Node.Location])]) {
+    edges.foldLeft(Map.empty[RunInfo, FromAndToNodes]) {
       case (edgesMap, (runInfo, Some(source), None)) =>
-        edgesMap.get(runInfo) match {
-          case None             => edgesMap + (runInfo -> (Set(source), Set.empty))
-          case Some((from, to)) => edgesMap + (runInfo -> (from + source, to))
+        edgesMap.find(matching(runInfo)) match {
+          case None =>
+            edgesMap + (runInfo -> (Set(source), Set.empty))
+          case Some((RunInfo(_, date), (from, to))) if runInfo.date == date =>
+            edgesMap + (runInfo -> (from + source, to))
+          case Some((oldInfo, _)) if (runInfo.date compareTo oldInfo.date) > 0 =>
+            edgesMap - oldInfo + (runInfo -> (Set(source), Set.empty))
+          case _ => edgesMap
         }
       case (edgesMap, (runInfo, None, Some(target))) =>
-        edgesMap.get(runInfo) match {
-          case None             => edgesMap + (runInfo -> (Set.empty, Set(target)))
-          case Some((from, to)) => edgesMap + (runInfo -> (from, to + target))
+        edgesMap.find(matching(runInfo)) match {
+          case None =>
+            edgesMap + (runInfo -> (Set.empty, Set(target)))
+          case Some((RunInfo(_, date), (from, to))) if runInfo.date == date =>
+            edgesMap + (runInfo -> (from, to + target))
+          case Some((oldInfo, _)) if (runInfo.date compareTo oldInfo.date) > 0 =>
+            edgesMap - oldInfo + (runInfo -> (Set.empty, Set(target)))
+          case _ => edgesMap
         }
       case (edgesMap, _) => edgesMap
     }
+
+  private def matching(runInfo: RunInfo): ((RunInfo, FromAndToNodes)) => Boolean = {
+    case (RunInfo(runInfo.entityId, _), _) => true
+    case _                                 => false
+  }
 }
 
 private object EdgesFinder {

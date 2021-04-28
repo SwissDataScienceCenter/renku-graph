@@ -27,7 +27,7 @@ import ch.datascience.graph.model.projects.ResourceId
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.knowledgegraph.lineage.LineageGenerators._
-import ch.datascience.knowledgegraph.lineage.model.{EdgeMap, Lineage, Node}
+import ch.datascience.knowledgegraph.lineage.model.{EdgeMap, _}
 import ch.datascience.rdfstore.SparqlQuery
 import io.renku.jsonld.EntityId
 import org.scalamock.scalatest.MockFactory
@@ -55,8 +55,8 @@ class LineageFinderSpec extends AnyWordSpec with MockFactory with ScalaCheckDriv
           .returning(trimmedEdgesMap.pure[Try])
 
         (nodeDetailsFinder
-          .findDetails(_: Set[EntityId], _: projects.Path)(_: (EntityId, ResourceId) => SparqlQuery))
-          .expects(trimmedEdgesMap.keySet, projectPath, runPlanIdQuery)
+          .findDetails(_: Set[RunInfo], _: projects.Path)(_: (RunInfo, ResourceId) => SparqlQuery))
+          .expects(trimmedEdgesMap.keySet, projectPath, runIdQuery)
           .returning(lineage.processRunNodes.pure[Try])
 
         val nodesSet = trimmedEdgesMap.view.mapValues { case (s, t) => s ++ t }.values.toSet.flatten
@@ -84,7 +84,7 @@ class LineageFinderSpec extends AnyWordSpec with MockFactory with ScalaCheckDriv
 
       (edgesTrimmer.trim _)
         .expects(initialEdgesMap, location)
-        .returning(Map.empty[EntityId, (Set[Node.Location], Set[Node.Location])].pure[Try])
+        .returning((Map.empty: EdgeMap).pure[Try])
 
       lineageFinder.find(projectPath, location) shouldBe None.pure[Try]
     }
@@ -121,15 +121,12 @@ class LineageFinderSpec extends AnyWordSpec with MockFactory with ScalaCheckDriv
       val trimmedEdgesMap = lineage.toEdgesMap
       (edgesTrimmer.trim _)
         .expects(initialEdgesMap, location)
-        .returning(
-          trimmedEdgesMap
-            .pure[Try]
-        )
+        .returning(trimmedEdgesMap.pure[Try])
 
       val exception = exceptions.generateOne
       (nodeDetailsFinder
-        .findDetails(_: Set[EntityId], _: projects.Path)(_: (EntityId, ResourceId) => SparqlQuery))
-        .expects(trimmedEdgesMap.keySet, projectPath, runPlanIdQuery)
+        .findDetails(_: Set[RunInfo], _: projects.Path)(_: (RunInfo, ResourceId) => SparqlQuery))
+        .expects(trimmedEdgesMap.keySet, projectPath, runIdQuery)
         .returning(exception.raiseError[Try, Set[Node]])
 
       lineageFinder.find(projectPath, location) shouldBeFailure exception
@@ -144,14 +141,11 @@ class LineageFinderSpec extends AnyWordSpec with MockFactory with ScalaCheckDriv
       val trimmedEdgesMap = lineage.toEdgesMap
       (edgesTrimmer.trim _)
         .expects(initialEdgesMap, location)
-        .returning(
-          trimmedEdgesMap
-            .pure[Try]
-        )
+        .returning(trimmedEdgesMap.pure[Try])
 
       (nodeDetailsFinder
-        .findDetails(_: Set[EntityId], _: projects.Path)(_: (EntityId, ResourceId) => SparqlQuery))
-        .expects(trimmedEdgesMap.keySet, projectPath, runPlanIdQuery)
+        .findDetails(_: Set[RunInfo], _: projects.Path)(_: (RunInfo, ResourceId) => SparqlQuery))
+        .expects(trimmedEdgesMap.keySet, projectPath, runIdQuery)
         .returning(lineage.processRunNodes.pure[Try])
 
       val nodesSet = trimmedEdgesMap.view
@@ -183,8 +177,8 @@ class LineageFinderSpec extends AnyWordSpec with MockFactory with ScalaCheckDriv
         )
 
       (nodeDetailsFinder
-        .findDetails(_: Set[EntityId], _: projects.Path)(_: (EntityId, ResourceId) => SparqlQuery))
-        .expects(trimmedEdgesMap.keySet, projectPath, runPlanIdQuery)
+        .findDetails(_: Set[RunInfo], _: projects.Path)(_: (RunInfo, ResourceId) => SparqlQuery))
+        .expects(trimmedEdgesMap.keySet, projectPath, runIdQuery)
         .returning(lineage.processRunNodes.pure[Try])
 
       val nodesSet = trimmedEdgesMap.view

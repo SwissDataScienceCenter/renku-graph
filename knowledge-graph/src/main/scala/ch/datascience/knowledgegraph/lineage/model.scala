@@ -18,7 +18,7 @@
 
 package ch.datascience.knowledgegraph.lineage
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.syntax.all._
 import ch.datascience.knowledgegraph.lineage.model.Node.Location
 import io.renku.jsonld.EntityId
@@ -28,15 +28,14 @@ import java.time.Instant
 object model {
 
   private[lineage] final case class RunInfo(entityId: EntityId, date: Instant)
-  private[lineage] type EdgeMap = Map[RunInfo, (Set[Node.Location], Set[Node.Location])]
+  private[lineage] type FromAndToNodes = (Set[Node.Location], Set[Node.Location])
+  private[lineage] type EdgeMap        = Map[RunInfo, FromAndToNodes]
 
   final case class Lineage private (edges: Set[Edge], nodes: Set[Node]) extends LineageOps
 
   object Lineage {
 
-    def from[Interpretation[_]: MonadError[*[_], Throwable]](edges: Set[Edge],
-                                                             nodes: Set[Node]
-    ): Interpretation[Lineage] = {
+    def from[Interpretation[_]: MonadThrow](edges: Set[Edge], nodes: Set[Node]): Interpretation[Lineage] = {
       val allEdgesLocations = collectLocations(edges)
       val allNodesLocations = nodes.map(_.location)
       if (allEdgesLocations == allNodesLocations) Lineage(edges, nodes).pure[Interpretation]

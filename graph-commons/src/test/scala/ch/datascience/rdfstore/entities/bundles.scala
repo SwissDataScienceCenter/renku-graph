@@ -26,10 +26,10 @@ import ch.datascience.graph.Schemas
 import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model._
 import ch.datascience.graph.model.datasets.{Dates, DerivedFrom, Description, Identifier, ImageUri, Keyword, Name, PartLocation, PartName, SameAs, Title, TopmostDerivedFrom, TopmostSameAs, Url}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.projects.{DateCreated, Path, Visibility}
-import ch.datascience.graph.model._
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.CommandParameter.Mapping.IOStream
 import ch.datascience.rdfstore.entities.CommandParameter.PositionInfo.Position
@@ -42,9 +42,8 @@ import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
 import org.scalacheck.Gen
 
-import java.time.{Duration, Instant}
-import java.time.temporal.ChronoUnit
 import java.time.temporal.ChronoUnit.DAYS
+import java.time.{Duration, Instant}
 
 object bundles extends Schemas {
 
@@ -53,15 +52,14 @@ object bundles extends Schemas {
 
   def generateAgent: Agent = Agent(cliVersions.generateOne)
 
-  def generateProject(path: Path): Project =
-    Project(
-      path,
-      projectNames.generateOne,
-      projectCreatedDates.generateOne,
-      projectCreators.generateOption,
-      projectVisibilities.generateOption,
-      version = projectSchemaVersions.generateOne
-    )
+  def generateProject(path: Path): Project = Project(
+    path,
+    projectNames.generateOne,
+    projectCreatedDates.generateOne,
+    projectCreators.generateOption,
+    projectVisibilities.generateOption,
+    version = projectSchemaVersions.generateOne
+  )
 
   def fileCommit(
       location:      Location = locations.generateOne,
@@ -342,7 +340,8 @@ object bundles extends Schemas {
         `sha9 grid_plot`:      NodeDef,
         `sha9 cumulative`:     NodeDef,
         `sha10 zhbikes`:       NodeDef,
-        `sha12 parquet`:       NodeDef
+        `sha12 parquet`:       NodeDef,
+        `sha12 parquet date`:  Instant
     )
 
     def apply(
@@ -681,7 +680,8 @@ object bundles extends Schemas {
         NodeDef(commit9ProcessRun.processRunAssociation.runPlan.output(gridPlotPng)),
         NodeDef(commit9ProcessRun.processRunAssociation.runPlan.output(cumulativePng)),
         NodeDef(commit10Activity.entity(dataSetFolder)),
-        NodeDef(commit12Workflow.processRunAssociation.runPlan.output(bikesParquet))
+        NodeDef(commit12Workflow.processRunAssociation.runPlan.output(bikesParquet)),
+        commit12Workflow.committedDate.value
       )
 
       List(

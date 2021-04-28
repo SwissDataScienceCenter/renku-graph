@@ -20,12 +20,12 @@ package ch.datascience.knowledgegraph.lineage
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.Schemas.{prov, rdf, schema}
+import ch.datascience.graph.Schemas._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.ResourceId
 import ch.datascience.graph.model.views.RdfResource
-import ch.datascience.knowledgegraph.lineage.model.Node
+import ch.datascience.knowledgegraph.lineage.model.{Node, RunInfo}
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
 import ch.datascience.tinytypes.json.TinyTypeDecoders
@@ -59,7 +59,7 @@ private class NodeDetailsFinderImpl(
   )(implicit query: (T, ResourceId) => SparqlQuery): IO[Set[Node]] =
     ids.toList
       .map { id =>
-        queryExpecting[Option[Node]](using = query(id, ResourceId(renkuBaseUrl, projectPath))) flatMap failIf(no = id)
+        queryExpecting[Option[Node]](using = query(id, ResourceId(renkuBaseUrl, projectPath))).flatMap(failIf(no = id))
       }
       .parSequence
       .map(_.toSet)
@@ -101,8 +101,12 @@ private class NodeDetailsFinderImpl(
     case Some(details) => details.pure[IO]
     case _ =>
       no match {
-        case _: Node.Location => new IllegalArgumentException(s"No entity with $no").raiseError[IO, Node]
-        case _: EntityId      => new IllegalArgumentException(s"No runPlan with $no").raiseError[IO, Node]
+        case location: Node.Location =>
+          new IllegalArgumentException(s"No entity with $location").raiseError[IO, Node]
+        case runInfo: RunInfo =>
+          new IllegalArgumentException(s"No runPlan with ${runInfo.entityId}").raiseError[IO, Node]
+        case other =>
+          new IllegalArgumentException(s"Entity $other not recognisable").raiseError[IO, Node]
       }
   }
 }
@@ -134,32 +138,32 @@ private object NodeDetailsFinder {
           |""".stripMargin
     )
 
-  implicit val runPlanIdQuery: (EntityId, ResourceId) => SparqlQuery = (runPlanId, _) =>
+  implicit val runIdQuery: (RunInfo, ResourceId) => SparqlQuery = { case (RunInfo(runId, _), _) =>
     SparqlQuery.of(
       name = "lineage - runPlan details",
-      Prefixes.of(prov -> "prov", rdf -> "rdf", schema -> "schema"),
+      Prefixes.of(prov -> "prov", rdf -> "rdf", renku -> "renku", schema -> "schema"),
       s"""|SELECT DISTINCT  ?type (CONCAT(STR(?command), STR(' '), (GROUP_CONCAT(?commandParameter; separator=' '))) AS ?label) ?location
           |WHERE {
           |  {
           |    SELECT DISTINCT ?command ?type ?location
           |    WHERE {
-          |      <$runPlanId> renku:command ?command.
-          |      ?activity prov:qualifiedAssociation/prov:hadPlan <$runPlanId>;
+          |      <$runId> renku:command ?command.
+          |      ?activity prov:qualifiedAssociation/prov:hadPlan <$runId>;
           |                rdf:type ?type.
-          |      BIND (<$runPlanId> AS ?location)
+          |      BIND (<$runId> AS ?location)
           |    }
           |  } {
           |    SELECT ?position ?commandParameter
           |    WHERE {
           |      { # inputs with position
-          |        <$runPlanId> renku:hasInputs ?input .
+          |        <$runId> renku:hasInputs ?input .
           |        ?input renku:consumes/prov:atLocation ?location;
           |               renku:position ?position.
           |        OPTIONAL { ?input renku:prefix ?maybePrefix }
           |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .
           |        BIND (CONCAT(?prefix, STR(?location)) AS ?commandParameter) .
           |      } UNION { # inputs with mappedTo
-          |        <$runPlanId> renku:hasInputs ?input .
+          |        <$runId> renku:hasInputs ?input .
           |        ?input renku:consumes/prov:atLocation ?location;
           |               renku:mappedTo/renku:streamType ?streamType.
           |        OPTIONAL { ?input renku:prefix ?maybePrefix }
@@ -169,20 +173,20 @@ private object NodeDetailsFinder {
           |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix).
           |        BIND (CONCAT(?prefix, ?streamOperator, STR(?location)) AS ?commandParameter) .
           |      } UNION { # inputs with no position and mappedTo
-          |        <$runPlanId> renku:hasInputs ?input .
+          |        <$runId> renku:hasInputs ?input .
           |        FILTER NOT EXISTS { ?input renku:position ?maybePosition }.
           |        FILTER NOT EXISTS { ?input renku:mappedTo ?mappedTo }.
           |        BIND (1 AS ?position).
           |        BIND ('' AS ?commandParameter).
           |      } UNION { # outputs with position
-          |        <$runPlanId> renku:hasOutputs ?output .
+          |        <$runId> renku:hasOutputs ?output .
           |        ?output renku:produces/prov:atLocation ?location;
           |                renku:position ?position.
           |        OPTIONAL { ?output renku:prefix ?maybePrefix }
           |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .
           |        BIND (CONCAT(?prefix, STR(?location)) AS ?commandParameter) .
           |      } UNION { # outputs with mappedTo
-          |        <$runPlanId> renku:hasOutputs ?output .
+          |        <$runId> renku:hasOutputs ?output .
           |        ?output renku:produces/prov:atLocation ?location;
           |                renku:mappedTo/renku:streamType ?streamType.
           |        OPTIONAL { ?output renku:prefix ?maybePrefix }
@@ -192,13 +196,13 @@ private object NodeDetailsFinder {
           |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .
           |        BIND (CONCAT(?prefix, ?streamOperator, STR(?location)) AS ?commandParameter) .
           |      } UNION { # outputs with no position and mappedTo
-          |        <$runPlanId> renku:hasOutputs ?output .
+          |        <$runId> renku:hasOutputs ?output .
           |        FILTER NOT EXISTS { ?output renku:position ?maybePosition }.
           |        FILTER NOT EXISTS { ?output renku:mappedTo ?mappedTo }.
           |        BIND (1 AS ?position).
           |        BIND ('' AS ?commandParameter).
           |      } UNION { # arguments
-          |        <$runPlanId> renku:hasArguments ?argument .
+          |        <$runId> renku:hasArguments ?argument .
           |        ?argument renku:position ?position .
           |        OPTIONAL { ?argument renku:prefix ?maybePrefix }
           |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?commandParameter) .
@@ -212,4 +216,5 @@ private object NodeDetailsFinder {
           |GROUP BY ?command ?type ?location
           |""".stripMargin
     )
+  }
 }
