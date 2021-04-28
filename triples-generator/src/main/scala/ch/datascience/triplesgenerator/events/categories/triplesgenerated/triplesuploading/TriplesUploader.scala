@@ -32,7 +32,6 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-//import scala.language.postfixOps
 import scala.util.control.NonFatal
 
 private trait TriplesUploader[Interpretation[_]] {

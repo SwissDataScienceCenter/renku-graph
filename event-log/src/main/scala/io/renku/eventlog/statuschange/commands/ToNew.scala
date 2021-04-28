@@ -19,7 +19,7 @@
 package io.renku.eventlog.statuschange.commands
 
 import cats.data.{Kleisli, NonEmptyList}
-import cats.effect.{Async, Bracket}
+import cats.effect.Bracket
 import cats.syntax.all._
 import ch.datascience.db.SqlStatement
 import ch.datascience.graph.model.events.EventStatus._
@@ -38,7 +38,7 @@ import skunk.implicits._
 
 import java.time.Instant
 
-final case class ToNew[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+final case class ToNew[Interpretation[_]: Bracket[*[_], Throwable]](
     eventId:                        CompoundEventId,
     awaitingTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
     underTriplesGenerationGauge:    LabeledGauge[Interpretation, projects.Path],
@@ -81,7 +81,7 @@ final case class ToNew[Interpretation[_]: Async: Bracket[*[_], Throwable]](
 }
 
 object ToNew {
-  def factory[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+  def factory[Interpretation[_]: Bracket[*[_], Throwable]](
       awaitingTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
       underTriplesGenerationGauge:    LabeledGauge[Interpretation, projects.Path]
   ): Kleisli[Interpretation, ChangeStatusRequest, CommandFindingResult] = Kleisli.fromFunction {

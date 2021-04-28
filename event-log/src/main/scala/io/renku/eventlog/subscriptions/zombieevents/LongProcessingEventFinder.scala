@@ -19,10 +19,10 @@
 package io.renku.eventlog.subscriptions.zombieevents
 
 import cats.data.{Kleisli, Nested}
-import cats.effect.{Async, Bracket, ContextShift, IO}
+import cats.effect.{BracketThrow, IO, Sync}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.db.implicits._
+import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
@@ -37,7 +37,7 @@ import skunk.implicits._
 
 import java.time.{Duration, Instant}
 
-private class LongProcessingEventFinder[Interpretation[_]: Async: Bracket[*[_], Throwable]: ContextShift](
+private class LongProcessingEventFinder[Interpretation[_]: Sync: BracketThrow](
     sessionResource:  SessionResource[Interpretation, EventLogDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
     now:              () => Instant = () => Instant.now
@@ -50,8 +50,7 @@ private class LongProcessingEventFinder[Interpretation[_]: Async: Bracket[*[_], 
     findPotentialZombies >>= lookForZombie >>= markEventTaken
   }
 
-  private lazy val findPotentialZombies
-      : Kleisli[Interpretation, Session[Interpretation], List[(projects.Id, EventStatus)]] =
+  private def findPotentialZombies =
     Nested(queryProjectsToCheck).map { case (id, currentStatus) => id -> currentStatus.toEventStatus }.value
 
   private def queryProjectsToCheck = measureExecutionTime {
@@ -168,9 +167,9 @@ private class LongProcessingEventFinder[Interpretation[_]: Async: Bracket[*[_], 
 private object LongProcessingEventFinder {
 
   def apply(
-      sessionResource:     SessionResource[IO, EventLogDB],
-      queriesExecTimes:    LabeledHistogram[IO, SqlStatement.Name]
-  )(implicit contextShift: ContextShift[IO]): IO[EventFinder[IO, ZombieEvent]] = IO {
+      sessionResource:  SessionResource[IO, EventLogDB],
+      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
+  ): IO[EventFinder[IO, ZombieEvent]] = IO {
     new LongProcessingEventFinder(sessionResource, queriesExecTimes)
   }
 }

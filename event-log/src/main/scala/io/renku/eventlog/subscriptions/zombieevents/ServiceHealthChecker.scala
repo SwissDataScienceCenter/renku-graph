@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.subscriptions.zombieevents
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.IORestClient
@@ -26,9 +26,9 @@ import ch.datascience.http.client.IORestClient.MaxRetriesAfterConnectionTimeout
 import ch.datascience.microservices.MicroserviceBaseUrl
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
-import org.typelevel.log4cats.Logger
 import org.http4s.Status.Ok
 import org.http4s._
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -43,7 +43,7 @@ private object ServiceHealthChecker {
       logger: Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
+      concurrentEffect: ConcurrentEffect[IO],
       timer:            Timer[IO]
   ): IO[ServiceHealthChecker[IO]] = IO {
     new ServiceHealthCheckerImpl(logger)
@@ -54,7 +54,7 @@ private class ServiceHealthCheckerImpl(
     logger:                  Logger[IO],
     retryInterval:           FiniteDuration = 1 second,
     maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+)(implicit executionContext: ExecutionContext, concurrentEffect: ConcurrentEffect[IO], timer: Timer[IO])
     extends IORestClient(Throttler.noThrottling, logger, retryInterval = retryInterval, maxRetries = maxRetries)
     with ServiceHealthChecker[IO] {
 

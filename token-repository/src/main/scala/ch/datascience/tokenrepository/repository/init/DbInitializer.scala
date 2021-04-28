@@ -28,7 +28,7 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-class DbInitializer[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+class DbInitializer[Interpretation[_]: BracketThrow](
     projectPathAdder:         ProjectPathAdder[Interpretation],
     duplicateProjectsRemover: DuplicateProjectsRemover[Interpretation],
     sessionResource:          SessionResource[Interpretation, ProjectsTokensDB],

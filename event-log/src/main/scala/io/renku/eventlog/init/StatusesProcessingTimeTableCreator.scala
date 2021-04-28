@@ -19,27 +19,27 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.{Async, Bracket}
+import cats.effect.BracketThrow
 import ch.datascience.db.SessionResource
-import org.typelevel.log4cats.Logger
 import io.renku.eventlog.EventLogDB
+import org.typelevel.log4cats.Logger
 import skunk._
-import skunk.implicits._
 import skunk.codec.all._
+import skunk.implicits._
 
 private trait StatusesProcessingTimeTableCreator[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
 private object StatusesProcessingTimeTableCreator {
-  def apply[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+  def apply[Interpretation[_]: BracketThrow](
       sessionResource: SessionResource[Interpretation, EventLogDB],
       logger:          Logger[Interpretation]
   ): StatusesProcessingTimeTableCreator[Interpretation] =
     new StatusesProcessingTimeTableCreatorImpl[Interpretation](sessionResource, logger)
 }
 
-private class StatusesProcessingTimeTableCreatorImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+private class StatusesProcessingTimeTableCreatorImpl[Interpretation[_]: BracketThrow](
     sessionResource: SessionResource[Interpretation, EventLogDB],
     logger:          Logger[Interpretation]
 ) extends StatusesProcessingTimeTableCreator[Interpretation] {

@@ -19,7 +19,7 @@
 package io.renku.eventlog.events.categories.commitsyncrequest
 
 import cats.data.Kleisli
-import cats.effect.{Async, Bracket}
+import cats.effect.BracketThrow
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.CategoryName
@@ -38,7 +38,7 @@ private trait CommitSyncForcer[Interpretation[_]] {
   def forceCommitSync(projectId: projects.Id, projectPath: projects.Path): Interpretation[Unit]
 }
 
-private class CommitSyncForcerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+private class CommitSyncForcerImpl[Interpretation[_]: BracketThrow](
     sessionResource:  SessionResource[Interpretation, EventLogDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
     now:              () => Instant = () => Instant.now
@@ -55,20 +55,19 @@ private class CommitSyncForcerImpl[Interpretation[_]: Async: Bracket[*[_], Throw
       }
     }
 
-  private def deleteLastSyncedDate(projectId: projects.Id) =
-    measureExecutionTime {
-      SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - delete last_synced"))
-        .command[projects.Id ~ CategoryName](sql"""
+  private def deleteLastSyncedDate(projectId: projects.Id) = measureExecutionTime {
+    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - delete last_synced"))
+      .command[projects.Id ~ CategoryName](sql"""
             DELETE FROM subscription_category_sync_time
             WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
           """.command)
-        .arguments(projectId ~ commitsync.categoryName)
-        .build
-        .mapResult {
-          case Completion.Delete(0) => true
-          case _                    => false
-        }
-    }
+      .arguments(projectId ~ commitsync.categoryName)
+      .build
+      .mapResult {
+        case Completion.Delete(0) => true
+        case _                    => false
+      }
+  }
 
   private def upsertProject(projectId: projects.Id, projectPath: projects.Path) = measureExecutionTime {
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - insert project"))

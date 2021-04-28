@@ -26,7 +26,7 @@ import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier
 import skunk.codec.all._
 import skunk.{Decoder, Encoder}
 
-import java.time.{OffsetDateTime, ZoneId}
+import java.time.{OffsetDateTime, ZoneOffset}
 
 object TypeSerializers extends TypeSerializers
 
@@ -47,20 +47,28 @@ trait TypeSerializers {
 
   val createdDateDecoder: Decoder[CreatedDate] = timestamptz.map(timestamp => CreatedDate(timestamp.toInstant))
   val createdDateEncoder: Encoder[CreatedDate] =
-    timestamptz.values.contramap((b: CreatedDate) => OffsetDateTime.ofInstant(b.value, ZoneId.systemDefault()))
+    timestamptz.values.contramap((b: CreatedDate) =>
+      OffsetDateTime.ofInstant(b.value, b.value.atOffset(ZoneOffset.UTC).toZonedDateTime.getZone)
+    )
 
   val executionDateDecoder: Decoder[ExecutionDate] =
     timestamptz.map(timestamp => ExecutionDate(timestamp.toInstant))
   val executionDateEncoder: Encoder[ExecutionDate] =
-    timestamptz.values.contramap((b: ExecutionDate) => OffsetDateTime.ofInstant(b.value, ZoneId.systemDefault()))
+    timestamptz.values.contramap((b: ExecutionDate) =>
+      OffsetDateTime.ofInstant(b.value, b.value.atOffset(ZoneOffset.UTC).toZonedDateTime.getZone)
+    )
 
   val eventDateDecoder: Decoder[EventDate] = timestamptz.map(timestamp => EventDate(timestamp.toInstant))
   val eventDateEncoder: Encoder[EventDate] =
-    timestamptz.values.contramap((b: EventDate) => OffsetDateTime.ofInstant(b.value, ZoneId.systemDefault()))
+    timestamptz.values.contramap((b: EventDate) =>
+      OffsetDateTime.ofInstant(b.value, b.value.atOffset(ZoneOffset.UTC).toZonedDateTime.getZone)
+    )
 
   val batchDateDecoder: Decoder[BatchDate] = timestamptz.map(timestamp => BatchDate(timestamp.toInstant))
   val batchDateEncoder: Encoder[BatchDate] =
-    timestamptz.values.contramap((b: BatchDate) => OffsetDateTime.ofInstant(b.value, ZoneId.systemDefault()))
+    timestamptz.values.contramap((b: BatchDate) =>
+      OffsetDateTime.ofInstant(b.value, b.value.atOffset(ZoneOffset.UTC).toZonedDateTime.getZone)
+    )
 
   val eventMessageDecoder: Decoder[EventMessage] = varchar.map(EventMessage.apply)
   val eventMessageEncoder: Encoder[EventMessage] = varchar.values.contramap(_.value)

@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
-import cats.effect.{Async, Bracket, IO, Timer}
+import cats.effect.{BracketThrow, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
@@ -34,7 +34,7 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.control.NonFatal
 
-private class DispatchRecoveryImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+private class DispatchRecoveryImpl[Interpretation[_]: BracketThrow](
     awaitingTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
     underTriplesGenerationGauge:    LabeledGauge[Interpretation, projects.Path],
     statusUpdatesRunner:            StatusUpdatesRunner[Interpretation],

@@ -24,7 +24,7 @@ import ch.datascience.db.DBConfigProvider.DBConfig
 import natchez.Trace
 import skunk.{Session, Transaction}
 
-class SessionResource[Interpretation[_]: Bracket[*[_], Throwable], TargetDB](
+class SessionResource[Interpretation[_]: BracketThrow, TargetDB](
     resource: Resource[Interpretation, Session[Interpretation]]
 ) {
 
@@ -51,9 +51,7 @@ object SessionPoolResource {
         user = dbConfig.user.value,
         database = dbConfig.name.value,
         password = Some(dbConfig.pass.value),
-        max = dbConfig.connectionPool.value,
-        readTimeout = dbConfig.maxLifetime,
-        writeTimeout = dbConfig.maxLifetime
+        max = dbConfig.connectionPool.value
       )
       .map(new SessionResource(_))
 }

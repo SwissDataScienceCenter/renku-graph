@@ -19,7 +19,7 @@
 package io.renku.eventlog.statuschange.commands
 
 import cats.data.{Kleisli, NonEmptyList}
-import cats.effect.{Async, Bracket}
+import cats.effect.BracketThrow
 import cats.syntax.all._
 import ch.datascience.db.SqlStatement
 import ch.datascience.graph.model.events.EventStatus._
@@ -27,10 +27,10 @@ import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcess
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import eu.timepit.refined.auto._
-import io.renku.eventlog.statuschange.{ChangeStatusRequest, CommandFindingResult}
 import io.renku.eventlog.statuschange.ChangeStatusRequest.EventOnlyRequest
 import io.renku.eventlog.statuschange.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
+import io.renku.eventlog.statuschange.{ChangeStatusRequest, CommandFindingResult}
 import io.renku.eventlog.{EventMessage, ExecutionDate, TypeSerializers}
 import skunk._
 import skunk.data.Completion
@@ -39,7 +39,7 @@ import skunk.implicits._
 import java.time.Instant
 import java.time.temporal.ChronoUnit.MINUTES
 
-final case class ToGenerationRecoverableFailure[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+final case class ToGenerationRecoverableFailure[Interpretation[_]: BracketThrow](
     eventId:                        CompoundEventId,
     message:                        EventMessage,
     awaitingTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
@@ -86,7 +86,7 @@ final case class ToGenerationRecoverableFailure[Interpretation[_]: Async: Bracke
 }
 
 private[statuschange] object ToGenerationRecoverableFailure {
-  def factory[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+  def factory[Interpretation[_]: BracketThrow](
       awaitingTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
       underTriplesGenerationGauge:    LabeledGauge[Interpretation, projects.Path]
   ): Kleisli[Interpretation, ChangeStatusRequest, CommandFindingResult] = Kleisli.fromFunction {

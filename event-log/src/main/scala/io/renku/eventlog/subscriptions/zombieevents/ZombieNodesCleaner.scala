@@ -20,10 +20,10 @@ package io.renku.eventlog.subscriptions.zombieevents
 
 import cats.Parallel
 import cats.data.Kleisli
-import cats.effect.{Async, Bracket, ContextShift, IO, Timer}
+import cats.effect.{BracketThrow, ConcurrentEffect, IO, Sync, Timer}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.db.implicits._
+import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
@@ -40,7 +40,7 @@ private trait ZombieNodesCleaner[Interpretation[_]] {
   def removeZombieNodes(): Interpretation[Unit]
 }
 
-private class ZombieNodesCleanerImpl[Interpretation[_]: Async: Parallel: Bracket[*[_], Throwable]: ContextShift](
+private class ZombieNodesCleanerImpl[Interpretation[_]: Sync: Parallel: BracketThrow](
     sessionResource:      SessionResource[Interpretation, EventLogDB],
     queriesExecTimes:     LabeledHistogram[Interpretation, SqlStatement.Name],
     microserviceBaseUrl:  MicroserviceBaseUrl,
@@ -48,8 +48,6 @@ private class ZombieNodesCleanerImpl[Interpretation[_]: Async: Parallel: Bracket
 ) extends DbClient(Some(queriesExecTimes))
     with ZombieNodesCleaner[Interpretation]
     with TypeSerializers {
-
-  import serviceHealthChecker._
 
   override def removeZombieNodes(): Interpretation[Unit] = sessionResource.useK {
     for {
@@ -62,9 +60,7 @@ private class ZombieNodesCleanerImpl[Interpretation[_]: Async: Parallel: Bracket
   private lazy val findPotentialZombieRecords = measureExecutionTime {
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find zombie sources"))
       .select[Void, (MicroserviceBaseUrl, SubscriberUrl)](
-        sql"""SELECT DISTINCT source_url, delivery_url
-                FROM subscriber
-          """
+        sql"""SELECT DISTINCT source_url, delivery_url FROM subscriber"""
           .query(microserviceBaseUrlDecoder ~ subscriberUrlDecoder)
           .map { case sourceUrl ~ subscriberUrl => (sourceUrl, subscriberUrl) }
       )
@@ -76,14 +72,18 @@ private class ZombieNodesCleanerImpl[Interpretation[_]: Async: Parallel: Bracket
     case (sourceUrl, subscriberUrl) =>
       for {
         subscriberAsBaseUrl <- subscriberUrl.as[Interpretation, MicroserviceBaseUrl]
-        subscriberHealthy   <- ping(subscriberAsBaseUrl)
-        sourceHealthy       <- ping(sourceUrl)
+        subscriberHealthy   <- ping(subscriberAsBaseUrl, ifNot = microserviceBaseUrl)
+        sourceHealthy       <- ping(sourceUrl, ifNot = microserviceBaseUrl)
       } yield sourceHealthy -> subscriberHealthy match {
         case (true, true)  => NoAction
         case (false, true) => Upsert(sourceUrl, subscriberUrl)
         case (_, false)    => Delete(sourceUrl, subscriberUrl)
       }
   }
+
+  private def ping(url: MicroserviceBaseUrl, ifNot: MicroserviceBaseUrl) =
+    if (url == ifNot) true.pure[Interpretation]
+    else serviceHealthChecker.ping(url)
 
   private lazy val toQuery: Action => Kleisli[Interpretation, Session[Interpretation], Completion] = {
     case Delete(sourceUrl, subscriberUrl, _) =>
@@ -158,7 +158,8 @@ private object ZombieNodesCleaner {
       logger:           Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
+      concurrentEffect: ConcurrentEffect[IO],
+      parallel:         Parallel[IO],
       timer:            Timer[IO]
   ): IO[ZombieNodesCleaner[IO]] = for {
     serviceUrlFinder     <- MicroserviceUrlFinder(Microservice.ServicePort)

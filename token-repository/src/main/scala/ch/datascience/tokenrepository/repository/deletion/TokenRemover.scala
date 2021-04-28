@@ -18,8 +18,7 @@
 
 package ch.datascience.tokenrepository.repository.deletion
 
-import cats.Monad
-import cats.effect.Async
+import cats.effect.BracketThrow
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.graph.model.projects.Id
@@ -29,7 +28,7 @@ import eu.timepit.refined.auto._
 import skunk.data.Completion
 import skunk.implicits._
 
-private[repository] class TokenRemover[Interpretation[_]: Async: Monad](
+private[repository] class TokenRemover[Interpretation[_]: BracketThrow](
     sessionResource:  SessionResource[Interpretation, ProjectsTokensDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
 ) extends DbClient[Interpretation](Some(queriesExecTimes))

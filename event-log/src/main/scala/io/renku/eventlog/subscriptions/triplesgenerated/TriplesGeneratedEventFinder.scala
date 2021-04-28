@@ -19,10 +19,10 @@
 package io.renku.eventlog.subscriptions.triplesgenerated
 
 import cats.data._
-import cats.effect.{Async, Bracket, ContextShift, IO}
+import cats.effect.{BracketThrow, IO, Sync}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.db.implicits._
+import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventStatus}
 import ch.datascience.graph.model.projects
@@ -42,7 +42,7 @@ import java.time.Instant
 import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
 
-private class TriplesGeneratedEventFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]: ContextShift](
+private class TriplesGeneratedEventFinderImpl[Interpretation[_]: Sync: BracketThrow](
     sessionResource:             SessionResource[Interpretation, EventLogDB],
     awaitingTransformationGauge: LabeledGauge[Interpretation, projects.Path],
     underTransformationGauge:    LabeledGauge[Interpretation, projects.Path],
@@ -186,7 +186,7 @@ private object IOTriplesGeneratedEventFinder {
             awaitingTransformationGauge: LabeledGauge[IO, projects.Path],
             underTransformationGauge:    LabeledGauge[IO, projects.Path],
             queriesExecTimes:            LabeledHistogram[IO, SqlStatement.Name]
-  )(implicit contextShift:               ContextShift[IO]): IO[EventFinder[IO, TriplesGeneratedEvent]] = IO {
+  ): IO[EventFinder[IO, TriplesGeneratedEvent]] = IO {
     new TriplesGeneratedEventFinderImpl(sessionResource,
                                         awaitingTransformationGauge,
                                         underTransformationGauge,

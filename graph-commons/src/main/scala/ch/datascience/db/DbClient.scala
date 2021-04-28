@@ -17,6 +17,7 @@
  */
 
 package ch.datascience.db
+import cats.Monad
 import cats.data.Kleisli
 import cats.effect.Async
 import cats.syntax.all._
@@ -24,7 +25,7 @@ import ch.datascience.db.SqlStatement.Name
 import ch.datascience.metrics.LabeledHistogram
 import skunk.Session
 
-abstract class DbClient[Interpretation[_]: Async](
+abstract class DbClient[Interpretation[_]: Monad](
     maybeHistogram: Option[LabeledHistogram[Interpretation, Name]]
 ) {
 

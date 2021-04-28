@@ -33,7 +33,6 @@ import eu.timepit.refined.string.MatchesRegex
 import io.circe._
 import io.circe.parser._
 
-//import scala.language.implicitConversions
 import scala.util.control.NonFatal
 
 private class AccessTokenCrypto[Interpretation[_]: MonadError[*[_], Throwable]](

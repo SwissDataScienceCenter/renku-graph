@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.eventdetails
 
-import cats.effect.{Async, IO}
+import cats.effect.{BracketThrow, IO}
 import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.{CompoundEventId, EventId}
 import ch.datascience.graph.model.projects
@@ -31,7 +31,7 @@ private trait EventDetailsFinder[Interpretation[_]] {
   def findDetails(eventId: CompoundEventId): Interpretation[Option[CompoundEventId]]
 }
 
-private class EventDetailsFinderImpl[Interpretation[_]: Async](
+private class EventDetailsFinderImpl[Interpretation[_]: BracketThrow](
     sessionResource:  SessionResource[Interpretation, EventLogDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
 ) extends DbClient[Interpretation](Some(queriesExecTimes))

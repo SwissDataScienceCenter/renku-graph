@@ -28,7 +28,7 @@ import ch.datascience.tokenrepository.repository.{ProjectsTokensDB, TokenReposit
 import eu.timepit.refined.auto._
 import skunk.implicits._
 
-private class PersistedTokensFinder[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+private class PersistedTokensFinder[Interpretation[_]: BracketThrow](
     sessionResource:  SessionResource[Interpretation, ProjectsTokensDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
 ) extends DbClient[Interpretation](Some(queriesExecTimes))

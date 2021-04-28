@@ -19,22 +19,22 @@
 package io.renku.eventlog.subscriptions.membersync
 
 import cats.data.Kleisli
-import cats.effect.{Async, Bracket, ContextShift, IO}
+import cats.effect.{BracketThrow, IO}
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.{CategoryName, LastSyncedDate}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
 import eu.timepit.refined.api.Refined
-import io.renku.eventlog.{EventDate, EventLogDB}
 import io.renku.eventlog.subscriptions.{EventFinder, SubscriptionTypeSerializers}
+import io.renku.eventlog.{EventDate, EventLogDB}
 import skunk._
 import skunk.data.Completion
 import skunk.implicits._
 
 import java.time.Instant
 
-private class MemberSyncEventFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]: ContextShift](
+private class MemberSyncEventFinderImpl[Interpretation[_]: BracketThrow](
     sessionResource:  SessionResource[Interpretation, EventLogDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
     now:              () => Instant = () => Instant.now
@@ -53,7 +53,7 @@ private class MemberSyncEventFinderImpl[Interpretation[_]: Async: Bracket[*[_], 
       case None => Kleisli.pure(Option.empty[MemberSyncEvent])
     }
 
-  private lazy val findEvent = measureExecutionTime {
+  private def findEvent = measureExecutionTime {
     val eventDate    = EventDate(now())
     val lastSyncDate = LastSyncedDate(now())
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find event"))
@@ -139,7 +139,7 @@ private object MemberSyncEventFinder {
   def apply(
       sessionResource:  SessionResource[IO, EventLogDB],
       queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
-  )(implicit ME:        Bracket[IO, Throwable], contextShift: ContextShift[IO]): IO[EventFinder[IO, MemberSyncEvent]] = IO {
+  ): IO[EventFinder[IO, MemberSyncEvent]] = IO {
     new MemberSyncEventFinderImpl(sessionResource, queriesExecTimes)
   }
 }

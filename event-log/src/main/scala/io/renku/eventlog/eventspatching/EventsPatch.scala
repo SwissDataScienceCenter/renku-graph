@@ -18,9 +18,8 @@
 
 package io.renku.eventlog.eventspatching
 
-import cats.MonadError
 import cats.data.Kleisli
-import cats.effect.Async
+import cats.effect.BracketThrow
 import cats.syntax.all._
 import ch.datascience.db.SqlStatement
 import ch.datascience.graph.model.events.EventStatus.New
@@ -43,7 +42,7 @@ private trait EventsPatch[Interpretation[_]] extends Product with Serializable w
   lazy val query: SqlStatement[Interpretation, Completion] = SqlStatement(sqlQuery, name)
 }
 
-private case class StatusNewPatch[Interpretation[_]: Async: MonadError[*[_], Throwable]](
+private case class StatusNewPatch[Interpretation[_]: BracketThrow](
     waitingEventsGauge:   LabeledGauge[Interpretation, projects.Path],
     underProcessingGauge: LabeledGauge[Interpretation, projects.Path],
     now:                  () => Instant = () => Instant.now

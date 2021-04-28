@@ -19,28 +19,28 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.{Async, Bracket}
+import cats.effect.BracketThrow
 import cats.syntax.all._
 import ch.datascience.db.SessionResource
-import org.typelevel.log4cats.Logger
 import io.renku.eventlog.EventLogDB
+import org.typelevel.log4cats.Logger
 import skunk._
-import skunk.implicits._
 import skunk.codec.all._
+import skunk.implicits._
 
 private trait TimestampZoneAdder[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
 private object TimestampZoneAdder {
-  def apply[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+  def apply[Interpretation[_]: BracketThrow](
       sessionResource: SessionResource[Interpretation, EventLogDB],
       logger:          Logger[Interpretation]
   ): TimestampZoneAdder[Interpretation] =
     TimestampZoneAdderImpl(sessionResource, logger)
 }
 
-private case class TimestampZoneAdderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+private case class TimestampZoneAdderImpl[Interpretation[_]: BracketThrow](
     sessionResource: SessionResource[Interpretation, EventLogDB],
     logger:          Logger[Interpretation]
 ) extends TimestampZoneAdder[Interpretation]

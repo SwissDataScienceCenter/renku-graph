@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
 import cats.data.{Kleisli, NonEmptyList}
-import cats.effect.{Async, Bracket, ContextShift, IO}
+import cats.effect.{BracketThrow, IO, Sync}
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.db.implicits._
@@ -42,7 +42,7 @@ import java.time.Instant
 import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
 
-private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]: ContextShift](
+private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Sync: BracketThrow](
     sessionResource:       SessionResource[Interpretation, EventLogDB],
     waitingEventsGauge:    LabeledGauge[Interpretation, projects.Path],
     underProcessingGauge:  LabeledGauge[Interpretation, projects.Path],
@@ -62,10 +62,9 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Async: Bracke
       (maybeProject, maybeAwaitingGenerationEvent) = maybeProjectAwaitingGenerationEvent
       _ <- maybeUpdateMetrics(maybeProject, maybeAwaitingGenerationEvent)
     } yield maybeAwaitingGenerationEvent
-
   }
 
-  private lazy val findEventAndUpdateForProcessing = for {
+  private def findEventAndUpdateForProcessing = for {
     maybeProject <- measureExecutionTime(findProjectsWithEventsInQueue)
                       .map(projectPrioritisation.prioritise)
                       .map(selectProject)
@@ -75,10 +74,11 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Async: Bracke
     maybeBody <- markAsProcessing(maybeIdAndProjectAndBody)
   } yield maybeProject -> maybeBody
 
-  private def findProjectsWithEventsInQueue = SqlStatement(
-    name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find projects")
-  ).select[EventStatus ~ ExecutionDate ~ Int, ProjectInfo](
-    sql"""
+  private def findProjectsWithEventsInQueue =
+    SqlStatement(
+      name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find projects")
+    ).select[EventStatus ~ ExecutionDate ~ Int, ProjectInfo](
+      sql"""
       SELECT
         proj.project_id,
         proj.project_path,
@@ -96,12 +96,12 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Async: Bracke
         LIMIT $int4
       ) proj
       """
-      .query(projectIdDecoder ~ projectPathDecoder ~ eventDateDecoder ~ int8)
-      .map { case projectId ~ projectPath ~ eventDate ~ (currentOccupancy: Long) =>
-        ProjectInfo(projectId, projectPath, eventDate, Refined.unsafeApply(currentOccupancy.toInt))
-      }
-  ).arguments(GeneratingTriples ~ ExecutionDate(now()) ~ projectsFetchingLimit.value)
-    .build(_.toList)
+        .query(projectIdDecoder ~ projectPathDecoder ~ eventDateDecoder ~ int8)
+        .map { case projectId ~ projectPath ~ eventDate ~ (currentOccupancy: Long) =>
+          ProjectInfo(projectId, projectPath, eventDate, Refined.unsafeApply(currentOccupancy.toInt))
+        }
+    ).arguments(GeneratingTriples ~ ExecutionDate(now()) ~ projectsFetchingLimit.value)
+      .build(_.toList)
 
   private def findOldestEvent(idAndPath: ProjectIds) = {
     val executionDate = ExecutionDate(now())
@@ -197,7 +197,7 @@ private object IOAwaitingGenerationEventFinder {
       waitingEventsGauge:   LabeledGauge[IO, projects.Path],
       underProcessingGauge: LabeledGauge[IO, projects.Path],
       queriesExecTimes:     LabeledHistogram[IO, SqlStatement.Name]
-  )(implicit contextShift:  ContextShift[IO]): IO[EventFinder[IO, AwaitingGenerationEvent]] = for {
+  ): IO[EventFinder[IO, AwaitingGenerationEvent]] = for {
     projectPrioritisation <- ProjectPrioritisation(subscribers)
   } yield new AwaitingGenerationEventFinderImpl(sessionResource,
                                                 waitingEventsGauge,

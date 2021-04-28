@@ -32,10 +32,10 @@ import io.renku.eventlog.{CreatedDate, EventDate, ExecutionDate}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk._
+import skunk.codec.all._
 import skunk.implicits._
-import skunk.codec.all.{timestamp, _}
 
-import java.time.{LocalDateTime, ZoneId, ZoneOffset}
+import java.time.ZoneOffset
 
 class ProjectTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
 
@@ -131,7 +131,7 @@ class ProjectTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Ma
     Kleisli { session =>
       val query: Query[Void, (Id, Path, EventDate)] =
         sql"""select project_id, project_path, latest_event_date from project"""
-          .query(projectIdDecoder ~ projectPathDecoder ~ eventDateTimestampGet)
+          .query(projectIdDecoder ~ projectPathDecoder ~ eventDateTimestampDecoder)
           .map { case projectId ~ projectPath ~ eventDate =>
             (projectId, projectPath, eventDate)
           }
@@ -139,7 +139,7 @@ class ProjectTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Ma
     }
   }
 
-  private val eventDateTimestampGet: Decoder[EventDate] =
+  private val eventDateTimestampDecoder: Decoder[EventDate] =
     timestamp.map(timestamp => EventDate(timestamp.toInstant(ZoneOffset.UTC)))
 
   private def createEvent(projectId:   Id = projectIds.generateOne,

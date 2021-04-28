@@ -27,10 +27,9 @@ trait EventLogDbMigrations {
 
   private val logger = TestLogger[IO]()
 
-  protected lazy val eventLogTableCreator: Migration = EventLogTableCreator(sessionResource, logger)
-  protected lazy val projectPathAdder:     Migration = ProjectPathAdder(sessionResource, logger)
-  protected lazy val batchDateAdder:       Migration = BatchDateAdder(sessionResource, logger)
-//  protected lazy val latestEventDatesViewRemover: Migration = LatestEventDatesViewRemover(sessionResource, logger)
+  protected lazy val eventLogTableCreator:     Migration = EventLogTableCreator(sessionResource, logger)
+  protected lazy val projectPathAdder:         Migration = ProjectPathAdder(sessionResource, logger)
+  protected lazy val batchDateAdder:           Migration = BatchDateAdder(sessionResource, logger)
   protected lazy val projectTableCreator:      Migration = ProjectTableCreator(sessionResource, logger)
   protected lazy val projectPathRemover:       Migration = ProjectPathRemover(sessionResource, logger)
   protected lazy val eventLogTableRenamer:     Migration = EventLogTableRenamer(sessionResource, logger)
@@ -52,7 +51,6 @@ trait EventLogDbMigrations {
     eventLogTableCreator,
     projectPathAdder,
     batchDateAdder,
-//    latestEventDatesViewRemover,
     projectTableCreator,
     projectPathRemover,
     eventLogTableRenamer,

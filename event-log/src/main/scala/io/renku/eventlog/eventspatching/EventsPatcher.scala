@@ -19,12 +19,12 @@
 package io.renku.eventlog.eventspatching
 
 import cats.data.Kleisli
-import cats.effect.{Async, Bracket, IO}
+import cats.effect.{Bracket, BracketThrow, IO}
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.metrics.LabeledHistogram
-import org.typelevel.log4cats.Logger
 import io.renku.eventlog.EventLogDB
+import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
@@ -32,7 +32,7 @@ private trait EventsPatcher[Interpretation[_]] {
   def applyToAllEvents(eventsPatch: EventsPatch[Interpretation]): Interpretation[Unit]
 }
 
-private class EventsPatcherImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+private class EventsPatcherImpl[Interpretation[_]: BracketThrow](
     sessionResource:  SessionResource[Interpretation, EventLogDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
     logger:           Logger[Interpretation]

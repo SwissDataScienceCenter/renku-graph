@@ -19,7 +19,7 @@
 package io.renku.eventlog.statuschange
 
 import cats.data.Kleisli
-import cats.effect.{Async, Bracket}
+import cats.effect.BracketThrow
 import cats.syntax.all._
 import ch.datascience.data.ErrorMessage
 import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
@@ -42,7 +42,7 @@ trait StatusUpdatesRunner[Interpretation[_]] {
   def run(command: ChangeStatusCommand[Interpretation]): Interpretation[UpdateResult]
 }
 
-class StatusUpdatesRunnerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+class StatusUpdatesRunnerImpl[Interpretation[_]: BracketThrow](
     sessionResource:  SessionResource[Interpretation, EventLogDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
     logger:           Logger[Interpretation]
@@ -105,41 +105,39 @@ class StatusUpdatesRunnerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]
       case false => Kleisli.pure(NotFound).widen[commands.UpdateResult]
     }
 
-  private def deleteDelivery(command: ChangeStatusCommand[Interpretation]) =
-    measureExecutionTime {
-      SqlStatement(name = "status update - delivery info remove")
-        .command[EventId ~ projects.Id](
-          sql"""DELETE FROM event_delivery
+  private def deleteDelivery(command: ChangeStatusCommand[Interpretation]) = measureExecutionTime {
+    SqlStatement(name = "status update - delivery info remove")
+      .command[EventId ~ projects.Id](
+        sql"""DELETE FROM event_delivery
                   WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
                """.command
-        )
-        .arguments(command.eventId.id ~ command.eventId.projectId)
-        .build
-        .mapResult(_ => UpdateResult.Updated: UpdateResult)
-    }
+      )
+      .arguments(command.eventId.id ~ command.eventId.projectId)
+      .build
+      .mapResult(_ => UpdateResult.Updated: UpdateResult)
+  }
 
   private def toUpdateResult: UpdateResult => Kleisli[Interpretation, Session[Interpretation], UpdateResult] = {
     case UpdateResult.Failure(message) => Kleisli.liftF(new Exception(message).raiseError[Interpretation, UpdateResult])
     case result                        => Kleisli.pure(result)
   }
 
-  private def checkIfPersisted(eventId: CompoundEventId) =
-    measureExecutionTime {
-      SqlStatement(name = "event update check existence")
-        .select[EventId ~ projects.Id, EventId](
-          sql"""SELECT event_id
+  private def checkIfPersisted(eventId: CompoundEventId) = measureExecutionTime {
+    SqlStatement(name = "event update check existence")
+      .select[EventId ~ projects.Id, EventId](
+        sql"""SELECT event_id
                   FROM event
                   WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder"""
-            .query(eventIdDecoder)
-        )
-        .arguments(eventId.id ~ eventId.projectId)
-        .build(_.option)
-        .mapResult(_.isDefined)
-    }
+          .query(eventIdDecoder)
+      )
+      .arguments(eventId.id ~ eventId.projectId)
+      .build(_.option)
+      .mapResult(_.isDefined)
+  }
 
   private def logInfo(command: ChangeStatusCommand[Interpretation], updateResult: UpdateResult) = updateResult match {
     case Updated => logger.info(s"Event ${command.eventId} got ${command.status}")
-    case _       => Bracket[Interpretation, Throwable].unit
+    case _       => ().pure[Interpretation]
   }
   private def maybeUpdateProcessingTimeQuery(command: ChangeStatusCommand[Interpretation]) =
     upsertStatusProcessingTime(command.eventId, command.status, command.maybeProcessingTime)

@@ -20,11 +20,11 @@ package ch.datascience.commiteventservice.events.categories.commitsync
 package eventgeneration
 package historytraversal
 
-import CommitEvent._
-import EventCreationResult._
-import Generators._
 import cats.MonadError
 import cats.syntax.all._
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEvent._
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.Generators._
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.EventCreationResult._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -45,7 +45,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import java.time.{Clock, Instant, ZoneId}
+import java.time.{Clock, Instant, ZoneId, ZoneOffset}
 import scala.util._
 
 class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matchers {
@@ -282,7 +282,7 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
     val startCommit = startCommits.generateOne
     val projectPath = startCommit.project.path
     val batchDate   = BatchDate(Instant.now)
-    val clock       = Clock.fixed(batchDate.value, ZoneId.systemDefault)
+    val clock       = Clock.fixed(batchDate.value, ZoneId.of(ZoneOffset.UTC.getId))
 
     val accessTokenFinder     = mock[AccessTokenFinder[Try]]
     val commitEventSender     = mock[CommitEventSender[Try]]

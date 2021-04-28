@@ -18,9 +18,10 @@
 
 package io.renku.eventlog.statuschange.commands
 
+import cats.{Applicative, Id}
 import cats.data.EitherT.fromEither
 import cats.data.{EitherT, Kleisli, NonEmptyList}
-import cats.effect.{Async, Bracket, Sync}
+import cats.effect.{Bracket, BracketThrow}
 import cats.syntax.all._
 import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples, TriplesGenerated}
@@ -36,13 +37,13 @@ import io.renku.eventlog.statuschange.{ChangeStatusRequest, CommandFindingResult
 import io.renku.eventlog.{EventLogDB, EventPayload, ExecutionDate, TypeSerializers}
 import skunk.data.Completion
 import skunk.implicits._
-import skunk.{Command, Session, ~, _}
+import skunk.{Command, Session, ~}
 
 import java.time.Instant
 
 trait ToTriplesGenerated[Interpretation[_]] extends ChangeStatusCommand[Interpretation]
 
-final case class GeneratingToTriplesGenerated[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+final case class GeneratingToTriplesGenerated[Interpretation[_]: BracketThrow](
     eventId:                     CompoundEventId,
     payload:                     EventPayload,
     schemaVersion:               SchemaVersion,
@@ -108,7 +109,7 @@ final case class GeneratingToTriplesGenerated[Interpretation[_]: Async: Bracket[
     }
 }
 
-final case class TransformingToTriplesGenerated[Interpretation[_]: Bracket[*[_], Throwable]](
+final case class TransformingToTriplesGenerated[Interpretation[_]: BracketThrow](
     eventId:                         CompoundEventId,
     awaitingTransformationGauge:     LabeledGauge[Interpretation, projects.Path],
     underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
@@ -118,32 +119,25 @@ final case class TransformingToTriplesGenerated[Interpretation[_]: Bracket[*[_],
   override lazy val status: events.EventStatus = TriplesGenerated
 
   override def queries: NonEmptyList[SqlStatement[Interpretation, Int]] = NonEmptyList.of(
-    SqlStatement(
-      queryExecution = updateStatus,
-      name = "transforming_triples->triples_generated"
-    )
-  )
-
-  private lazy val updateStatus = Kleisli[Interpretation, Session[Interpretation], Int] { session =>
-    val query: Command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus] =
-      sql"""
-      UPDATE event
-      SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
-      WHERE event_id = $eventIdEncoder
-        AND project_id = $projectIdEncoder
-        AND status = $eventStatusEncoder;
+    SqlStatement(name = "transforming_triples->triples_generated")
+      .command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus](
+        sql"""UPDATE event
+              SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
+              WHERE event_id = $eventIdEncoder
+                AND project_id = $projectIdEncoder
+                AND status = $eventStatusEncoder;
       """.command
-    session
-      .prepare(query)
-      .use(_.execute(status ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ TransformingTriples))
-      .flatMap {
+      )
+      .arguments(status ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ TransformingTriples)
+      .build
+      .flatMapResult {
         case Completion.Update(n) => n.pure[Interpretation]
         case completion =>
           new RuntimeException(
-            s"generating_triples->triples_generated time query failed with completion status $completion"
+            s"transforming_triples->triples_generated time query failed with completion status $completion"
           ).raiseError[Interpretation, Int]
       }
-  }
+  )
 
   override def updateGauges(updateResult: UpdateResult): Kleisli[Interpretation, Session[Interpretation], Unit] =
     updateResult match {
@@ -161,7 +155,7 @@ final case class TransformingToTriplesGenerated[Interpretation[_]: Bracket[*[_],
 
 private[statuschange] object ToTriplesGenerated extends TypeSerializers {
 
-  def factory[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+  def factory[Interpretation[_]: Bracket[*[_], Throwable]](
       sessionResource:                 SessionResource[Interpretation, EventLogDB],
       underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
       underTriplesGenerationGauge:     LabeledGauge[Interpretation, projects.Path],
@@ -208,7 +202,7 @@ private[statuschange] object ToTriplesGenerated extends TypeSerializers {
       either.leftMap(e => PayloadMalformed(e.getMessage)).leftWiden[CommandFindingResult]
   }
 
-  private def stringToJson[Interpretation[_]: Sync](
+  private def stringToJson[Interpretation[_]: Applicative](
       payloadPartBody: String
   ): EitherT[Interpretation, CommandFindingResult, Json] =
     EitherT.fromEither[Interpretation](parser.parse(payloadPartBody).leftMap(e => PayloadMalformed(e.getMessage)))
@@ -219,19 +213,21 @@ private[statuschange] object ToTriplesGenerated extends TypeSerializers {
       payload       <- cursor.downField("payload").as[EventPayload]
     } yield (schemaVersion, payload)
 
-  private def findEventStatus[Interpretation[_]: Sync: Bracket[*[_], Throwable]](
+  private def findEventStatus[Interpretation[_]: BracketThrow](
       eventId:         CompoundEventId,
       sessionResource: SessionResource[Interpretation, EventLogDB]
   ): Interpretation[EventStatus] = sessionResource.useK {
-    val query: Query[EventId ~ projects.Id, EventStatus] =
-      sql"""
+    SqlStatement(name = "to_triples_generated find event status")
+      .select[EventId ~ projects.Id, EventStatus](
+        sql"""
             SELECT status
             FROM event
             WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
             """.query(eventStatusDecoder)
-    Kleisli[Interpretation, Session[Interpretation], EventStatus](session =>
-      session.prepare(query).use(_.unique(eventId.id ~ eventId.projectId))
-    )
+      )
+      .arguments(eventId.id ~ eventId.projectId)
+      .build[Id](_.unique)
+      .queryExecution
   }
 
 }

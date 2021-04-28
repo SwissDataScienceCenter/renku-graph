@@ -19,7 +19,7 @@
 package ch.datascience.db
 
 import cats.data.Kleisli
-import cats.effect.{ContextShift, IO, Resource}
+import cats.effect.{Concurrent, ContextShift, IO, Resource}
 import ch.datascience.db.SqlStatement.Name
 import ch.datascience.db.TestDbConfig.newDbConfig
 import ch.datascience.metrics.{LabeledHistogram, TestLabeledHistogram}
@@ -85,6 +85,7 @@ trait ContainerTestDb extends ForAllTestContainer {
 
   private trait TestDB
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
+  private implicit val concurrent:   Concurrent[IO]   = IO.ioConcurrentEffect
 
   private val dbConfig: DBConfigProvider.DBConfig[TestDB] = newDbConfig[TestDB]
 
@@ -102,9 +103,6 @@ trait ContainerTestDb extends ForAllTestContainer {
       user = dbConfig.user.value,
       database = dbConfig.name.value,
       password = Some(dbConfig.pass),
-      max = dbConfig.connectionPool.value,
-      readTimeout = dbConfig.maxLifetime,
-      writeTimeout = dbConfig.maxLifetime
+      max = dbConfig.connectionPool.value
     )
-
 }

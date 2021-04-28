@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.{Async, Bracket}
+import cats.effect.{Bracket, BracketThrow}
 import cats.syntax.all._
 import ch.datascience.db.SessionResource
 import ch.datascience.graph.model.projects
@@ -40,14 +40,14 @@ private trait ProjectPathAdder[Interpretation[_]] {
 }
 
 private object ProjectPathAdder {
-  def apply[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+  def apply[Interpretation[_]: BracketThrow](
       sessionResource: SessionResource[Interpretation, EventLogDB],
       logger:          Logger[Interpretation]
   ): ProjectPathAdder[Interpretation] =
     new ProjectPathAdderImpl(sessionResource, logger)
 }
 
-private class ProjectPathAdderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+private class ProjectPathAdderImpl[Interpretation[_]: BracketThrow](
     sessionResource: SessionResource[Interpretation, EventLogDB],
     logger:          Logger[Interpretation]
 ) extends ProjectPathAdder[Interpretation]

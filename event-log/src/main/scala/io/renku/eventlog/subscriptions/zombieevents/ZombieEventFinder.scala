@@ -18,15 +18,15 @@
 
 package io.renku.eventlog.subscriptions.zombieevents
 
-import cats.MonadError
 import cats.data.OptionT
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.all._
+import cats.{MonadError, Parallel}
 import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.metrics.LabeledHistogram
-import org.typelevel.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.subscriptions.EventFinder
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
@@ -59,7 +59,8 @@ private object ZombieEventFinder {
       logger:           Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
+      concurrentEffect: ConcurrentEffect[IO],
+      parallel:         Parallel[IO],
       timer:            Timer[IO]
   ): IO[EventFinder[IO, ZombieEvent]] = for {
     longProcessingEventFinder <- LongProcessingEventFinder(sessionResource, queriesExecTimes)

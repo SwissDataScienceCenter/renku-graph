@@ -18,7 +18,7 @@
 
 package ch.datascience.db
 
-import cats.effect.{ContextShift, IO}
+import cats.effect.{ConcurrentEffect, ContextShift, IO}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -37,7 +37,8 @@ class SessionResourceResourceSpec extends AnyWordSpec with MockFactory with shou
     }
   }
 
-  private implicit val cs: ContextShift[IO] = IO.contextShift(global)
+  private implicit val cs:         ContextShift[IO]     = IO.contextShift(global)
+  private implicit val concurrent: ConcurrentEffect[IO] = IO.ioConcurrentEffect
 
   private trait TestCase {
     import natchez.Trace.Implicits.noop
