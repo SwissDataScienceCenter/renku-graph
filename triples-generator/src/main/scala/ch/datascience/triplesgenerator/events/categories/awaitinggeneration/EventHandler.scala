@@ -30,7 +30,6 @@ import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResu
 import ch.datascience.graph.model.RenkuVersionPair
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventBody}
 import ch.datascience.metrics.MetricsRegistry
-import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -71,7 +70,6 @@ object EventHandler {
   def apply(
       currentVersionPair:    RenkuVersionPair,
       metricsRegistry:       MetricsRegistry[IO],
-      timeRecorder:          SparqlQueryTimeRecorder[IO],
       subscriptionMechanism: SubscriptionMechanism[IO],
       logger:                Logger[IO]
   )(implicit
@@ -80,6 +78,6 @@ object EventHandler {
       timer:            Timer[IO]
   ): IO[EventHandler[IO]] = for {
     processingRunner <-
-      IOEventsProcessingRunner(metricsRegistry, timeRecorder, subscriptionMechanism, logger)
+      IOEventsProcessingRunner(metricsRegistry, subscriptionMechanism, logger)
   } yield new EventHandler[IO](categoryName, processingRunner, EventBodyDeserializer(), currentVersionPair, logger)
 }

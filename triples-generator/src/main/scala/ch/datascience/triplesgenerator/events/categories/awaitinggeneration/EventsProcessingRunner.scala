@@ -29,7 +29,6 @@ import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.metrics.MetricsRegistry
-import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import com.typesafe.config.{Config, ConfigFactory}
 import org.typelevel.log4cats.Logger
 
@@ -105,7 +104,6 @@ private object IOEventsProcessingRunner {
 
   def apply(
       metricsRegistry:       MetricsRegistry[IO],
-      timeRecorder:          SparqlQueryTimeRecorder[IO],
       subscriptionMechanism: SubscriptionMechanism[IO],
       logger:                Logger[IO],
       config:                Config = ConfigFactory.load()
@@ -115,7 +113,7 @@ private object IOEventsProcessingRunner {
       timer:            Timer[IO]
   ): IO[EventsProcessingRunner[IO]] =
     for {
-      eventProcessor      <- IOCommitEventProcessor(metricsRegistry, timeRecorder, logger)
+      eventProcessor      <- IOCommitEventProcessor(metricsRegistry, logger)
       generationProcesses <- GenerationProcessesNumber(config)
       semaphore           <- Semaphore(generationProcesses.value)
     } yield new EventsProcessingRunnerImpl(eventProcessor,

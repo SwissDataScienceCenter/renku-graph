@@ -30,7 +30,7 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.metrics.MetricsRegistry
-import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
+import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater
 import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater._
@@ -220,7 +220,6 @@ private object IOCommitEventProcessor {
 
   def apply(
       metricsRegistry: MetricsRegistry[IO],
-      timeRecorder:    SparqlQueryTimeRecorder[IO],
       logger:          Logger[IO]
   )(implicit
       contextShift:     ContextShift[IO],
