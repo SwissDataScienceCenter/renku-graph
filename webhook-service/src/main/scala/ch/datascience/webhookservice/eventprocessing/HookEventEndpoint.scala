@@ -21,8 +21,6 @@ package ch.datascience.webhookservice.eventprocessing
 import cats.MonadError
 import cats.effect._
 import cats.syntax.all._
-import ch.datascience.config.GitLab
-import ch.datascience.control.Throttler
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.http.ErrorMessage._

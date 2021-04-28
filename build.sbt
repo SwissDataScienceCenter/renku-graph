@@ -144,16 +144,6 @@ lazy val acceptanceTests = Project(
   AutomateHeaderPlugin
 )
 
-import sys.process._
-val platform = System.getProperty("os.name").toLowerCase
-val numberOfCores: String =
-  if (platform.startsWith("mac os x")) "sysctl hw.logicalcpu".!!.split(" ").last
-  else "nproc".!!
-
-lazy val hello = taskKey[Unit]("Prints 'Hello World'")
-
-hello := println(s"numberOfCores  = $numberOfCores")
-
 lazy val commonSettings = Seq(
   organization := "ch.datascience",
   scalaVersion := "2.13.5",
@@ -200,10 +190,10 @@ lazy val commonSettings = Seq(
 //    "-Wmacros:both", // Lints code before and after applying a macro
 //    "-Woctal-literal", // Warn on obsolete octal syntax.
     "-Wunused:imports", // Warn if an import selector is not referenced.
-//    "-Wunused:patvars", // Warn if a variable bound in a pattern is unused.
+    "-Wunused:patvars", // Warn if a variable bound in a pattern is unused.
     "-Wunused:locals", // Warn if a local definition is unused.
     "-Wunused:explicits", // Warn if an explicit parameter is unused.
-//    "-Wvalue-discard", // Warn when non-Unit expression results are unused.
+    "-Wvalue-discard", // Warn when non-Unit expression results are unused.
     "-Ybackend-parallelism",
     "8",
     "-Ycache-plugin-class-loader:last-modified", // Enables caching of classloaders for compiler plugins

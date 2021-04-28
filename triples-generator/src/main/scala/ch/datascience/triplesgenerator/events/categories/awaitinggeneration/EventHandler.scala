@@ -23,8 +23,6 @@ import cats.MonadError
 import cats.data.EitherT.{fromEither, fromOption}
 import cats.data.NonEmptyList
 import cats.effect.{ContextShift, Effect, IO, Timer}
-import ch.datascience.config.GitLab
-import ch.datascience.control.Throttler
 import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
@@ -73,7 +71,6 @@ object EventHandler {
   def apply(
       currentVersionPair:    RenkuVersionPair,
       metricsRegistry:       MetricsRegistry[IO],
-      gitLabThrottler:       Throttler[IO, GitLab],
       timeRecorder:          SparqlQueryTimeRecorder[IO],
       subscriptionMechanism: SubscriptionMechanism[IO],
       logger:                Logger[IO]
@@ -83,6 +80,6 @@ object EventHandler {
       timer:            Timer[IO]
   ): IO[EventHandler[IO]] = for {
     processingRunner <-
-      IOEventsProcessingRunner(metricsRegistry, gitLabThrottler, timeRecorder, subscriptionMechanism, logger)
+      IOEventsProcessingRunner(metricsRegistry, timeRecorder, subscriptionMechanism, logger)
   } yield new EventHandler[IO](categoryName, processingRunner, EventBodyDeserializer(), currentVersionPair, logger)
 }

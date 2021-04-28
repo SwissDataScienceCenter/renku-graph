@@ -27,14 +27,13 @@ import ch.datascience.http.ErrorMessage._
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.http.{ErrorMessage, InfoMessage}
-import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.hookcreation.HookCreator.CreationResult
 import ch.datascience.webhookservice.hookcreation.HookCreator.CreationResult.{HookCreated, HookExisted}
 import ch.datascience.webhookservice.model.ProjectHookUrl
-import org.typelevel.log4cats.Logger
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Response, Status}
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
@@ -74,11 +73,10 @@ class HookCreationEndpointImpl[Interpretation[_]: Effect](
 
 object IOHookCreationEndpoint {
   def apply(
-      projectHookUrl:        ProjectHookUrl,
-      gitLabThrottler:       Throttler[IO, GitLab],
-      hookTokenCrypto:       HookTokenCrypto[IO],
-      executionTimeRecorder: ExecutionTimeRecorder[IO],
-      logger:                Logger[IO]
+      projectHookUrl:  ProjectHookUrl,
+      gitLabThrottler: Throttler[IO, GitLab],
+      hookTokenCrypto: HookTokenCrypto[IO],
+      logger:          Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],

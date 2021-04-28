@@ -73,7 +73,6 @@ object Microservice extends IOMicroservice {
     sparqlTimeRecorder      <- SparqlQueryTimeRecorder(metricsRegistry)
     awaitingGenerationSubscription <- events.categories.awaitinggeneration.SubscriptionFactory(renkuVersionPairs.head,
                                                                                                metricsRegistry,
-                                                                                               gitLabThrottler,
                                                                                                sparqlTimeRecorder,
                                                                                                ApplicationLogger
                                       )
