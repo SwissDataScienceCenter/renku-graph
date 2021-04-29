@@ -31,7 +31,6 @@ import eu.timepit.refined.auto._
 import io.renku.jsonld.EntityId
 import org.typelevel.log4cats.Logger
 
-import java.time.Instant
 import scala.concurrent.ExecutionContext
 
 private trait EdgesFinder[Interpretation[_]] {
@@ -97,14 +96,14 @@ private class EdgesFinderImpl(
   import io.circe.Decoder
 
   private implicit val edgesDecoder: Decoder[Set[EdgeData]] = {
-    import ch.datascience.tinytypes.json.TinyTypeDecoders.stringDecoder
+    import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
     implicit val locationDecoder: Decoder[Node.Location] = stringDecoder(Node.Location)
 
     implicit lazy val edgeDecoder: Decoder[EdgeData] = { cursor =>
       for {
         runPlanId      <- cursor.downField("runPlan").downField("value").as[EntityId]
-        date           <- cursor.downField("date").downField("value").as[Instant]
+        date           <- cursor.downField("date").downField("value").as[RunDate]
         sourceLocation <- cursor.downField("sourceEntityLocation").downField("value").as[Option[Node.Location]]
         targetLocation <- cursor.downField("targetEntityLocation").downField("value").as[Option[Node.Location]]
       } yield (RunInfo(runPlanId, date), sourceLocation, targetLocation)

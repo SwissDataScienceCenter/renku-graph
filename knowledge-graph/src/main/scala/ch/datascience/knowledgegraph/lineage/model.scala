@@ -21,13 +21,16 @@ package ch.datascience.knowledgegraph.lineage
 import cats.MonadThrow
 import cats.syntax.all._
 import ch.datascience.knowledgegraph.lineage.model.Node.Location
+import ch.datascience.tinytypes.{InstantTinyType, TinyTypeFactory}
 import io.renku.jsonld.EntityId
 
 import java.time.Instant
 
 object model {
 
-  private[lineage] final case class RunInfo(entityId: EntityId, date: Instant)
+  private[lineage] final case class RunInfo(entityId: EntityId, date: RunDate)
+  private[lineage] final class RunDate private (val value: Instant) extends AnyVal with InstantTinyType
+  private[lineage] implicit object RunDate extends TinyTypeFactory[RunDate](new RunDate(_))
   private[lineage] type FromAndToNodes = (Set[Node.Location], Set[Node.Location])
   private[lineage] type EdgeMap        = Map[RunInfo, FromAndToNodes]
 

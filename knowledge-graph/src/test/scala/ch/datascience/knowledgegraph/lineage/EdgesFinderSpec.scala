@@ -47,11 +47,11 @@ class EdgesFinderSpec extends AnyWordSpec with InMemoryRdfStore with ExternalSer
       edgesFinder
         .findEdges(projectPath)
         .unsafeRunSync() shouldBe Map(
-        RunInfo(`sha8 renku run`.toEntityId, `sha12 parquet date`) -> (
+        RunInfo(`sha8 renku run`.toEntityId, RunDate(`sha12 parquet date`)) -> (
           Set(`sha3 zhbikes`.toNodeLocation, `sha7 clean_data`.toNodeLocation),
           Set(`sha8 parquet`.toNodeLocation)
         ),
-        RunInfo(`sha9 renku run`.toEntityId, `sha12 parquet date`) -> (
+        RunInfo(`sha9 renku run`.toEntityId, RunDate(`sha12 parquet date`)) -> (
           Set(`sha7 plot_data`.toNodeLocation, `sha8 parquet`.toNodeLocation),
           Set(`sha9 grid_plot`.toNodeLocation, `sha9 cumulative`.toNodeLocation)
         )

@@ -25,8 +25,6 @@ import ch.datascience.knowledgegraph.lineage.model.Node.Location
 import ch.datascience.knowledgegraph.lineage.model._
 import io.renku.jsonld.EntityId
 
-import java.time.Instant
-
 private trait EdgesTrimmer[Interpretation[_]] {
   def trim(edges: EdgeMap, location: Location): Interpretation[EdgeMap]
 }
@@ -81,7 +79,7 @@ private class EdgesTrimmerImpl[Interpretation[_]: MonadThrow]() extends EdgesTri
     to contains location
   }
 
-  private lazy val runInfoDate: ((RunInfo, FromAndToNodes)) => Instant = { case (RunInfo(_, date), _) => date }
+  private lazy val runInfoDate: ((RunInfo, FromAndToNodes)) => RunDate = { case (RunInfo(_, date), _) => date }
 
   @scala.annotation.tailrec
   private def findEdgesConnected[T <: TraversalDirection](
