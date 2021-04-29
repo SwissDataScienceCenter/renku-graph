@@ -152,17 +152,17 @@ lazy val commonSettings = Seq(
   Compile / packageDoc / publishArtifact := false,
   Compile / packageSrc / publishArtifact := false,
   addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.3" cross CrossVersion.full),
+  // format: off
   scalacOptions ++= Seq(
     "-deprecation", // Emit warning and location for usages of deprecated APIs.
-    "-Ywarn-value-discard", // Emit warning and location for usages of deprecated APIs.
-    "-encoding",
-    "utf-8", // Specify character encoding used by source files.
+    "-encoding", "utf-8", // Specify character encoding used by source files.
     "-explaintypes", // Explain type errors in more detail.
-    "-language:higherKinds", // Allow higher-kinded types
     "-feature", // Emit warning and location for usages of features that should be imported explicitly.
-    "-language:existentials", // Existential types (besides wildcard types) can be written and inferred
     "-unchecked", // Enable additional warnings where generated code depends on assumptions.
+    "-language:higherKinds", // Allow higher-kinded types
+    "-language:existentials", // Existential types (besides wildcard types) can be written and inferred
     "-Xcheckinit", // Wrap field accessors to throw an exception on uninitialized access.
+    "-Xfatal-warnings",
     "-Xlint:infer-any", // Warn when a type argument is inferred to be `Any`.
     "-Xlint:missing-interpolator", // A string literal appears to be missing an interpolator id.
     "-Xlint:package-object-classes", // Class or object defined in package object.
@@ -173,11 +173,12 @@ lazy val commonSettings = Seq(
     "-Wunused:locals", // Warn if a local definition is unused.
     "-Wunused:explicits", // Warn if an explicit parameter is unused.
     "-Wvalue-discard", // Warn when non-Unit expression results are unused.
-    "-Ybackend-parallelism",
-    "8",
+    "-Ybackend-parallelism", "8",
     "-Ycache-plugin-class-loader:last-modified", // Enables caching of classloaders for compiler plugins
-    "-Ycache-macro-class-loader:last-modified" // and macro definitions. This can lead to performance improvements.
+    "-Ycache-macro-class-loader:last-modified", // and macro definitions. This can lead to performance improvements.
+    "-Ywarn-value-discard" // Emit warning and location for usages of deprecated APIs.
   ),
+  // Format: on
   organizationName := "Swiss Data Science Center (SDSC)",
   startYear := Some(java.time.LocalDate.now().getYear),
   licenses += ("Apache-2.0", new URL("https://www.apache.org/licenses/LICENSE-2.0.txt")),
