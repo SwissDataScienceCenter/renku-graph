@@ -25,7 +25,6 @@ import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.ProcessRun.{ChildProcessRun, StandAloneProcessRun, WorkflowProcessRun}
 import ch.datascience.rdfstore.entities.WorkflowRun.ActivityWorkflowRun
 
-import scala.language.postfixOps
 import scala.reflect.ClassTag
 
 class Activity(val commitId:                 CommitId,

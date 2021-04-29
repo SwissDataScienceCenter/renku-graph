@@ -18,10 +18,6 @@
 
 package ch.datascience.rdfstore
 
-import java.io.ByteArrayInputStream
-import java.net.{ServerSocket, SocketException}
-import java.nio.charset.StandardCharsets.UTF_8
-
 import cats.MonadError
 import cats.data.Validated
 import cats.effect._
@@ -42,9 +38,12 @@ import org.apache.jena.riot.{Lang, RDFDataMgr}
 import org.http4s.Uri
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, Suite}
 
+import java.io.ByteArrayInputStream
+import java.net.{ServerSocket, SocketException}
+import java.nio.charset.StandardCharsets.UTF_8
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.global
-import scala.language.{postfixOps, reflectiveCalls}
+import scala.language.reflectiveCalls
 import scala.util.Random.nextInt
 import scala.xml.Elem
 

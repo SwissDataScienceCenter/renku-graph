@@ -44,7 +44,6 @@ class SchemaSpec extends AnyWordSpec with should.Matchers {
     "return the value of the Schema" in {
       val schemaUrl = schemaUrls.generateOne
       val separator = Gen.oneOf("/", "#").generateOne
-      val schema    = Schema.from(schemaUrl, separator)
 
       Schema.from(schemaUrl, separator).toString shouldBe s"$schemaUrl$separator"
     }

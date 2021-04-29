@@ -19,15 +19,14 @@
 package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.users.{Affiliation, Email, Name => UserName}
 import ch.datascience.knowledgegraph.datasets.model.DatasetCreator
 import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
-import org.typelevel.log4cats.Logger
 import io.circe.Decoder.{Result, decodeList}
 import io.circe.HCursor
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 

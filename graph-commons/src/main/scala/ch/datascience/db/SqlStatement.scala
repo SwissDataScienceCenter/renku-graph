@@ -19,7 +19,7 @@
 package ch.datascience.db
 
 import cats.data.Kleisli
-import cats.effect.{Bracket, BracketThrow}
+import cats.effect.BracketThrow
 import cats.syntax.all._
 import cats.{Functor, Monad}
 import ch.datascience.db.SqlStatement.Name

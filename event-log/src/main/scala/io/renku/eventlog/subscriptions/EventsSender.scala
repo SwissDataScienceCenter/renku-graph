@@ -30,7 +30,6 @@ import io.renku.eventlog.subscriptions.EventsSender.SendingResult
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 private trait EventsSender[Interpretation[_], CategoryEvent] {
   def sendEvent(subscriptionUrl: SubscriberUrl, categoryEvent: CategoryEvent): Interpretation[SendingResult]

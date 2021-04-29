@@ -24,17 +24,17 @@ import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.{GitLabApiUrl, GitLabUrl}
 import ch.datascience.graph.model.projects.Path
-import ch.datascience.graph.model.users.{GitLabId, Name, Username}
+import ch.datascience.graph.model.users.{GitLabId, Name}
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
-import org.typelevel.log4cats.Logger
 import io.circe.Decoder
 import org.http4s.Method.GET
 import org.http4s._
 import org.http4s.circe.jsonOf
 import org.http4s.dsl.io.{NotFound, Ok}
 import org.http4s.util.CaseInsensitiveString
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration

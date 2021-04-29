@@ -19,7 +19,6 @@
 package ch.datascience.knowledgegraph.graphql
 
 import cats.effect.{ContextShift, IO, Timer}
-import cats.syntax.all._
 import ch.datascience.knowledgegraph.lineage.LineageFinder
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger

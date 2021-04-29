@@ -41,12 +41,11 @@ object Microservice extends IOMicroservice {
   override def run(args: List[String]): IO[ExitCode] =
     for {
       sessionPoolResource <- new ProjectsTokensDbConfigProvider[IO]() map SessionPoolResource[IO, ProjectsTokensDB]
-      exitCode            <- runMicroservice(sessionPoolResource, args)
+      exitCode            <- runMicroservice(sessionPoolResource)
     } yield exitCode
 
   private def runMicroservice(
-      sessionPoolResource: Resource[IO, SessionResource[IO, ProjectsTokensDB]],
-      args:                List[String]
+      sessionPoolResource: Resource[IO, SessionResource[IO, ProjectsTokensDB]]
   ) = sessionPoolResource.use { sessionResource =>
     for {
       certificateLoader      <- CertificateLoader[IO](ApplicationLogger)

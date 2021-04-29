@@ -131,8 +131,8 @@ abstract class IORestClient[ThrottlingTarget](
 
   private def processResponse[ResultType](request: Request[IO], mapResponse: ResponseMapping[ResultType])(
       response:                                    Response[IO]
-  ) =
-    (mapResponse orElse raiseBadRequest orElse raiseUnexpectedResponse)(response.status, request, response)
+  ): IO[ResultType] =
+    (mapResponse orElse raiseBadRequest orElse raiseUnexpectedResponse)((response.status, request, response))
       .recoverWith(mappingError(request, response))
 
   private def raiseBadRequest[T]: PartialFunction[(Status, Request[IO], Response[IO]), IO[T]] = {

@@ -20,15 +20,16 @@ package io.renku.eventlog.eventspatching
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.http.ErrorMessage.ErrorMessage
-import ch.datascience.http.InfoMessage._
-import ch.datascience.http.InfoMessage
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.graph.model.events.EventStatus.New
 import ch.datascience.graph.model.projects.Path
+import ch.datascience.http.ErrorMessage.ErrorMessage
+import ch.datascience.http.InfoMessage._
 import ch.datascience.http.server.EndpointTester._
+import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.LabeledGauge
 import io.circe.literal._
@@ -41,8 +42,6 @@ import org.scalamock.matchers.ArgCapture.CaptureAll
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.http.{ErrorMessage, InfoMessage}
 
 class EventsPatchingEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers {
 

@@ -43,7 +43,6 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit.{HOURS => H}
-import scala.language.postfixOps
 
 private class TriplesGeneratedEventFinderSpec
     extends AnyWordSpec

@@ -16,19 +16,18 @@
  * limitations under the License.
  */
 
-package ch.datascience.tokenrepository.repository.association
+package ch.datascience.knowledgegraph.metrics
 
-import cats.effect.IO
-import ch.datascience.tokenrepository.repository.AccessTokenCrypto
-import ch.datascience.tokenrepository.repository.deletion.TokenRemover
-import org.typelevel.log4cats.Logger
+import ch.datascience.graph.Schemas
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.constraints.NonBlank
 
-private class IOTokenAssociator(
-    pathFinder:           ProjectPathFinder[IO],
-    accessTokenCrypto:    AccessTokenCrypto[IO],
-    associationPersister: AssociationPersister[IO],
-    tokenRemover:         TokenRemover[IO]
-) extends TokenAssociator[IO](pathFinder, accessTokenCrypto, associationPersister, tokenRemover)
-
-class IOAssociateTokenEndpoint(tokenAssociator: TokenAssociator[IO], logger: Logger[IO])
-    extends AssociateTokenEndpoint[IO](tokenAssociator, logger)
+final class EntityType private (val value: String) extends AnyVal with StringTinyType
+object EntityType extends TinyTypeFactory[EntityType](new EntityType(_)) with NonBlank {
+  private val allSchemas = Schemas.all.map(_.toString)
+  override val transform: String => Either[Throwable, String] = entityType =>
+    allSchemas
+      .find(schema => entityType.startsWith(schema))
+      .map(schema => entityType.replace(schema, ""))
+      .toRight(left = new IllegalArgumentException(s"$entityType not recognizable"))
+}
