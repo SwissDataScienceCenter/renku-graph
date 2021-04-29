@@ -18,58 +18,61 @@
 
 package io.renku.eventlog.init
 
-import cats.effect.Bracket
+import cats.data.Kleisli
+import cats.effect.BracketThrow
 import cats.syntax.all._
-import ch.datascience.db.DbTransactor
-import doobie.implicits._
-import io.chrisdavenport.log4cats.Logger
+import ch.datascience.db.SessionResource
 import io.renku.eventlog.EventLogDB
+import org.typelevel.log4cats.Logger
+import skunk._
+import skunk.codec.all._
+import skunk.implicits._
 
 private trait EventLogTableRenamer[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
 private object EventLogTableRenamer {
-  def apply[Interpretation[_]](
-      transactor: DbTransactor[Interpretation, EventLogDB],
-      logger:     Logger[Interpretation]
-  )(implicit ME:  Bracket[Interpretation, Throwable]): EventLogTableRenamer[Interpretation] =
-    new EventLogTableRenamerImpl(transactor, logger)
+  def apply[Interpretation[_]: BracketThrow](
+      sessionResource: SessionResource[Interpretation, EventLogDB],
+      logger:          Logger[Interpretation]
+  ): EventLogTableRenamer[Interpretation] =
+    new EventLogTableRenamerImpl(sessionResource, logger)
 }
 
-private class EventLogTableRenamerImpl[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB],
-    logger:     Logger[Interpretation]
-)(implicit ME:  Bracket[Interpretation, Throwable])
-    extends EventLogTableRenamer[Interpretation]
-    with EventTableCheck[Interpretation] {
+private class EventLogTableRenamerImpl[Interpretation[_]: BracketThrow](
+    sessionResource: SessionResource[Interpretation, EventLogDB],
+    logger:          Logger[Interpretation]
+) extends EventLogTableRenamer[Interpretation]
+    with EventTableCheck {
 
-  private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
-
-  override def run(): Interpretation[Unit] =
-    checkOldTableExists flatMap {
-      case false => logger info "'event' table already exists"
+  override def run(): Interpretation[Unit] = sessionResource.useK {
+    checkOldTableExists >>= {
+      case false => Kleisli.liftF(logger info "'event' table already exists")
       case true =>
         whenEventTableExists(
           dropOldTable(),
           otherwise = renameTable()
         )
     }
+  }
 
-  private def checkOldTableExists: Interpretation[Boolean] =
-    sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_log')"
-      .query[Boolean]
-      .unique
-      .transact(transactor.get)
-      .recover { case _ => false }
+  private lazy val checkOldTableExists: Kleisli[Interpretation, Session[Interpretation], Boolean] = {
+    val query: Query[Void, Boolean] = sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_log')"
+      .query(bool)
+    Kleisli(_.unique(query).recover { case _ => false })
+  }
 
-  private def renameTable() = for {
-    _ <- execute(sql"ALTER TABLE event_log RENAME TO event")
-    _ <- logger info "'event_log' table renamed to 'event'"
-  } yield ()
+  private def renameTable(): Kleisli[Interpretation, Session[Interpretation], Unit] =
+    for {
+      _ <- execute(sql"ALTER TABLE event_log RENAME TO event".command)
+      _ <- Kleisli.liftF(logger info "'event_log' table renamed to 'event'")
+    } yield ()
 
-  private def dropOldTable() = for {
-    _ <- execute(sql"DROP TABLE IF EXISTS event_log")
-    _ <- logger info "'event_log' table dropped"
-  } yield ()
+  private def dropOldTable(): Kleisli[Interpretation, Session[Interpretation], Unit] =
+    for {
+      _ <- execute(sql"DROP TABLE IF EXISTS event_log".command)
+      _ <- Kleisli.liftF(logger info "'event_log' table dropped")
+    } yield ()
+
 }

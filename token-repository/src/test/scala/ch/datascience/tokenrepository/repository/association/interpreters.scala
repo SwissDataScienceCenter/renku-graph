@@ -18,20 +18,10 @@
 
 package ch.datascience.tokenrepository.repository.association
 
-import cats.effect.{Bracket, IO}
-import ch.datascience.db.{DbTransactor, SqlQuery}
-import ch.datascience.metrics.LabeledHistogram
+import cats.effect.IO
+import ch.datascience.tokenrepository.repository.AccessTokenCrypto
 import ch.datascience.tokenrepository.repository.deletion.TokenRemover
-import ch.datascience.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB}
-import io.chrisdavenport.log4cats.Logger
-
-import scala.util.Try
-
-private class TryAssociationPersister(
-    transactor:       DbTransactor[Try, ProjectsTokensDB],
-    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
-)(implicit ME:        Bracket[Try, Throwable])
-    extends AssociationPersister[Try](transactor, queriesExecTimes)
+import org.typelevel.log4cats.Logger
 
 private class IOTokenAssociator(
     pathFinder:           ProjectPathFinder[IO],

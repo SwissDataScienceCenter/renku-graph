@@ -21,16 +21,14 @@ package io.renku.eventlog.subscriptions
 import cats._
 import cats.effect.{ContextShift, Effect, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.numeric.Positive
-import io.chrisdavenport.log4cats.Logger
 import io.circe.Json
 import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.subscriptions.EventProducersRegistry.{SubscriptionResult, SuccessfulSubscription, UnsupportedPayload}
 import io.renku.eventlog.subscriptions.SubscriptionCategory.{AcceptedRegistration, RejectedRegistration}
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
@@ -67,37 +65,37 @@ object EventProducersRegistry {
   final case class UnsupportedPayload(message: String) extends SubscriptionResult
 
   def apply(
-      transactor:                     DbTransactor[IO, EventLogDB],
+      sessionResource:                SessionResource[IO, EventLogDB],
       awaitingTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
       underTriplesGenerationGauge:    LabeledGauge[IO, projects.Path],
       awaitingTransformationGauge:    LabeledGauge[IO, projects.Path],
       underTransformationGauge:       LabeledGauge[IO, projects.Path],
-      queriesExecTimes:               LabeledHistogram[IO, SqlQuery.Name],
-      microservicePort:               Int Refined Positive,
+      queriesExecTimes:               LabeledHistogram[IO, SqlStatement.Name],
       logger:                         Logger[IO]
   )(implicit
       contextShift:     ContextShift[IO],
       timer:            Timer[IO],
       executionContext: ExecutionContext
   ): IO[EventProducersRegistry[IO]] = for {
-    subscriberTracker <- SubscriberTracker(transactor, queriesExecTimes)
-    awaitingGenerationCategory <- awaitinggeneration.SubscriptionCategory(transactor,
+    subscriberTracker <- SubscriberTracker(sessionResource, queriesExecTimes)
+    awaitingGenerationCategory <- awaitinggeneration.SubscriptionCategory(sessionResource,
                                                                           awaitingTriplesGenerationGauge,
                                                                           underTriplesGenerationGauge,
                                                                           queriesExecTimes,
                                                                           subscriberTracker,
                                                                           logger
                                   )
-    memberSyncCategory <- membersync.SubscriptionCategory(transactor, queriesExecTimes, subscriberTracker, logger)
-    commitSyncCategory <- commitsync.SubscriptionCategory(transactor, queriesExecTimes, subscriberTracker, logger)
-    triplesGeneratedCategory <- triplesgenerated.SubscriptionCategory(transactor,
+    memberSyncCategory <- membersync.SubscriptionCategory(sessionResource, queriesExecTimes, subscriberTracker, logger)
+    commitSyncCategory <- commitsync.SubscriptionCategory(sessionResource, queriesExecTimes, subscriberTracker, logger)
+    triplesGeneratedCategory <- triplesgenerated.SubscriptionCategory(sessionResource,
                                                                       awaitingTransformationGauge,
                                                                       underTransformationGauge,
                                                                       queriesExecTimes,
                                                                       subscriberTracker,
                                                                       logger
                                 )
-    zombieEventsCategory <- zombieevents.SubscriptionCategory(transactor, queriesExecTimes, subscriberTracker, logger)
+    zombieEventsCategory <-
+      zombieevents.SubscriptionCategory(sessionResource, queriesExecTimes, subscriberTracker, logger)
   } yield new EventProducersRegistryImpl(
     Set[SubscriptionCategory[IO]](
       awaitingGenerationCategory,

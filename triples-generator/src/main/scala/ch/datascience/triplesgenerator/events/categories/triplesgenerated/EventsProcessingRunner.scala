@@ -25,16 +25,14 @@ import cats.syntax.all._
 import ch.datascience.config.{ConfigLoader, GitLab}
 import ch.datascience.control.Throttler
 import ch.datascience.events.consumers.EventSchedulingResult
-import ch.datascience.graph.model.{SchemaVersion, projects}
-import ch.datascience.graph.model.events.CompoundEventId
-import ch.datascience.metrics.MetricsRegistry
-import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
-import EventSchedulingResult._
+import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
+import ch.datascience.metrics.MetricsRegistry
+import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
@@ -101,8 +99,6 @@ private object IOEventsProcessingRunner {
 
   import ConfigLoader.find
   import eu.timepit.refined.pureconfig._
-
-  import scala.language.postfixOps
 
   def apply(
       metricsRegistry:       MetricsRegistry[IO],

@@ -22,24 +22,23 @@ import cats.MonadError
 import cats.effect.Effect
 import cats.syntax.all._
 import ch.datascience.http.ErrorMessage._
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.ErrorMessage
 import ch.datascience.http.client.AccessToken
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{EntityDecoder, Request, Response}
 
 import scala.util.control.NonFatal
 
-class AssociateTokenEndpoint[Interpretation[_]: Effect](
+class AssociateTokenEndpoint[Interpretation[_]: Effect: MonadError[*[_], Throwable]](
     tokenAssociator: TokenAssociator[Interpretation],
     logger:          Logger[Interpretation]
-)(implicit ME:       MonadError[Interpretation, Throwable])
-    extends Http4sDsl[Interpretation] {
+) extends Http4sDsl[Interpretation] {
 
   import tokenAssociator._
 
@@ -57,7 +56,7 @@ class AssociateTokenEndpoint[Interpretation[_]: Effect](
   private case class BadRequestError(cause: Throwable) extends Exception(cause)
 
   private lazy val badRequest: PartialFunction[Throwable, Interpretation[AccessToken]] = { case NonFatal(exception) =>
-    ME.raiseError(BadRequestError(exception))
+    MonadError[Interpretation, Throwable].raiseError(BadRequestError(exception))
   }
 
   private def httpResponse(projectId: Id): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
@@ -71,13 +70,14 @@ class AssociateTokenEndpoint[Interpretation[_]: Effect](
 }
 
 object IOAssociateTokenEndpoint {
+
   import cats.effect.{ContextShift, IO, Timer}
 
   import scala.concurrent.ExecutionContext
 
   def apply(
-      transactor:       DbTransactor[IO, ProjectsTokensDB],
-      queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
+      sessionResource:  SessionResource[IO, ProjectsTokensDB],
+      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name],
       logger:           Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
@@ -85,6 +85,6 @@ object IOAssociateTokenEndpoint {
       timer:            Timer[IO]
   ): IO[AssociateTokenEndpoint[IO]] =
     for {
-      tokenAssociator <- IOTokenAssociator(transactor, queriesExecTimes, logger)
+      tokenAssociator <- IOTokenAssociator(sessionResource, queriesExecTimes, logger)
     } yield new AssociateTokenEndpoint[IO](tokenAssociator, logger)
 }

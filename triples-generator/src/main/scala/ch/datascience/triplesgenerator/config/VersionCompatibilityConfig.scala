@@ -25,7 +25,7 @@ import cats.syntax.all._
 import ch.datascience.graph.model.{CliVersion, SchemaVersion}
 import ch.datascience.graph.model.RenkuVersionPair
 import com.typesafe.config.{Config, ConfigFactory}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import pureconfig.ConfigReader
 
 import scala.util.control.NonFatal

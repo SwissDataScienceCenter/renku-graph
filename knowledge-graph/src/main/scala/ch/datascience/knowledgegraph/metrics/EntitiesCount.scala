@@ -16,10 +16,17 @@
  * limitations under the License.
  */
 
-package ch.datascience.interpreters
+package ch.datascience.knowledgegraph.metrics
 
-import cats.effect.IO
-import ch.datascience.db.DbTransactor
-import doobie.util.transactor.Transactor
+import ch.datascience.tinytypes.{LongTinyType, TinyTypeFactory}
+import io.circe.Decoder
+import ch.datascience.tinytypes.json.TinyTypeDecoders.longDecoder
 
-class TestDbTransactor[TargetDB](transactor: Transactor.Aux[IO, _]) extends DbTransactor[IO, TargetDB](transactor)
+final class EntitiesCount private (val value: Long) extends AnyVal with LongTinyType
+object EntitiesCount extends TinyTypeFactory[EntitiesCount](new EntitiesCount(_)) {
+  implicit val decoder: Decoder[EntitiesCount] = longDecoder(EntitiesCount)
+  addConstraint(
+    check = _ >= 0L,
+    message = _ => s"$typeName has to be >= 0"
+  )
+}

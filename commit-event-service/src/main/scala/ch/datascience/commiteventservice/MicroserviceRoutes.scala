@@ -20,13 +20,8 @@ package ch.datascience.commiteventservice
 
 import cats.effect.{Clock, ConcurrentEffect, ContextShift, IO, Resource, Timer}
 import ch.datascience.commiteventservice.events.EventEndpoint
-import ch.datascience.config.GitLab
-import ch.datascience.control.Throttler
 import ch.datascience.events.consumers.EventConsumersRegistry
-import ch.datascience.graph.http.server.security.GitLabAuthenticator
-import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
-import io.chrisdavenport.log4cats.Logger
 import org.http4s.dsl.Http4sDsl
 
 import scala.concurrent.ExecutionContext
@@ -43,26 +38,23 @@ private class MicroserviceRoutes[Interpretation[_]: ConcurrentEffect](
 
   // format: off
   lazy val routes: Resource[Interpretation, HttpRoutes[Interpretation]] = HttpRoutes.of[Interpretation] {
-    case           GET  -> Root / "ping"   => Ok("pong")
-    case request @ POST -> Root / "events" => processEvent(request)
+    case GET -> Root / "ping" => Ok("pong")
+    case request@POST -> Root / "events" => processEvent(request)
   }.withMetrics
   // format: on
 }
 
 private object MicroserviceRoutes {
   def apply(
-      consumersRegistry:     EventConsumersRegistry[IO],
-      metricsRegistry:       MetricsRegistry[IO],
-      gitLabThrottler:       Throttler[IO, GitLab],
-      executionTimeRecorder: ExecutionTimeRecorder[IO],
-      logger:                Logger[IO]
+      consumersRegistry: EventConsumersRegistry[IO],
+      metricsRegistry:   MetricsRegistry[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[MicroserviceRoutes[IO]] =
     for {
-      eventEndpoint <- EventEndpoint(consumersRegistry, logger)
+      eventEndpoint <- EventEndpoint(consumersRegistry)
     } yield new MicroserviceRoutes(
       eventEndpoint,
       new RoutesMetrics[IO](metricsRegistry)

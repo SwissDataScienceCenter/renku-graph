@@ -22,7 +22,7 @@ import cats.data.NonEmptyList
 
 import java.time.Instant
 import cats.effect.IO
-import ch.datascience.db.SqlQuery
+import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
@@ -84,7 +84,7 @@ class StatusNewPatchSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
       findEventMessage(event4Id) shouldBe None
 
       queriesExecTimes.verifyExecutionTimeMeasured(
-        NonEmptyList[SqlQuery.Name](Refined.unsafeApply(s"status $New patch"), Nil)
+        NonEmptyList[SqlStatement.Name](Refined.unsafeApply(s"status $New patch"), Nil)
       )
     }
   }
@@ -93,13 +93,13 @@ class StatusNewPatchSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
 
     val waitingEventsGauge          = mock[LabeledGauge[IO, Path]]
     val underProcessingGauge        = mock[LabeledGauge[IO, Path]]
-    val queriesExecTimes            = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val queriesExecTimes            = TestLabeledHistogram[SqlStatement.Name]("query_id")
     val currentTime                 = Instant.now()
     private val currentTimeProvider = mockFunction[Instant]
     currentTimeProvider.expects().returning(currentTime)
     val patch = StatusNewPatch(waitingEventsGauge, underProcessingGauge, currentTimeProvider)
 
-    val patcher = new EventsPatcherImpl(transactor, queriesExecTimes, TestLogger[IO]())
+    val patcher = new EventsPatcherImpl(sessionResource, queriesExecTimes, TestLogger[IO]())
 
     def addEvent(commitEventId: CompoundEventId,
                  status:        EventStatus,

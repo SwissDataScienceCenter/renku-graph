@@ -24,16 +24,18 @@ import cats.syntax.all._
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, SchedulingError, UnsupportedEventType}
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventId}
 import ch.datascience.graph.model.projects
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.{Decoder, DecodingFailure, Json}
 
 import scala.util.control.NonFatal
 
 trait EventHandler[Interpretation[_]] {
   val categoryName: CategoryName
+
   def handle(request: EventRequestContent): Interpretation[EventSchedulingResult]
 
   implicit class JsonOps(json: Json) {
+
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
     lazy val validateCategoryName: Either[EventSchedulingResult, Unit] =
@@ -109,7 +111,7 @@ trait EventHandler[Interpretation[_]] {
 
     private def as(
         result: EventSchedulingResult
-    ): PartialFunction[Throwable, Either[EventSchedulingResult, T]] = { case NonFatal(e) =>
+    ): PartialFunction[Throwable, Either[EventSchedulingResult, T]] = { case NonFatal(_) =>
       Left(result)
     }
 

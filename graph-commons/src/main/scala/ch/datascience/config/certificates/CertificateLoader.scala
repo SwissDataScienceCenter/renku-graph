@@ -19,7 +19,7 @@
 package ch.datascience.config.certificates
 
 import cats.MonadError
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 trait CertificateLoader[Interpretation[_]] {
   def run(): Interpretation[Unit]

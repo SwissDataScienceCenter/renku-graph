@@ -37,7 +37,7 @@ import java.time.Instant.now
 import java.time.temporal.ChronoUnit.{DAYS => JAVA_DAYS, MINUTES => JAVA_MINS}
 import java.time.{Duration => JavaDuration, _}
 import scala.concurrent.duration._
-import scala.language.{implicitConversions, postfixOps}
+import scala.language.postfixOps
 
 object Generators {
 
@@ -174,7 +174,7 @@ object Generators {
     } yield parts.mkString("/")
   }
 
-  val httpPorts: Gen[Int Refined Positive] = choose(1000, 10000) map Refined.unsafeApply
+  val httpPorts: Gen[Int Refined Positive] = choose(2000, 10000) map Refined.unsafeApply
 
   def httpUrls(pathGenerator: Gen[String] = relativePaths(minSegments = 0, maxSegments = 2)): Gen[String] =
     for {
@@ -261,7 +261,7 @@ object Generators {
 
   val zonedDateTimes: Gen[ZonedDateTime] =
     timestamps
-      .map(ZonedDateTime.ofInstant(_, ZoneId.systemDefault))
+      .map(ZonedDateTime.ofInstant(_, ZoneId.of(ZoneOffset.UTC.getId)))
 
   val localDates: Gen[LocalDate] =
     timestamps

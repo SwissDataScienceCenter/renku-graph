@@ -508,17 +508,18 @@ Event-log uses relational database as an internal storage. The DB has the follow
 | event_id   VARCHAR    PK    NOT NULL |
 | project_id INT4       PK FK NOT NULL |
 | status     VARCHAR          NOT NULL |
-| created_date TIMESTAMP      NOT NULL |
-| execution_date TIMESTAMP    NOT NULL |
-| event_date TIMESTAMP        NOT NULL |
+| created_date TIMESTAMPTZ    NOT NULL |
+| execution_date TIMESTAMPTZ  NOT NULL |
+| event_date TIMESTAMPTZ      NOT NULL |
+| batch_date TIMESTAMPTZ      NOT NULL |
 | event_body TEXT             NOT NULL |
 | message TEXT                         |
 
-| project                              |
-|--------------------------------------|
-| project_id INT4          PK NOT NULL |
-| project_path VARCHAR        NOT NULL |
-| latest_event_date TIMESTAMP NOT NULL |
+| project                                   |
+|-------------------------------------------|
+| project_id        INT4        PK NOT NULL |
+| project_path      VARCHAR        NOT NULL |
+| latest_event_date TIMESTAMPTZ    NOT NULL |
 
 | event_payload                        |
 |--------------------------------------|
@@ -529,9 +530,9 @@ Event-log uses relational database as an internal storage. The DB has the follow
 
 | subscription_category_sync_time       |
 |---------------------------------------|
-| project_id       INT4  PK FK NOT NULL |
-| category_name    TEXT  PK    NOT NULL |
-| last_synced      TIMESTAMP   NOT NULL |
+| project_id     INT4  PK FK   NOT NULL |
+| category_name  TEXT  PK      NOT NULL |
+| last_synced    TIMESTAMPTZ   NOT NULL |
 
 | status_processing_time                    |
 |-------------------------------------------|

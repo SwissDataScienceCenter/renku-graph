@@ -18,44 +18,81 @@
 
 package ch.datascience.knowledgegraph.lineage
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.knowledgegraph.lineage.model.Node.Location
-import ch.datascience.knowledgegraph.lineage.model.{EdgeMap, Node}
+import ch.datascience.knowledgegraph.lineage.model._
 import io.renku.jsonld.EntityId
 
 private trait EdgesTrimmer[Interpretation[_]] {
   def trim(edges: EdgeMap, location: Location): Interpretation[EdgeMap]
 }
 
-/**
-  * Removes graphs which are not connected to the given location of the dataset (not workflow) which are rectangles.
+/** Removes graphs which are not connected to the given location of the dataset (not workflow) which are rectangles.
   */
-private class EdgesTrimmerImpl[Interpretation[_]]()(implicit ME: MonadError[Interpretation, Throwable])
-    extends EdgesTrimmer[Interpretation] {
+private class EdgesTrimmerImpl[Interpretation[_]: MonadThrow]() extends EdgesTrimmer[Interpretation] {
 
-  /**
-    * @param edges Edges from the whole project
+  /** @param edges Edges from the whole project
     * @param location location of file the user selected in the UI
     * @return Trimmed graph with only nodes connected to the location
     */
-  def trim(edges: EdgeMap, location: Location): Interpretation[EdgeMap] =
-    findEdgesConnected[To](to = Set(location), edgesLeft = edges)
-      .combine(findEdgesConnected[From](to = Set(location), edgesLeft = edges))
-      .pure[Interpretation]
+  def trim(edges: EdgeMap, location: Location): Interpretation[EdgeMap] = {
+
+    val latestEdges = removeEdgesWithOverriddenTOs(edges)
+
+    List(
+      findEdgesConnected[From](to = Set(location), _: EdgeMap),
+      findEdgesConnected[To](to = Set(location), _:   EdgeMap)
+    ).flatMap(_.apply(latestEdges)).toMap.pure[Interpretation]
+  }
+
+  private def removeEdgesWithOverriddenTOs(edges: EdgeMap): EdgeMap =
+    removeEdgesWithOverriddenTOs(nodesToCheck = collectAllTOs(edges), edgesToCheck = edges)
+
+  private def collectAllTOs(edges: EdgeMap): Set[Location] =
+    edges.foldLeft(Set.empty[Location]) { case (allLocations, (_, (_, to))) => allLocations ++ to }
+
+  @scala.annotation.tailrec
+  private def removeEdgesWithOverriddenTOs(nodesToCheck: Set[Location],
+                                           edgesToCheck: EdgeMap,
+                                           latestEdges:  EdgeMap = Map.empty
+  ): EdgeMap = nodesToCheck.headOption match {
+    case None => latestEdges
+    case Some(location) =>
+      edgesToCheck
+        .filter(edgesProducing(location))
+        .toSeq
+        .sortBy(runInfoDate)
+        .reverse match {
+        case Nil =>
+          removeEdgesWithOverriddenTOs(nodesToCheck.tail, edgesToCheck, latestEdges)
+        case latestEdge :: earlierEdges =>
+          removeEdgesWithOverriddenTOs(nodesToCheck.tail,
+                                       edgesToCheck.removedAll(earlierEdges.map(_._1)),
+                                       latestEdges + latestEdge
+          )
+      }
+  }
+
+  private def edgesProducing(location: Location): ((RunInfo, FromAndToNodes)) => Boolean = { case (_, (_, to)) =>
+    to contains location
+  }
+
+  private lazy val runInfoDate: ((RunInfo, FromAndToNodes)) => RunDate = { case (RunInfo(_, date), _) => date }
 
   @scala.annotation.tailrec
   private def findEdgesConnected[T <: TraversalDirection](
       to:                       Set[Location],
-      edgesLeft:                Map[EntityId, FromAndToNodes],
-      foundEdges:               Map[EntityId, FromAndToNodes] = Map.empty
-  )(implicit traversalStrategy: TraversalStrategy[T]): Map[EntityId, FromAndToNodes] = {
+      edgesToCheck:             EdgeMap,
+      foundEdges:               EdgeMap = Map.empty
+  )(implicit traversalStrategy: TraversalStrategy[T]): EdgeMap = {
     import traversalStrategy._
+
     to.headOption match {
       case None => foundEdges
       case Some(nodeToCheck) =>
-        edgesLeft.partition(edgeWith(nodeToCheck)) match {
+        edgesToCheck partition edgeContaining(nodeToCheck) match {
           case (foundEdgesWithLocation, remainingEdges) if foundEdgesWithLocation.isEmpty =>
             findEdgesConnected[T](to.tail, remainingEdges, foundEdges)
           case (foundEdgesWithLocation, remainingEdges) =>
@@ -68,8 +105,6 @@ private class EdgesTrimmerImpl[Interpretation[_]]()(implicit ME: MonadError[Inte
     }
   }
 
-  private type FromAndToNodes = (Set[Node.Location], Set[Node.Location])
-
   private sealed trait TraversalDirection
   private case object To   extends TraversalDirection
   private case object From extends TraversalDirection
@@ -77,68 +112,66 @@ private class EdgesTrimmerImpl[Interpretation[_]]()(implicit ME: MonadError[Inte
   private type From = From.type
 
   private trait TraversalStrategy[T <: TraversalDirection] {
-    def removeSiblings(edges:       Map[EntityId, FromAndToNodes],
-                       nodeToCheck: Location
-    ): Map[EntityId, (Set[Location], Set[Location])]
 
-    def edgeWith(location: Location): ((EntityId, FromAndToNodes)) => Boolean
+    def removeSiblings(edges: EdgeMap, nodeToCheck: Location): EdgeMap
+
+    def edgeContaining(location: Location): ((RunInfo, FromAndToNodes)) => Boolean
 
     def locationsOtherThan(
         location: Location
-    ): PartialFunction[(EntityId, FromAndToNodes), Set[Location]]
+    ): PartialFunction[(RunInfo, FromAndToNodes), Set[Location]]
   }
 
   private implicit lazy val toTraversalStrategy: TraversalStrategy[To] = new TraversalStrategy[To] {
-    def removeSiblings(edges: Map[EntityId, FromAndToNodes], nodeToCheck: Location): Map[EntityId, FromAndToNodes] =
-      edges.foldLeft(Map.empty[EntityId, FromAndToNodes]) {
+
+    def removeSiblings(edges: EdgeMap, nodeToCheck: Location): EdgeMap =
+      edges.foldLeft(Map.empty[RunInfo, FromAndToNodes]) {
         case (graphWithoutSiblings, entry @ (_, (from, to)))
             if from.contains(nodeToCheck) && to.contains(nodeToCheck) =>
           graphWithoutSiblings + entry
-        case (graphWithoutSiblings, (entityId, (from, to))) if from.contains(nodeToCheck) =>
-          graphWithoutSiblings + (entityId -> (Set(nodeToCheck), to))
+        case (graphWithoutSiblings, (runInfo, (from, to))) if from.contains(nodeToCheck) =>
+          graphWithoutSiblings + (runInfo -> (Set(nodeToCheck), to))
         case (graphWithoutSiblings, _) => graphWithoutSiblings
       }
 
-    def edgeWith(location: Location): ((EntityId, FromAndToNodes)) => Boolean = {
-      case (_, (from, _)) if from.contains(location) => true
-      case _                                         => false
+    def edgeContaining(location: Location): ((RunInfo, FromAndToNodes)) => Boolean = {
+      case (_, (from, _)) if from contains location => true
+      case _                                        => false
     }
 
     def locationsOtherThan(
         location: Location
-    ): PartialFunction[(EntityId, FromAndToNodes), Set[Location]] = {
-      case (_, (from, to)) if from.contains(location) => to
+    ): PartialFunction[(RunInfo, FromAndToNodes), Set[Location]] = {
+      case (_, (from, to)) if from contains location => to
     }
   }
 
   private implicit lazy val fromTraversalStrategy: TraversalStrategy[From] = new TraversalStrategy[From] {
-    def removeSiblings(edges:       Map[EntityId, FromAndToNodes],
-                       nodeToCheck: Location
-    ): Map[EntityId, (Set[Location], Set[Location])] =
-      edges.foldLeft(Map.empty[EntityId, FromAndToNodes]) {
+
+    def removeSiblings(edges: EdgeMap, nodeToCheck: Location): EdgeMap =
+      edges.foldLeft(Map.empty[RunInfo, FromAndToNodes]) {
         case (graphWithoutSiblings, entry @ (_, (from, to)))
             if from.contains(nodeToCheck) && to.contains(nodeToCheck) =>
           graphWithoutSiblings + entry
-        case (graphWithoutSiblings, (entityId, (from, to))) if to.contains(nodeToCheck) =>
-          graphWithoutSiblings + (entityId -> (from, Set(nodeToCheck)))
+        case (graphWithoutSiblings, (runInfo, (from, to))) if to.contains(nodeToCheck) =>
+          graphWithoutSiblings + (runInfo -> (from, Set(nodeToCheck)))
         case (graphWithoutSiblings, _) => graphWithoutSiblings
       }
 
-    def edgeWith(location: Location): ((EntityId, FromAndToNodes)) => Boolean = {
-      case (_, (_, to)) if to.contains(location) => true
-      case _                                     => false
+    def edgeContaining(location: Location): ((RunInfo, FromAndToNodes)) => Boolean = {
+      case (_, (_, to)) if to contains location => true
+      case _                                    => false
     }
 
     def locationsOtherThan(
         location: Location
-    ): PartialFunction[(EntityId, FromAndToNodes), Set[Location]] = {
-      case (_, (from, to)) if to.contains(location) => from
+    ): PartialFunction[(RunInfo, FromAndToNodes), Set[Location]] = {
+      case (_, (from, to)) if to contains location => from
     }
   }
-
 }
 
-private object IOLineageDataTrimmer {
+private object LineageDataTrimmer {
   def apply(): IO[EdgesTrimmer[IO]] = new EdgesTrimmerImpl[IO]().pure[IO]
 
   implicit class EntityIdOps(entityId: EntityId) {

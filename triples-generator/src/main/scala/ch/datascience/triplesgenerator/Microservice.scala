@@ -39,7 +39,7 @@ import ch.datascience.triplesgenerator.reprovisioning.{IOReProvisioning, ReProvi
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import pureconfig._
 
 import java.util.concurrent.ConcurrentHashMap
@@ -73,8 +73,6 @@ object Microservice extends IOMicroservice {
     sparqlTimeRecorder      <- SparqlQueryTimeRecorder(metricsRegistry)
     awaitingGenerationSubscription <- events.categories.awaitinggeneration.SubscriptionFactory(renkuVersionPairs.head,
                                                                                                metricsRegistry,
-                                                                                               gitLabThrottler,
-                                                                                               sparqlTimeRecorder,
                                                                                                ApplicationLogger
                                       )
     membersSyncSubscription <-
@@ -84,10 +82,10 @@ object Microservice extends IOMicroservice {
                                                                                            sparqlTimeRecorder,
                                                                                            ApplicationLogger
                                     )
-    eventConsumersRegistry <- consumers.EventConsumersRegistry(ApplicationLogger,
-                                                               awaitingGenerationSubscription,
-                                                               membersSyncSubscription,
-                                                               triplesGeneratedSubscription
+    eventConsumersRegistry <- consumers.EventConsumersRegistry(
+                                awaitingGenerationSubscription,
+                                membersSyncSubscription,
+                                triplesGeneratedSubscription
                               )
     reProvisioningStatus    <- ReProvisioningStatus(eventConsumersRegistry, ApplicationLogger, sparqlTimeRecorder)
     reProvisioning          <- IOReProvisioning(reProvisioningStatus, renkuVersionPairs, sparqlTimeRecorder, ApplicationLogger)

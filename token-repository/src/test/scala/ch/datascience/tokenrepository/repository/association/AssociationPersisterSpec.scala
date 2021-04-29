@@ -18,7 +18,7 @@
 
 package ch.datascience.tokenrepository.repository.association
 
-import ch.datascience.db.SqlQuery
+import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.metrics.TestLabeledHistogram
@@ -82,7 +82,7 @@ class AssociationPersisterSpec extends AnyWordSpec with InMemoryProjectsTokensDb
     val projectId   = projectIds.generateOne
     val projectPath = projectPaths.generateOne
 
-    private val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
-    val associator               = new AssociationPersister(transactor, queriesExecTimes)
+    private val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
+    val associator               = new AssociationPersister(sessionResource, queriesExecTimes)
   }
 }

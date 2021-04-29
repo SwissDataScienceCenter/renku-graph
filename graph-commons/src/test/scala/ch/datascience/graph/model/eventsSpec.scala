@@ -152,14 +152,11 @@ class BatchDateSpec extends AnyWordSpec with should.Matchers {
   "apply()" should {
 
     "instantiate a new BatchDate with current timestamp" in {
-      val systemZone = ZoneId.systemDefault
-      val fixedNow   = Instant.now
+      val fixedNow = Instant.now
 
-      val clock = Clock.fixed(fixedNow, systemZone)
+      val clock = Clock.fixed(fixedNow, ZoneId.systemDefault())
 
       BatchDate(clock).value shouldBe fixedNow
-
-      Clock.system(systemZone)
     }
   }
 }

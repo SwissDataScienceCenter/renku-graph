@@ -18,9 +18,10 @@
 
 package io.renku.eventlog.eventspatching
 
+import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.db.SqlQuery
+import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventStatus
@@ -28,13 +29,14 @@ import ch.datascience.graph.model.events.EventStatus.New
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.metrics.{SingleValueGauge, TestLabeledHistogram}
-import doobie.free.connection.ConnectionIO
-import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk._
+import skunk.data.Completion
+import skunk.implicits._
 
 class EventsPatcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory with should.Matchers {
 
@@ -55,7 +57,10 @@ class EventsPatcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Moc
 
     "log a failure when running the update fails" in new TestCase {
 
-      val patch = TestEventsPatch(gauge, sql"UPDATE event".update.run)
+      val patch =
+        TestEventsPatch(gauge,
+                        Kleisli[IO, Session[IO], Completion](session => session.execute(sql"UPDATE event".command))
+        )
 
       val exception = intercept[Exception] {
         patcher.applyToAllEvents(patch).unsafeRunSync()
@@ -94,16 +99,19 @@ class EventsPatcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Moc
 
     val gauge = mock[SingleValueGauge[IO]]
 
-    val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
     val logger           = TestLogger[IO]()
-    val patcher          = new EventsPatcherImpl(transactor, queriesExecTimes, logger)
+    val patcher          = new EventsPatcherImpl(sessionResource, queriesExecTimes, logger)
   }
 
   private case class TestEventsPatch(
-      gauge:                  SingleValueGauge[IO],
-      protected val sqlQuery: ConnectionIO[Int] = sql"""|UPDATE event
-                                                        |SET status = ${New: EventStatus}
-                                                        |""".stripMargin.update.run
+      gauge: SingleValueGauge[IO],
+      protected val sqlQuery: Kleisli[IO, Session[IO], Completion] = Kleisli { session =>
+        val query: Command[EventStatus] = sql"""UPDATE event
+                                                SET status = $eventStatusEncoder
+                                                """.command
+        session.prepare(query).use(_.execute(New))
+      }
   ) extends EventsPatch[IO] {
     override val name           = "test events patch"
     override def updateGauges() = gauge.set(20d)

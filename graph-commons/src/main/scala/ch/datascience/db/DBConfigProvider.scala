@@ -19,83 +19,56 @@
 package ch.datascience.db
 
 import cats.MonadError
-import cats.data.OptionT
 import cats.syntax.all._
 import ch.datascience.config.ConfigLoader
 import ch.datascience.db.DBConfigProvider.DBConfig
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.W
-import eu.timepit.refined.api.{RefType, Refined}
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.Positive
 import eu.timepit.refined.pureconfig._
 import eu.timepit.refined.string.MatchesRegex
 
-import scala.concurrent.duration.FiniteDuration
-
-class DBConfigProvider[Interpretation[_], TargetDB](
-    namespace:       String,
-    dbName:          DBConfig.DbName,
-    config:          Config = ConfigFactory.load(),
-    jdbcUrlOverride: Option[DBConfig.Url] = None
-)(implicit ME:       MonadError[Interpretation, Throwable])
-    extends ConfigLoader[Interpretation] {
+class DBConfigProvider[Interpretation[_]: MonadError[*[_], Throwable], TargetDB](
+    namespace: String,
+    dbName:    DBConfig.DbName,
+    config:    Config = ConfigFactory.load()
+) extends ConfigLoader[Interpretation] {
 
   import DBConfigProvider._
 
   def map[Out](f: DBConfig[TargetDB] => Out): Interpretation[Out] =
     get() map f
 
-  def get(): Interpretation[DBConfig[TargetDB]] =
-    for {
-      driver         <- find[DBConfig.Driver](s"$namespace.db-driver", config)
-      host           <- find[DBConfig.Host](s"$namespace.db-host", config)
-      user           <- find[DBConfig.User](s"$namespace.db-user", config)
-      pass           <- find[DBConfig.Pass](s"$namespace.db-pass", config)
-      connectionPool <- find[DBConfig.ConnectionPool](s"$namespace.connection-pool", config)
-      maxLifetime    <- find[DBConfig.MaxLifetime](s"$namespace.max-connection-lifetime", config)
-      urlTemplate    <- find[DBConfig.UrlTemplate](s"$namespace.db-url-template", config)
-      url            <- OptionT.fromOption(jdbcUrlOverride) getOrElseF findUrl(urlTemplate, host)
-    } yield DBConfig(driver, url, user, pass, connectionPool, maxLifetime)
-
-  private def findUrl(urlTeplate: DBConfig.UrlTemplate, host: DBConfig.Host): Interpretation[DBConfig.Url] =
-    ME.fromEither {
-      RefType
-        .applyRef[DBConfig.Url](urlTeplate.value.replace("$host", host.value).replace("$dbName", dbName.value))
-        .leftMap(_ => new IllegalArgumentException("Invalid db url value"))
-    }
+  def get(): Interpretation[DBConfig[TargetDB]] = for {
+    host           <- find[DBConfig.Host](s"$namespace.db-host", config)
+    port           <- find[DBConfig.Port](s"$namespace.db-port", config)
+    user           <- find[DBConfig.User](s"$namespace.db-user", config)
+    pass           <- find[DBConfig.Pass](s"$namespace.db-pass", config)
+    connectionPool <- find[DBConfig.ConnectionPool](s"$namespace.connection-pool", config)
+  } yield DBConfig(host, port, dbName, user, pass, connectionPool)
 }
 
 object DBConfigProvider {
+
   import DBConfig._
 
-  case class DBConfig[TargetDB](driver:         Driver,
-                                url:            Url,
-                                user:           User,
-                                pass:           Pass,
-                                connectionPool: ConnectionPool,
-                                maxLifetime:    MaxLifetime
+  case class DBConfig[TargetDB](
+      host:           Host,
+      port:           Port,
+      name:           DbName,
+      user:           User,
+      pass:           Pass,
+      connectionPool: ConnectionPool
   )
+
   object DBConfig {
-    type Driver         = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
-    type Url            = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
     type Host           = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
-    type UrlTemplate    = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
+    type Port           = Int Refined Positive
     type DbName         = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
     type User           = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
-    type Pass           = String
+    type Pass           = String Refined NonEmpty
     type ConnectionPool = Int Refined Positive
-    type MaxLifetime    = FiniteDuration
-  }
-
-  val JdbcUrl: String = "jdbc-url"
-
-  implicit class SettingsListOps(settings: List[String]) {
-
-    private val jdbcUrlExtractor = s"$JdbcUrl=(.*)$$".r
-
-    lazy val findJdbcUrl: Option[DBConfig.Url] =
-      settings
-        .collectFirst { case jdbcUrlExtractor(url) => url }
-        .flatMap(url => RefType.applyRef[DBConfig.Url](url).fold(_ => Option.empty[DBConfig.Url], Option.apply))
   }
 }

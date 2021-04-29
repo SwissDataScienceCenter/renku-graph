@@ -33,7 +33,7 @@ import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.http4s._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.dsl.impl.OptionalValidatingQueryParamDecoderMatcher
@@ -136,6 +136,7 @@ object DatasetsSearchEndpoint {
 
   object Query {
     final class Phrase private (val value: String) extends AnyVal with StringTinyType
+
     implicit object Phrase extends TinyTypeFactory[Phrase](new Phrase(_)) with NonBlank
 
     private implicit val queryParameterDecoder: QueryParamDecoder[Phrase] =
@@ -154,10 +155,14 @@ object DatasetsSearchEndpoint {
 
     type PropertyType = SearchProperty
 
-    sealed trait SearchProperty             extends Property
-    final case object TitleProperty         extends Property("title") with SearchProperty
-    final case object DateProperty          extends Property("date") with SearchProperty
+    sealed trait SearchProperty extends Property
+
+    final case object TitleProperty extends Property("title") with SearchProperty
+
+    final case object DateProperty extends Property("date") with SearchProperty
+
     final case object DatePublishedProperty extends Property("datePublished") with SearchProperty
+
     final case object ProjectsCountProperty extends Property("projectsCount") with SearchProperty
 
     override lazy val properties: Set[SearchProperty] = Set(

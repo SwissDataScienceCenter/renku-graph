@@ -20,12 +20,12 @@ package io.renku.eventlog.eventdetails
 
 import cats.effect.{Effect, IO}
 import cats.syntax.all._
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.http.InfoMessage._
 import ch.datascience.metrics.LabeledHistogram
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.Encoder
 import io.circe.literal.JsonStringContext
 import io.circe.syntax.EncoderOps
@@ -69,10 +69,10 @@ class EventDetailsEndpointImpl[Interpretation[_]: Effect](eventDetailsFinder: Ev
 }
 
 object EventDetailsEndpoint {
-  def apply(transactor:       DbTransactor[IO, EventLogDB],
-            queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
+  def apply(sessionResource:  SessionResource[IO, EventLogDB],
+            queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name],
             logger:           Logger[IO]
   ): IO[EventDetailsEndpoint[IO]] = for {
-    eventDetailFinder <- EventDetailsFinder(transactor, queriesExecTimes)
+    eventDetailFinder <- EventDetailsFinder(sessionResource, queriesExecTimes)
   } yield new EventDetailsEndpointImpl[IO](eventDetailFinder, logger)
 }

@@ -20,16 +20,13 @@ package io.renku.eventlog
 
 import cats.MonadError
 import ch.datascience.db.DBConfigProvider
-import ch.datascience.db.DBConfigProvider._
 import eu.timepit.refined.auto._
 
 sealed trait EventLogDB
 
 class EventLogDbConfigProvider[Interpretation[_]](
-    settings:  List[String] = Nil
 )(implicit ME: MonadError[Interpretation, Throwable])
     extends DBConfigProvider[Interpretation, EventLogDB](
       namespace = "event-log",
-      dbName = "event_log",
-      jdbcUrlOverride = settings.findJdbcUrl
+      dbName = "event_log"
     )

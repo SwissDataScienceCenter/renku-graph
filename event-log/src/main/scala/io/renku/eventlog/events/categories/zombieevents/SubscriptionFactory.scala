@@ -19,25 +19,25 @@
 package io.renku.eventlog.events.categories.zombieevents
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.events.consumers.EventHandler
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
 import ch.datascience.events.consumers.subscriptions.SubscriptionPayloadComposer.categoryAndUrlPayloadsComposerFactory
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.renku.eventlog.{EventLogDB, Microservice}
 
 import scala.concurrent.ExecutionContext
 
 object SubscriptionFactory {
 
-  def apply(transactor:                         DbTransactor[IO, EventLogDB],
+  def apply(sessionResource:                    SessionResource[IO, EventLogDB],
             awaitingTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],
             underTriplesGenerationGauge:        LabeledGauge[IO, projects.Path],
             awaitingTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
             underTriplesTransformationGauge:    LabeledGauge[IO, projects.Path],
-            queriesExecTimes:                   LabeledHistogram[IO, SqlQuery.Name],
+            queriesExecTimes:                   LabeledHistogram[IO, SqlStatement.Name],
             logger:                             Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
@@ -50,7 +50,7 @@ object SubscriptionFactory {
                                logger
                              )
     handler <- EventHandler(
-                 transactor,
+                 sessionResource,
                  queriesExecTimes,
                  awaitingTriplesGenerationGauge,
                  underTriplesGenerationGauge,

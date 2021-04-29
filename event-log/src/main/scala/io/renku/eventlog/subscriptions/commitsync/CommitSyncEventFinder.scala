@@ -18,105 +18,116 @@
 
 package io.renku.eventlog.subscriptions.commitsync
 
-import cats.effect.{Bracket, ContextShift, IO}
+import cats.data.Kleisli
+import cats.effect.{BracketThrow, IO}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
-import ch.datascience.graph.model.events.{CompoundEventId, LastSyncedDate}
-import ch.datascience.graph.model.{events, projects}
+import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
+import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, LastSyncedDate}
+import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
 import eu.timepit.refined.api.Refined
 import io.renku.eventlog.subscriptions.{EventFinder, SubscriptionTypeSerializers}
 import io.renku.eventlog.{EventDate, EventLogDB}
+import skunk._
+import skunk.data.Completion
+import skunk.implicits._
 
 import java.time.Instant
 
-private class CommitSyncEventFinderImpl(transactor:       DbTransactor[IO, EventLogDB],
-                                        queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
-                                        now:              () => Instant = () => Instant.now
-)(implicit ME:                                            Bracket[IO, Throwable], contextShift: ContextShift[IO])
-    extends DbClient(Some(queriesExecTimes))
-    with EventFinder[IO, CommitSyncEvent]
+private class CommitSyncEventFinderImpl[Interpretation[_]: BracketThrow](
+    sessionResource:  SessionResource[Interpretation, EventLogDB],
+    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
+    now:              () => Instant = () => Instant.now
+) extends DbClient(Some(queriesExecTimes))
+    with EventFinder[Interpretation, CommitSyncEvent]
     with SubscriptionTypeSerializers {
 
-  import cats.free.Free
-  import doobie.free.connection.ConnectionOp
-  import doobie.implicits._
+  override def popEvent(): Interpretation[Option[CommitSyncEvent]] = sessionResource.useK(findEventAndMarkTaken)
 
-  override def popEvent(): IO[Option[CommitSyncEvent]] = findEventAndMarkTaken() transact transactor.get
-
-  private def findEventAndMarkTaken() = findEvent >>= {
-    case Some((event, maybeSyncDate)) =>
-      setSyncDate(event, maybeSyncDate) map toNoneIfEventAlreadyTaken(event)
-    case None =>
-      Free.pure[ConnectionOp, Option[CommitSyncEvent]](None)
-  }
+  private def findEventAndMarkTaken =
+    findEvent >>= {
+      case Some((event, maybeSyncDate)) =>
+        setSyncDate(event, maybeSyncDate) map toNoneIfEventAlreadyTaken(event)
+      case None => Kleisli.pure(Option.empty[CommitSyncEvent])
+    }
 
   private def findEvent = measureExecutionTime {
-    SqlQuery(
-      sql"""|SELECT
-            |  (SELECT evt.event_id 
-            |    FROM event evt 
-            |    WHERE evt.project_id = proj.project_id 
-            |      AND evt.event_date = proj.latest_event_date
-            |    ORDER BY created_date DESC
-            |    LIMIT 1
-            |  ),
-            |  proj.project_id, 
-            |  proj.project_path,
-            |  sync_time.last_synced,
-            |  proj.latest_event_date
-            |FROM project proj
-            |LEFT JOIN subscription_category_sync_time sync_time 
-            |  ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryName
-            |WHERE
-            |  sync_time.last_synced IS NULL
-            |  OR (
-            |       ((${now()} - proj.latest_event_date) <= INTERVAL '7 days' AND (${now()} - sync_time.last_synced) > INTERVAL '1 hour')
-            |    OR ((${now()} - proj.latest_event_date) >  INTERVAL '7 days' AND (${now()} - sync_time.last_synced) > INTERVAL '1 day')
-            |  )
-            |ORDER BY proj.latest_event_date DESC 
-            |LIMIT 1
-      """.stripMargin
-        .query[(Option[events.EventId], projects.Id, projects.Path, Option[LastSyncedDate], EventDate)]
-        .map {
-          case (Some(eventId), projectId, projectPath, maybeLastSyncDate, latestEventDate) =>
-            FullCommitSyncEvent(CompoundEventId(eventId, projectId),
-                                projectPath,
-                                maybeLastSyncDate getOrElse LastSyncedDate(latestEventDate.value)
-            ) -> maybeLastSyncDate
-          case (None, projectId, projectPath, maybeLastSyncDate, _) =>
-            MinimalCommitSyncEvent(projectId, projectPath) -> maybeLastSyncDate
-        }
-        .option,
-      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find full event")
-    )
+    val (eventDate, lastSyncDate) = (EventDate.apply _ &&& LastSyncedDate.apply _)(now())
+    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find event"))
+      .select[CategoryName ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate,
+              (CommitSyncEvent, Option[LastSyncedDate])
+      ](
+        sql"""SELECT
+                (SELECT evt.event_id
+                  FROM event evt
+                  WHERE evt.project_id = proj.project_id
+                    AND evt.event_date = proj.latest_event_date
+                  ORDER BY created_date DESC
+                  LIMIT 1
+                ),
+                proj.project_id,
+                proj.project_path,
+                sync_time.last_synced,
+                proj.latest_event_date
+              FROM project proj
+              LEFT JOIN subscription_category_sync_time sync_time
+                ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryNameEncoder
+              WHERE
+                sync_time.last_synced IS NULL
+                OR (
+                     (($eventDateEncoder - proj.latest_event_date) <= INTERVAL '7 days' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 hour')
+                  OR (($eventDateEncoder - proj.latest_event_date) >  INTERVAL '7 days' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 day')
+                )
+              ORDER BY proj.latest_event_date DESC
+              LIMIT 1"""
+          .query(
+            eventIdDecoder.opt ~ projectIdDecoder ~ projectPathDecoder ~ lastSyncedDateDecoder.opt ~ eventDateDecoder
+          )
+          .map {
+            case Some(eventId) ~ projectId ~ projectPath ~ maybeLastSyncDate ~ latestEventDate =>
+              FullCommitSyncEvent(CompoundEventId(eventId, projectId),
+                                  projectPath,
+                                  maybeLastSyncDate getOrElse LastSyncedDate(latestEventDate.value)
+              ) -> maybeLastSyncDate
+            case None ~ projectId ~ projectPath ~ maybeLastSyncDate ~ _ =>
+              MinimalCommitSyncEvent(projectId, projectPath) -> maybeLastSyncDate
+          }
+      )
+      .arguments(categoryName ~ eventDate ~ lastSyncDate ~ eventDate ~ lastSyncDate)
+      .build(_.option)
   }
 
   private def setSyncDate(event: CommitSyncEvent, maybeSyncedDate: Option[LastSyncedDate]) =
     if (maybeSyncedDate.isDefined) updateLastSyncedDate(event)
     else insertLastSyncedDate(event)
 
-  private def updateLastSyncedDate(event: CommitSyncEvent) = measureExecutionTime {
-    SqlQuery(
-      sql"""|UPDATE subscription_category_sync_time
-            |SET last_synced = ${now()}
-            |WHERE project_id = ${event.projectId} AND category_name = $categoryName
-            |""".stripMargin.update.run,
-      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - update last_synced")
-    )
-  }
+  private def updateLastSyncedDate(event: CommitSyncEvent) =
+    measureExecutionTime {
+      SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - update last_synced"))
+        .command[LastSyncedDate ~ projects.Id ~ CategoryName](
+          sql"""UPDATE subscription_category_sync_time
+                  SET last_synced = $lastSyncedDateEncoder
+                  WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
+            """.command
+        )
+        .arguments(LastSyncedDate(now()) ~ event.projectId ~ categoryName)
+        .build
+    }
 
-  private def insertLastSyncedDate(event: CommitSyncEvent) = measureExecutionTime {
-    SqlQuery(
-      sql"""|INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
-            |VALUES (${event.projectId}, $categoryName, ${now()})
-            |ON CONFLICT (project_id, category_name)
-            |DO UPDATE
-            |  SET last_synced = EXCLUDED.last_synced
-            |""".stripMargin.update.run,
-      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - insert last_synced")
-    )
-  }
+  private def insertLastSyncedDate(event: CommitSyncEvent) =
+    measureExecutionTime {
+      SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - insert last_synced"))
+        .command[projects.Id ~ CategoryName ~ LastSyncedDate](
+          sql"""INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
+                VALUES ($projectIdEncoder, $categoryNameEncoder, $lastSyncedDateEncoder)
+                ON CONFLICT (project_id, category_name)
+                DO UPDATE
+                  SET last_synced = EXCLUDED.last_synced
+            """.command
+        )
+        .arguments(event.projectId ~ categoryName ~ LastSyncedDate(now()))
+        .build
+    }
 
   private implicit class SyncEventOps(commitSyncEvent: CommitSyncEvent) {
     lazy val projectId: projects.Id = commitSyncEvent match {
@@ -125,17 +136,18 @@ private class CommitSyncEventFinderImpl(transactor:       DbTransactor[IO, Event
     }
   }
 
-  private def toNoneIfEventAlreadyTaken(event: CommitSyncEvent): Int => Option[CommitSyncEvent] = {
-    case 0 => None
-    case 1 => Some(event)
+  private def toNoneIfEventAlreadyTaken(event: CommitSyncEvent): Completion => Option[CommitSyncEvent] = {
+    case Completion.Update(1) | Completion.Insert(1) => Some(event)
+    case _                                           => None
   }
+
 }
 
 private object CommitSyncEventFinder {
   def apply(
-      transactor:       DbTransactor[IO, EventLogDB],
-      queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
-  )(implicit ME:        Bracket[IO, Throwable], contextShift: ContextShift[IO]): IO[EventFinder[IO, CommitSyncEvent]] = IO {
-    new CommitSyncEventFinderImpl(transactor, queriesExecTimes)
+      sessionResource:  SessionResource[IO, EventLogDB],
+      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
+  ): IO[EventFinder[IO, CommitSyncEvent]] = IO {
+    new CommitSyncEventFinderImpl(sessionResource, queriesExecTimes)
   }
 }

@@ -29,7 +29,7 @@ import ch.datascience.control.Throttler
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
@@ -45,7 +45,7 @@ private class CommitToEventLogImpl[Interpretation[_]: MonadError[*[_], Throwable
     eventDetailsFinder:    EventDetailsFinder[Interpretation],
     logger:                Logger[Interpretation],
     executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
-    clock:                 java.time.Clock = java.time.Clock.systemDefaultZone()
+    clock:                 java.time.Clock = java.time.Clock.systemUTC()
 ) extends CommitToEventLog[Interpretation] {
 
   import IOAccessTokenFinder._

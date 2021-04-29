@@ -21,9 +21,9 @@ package io.renku.eventlog.init
 import cats.effect.IO
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
-import doobie.implicits.toSqlInterpolator
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk.implicits._
 
 class SubscriberTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
 
@@ -31,7 +31,6 @@ class SubscriberTableCreatorSpec extends AnyWordSpec with DbInitSpec with should
     eventLogTableCreator,
     projectPathAdder,
     batchDateAdder,
-    latestEventDatesViewRemover,
     projectTableCreator,
     projectPathRemover,
     eventLogTableRenamer,
@@ -67,14 +66,14 @@ class SubscriberTableCreatorSpec extends AnyWordSpec with DbInitSpec with should
 
       tableExists("subscriber") shouldBe true
 
-      verifyTrue(sql"DROP INDEX idx_delivery_id")
-      verifyTrue(sql"DROP INDEX idx_delivery_url")
-      verifyTrue(sql"DROP INDEX idx_source_url")
+      verifyTrue(sql"DROP INDEX idx_delivery_id".command)
+      verifyTrue(sql"DROP INDEX idx_delivery_url".command)
+      verifyTrue(sql"DROP INDEX idx_source_url".command)
     }
   }
 
   private trait TestCase {
     val logger       = TestLogger[IO]()
-    val tableCreator = new SubscriberTableCreatorImpl[IO](transactor, logger)
+    val tableCreator = new SubscriberTableCreatorImpl[IO](sessionResource, logger)
   }
 }

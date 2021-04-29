@@ -25,8 +25,6 @@ import ch.datascience.rdfstore.entities.Association.{ChildRunPlanAssociation, Pr
 import ch.datascience.rdfstore.entities.RunPlan.{ProcessRunPlan, WorkflowRunPlan}
 import ch.datascience.rdfstore.entities.WorkflowRun.ActivityWorkflowRun
 
-import scala.language.postfixOps
-
 sealed trait ProcessRun[RunPlanType <: Entity with RunPlan] {
   self: Activity =>
   type AssociationType <: Association[RunPlanType]
@@ -155,7 +153,8 @@ object ProcessRun {
           ).asRight
 
       override def toEntityId: Activity with ChildProcessRun => Option[EntityId] =
-        entity => (EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId / entity.processRunStep).some
+        entity =>
+          (EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId / "step" / s"step_${entity.processRunStep}").some
     }
 
   private[entities] implicit def standAloneProcessRunConverter(implicit

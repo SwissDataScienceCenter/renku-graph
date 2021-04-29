@@ -22,7 +22,7 @@ import java.time.temporal.ChronoUnit.{HOURS => H}
 import java.time.Instant
 
 import cats.effect.IO
-import ch.datascience.db.SqlQuery
+import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
@@ -41,8 +41,6 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-
-import scala.language.postfixOps
 
 private class AwaitingGenerationEventFinderSpec
     extends AnyWordSpec
@@ -196,7 +194,7 @@ private class AwaitingGenerationEventFinderSpec
     "return events from all the projects - case with projectsFetchingLimit > 1" in new TestCaseCommons {
 
       val eventLogFind = new AwaitingGenerationEventFinderImpl(
-        transactor,
+        sessionResource,
         waitingEventsGauge,
         underProcessingGauge,
         queriesExecTimes,
@@ -246,7 +244,7 @@ private class AwaitingGenerationEventFinderSpec
     val waitingEventsGauge    = mock[LabeledGauge[IO, Path]]
     val underProcessingGauge  = mock[LabeledGauge[IO, Path]]
     val projectPrioritisation = mock[ProjectPrioritisation[IO]]
-    val queriesExecTimes      = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val queriesExecTimes      = TestLabeledHistogram[SqlStatement.Name]("query_id")
 
     def expectWaitingEventsGaugeDecrement(projectPath: Path) =
       (waitingEventsGauge.decrement _)
@@ -272,7 +270,7 @@ private class AwaitingGenerationEventFinderSpec
   private trait TestCase extends TestCaseCommons {
 
     val finder = new AwaitingGenerationEventFinderImpl(
-      transactor,
+      sessionResource,
       waitingEventsGauge,
       underProcessingGauge,
       queriesExecTimes,

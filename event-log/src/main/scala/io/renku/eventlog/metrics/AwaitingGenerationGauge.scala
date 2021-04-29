@@ -25,7 +25,6 @@ import ch.datascience.metrics._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
-import io.chrisdavenport.log4cats.Logger
 
 object AwaitingGenerationGauge {
 
@@ -33,8 +32,7 @@ object AwaitingGenerationGauge {
 
   def apply(
       metricsRegistry: MetricsRegistry[IO],
-      statsFinder:     StatsFinder[IO],
-      logger:          Logger[IO]
+      statsFinder:     StatsFinder[IO]
   ): IO[LabeledGauge[IO, projects.Path]] =
     Gauge[IO, projects.Path](
       name = "events_awaiting_generation_count",

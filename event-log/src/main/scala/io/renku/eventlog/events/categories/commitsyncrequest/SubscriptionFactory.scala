@@ -19,25 +19,25 @@
 package io.renku.eventlog.events.categories.commitsyncrequest
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.events.consumers.EventHandler
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
 import ch.datascience.metrics.LabeledHistogram
-import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
 object SubscriptionFactory {
 
-  def apply(transactor:       DbTransactor[IO, EventLogDB],
-            queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
+  def apply(sessionResource:  SessionResource[IO, EventLogDB],
+            queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name],
             logger:           Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[(EventHandler[IO], SubscriptionMechanism[IO])] = for {
-    handler <- EventHandler(transactor, queriesExecTimes, logger)
+    handler <- EventHandler(sessionResource, queriesExecTimes, logger)
   } yield handler -> SubscriptionMechanism.noOpSubscriptionMechanism(categoryName)
 }

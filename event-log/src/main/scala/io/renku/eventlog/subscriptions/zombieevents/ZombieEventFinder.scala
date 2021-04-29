@@ -18,15 +18,15 @@
 
 package io.renku.eventlog.subscriptions.zombieevents
 
-import cats.MonadError
 import cats.data.OptionT
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import cats.{MonadError, Parallel}
+import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.metrics.LabeledHistogram
-import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.subscriptions.EventFinder
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
@@ -34,12 +34,12 @@ import scala.util.control.NonFatal
 private class ZombieEventFinder[Interpretation[_]: MonadError[*[_], Throwable]](
     longProcessingEventsFinder: EventFinder[Interpretation, ZombieEvent],
     lostSubscriberEventFinder:  EventFinder[Interpretation, ZombieEvent],
-    zombieEventSourceCleaner:   ZombieEventSourceCleaner[Interpretation],
+    zombieNodesCleaner:         ZombieNodesCleaner[Interpretation],
     lostZombieEventFinder:      EventFinder[Interpretation, ZombieEvent],
     logger:                     Logger[Interpretation]
 ) extends EventFinder[Interpretation, ZombieEvent] {
   override def popEvent(): Interpretation[Option[ZombieEvent]] = for {
-    _ <- zombieEventSourceCleaner.removeZombieSources() recoverWith logError
+    _ <- zombieNodesCleaner.removeZombieNodes() recoverWith logError
     maybeEvent <- OptionT(longProcessingEventsFinder.popEvent())
                     .orElseF(lostSubscriberEventFinder.popEvent())
                     .orElseF(lostZombieEventFinder.popEvent())
@@ -54,21 +54,22 @@ private class ZombieEventFinder[Interpretation[_]: MonadError[*[_], Throwable]](
 private object ZombieEventFinder {
 
   def apply(
-      transactor:       DbTransactor[IO, EventLogDB],
-      queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
+      sessionResource:  SessionResource[IO, EventLogDB],
+      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name],
       logger:           Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
+      concurrentEffect: ConcurrentEffect[IO],
+      parallel:         Parallel[IO],
       timer:            Timer[IO]
   ): IO[EventFinder[IO, ZombieEvent]] = for {
-    longProcessingEventFinder <- LongProcessingEventFinder(transactor, queriesExecTimes)
-    lostSubscriberEventFinder <- LostSubscriberEventFinder(transactor, queriesExecTimes)
-    zombieEventSourceCleaner  <- ZombieEventSourceCleaner(transactor, queriesExecTimes, logger)
-    lostZombieEventFinder     <- LostZombieEventFinder(transactor, queriesExecTimes)
+    longProcessingEventFinder <- LongProcessingEventFinder(sessionResource, queriesExecTimes)
+    lostSubscriberEventFinder <- LostSubscriberEventFinder(sessionResource, queriesExecTimes)
+    zombieNodesCleaner        <- ZombieNodesCleaner(sessionResource, queriesExecTimes, logger)
+    lostZombieEventFinder     <- LostZombieEventFinder(sessionResource, queriesExecTimes)
   } yield new ZombieEventFinder[IO](longProcessingEventFinder,
                                     lostSubscriberEventFinder,
-                                    zombieEventSourceCleaner,
+                                    zombieNodesCleaner,
                                     lostZombieEventFinder,
                                     logger
   )

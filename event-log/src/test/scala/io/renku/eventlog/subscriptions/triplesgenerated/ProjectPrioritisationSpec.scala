@@ -21,9 +21,7 @@ package io.renku.eventlog.subscriptions.triplesgenerated
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import eu.timepit.refined.numeric.NonNegative
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.EventDate
 import io.renku.eventlog.subscriptions.ProjectIds

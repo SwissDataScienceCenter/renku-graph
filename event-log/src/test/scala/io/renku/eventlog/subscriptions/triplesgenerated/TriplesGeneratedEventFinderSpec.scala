@@ -20,7 +20,7 @@ package io.renku.eventlog.subscriptions.triplesgenerated
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.db.SqlQuery
+import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
@@ -43,7 +43,6 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit.{HOURS => H}
-import scala.language.postfixOps
 
 private class TriplesGeneratedEventFinderSpec
     extends AnyWordSpec
@@ -200,7 +199,7 @@ private class TriplesGeneratedEventFinderSpec
     "return events from all the projects - case with projectsFetchingLimit > 1" in new TestCaseCommons {
 
       val eventLogFind = new TriplesGeneratedEventFinderImpl(
-        transactor,
+        sessionResource,
         awaitingTransformationGauge,
         underTransformationGauge,
         queriesExecTimes,
@@ -250,7 +249,7 @@ private class TriplesGeneratedEventFinderSpec
     val awaitingTransformationGauge = mock[LabeledGauge[IO, Path]]
     val underTransformationGauge    = mock[LabeledGauge[IO, Path]]
     val projectPrioritisation       = mock[ProjectPrioritisation]
-    val queriesExecTimes            = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val queriesExecTimes            = TestLabeledHistogram[SqlStatement.Name]("query_id")
 
     def expectAwaitingTransformationGaugeDecrement(projectPath: Path) =
       (awaitingTransformationGauge.decrement _)
@@ -277,7 +276,7 @@ private class TriplesGeneratedEventFinderSpec
     val schemaVersion = projectSchemaVersions.generateOne
 
     val finder = new TriplesGeneratedEventFinderImpl(
-      transactor,
+      sessionResource,
       awaitingTransformationGauge,
       underTransformationGauge,
       queriesExecTimes,

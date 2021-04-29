@@ -18,67 +18,70 @@
 
 package io.renku.eventlog.init
 
-import cats.effect.Bracket
-import ch.datascience.db.DbTransactor
+import cats.data.Kleisli
+import cats.effect.BracketThrow
+import ch.datascience.db.SessionResource
+import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.graph.model.events.EventStatus.GenerationRecoverableFailure
-import io.chrisdavenport.log4cats.Logger
-import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.{EventLogDB, TypeSerializers}
+import org.typelevel.log4cats.Logger
+import skunk._
+import skunk.codec.all._
+import skunk.implicits._
 
 private trait EventLogTableCreator[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
 private object EventLogTableCreator {
-  def apply[Interpretation[_]](
-      transactor: DbTransactor[Interpretation, EventLogDB],
-      logger:     Logger[Interpretation]
-  )(implicit ME:  Bracket[Interpretation, Throwable]): EventLogTableCreator[Interpretation] =
-    new EventLogTableCreatorImpl(transactor, logger)
+  def apply[Interpretation[_]: BracketThrow](
+      sessionResource: SessionResource[Interpretation, EventLogDB],
+      logger:          Logger[Interpretation]
+  ): EventLogTableCreator[Interpretation] =
+    new EventLogTableCreatorImpl(sessionResource, logger)
 }
 
-private class EventLogTableCreatorImpl[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB],
-    logger:     Logger[Interpretation]
-)(implicit ME:  Bracket[Interpretation, Throwable])
-    extends EventLogTableCreator[Interpretation]
-    with EventTableCheck[Interpretation] {
+private class EventLogTableCreatorImpl[Interpretation[_]: BracketThrow](
+    sessionResource: SessionResource[Interpretation, EventLogDB],
+    logger:          Logger[Interpretation]
+) extends EventLogTableCreator[Interpretation]
+    with EventTableCheck
+    with TypeSerializers {
 
   import cats.syntax.all._
-  import doobie.implicits._
 
-  private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
-
-  override def run(): Interpretation[Unit] =
+  override def run(): Interpretation[Unit] = sessionResource.useK {
     whenEventTableExists(
-      logger info "'event_log' table creation skipped",
+      Kleisli.liftF(logger info "'event_log' table creation skipped"),
       otherwise = checkTableExists flatMap {
-        case true  => logger info "'event_log' table exists"
+        case true =>
+          Kleisli.liftF[Interpretation, Session[Interpretation], Unit](logger info "'event_log' table exists")
         case false => createTable
       }
     )
+  }
 
-  private def checkTableExists: Interpretation[Boolean] =
-    sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_log')"
-      .query[Boolean]
-      .unique
-      .transact(transactor.get)
-      .recover { case _ => false }
+  private lazy val checkTableExists = {
+    val query: Query[Void, Boolean] = sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_log')"
+      .query(bool)
+    Kleisli[Interpretation, Session[Interpretation], Boolean](_.unique(query).recover { case _ => false })
+  }
 
-  private def createTable = for {
-    _ <- createTableSql.update.run transact transactor.get
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON event_log(project_id)")
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id ON event_log(event_id)")
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_status ON event_log(status)")
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_execution_date ON event_log(execution_date DESC)")
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_date ON event_log(event_date DESC)")
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_created_date ON event_log(created_date DESC)")
-    _ <- execute(
-           sql"UPDATE event_log set status=${GenerationRecoverableFailure.value} where status='TRIPLES_STORE_FAILURE'"
-         )
-    _ <- logger info "'event_log' table created"
-  } yield ()
+  private lazy val createTable: Kleisli[Interpretation, Session[Interpretation], Unit] =
+    for {
+      _ <- execute(createTableSql)
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON event_log(project_id)".command)
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id ON event_log(event_id)".command)
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_status ON event_log(status)".command)
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_execution_date ON event_log(execution_date DESC)".command)
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_date ON event_log(event_date DESC)".command)
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_created_date ON event_log(created_date DESC)".command)
+      _ <- revertStatusToGenerationRecoverableFailure
+      _ <- Kleisli.liftF(logger info "'event_log' table created")
+    } yield ()
 
-  private lazy val createTableSql = sql"""
+  private lazy val createTableSql: Command[Void] =
+    sql"""
     CREATE TABLE IF NOT EXISTS event_log(
       event_id       varchar   NOT NULL,
       project_id     int4      NOT NULL,
@@ -90,5 +93,14 @@ private class EventLogTableCreatorImpl[Interpretation[_]](
       message        varchar,
       PRIMARY KEY (event_id, project_id)
     );
-    """
+    """.command
+
+  private lazy val revertStatusToGenerationRecoverableFailure = {
+    val query: Command[EventStatus] =
+      sql"UPDATE event_log set status=$eventStatusEncoder where status='TRIPLES_STORE_FAILURE'".command
+    Kleisli[Interpretation, Session[Interpretation], Unit] {
+      _.prepare(query).use(_.execute(GenerationRecoverableFailure).void)
+    }
+  }
+
 }

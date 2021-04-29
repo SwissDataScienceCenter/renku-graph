@@ -19,13 +19,13 @@
 package io.renku.eventlog.eventspatching
 
 import cats.effect.{ContextShift, IO}
-import ch.datascience.db.SqlQuery
+import ch.datascience.db.SqlStatement
 import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.graph.model.events.EventStatus.New
 import ch.datascience.graph.model.projects
 import ch.datascience.http.ErrorMessage
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.http4s.circe.jsonOf
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Request, Response}
@@ -89,18 +89,18 @@ class EventsPatchingEndpointImpl(
 }
 
 object IOEventsPatchingEndpoint {
-  import ch.datascience.db.DbTransactor
+  import ch.datascience.db.SessionResource
   import io.renku.eventlog.EventLogDB
 
   def apply(
-      transactor:           DbTransactor[IO, EventLogDB],
+      sessionResource:      SessionResource[IO, EventLogDB],
       waitingEventsGauge:   LabeledGauge[IO, projects.Path],
       underProcessingGauge: LabeledGauge[IO, projects.Path],
-      queriesExecTimes:     LabeledHistogram[IO, SqlQuery.Name],
+      queriesExecTimes:     LabeledHistogram[IO, SqlStatement.Name],
       logger:               Logger[IO]
   )(implicit contextShift:  ContextShift[IO]): IO[EventsPatchingEndpoint[IO]] =
     for {
-      eventsPatcher <- IOEventsPatcher(transactor, queriesExecTimes, logger)
+      eventsPatcher <- IOEventsPatcher(sessionResource, queriesExecTimes, logger)
     } yield new EventsPatchingEndpointImpl(
       eventsPatcher,
       waitingEventsGauge,

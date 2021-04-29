@@ -22,10 +22,9 @@ import cats.Applicative
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.events.CategoryName
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.language.postfixOps
 
 private trait Subscribers[Interpretation[_]] {
   def add(subscriptionInfo: SubscriptionInfo): Interpretation[Unit]

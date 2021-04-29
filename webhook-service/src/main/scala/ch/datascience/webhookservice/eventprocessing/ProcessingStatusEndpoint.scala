@@ -33,7 +33,7 @@ import ch.datascience.webhookservice.eventprocessing.ProcessingStatusFetcher.Pro
 import ch.datascience.webhookservice.hookvalidation.HookValidator
 import ch.datascience.webhookservice.hookvalidation.HookValidator.{HookValidationResult, NoAccessTokenException}
 import ch.datascience.webhookservice.model.ProjectHookUrl
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
@@ -110,7 +110,8 @@ private object ProcessingStatusEndpoint {
       }"""
   }
 
-  val zeroProcessingStatusJson: Json = json"""
+  val zeroProcessingStatusJson: Json =
+    json"""
       {
        "done": ${0},
        "total": ${0}

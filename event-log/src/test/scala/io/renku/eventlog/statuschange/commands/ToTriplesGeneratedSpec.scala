@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.statuschange.commands
 import cats.effect.IO
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies, eventProcessingTimes}
 import ch.datascience.graph.model.GraphModelGenerators.{projectPaths, projectSchemaVersions}
@@ -278,7 +278,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
           }""".spaces2
 
         val actual = ToTriplesGenerated
-          .factory(transactor,
+          .factory(sessionResource,
                    underTriplesTransformationGauge,
                    underTriplesGenerationGauge,
                    awaitingTransformationGauge
@@ -303,7 +303,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
         createEvent(TransformingTriples)
 
         val actual = ToTriplesGenerated
-          .factory(transactor,
+          .factory(sessionResource,
                    underTriplesTransformationGauge,
                    underTriplesGenerationGauge,
                    awaitingTransformationGauge
@@ -325,7 +325,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
     EventStatus.all.filterNot(status => status == TriplesGenerated) foreach { eventStatus =>
       s"return NotSupported if status is $eventStatus" in new TestCase {
         ToTriplesGenerated
-          .factory(transactor,
+          .factory(sessionResource,
                    underTriplesTransformationGauge,
                    underTriplesGenerationGauge,
                    awaitingTransformationGauge
@@ -342,7 +342,11 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
           }""".spaces2
 
       ToTriplesGenerated
-        .factory(transactor, underTriplesTransformationGauge, underTriplesGenerationGauge, awaitingTransformationGauge)
+        .factory(sessionResource,
+                 underTriplesTransformationGauge,
+                 underTriplesGenerationGauge,
+                 awaitingTransformationGauge
+        )
         .run(EventAndPayloadRequest(eventId, TriplesGenerated, None, payloadPartBody))
         .unsafeRunSync() shouldBe PayloadMalformed("No processing time provided")
     }
@@ -355,7 +359,11 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
       val payloadPartBody = json"""{"payload": ${eventPayload.value}}""".spaces2
 
       ToTriplesGenerated
-        .factory(transactor, underTriplesTransformationGauge, underTriplesGenerationGauge, awaitingTransformationGauge)
+        .factory(sessionResource,
+                 underTriplesTransformationGauge,
+                 underTriplesGenerationGauge,
+                 awaitingTransformationGauge
+        )
         .run(EventAndPayloadRequest(eventId, TriplesGenerated, processingTime, payloadPartBody))
         .unsafeRunSync() shouldBe PayloadMalformed(
         "Attempt to decode value on failed cursor: DownField(schemaVersion)"
@@ -369,7 +377,11 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
       val payloadPartBody = json"""{"schemaVersion": ${schemaVersion.value}}""".spaces2
 
       ToTriplesGenerated
-        .factory(transactor, underTriplesTransformationGauge, underTriplesGenerationGauge, awaitingTransformationGauge)
+        .factory(sessionResource,
+                 underTriplesTransformationGauge,
+                 underTriplesGenerationGauge,
+                 awaitingTransformationGauge
+        )
         .run(EventAndPayloadRequest(eventId, TriplesGenerated, processingTime, payloadPartBody))
         .unsafeRunSync() shouldBe PayloadMalformed(
         "Attempt to decode value on failed cursor: DownField(payload)"
@@ -381,7 +393,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
     val awaitingTransformationGauge     = mock[LabeledGauge[IO, projects.Path]]
     val underTriplesTransformationGauge = mock[LabeledGauge[IO, projects.Path]]
     val underTriplesGenerationGauge     = mock[LabeledGauge[IO, projects.Path]]
-    val histogram                       = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val histogram                       = TestLabeledHistogram[SqlStatement.Name]("query_id")
 
     val currentTime    = mockFunction[Instant]
     val eventId        = compoundEventIds.generateOne
@@ -390,8 +402,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
 
     val payload       = eventPayloads.generateOne
     val schemaVersion = projectSchemaVersions.generateOne
-    implicit val implicitTransactor: DbTransactor[IO, EventLogDB] = transactor
-    val commandRunner = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
+    val commandRunner = new StatusUpdatesRunnerImpl(sessionResource, histogram, TestLogger[IO]())
     val now           = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()
 

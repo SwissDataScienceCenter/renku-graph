@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions.zombieevents
 
 import cats.syntax.all._
-import ch.datascience.db.SqlQuery
+import ch.datascience.db.SqlStatement
 import ch.datascience.events.consumers.subscriptions._
 import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
 import ch.datascience.generators.Generators.Implicits._
@@ -73,9 +73,9 @@ class LostSubscriberEventFinderSpec extends AnyWordSpec with InMemoryEventLogDbS
     val subscriberId     = subscriberIds.generateOne
     val sourceUrl        = microserviceBaseUrls.generateOne
     val projectPath      = projectPaths.generateOne
-    val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
 
-    val finder = new LostSubscriberEventFinder(transactor, queriesExecTimes)
+    val finder = new LostSubscriberEventFinder(sessionResource, queriesExecTimes)
 
     def addEvent(eventId: CompoundEventId, status: EventStatus): Unit = storeEvent(
       eventId,

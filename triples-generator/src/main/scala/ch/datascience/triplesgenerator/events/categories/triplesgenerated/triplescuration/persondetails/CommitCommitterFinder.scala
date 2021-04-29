@@ -26,16 +26,16 @@ import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabApiUrl
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects
-import ch.datascience.http.client.RestClientError.{ConnectivityException, UnauthorizedException}
+import ch.datascience.http.client.RestClientError.ConnectivityException
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
-import io.chrisdavenport.log4cats.Logger
 import org.http4s.Method.GET
 import org.http4s.Status.{Ok, Unauthorized}
 import org.http4s.circe.jsonOf
 import org.http4s.dsl.io.ServiceUnavailable
 import org.http4s.{EntityDecoder, Request, Response, Status}
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
@@ -68,7 +68,7 @@ private class CommitCommitterFinderImpl(
     } yield result
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[
-    Either[ProcessingRecoverableError, (CommitPersonsInfo)]
+    Either[ProcessingRecoverableError, CommitPersonsInfo]
   ]] = {
     case (Ok, _, response) => response.as[CommitPersonsInfo].map(info => Right(info))
     case (ServiceUnavailable, _, _) =>
@@ -85,6 +85,7 @@ private class CommitCommitterFinderImpl(
     case ConnectivityException(message, cause) =>
       IO.pure(Either.left(CurationRecoverableError(message, cause)))
   }
+
   private implicit class ResultOps[T](out: IO[T]) {
     lazy val toRightT: EitherT[IO, ProcessingRecoverableError, T] =
       EitherT.right[ProcessingRecoverableError](out)

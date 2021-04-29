@@ -1,19 +1,19 @@
 organization := "ch.datascience"
 name := "renku-graph"
-scalaVersion := "2.13.4"
+scalaVersion := "2.13.5"
 
 // This project contains nothing to package, like pure POM maven project
 packagedArtifacts := Map.empty
 
 releaseVersionBump := sbtrelease.Version.Bump.Minor
 releaseIgnoreUntrackedFiles := true
-releaseTagName := (version in ThisBuild).value
+releaseTagName := (ThisBuild / version).value
 
 lazy val root = Project(
   id = "renku-graph",
   base = file(".")
 ).settings(
-  skip in publish := true,
+  publish / skip := true,
   publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 ).aggregate(
   jsonLd,
@@ -146,17 +146,39 @@ lazy val acceptanceTests = Project(
 
 lazy val commonSettings = Seq(
   organization := "ch.datascience",
-  scalaVersion := "2.13.4",
-  skip in publish := true,
+  scalaVersion := "2.13.5",
+  publish / skip := true,
   publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo"))),
-  publishArtifact in (Compile, packageDoc) := false,
-  publishArtifact in (Compile, packageSrc) := false,
-  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.1" cross CrossVersion.full),
-  scalacOptions += "-feature",
-  scalacOptions += "-unchecked",
-  scalacOptions += "-deprecation",
-  scalacOptions += "-Ywarn-value-discard",
-  scalacOptions += "-Xfatal-warnings",
+  Compile / packageDoc / publishArtifact := false,
+  Compile / packageSrc / publishArtifact := false,
+  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.3" cross CrossVersion.full),
+  // format: off
+  scalacOptions ++= Seq(
+    "-deprecation", // Emit warning and location for usages of deprecated APIs.
+    "-encoding", "utf-8", // Specify character encoding used by source files.
+    "-explaintypes", // Explain type errors in more detail.
+    "-feature", // Emit warning and location for usages of features that should be imported explicitly.
+    "-unchecked", // Enable additional warnings where generated code depends on assumptions.
+    "-language:higherKinds", // Allow higher-kinded types
+    "-language:existentials", // Existential types (besides wildcard types) can be written and inferred
+    "-Xcheckinit", // Wrap field accessors to throw an exception on uninitialized access.
+    "-Xfatal-warnings",
+    "-Xlint:infer-any", // Warn when a type argument is inferred to be `Any`.
+    "-Xlint:missing-interpolator", // A string literal appears to be missing an interpolator id.
+    "-Xlint:package-object-classes", // Class or object defined in package object.
+    "-Xlint:private-shadow", // A private field (or class parameter) shadows a superclass field.
+    "-Wdead-code", // Warn when dead code is identified.
+    "-Wunused:imports", // Warn if an import selector is not referenced.
+    "-Wunused:patvars", // Warn if a variable bound in a pattern is unused.
+    "-Wunused:locals", // Warn if a local definition is unused.
+    "-Wunused:explicits", // Warn if an explicit parameter is unused.
+    "-Wvalue-discard", // Warn when non-Unit expression results are unused.
+    "-Ybackend-parallelism", "8",
+    "-Ycache-plugin-class-loader:last-modified", // Enables caching of classloaders for compiler plugins
+    "-Ycache-macro-class-loader:last-modified", // and macro definitions. This can lead to performance improvements.
+    "-Ywarn-value-discard" // Emit warning and location for usages of deprecated APIs.
+  ),
+  // Format: on
   organizationName := "Swiss Data Science Center (SDSC)",
   startYear := Some(java.time.LocalDate.now().getYear),
   licenses += ("Apache-2.0", new URL("https://www.apache.org/licenses/LICENSE-2.0.txt")),

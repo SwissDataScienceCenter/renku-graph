@@ -18,21 +18,23 @@
 
 package io.renku.eventlog.statuschange
 
-import cats.effect.{Bracket, IO}
-import cats.free.Free
+import cats.data.Kleisli
+import cats.effect.BracketThrow
 import cats.syntax.all._
 import ch.datascience.data.ErrorMessage
-import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
-import ch.datascience.graph.model.events.CompoundEventId
+import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
+import ch.datascience.graph.model.events._
+import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
-import doobie.free.connection
-import doobie.free.connection.ConnectionIO
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.statuschange.commands.UpdateResult.{NotFound, Updated}
 import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
+import org.typelevel.log4cats.Logger
+import skunk._
+import skunk.data.Completion
+import skunk.implicits._
 
 import scala.util.control.NonFatal
 
@@ -40,83 +42,109 @@ trait StatusUpdatesRunner[Interpretation[_]] {
   def run(command: ChangeStatusCommand[Interpretation]): Interpretation[UpdateResult]
 }
 
-class StatusUpdatesRunnerImpl(
-    transactor:       DbTransactor[IO, EventLogDB],
-    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
-    logger:           Logger[IO]
-)(implicit ME:        Bracket[IO, Throwable])
-    extends DbClient(Some(queriesExecTimes))
-    with StatusUpdatesRunner[IO]
+class StatusUpdatesRunnerImpl[Interpretation[_]: BracketThrow](
+    sessionResource:  SessionResource[Interpretation, EventLogDB],
+    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
+    logger:           Logger[Interpretation]
+) extends DbClient(Some(queriesExecTimes))
+    with StatusUpdatesRunner[Interpretation]
     with StatusProcessingTime {
 
-  private implicit val transact: DbTransactor[IO, EventLogDB] = transactor
-
-  import doobie.implicits._
-
-  override def run(command: ChangeStatusCommand[IO]): IO[UpdateResult] = for {
-    _ <- deleteDelivery(command) transact transactor.get recoverWith errorToUpdateResult(
-           s"Event ${command.eventId} - cannot remove event delivery"
-         )
-    updateResult <- executeCommand(command) transact transactor.get recoverWith errorToUpdateResult(
-                      s"Event ${command.eventId} got ${command.status}"
-                    )
-    _ <- logInfo(command, updateResult)
-    _ <- command updateGauges updateResult
-  } yield updateResult
-
-  private def errorToUpdateResult(message: String): PartialFunction[Throwable, IO[UpdateResult]] = {
-    case NonFatal(exception) =>
-      logger.error(exception)(message)
-      UpdateResult.Failure(ErrorMessage.withExceptionMessage(exception)).pure[IO]
-  }
-
-  private def logInfo(command: ChangeStatusCommand[IO], updateResult: UpdateResult) = updateResult match {
-    case Updated => logger.info(s"Event ${command.eventId} got ${command.status}")
-    case _       => ME.unit
-  }
-
-  private def executeCommand(command: ChangeStatusCommand[IO]): Free[connection.ConnectionOp, UpdateResult] =
-    checkIfPersisted(command.eventId) >>= {
-      case true =>
-        runUpdateQueriesIfSuccessful(
-          command.queries.toList :++ maybeUpdateProcessingTimeQuery(command),
-          command
-        ) >>= toUpdateResult
-      case false => NotFound.pure[ConnectionIO].widen[commands.UpdateResult]
+  override def run(command: ChangeStatusCommand[Interpretation]): Interpretation[UpdateResult] =
+    sessionResource.useWithTransactionK {
+      Kleisli { case (transaction, session) =>
+        {
+          for {
+            sp <- Kleisli.liftF(transaction.savepoint)
+            updateResult <- (deleteDelivery(command) >> executeCommand(command)).recoverWith(
+                              deliveryCleanUp(command, () => transaction.rollback(sp))
+                            )
+            _ <- Kleisli.liftF(logInfo(command, updateResult))
+            _ <- command updateGauges updateResult
+          } yield updateResult
+        }.run(session)
+      }
     }
 
-  private def deleteDelivery(command: ChangeStatusCommand[IO]) = measureExecutionTime {
-    SqlQuery(
-      sql"""|DELETE FROM event_delivery 
-            |WHERE event_id = ${command.eventId.id} AND project_id = ${command.eventId.projectId}
-            |""".stripMargin.update.run.map(_ => UpdateResult.Updated: UpdateResult),
-      name = "status update - delivery info remove"
-    )
+  private def deliveryCleanUp(command:  ChangeStatusCommand[Interpretation],
+                              rollback: () => Interpretation[Completion]
+  ): PartialFunction[Throwable, Kleisli[Interpretation, Session[Interpretation], UpdateResult]] = {
+    case NonFatal(exception) =>
+      Kleisli.liftF[Interpretation, Session[Interpretation], Completion](rollback()) >>
+        deleteDelivery(command)
+          .recoverWith(deliveryErrorToResult(command)) >>= {
+        case UpdateResult.Updated => logAndAsResult(s"Event ${command.eventId} got ${command.status}", exception)
+        case deletionResult       => Kleisli.pure(deletionResult)
+      }
   }
 
-  private def toUpdateResult: UpdateResult => ConnectionIO[UpdateResult] = {
-    case UpdateResult.Failure(message) => new Exception(message).raiseError[ConnectionIO, UpdateResult]
-    case result                        => result.pure[ConnectionIO]
+  private def deliveryErrorToResult(
+      command: ChangeStatusCommand[Interpretation]
+  ): PartialFunction[Throwable, Kleisli[Interpretation, Session[Interpretation], UpdateResult]] = {
+    case NonFatal(exception) =>
+      logAndAsResult(s"Event ${command.eventId} - cannot remove event delivery", exception)
+  }
+
+  private def logAndAsResult(message: String, cause: Throwable) =
+    Kleisli.liftF(
+      logger.error(cause)(message) >> UpdateResult
+        .Failure(ErrorMessage.withExceptionMessage(cause))
+        .pure[Interpretation]
+        .widen[UpdateResult]
+    )
+
+  private def executeCommand(
+      command: ChangeStatusCommand[Interpretation]
+  ): Kleisli[Interpretation, Session[Interpretation], UpdateResult] =
+    checkIfPersisted(command.eventId) >>= {
+      case true =>
+        executeQueries(
+          queries = command.queries.toList :++ maybeUpdateProcessingTimeQuery(command),
+          command
+        ) >>= toUpdateResult
+      case false => Kleisli.pure(NotFound).widen[commands.UpdateResult]
+    }
+
+  private def deleteDelivery(command: ChangeStatusCommand[Interpretation]) = measureExecutionTime {
+    SqlStatement(name = "status update - delivery info remove")
+      .command[EventId ~ projects.Id](
+        sql"""DELETE FROM event_delivery
+                  WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
+               """.command
+      )
+      .arguments(command.eventId.id ~ command.eventId.projectId)
+      .build
+      .mapResult(_ => UpdateResult.Updated: UpdateResult)
+  }
+
+  private def toUpdateResult: UpdateResult => Kleisli[Interpretation, Session[Interpretation], UpdateResult] = {
+    case UpdateResult.Failure(message) => Kleisli.liftF(new Exception(message).raiseError[Interpretation, UpdateResult])
+    case result                        => Kleisli.pure(result)
   }
 
   private def checkIfPersisted(eventId: CompoundEventId) = measureExecutionTime {
-    SqlQuery(
-      sql"""|SELECT event_id
-            |FROM event
-            |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId}""".stripMargin
-        .query[String]
-        .option
-        .map(_.isDefined),
-      name = "event update check existence"
-    )
+    SqlStatement(name = "event update check existence")
+      .select[EventId ~ projects.Id, EventId](
+        sql"""SELECT event_id
+                  FROM event
+                  WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder"""
+          .query(eventIdDecoder)
+      )
+      .arguments(eventId.id ~ eventId.projectId)
+      .build(_.option)
+      .mapResult(_.isDefined)
   }
 
-  private def maybeUpdateProcessingTimeQuery(command: ChangeStatusCommand[IO]) =
+  private def logInfo(command: ChangeStatusCommand[Interpretation], updateResult: UpdateResult) = updateResult match {
+    case Updated => logger.info(s"Event ${command.eventId} got ${command.status}")
+    case _       => ().pure[Interpretation]
+  }
+  private def maybeUpdateProcessingTimeQuery(command: ChangeStatusCommand[Interpretation]) =
     upsertStatusProcessingTime(command.eventId, command.status, command.maybeProcessingTime)
 
-  private def runUpdateQueriesIfSuccessful(queries: List[SqlQuery[Int]],
-                                           command: ChangeStatusCommand[IO]
-  ): ConnectionIO[UpdateResult] =
+  private def executeQueries(queries: List[SqlStatement[Interpretation, Int]],
+                             command: ChangeStatusCommand[Interpretation]
+  ) =
     queries
       .map(query => measureExecutionTime(query).map(query -> _))
       .sequence
@@ -137,10 +165,10 @@ object IOUpdateCommandsRunner {
 
   import cats.effect.IO
 
-  def apply(transactor:       DbTransactor[IO, EventLogDB],
-            queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
+  def apply(sessionResource:  SessionResource[IO, EventLogDB],
+            queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name],
             logger:           Logger[IO]
   ): IO[StatusUpdatesRunner[IO]] = IO {
-    new StatusUpdatesRunnerImpl(transactor, queriesExecTimes, logger)
+    new StatusUpdatesRunnerImpl(sessionResource, queriesExecTimes, logger)
   }
 }

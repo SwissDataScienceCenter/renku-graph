@@ -32,7 +32,9 @@ spec:
                   name: client-certificate-secret
                   key: client-certificate
             - name: EVENT_LOG_POSTGRES_HOST
-              value: "{{ template "postgresql.fullname" . }}:5432"
+              value: "{{ template "postgresql.fullname" . }}"
+            - name: EVENT_LOG_POSTGRES_PORT
+              value: "5432"
             - name: EVENT_LOG_POSTGRES_USER
               value: {{ .Values.global.graph.dbEventLog.postgresUser }}
             - name: EVENT_LOG_POSTGRES_PASSWORD

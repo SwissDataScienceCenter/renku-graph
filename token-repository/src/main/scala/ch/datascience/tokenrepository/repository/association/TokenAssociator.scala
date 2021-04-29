@@ -21,22 +21,22 @@ package ch.datascience.tokenrepository.repository.association
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.deletion.TokenRemover
 import ch.datascience.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private class TokenAssociator[Interpretiation[_]](
+private class TokenAssociator[Interpretiation[_]: MonadError[*[_], Throwable]](
     projectPathFinder:    ProjectPathFinder[Interpretiation],
     accessTokenCrypto:    AccessTokenCrypto[Interpretiation],
     associationPersister: AssociationPersister[Interpretiation],
     tokenRemover:         TokenRemover[Interpretiation]
-)(implicit ME:            MonadError[Interpretiation, Throwable]) {
+) {
 
   import accessTokenCrypto._
   import associationPersister._
@@ -57,8 +57,8 @@ private class TokenAssociator[Interpretiation[_]](
 
 private object IOTokenAssociator {
   def apply(
-      transactor:       DbTransactor[IO, ProjectsTokensDB],
-      queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
+      sessionResource:  SessionResource[IO, ProjectsTokensDB],
+      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name],
       logger:           Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
@@ -68,7 +68,7 @@ private object IOTokenAssociator {
     for {
       pathFinder        <- IOProjectPathFinder(logger)
       accessTokenCrypto <- AccessTokenCrypto[IO]()
-      persister    = new IOAssociationPersister(transactor, queriesExecTimes)
-      tokenRemover = new TokenRemover[IO](transactor, queriesExecTimes)
+      persister    = new IOAssociationPersister(sessionResource, queriesExecTimes)
+      tokenRemover = new TokenRemover[IO](sessionResource, queriesExecTimes)
     } yield new TokenAssociator[IO](pathFinder, accessTokenCrypto, persister, tokenRemover)
 }

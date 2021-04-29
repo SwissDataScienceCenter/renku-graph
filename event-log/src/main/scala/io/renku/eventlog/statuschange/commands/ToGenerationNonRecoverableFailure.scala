@@ -19,22 +19,23 @@
 package io.renku.eventlog.statuschange
 package commands
 
-import cats.MonadError
 import cats.data.{Kleisli, NonEmptyList}
-import cats.effect.{Bracket, Sync}
+import cats.effect.BracketThrow
 import cats.syntax.all._
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.SqlStatement
 import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
+import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
-import doobie.implicits._
 import eu.timepit.refined.auto._
-import io.renku.eventlog.{EventLogDB, EventMessage}
+import io.renku.eventlog.{EventMessage, ExecutionDate}
+import skunk._
+import skunk.data.Completion
+import skunk.implicits._
 
 import java.time.Instant
 
-final case class ToGenerationNonRecoverableFailure[Interpretation[_]: Bracket[*[_], Throwable]](
+final case class ToGenerationNonRecoverableFailure[Interpretation[_]: BracketThrow](
     eventId:                     CompoundEventId,
     message:                     EventMessage,
     underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
@@ -46,21 +47,31 @@ final case class ToGenerationNonRecoverableFailure[Interpretation[_]: Bracket[*[
 
   override lazy val status: EventStatus = GenerationNonRecoverableFailure
 
-  override def queries: NonEmptyList[SqlQuery[Int]] = NonEmptyList.of(
-    SqlQuery(
-      sql"""|UPDATE event 
-            |SET status = $status, execution_date = ${now()}, message = $message
-            |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${GeneratingTriples: EventStatus}
-            |""".stripMargin.update.run,
-      name = "generating_triples->generation_non_recoverable_fail"
-    )
+  override def queries: NonEmptyList[SqlStatement[Interpretation, Int]] = NonEmptyList.of(
+    SqlStatement(name = "generating_triples->generation_non_recoverable_fail")
+      .command[EventStatus ~ ExecutionDate ~ EventMessage ~ EventId ~ projects.Id ~ EventStatus](
+        sql"""UPDATE event
+                SET status = $eventStatusEncoder, execution_date = $executionDateEncoder, message = $eventMessageEncoder
+                WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND status = $eventStatusEncoder
+             """.command
+      )
+      .arguments(status ~ ExecutionDate(now()) ~ message ~ eventId.id ~ eventId.projectId ~ GeneratingTriples)
+      .build
+      .flatMapResult {
+        case Completion.Update(n) => n.pure[Interpretation]
+        case completion =>
+          new Exception(
+            s"generating_triples->generation_non_recoverable_fail time query failed with completion status $completion"
+          ).raiseError[Interpretation, Int]
+      }
   )
 
   override def updateGauges(
-      updateResult:      UpdateResult
-  )(implicit transactor: DbTransactor[Interpretation, EventLogDB]): Interpretation[Unit] = updateResult match {
-    case UpdateResult.Updated => findProjectPath(eventId) flatMap underTriplesGenerationGauge.decrement
-    case _                    => ().pure[Interpretation]
+      updateResult: UpdateResult
+  ): Kleisli[Interpretation, Session[Interpretation], Unit] = updateResult match {
+    case UpdateResult.Updated =>
+      findProjectPath(eventId).flatMap(label => Kleisli.liftF(underTriplesGenerationGauge.decrement(label)))
+    case _ => Kleisli.pure(())
   }
 }
 
@@ -69,10 +80,8 @@ object ToGenerationNonRecoverableFailure {
   import ChangeStatusRequest.EventOnlyRequest
   import CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
 
-  def factory[Interpretation[_]: Sync](
+  def factory[Interpretation[_]: BracketThrow](
       underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path]
-  )(implicit
-      ME: MonadError[Interpretation, Throwable]
   ): Kleisli[Interpretation, ChangeStatusRequest, CommandFindingResult] = Kleisli.fromFunction {
     case EventOnlyRequest(eventId, GenerationNonRecoverableFailure, maybeProcessingTime, Some(message)) =>
       CommandFound(

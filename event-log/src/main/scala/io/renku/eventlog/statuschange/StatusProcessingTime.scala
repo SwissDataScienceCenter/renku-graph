@@ -18,24 +18,31 @@
 
 package io.renku.eventlog.statuschange
 
-import ch.datascience.db.SqlQuery
-import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
-import doobie.implicits._
+import cats.effect.BracketThrow
+import ch.datascience.db.SqlStatement
+import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
+import ch.datascience.graph.model.projects
 import eu.timepit.refined.auto._
 import io.renku.eventlog.TypeSerializers
+import skunk._
+import skunk.implicits._
 
 trait StatusProcessingTime extends TypeSerializers {
-  def upsertStatusProcessingTime(eventId:             CompoundEventId,
-                                 status:              EventStatus,
-                                 maybeProcessingTime: Option[EventProcessingTime]
-  ): Option[SqlQuery[Int]] = maybeProcessingTime.map { processingTime =>
-    SqlQuery[Int](
-      query = sql"""|INSERT INTO status_processing_time(event_id, project_id, status, processing_time)
-                    |VALUES(${eventId.id}, ${eventId.projectId}, $status, $processingTime)
-                    |ON CONFLICT (event_id, project_id, status)
-                    |DO UPDATE SET processing_time = EXCLUDED.processing_time;
-                    |""".stripMargin.update.run.map(_ => 1),
-      name = "upsert_processing_time"
-    )
+  def upsertStatusProcessingTime[Interpretation[_]: BracketThrow](
+      eventId:             CompoundEventId,
+      status:              EventStatus,
+      maybeProcessingTime: Option[EventProcessingTime]
+  ): Option[SqlStatement[Interpretation, Int]] = maybeProcessingTime.map { processingTime =>
+    SqlStatement(name = "upsert_processing_time")
+      .command[EventId ~ projects.Id ~ EventStatus ~ EventProcessingTime](
+        sql"""INSERT INTO status_processing_time(event_id, project_id, status, processing_time)
+                VALUES($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $eventProcessingTimeEncoder)
+                ON CONFLICT (event_id, project_id, status)
+                DO UPDATE SET processing_time = EXCLUDED.processing_time;
+                """.command
+      )
+      .arguments(eventId.id ~ eventId.projectId ~ status ~ processingTime)
+      .build
+      .mapResult(_ => 1)
   }
 }

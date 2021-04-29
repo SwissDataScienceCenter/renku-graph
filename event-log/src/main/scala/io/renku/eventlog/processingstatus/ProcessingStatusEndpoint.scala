@@ -19,11 +19,11 @@
 package io.renku.eventlog.processingstatus
 
 import cats.MonadError
-import ch.datascience.db.{DbTransactor, SqlQuery}
-import ch.datascience.http.{ErrorMessage, InfoMessage}
+import ch.datascience.db.{SessionResource, SqlStatement}
+import ch.datascience.http.ErrorMessage
 import ch.datascience.metrics.LabeledHistogram
-import io.chrisdavenport.log4cats.Logger
 import org.http4s.dsl.Http4sDsl
+import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
@@ -34,9 +34,9 @@ class ProcessingStatusEndpoint[Interpretation[_]](
     extends Http4sDsl[Interpretation] {
 
   import cats.syntax.all._
+  import ch.datascience.graph.model.projects
   import ch.datascience.http.ErrorMessage._
   import ch.datascience.http.InfoMessage
-  import ch.datascience.graph.model.projects
   import io.circe.Encoder
   import io.circe.literal._
   import io.circe.syntax._
@@ -78,15 +78,16 @@ class ProcessingStatusEndpoint[Interpretation[_]](
 }
 
 object IOProcessingStatusEndpoint {
+
   import cats.effect.{ContextShift, IO}
   import io.renku.eventlog.EventLogDB
 
   def apply(
-      transactor:          DbTransactor[IO, EventLogDB],
-      queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name],
+      sessionResource:     SessionResource[IO, EventLogDB],
+      queriesExecTimes:    LabeledHistogram[IO, SqlStatement.Name],
       logger:              Logger[IO]
   )(implicit contextShift: ContextShift[IO]): IO[ProcessingStatusEndpoint[IO]] =
     for {
-      statusFinder <- IOProcessingStatusFinder(transactor, queriesExecTimes)
+      statusFinder <- IOProcessingStatusFinder(sessionResource, queriesExecTimes)
     } yield new ProcessingStatusEndpoint[IO](statusFinder, logger)
 }

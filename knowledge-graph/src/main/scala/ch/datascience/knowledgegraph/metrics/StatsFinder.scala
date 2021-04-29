@@ -25,9 +25,9 @@ import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import eu.timepit.refined.auto._
-import io.chrisdavenport.log4cats.Logger
 import io.circe.Decoder.decodeList
 import io.circe.{Decoder, DecodingFailure}
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
@@ -108,9 +108,14 @@ private object EntityCount {
   private[metrics] implicit val countsDecoder: Decoder[List[(EntityType, EntitiesCount)]] = {
     val counts: Decoder[(EntityType, EntitiesCount)] = { cursor =>
       for {
-        entityType <- cursor.downField("type").downField("value").as[String].flatMap(convert[String, EntityType])
-        count      <- cursor.downField("count").downField("value").as[Long].flatMap(convert[Long, EntitiesCount])
-      } yield entityType -> count
+        entityType <- cursor
+                        .downField("type")
+                        .downField("value")
+                        .as[String]
+                        .flatMap(convert[String, EntityType](EntityType))
+        count <-
+          cursor.downField("count").downField("value").as[Long].flatMap(convert[Long, EntitiesCount](EntitiesCount))
+      } yield (entityType, count)
     }
 
     _.downField("results")

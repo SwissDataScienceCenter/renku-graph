@@ -18,13 +18,13 @@
 
 package ch.datascience.tinytypes.constraints
 
-import java.time.{Clock, Instant, ZoneId}
-
 import ch.datascience.generators.Generators._
 import ch.datascience.tinytypes.{InstantTinyType, TinyTypeFactory}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+
+import java.time.{Clock, Instant, ZoneId}
 
 class InstantNotInTheFutureSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 

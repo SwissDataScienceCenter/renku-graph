@@ -23,7 +23,7 @@ import cats.effect._
 import cats.syntax.all._
 import ch.datascience.http.ErrorMessage
 import ch.datascience.knowledgegraph.lineage
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.Json
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{EntityDecoder, Request, Response}
@@ -106,6 +106,7 @@ private object QueryEndpoint {
 }
 
 object IOQueryEndpoint {
+
   import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 
   def apply(
@@ -115,9 +116,8 @@ object IOQueryEndpoint {
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[QueryEndpoint[IO]] =
-    for {
-      queryContext <- IOQueryContext(timeRecorder, logger)
-      querySchema = QuerySchema[IO](lineage.graphql.QueryFields())
-    } yield new QueryEndpoint[IO](querySchema, new QueryRunner(querySchema, queryContext))
+  ): IO[QueryEndpoint[IO]] = for {
+    queryContext <- QueryContext(timeRecorder, logger)
+    querySchema = QuerySchema[IO](lineage.graphql.QueryFields())
+  } yield new QueryEndpoint[IO](querySchema, new QueryRunner(querySchema, queryContext))
 }

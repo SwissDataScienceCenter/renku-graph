@@ -24,12 +24,11 @@ import ch.datascience.control.Throttler
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.http.client.IORestClient
 import ch.datascience.http.client.RestClientError.ConnectivityException
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 private trait EventsSender[Interpretation[_], CategoryEvent] {
   def sendEvent(subscriptionUrl: SubscriberUrl, categoryEvent: CategoryEvent): Interpretation[SendingResult]
@@ -38,9 +37,9 @@ private trait EventsSender[Interpretation[_], CategoryEvent] {
 private object EventsSender {
   sealed trait SendingResult extends Product with Serializable
   object SendingResult {
-    case object Delivered    extends SendingResult
-    case object ServiceBusy  extends SendingResult
-    case object Misdelivered extends SendingResult
+    case object Delivered              extends SendingResult
+    case object TemporarilyUnavailable extends SendingResult
+    case object Misdelivered           extends SendingResult
   }
 }
 
@@ -78,10 +77,10 @@ private class EventsSenderImpl[CategoryEvent](
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[SendingResult]] = {
     case (Accepted, _, _)           => Delivered.pure[IO]
-    case (TooManyRequests, _, _)    => ServiceBusy.pure[IO]
-    case (NotFound, _, _)           => Misdelivered.pure[IO]
-    case (BadGateway, _, _)         => Misdelivered.pure[IO]
-    case (ServiceUnavailable, _, _) => ServiceBusy.pure[IO]
+    case (TooManyRequests, _, _)    => TemporarilyUnavailable.pure[IO]
+    case (ServiceUnavailable, _, _) => TemporarilyUnavailable.pure[IO]
+    case (NotFound, _, _)           => TemporarilyUnavailable.pure[IO] // to mitigate k8s problems
+    case (BadGateway, _, _)         => TemporarilyUnavailable.pure[IO] // to mitigate k8s problems
   }
 
   private def connectivityException(to: SendingResult): PartialFunction[Throwable, IO[SendingResult]] = {

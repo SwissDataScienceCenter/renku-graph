@@ -18,78 +18,84 @@
 
 package ch.datascience.graph.acceptancetests.db
 
-import cats.data.NonEmptyList
-import cats.effect.{ContextShift, IO}
-import ch.datascience.db.{DBConfigProvider, DbTransactor}
+import cats.data.{Kleisli, NonEmptyList}
+import cats.effect.{Concurrent, ContextShift, IO, Resource}
+import ch.datascience.db.{DBConfigProvider, SessionResource}
 import ch.datascience.graph.acceptancetests.tooling.TestLogger
 import ch.datascience.graph.model.events.{CommitId, EventId, EventStatus}
+import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Id
-import com.dimafeng.testcontainers.{Container, JdbcDatabaseContainer, PostgreSQLContainer}
-import doobie.Transactor
-import doobie.free.connection.ConnectionIO
-import doobie.implicits._
-import doobie.util.fragments.in
+import com.dimafeng.testcontainers.FixedHostPortGenericContainer
 import io.renku.eventlog._
-import org.testcontainers.utility.DockerImageName
+import natchez.Trace.Implicits.noop
+import skunk._
+import skunk.implicits._
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.language.postfixOps
 
 object EventLog extends TypeSerializers {
 
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
+  private implicit val concurrent:   Concurrent[IO]   = IO.ioConcurrentEffect
   private val logger = TestLogger()
 
-  def findEvents(projectId: Id): List[(EventId, EventStatus)] = execute {
-    fr"""
-     SELECT event_id, status
-     FROM event
-     WHERE project_id = $projectId"""
-      .query[(EventId, EventStatus)]
-      .to[List]
+  def findEvents(projectId: Id): List[(EventId, EventStatus)] = execute { session =>
+    val query: Query[projects.Id, (EventId, EventStatus)] =
+      sql"""SELECT event_id, status
+            FROM event
+            WHERE project_id = $projectIdEncoder"""
+        .query(eventIdDecoder ~ eventStatusDecoder)
+        .map { case id ~ status => (id, status) }
+    session.prepare(query).use(_.stream(projectId, 32).compile.toList)
   }
 
-  def findEvents(projectId: Id, status: EventStatus*): List[CommitId] = execute {
-    (fr"""
-     SELECT event_id
-     FROM event
-     WHERE project_id = $projectId AND """ ++ `status IN`(status.toList))
-      .query[EventId]
-      .to[List]
-      .map(_.map(eventId => CommitId(eventId.value)))
+  def findEvents(projectId: Id, status: EventStatus*): List[CommitId] = execute { session =>
+    val query: Query[projects.Id, CommitId] =
+      sql"""SELECT event_id
+            FROM event
+            WHERE project_id = $projectIdEncoder AND #${`status IN`(status.toList)}"""
+        .query(eventIdDecoder)
+        .map(eventId => CommitId(eventId.value))
+    session.prepare(query).use(_.stream(projectId, 32).compile.toList)
   }
 
   private def `status IN`(status: List[EventStatus]) =
-    in(fr"status", NonEmptyList.fromListUnsafe(status))
+    s"status IN (${NonEmptyList.fromListUnsafe(status).map(el => s"'$el'").toList.mkString(",")})"
 
-  def execute[O](query: ConnectionIO[O]): O =
-    query
-      .transact(transactor.get)
+  def execute[O](query: Session[IO] => IO[O]): O =
+    sessionResource
+      .use(_.useK(Kleisli[IO, Session[IO], O](session => query(session))))
       .unsafeRunSync()
 
   private val dbConfig: DBConfigProvider.DBConfig[EventLogDB] =
     new EventLogDbConfigProvider[IO].get().unsafeRunSync()
 
-  private val postgresContainer: Container with JdbcDatabaseContainer = PostgreSQLContainer(
-    dockerImageNameOverride = DockerImageName.parse("postgres:9.6.19-alpine"),
-    databaseName = "event_log",
-    username = dbConfig.user.value,
-    password = dbConfig.pass
+  private val postgresContainer = FixedHostPortGenericContainer(
+    imageName = "postgres:9.6.19-alpine",
+    env = Map("POSTGRES_USER"     -> dbConfig.user.value,
+              "POSTGRES_PASSWORD" -> dbConfig.pass.value,
+              "POSTGRES_DB"       -> dbConfig.name.value
+    ),
+    exposedPorts = Seq(dbConfig.port.value),
+    exposedHostPort = dbConfig.port.value,
+    exposedContainerPort = dbConfig.port.value,
+    command = Seq(s"-p ${dbConfig.port.value}")
   )
-
-  lazy val jdbcUrl: String = postgresContainer.jdbcUrl
 
   def startDB(): IO[Unit] = for {
     _ <- IO(postgresContainer.start())
     _ <- logger.info("event_log DB started")
   } yield ()
 
-  private lazy val transactor: DbTransactor[IO, EventLogDB] = DbTransactor[IO, EventLogDB] {
-    Transactor.fromDriverManager[IO](
-      dbConfig.driver.value,
-      postgresContainer.jdbcUrl,
-      dbConfig.user.value,
-      dbConfig.pass
-    )
-  }
+  private lazy val sessionResource: Resource[IO, SessionResource[IO, EventLogDB]] =
+    Session
+      .pooled(
+        host = postgresContainer.host,
+        port = postgresContainer.container.getMappedPort(dbConfig.port.value),
+        database = dbConfig.name.value,
+        user = dbConfig.user.value,
+        password = Some(dbConfig.pass.value),
+        max = dbConfig.connectionPool.value
+      )
+      .map(new SessionResource(_))
 }

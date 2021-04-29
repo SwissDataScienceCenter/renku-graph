@@ -18,53 +18,60 @@
 
 package io.renku.eventlog.init
 
-import cats.effect.Bracket
+import cats.data.Kleisli
+import cats.effect.BracketThrow
 import cats.syntax.all._
-import ch.datascience.db.DbTransactor
-import doobie.implicits._
-import io.chrisdavenport.log4cats.Logger
+import ch.datascience.db.SessionResource
 import io.renku.eventlog.EventLogDB
+import org.typelevel.log4cats.Logger
+import skunk._
+import skunk.codec.all._
+import skunk.implicits._
 
 private trait ProjectPathRemover[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
 private object ProjectPathRemover {
-  def apply[Interpretation[_]](
-      transactor: DbTransactor[Interpretation, EventLogDB],
-      logger:     Logger[Interpretation]
-  )(implicit ME:  Bracket[Interpretation, Throwable]): ProjectPathRemover[Interpretation] =
-    new ProjectPathRemoverImpl(transactor, logger)
+  def apply[Interpretation[_]: BracketThrow](
+      sessionResource: SessionResource[Interpretation, EventLogDB],
+      logger:          Logger[Interpretation]
+  ): ProjectPathRemover[Interpretation] =
+    new ProjectPathRemoverImpl(sessionResource, logger)
 }
 
-private class ProjectPathRemoverImpl[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB],
-    logger:     Logger[Interpretation]
-)(implicit ME:  Bracket[Interpretation, Throwable])
-    extends ProjectPathRemover[Interpretation]
-    with EventTableCheck[Interpretation] {
+private class ProjectPathRemoverImpl[Interpretation[_]: BracketThrow](
+    sessionResource: SessionResource[Interpretation, EventLogDB],
+    logger:          Logger[Interpretation]
+) extends ProjectPathRemover[Interpretation]
+    with EventTableCheck {
 
-  private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
-
-  override def run(): Interpretation[Unit] =
+  override def run(): Interpretation[Unit] = sessionResource.useK {
     whenEventTableExists(
-      logger info "'project_path' column dropping skipped",
-      otherwise = checkColumnExists flatMap {
-        case false => logger info "'project_path' column already removed"
-        case true  => removeColumn()
+      Kleisli.liftF(logger info "'project_path' column dropping skipped"),
+      otherwise = checkColumnExists >>= {
+        case false =>
+          Kleisli.liftF[Interpretation, Session[Interpretation], Unit](
+            logger info "'project_path' column already removed"
+          )
+        case true => removeColumn()
       }
     )
+  }
 
-  private def checkColumnExists: Interpretation[Boolean] =
-    sql"select project_path from event_log limit 1"
-      .query[String]
-      .option
-      .transact(transactor.get)
-      .map(_ => true)
-      .recover { case _ => false }
+  private lazy val checkColumnExists = {
+    val query: Query[Void, String] = sql"select project_path from event_log limit 1".query(varchar)
+    Kleisli[Interpretation, Session[Interpretation], Boolean] {
+      _.option(query)
+        .map(_ => true)
+        .recover { case _ => false }
+    }
+  }
 
-  private def removeColumn() = for {
-    _ <- execute(sql"ALTER TABLE event_log DROP COLUMN IF EXISTS project_path")
-    _ <- logger info "'project_path' column removed"
-  } yield ()
+  private def removeColumn(): Kleisli[Interpretation, Session[Interpretation], Unit] =
+    for {
+      _ <- execute(sql"ALTER TABLE event_log DROP COLUMN IF EXISTS project_path".command)
+      _ <- Kleisli.liftF(logger info "'project_path' column removed")
+    } yield ()
+
 }

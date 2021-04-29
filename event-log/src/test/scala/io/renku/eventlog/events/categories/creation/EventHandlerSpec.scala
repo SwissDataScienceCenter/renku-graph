@@ -27,10 +27,8 @@ import ch.datascience.events.consumers.{EventRequestContent, Project}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventStatus
-import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level._
-import ch.datascience.metrics.LabeledGauge
 import io.circe.literal.JsonStringContext
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
@@ -65,7 +63,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     }
 
     s"return $BadRequest if the eventJson is malformed" in new TestCase {
-      val event = jsons.generateOne deepMerge (json""" {"categoryName":${categoryName.value} }""")
+      val event = jsons.generateOne deepMerge json""" {"categoryName":${categoryName.value} }"""
 
       val requestContent = eventRequestContents.generateOne.copy(event)
 
@@ -87,7 +85,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     unacceptableStatuses.foreach { unacceptableStatus =>
       s"return $BadRequest if the event status is $unacceptableStatus" in new TestCase {
         val event =
-          newOrSkippedEvents.generateOne.asJson deepMerge (json"""{"status": ${unacceptableStatus.value}}""")
+          newOrSkippedEvents.generateOne.asJson deepMerge json"""{"status": ${unacceptableStatus.value}}"""
 
         val requestContent = eventRequestContents.generateOne.copy(event)
 

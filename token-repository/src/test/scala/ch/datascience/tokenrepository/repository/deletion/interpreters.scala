@@ -19,23 +19,15 @@
 package ch.datascience.tokenrepository.repository.deletion
 
 import cats.effect._
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
-import io.chrisdavenport.log4cats.Logger
-
-import scala.util.Try
-
-class TryTokenRemover(
-    transactor:       DbTransactor[Try, ProjectsTokensDB],
-    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
-)(implicit ME:        Bracket[Try, Throwable])
-    extends TokenRemover[Try](transactor, queriesExecTimes)
+import org.typelevel.log4cats.Logger
 
 class IOTokenRemover(
-    transactor:       DbTransactor[IO, ProjectsTokensDB],
-    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
-) extends TokenRemover[IO](transactor, queriesExecTimes)
+    sessionResource:  SessionResource[IO, ProjectsTokensDB],
+    queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
+) extends TokenRemover[IO](sessionResource, queriesExecTimes)
 
 class IODeleteTokenEndpoint(tokenRemover: TokenRemover[IO], logger: Logger[IO])
     extends DeleteTokenEndpoint[IO](tokenRemover, logger)

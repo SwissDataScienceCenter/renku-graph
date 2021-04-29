@@ -18,7 +18,7 @@
 
 package ch.datascience.tokenrepository.repository.fetching
 
-import ch.datascience.db.SqlQuery
+import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.metrics.TestLabeledHistogram
@@ -59,7 +59,7 @@ class PersistedTokensFinderSpec extends AnyWordSpec with InMemoryProjectsTokensD
     val projectId   = projectIds.generateOne
     val projectPath = projectPaths.generateOne
 
-    private val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
-    val finder                   = new PersistedTokensFinder(transactor, queriesExecTimes)
+    private val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
+    val finder                   = new PersistedTokensFinder(sessionResource, queriesExecTimes)
   }
 }

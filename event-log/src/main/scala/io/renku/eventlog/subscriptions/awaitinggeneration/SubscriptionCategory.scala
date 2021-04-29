@@ -19,11 +19,11 @@
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.renku.eventlog.subscriptions._
 import io.renku.eventlog.{EventLogDB, subscriptions}
 
@@ -34,10 +34,10 @@ private[subscriptions] object SubscriptionCategory {
   val name: CategoryName = CategoryName("AWAITING_GENERATION")
 
   def apply(
-      transactor:                     DbTransactor[IO, EventLogDB],
+      sessionResource:                SessionResource[IO, EventLogDB],
       awaitingTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
       underTriplesGenerationGauge:    LabeledGauge[IO, projects.Path],
-      queriesExecTimes:               LabeledHistogram[IO, SqlQuery.Name],
+      queriesExecTimes:               LabeledHistogram[IO, SqlStatement.Name],
       subscriberTracker:              SubscriberTracker[IO],
       logger:                         Logger[IO]
   )(implicit
@@ -46,24 +46,23 @@ private[subscriptions] object SubscriptionCategory {
       timer:            Timer[IO]
   ): IO[subscriptions.SubscriptionCategory[IO]] = for {
     subscribers <- Subscribers(name, subscriberTracker, logger)
-    eventFetcher <- IOAwaitingGenerationEventFinder(transactor,
+    eventFetcher <- IOAwaitingGenerationEventFinder(sessionResource,
                                                     subscribers,
                                                     awaitingTriplesGenerationGauge,
                                                     underTriplesGenerationGauge,
                                                     queriesExecTimes
                     )
-    dispatchRecovery <- DispatchRecovery(transactor,
+    dispatchRecovery <- DispatchRecovery(sessionResource,
                                          awaitingTriplesGenerationGauge,
                                          underTriplesGenerationGauge,
                                          queriesExecTimes,
                                          logger
                         )
-    eventDelivery <- EventDelivery[AwaitingGenerationEvent](transactor,
+    eventDelivery <- EventDelivery[AwaitingGenerationEvent](sessionResource,
                                                             compoundEventIdExtractor = (_: AwaitingGenerationEvent).id,
                                                             queriesExecTimes
                      )
     eventsDistributor <- IOEventsDistributor(name,
-                                             transactor,
                                              subscribers,
                                              eventFetcher,
                                              eventDelivery,

@@ -18,12 +18,15 @@
 
 package ch.datascience.db
 
-import ch.datascience.db.SqlQuery.Name
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.collection.NonEmpty
+import cats.effect.Sync
+import skunk.PreparedQuery
 
-final case class SqlQuery[ResultType](query: doobie.ConnectionIO[ResultType], name: Name)
+object implicits {
 
-object SqlQuery {
-  type Name = String Refined NonEmpty
+  implicit class PreparedQueryOps[Interpretation[_], In, Out](
+      preparedQuery: PreparedQuery[Interpretation, In, Out]
+  ) {
+    def toList(implicit sync: Sync[Interpretation]): In => Interpretation[List[Out]] = args =>
+      preparedQuery.stream(args, chunkSize = 32).compile.toList
+  }
 }

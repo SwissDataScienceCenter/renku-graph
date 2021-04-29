@@ -18,61 +18,66 @@
 
 package io.renku.eventlog.statuschange.commands
 
-import cats.MonadError
 import cats.data.{Kleisli, NonEmptyList}
-import cats.effect.{Bracket, Sync}
+import cats.effect.BracketThrow
 import cats.syntax.all._
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.SqlStatement
 import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
+import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
-import doobie.implicits._
 import eu.timepit.refined.auto._
-import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.ExecutionDate
 import io.renku.eventlog.statuschange.ChangeStatusRequest.EventOnlyRequest
 import io.renku.eventlog.statuschange.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 import io.renku.eventlog.statuschange.{ChangeStatusRequest, CommandFindingResult}
+import skunk._
+import skunk.data.Completion
+import skunk.implicits._
 
 import java.time.Instant
 
-final case class ToTriplesStore[Interpretation[_]](
+final case class ToTriplesStore[Interpretation[_]: BracketThrow](
     eventId:                         CompoundEventId,
     underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
     maybeProcessingTime:             Option[EventProcessingTime],
     now:                             () => Instant = () => Instant.now
-)(implicit ME:                       Bracket[Interpretation, Throwable])
-    extends ChangeStatusCommand[Interpretation] {
+) extends ChangeStatusCommand[Interpretation] {
 
   override lazy val status: EventStatus = TriplesStore
 
-  override def queries: NonEmptyList[SqlQuery[Int]] = NonEmptyList.of(
-    SqlQuery(
-      query = upsertEventStatus,
-      name = "transforming_triples->triples_store"
-    )
+  override def queries: NonEmptyList[SqlStatement[Interpretation, Int]] = NonEmptyList.of(
+    SqlStatement(name = "transforming_triples->triples_store")
+      .command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus](
+        sql"""UPDATE event
+            SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
+            WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND status = $eventStatusEncoder
+            """.command
+      )
+      .arguments(status ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ TransformingTriples)
+      .build
+      .flatMapResult {
+        case Completion.Update(n) => n.pure[Interpretation]
+        case completion =>
+          new RuntimeException(
+            s"transforming_triples->triples_store time query failed with completion status $completion"
+          ).raiseError[Interpretation, Int]
+      }
   )
 
-  private lazy val upsertEventStatus =
-    sql"""|UPDATE event
-          |SET status = $status, execution_date = ${now()}
-          |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${TransformingTriples: EventStatus}
-          |""".stripMargin.update.run
-
   override def updateGauges(
-      updateResult:      UpdateResult
-  )(implicit transactor: DbTransactor[Interpretation, EventLogDB]): Interpretation[Unit] = updateResult match {
-    case UpdateResult.Updated => findProjectPath(eventId) flatMap underTriplesTransformationGauge.decrement
-    case _                    => ME.unit
+      updateResult: UpdateResult
+  ): Kleisli[Interpretation, Session[Interpretation], Unit] = updateResult match {
+    case UpdateResult.Updated =>
+      findProjectPath(eventId).flatMap(label => Kleisli.liftF(underTriplesTransformationGauge.decrement(label)))
+    case _ => Kleisli.pure(())
   }
 }
 
 private[statuschange] object ToTriplesStore {
-  def factory[Interpretation[_]: Sync](
+  def factory[Interpretation[_]: BracketThrow](
       underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path]
-  )(implicit
-      ME: MonadError[Interpretation, Throwable]
   ): Kleisli[Interpretation, ChangeStatusRequest, CommandFindingResult] = Kleisli.fromFunction {
     case EventOnlyRequest(eventId, TriplesStore, someTime @ Some(_), _) =>
       CommandFound(ToTriplesStore[Interpretation](eventId, underTriplesTransformationGauge, someTime))

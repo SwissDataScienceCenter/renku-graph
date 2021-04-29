@@ -18,14 +18,17 @@
 
 package io.renku.eventlog.init
 
+import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
+import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
-import doobie.implicits._
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk._
+import skunk.implicits._
 
 class ProjectPathRemoverSpec
     extends AnyWordSpec
@@ -38,7 +41,6 @@ class ProjectPathRemoverSpec
     eventLogTableCreator,
     projectPathAdder,
     batchDateAdder,
-    latestEventDatesViewRemover,
     projectTableCreator
   )
 
@@ -73,15 +75,20 @@ class ProjectPathRemoverSpec
 
   private trait TestCase {
     val logger             = TestLogger[IO]()
-    val projectPathRemover = new ProjectPathRemoverImpl[IO](transactor, logger)
+    val projectPathRemover = new ProjectPathRemoverImpl[IO](sessionResource, logger)
   }
 
-  private def checkColumnExists: Boolean =
-    sql"select project_path from event_log limit 1"
-      .query[String]
-      .option
-      .transact(transactor.get)
-      .map(_ => true)
-      .recover { case _ => false }
-      .unsafeRunSync()
+  private def checkColumnExists: Boolean = sessionResource
+    .useK {
+      Kleisli { session =>
+        val query: Query[Void, projects.Path] = sql"select project_path from event_log limit 1"
+          .query(projectPathDecoder)
+        session
+          .option(query)
+          .map(_ => true)
+          .recover { case _ => false }
+      }
+    }
+    .unsafeRunSync()
+
 }

@@ -18,11 +18,16 @@
 
 package ch.datascience.tokenrepository.repository
 
+import cats.data.Kleisli
+import cats.effect.IO
 import ch.datascience.db.DbSpec
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
-import doobie.implicits._
 import org.scalatest.TestSuite
+import skunk._
+import skunk.data.Completion
+import skunk.implicits._
+import skunk.codec.all._
 
 trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb {
   self: TestSuite =>
@@ -30,34 +35,45 @@ trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb 
   protected def initDb(): Unit = createTable()
 
   protected def prepareDbForTest(): Unit = execute {
-    sql"TRUNCATE TABLE projects_tokens".update.run.map(_ => ())
+    Kleisli[IO, Session[IO], Unit] { session =>
+      val query: Command[skunk.Void] = sql"TRUNCATE TABLE projects_tokens".command
+      session.execute(query).map(_ => ())
+    }
   }
 
   protected def insert(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken): Unit =
     execute {
-      sql"""insert into 
+      Kleisli[IO, Session[IO], Unit] { session =>
+        val query: Command[Int ~ String ~ String] =
+          sql"""insert into 
             projects_tokens (project_id, project_path, token) 
-            values (${projectId.value}, ${projectPath.value}, ${encryptedToken.value})
-         """.update.run
-        .map(assureInserted)
+            values ($int4, $varchar, $varchar)
+         """.command
+        session
+          .prepare(query)
+          .use(_.execute(projectId.value ~ projectPath.value ~ encryptedToken.value))
+          .map(assureInserted)
+      }
     }
 
-  private lazy val assureInserted: Int => Unit = {
-    case 1 => ()
-    case _ => fail("insertion problem")
+  private lazy val assureInserted: Completion => Unit = {
+    case Completion.Insert(1) => ()
+    case _                    => fail("insertion problem")
   }
 
-  protected def findToken(projectPath: Path): Option[String] =
-    sql"select token from projects_tokens where project_path = ${projectPath.value}"
-      .query[String]
-      .option
-      .transact(transactor.get)
-      .unsafeRunSync()
+  protected def findToken(projectPath: Path): Option[String] = sessionResource
+    .useK {
+      val query: Query[String, String] = sql"select token from projects_tokens where project_path = $varchar"
+        .query(varchar)
+      Kleisli(_.prepare(query).use(_.option(projectPath.value)))
+    }
+    .unsafeRunSync()
 
-  protected def findToken(projectId: Id): Option[String] =
-    sql"select token from projects_tokens where project_id = ${projectId.value}"
-      .query[String]
-      .option
-      .transact(transactor.get)
-      .unsafeRunSync()
+  protected def findToken(projectId: Id): Option[String] = sessionResource
+    .useK {
+      val query: Query[Int, String] = sql"select token from projects_tokens where project_id = $int4"
+        .query(varchar)
+      Kleisli(_.prepare(query).use(_.option(projectId.value)))
+    }
+    .unsafeRunSync()
 }

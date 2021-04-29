@@ -18,9 +18,6 @@
 
 package ch.datascience.rdfstore.entities
 
-import java.time.Instant
-import java.time.temporal.ChronoUnit._
-
 import cats.syntax.all._
 import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
@@ -51,31 +48,28 @@ object WorkflowRun {
       workflowFile:             WorkflowFile,
       informedBy:               Activity,
       associationFactory:       Project => Activity => WorkflowFile => WorkflowRunPlanAssociation,
-      startTime:                Instant = Instant.now(),
-      endTime:                  Instant = Instant.now().plus(10, SECONDS),
       maybeInfluenced:          Option[Activity] = None,
       processRunsFactories:     List[ActivityWorkflowRun => Step => Activity with ChildProcessRun],
       maybeInvalidation:        Option[Entity with Artifact] = None,
       maybeGenerationFactories: List[Activity => Generation] = Nil
-  ): ActivityWorkflowRun =
-    new Activity(commitId,
-                 committedDate,
-                 committer,
-                 project,
-                 agent,
-                 comment,
-                 Some(informedBy),
-                 maybeInfluenced,
-                 maybeInvalidation,
-                 maybeGenerationFactories
-    ) with WorkflowProcessRun with WorkflowRun {
-      override val processRunAssociation: WorkflowRunPlanAssociation = associationFactory(project)(this)(workflowFile)
-      override val processRunUsages:      List[Usage]                = processRunAssociation.runPlan.asUsages(this)
-      val workflowRunFile:                WorkflowFile               = workflowFile
-      val processRuns: List[Activity with ChildProcessRun] = processRunsFactories.zipWithIndex.map {
-        case (factory, idx) => factory(this)(Step(idx))
-      }
+  ): ActivityWorkflowRun = new Activity(commitId,
+                                        committedDate,
+                                        committer,
+                                        project,
+                                        agent,
+                                        comment,
+                                        Some(informedBy),
+                                        maybeInfluenced,
+                                        maybeInvalidation,
+                                        maybeGenerationFactories
+  ) with WorkflowProcessRun with WorkflowRun {
+    override val processRunAssociation: WorkflowRunPlanAssociation = associationFactory(project)(this)(workflowFile)
+    override val processRunUsages:      List[Usage]                = processRunAssociation.runPlan.asUsages(this)
+    val workflowRunFile:                WorkflowFile               = workflowFile
+    val processRuns: List[Activity with ChildProcessRun] = processRunsFactories.zipWithIndex.map {
+      case (factory, idx) => factory(this)(Step(idx))
     }
+  }
 
   private[entities] implicit def converter(implicit
       renkuBaseUrl:  RenkuBaseUrl,

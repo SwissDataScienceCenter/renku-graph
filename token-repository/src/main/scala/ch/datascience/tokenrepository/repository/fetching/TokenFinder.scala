@@ -20,17 +20,17 @@ package ch.datascience.tokenrepository.repository.fetching
 
 import cats.MonadError
 import cats.data.OptionT
-import cats.effect.{ContextShift, IO}
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import cats.effect.{Async, ContextShift, IO}
+import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository._
 
-private class TokenFinder[Interpretation[_]](
+private class TokenFinder[Interpretation[_]: Async: MonadError[*[_], Throwable]](
     tokenInRepoFinder: PersistedTokensFinder[Interpretation],
     accessTokenCrypto: AccessTokenCrypto[Interpretation]
-)(implicit ME:         MonadError[Interpretation, Throwable]) {
+) {
 
   import accessTokenCrypto._
 
@@ -49,13 +49,13 @@ private class TokenFinder[Interpretation[_]](
 
 private object IOTokenFinder {
   def apply(
-      transactor:          DbTransactor[IO, ProjectsTokensDB],
-      queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
+      sessionResource:     SessionResource[IO, ProjectsTokensDB],
+      queriesExecTimes:    LabeledHistogram[IO, SqlStatement.Name]
   )(implicit contextShift: ContextShift[IO]): IO[TokenFinder[IO]] =
     for {
       accessTokenCrypto <- AccessTokenCrypto[IO]()
     } yield new TokenFinder[IO](
-      new IOPersistedTokensFinder(transactor, queriesExecTimes),
+      new IOPersistedTokensFinder(sessionResource, queriesExecTimes),
       accessTokenCrypto
     )
 }

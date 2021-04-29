@@ -26,7 +26,7 @@ import ch.datascience.triplesgenerator.events.categories.triplesgenerated.Triple
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.{DataSetInfoEnricher, IODataSetInfoEnricher}
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails.PersonDetailsUpdater
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects.{IOProjectInfoUpdater, ProjectInfoUpdater}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 

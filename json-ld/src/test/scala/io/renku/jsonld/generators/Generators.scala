@@ -41,7 +41,7 @@ object Generators {
 
   def nonEmptyStrings(maxLength: Int = 10, charsGenerator: Gen[Char] = alphaChar): Gen[String] = {
     require(maxLength > 0)
-    nonBlankStrings(maxLength = Refined.unsafeApply(maxLength)) map (_.value)
+    nonBlankStrings(maxLength = Refined.unsafeApply(maxLength), charsGenerator = charsGenerator) map (_.value)
   }
 
   def nonBlankStrings(minLength:      Int Refined Positive = 1,
@@ -192,10 +192,6 @@ object Generators {
     Gen
       .choose(Instant.now().plus(10, MINS).toEpochMilli, Instant.now().plus(2000, DAYS).toEpochMilli)
       .map(Instant.ofEpochMilli)
-
-  implicit val zonedDateTimes: Gen[ZonedDateTime] =
-    timestamps
-      .map(ZonedDateTime.ofInstant(_, ZoneId.systemDefault))
 
   implicit val localDates: Gen[LocalDate] =
     timestamps

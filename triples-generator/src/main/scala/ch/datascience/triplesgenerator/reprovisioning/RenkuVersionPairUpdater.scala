@@ -21,13 +21,13 @@ package ch.datascience.triplesgenerator.reprovisioning
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.Schemas._
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.views.RdfResource
-import ch.datascience.rdfstore.SparqlQuery.{Prefix, Prefixes}
-import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
 import ch.datascience.graph.model.RenkuVersionPair
-import io.chrisdavenport.log4cats.Logger
-import io.renku.jsonld.EntityId
+import ch.datascience.graph.model.views.RdfResource
+import ch.datascience.rdfstore.SparqlQuery.Prefixes
+import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
 import eu.timepit.refined.auto._
+import io.renku.jsonld.EntityId
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 

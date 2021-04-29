@@ -19,165 +19,167 @@
 package io.renku.eventlog.metrics
 
 import cats.data.NonEmptyList
-import cats.effect.{Bracket, ContextShift, IO}
+import cats.effect.{BracketThrow, ContextShift, IO, Sync}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
-import ch.datascience.graph.model.events.{CategoryName, EventStatus}
+import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
+import ch.datascience.db.implicits._
+import ch.datascience.graph.model.events.{CategoryName, EventStatus, LastSyncedDate}
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.metrics.LabeledHistogram
-import doobie.implicits._
-import doobie.util.fragment.Fragment
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.eventlog._
-import io.renku.eventlog.subscriptions._
+import io.renku.eventlog.subscriptions.{SubscriptionTypeSerializers, commitsync, membersync}
+import skunk._
+import skunk.codec.all._
+import skunk.implicits._
 
 import java.time.Instant
 
 trait StatsFinder[Interpretation[_]] {
   def countEventsByCategoryName(): Interpretation[Map[CategoryName, Long]]
-  def statuses():                  Interpretation[Map[EventStatus, Long]]
+
+  def statuses(): Interpretation[Map[EventStatus, Long]]
+
   def countEvents(statuses:   Set[EventStatus],
                   maybeLimit: Option[Int Refined Positive] = None
   ): Interpretation[Map[Path, Long]]
 }
 
-class StatsFinderImpl(
-    transactor:       DbTransactor[IO, EventLogDB],
-    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
+class StatsFinderImpl[Interpretation[_]: Sync: BracketThrow](
+    sessionResource:  SessionResource[Interpretation, EventLogDB],
+    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
     now:              () => Instant = () => Instant.now
-)(implicit ME:        Bracket[IO, Throwable])
-    extends DbClient(Some(queriesExecTimes))
-    with StatsFinder[IO]
-    with TypeSerializers {
+) extends DbClient(Some(queriesExecTimes))
+    with StatsFinder[Interpretation]
+    with SubscriptionTypeSerializers {
 
-  override def countEventsByCategoryName(): IO[Map[CategoryName, Long]] =
-    measureExecutionTime(countEventsPerCategoryName)
-      .transact(transactor.get)
-      .map(_.toMap)
+  override def countEventsByCategoryName(): Interpretation[Map[CategoryName, Long]] = sessionResource.useK {
+    measureExecutionTime(countEventsPerCategoryName).map(_.toMap)
+  }
 
-  private lazy val countEventsPerCategoryName = SqlQuery(
-    sql"""|SELECT all_counts.category_name, SUM(all_counts.count)
-          |FROM (
-          |  (
-          |    SELECT sync_time.category_name, COUNT(DISTINCT proj.project_id) AS count
-          |    FROM project proj
-          |    JOIN subscription_category_sync_time sync_time
-          |      ON sync_time.project_id = proj.project_id AND sync_time.category_name = ${membersync.categoryName.value}
-          |    WHERE
-          |         ((${now()} - proj.latest_event_date) < INTERVAL '1 hour' AND (${now()} - sync_time.last_synced) > INTERVAL '1 minute')
-          |      OR ((${now()} - proj.latest_event_date) < INTERVAL '1 day'  AND (${now()} - sync_time.last_synced) > INTERVAL '1 hour')
-          |      OR ((${now()} - proj.latest_event_date) > INTERVAL '1 day'  AND (${now()} - sync_time.last_synced) > INTERVAL '1 day')
-          |    GROUP BY sync_time.category_name
-          |  ) UNION ALL (
-          |    SELECT ${membersync.categoryName.value} AS category_name, COUNT(DISTINCT proj.project_id) AS count
-          |    FROM project proj
-          |    WHERE proj.project_id NOT IN (
-          |      SELECT project_id 
-          |      FROM subscription_category_sync_time 
-          |      WHERE category_name = ${membersync.categoryName.value}
-          |    )
-          |  ) UNION ALL (
-          |    SELECT sync_time.category_name, COUNT(DISTINCT proj.project_id) AS count
-          |    FROM project proj
-          |    JOIN subscription_category_sync_time sync_time
-          |      ON sync_time.project_id = proj.project_id AND sync_time.category_name = ${commitsync.categoryName.value}
-          |    WHERE
-          |         ((${now()} - proj.latest_event_date) <= INTERVAL '7 days' AND (${now()} - sync_time.last_synced) > INTERVAL '1 hour')
-          |      OR ((${now()} - proj.latest_event_date) >  INTERVAL '7 days' AND (${now()} - sync_time.last_synced) > INTERVAL '1 day')
-          |    GROUP BY sync_time.category_name
-          |  ) UNION ALL (
-          |    SELECT ${commitsync.categoryName.value} AS category_name, COUNT(DISTINCT proj.project_id) AS count
-          |    FROM project proj
-          |    WHERE proj.project_id NOT IN (
-          |      SELECT project_id 
-          |      FROM subscription_category_sync_time 
-          |      WHERE category_name = ${commitsync.categoryName.value}
-          |    )
-          |  )
-          |) all_counts
-          |GROUP BY all_counts.category_name
-          |""".stripMargin
-      .query[(CategoryName, Long)]
-      .to[List],
-    name = "category name events count"
-  )
+  // format: off
 
-  override def statuses(): IO[Map[EventStatus, Long]] =
+  private def countEventsPerCategoryName = {
+    val (eventDate, lastSyncedDate) = (EventDate.apply _ &&& LastSyncedDate.apply _) (now())
+    SqlStatement(name = "category name events count").select[CategoryName ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~
+      CategoryName ~ CategoryName ~ CategoryName ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ CategoryName ~
+      CategoryName, (CategoryName, Long)](
+      sql"""
+          SELECT all_counts.category_name, SUM(all_counts.count)
+          FROM (
+            (
+              SELECT sync_time.category_name, COUNT(DISTINCT proj.project_id) AS count
+              FROM project proj
+              JOIN subscription_category_sync_time sync_time
+                ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryNameEncoder
+              WHERE
+                   (($eventDateEncoder - proj.latest_event_date) < INTERVAL '1 hour' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 minute')
+                OR (($eventDateEncoder - proj.latest_event_date) < INTERVAL '1 day'  AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 hour')
+                OR (($eventDateEncoder - proj.latest_event_date) > INTERVAL '1 day'  AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 day')
+              GROUP BY sync_time.category_name
+            ) UNION ALL (
+              SELECT $categoryNameEncoder AS category_name, COUNT(DISTINCT proj.project_id) AS count
+              FROM project proj
+              WHERE proj.project_id NOT IN (
+                SELECT project_id
+                FROM subscription_category_sync_time
+                WHERE category_name = $categoryNameEncoder
+              )
+            ) UNION ALL (
+              SELECT sync_time.category_name, COUNT(DISTINCT proj.project_id) AS count
+              FROM project proj
+              JOIN subscription_category_sync_time sync_time
+                ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryNameEncoder
+              WHERE
+                   (($eventDateEncoder - proj.latest_event_date) <= INTERVAL '7 days' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 hour')
+                OR (($eventDateEncoder - proj.latest_event_date) >  INTERVAL '7 days' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 day')
+              GROUP BY sync_time.category_name
+            ) UNION ALL (
+              SELECT $categoryNameEncoder AS category_name, COUNT(DISTINCT proj.project_id) AS count
+              FROM project proj
+              WHERE proj.project_id NOT IN (
+                SELECT project_id
+                FROM subscription_category_sync_time
+                WHERE category_name = $categoryNameEncoder
+              )
+            )
+          ) all_counts
+          GROUP BY all_counts.category_name
+          """.query(categoryNameDecoder ~ numeric).map { case categoryName ~ (count: BigDecimal) => (categoryName, count.longValue) }
+    ).arguments(membersync.categoryName ~ eventDate ~ lastSyncedDate ~ eventDate ~ lastSyncedDate ~ eventDate ~
+      lastSyncedDate ~ membersync.categoryName ~ membersync.categoryName ~ commitsync.categoryName ~ eventDate ~
+      lastSyncedDate ~ eventDate ~ lastSyncedDate ~ commitsync.categoryName ~ commitsync.categoryName).build(_.toList)
+  }
+
+  override def statuses(): Interpretation[Map[EventStatus, Long]] = sessionResource.useK { 
     measureExecutionTime(findStatuses)
-      .transact(transactor.get)
       .map(_.toMap)
       .map(addMissingStatues)
+  }
 
-  private lazy val findStatuses = SqlQuery(
-    sql"""SELECT status, COUNT(event_id) FROM event GROUP BY status;""".stripMargin
-      .query[(EventStatus, Long)]
-      .to[List],
-    name = "statuses count"
-  )
+  private lazy val findStatuses: SqlStatement[Interpretation, List[(EventStatus, Long)]] = SqlStatement(name = "statuses count").select[Void, (EventStatus, Long)](
+        sql"""SELECT status, COUNT(event_id) FROM event GROUP BY status;"""
+          .query(eventStatusDecoder ~ int8)
+          .map { case status ~ count => (status, count) }
+  ).arguments(Void).build(_.toList)
+
 
   private def addMissingStatues(stats: Map[EventStatus, Long]): Map[EventStatus, Long] =
     EventStatus.all.map(status => status -> stats.getOrElse(status, 0L)).toMap
 
-  override def countEvents(statuses:   Set[EventStatus],
+  override def countEvents(statuses: Set[EventStatus],
                            maybeLimit: Option[Int Refined Positive] = None
-  ): IO[Map[Path, Long]] =
+                          ): Interpretation[Map[Path, Long]] =
     NonEmptyList.fromList(statuses.toList) match {
-      case None => Map.empty[Path, Long].pure[IO]
+      case None => Map.empty[Path, Long].pure[Interpretation]
       case Some(statusesList) =>
-        measureExecutionTime(countProjectsEvents(statusesList, maybeLimit))
-          .transact(transactor.get)
-          .map(_.toMap)
+        sessionResource.useK {
+          measureExecutionTime(countProjectsEvents(statusesList, maybeLimit))
+            .map(_.toMap)
+        }
     }
 
-  private def countProjectsEvents(statuses:   NonEmptyList[EventStatus],
+  private def countProjectsEvents(statuses: NonEmptyList[EventStatus],
                                   maybeLimit: Option[Int Refined Positive] = None
-  ) = maybeLimit match {
-    case None        => prepareQuery(statuses)
+                                 ) = maybeLimit match {
+    case None => prepareQuery(statuses)
     case Some(limit) => prepareQuery(statuses, limit)
   }
 
-  private def prepareQuery(statuses: NonEmptyList[EventStatus]) = SqlQuery(
-    query = Fragment
-      .const {
-        s"""|SELECT
-            |  project_path,
-            |  (SELECT count(event_id) FROM event evt_int WHERE evt_int.project_id = prj.project_id AND status IN (${statuses.toSql})) AS count
-            |FROM project prj
-            |WHERE EXISTS (
-            |        SELECT project_id
-            |        FROM event evt
-            |        WHERE evt.project_id = prj.project_id AND status IN (${statuses.toSql})
-            |      )
-            |""".stripMargin
-      }
-      .query[(Path, Long)]
-      .to[List],
-    name = "projects events count"
-  )
+  private def prepareQuery(statuses: NonEmptyList[EventStatus]) = SqlStatement(name = "projects events count")
+    .select[Void, Path ~ Long]( sql"""SELECT
+                                      project_path,
+                                      (SELECT count(event_id) FROM event evt_int WHERE evt_int.project_id = prj.project_id AND status IN (#${statuses.toSql})) AS count
+                                      FROM project prj
+                                      WHERE EXISTS (
+                                              SELECT project_id
+                                              FROM event evt
+                                              WHERE evt.project_id = prj.project_id AND status IN (#${statuses.toSql})
+                                            )
+              """.query(projectPathDecoder ~ int8).map { case path ~ count => (path, count) }
+  ).arguments(Void).build(_.toList)
 
-  private def prepareQuery(statuses: NonEmptyList[EventStatus], limit: Int Refined Positive) = SqlQuery(
-    query = Fragment
-      .const {
-        s"""|SELECT
-            |  project_path,
-            |  (select count(event_id) FROM event evt_int WHERE evt_int.project_id = prj.project_id AND status IN (${statuses.toSql})) AS count
-            |FROM (select project_id, project_path, latest_event_date
-            |      FROM project
-            |      ORDER BY latest_event_date desc) prj
-            |WHERE EXISTS (
-            |        SELECT project_id
-            |        FROM event evt
-            |        WHERE evt.project_id = prj.project_id AND status IN (${statuses.toSql})
-            |      )
-            |LIMIT $limit;
-            |""".stripMargin
-      }
-      .query[(Path, Long)]
-      .to[List],
-    name = "projects events count limit"
-  )
+  private def prepareQuery(statuses: NonEmptyList[EventStatus], limit: Int Refined Positive) =
+    SqlStatement(name = "projects events count limit").select[Int, (Path, Long)](
+          sql"""
+              SELECT
+                project_path,
+                (select count(event_id) FROM event evt_int WHERE evt_int.project_id = prj.project_id AND status IN (#${statuses.toSql})) AS count
+              FROM (select project_id, project_path, latest_event_date
+                    FROM project
+                    ORDER BY latest_event_date desc) prj
+              WHERE EXISTS (
+                      SELECT project_id
+                      FROM event evt
+                      WHERE evt.project_id = prj.project_id AND status IN (#${statuses.toSql})
+                    )
+              LIMIT $int4;
+              """
+            .query(projectPathDecoder ~ int8)
+            .map { case projectPath ~ count => (projectPath, count) }
+    ).arguments(limit).build(_.toList)
 
   private implicit class StatusesOps(statuses: NonEmptyList[EventStatus]) {
     lazy val toSql: String = statuses.map(status => s"'$status'").mkString_(", ")
@@ -187,9 +189,9 @@ class StatsFinderImpl(
 object IOStatsFinder {
 
   def apply(
-      transactor:          DbTransactor[IO, EventLogDB],
-      queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
-  )(implicit contextShift: ContextShift[IO]): IO[StatsFinder[IO]] = IO {
-    new StatsFinderImpl(transactor, queriesExecTimes)
+             sessionResource: SessionResource[IO, EventLogDB],
+             queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
+           )(implicit contextShift: ContextShift[IO]): IO[StatsFinder[IO]] = IO {
+    new StatsFinderImpl(sessionResource, queriesExecTimes)
   }
 }

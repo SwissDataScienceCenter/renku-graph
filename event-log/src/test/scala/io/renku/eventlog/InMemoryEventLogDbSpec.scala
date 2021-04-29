@@ -18,12 +18,14 @@
 
 package io.renku.eventlog
 
+import cats.data.Kleisli
 import cats.syntax.all._
 import ch.datascience.db.DbSpec
-import doobie.implicits.toSqlInterpolator
-import doobie.util.fragment.Fragment
 import io.renku.eventlog.init.EventLogDbMigrations
 import org.scalatest.TestSuite
+import skunk._
+import skunk.implicits._
+import skunk.codec.all._
 
 import scala.language.reflectiveCalls
 
@@ -39,14 +41,19 @@ trait InMemoryEventLogDbSpec
     allMigrations.map(_.run()).sequence.void.unsafeRunSync()
 
   private def findAllTables(): List[String] = execute {
-    sql"""|SELECT DISTINCT tablename FROM pg_tables
-          |WHERE schemaname != 'pg_catalog'
-          |  AND schemaname != 'information_schema'""".stripMargin
-      .query[String]
-      .to[List]
+    Kleisli { session =>
+      val query: Query[Void, String] = sql"""SELECT DISTINCT tablename FROM pg_tables
+                                WHERE schemaname != 'pg_catalog'
+                                AND schemaname != 'information_schema'"""
+        .query(name)
+      session.execute(query)
+    }
   }
 
-  protected def prepareDbForTest(): Unit = execute {
-    Fragment.const(s"TRUNCATE TABLE ${findAllTables().mkString(", ")} CASCADE").update.run.void
+  protected def prepareDbForTest(): Unit = execute[Unit] {
+    Kleisli { session =>
+      val query: Command[Void] = sql"TRUNCATE TABLE #${findAllTables().mkString(", ")} CASCADE".command
+      session.execute(query).void
+    }
   }
 }

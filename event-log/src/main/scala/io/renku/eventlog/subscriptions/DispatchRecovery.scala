@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.syntax.all._
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.events.CategoryName
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 

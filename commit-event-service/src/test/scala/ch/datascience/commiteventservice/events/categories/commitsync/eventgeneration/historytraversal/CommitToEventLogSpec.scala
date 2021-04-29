@@ -20,11 +20,11 @@ package ch.datascience.commiteventservice.events.categories.commitsync
 package eventgeneration
 package historytraversal
 
-import CommitEvent._
-import EventCreationResult._
-import Generators._
 import cats.MonadError
 import cats.syntax.all._
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEvent._
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.Generators._
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.EventCreationResult._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -45,7 +45,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import java.time.{Clock, Instant, ZoneId}
+import java.time.{Clock, Instant, ZoneId, ZoneOffset}
 import scala.util._
 
 class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matchers {
@@ -101,7 +101,6 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
       logger.loggedOnly(
         Info(
           successfulStoring(startCommit,
-                            commitEvents = commitEvents.size,
                             created = eventCreationResults.count(_ == Created),
                             existed = eventCreationResults.count(_ == Existed),
                             failed = 0
@@ -271,7 +270,13 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
       logger.loggedOnly(
         Error(failedStoring(startCommit, failingToSendEvent), sendException),
         Error(failedEventFinding(startCommit, failingToCheckIfExistEvent), checkIfExistsException),
-        Info(successfulStoring(startCommit, commitEvents.size, created = passingEvents.size, existed = 0, failed = 2))
+        Info(
+          successfulStoring(startCommit,
+                            created = passingEvents.size,
+                            existed = 0,
+                            failed = commitEvents.size - passingEvents.size
+          )
+        )
       )
     }
   }
@@ -282,7 +287,7 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
     val startCommit = startCommits.generateOne
     val projectPath = startCommit.project.path
     val batchDate   = BatchDate(Instant.now)
-    val clock       = Clock.fixed(batchDate.value, ZoneId.systemDefault)
+    val clock       = Clock.fixed(batchDate.value, ZoneId.of(ZoneOffset.UTC.getId))
 
     val accessTokenFinder     = mock[AccessTokenFinder[Try]]
     val commitEventSender     = mock[CommitEventSender[Try]]
@@ -301,12 +306,7 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
       clock
     )
 
-    def successfulStoring(startCommit:  StartCommit,
-                          commitEvents: Int,
-                          created:      Int,
-                          existed:      Int,
-                          failed:       Int
-    ): String =
+    def successfulStoring(startCommit: StartCommit, created: Int, existed: Int, failed: Int): String =
       s"$categoryName: id = ${startCommit.id}, projectId = ${startCommit.project.id}, projectPath = ${startCommit.project.path} -> " +
         s"events generation result: $created created, $existed existed, $failed failed in ${executionTimeRecorder.elapsedTime}ms"
 

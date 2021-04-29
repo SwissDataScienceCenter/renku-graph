@@ -26,7 +26,6 @@ import cats.syntax.all._
 import ch.datascience.events.consumers.{EventConsumersRegistry, EventRequestContent, EventSchedulingResult}
 import ch.datascience.http.InfoMessage._
 import ch.datascience.http.{ErrorMessage, InfoMessage}
-import io.chrisdavenport.log4cats.Logger
 import io.circe.Json
 import org.http4s.dsl.Http4sDsl
 import org.http4s.multipart.Multipart
@@ -106,8 +105,7 @@ object EventEndpoint {
   import cats.effect.{ContextShift, IO}
 
   def apply(
-      subscriptionsRegistry: EventConsumersRegistry[IO],
-      logger:                Logger[IO]
+      subscriptionsRegistry: EventConsumersRegistry[IO]
   )(implicit contextShift:   ContextShift[IO]): IO[EventEndpoint[IO]] = IO {
     new EventEndpointImpl[IO](subscriptionsRegistry)
   }

@@ -18,70 +18,78 @@
 
 package io.renku.eventlog.init
 
-import cats.effect.Bracket
-import ch.datascience.db.DbTransactor
-import io.chrisdavenport.log4cats.Logger
+import cats.data.Kleisli
+import cats.effect.{Bracket, BracketThrow}
+import ch.datascience.db.SessionResource
 import io.renku.eventlog.EventLogDB
+import org.typelevel.log4cats.Logger
+import skunk._
+import skunk.codec.all._
+import skunk.implicits._
 
 private trait EventPayloadTableCreator[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
 private object EventPayloadTableCreator {
-  def apply[Interpretation[_]](
-      transactor: DbTransactor[Interpretation, EventLogDB],
-      logger:     Logger[Interpretation]
-  )(implicit ME:  Bracket[Interpretation, Throwable]): EventPayloadTableCreator[Interpretation] =
-    new EventPayloadTableCreatorImpl(transactor, logger)
+  def apply[Interpretation[_]: BracketThrow](
+      sessionResource: SessionResource[Interpretation, EventLogDB],
+      logger:          Logger[Interpretation]
+  ): EventPayloadTableCreator[Interpretation] =
+    new EventPayloadTableCreatorImpl(sessionResource, logger)
 }
 
-private class EventPayloadTableCreatorImpl[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB],
-    logger:     Logger[Interpretation]
-)(implicit ME:  Bracket[Interpretation, Throwable])
-    extends EventPayloadTableCreator[Interpretation]
-    with EventTableCheck[Interpretation] {
+private class EventPayloadTableCreatorImpl[Interpretation[_]: BracketThrow](
+    sessionResource: SessionResource[Interpretation, EventLogDB],
+    logger:          Logger[Interpretation]
+) extends EventPayloadTableCreator[Interpretation]
+    with EventTableCheck {
 
   import cats.syntax.all._
-  import doobie.implicits._
 
-  private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
-
-  override def run(): Interpretation[Unit] =
+  override def run(): Interpretation[Unit] = sessionResource.useK {
     whenEventTableExists(
       checkTableExists flatMap {
-        case true  => logger info "'event_payload' table exists"
-        case false => createTable
+        case true  => Kleisli.liftF(logger info "'event_payload' table exists")
+        case false => createTable()
       },
-      otherwise = ME.raiseError(new Exception("Event table missing; creation of event_payload is not possible"))
+      otherwise = Kleisli.liftF(
+        Bracket[Interpretation, Throwable].raiseError(
+          new Exception("Event table missing; creation of event_payload is not possible")
+        )
+      )
     )
+  }
 
-  private def checkTableExists: Interpretation[Boolean] =
-    sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_payload')"
-      .query[Boolean]
-      .unique
-      .transact(transactor.get)
-      .recover { case _ => false }
+  private def checkTableExists: Kleisli[Interpretation, Session[Interpretation], Boolean] = {
+    val query: Query[Void, Boolean] =
+      sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_payload')"
+        .query(bool)
+    Kleisli(_.unique(query).recover { case _ => false })
+  }
 
-  private def createTable = for {
-    _ <- createTableSql.update.run transact transactor.get
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id ON event_payload(event_id)")
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON event_payload(project_id)")
-    _ <- logger info "'event_payload' table created"
-    _ <- foreignKeySql.run transact transactor.get
-  } yield ()
+  private def createTable(): Kleisli[Interpretation, Session[Interpretation], Unit] =
+    for {
+      _ <- execute(createTableSql)
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id ON event_payload(event_id)".command)
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON event_payload(project_id)".command)
+      _ <- Kleisli.liftF(logger info "'event_payload' table created")
+      _ <- execute(foreignKeySql)
+    } yield ()
 
-  private lazy val createTableSql = sql"""
+  private lazy val createTableSql: Command[Void] =
+    sql"""
     CREATE TABLE IF NOT EXISTS event_payload(
       event_id       varchar   NOT NULL,
       project_id     int4      NOT NULL,
       payload        text,
       PRIMARY KEY (event_id, project_id)
     );
-    """
+    """.command
 
-  private lazy val foreignKeySql = sql"""
+  private lazy val foreignKeySql: Command[Void] =
+    sql"""
     ALTER TABLE event_payload
     ADD CONSTRAINT fk_event FOREIGN KEY (event_id, project_id) REFERENCES event (event_id, project_id);
-  """.update
+  """.command
 }

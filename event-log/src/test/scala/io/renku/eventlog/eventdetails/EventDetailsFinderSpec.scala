@@ -19,7 +19,7 @@
 package io.renku.eventlog.eventdetails
 
 import cats.syntax.all._
-import ch.datascience.db.SqlQuery
+import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventStatuses}
 import ch.datascience.graph.model.events.CompoundEventId
@@ -52,7 +52,7 @@ class EventDetailsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
 
   private trait TestCase {
     val eventId            = compoundEventIds.generateOne
-    val queriesExecTimes   = TestLabeledHistogram[SqlQuery.Name]("query_id")
-    val eventDetailsFinder = new EventDetailsFinderImpl(transactor, queriesExecTimes)
+    val queriesExecTimes   = TestLabeledHistogram[SqlStatement.Name]("query_id")
+    val eventDetailsFinder = new EventDetailsFinderImpl(sessionResource, queriesExecTimes)
   }
 }

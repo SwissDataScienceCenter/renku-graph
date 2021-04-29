@@ -20,7 +20,6 @@ package ch.datascience.commiteventservice.events.categories.commitsync.eventgene
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.{CompoundEventId, EventId}
 import ch.datascience.graph.model.users.Email
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
