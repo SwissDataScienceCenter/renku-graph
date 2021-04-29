@@ -270,7 +270,13 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
       logger.loggedOnly(
         Error(failedStoring(startCommit, failingToSendEvent), sendException),
         Error(failedEventFinding(startCommit, failingToCheckIfExistEvent), checkIfExistsException),
-        Info(successfulStoring(startCommit, commitEvents.size, existed = 0, failed = 2))
+        Info(
+          successfulStoring(startCommit,
+                            created = passingEvents.size,
+                            existed = 0,
+                            failed = commitEvents.size - passingEvents.size
+          )
+        )
       )
     }
   }
