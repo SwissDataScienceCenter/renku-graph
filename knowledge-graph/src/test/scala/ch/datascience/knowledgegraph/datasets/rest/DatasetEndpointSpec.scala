@@ -62,11 +62,11 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
     "respond with OK and the found dataset" in new TestCase {
       forAll(datasets) { dataset =>
         (datasetsFinder
-          .findDataset(_: Identifier, _: Option[AuthUser]))
-          .expects(dataset.id, None)
+          .findDataset(_: Identifier))
+          .expects(dataset.id)
           .returning(context.pure(Some(dataset)))
 
-        val response = getDataset(dataset.id, None).unsafeRunSync()
+        val response = getDataset(dataset.id).unsafeRunSync()
 
         response.status                      shouldBe Ok
         response.contentType                 shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -118,11 +118,11 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       val identifier = datasetIdentifiers.generateOne
 
       (datasetsFinder
-        .findDataset(_: Identifier, _: Option[AuthUser]))
-        .expects(identifier, None)
+        .findDataset(_: Identifier))
+        .expects(identifier)
         .returning(context.pure(None))
 
-      val response = getDataset(identifier, None).unsafeRunSync()
+      val response = getDataset(identifier).unsafeRunSync()
 
       response.status      shouldBe NotFound
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -138,11 +138,11 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
 
       val exception = exceptions.generateOne
       (datasetsFinder
-        .findDataset(_: Identifier, _: Option[AuthUser]))
-        .expects(identifier, None)
+        .findDataset(_: Identifier))
+        .expects(identifier)
         .returning(context.raiseError(exception))
 
-      val response = getDataset(identifier, None).unsafeRunSync()
+      val response = getDataset(identifier).unsafeRunSync()
 
       response.status      shouldBe InternalServerError
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))

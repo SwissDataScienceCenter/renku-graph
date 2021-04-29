@@ -30,7 +30,7 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.ExecutionContext
 
 private trait DatasetFinder[Interpretation[_]] {
-  def findDataset(identifier: Identifier, maybeUser: Option[AuthUser]): Interpretation[Option[Dataset]]
+  def findDataset(identifier: Identifier): Interpretation[Option[Dataset]]
 }
 
 private class IODatasetFinder(
@@ -46,9 +46,9 @@ private class IODatasetFinder(
   import partsFinder._
   import projectsFinder._
 
-  def findDataset(identifier: Identifier, maybeUser: Option[AuthUser]): IO[Option[Dataset]] =
+  def findDataset(identifier: Identifier): IO[Option[Dataset]] =
     for {
-      usedIn            <- findUsedIn(identifier, maybeUser)
+      usedIn            <- findUsedIn(identifier)
       maybeDetailsFiber <- findBaseDetails(identifier, usedIn).start
       keywordsFiber     <- findKeywords(identifier).start
       imagesFiber       <- findImages(identifier).start

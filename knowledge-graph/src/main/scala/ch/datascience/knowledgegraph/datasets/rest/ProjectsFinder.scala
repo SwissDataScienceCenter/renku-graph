@@ -43,10 +43,10 @@ private class ProjectsFinder(
 
   import ProjectsFinder._
 
-  def findUsedIn(identifier: Identifier, maybeUser: Option[AuthUser]): IO[List[DatasetProject]] =
-    queryExpecting[List[DatasetProject]](using = query(identifier, maybeUser))
+  def findUsedIn(identifier: Identifier): IO[List[DatasetProject]] =
+    queryExpecting[List[DatasetProject]](using = query(identifier))
 
-  private def query(identifier: Identifier, maybeUser: Option[AuthUser]) = SparqlQuery(
+  private def query(identifier: Identifier) = SparqlQuery(
     name = "ds by id - projects",
     Set(
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
@@ -92,36 +92,11 @@ private class ProjectsFinder(
         |  ?associationId rdf:type <http://schema.org/Person>;
         |                 schema:name ?agentName.
         |  OPTIONAL { ?associationId schema:email ?maybeAgentEmail }
-        |  ${projectMemberFilterQuery(maybeUser)}
         |}
         |ORDER BY ASC(?projectName)
         |""".stripMargin
   )
 
-  private lazy val projectMemberFilterQuery: Option[AuthUser] => String = {
-    case Some(user) =>
-      s"""
-         |OPTIONAL { ?projectId renku:projectVisibility ?visibility;
-         |                schema:member/schema:sameAs ?memberId.
-         |           ?memberId schema:additionalType 'GitLab';
-         |              schema:identifier ?userGitlabId .
-         |}
-         |BIND (IF (BOUND (?visibility), ?visibility,  '${Visibility.Public.value}') as ?projectVisibility)
-         |FILTER (
-         |  ?projectVisibility = '${Visibility.Public.value}' || 
-         |  ((?projectVisibility = '${Visibility.Private.value}' || ?projectVisibility = '${Visibility.Internal.value}') && 
-         |  ?userGitlabId = ${user.id.value})
-         |)
-         |""".stripMargin
-    case _ =>
-      s"""
-         |OPTIONAL {
-         |  ?projectId renku:projectVisibility ?visibility .
-         |}
-         |BIND(IF (BOUND (?visibility), ?visibility, '${Visibility.Public.value}' ) as ?projectVisibility)
-         |FILTER(?projectVisibility = '${Visibility.Public.value}')
-         |""".stripMargin
-  }
 }
 
 private object ProjectsFinder {

@@ -50,10 +50,10 @@ class DatasetEndpoint[Interpretation[_]: Effect](
   import executionTimeRecorder._
   import org.http4s.circe._
 
-  def getDataset(identifier: Identifier, maybeUser: Option[AuthUser]): Interpretation[Response[Interpretation]] =
+  def getDataset(identifier: Identifier): Interpretation[Response[Interpretation]] =
     measureExecutionTime {
       datasetFinder
-        .findDataset(identifier, maybeUser)
+        .findDataset(identifier)
         .flatMap(toHttpResult(identifier))
         .recoverWith(httpResult(identifier))
     } map logExecutionTimeWhen(finishedSuccessfully(identifier))
