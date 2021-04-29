@@ -22,11 +22,12 @@ import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.cliVersions
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.lineage.LineageGenerators._
-import ch.datascience.knowledgegraph.lineage.model.Node
+import ch.datascience.knowledgegraph.lineage.model._
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory
 import ch.datascience.rdfstore.entities.CommandParameter.Mapping.IOStream._
@@ -44,13 +45,13 @@ import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class NodesDetailsFinderSpec
+class NodeDetailsFinderSpec
     extends AnyWordSpec
     with InMemoryRdfStore
     with ExternalServiceStubbing
     with should.Matchers {
 
-  import NodesDetailsFinder._
+  import NodeDetailsFinder._
 
   "findDetails - locations" should {
 
@@ -135,7 +136,10 @@ class NodesDetailsFinderSpec
 
       nodeDetailsFinder
         .findDetails(
-          Set(EntityId.of(process1ActivityNode.location.toString), EntityId.of(process2ActivityNode.location.toString)),
+          Set(
+            RunInfo(EntityId.of(process1ActivityNode.location.toString), timestampsNotInTheFuture.generateOne),
+            RunInfo(EntityId.of(process2ActivityNode.location.toString), timestampsNotInTheFuture.generateOne)
+          ),
           projectPath
         )
         .unsafeRunSync() shouldBe Set(process1ActivityNode, process2ActivityNode)
@@ -153,7 +157,14 @@ class NodesDetailsFinderSpec
       loadToStore(inputActivity.asJsonLD, processRunActivity.asJsonLD)
 
       nodeDetailsFinder
-        .findDetails(Set(EntityId.of(NodeDef(processRunActivity).toNode.location.toString)), projectPath)
+        .findDetails(
+          Set(
+            RunInfo(EntityId.of(NodeDef(processRunActivity).toNode.location.toString),
+                    timestampsNotInTheFuture.generateOne
+            )
+          ),
+          projectPath
+        )
         .unsafeRunSync() shouldBe Set(NodeDef(processRunActivity).toNode)
     }
 
@@ -172,14 +183,21 @@ class NodesDetailsFinderSpec
       loadToStore(inputActivity.asJsonLD, processRunActivity.asJsonLD)
 
       nodeDetailsFinder
-        .findDetails(Set(EntityId.of(NodeDef(processRunActivity).toNode.location.toString)), projectPath)
+        .findDetails(
+          Set(
+            RunInfo(EntityId.of(NodeDef(processRunActivity).toNode.location.toString),
+                    timestampsNotInTheFuture.generateOne
+            )
+          ),
+          projectPath
+        )
         .unsafeRunSync() shouldBe Set(NodeDef(processRunActivity).toNode)
     }
 
     "return no results if no ids given" in new TestCase {
 
       nodeDetailsFinder
-        .findDetails(Set.empty[EntityId], projectPath)
+        .findDetails(Set.empty[RunInfo], projectPath)
         .unsafeRunSync() shouldBe Set.empty
     }
 
@@ -200,8 +218,14 @@ class NodesDetailsFinderSpec
 
       val exception = intercept[Exception] {
         nodeDetailsFinder
-          .findDetails(Set(EntityId.of(NodeDef(processRunActivity).toNode.location.toString), missingRunPlan),
-                       projectPath
+          .findDetails(
+            Set(
+              RunInfo(EntityId.of(NodeDef(processRunActivity).toNode.location.toString),
+                      timestampsNotInTheFuture.generateOne
+              ),
+              RunInfo(missingRunPlan, timestampsNotInTheFuture.generateOne)
+            ),
+            projectPath
           )
           .unsafeRunSync()
       }
@@ -218,7 +242,7 @@ class NodesDetailsFinderSpec
 
     val logger                = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
-    val nodeDetailsFinder = new IONodesDetailsFinder(
+    val nodeDetailsFinder = new NodeDetailsFinderImpl(
       rdfStoreConfig,
       renkuBaseUrl,
       logger,

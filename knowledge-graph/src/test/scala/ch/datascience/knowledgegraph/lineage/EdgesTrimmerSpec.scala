@@ -21,13 +21,14 @@ package ch.datascience.knowledgegraph.lineage
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.knowledgegraph.lineage.LineageGenerators._
-import ch.datascience.knowledgegraph.lineage.model.EdgeMap
+import ch.datascience.knowledgegraph.lineage.model._
 import ch.datascience.knowledgegraph.lineage.model.Node.Location
 import io.renku.jsonld.EntityId
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
+import java.time.Instant
 import scala.util.Try
 
 class EdgesTrimmerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
@@ -37,16 +38,18 @@ class EdgesTrimmerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
     *  a -- B -- c -- H -- j
     *  e _/   \_ d
     *    \_ F -- g
+    *  k __ L __/
     *
-    *   x -- Z -- y
+    *  x -- Z -- y
     *
     *   trim on a should return B c d H j
     *   trim on c should return a B c e H j
     *   trim on d should return a B e
     *   trim on e should return B c d F g H j
-    *   trim on g should return e F
+    *   trim on g should return e F (with assumption that F is more recent than L)
     *   trim on i should return H j
     *   trim on j should return a B c e H i
+    *   trim on k should return nothing (with assumption that F is more recent than L)
     */
 
   "trim" should {
@@ -57,76 +60,81 @@ class EdgesTrimmerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
     val g = Location("g")
     val i = Location("i")
     val j = Location("j")
+    val k = Location("k")
     val x = Location("x")
     val y = Location("y")
-    val B = EntityId.of("B")
-    val F = EntityId.of("F")
-    val H = EntityId.of("H")
-    val Z = EntityId.of("Z")
+    val B = RunInfo(EntityId.of("B"), Instant.now())
+    val F = RunInfo(EntityId.of("F"), B.date.value plusSeconds 60)
+    val H = RunInfo(EntityId.of("H"), F.date.value plusSeconds 60)
+    val L = RunInfo(EntityId.of("L"), F.date.value minusSeconds 60)
+    val Z = RunInfo(EntityId.of("Z"), Instant.now())
 
-    val graph = Map[EntityId, (Set[Location], Set[Location])](
+    val graph: EdgeMap = Map(
       B -> (Set(a, e), Set(c, d)),
       F -> (Set(e), Set(g)),
       H -> (Set(c, i), Set(j)),
+      L -> (Set(k), Set(g)),
       Z -> (Set(x), Set(y))
     )
 
-    "return a B c d H j when looking for a" in new TestCase {
-      edgesTrimmer.trim(graph, a) shouldBe Map[EntityId, (Set[Location], Set[Location])](
+    "return a B c d H j when looking for a" in {
+      edgesTrimmer.trim(graph, a) shouldBe Map(
         B -> (Set(a), Set(c, d)),
         H -> (Set(c), Set(j))
       ).pure[Try]
     }
 
-    "return a B c e H j when looking for c" in new TestCase {
-      edgesTrimmer.trim(graph, c) shouldBe Map[EntityId, (Set[Location], Set[Location])](
+    "return a B c e H j when looking for c" in {
+      edgesTrimmer.trim(graph, c) shouldBe Map(
         B -> (Set(a, e), Set(c)),
         H -> (Set(c), Set(j))
       ).pure[Try]
     }
 
-    "return a B e when looking for d" in new TestCase {
-      edgesTrimmer.trim(graph, d) shouldBe Map[EntityId, (Set[Location], Set[Location])](
+    "return a B e when looking for d" in {
+      edgesTrimmer.trim(graph, d) shouldBe Map(
         B -> (Set(a, e), Set(d))
       ).pure[Try]
     }
 
-    "return B c d F g H j when looking for e" in new TestCase {
-      edgesTrimmer.trim(graph, e) shouldBe Map[EntityId, (Set[Location], Set[Location])](
+    "return B c d F g H j when looking for e" in {
+      edgesTrimmer.trim(graph, e) shouldBe Map(
         B -> (Set(e), Set(c, d)),
         H -> (Set(c), Set(j)),
         F -> (Set(e), Set(g))
       ).pure[Try]
     }
 
-    "return e F when looking for g" in new TestCase {
-      edgesTrimmer.trim(graph, g) shouldBe Map[EntityId, (Set[Location], Set[Location])](
+    "return e F when looking for g" in {
+      edgesTrimmer.trim(graph, g) shouldBe Map(
         F -> (Set(e), Set(g))
       ).pure[Try]
     }
 
-    "return H j when looking for i" in new TestCase {
-      edgesTrimmer.trim(graph, i) shouldBe Map[EntityId, (Set[Location], Set[Location])](
+    "return H j when looking for i" in {
+      edgesTrimmer.trim(graph, i) shouldBe Map(
         H -> (Set(i), Set(j))
       ).pure[Try]
     }
 
-    "return a B c e H i when looking for j" in new TestCase {
-      edgesTrimmer.trim(graph, j) shouldBe Map[EntityId, (Set[Location], Set[Location])](
+    "return a B c e H i when looking for j" in {
+      edgesTrimmer.trim(graph, j) shouldBe Map(
         B -> (Set(a, e), Set(c)),
         H -> (Set(c, i), Set(j))
       ).pure[Try]
     }
 
-    "return an empty edges map if the given location does not exists in the given edges map" in new TestCase {
+    "return nothing when looking for k" in {
+      edgesTrimmer.trim(graph, k) shouldBe Map.empty.pure[Try]
+    }
+
+    "return nothing if the given location does not exists in the given edges map" in {
       edgesTrimmer.trim(
         lineages.generateOne.toEdgesMap,
         nodeLocations.generateOne
-      ) shouldBe (Map.empty: EdgeMap).pure[Try]
+      ) shouldBe Map.empty.pure[Try]
     }
   }
 
-  private trait TestCase {
-    val edgesTrimmer = new EdgesTrimmerImpl[Try]()
-  }
+  private lazy val edgesTrimmer = new EdgesTrimmerImpl[Try]()
 }

@@ -18,28 +18,34 @@
 
 package ch.datascience.knowledgegraph.lineage
 
-import cats.MonadError
+import cats.MonadThrow
+import cats.syntax.all._
 import ch.datascience.knowledgegraph.lineage.model.Node.Location
+import ch.datascience.tinytypes.{InstantTinyType, TinyTypeFactory}
 import io.renku.jsonld.EntityId
+
+import java.time.Instant
 
 object model {
 
-  private[lineage] type EdgeMap = Map[EntityId, (Set[Node.Location], Set[Node.Location])]
+  private[lineage] final case class RunInfo(entityId: EntityId, date: RunDate)
+  private[lineage] final class RunDate private (val value: Instant) extends AnyVal with InstantTinyType
+  private[lineage] implicit object RunDate extends TinyTypeFactory[RunDate](new RunDate(_))
+  private[lineage] type FromAndToNodes = (Set[Node.Location], Set[Node.Location])
+  private[lineage] type EdgeMap        = Map[RunInfo, FromAndToNodes]
 
   final case class Lineage private (edges: Set[Edge], nodes: Set[Node]) extends LineageOps
 
   object Lineage {
 
-    def from[Interpretation[_]](edges: Set[Edge], nodes: Set[Node])(implicit
-        ME:                            MonadError[Interpretation, Throwable]
-    ): Interpretation[Lineage] = {
+    def from[Interpretation[_]: MonadThrow](edges: Set[Edge], nodes: Set[Node]): Interpretation[Lineage] = {
       val allEdgesLocations = collectLocations(edges)
       val allNodesLocations = nodes.map(_.location)
-      if (allEdgesLocations == allNodesLocations) ME.pure(Lineage(edges, nodes))
+      if (allEdgesLocations == allNodesLocations) Lineage(edges, nodes).pure[Interpretation]
       else if ((allNodesLocations diff allEdgesLocations).nonEmpty)
-        ME.raiseError(new IllegalArgumentException("There are orphan nodes"))
+        new IllegalArgumentException("There are orphan nodes").raiseError[Interpretation, Lineage]
       else
-        ME.raiseError(new IllegalArgumentException("There are edges with no nodes definitions"))
+        new IllegalArgumentException("There are edges with no nodes definitions").raiseError[Interpretation, Lineage]
     }
 
     private def collectLocations(edges: Set[Edge]): Set[Node.Location] =
