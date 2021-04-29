@@ -19,8 +19,6 @@
 package io.renku.eventlog.subscriptions.zombieevents
 
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import io.circe.literal._
 import io.renku.eventlog.subscriptions.EventEncoder
 import io.renku.eventlog.subscriptions.zombieevents.Generators.zombieEvents

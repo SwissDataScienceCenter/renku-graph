@@ -18,14 +18,13 @@
 
 package io.renku.eventlog.init
 
-import cats.MonadError
 import cats.data.Kleisli
-import cats.effect.{Async, Bracket, BracketThrow}
+import cats.effect.{Bracket, BracketThrow}
 import ch.datascience.db.SessionResource
-import org.typelevel.log4cats.Logger
 import io.renku.eventlog.EventLogDB
-import skunk.codec.all._
+import org.typelevel.log4cats.Logger
 import skunk._
+import skunk.codec.all._
 import skunk.implicits._
 
 private trait EventPayloadTableCreator[Interpretation[_]] {

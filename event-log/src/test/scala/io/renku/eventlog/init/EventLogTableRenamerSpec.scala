@@ -26,7 +26,6 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk._
 import skunk.implicits._
-import skunk.codec.all._
 
 class EventLogTableRenamerSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
 

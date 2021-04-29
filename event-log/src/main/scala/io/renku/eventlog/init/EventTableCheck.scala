@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.{Async, Bracket, BracketThrow}
+import cats.effect.BracketThrow
 import cats.syntax.all._
 import skunk.codec.all._
 import skunk.implicits.toStringOps

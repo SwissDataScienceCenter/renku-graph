@@ -28,7 +28,6 @@ import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Path
-import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.MetricsTools._
 import ch.datascience.metrics.{LabeledGauge, MetricsRegistry}
 import io.prometheus.client.{Gauge => LibGauge}
@@ -56,7 +55,7 @@ class AwaitingTransformationGaugeSpec extends AnyWordSpec with MockFactory with 
           actual.pure[IO]
         }
 
-      val gauge = AwaitingTransformationGauge(metricsRegistry, statsFinder, TestLogger()).unsafeRunSync()
+      val gauge = AwaitingTransformationGauge(metricsRegistry, statsFinder).unsafeRunSync()
 
       gauge.isInstanceOf[LabeledGauge[IO, projects.Path]] shouldBe true
     }
@@ -74,7 +73,7 @@ class AwaitingTransformationGaugeSpec extends AnyWordSpec with MockFactory with 
         .expects(Set[EventStatus](TriplesGenerated), Some(NumberOfProjects))
         .returning(waitingEvents.pure[IO])
 
-      AwaitingTransformationGauge(metricsRegistry, statsFinder, TestLogger()).flatMap(_.reset()).unsafeRunSync()
+      AwaitingTransformationGauge(metricsRegistry, statsFinder).flatMap(_.reset()).unsafeRunSync()
 
       underlying.collectAllSamples should contain theSameElementsAs waitingEvents.map { case (project, count) =>
         ("project", project.value, count.toDouble)

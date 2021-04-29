@@ -22,19 +22,18 @@ import cats.effect._
 import cats.syntax.all._
 import ch.datascience.config.{GitLab, renku}
 import ch.datascience.control.Throttler
-import ch.datascience.http.InfoMessage._
-import ch.datascience.http.InfoMessage
 import ch.datascience.graph.model.projects
-import ch.datascience.http.{ErrorMessage, InfoMessage}
+import ch.datascience.http.InfoMessage._
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.server.security.model.AuthUser
+import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.knowledgegraph.projects.model.Permissions._
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import org.typelevel.log4cats.Logger
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal

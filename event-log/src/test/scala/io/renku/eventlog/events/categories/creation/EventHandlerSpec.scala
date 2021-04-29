@@ -27,10 +27,8 @@ import ch.datascience.events.consumers.{EventRequestContent, Project}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventStatus
-import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level._
-import ch.datascience.metrics.LabeledGauge
 import io.circe.literal.JsonStringContext
 import io.circe.syntax._
 import io.circe.{Encoder, Json}

@@ -26,7 +26,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.EventsGenerators.commitIds
-import ch.datascience.graph.model.GraphModelGenerators.{datasetCreatedDates, datasetIdentifiers, datasetKeywords, userAffiliations, userEmails}
+import ch.datascience.graph.model.GraphModelGenerators.{datasetCreatedDates, datasetIdentifiers, userAffiliations, userEmails}
 import ch.datascience.graph.model.datasets.Dates.{AllDatasetDates, ImportedDatasetDates, RenkuDatasetDates}
 import ch.datascience.graph.model.datasets.{DateCreated, DateCreatedInProject, Dates, DerivedFrom, Description, Keyword, Name, PublishedDate, SameAs, Title, TopmostDerivedFrom, TopmostSameAs}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
@@ -41,8 +41,6 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import io.renku.jsonld.{EntityId, JsonLD}
 import org.scalacheck.Gen
-
-import scala.language.postfixOps
 
 package object rest {
   val phrases:                      Gen[Phrase]                         = nonBlankStrings(minLength = 5) map (_.value) map Phrase.apply

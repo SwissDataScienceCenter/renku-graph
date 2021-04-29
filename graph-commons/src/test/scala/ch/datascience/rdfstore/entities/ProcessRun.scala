@@ -25,8 +25,6 @@ import ch.datascience.rdfstore.entities.Association.{ChildRunPlanAssociation, Pr
 import ch.datascience.rdfstore.entities.RunPlan.{ProcessRunPlan, WorkflowRunPlan}
 import ch.datascience.rdfstore.entities.WorkflowRun.ActivityWorkflowRun
 
-import scala.language.postfixOps
-
 sealed trait ProcessRun[RunPlanType <: Entity with RunPlan] {
   self: Activity =>
   type AssociationType <: Association[RunPlanType]

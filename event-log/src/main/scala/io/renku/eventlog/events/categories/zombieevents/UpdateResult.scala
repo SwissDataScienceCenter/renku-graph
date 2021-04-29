@@ -16,19 +16,8 @@
  * limitations under the License.
  */
 
-package ch.datascience.tokenrepository.repository.association
+package io.renku.eventlog.events.categories.zombieevents
 
-import cats.effect.IO
-import ch.datascience.tokenrepository.repository.AccessTokenCrypto
-import ch.datascience.tokenrepository.repository.deletion.TokenRemover
-import org.typelevel.log4cats.Logger
-
-private class IOTokenAssociator(
-    pathFinder:           ProjectPathFinder[IO],
-    accessTokenCrypto:    AccessTokenCrypto[IO],
-    associationPersister: AssociationPersister[IO],
-    tokenRemover:         TokenRemover[IO]
-) extends TokenAssociator[IO](pathFinder, accessTokenCrypto, associationPersister, tokenRemover)
-
-class IOAssociateTokenEndpoint(tokenAssociator: TokenAssociator[IO], logger: Logger[IO])
-    extends AssociateTokenEndpoint[IO](tokenAssociator, logger)
+private[zombieevents] sealed trait UpdateResult
+private[zombieevents] case object Updated    extends UpdateResult
+private[zombieevents] case object NotUpdated extends UpdateResult

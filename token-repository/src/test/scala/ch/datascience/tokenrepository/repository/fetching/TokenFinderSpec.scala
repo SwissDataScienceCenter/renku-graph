@@ -26,15 +26,12 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects.{Id, Path}
-import ch.datascience.http.client.AccessToken
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import ch.datascience.tokenrepository.repository.IOAccessTokenCrypto
 import ch.datascience.tokenrepository.repository.RepositoryGenerators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-
-import scala.util.Try
 
 class TokenFinderSpec extends AnyWordSpec with MockFactory with should.Matchers {
 

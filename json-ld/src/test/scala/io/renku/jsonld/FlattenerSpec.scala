@@ -19,7 +19,7 @@
 package io.renku.jsonld
 
 import eu.timepit.refined.auto._
-import io.renku.jsonld.JsonLD.{JsonLDEntity, JsonLDEntityId, JsonLDNull, MalformedJsonLD}
+import io.renku.jsonld.JsonLD.{JsonLDEntity, JsonLDEntityId, MalformedJsonLD}
 import io.renku.jsonld.generators.Generators.Implicits._
 import io.renku.jsonld.generators.JsonLDGenerators._
 import io.renku.jsonld.syntax._

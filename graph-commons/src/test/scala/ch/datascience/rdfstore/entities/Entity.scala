@@ -27,8 +27,6 @@ import ch.datascience.rdfstore.entities.DataSet.DataSetEntity
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 
-import scala.language.postfixOps
-
 class Entity(val commitId:                  CommitId,
              val location:                  Location,
              val project:                   Project,

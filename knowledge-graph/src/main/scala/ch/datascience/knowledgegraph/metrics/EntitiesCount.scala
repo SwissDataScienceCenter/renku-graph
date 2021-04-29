@@ -16,19 +16,17 @@
  * limitations under the License.
  */
 
-package ch.datascience.tokenrepository.repository.association
+package ch.datascience.knowledgegraph.metrics
 
-import cats.effect.IO
-import ch.datascience.tokenrepository.repository.AccessTokenCrypto
-import ch.datascience.tokenrepository.repository.deletion.TokenRemover
-import org.typelevel.log4cats.Logger
+import ch.datascience.tinytypes.{LongTinyType, TinyTypeFactory}
+import io.circe.Decoder
+import ch.datascience.tinytypes.json.TinyTypeDecoders.longDecoder
 
-private class IOTokenAssociator(
-    pathFinder:           ProjectPathFinder[IO],
-    accessTokenCrypto:    AccessTokenCrypto[IO],
-    associationPersister: AssociationPersister[IO],
-    tokenRemover:         TokenRemover[IO]
-) extends TokenAssociator[IO](pathFinder, accessTokenCrypto, associationPersister, tokenRemover)
-
-class IOAssociateTokenEndpoint(tokenAssociator: TokenAssociator[IO], logger: Logger[IO])
-    extends AssociateTokenEndpoint[IO](tokenAssociator, logger)
+final class EntitiesCount private (val value: Long) extends AnyVal with LongTinyType
+object EntitiesCount extends TinyTypeFactory[EntitiesCount](new EntitiesCount(_)) {
+  implicit val decoder: Decoder[EntitiesCount] = longDecoder(EntitiesCount)
+  addConstraint(
+    check = _ >= 0L,
+    message = _ => s"$typeName has to be >= 0"
+  )
+}

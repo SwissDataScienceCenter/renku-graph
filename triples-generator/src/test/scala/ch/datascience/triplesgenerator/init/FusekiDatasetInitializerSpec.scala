@@ -19,18 +19,15 @@
 package ch.datascience.triplesgenerator.init
 
 import cats.MonadError
-
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
-import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators
-import ServiceTypesGenerators._
-import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.language.postfixOps
 import scala.util.Try
 
 class FusekiDatasetInitializerSpec extends AnyWordSpec with MockFactory with should.Matchers {

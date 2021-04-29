@@ -25,7 +25,6 @@ import ch.datascience.graph.model.events.CategoryName
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.language.postfixOps
 
 private trait Subscribers[Interpretation[_]] {
   def add(subscriptionInfo: SubscriptionInfo): Interpretation[Unit]
