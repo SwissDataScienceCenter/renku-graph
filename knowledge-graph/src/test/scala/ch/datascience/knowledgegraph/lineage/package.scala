@@ -18,19 +18,24 @@
 
 package ch.datascience.knowledgegraph
 
-import ch.datascience.knowledgegraph.lineage.model.{Edge, Lineage, Node}
+import ch.datascience.knowledgegraph.lineage.model._
 import ch.datascience.rdfstore.entities.bundles.{prov, wfprov}
 import io.renku.jsonld.EntityId
+
+import java.time.Instant
 
 package object lineage {
 
   private[lineage] implicit class LineageOps(lineage: Lineage) {
 
     lazy val toEdgesMap =
-      processRunNodes.foldLeft(Map.empty[EntityId, (Set[Node.Location], Set[Node.Location])]) {
+      processRunNodes.foldLeft(Map.empty[RunInfo, (Set[Node.Location], Set[Node.Location])]) {
         case (planWithLocation, node) =>
-          planWithLocation + (EntityId.of(node.location.toString) -> (lineage.collectSources(of = node) -> lineage
-            .collectTargets(of = node)))
+          planWithLocation + (
+            RunInfo(EntityId.of(node.location.toString), Instant.now()) -> (
+              lineage.collectSources(of = node) -> lineage.collectTargets(of = node)
+            )
+          )
       }
 
     def collectSources(of: Node): Set[Node.Location] =

@@ -19,7 +19,8 @@
 package ch.datascience.knowledgegraph.graphql
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.knowledgegraph.lineage.{IOLineageFinder, LineageFinder, LineageFinderImpl}
+import cats.syntax.all._
+import ch.datascience.knowledgegraph.lineage.LineageFinder
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
@@ -29,7 +30,7 @@ class QueryContext[Interpretation[_]](
     val lineageFinder: LineageFinder[Interpretation]
 )
 
-object IOQueryContext {
+object QueryContext {
   def apply(
       timeRecorder: SparqlQueryTimeRecorder[IO],
       logger:       Logger[IO]
@@ -37,8 +38,5 @@ object IOQueryContext {
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[QueryContext[IO]] =
-    for {
-      lineageFinder <- IOLineageFinder(timeRecorder, logger)
-    } yield new QueryContext[IO](lineageFinder)
+  ): IO[QueryContext[IO]] = LineageFinder(timeRecorder, logger) map (new QueryContext[IO](_))
 }

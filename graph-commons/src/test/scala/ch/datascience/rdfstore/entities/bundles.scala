@@ -21,15 +21,15 @@ package ch.datascience.rdfstore.entities
 import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.{cliVersions, gitLabUrls}
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.{listOf, nonEmptySet, setOf}
+import ch.datascience.generators.Generators._
 import ch.datascience.graph.Schemas
 import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model._
 import ch.datascience.graph.model.datasets.{Dates, DerivedFrom, Description, Identifier, ImageUri, Keyword, Name, PartLocation, PartName, SameAs, Title, TopmostDerivedFrom, TopmostSameAs, Url}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.projects.{DateCreated, Path, Visibility}
-import ch.datascience.graph.model._
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.CommandParameter.Mapping.IOStream
 import ch.datascience.rdfstore.entities.CommandParameter.PositionInfo.Position
@@ -42,6 +42,9 @@ import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
 import org.scalacheck.Gen
 
+import java.time.temporal.ChronoUnit.DAYS
+import java.time.{Duration, Instant}
+
 object bundles extends Schemas {
 
   implicit lazy val renkuBaseUrl: RenkuBaseUrl = RenkuBaseUrl("https://dev.renku.ch")
@@ -49,15 +52,14 @@ object bundles extends Schemas {
 
   def generateAgent: Agent = Agent(cliVersions.generateOne)
 
-  def generateProject(path: Path): Project =
-    Project(
-      path,
-      projectNames.generateOne,
-      projectCreatedDates.generateOne,
-      projectCreators.generateOption,
-      projectVisibilities.generateOption,
-      version = projectSchemaVersions.generateOne
-    )
+  def generateProject(path: Path): Project = Project(
+    path,
+    projectNames.generateOne,
+    projectCreatedDates.generateOne,
+    projectCreators.generateOption,
+    projectVisibilities.generateOption,
+    version = projectSchemaVersions.generateOne
+  )
 
   def fileCommit(
       location:      Location = locations.generateOne,
@@ -323,26 +325,29 @@ object bundles extends Schemas {
 
   object exemplarLineageFlow {
 
-    final case class ExamplarData(
-        location:          Location,
-        commitId:          CommitId,
-        committer:         Person,
-        `sha3 zhbikes`:    NodeDef,
-        `sha7 plot_data`:  NodeDef,
-        `sha7 clean_data`: NodeDef,
-        `sha8 renku run`:  NodeDef,
-        `sha8 parquet`:    NodeDef,
-        `sha9 renku run`:  NodeDef,
-        `sha9 grid_plot`:  NodeDef,
-        `sha9 cumulative`: NodeDef,
-        `sha10 zhbikes`:   NodeDef,
-        `sha12 parquet`:   NodeDef
+    final case class ExemplarData(
+        location:              Location,
+        commitId:              CommitId,
+        committer:             Person,
+        `sha3 zhbikes`:        NodeDef,
+        `sha7 plot_data`:      NodeDef,
+        `sha7 clean_data`:     NodeDef,
+        `sha8 renku run`:      NodeDef,
+        `sha8 renku run date`: Instant,
+        `sha8 parquet`:        NodeDef,
+        `sha9 renku run`:      NodeDef,
+        `sha9 renku run date`: Instant,
+        `sha9 grid_plot`:      NodeDef,
+        `sha9 cumulative`:     NodeDef,
+        `sha10 zhbikes`:       NodeDef,
+        `sha12 parquet`:       NodeDef,
+        `sha12 parquet date`:  Instant
     )
 
     def apply(
         projectPath:         Path = projectPaths.generateOne,
         cliVersion:          CliVersion = cliVersions.generateOne
-    )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): (List[JsonLD], ExamplarData) = {
+    )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): (List[JsonLD], ExemplarData) = {
       val project = Project(
         projectPath,
         projectNames.generateOne,
@@ -379,7 +384,7 @@ object bundles extends Schemas {
 
       val commit2DataSetCreation = Activity(
         CommitId("000002"),
-        committedDates.generateOne,
+        relativeTimestamps(moreThanAgo = Duration.ofDays(30)).generateAs(CommittedDate),
         persons.generateOne,
         project,
         agent,
@@ -389,7 +394,7 @@ object bundles extends Schemas {
 
       val commit3AddingDataSetFile = Activity(
         CommitId("000003"),
-        committedDates.generateOne,
+        CommittedDate(commit2DataSetCreation.committedDate.value.plus(1, DAYS)),
         persons.generateOne,
         project,
         agent,
@@ -404,7 +409,7 @@ object bundles extends Schemas {
 
       val commit4Activity = Activity(
         CommitId("000004"),
-        committedDates.generateOne,
+        CommittedDate(commit3AddingDataSetFile.committedDate.value.plus(1, DAYS)),
         persons.generateOne,
         project,
         agent,
@@ -424,7 +429,7 @@ object bundles extends Schemas {
 
       val commit5Activity = Activity(
         CommitId("000005"),
-        committedDates.generateOne,
+        CommittedDate(commit4Activity.committedDate.value.plus(1, DAYS)),
         committer = persons.generateOne,
         project,
         agent,
@@ -437,7 +442,7 @@ object bundles extends Schemas {
 
       val commit6Activity = Activity(
         CommitId("000006"),
-        committedDates.generateOne,
+        CommittedDate(commit5Activity.committedDate.value.plus(1, DAYS)),
         committer = persons.generateOne,
         project,
         agent,
@@ -450,7 +455,7 @@ object bundles extends Schemas {
 
       val commit7Activity = Activity(
         CommitId("000007"),
-        committedDates.generateOne,
+        CommittedDate(commit6Activity.committedDate.value.plus(1, DAYS)),
         committer = persons.generateOne,
         project,
         agent,
@@ -464,7 +469,7 @@ object bundles extends Schemas {
 
       val oldCommit8ProcessRun = Activity(
         commitIds.generateOne,
-        committedDates.generateOne,
+        CommittedDate(commit7Activity.committedDate.value.plus(1, DAYS)),
         persons.generateOne,
         project,
         agent,
@@ -478,7 +483,7 @@ object bundles extends Schemas {
       val commit8ParquetEntityFactory = (activity: Activity) => Entity(Generation(bikesParquet, activity))
       val commit8ProcessRun = ProcessRun.standAlone(
         CommitId("000008"),
-        committedDates.generateOne,
+        CommittedDate(commit7Activity.committedDate.value.plus(1, DAYS)),
         persons.generateOne,
         project,
         agent,
@@ -501,7 +506,7 @@ object bundles extends Schemas {
 
       val oldCommit9ProcessRun = Activity(
         commitIds.generateOne,
-        committedDates.generateOne,
+        CommittedDate(commit8ProcessRun.committedDate.value.plus(1, DAYS)),
         persons.generateOne,
         project,
         agent,
@@ -515,7 +520,7 @@ object bundles extends Schemas {
       val commit9GridPlotEntityFactory = (activity: Activity) => Entity(Generation(gridPlotPng, activity))
       val commit9ProcessRun = ProcessRun.standAlone(
         CommitId("000009"),
-        committedDates.generateOne,
+        CommittedDate(commit8ProcessRun.committedDate.value.plus(1, DAYS)),
         persons.generateOne,
         project,
         agent,
@@ -540,7 +545,7 @@ object bundles extends Schemas {
 
       val commit10Activity = Activity(
         CommitId("0000010"),
-        committedDates.generateOne,
+        CommittedDate(commit9ProcessRun.committedDate.value.plus(1, DAYS)),
         persons.generateOne,
         project,
         agent,
@@ -553,7 +558,7 @@ object bundles extends Schemas {
 
       val commit11Activity = Activity(
         CommitId("0000011"),
-        committedDates.generateOne,
+        CommittedDate(commit10Activity.committedDate.value.plus(1, DAYS)),
         persons.generateOne,
         project,
         agent,
@@ -574,7 +579,7 @@ object bundles extends Schemas {
 
       val oldCommit12Workflow = Activity(
         commitIds.generateOne,
-        committedDates.generateOne,
+        CommittedDate(commit11Activity.committedDate.value.plus(1, DAYS)),
         persons.generateOne,
         project,
         agent,
@@ -587,7 +592,7 @@ object bundles extends Schemas {
 
       val oldCommit12WorkflowStep0 = Activity(
         commitIds.generateOne,
-        committedDates.generateOne,
+        CommittedDate(commit11Activity.committedDate.value.plus(1, DAYS)),
         persons.generateOne,
         project,
         agent,
@@ -600,7 +605,7 @@ object bundles extends Schemas {
 
       val oldCommit12WorkflowStep1 = Activity(
         commitIds.generateOne,
-        committedDates.generateOne,
+        CommittedDate(commit11Activity.committedDate.value.plus(1, DAYS)),
         persons.generateOne,
         project,
         agent,
@@ -617,7 +622,7 @@ object bundles extends Schemas {
       val commit12Committer                  = persons.generateOne
       val commit12Workflow = WorkflowRun(
         CommitId("0000012"),
-        committedDates.generateOne,
+        CommittedDate(commit11Activity.committedDate.value.plus(1, DAYS)),
         commit12Committer,
         project,
         agent,
@@ -660,7 +665,7 @@ object bundles extends Schemas {
         maybeInvalidation = oldCommit12Workflow.generations.headOption.flatMap(_.maybeReverseEntity)
       )
 
-      val examplarData = ExamplarData(
+      val examplarData = ExemplarData(
         gridPlotPng,
         commit12Workflow.commitId,
         commit12Committer,
@@ -668,12 +673,15 @@ object bundles extends Schemas {
         NodeDef(commit7Activity.entity(plotData)),
         NodeDef(commit7Activity.entity(cleanData)),
         NodeDef(commit8ProcessRun),
+        commit8ProcessRun.committedDate.value,
         NodeDef(commit8ProcessRun.processRunAssociation.runPlan.output(bikesParquet)),
         NodeDef(commit9ProcessRun),
+        commit9ProcessRun.committedDate.value,
         NodeDef(commit9ProcessRun.processRunAssociation.runPlan.output(gridPlotPng)),
         NodeDef(commit9ProcessRun.processRunAssociation.runPlan.output(cumulativePng)),
         NodeDef(commit10Activity.entity(dataSetFolder)),
-        NodeDef(commit12Workflow.processRunAssociation.runPlan.output(bikesParquet))
+        NodeDef(commit12Workflow.processRunAssociation.runPlan.output(bikesParquet)),
+        commit12Workflow.committedDate.value
       )
 
       List(
