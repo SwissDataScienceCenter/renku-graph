@@ -22,23 +22,21 @@ import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples}
 import ch.datascience.graph.model.projects
 
-private[zombieevents] sealed trait ZombieEvent {
+private sealed trait ZombieEvent {
   type Status <: EventStatus
   val eventId:     CompoundEventId
   val projectPath: projects.Path
   val status:      Status
 }
 
-private[zombieevents] final case class GeneratingTriplesZombieEvent(eventId:     CompoundEventId,
-                                                                    projectPath: projects.Path
-) extends ZombieEvent {
+private final case class GeneratingTriplesZombieEvent(eventId: CompoundEventId, projectPath: projects.Path)
+    extends ZombieEvent {
   override type Status = GeneratingTriples
   override val status: GeneratingTriples = GeneratingTriples
 }
 
-private[zombieevents] final case class TransformingTriplesZombieEvent(eventId:     CompoundEventId,
-                                                                      projectPath: projects.Path
-) extends ZombieEvent {
+private final case class TransformingTriplesZombieEvent(eventId: CompoundEventId, projectPath: projects.Path)
+    extends ZombieEvent {
   override type Status = TransformingTriples
   override val status: TransformingTriples = TransformingTriples
 }
