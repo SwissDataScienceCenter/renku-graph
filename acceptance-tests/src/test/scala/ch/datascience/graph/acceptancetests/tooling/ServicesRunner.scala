@@ -43,7 +43,6 @@ class ServicesRunner(
   import cats.syntax.all._
 
   import scala.concurrent.duration._
-  import scala.language.postfixOps
 
   private val logger = TestLogger()
 

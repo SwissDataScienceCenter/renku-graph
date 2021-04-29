@@ -46,8 +46,6 @@ import org.scalatest.concurrent.Eventually
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 
-import scala.language.postfixOps
-
 class EventsProcessingStatusSpec
     extends AnyFeatureSpec
     with ModelImplicits
