@@ -163,7 +163,7 @@ abstract class IORestClient[ThrottlingTarget](
                                  mapResponse: ResponseMapping[T],
                                  attempt:     Int
   ): PartialFunction[Throwable, IO[T]] = {
-    case error: RestClientError => throttler.release() flatMap (_ => error.raiseError[IO, T])
+    case error: RestClientError => throttler.release() >> error.raiseError[IO, T]
     case NonFatal(cause) =>
       cause match {
         case exception: ConnectionFailure if attempt <= maxRetries.value =>
@@ -172,12 +172,12 @@ abstract class IORestClient[ThrottlingTarget](
             _      <- timer sleep retryInterval
             result <- callRemote(httpClient, request, mapResponse, attempt + 1)
           } yield result
+        case exception: ConnectionFailure if attempt > maxRetries.value =>
+          throttler.release() >> ConnectivityException(LogMessage(request.request, exception), exception)
+            .raiseError[IO, T]
         case other =>
-          throttler.release() flatMap (_ =>
-            ConnectivityException(LogMessage(request.request, other), other).raiseError[IO, T]
-          )
+          throttler.release() >> ClientException(LogMessage(request.request, other), other).raiseError[IO, T]
       }
-
   }
 
   private type ResponseMapping[ResultType] = PartialFunction[(Status, Request[IO], Response[IO]), IO[ResultType]]
