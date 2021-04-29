@@ -116,9 +116,8 @@ object IOQueryEndpoint {
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[QueryEndpoint[IO]] =
-    for {
-      queryContext <- IOQueryContext(timeRecorder, logger)
-      querySchema = QuerySchema[IO](lineage.graphql.QueryFields())
-    } yield new QueryEndpoint[IO](querySchema, new QueryRunner(querySchema, queryContext))
+  ): IO[QueryEndpoint[IO]] = for {
+    queryContext <- QueryContext(timeRecorder, logger)
+    querySchema = QuerySchema[IO](lineage.graphql.QueryFields())
+  } yield new QueryEndpoint[IO](querySchema, new QueryRunner(querySchema, queryContext))
 }

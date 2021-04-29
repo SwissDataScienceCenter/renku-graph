@@ -19,7 +19,6 @@
 package ch.datascience.http.server
 
 import cats.effect._
-import cats.implicits.catsSyntaxApplicativeId
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.httpPorts
 import ch.datascience.http.server.EndpointTester._
@@ -65,13 +64,11 @@ class HttpServerSpec extends AnyWordSpec with Http4sDsl[IO] with should.Matchers
       }
       .unsafeRunSync()
 
-  private implicit val timer:        Timer[IO]        = IO.timer(global)
-  private implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
+  private implicit lazy val timer:        Timer[IO]        = IO.timer(global)
+  private implicit lazy val contextShift: ContextShift[IO] = IO.contextShift(global)
 
-  val port            = httpPorts.generateOne
-  private val baseUri = Uri.unsafeFromString(s"http://localhost:$port")
-  private val routes = HttpRoutes.of[IO] { case GET -> Root / "resource" =>
-    Ok("response")
-  }
+  private lazy val port    = httpPorts.generateOne
+  private lazy val baseUri = Uri.unsafeFromString(s"http://localhost:$port")
+  private lazy val routes  = HttpRoutes.of[IO] { case GET -> Root / "resource" => Ok("response") }
   new HttpServer[IO](port.value, routes).run().unsafeRunAsyncAndForget()
 }

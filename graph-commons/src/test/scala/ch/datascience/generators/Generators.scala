@@ -174,7 +174,7 @@ object Generators {
     } yield parts.mkString("/")
   }
 
-  val httpPorts: Gen[Int Refined Positive] = choose(1000, 10000) map Refined.unsafeApply
+  val httpPorts: Gen[Int Refined Positive] = choose(2000, 10000) map Refined.unsafeApply
 
   def httpUrls(pathGenerator: Gen[String] = relativePaths(minSegments = 0, maxSegments = 2)): Gen[String] =
     for {

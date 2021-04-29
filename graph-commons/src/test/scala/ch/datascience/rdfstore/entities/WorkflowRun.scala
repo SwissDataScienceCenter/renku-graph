@@ -57,25 +57,24 @@ object WorkflowRun {
       processRunsFactories:     List[ActivityWorkflowRun => Step => Activity with ChildProcessRun],
       maybeInvalidation:        Option[Entity with Artifact] = None,
       maybeGenerationFactories: List[Activity => Generation] = Nil
-  ): ActivityWorkflowRun =
-    new Activity(commitId,
-                 committedDate,
-                 committer,
-                 project,
-                 agent,
-                 comment,
-                 Some(informedBy),
-                 maybeInfluenced,
-                 maybeInvalidation,
-                 maybeGenerationFactories
-    ) with WorkflowProcessRun with WorkflowRun {
-      override val processRunAssociation: WorkflowRunPlanAssociation = associationFactory(project)(this)(workflowFile)
-      override val processRunUsages:      List[Usage]                = processRunAssociation.runPlan.asUsages(this)
-      val workflowRunFile:                WorkflowFile               = workflowFile
-      val processRuns: List[Activity with ChildProcessRun] = processRunsFactories.zipWithIndex.map {
-        case (factory, idx) => factory(this)(Step(idx))
-      }
+  ): ActivityWorkflowRun = new Activity(commitId,
+                                        committedDate,
+                                        committer,
+                                        project,
+                                        agent,
+                                        comment,
+                                        Some(informedBy),
+                                        maybeInfluenced,
+                                        maybeInvalidation,
+                                        maybeGenerationFactories
+  ) with WorkflowProcessRun with WorkflowRun {
+    override val processRunAssociation: WorkflowRunPlanAssociation = associationFactory(project)(this)(workflowFile)
+    override val processRunUsages:      List[Usage]                = processRunAssociation.runPlan.asUsages(this)
+    val workflowRunFile:                WorkflowFile               = workflowFile
+    val processRuns: List[Activity with ChildProcessRun] = processRunsFactories.zipWithIndex.map {
+      case (factory, idx) => factory(this)(Step(idx))
     }
+  }
 
   private[entities] implicit def converter(implicit
       renkuBaseUrl:  RenkuBaseUrl,
