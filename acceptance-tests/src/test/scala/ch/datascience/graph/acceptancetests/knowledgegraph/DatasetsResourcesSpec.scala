@@ -431,7 +431,7 @@ class DatasetsResourcesSpec
 
       Given("some datasets with title, description, name and author containing some arbitrary chosen text")
       val sameAs1Ids = pushToStore(dataset1, dataset1Projects)
-      val sameAs2Ids = pushToStore(dataset2, dataset2PrivateProjects)
+      pushToStore(dataset2, dataset2PrivateProjects)
       val sameAs3Ids = pushToStore(dataset3, dataset3PrivateProjects, user.some)
 
       When("user calls the GET knowledge-graph/datasets?query=<text>")

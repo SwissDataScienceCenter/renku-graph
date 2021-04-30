@@ -24,7 +24,6 @@ import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.http.server.security.ProjectAuthorizer
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.http.ErrorMessage.ErrorMessage
@@ -293,7 +292,6 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
     val projectDatasetsEndpoint = mock[IOProjectDatasetsEndpointStub]
     val datasetsEndpoint        = mock[IODatasetEndpointStub]
     val datasetsSearchEndpoint  = mock[IODatasetsSearchEndpointStub]
-    val projectAuthorizer       = mock[ProjectAuthorizer[IO]]
     val routesMetrics           = TestRoutesMetrics()
     lazy val routes = new MicroserviceRoutes[IO](
       queryEndpoint,
@@ -301,6 +299,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
       projectDatasetsEndpoint,
       datasetsEndpoint,
       datasetsSearchEndpoint,
+      givenAuthIfNeededMiddleware(returning = authenticationResponse),
       routesMetrics
     ).routes.map(_.or(notAvailableResponse))
   }

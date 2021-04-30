@@ -35,7 +35,6 @@ import ch.datascience.http.rest.Links
 import ch.datascience.http.rest.Links.Rel.Self
 import ch.datascience.http.rest.Links.{Href, Rel}
 import ch.datascience.http.server.EndpointTester._
-import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
