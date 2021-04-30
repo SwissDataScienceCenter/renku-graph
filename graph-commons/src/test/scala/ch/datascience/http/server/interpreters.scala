@@ -18,10 +18,8 @@
 
 package ch.datascience.http.server
 
-import cats.effect.{ContextShift, ExitCode, IO, Resource, Timer}
+import cats.effect.{ContextShift, ExitCode, IO, Timer}
 import org.http4s.HttpRoutes
-import org.http4s.implicits._
-import org.http4s.server.blaze.BlazeServerBuilder
 
 import scala.concurrent.ExecutionContext
 

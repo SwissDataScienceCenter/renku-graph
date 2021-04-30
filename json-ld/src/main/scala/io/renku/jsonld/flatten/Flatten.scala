@@ -19,8 +19,8 @@
 package io.renku.jsonld.flatten
 
 import cats.syntax.all._
-import io.renku.jsonld.JsonLD.{JsonLDArray, JsonLDEntity, JsonLDEntityId, JsonLDValue, MalformedJsonLD}
-import io.renku.jsonld.{EntityId, JsonLD, Property, Reverse}
+import io.renku.jsonld.JsonLD.{JsonLDArray, JsonLDEntity, JsonLDEntityId, MalformedJsonLD}
+import io.renku.jsonld.{JsonLD, Property, Reverse}
 
 import scala.annotation.tailrec
 

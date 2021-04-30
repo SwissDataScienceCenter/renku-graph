@@ -23,7 +23,7 @@ import cats.effect.{Clock, ConcurrentEffect, ContextShift, IO, Resource, Timer}
 import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.{RateLimit, Throttler}
-import ch.datascience.graph.http.server.security.{GitLabAuthenticator, ProjectAuthorizer}
+import ch.datascience.graph.http.server.security.GitLabAuthenticator
 import ch.datascience.graph.model
 import ch.datascience.http.rest.SortBy.Direction
 import ch.datascience.http.rest.paging.PagingRequest
@@ -52,7 +52,6 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     datasetEndpoint:         DatasetEndpoint[F],
     datasetsSearchEndpoint:  DatasetsSearchEndpoint[F],
     authMiddleware:          AuthMiddleware[F, Option[AuthUser]],
-    projectAuthorizer:       ProjectAuthorizer[F],
     routesMetrics:           RoutesMetrics[F]
 )(implicit clock:            Clock[F])
     extends Http4sDsl[F] {
@@ -148,7 +147,6 @@ private object MicroserviceRoutes {
       datasetsSearchEndpoint  <- IODatasetsSearchEndpoint(sparqlTimeRecorder)
       authenticator           <- GitLabAuthenticator(gitLabThrottler, logger)
       authMiddleware          <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
-      projectAuthorizer       <- ProjectAuthorizer(sparqlTimeRecorder, logger = logger)
       routesMetrics = new RoutesMetrics[IO](metricsRegistry)
     } yield new MicroserviceRoutes(queryEndpoint,
                                    projectEndpoint,
@@ -156,7 +154,6 @@ private object MicroserviceRoutes {
                                    datasetEndpoint,
                                    datasetsSearchEndpoint,
                                    authMiddleware,
-                                   projectAuthorizer,
                                    routesMetrics
     )
 }

@@ -42,8 +42,6 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.language.postfixOps
-
 private class AwaitingGenerationEventFinderSpec
     extends AnyWordSpec
     with InMemoryEventLogDbSpec

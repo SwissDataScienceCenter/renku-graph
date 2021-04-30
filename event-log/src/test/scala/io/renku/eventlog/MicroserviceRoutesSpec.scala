@@ -20,17 +20,14 @@ package io.renku.eventlog
 
 import cats.effect.{Clock, IO}
 import cats.syntax.all._
-import ch.datascience.db.SessionResource
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.compoundEventIds
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
-import ch.datascience.graph.model.projects
 import ch.datascience.http.ErrorMessage.ErrorMessage
 import ch.datascience.http.InfoMessage.InfoMessage
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.interpreters.TestRoutesMetrics
-import ch.datascience.metrics.LabeledGauge
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.EventEndpoint
 import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
@@ -197,12 +194,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
   ) extends SubscriptionsEndpoint[IO](subscriptionCategoryRegistry, logger)
 
   class TestStatusChangeEndpoint(
-      sessionResource:                 SessionResource[IO, EventLogDB],
-      updateCommandsRunner:            StatusUpdatesRunner[IO],
-      awaitingTriplesGenerationGauge:  LabeledGauge[IO, projects.Path],
-      underTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],
-      awaitingTransformationGauge:     LabeledGauge[IO, projects.Path],
-      underTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
-      logger:                          Logger[IO]
+      updateCommandsRunner: StatusUpdatesRunner[IO],
+      logger:               Logger[IO]
   ) extends StatusChangeEndpoint[IO](updateCommandsRunner, Set.empty, logger)
 }

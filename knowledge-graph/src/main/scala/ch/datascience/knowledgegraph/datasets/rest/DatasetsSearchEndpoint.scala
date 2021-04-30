@@ -18,7 +18,6 @@
 
 package ch.datascience.knowledgegraph.datasets.rest
 
-import cats.MonadError
 import cats.effect._
 import cats.syntax.all._
 import ch.datascience.config._
@@ -34,10 +33,10 @@ import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
-import org.typelevel.log4cats.Logger
 import org.http4s._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.dsl.impl.OptionalValidatingQueryParamDecoderMatcher
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal

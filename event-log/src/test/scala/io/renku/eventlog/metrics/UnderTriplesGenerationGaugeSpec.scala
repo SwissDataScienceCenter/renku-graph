@@ -28,7 +28,6 @@ import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Path
-import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.MetricsTools._
 import ch.datascience.metrics.{LabeledGauge, MetricsRegistry}
 import io.prometheus.client.{Gauge => LibGauge}
@@ -55,7 +54,7 @@ class UnderTriplesGenerationGaugeSpec extends AnyWordSpec with MockFactory with 
           actual.pure[IO]
         }
 
-      val gauge = UnderTriplesGenerationGauge(metricsRegistry, statsFinder, TestLogger()).unsafeRunSync()
+      val gauge = UnderTriplesGenerationGauge(metricsRegistry, statsFinder).unsafeRunSync()
 
       gauge.isInstanceOf[LabeledGauge[IO, projects.Path]] shouldBe true
     }
@@ -72,7 +71,7 @@ class UnderTriplesGenerationGaugeSpec extends AnyWordSpec with MockFactory with 
         .expects(Set(GeneratingTriples: EventStatus), None)
         .returning(processingEvents.pure[IO])
 
-      UnderTriplesGenerationGauge(metricsRegistry, statsFinder, TestLogger()).flatMap(_.reset()).unsafeRunSync()
+      UnderTriplesGenerationGauge(metricsRegistry, statsFinder).flatMap(_.reset()).unsafeRunSync()
 
       underlying.collectAllSamples should contain theSameElementsAs processingEvents.map { case (project, count) =>
         ("project", project.value, count.toDouble)

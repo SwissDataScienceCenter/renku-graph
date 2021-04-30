@@ -19,9 +19,9 @@
 package io.renku.eventlog.statuschange
 
 import cats.data.{Kleisli, NonEmptyList}
-import cats.syntax.all._
 import cats.effect.IO
-import ch.datascience.db.{SessionResource, SqlStatement}
+import cats.syntax.all._
+import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventProcessingTimes}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
@@ -33,9 +33,9 @@ import ch.datascience.interpreters.TestLogger.Level.Info
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventContentGenerators.{eventDates, executionDates}
+import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.eventlog.statuschange.commands.UpdateResult.{NotFound, Updated}
 import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
-import io.renku.eventlog.{EventLogDB, InMemoryEventLogDbSpec}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

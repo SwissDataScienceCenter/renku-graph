@@ -101,7 +101,6 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
       logger.loggedOnly(
         Info(
           successfulStoring(startCommit,
-                            commitEvents = commitEvents.size,
                             created = eventCreationResults.count(_ == Created),
                             existed = eventCreationResults.count(_ == Existed),
                             failed = 0
@@ -271,7 +270,13 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
       logger.loggedOnly(
         Error(failedStoring(startCommit, failingToSendEvent), sendException),
         Error(failedEventFinding(startCommit, failingToCheckIfExistEvent), checkIfExistsException),
-        Info(successfulStoring(startCommit, commitEvents.size, created = passingEvents.size, existed = 0, failed = 2))
+        Info(
+          successfulStoring(startCommit,
+                            created = passingEvents.size,
+                            existed = 0,
+                            failed = commitEvents.size - passingEvents.size
+          )
+        )
       )
     }
   }
@@ -301,12 +306,7 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
       clock
     )
 
-    def successfulStoring(startCommit:  StartCommit,
-                          commitEvents: Int,
-                          created:      Int,
-                          existed:      Int,
-                          failed:       Int
-    ): String =
+    def successfulStoring(startCommit: StartCommit, created: Int, existed: Int, failed: Int): String =
       s"$categoryName: id = ${startCommit.id}, projectId = ${startCommit.project.id}, projectPath = ${startCommit.project.path} -> " +
         s"events generation result: $created created, $existed existed, $failed failed in ${executionTimeRecorder.elapsedTime}ms"
 

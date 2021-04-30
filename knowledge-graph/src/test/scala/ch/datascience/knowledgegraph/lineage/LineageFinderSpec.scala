@@ -29,7 +29,6 @@ import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.knowledgegraph.lineage.LineageGenerators._
 import ch.datascience.knowledgegraph.lineage.model.{EdgeMap, _}
 import ch.datascience.rdfstore.SparqlQuery
-import io.renku.jsonld.EntityId
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Assertion
 import org.scalatest.matchers.should

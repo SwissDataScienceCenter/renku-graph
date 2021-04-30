@@ -28,9 +28,9 @@ import sangria.schema.Schema
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
 
-class QueryRunner[Interpretation[_]: Async, +QueryContext](
-    schema:                  Schema[QueryContext, Unit],
-    repository:              QueryContext
+class QueryRunner[Interpretation[_]: Async, +QueryContextT](
+    schema:                  Schema[QueryContextT, Unit],
+    repository:              QueryContextT
 )(implicit executionContext: ExecutionContext) {
 
   def run(userQuery: UserQuery): Interpretation[Json] = Async[Interpretation].async { callback =>

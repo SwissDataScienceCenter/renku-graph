@@ -66,7 +66,7 @@ private class SubscriptionMechanismImpl(
   override def run(): IO[Unit] = for {
     _    <- timer sleep initialDelay
     init <- Ref.of[IO, Boolean](true)
-    _    <- subscribeForEvents(init).foreverM
+    _    <- subscribeForEvents(init).foreverM[Unit]
   } yield ()
 
   private def subscribeForEvents(initOrError: Ref[IO, Boolean]): IO[Unit] = {

@@ -24,8 +24,6 @@ import ch.datascience.generators.Generators.nonEmptyStrings
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 
-import scala.language.postfixOps
-
 object TestDbConfig {
 
   def newDbConfig[TargetDb]: DBConfig[TargetDb] =

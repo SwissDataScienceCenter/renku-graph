@@ -20,6 +20,7 @@ package io.renku.jsonld
 
 import java.time.{Instant, LocalDate}
 
+@FunctionalInterface
 /** A type class that provides a conversion from a value of type `A` to a [[JsonLD]] value.
   */
 trait JsonLDEncoder[A] extends Serializable {

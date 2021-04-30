@@ -19,17 +19,16 @@
 package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.IO
-import ch.datascience.generators.CommonGraphGenerators.cliVersions
 import ch.datascience.generators.Generators.Implicits.GenOps
 import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import ch.datascience.triplesgenerator.generators.VersionGenerators.renkuVersionPairs
 import io.renku.jsonld.{EntityTypes, JsonLD}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import ch.datascience.triplesgenerator.generators.VersionGenerators.renkuVersionPairs
 
 class IOTriplesRemoverSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers {
 

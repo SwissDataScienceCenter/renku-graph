@@ -24,13 +24,11 @@ import cats.syntax.all._
 import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.numeric.Positive
-import org.typelevel.log4cats.Logger
 import io.circe.Json
 import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.subscriptions.EventProducersRegistry.{SubscriptionResult, SuccessfulSubscription, UnsupportedPayload}
 import io.renku.eventlog.subscriptions.SubscriptionCategory.{AcceptedRegistration, RejectedRegistration}
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
@@ -73,7 +71,6 @@ object EventProducersRegistry {
       awaitingTransformationGauge:    LabeledGauge[IO, projects.Path],
       underTransformationGauge:       LabeledGauge[IO, projects.Path],
       queriesExecTimes:               LabeledHistogram[IO, SqlStatement.Name],
-      microservicePort:               Int Refined Positive,
       logger:                         Logger[IO]
   )(implicit
       contextShift:     ContextShift[IO],

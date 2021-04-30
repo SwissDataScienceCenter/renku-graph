@@ -71,10 +71,10 @@ object Microservice extends IOMicroservice {
         queriesExecTimes            <- QueriesExecutionTimes(metricsRegistry)
         statsFinder                 <- IOStatsFinder(sessionResource, queriesExecTimes)
         eventLogMetrics             <- IOEventLogMetrics(statsFinder, ApplicationLogger, metricsRegistry)
-        awaitingGenerationGauge     <- AwaitingGenerationGauge(metricsRegistry, statsFinder, ApplicationLogger)
-        awaitingTransformationGauge <- AwaitingTransformationGauge(metricsRegistry, statsFinder, ApplicationLogger)
-        underTransformationGauge    <- UnderTransformationGauge(metricsRegistry, statsFinder, ApplicationLogger)
-        underTriplesGenerationGauge <- UnderTriplesGenerationGauge(metricsRegistry, statsFinder, ApplicationLogger)
+        awaitingGenerationGauge     <- AwaitingGenerationGauge(metricsRegistry, statsFinder)
+        awaitingTransformationGauge <- AwaitingTransformationGauge(metricsRegistry, statsFinder)
+        underTransformationGauge    <- UnderTransformationGauge(metricsRegistry, statsFinder)
+        underTriplesGenerationGauge <- UnderTriplesGenerationGauge(metricsRegistry, statsFinder)
         metricsResetScheduler <- IOGaugeResetScheduler(
                                    List(awaitingGenerationGauge,
                                         underTriplesGenerationGauge,
@@ -103,10 +103,10 @@ object Microservice extends IOMicroservice {
                                            queriesExecTimes,
                                            ApplicationLogger
                                          )
-        eventConsumersRegistry <- consumers.EventConsumersRegistry(ApplicationLogger,
-                                                                   creationSubscription,
-                                                                   zombieEventsSubscription,
-                                                                   commitSyncRequestSubscription
+        eventConsumersRegistry <- consumers.EventConsumersRegistry(
+                                    creationSubscription,
+                                    zombieEventsSubscription,
+                                    commitSyncRequestSubscription
                                   )
         eventEndpoint            <- EventEndpoint(eventConsumersRegistry)
         processingStatusEndpoint <- IOProcessingStatusEndpoint(sessionResource, queriesExecTimes, ApplicationLogger)
@@ -132,7 +132,6 @@ object Microservice extends IOMicroservice {
                                     awaitingTransformationGauge,
                                     underTransformationGauge,
                                     queriesExecTimes,
-                                    ServicePort,
                                     ApplicationLogger
                                   )
         subscriptionsEndpoint <- IOSubscriptionsEndpoint(eventProducersRegistry, ApplicationLogger)

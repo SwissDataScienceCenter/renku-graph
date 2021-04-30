@@ -31,7 +31,6 @@ import ch.datascience.rdfstore._
 import ch.datascience.tinytypes.json.TinyTypeDecoders
 import eu.timepit.refined.auto._
 import io.circe.Decoder
-import io.renku.jsonld.EntityId
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext

@@ -19,15 +19,14 @@
 package io.renku.eventlog
 
 import cats.data.Kleisli
-import cats.syntax.all._
 import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl, subscriberIds, subscriberUrls}
 import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.{projectPaths, projectSchemaVersions}
-import ch.datascience.graph.model.{SchemaVersion, projects}
 import ch.datascience.graph.model.events.EventStatus.{TransformationRecoverableFailure, TransformingTriples, TriplesGenerated}
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects.Path
+import ch.datascience.graph.model.{SchemaVersion, projects}
 import ch.datascience.microservices.MicroserviceBaseUrl
 import skunk._
 import skunk.implicits._
