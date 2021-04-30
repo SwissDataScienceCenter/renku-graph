@@ -22,10 +22,11 @@ package datasets
 import cats.MonadError
 import cats.data.EitherT
 import cats.syntax.all._
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{exceptions, serverErrorHttpStatuses}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.http.client.RestClientError.{ConnectivityException, UnexpectedResponseException}
+import ch.datascience.http.client.RestClientError.UnexpectedResponseException
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CurationGenerators._
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
@@ -89,21 +90,22 @@ class DataSetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.M
       enricher.enrichDataSetInfo(curatedTriples).value shouldBe Success(Right(curatedTriplesWithUpdates))
     }
 
-    "return recoverable error when finding topmost data fails with connectivity issue" in new TestCase {
-      val datasetInfoList = datasetInfos.generateNonEmptyList()
+    connectivityExceptions.generateOne +: clientExceptions.generateOne +: Nil foreach { exception =>
+      s"return recoverable error when finding topmost data fails with ${exception.getClass.getSimpleName}" in new TestCase {
+        val datasetInfoList = datasetInfos.generateNonEmptyList()
 
-      (infoFinder.findDatasetsInfo _)
-        .expects(curatedTriples.triples)
-        .returning(datasetInfoList.toList.toSet.pure[Try])
+        (infoFinder.findDatasetsInfo _)
+          .expects(curatedTriples.triples)
+          .returning(datasetInfoList.toList.toSet.pure[Try])
 
-      val exception = ConnectivityException("Connectivity exception", exceptions.generateOne)
-      datasetInfoList.toList.foreach { datasetInfo =>
-        (topmostDataFinder.findTopmostData _).expects(datasetInfo).returning(exception.raiseError[Try, TopmostData])
+        datasetInfoList.toList.foreach { datasetInfo =>
+          (topmostDataFinder.findTopmostData _).expects(datasetInfo).returning(exception.raiseError[Try, TopmostData])
+        }
+
+        enricher.enrichDataSetInfo(curatedTriples).value shouldBe Success(
+          Left(CurationRecoverableError("Problem with finding top most data", exception))
+        )
       }
-
-      enricher.enrichDataSetInfo(curatedTriples).value shouldBe Success(
-        Left(CurationRecoverableError("Problem with finding top most data", exception))
-      )
     }
 
     "return recoverable error when finding topmost data fails with unexpected response" in new TestCase {

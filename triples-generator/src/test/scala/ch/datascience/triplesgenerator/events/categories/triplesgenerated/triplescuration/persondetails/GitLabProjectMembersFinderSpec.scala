@@ -21,7 +21,7 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated.tripl
 import PersonDetailsGenerators._
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
-import ch.datascience.generators.CommonGraphGenerators.{accessTokens, gitLabUrls}
+import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
@@ -31,6 +31,7 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
 import com.github.tomakehurst.wiremock.client.WireMock._
+import com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER
 import eu.timepit.refined.auto._
 import io.circe.Encoder
 import io.circe.literal._
@@ -125,22 +126,27 @@ class GitLabProjectMembersFinderSpec
       }
     }
 
-    "return a CurationRecoverableError when service is not available" in new TestCase {
+    Set(
+      "connection problem" -> aResponse().withFault(CONNECTION_RESET_BY_PEER),
+      "client problem"     -> aResponse().withFixedDelay((requestTimeout.toMillis + 500).toInt)
+    ) foreach { case (problemName, response) =>
+      s"return a CurationRecoverableError if there's a $problemName" in new TestCase {
 
-      override val finder = new IOGitLabProjectMembersFinder(gitLabUrls.generateOne.apiV4,
-                                                             Throttler.noThrottling,
-                                                             TestLogger(),
-                                                             retryInterval = 1 millis
-      )
+        stubFor {
+          get(s"/api/v4/projects/${urlEncode(path.toString)}/members")
+            .willReturn(response)
+        }
 
-      val Left(error) = finder.findProjectMembers(path).value.unsafeRunSync()
+        val Left(error) = finder.findProjectMembers(path).value.unsafeRunSync()
 
-      error shouldBe a[CurationRecoverableError]
+        error shouldBe a[CurationRecoverableError]
+      }
     }
   }
 
   private implicit lazy val cs:    ContextShift[IO] = IO.contextShift(global)
   private implicit lazy val timer: Timer[IO]        = IO.timer(global)
+  private lazy val requestTimeout = 2 seconds
 
   private trait TestCase {
 
@@ -148,7 +154,13 @@ class GitLabProjectMembersFinderSpec
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
 
     private val gitLabUrl = GitLabUrl(externalServiceBaseUrl)
-    val finder            = new IOGitLabProjectMembersFinder(gitLabUrl.apiV4, Throttler.noThrottling, TestLogger())
+    val finder = new IOGitLabProjectMembersFinder(gitLabUrl.apiV4,
+                                                  Throttler.noThrottling,
+                                                  TestLogger(),
+                                                  retryInterval = 100 millis,
+                                                  maxRetries = 1,
+                                                  requestTimeoutOverride = Some(requestTimeout)
+    )
   }
 
   private implicit val projectMemberEncoder: Encoder[GitLabProjectMember] = Encoder.instance[GitLabProjectMember] {

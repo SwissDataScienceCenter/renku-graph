@@ -27,8 +27,9 @@ import ch.datascience.interpreters.TestLogger.Level.Info
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.webhookservice.model.CommitSyncRequest
 import com.github.tomakehurst.wiremock.client.WireMock.{post, _}
-import com.github.tomakehurst.wiremock.http.Fault
+import com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER
 import com.github.tomakehurst.wiremock.stubbing.Scenario
+import eu.timepit.refined.auto._
 import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
@@ -121,14 +122,41 @@ class CommitSyncRequestSenderSpec
         postRequest
           .whenScenarioStateIs(Scenario.STARTED)
           .willSetStateTo("Error")
-          .willReturn(aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER))
+          .willReturn(aResponse().withFault(CONNECTION_RESET_BY_PEER))
       }
 
       stubFor {
         postRequest
           .whenScenarioStateIs("Error")
           .willSetStateTo("Successful")
-          .willReturn(aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER))
+          .willReturn(aResponse().withFault(CONNECTION_RESET_BY_PEER))
+      }
+
+      stubFor {
+        postRequest
+          .whenScenarioStateIs("Successful")
+          .willReturn(aResponse().withStatus(Accepted.code))
+      }
+
+      eventSender.sendCommitSyncRequest(syncRequest).unsafeRunSync() shouldBe ()
+    }
+
+    "retry in case of client exception" in new TestCase {
+
+      val postRequest = post("/events").inScenario("Retry")
+
+      stubFor {
+        postRequest
+          .whenScenarioStateIs(Scenario.STARTED)
+          .willSetStateTo("Error")
+          .willReturn(aResponse().withFixedDelay((requestTimeout.toMillis + 500).toInt))
+      }
+
+      stubFor {
+        postRequest
+          .whenScenarioStateIs("Error")
+          .willSetStateTo("Successful")
+          .willReturn(aResponse().withFault(CONNECTION_RESET_BY_PEER))
       }
 
       stubFor {
@@ -148,9 +176,16 @@ class CommitSyncRequestSenderSpec
 
     val syncRequest = commitSyncRequests.generateOne
 
-    val eventLogUrl = EventLogUrl(externalServiceBaseUrl)
-    val logger      = TestLogger[IO]()
-    val eventSender = new CommitSyncRequestSenderImpl(eventLogUrl, logger, 500 millis)
+    val eventLogUrl    = EventLogUrl(externalServiceBaseUrl)
+    val logger         = TestLogger[IO]()
+    val requestTimeout = 2 seconds
+    val eventSender = new CommitSyncRequestSenderImpl(eventLogUrl,
+                                                      logger,
+                                                      500 millis,
+                                                      retryInterval = 100 millis,
+                                                      maxRetries = 1,
+                                                      requestTimeoutOverride = Some(requestTimeout)
+    )
   }
 
   private implicit lazy val eventEncoder: Encoder[CommitSyncRequest] = Encoder.instance[CommitSyncRequest] { event =>

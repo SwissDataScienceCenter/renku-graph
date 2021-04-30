@@ -24,7 +24,7 @@ import ch.datascience.control.Throttler
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.http.client.IORestClient
-import ch.datascience.http.client.RestClientError.ConnectivityException
+import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException}
 import org.typelevel.log4cats.Logger
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
 
@@ -45,11 +45,11 @@ private object EventsSender {
 }
 
 private class EventsSenderImpl[CategoryEvent](
-    categoryName:         CategoryName,
-    categoryEventEncoder: EventEncoder[CategoryEvent],
-    logger:               Logger[IO],
-    retryInterval:        FiniteDuration = 1 second,
-    idleTimeoutOverride:  Option[Duration] = None
+    categoryName:           CategoryName,
+    categoryEventEncoder:   EventEncoder[CategoryEvent],
+    logger:                 Logger[IO],
+    retryInterval:          FiniteDuration = 1 second,
+    requestTimeoutOverride: Option[Duration] = None
 )(implicit
     ME:               MonadError[IO, Throwable],
     executionContext: ExecutionContext,
@@ -58,7 +58,7 @@ private class EventsSenderImpl[CategoryEvent](
 ) extends IORestClient(Throttler.noThrottling,
                        logger,
                        retryInterval = retryInterval,
-                       idleTimeoutOverride = idleTimeoutOverride
+                       requestTimeoutOverride = requestTimeoutOverride
     )
     with EventsSender[IO, CategoryEvent] {
 
@@ -91,9 +91,9 @@ private class EventsSenderImpl[CategoryEvent](
   }
 
   private lazy val exceptionToSendingResult: PartialFunction[Throwable, IO[SendingResult]] = {
-    case _: ConnectivityException => Misdelivered.pure[IO]
-    case cause =>
-      logger.error(cause)(s"$categoryName: sending event failed") >> TemporarilyUnavailable.pure[IO]
+    case _:         ConnectivityException => Misdelivered.pure[IO]
+    case exception: ClientException =>
+      logger.error(exception)(s"$categoryName: sending event failed") >> TemporarilyUnavailable.pure[IO]
   }
 }
 
