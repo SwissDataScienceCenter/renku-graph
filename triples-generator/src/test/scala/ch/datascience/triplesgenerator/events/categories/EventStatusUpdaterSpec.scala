@@ -19,6 +19,7 @@
 package ch.datascience.triplesgenerator.events.categories
 
 import EventStatusUpdater._
+import cats.Applicative
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.data.ErrorMessage
 import ch.datascience.generators.CommonGraphGenerators._
@@ -27,12 +28,13 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.EventStatus.{TriplesGenerated, _}
+import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
-import com.github.tomakehurst.wiremock.http.Fault
+import com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER
 import com.github.tomakehurst.wiremock.stubbing.Scenario
+import eu.timepit.refined.auto._
 import io.circe.literal._
 import org.http4s.Status._
 import org.scalatest.matchers.should
@@ -47,7 +49,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
   "toTriplesGenerated" should {
 
     Set(Ok, NotFound) foreach { status =>
-      s"succeed if remote responds with $status" in new TestCase {
+      s"succeed if remote responds with $status" in {
         val processingTime = eventProcessingTimes.generateOne
 
         stubFor {
@@ -77,7 +79,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
       }
     }
 
-    s"fail if remote responds with status different than $Ok" in new TestCase {
+    s"fail if remote responds with status different than $Ok" in {
       val processingTime = eventProcessingTimes.generateOne
       val status         = BadRequest
 
@@ -111,7 +113,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
   "toTriplesStore" should {
 
     Set(Ok, NotFound) foreach { status =>
-      s"succeed if remote responds with $status" in new TestCase {
+      s"succeed if remote responds with $status" in {
         val processingTime = eventProcessingTimes.generateOne
 
         stubFor {
@@ -129,7 +131,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
       }
     }
 
-    s"fail if remote responds with status different than $Ok" in new TestCase {
+    s"fail if remote responds with status different than $Ok" in {
       val processingTime = eventProcessingTimes.generateOne
       val status         = BadRequest
 
@@ -153,7 +155,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
   "rollback" should {
 
     Set(Ok, NotFound) foreach { status =>
-      s"succeed if remote responds with $status - case of $New" in new TestCase {
+      s"succeed if remote responds with $status - case of $New" in {
         stubFor {
           patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
             .withMultipartRequestBody(
@@ -166,7 +168,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
         updater.rollback[New](eventId).unsafeRunSync() shouldBe ((): Unit)
       }
 
-      s"succeed if remote responds with $status - case of $TriplesGenerated" in new TestCase {
+      s"succeed if remote responds with $status - case of $TriplesGenerated" in {
         stubFor {
           patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
             .withMultipartRequestBody(
@@ -180,7 +182,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
       }
     }
 
-    s"fail if remote responds with status different than $Ok - case of $New" in new TestCase {
+    s"fail if remote responds with status different than $Ok - case of $New" in {
       val status = BadRequest
       stubFor {
         patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
@@ -196,7 +198,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
       }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/${eventId.projectId} returned $status; body: "
     }
 
-    s"fail if remote responds with status different than $Ok - case of $TriplesGenerated" in new TestCase {
+    s"fail if remote responds with status different than $Ok - case of $TriplesGenerated" in {
       val status = BadRequest
       stubFor {
         patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
@@ -218,7 +220,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
     GenerationRecoverableFailure +: GenerationNonRecoverableFailure +: TransformationRecoverableFailure +: TransformationNonRecoverableFailure +: Nil foreach {
       eventStatus =>
         Set(Ok, NotFound) foreach { status =>
-          s"succeed if remote responds with $status for $eventStatus" in new TestCase {
+          s"succeed if remote responds with $status for $eventStatus" in {
             val exception = exceptions.generateOne
             stubFor {
               patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
@@ -240,7 +242,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
           }
         }
 
-        s"fail if remote responds with status different than $Ok for $eventStatus" in new TestCase {
+        s"fail if remote responds with status different than $Ok for $eventStatus" in {
           val status = BadRequest
 
           stubFor {
@@ -258,7 +260,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
   "eventStatusUpdater" should {
 
     Set(BadGateway, ServiceUnavailable, GatewayTimeout) foreach { errorStatus =>
-      s"retry if remote responds with status such as $errorStatus" in new TestCase {
+      s"retry if remote responds with status such as $errorStatus" in {
         Set(
           updater.toTriplesGenerated(eventId, rawTriples, schemaVersion, eventProcessingTimes.generateOne),
           updater.toTriplesStore(eventId, eventProcessingTimes.generateOne),
@@ -295,53 +297,68 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
       }
     }
 
-    s"retry if remote is not reachable" in new TestCase {
-      Set(
-        updater.toTriplesGenerated(eventId, rawTriples, schemaVersion, eventProcessingTimes.generateOne),
-        updater.toTriplesStore(eventId, eventProcessingTimes.generateOne),
-        updater.rollback[New](eventId),
-        updater.toFailure(eventId, failureEventStatuses.generateOne, exceptions.generateOne)
-      ) foreach { updateFunction =>
-        val patchRequest = patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
-          .inScenario("Retry")
+    val failureResponses = List(
+      "connection error"   -> aResponse().withFault(CONNECTION_RESET_BY_PEER),
+      "other client error" -> aResponse().withFixedDelay((requestTimeout.toMillis + 500).toInt)
+    )
+    val updateFunctions = List(
+      "toTriplesGenerated" -> updater.toTriplesGenerated(eventId,
+                                                         rawTriples,
+                                                         schemaVersion,
+                                                         eventProcessingTimes.generateOne
+      ),
+      "toTriplesStore" -> updater.toTriplesStore(eventId, eventProcessingTimes.generateOne),
+      "rollback"       -> updater.rollback[New](eventId),
+      "toFailure"      -> updater.toFailure(eventId, failureEventStatuses.generateOne, exceptions.generateOne)
+    )
+    Applicative[List].product(updateFunctions, failureResponses) foreach {
+      case ((functionName, updateFunction), (responseName, response)) =>
+        s"retry $functionName command in case of $responseName" in {
+          val patchRequest = patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
+            .inScenario("Retry")
 
-        stubFor {
-          patchRequest
-            .whenScenarioStateIs(Scenario.STARTED)
-            .willSetStateTo("Error")
-            .willReturn(aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER))
+          stubFor {
+            patchRequest
+              .whenScenarioStateIs(Scenario.STARTED)
+              .willSetStateTo("Error")
+              .willReturn(response)
+          }
+
+          stubFor {
+            patchRequest
+              .whenScenarioStateIs("Error")
+              .willSetStateTo("Successful")
+              .willReturn(response)
+          }
+
+          stubFor {
+            patchRequest
+              .whenScenarioStateIs("Successful")
+              .willReturn(aResponse().withStatus(Ok.code))
+          }
+
+          updateFunction.unsafeRunSync() shouldBe ()
+
+          reset()
         }
-
-        stubFor {
-          patchRequest
-            .whenScenarioStateIs("Error")
-            .willSetStateTo("Successful")
-            .willReturn(aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER))
-        }
-
-        stubFor {
-          patchRequest
-            .whenScenarioStateIs("Successful")
-            .willReturn(aResponse().withStatus(Ok.code))
-        }
-
-        updateFunction.unsafeRunSync() shouldBe ()
-
-        reset()
-      }
     }
   }
 
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO]        = IO.timer(global)
+  private implicit lazy val cs:    ContextShift[IO] = IO.contextShift(global)
+  private implicit lazy val timer: Timer[IO]        = IO.timer(global)
 
-  private trait TestCase {
-    val eventId       = compoundEventIds.generateOne
-    val rawTriples    = jsonLDTriples.generateOne
-    val schemaVersion = projectSchemaVersions.generateOne
+  private lazy val requestTimeout: Duration    = 1 second
+  private lazy val eventLogUrl:    EventLogUrl = EventLogUrl(externalServiceBaseUrl)
+  private lazy val updater = new EventStatusUpdaterImpl(eventLogUrl,
+                                                        categoryNames.generateOne,
+                                                        retryDelay = 100 millis,
+                                                        TestLogger(),
+                                                        retryInterval = 100 millis,
+                                                        maxRetries = 2,
+                                                        requestTimeoutOverride = Some(requestTimeout)
+  )
 
-    val eventLogUrl = EventLogUrl(externalServiceBaseUrl)
-    val updater =
-      new EventStatusUpdaterImpl(eventLogUrl, categoryNames.generateOne, retryDelay = 500 millis, TestLogger())
-  }
+  private lazy val eventId       = compoundEventIds.generateOne
+  private lazy val rawTriples    = jsonLDTriples.generateOne
+  private lazy val schemaVersion = projectSchemaVersions.generateOne
 }

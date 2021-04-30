@@ -26,18 +26,21 @@ import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabApiUrl
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects
-import ch.datascience.http.client.RestClientError.ConnectivityException
+import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException}
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.numeric.NonNegative
 import org.http4s.Method.GET
 import org.http4s.Status.{Ok, Unauthorized}
 import org.http4s.circe.jsonOf
 import org.http4s.dsl.io.ServiceUnavailable
-import org.http4s.{EntityDecoder, Request, Response, Status}
+import org.http4s._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.{Duration, FiniteDuration}
 
 private trait CommitCommitterFinder[Interpretation[_]] {
 
@@ -48,14 +51,22 @@ private trait CommitCommitterFinder[Interpretation[_]] {
 }
 
 private class CommitCommitterFinderImpl(
-    gitLabApiUrl:    GitLabApiUrl,
-    gitLabThrottler: Throttler[IO, GitLab],
-    logger:          Logger[IO]
+    gitLabApiUrl:           GitLabApiUrl,
+    gitLabThrottler:        Throttler[IO, GitLab],
+    logger:                 Logger[IO],
+    retryInterval:          FiniteDuration = IORestClient.SleepAfterConnectionIssue,
+    maxRetries:             Int Refined NonNegative = IORestClient.MaxRetriesAfterConnectionTimeout,
+    requestTimeoutOverride: Option[Duration] = None
 )(implicit
     executionContext: ExecutionContext,
     contextShift:     ContextShift[IO],
     timer:            Timer[IO]
-) extends IORestClient(gitLabThrottler, logger)
+) extends IORestClient(gitLabThrottler,
+                       logger,
+                       retryInterval = retryInterval,
+                       maxRetries = maxRetries,
+                       requestTimeoutOverride = requestTimeoutOverride
+    )
     with CommitCommitterFinder[IO] {
 
   def findCommitPeople(projectId:        projects.Id,
@@ -82,8 +93,8 @@ private class CommitCommitterFinderImpl(
 
   private lazy val maybeRecoverableError
       : PartialFunction[Throwable, IO[Either[ProcessingRecoverableError, CommitPersonsInfo]]] = {
-    case ConnectivityException(message, cause) =>
-      IO.pure(Either.left(CurationRecoverableError(message, cause)))
+    case exception @ (_: ConnectivityException | _: ClientException) =>
+      Either.left(CurationRecoverableError(exception.getMessage, exception.getCause)).pure[IO]
   }
 
   private implicit class ResultOps[T](out: IO[T]) {
