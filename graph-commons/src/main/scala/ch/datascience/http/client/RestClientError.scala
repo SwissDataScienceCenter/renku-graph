@@ -34,6 +34,10 @@ object RestClientError {
       extends Exception(message, cause)
       with RestClientError
 
+  final case class ClientException(message: String, cause: Throwable)
+      extends Exception(message, cause)
+      with RestClientError
+
   final case class MappingException(message: String, cause: Throwable)
       extends Exception(message, cause)
       with RestClientError

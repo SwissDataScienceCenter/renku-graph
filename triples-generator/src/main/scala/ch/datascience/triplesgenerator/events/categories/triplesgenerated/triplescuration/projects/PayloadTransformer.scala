@@ -23,7 +23,7 @@ import cats.data.EitherT
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
 import ch.datascience.http.client.AccessToken
-import ch.datascience.http.client.RestClientError.{ConnectivityException, UnexpectedResponseException}
+import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedEvent
@@ -63,11 +63,7 @@ private class PayloadTransformerImpl(
 
   private lazy val maybeToRecoverableError
       : PartialFunction[Throwable, Either[ProcessingRecoverableError, JsonLDTriples]] = {
-    case e: UnexpectedResponseException =>
-      Left[ProcessingRecoverableError, JsonLDTriples](
-        CurationRecoverableError("Problem with finding fork info", e)
-      )
-    case e: ConnectivityException =>
+    case e @ (_: UnexpectedResponseException | _: ConnectivityException | _: ClientException) =>
       Left[ProcessingRecoverableError, JsonLDTriples](
         CurationRecoverableError("Problem with finding fork info", e)
       )

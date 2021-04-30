@@ -22,8 +22,9 @@ import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
+import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.http.client.IORestClient
-import ch.datascience.http.client.RestClientError.ConnectivityException
+import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException}
 import org.typelevel.log4cats.Logger
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
 
@@ -44,15 +45,21 @@ private object EventsSender {
 }
 
 private class EventsSenderImpl[CategoryEvent](
-    categoryEventEncoder: EventEncoder[CategoryEvent],
-    logger:               Logger[IO],
-    retryInterval:        FiniteDuration = 1 second
+    categoryName:           CategoryName,
+    categoryEventEncoder:   EventEncoder[CategoryEvent],
+    logger:                 Logger[IO],
+    retryInterval:          FiniteDuration = 1 second,
+    requestTimeoutOverride: Option[Duration] = None
 )(implicit
     ME:               MonadError[IO, Throwable],
     executionContext: ExecutionContext,
     contextShift:     ContextShift[IO],
     timer:            Timer[IO]
-) extends IORestClient(Throttler.noThrottling, logger, retryInterval = retryInterval)
+) extends IORestClient(Throttler.noThrottling,
+                       logger,
+                       retryInterval = retryInterval,
+                       requestTimeoutOverride = requestTimeoutOverride
+    )
     with EventsSender[IO, CategoryEvent] {
 
   import SendingResult._
@@ -73,7 +80,7 @@ private class EventsSenderImpl[CategoryEvent](
             .build()
         )(mapResponse)
     } yield sendingResult
-  } recoverWith connectivityException(to = Misdelivered)
+  } recoverWith exceptionToSendingResult
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[SendingResult]] = {
     case (Accepted, _, _)           => Delivered.pure[IO]
@@ -83,13 +90,16 @@ private class EventsSenderImpl[CategoryEvent](
     case (BadGateway, _, _)         => TemporarilyUnavailable.pure[IO] // to mitigate k8s problems
   }
 
-  private def connectivityException(to: SendingResult): PartialFunction[Throwable, IO[SendingResult]] = {
-    case _: ConnectivityException => to.pure[IO]
+  private lazy val exceptionToSendingResult: PartialFunction[Throwable, IO[SendingResult]] = {
+    case _:         ConnectivityException => Misdelivered.pure[IO]
+    case exception: ClientException =>
+      logger.error(exception)(s"$categoryName: sending event failed") >> TemporarilyUnavailable.pure[IO]
   }
 }
 
 private object IOEventsSender {
   def apply[CategoryEvent](
+      categoryName:         CategoryName,
       categoryEventEncoder: EventEncoder[CategoryEvent],
       logger:               Logger[IO]
   )(implicit
@@ -97,6 +107,6 @@ private object IOEventsSender {
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[EventsSender[IO, CategoryEvent]] = IO {
-    new EventsSenderImpl(categoryEventEncoder, logger)
+    new EventsSenderImpl(categoryName, categoryEventEncoder, logger)
   }
 }

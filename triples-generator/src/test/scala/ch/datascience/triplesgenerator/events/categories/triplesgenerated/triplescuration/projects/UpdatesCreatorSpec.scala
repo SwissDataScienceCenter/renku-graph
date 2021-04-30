@@ -219,8 +219,9 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
     }
 
     Set(
-      UnexpectedResponseException(serverErrorHttpStatuses.generateOne, nonBlankStrings().generateOne),
-      ConnectivityException(nonBlankStrings().generateOne, exceptions.generateOne)
+      unexpectedResponseExceptions.generateOne,
+      connectivityExceptions.generateOne,
+      clientExceptions.generateOne
     ) foreach { exception =>
       s"return $CurationRecoverableError if finding GitLab project fails with ${exception.getClass.getSimpleName}" in new TestCase {
 

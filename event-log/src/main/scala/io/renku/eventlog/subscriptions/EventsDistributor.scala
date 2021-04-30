@@ -130,7 +130,7 @@ private object IOEventsDistributor {
       timer:            Timer[IO]
   ): IO[EventsDistributor[IO]] =
     for {
-      eventsSender <- IOEventsSender[CategoryEvent](categoryEventEncoder, logger)
+      eventsSender <- IOEventsSender[CategoryEvent](categoryName, categoryEventEncoder, logger)
     } yield new EventsDistributorImpl(categoryName,
                                       subscribers,
                                       eventsFinder,

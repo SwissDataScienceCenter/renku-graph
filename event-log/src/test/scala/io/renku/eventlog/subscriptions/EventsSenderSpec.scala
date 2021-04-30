@@ -23,10 +23,14 @@ import cats.implicits.catsSyntaxOptionId
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.http.client.RestClientError.ClientException
 import ch.datascience.interpreters.TestLogger
+import ch.datascience.interpreters.TestLogger.Level.Error
+import ch.datascience.interpreters.TestLogger.LogMessage.MessageAndThrowable
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult._
+import io.renku.eventlog.subscriptions.Generators.categoryNames
 import io.renku.eventlog.subscriptions.TestCategoryEvent._
 import org.http4s.Status._
 import org.scalamock.scalatest.MockFactory
@@ -82,14 +86,43 @@ class EventsSenderSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
       }
     }
 
-    "return Misdelivered if call to the remote fails with Connect Exception" in new TestCase {
-      override val sender = new EventsSenderImpl(categoryEventEncoder, TestLogger(), retryInterval = 10 millis)
+    "return Misdelivered if call to the remote fails with ConnectivityException" in new TestCase {
+      override val sender = new EventsSenderImpl(categoryName, categoryEventEncoder, logger, retryInterval = 10 millis)
 
       expectEventEncoding(event)
 
       sender
         .sendEvent(SubscriberUrl("http://unexisting"), event)
         .unsafeRunSync() shouldBe Misdelivered
+    }
+
+    "return TemporarilyUnavailable if call to the remote fails with exception other than ConnectivityException" in new TestCase {
+
+      val (eventJson, eventPayload) = expectEventEncoding(event)
+
+      stubFor {
+        post("/")
+          .withMultipartRequestBody(
+            aMultipart("event")
+              .withBody(equalToJson(eventJson.spaces2))
+          )
+          .withMultipartRequestBody(
+            aMultipart("payload")
+              .withBody(equalTo(eventPayload))
+          )
+          .willReturn(aResponse().withFixedDelay((requestTimeout.toMillis + 500).toInt))
+      }
+
+      sender
+        .sendEvent(subscriberUrl, event)
+        .unsafeRunSync() shouldBe TemporarilyUnavailable
+
+      logger.getMessages(Error).map {
+        case MessageAndThrowable(message, cause) =>
+          message shouldBe s"$categoryName: sending event failed"
+          cause   shouldBe a[ClientException]
+        case other => fail(s"Did not expect log statement: $other")
+      }
     }
 
     s"fail if remote responds with $BadRequest" in new TestCase {
@@ -118,11 +151,17 @@ class EventsSenderSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
+    val categoryName         = categoryNames.generateOne
+    val requestTimeout       = 500 millis
     val event                = testCategoryEvents.generateOne
     val subscriberUrl        = SubscriberUrl(externalServiceBaseUrl)
     val categoryEventEncoder = mock[EventEncoder[TestCategoryEvent]]
-
-    val sender = new EventsSenderImpl[TestCategoryEvent](categoryEventEncoder, TestLogger())
+    val logger               = TestLogger[IO]()
+    val sender = new EventsSenderImpl[TestCategoryEvent](categoryName,
+                                                         categoryEventEncoder,
+                                                         logger,
+                                                         requestTimeoutOverride = Some(requestTimeout)
+    )
 
     def expectEventEncoding(event: TestCategoryEvent) = {
       val eventJson    = jsons.generateOne
@@ -137,5 +176,4 @@ class EventsSenderSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
       (eventJson, eventPayload)
     }
   }
-
 }

@@ -23,7 +23,7 @@ import cats.MonadError
 import cats.data.EitherT
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
-import ch.datascience.http.client.RestClientError.{ConnectivityException, UnexpectedResponseException}
+import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
@@ -64,11 +64,7 @@ private[triplescuration] class DataSetInfoEnricherImpl[Interpretation[_]](
 
   private lazy val maybeToRecoverableError
       : PartialFunction[Throwable, Either[ProcessingRecoverableError, List[TopmostData]]] = {
-    case e: UnexpectedResponseException =>
-      Left[ProcessingRecoverableError, List[TopmostData]](
-        CurationRecoverableError("Problem with finding top most data", e)
-      )
-    case e: ConnectivityException =>
+    case e @ (_: UnexpectedResponseException | _: ConnectivityException | _: ClientException) =>
       Left[ProcessingRecoverableError, List[TopmostData]](
         CurationRecoverableError("Problem with finding top most data", e)
       )
