@@ -114,7 +114,7 @@ eventLog:
 
 commitEventService:
   image:
-    repository: jachro/commit-event-service
+    repository: renku/commit-event-service
     tag: 'latest'
     pullPolicy: IfNotPresent
   service:
