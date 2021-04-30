@@ -39,11 +39,13 @@ import org.http4s.Method.{GET, POST}
 import org.http4s.client.ConnectionFailure
 import org.http4s.{multipart => _, _}
 import MediaType._
+import com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.typelevel.log4cats.Logger
 
+import java.net.ConnectException
 import java.util.concurrent.TimeoutException
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -219,6 +221,29 @@ class IORestClientSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
       logger.loggedOnly(
         Warn(s"GET http://localhost:1024/resource timed out -> retrying attempt 1 error: $exceptionMessage"),
         Warn(s"GET http://localhost:1024/resource timed out -> retrying attempt 2 error: $exceptionMessage")
+      )
+    }
+
+    "fail after retrying if there is a persistent java.net.ConnectException" in new TestCase {
+
+      stubFor {
+        get("/resource")
+          .willReturn(aResponse.withFault(CONNECTION_RESET_BY_PEER))
+      }
+
+      verifyThrottling()
+
+      val exceptionMessage = s"Failed to connect to endpoint: $hostUrl"
+
+      val exception = intercept[ConnectivityException] {
+        client.callRemote.unsafeRunSync()
+      }
+      exception.getMessage shouldBe s"GET $hostUrl/resource error: $exceptionMessage"
+      exception.getCause   shouldBe a[ConnectException]
+
+      logger.loggedOnly(
+        Warn(s"GET $hostUrl/resource timed out -> retrying attempt 1 error: $exceptionMessage"),
+        Warn(s"GET $hostUrl/resource timed out -> retrying attempt 2 error: $exceptionMessage")
       )
     }
 

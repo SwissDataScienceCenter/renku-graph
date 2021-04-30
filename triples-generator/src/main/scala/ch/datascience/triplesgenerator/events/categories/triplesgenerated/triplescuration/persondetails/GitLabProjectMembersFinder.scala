@@ -26,12 +26,14 @@ import ch.datascience.control.Throttler
 import ch.datascience.graph.config.{GitLabApiUrl, GitLabUrl}
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.model.users.GitLabId
-import ch.datascience.http.client.RestClientError.ConnectivityException
+import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException}
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.numeric.NonNegative
 import org.typelevel.log4cats.Logger
 import io.circe.Decoder
 import org.http4s.Method.GET
@@ -41,7 +43,7 @@ import org.http4s.dsl.io._
 import org.http4s.util.CaseInsensitiveString
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration.{Duration, FiniteDuration}
 
 private trait GitLabProjectMembersFinder[Interpretation[_]] {
   def findProjectMembers(path: Path)(implicit
@@ -50,15 +52,22 @@ private trait GitLabProjectMembersFinder[Interpretation[_]] {
 }
 
 private class IOGitLabProjectMembersFinder(
-    gitLabApiUrl:    GitLabApiUrl,
-    gitLabThrottler: Throttler[IO, GitLab],
-    logger:          Logger[IO],
-    retryInterval:   FiniteDuration = IORestClient.SleepAfterConnectionIssue
+    gitLabApiUrl:           GitLabApiUrl,
+    gitLabThrottler:        Throttler[IO, GitLab],
+    logger:                 Logger[IO],
+    retryInterval:          FiniteDuration = IORestClient.SleepAfterConnectionIssue,
+    maxRetries:             Int Refined NonNegative = IORestClient.MaxRetriesAfterConnectionTimeout,
+    requestTimeoutOverride: Option[Duration] = None
 )(implicit
     executionContext: ExecutionContext,
     contextShift:     ContextShift[IO],
     timer:            Timer[IO]
-) extends IORestClient(gitLabThrottler, logger, retryInterval = retryInterval)
+) extends IORestClient(gitLabThrottler,
+                       logger,
+                       retryInterval = retryInterval,
+                       maxRetries = maxRetries,
+                       requestTimeoutOverride = requestTimeoutOverride
+    )
     with GitLabProjectMembersFinder[IO] {
 
   override def findProjectMembers(
@@ -129,8 +138,8 @@ private class IOGitLabProjectMembersFinder(
 
   private lazy val maybeRecoverableError
       : PartialFunction[Throwable, IO[Either[ProcessingRecoverableError, (Set[GitLabProjectMember], Option[Int])]]] = {
-    case ConnectivityException(message, cause) =>
-      IO.pure(Either.left(CurationRecoverableError(message, cause)))
+    case exception @ (_: ConnectivityException | _: ClientException) =>
+      Either.left(CurationRecoverableError(exception.getMessage, exception.getCause)).pure[IO]
   }
 
   private implicit class ResultOps[T](out: IO[T]) {

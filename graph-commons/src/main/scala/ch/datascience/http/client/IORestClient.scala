@@ -40,6 +40,7 @@ import org.http4s.multipart.{Multipart, Part}
 import org.http4s.util.CaseInsensitiveString
 import org.typelevel.log4cats.Logger
 
+import java.net.ConnectException
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.control.NonFatal
@@ -166,13 +167,13 @@ abstract class IORestClient[ThrottlingTarget](
     case error: RestClientError => throttler.release() >> error.raiseError[IO, T]
     case NonFatal(cause) =>
       cause match {
-        case exception: ConnectionFailure if attempt <= maxRetries.value =>
+        case exception @ (_: ConnectionFailure | _: ConnectException) if attempt <= maxRetries.value =>
           for {
             _      <- logger.warn(LogMessage(request.request, s"timed out -> retrying attempt $attempt", exception))
             _      <- timer sleep retryInterval
             result <- callRemote(httpClient, request, mapResponse, attempt + 1)
           } yield result
-        case exception: ConnectionFailure if attempt > maxRetries.value =>
+        case exception @ (_: ConnectionFailure | _: ConnectException) if attempt > maxRetries.value =>
           throttler.release() >> ConnectivityException(LogMessage(request.request, exception), exception)
             .raiseError[IO, T]
         case other =>

@@ -35,6 +35,8 @@ import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecove
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails.PersonDetailsGenerators._
 import com.github.tomakehurst.wiremock.client.WireMock._
+import com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER
+import eu.timepit.refined.auto._
 import io.circe.Json
 import io.circe.literal.JsonStringContext
 import org.http4s.Status
@@ -42,9 +44,13 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.language.postfixOps
 
 class CommitCommitterFinderSpec extends AnyWordSpec with ExternalServiceStubbing with should.Matchers {
+
   "findCommitPeople" should {
+
     "return a CommitPersonInfo 2 CommitPersons when both the author and committer were found" in new TestCase {
       val accessToken = oauthAccessTokens.generateOne
       val author      = commitPersons.generateOne
@@ -93,6 +99,36 @@ class CommitCommitterFinderSpec extends AnyWordSpec with ExternalServiceStubbing
       )
     }
 
+    "return an CurationRecoverableError if there's a connectivity problem" in new TestCase {
+
+      stubFor {
+        get(s"/api/v4/projects/${urlEncode(projectId.toString)}/repository/commits/$commitId")
+          .willReturn(aResponse().withFault(CONNECTION_RESET_BY_PEER))
+      }
+
+      val Left(error) = commitCommitterFinder
+        .findCommitPeople(projectId, commitId, maybeAccessToken = None)
+        .value
+        .unsafeRunSync()
+
+      error shouldBe a[CurationRecoverableError]
+    }
+
+    "return an CurationRecoverableError if there's other client error" in new TestCase {
+
+      stubFor {
+        get(s"/api/v4/projects/${urlEncode(projectId.toString)}/repository/commits/$commitId")
+          .willReturn(aResponse().withFixedDelay((requestTimeout.toMillis + 500).toInt))
+      }
+
+      val Left(error) = commitCommitterFinder
+        .findCommitPeople(projectId, commitId, maybeAccessToken = None)
+        .value
+        .unsafeRunSync()
+
+      error shouldBe a[CurationRecoverableError]
+    }
+
     "return an Error if remote client responds with invalid json" in new TestCase {
 
       stubFor {
@@ -122,10 +158,16 @@ class CommitCommitterFinderSpec extends AnyWordSpec with ExternalServiceStubbing
   private implicit lazy val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
-    val gitLabUrl = GitLabUrl(externalServiceBaseUrl)
+    val gitLabUrl      = GitLabUrl(externalServiceBaseUrl)
+    val requestTimeout = 500 millis
 
-    val commitCommitterFinder =
-      new CommitCommitterFinderImpl(gitLabUrl.apiV4, Throttler.noThrottling, TestLogger())
+    val commitCommitterFinder = new CommitCommitterFinderImpl(gitLabUrl.apiV4,
+                                                              Throttler.noThrottling,
+                                                              TestLogger(),
+                                                              retryInterval = 100 millis,
+                                                              maxRetries = 1,
+                                                              requestTimeoutOverride = Some(requestTimeout)
+    )
 
     val projectId = projectIds.generateOne
     val commitId  = commitIds.generateOne

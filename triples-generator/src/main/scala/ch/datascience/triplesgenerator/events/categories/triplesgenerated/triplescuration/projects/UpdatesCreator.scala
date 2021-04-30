@@ -25,7 +25,7 @@ import cats.syntax.all._
 import ch.datascience.graph.config.{GitLabUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.users
 import ch.datascience.http.client.AccessToken
-import ch.datascience.http.client.RestClientError.{ConnectivityException, UnexpectedResponseException}
+import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
 import ch.datascience.rdfstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedEvent
@@ -114,11 +114,7 @@ private class UpdatesCreatorImpl(
 
   private lazy val maybeToRecoverableError
       : PartialFunction[Throwable, Either[ProcessingRecoverableError, List[SparqlQuery]]] = {
-    case e: UnexpectedResponseException =>
-      Left[ProcessingRecoverableError, List[SparqlQuery]](
-        CurationRecoverableError("Problem with finding fork info", e)
-      )
-    case e: ConnectivityException =>
+    case e @ (_: UnexpectedResponseException | _: ConnectivityException | _: ClientException) =>
       Left[ProcessingRecoverableError, List[SparqlQuery]](
         CurationRecoverableError("Problem with finding fork info", e)
       )

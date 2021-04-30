@@ -110,7 +110,7 @@ class EventsSenderSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
             aMultipart("payload")
               .withBody(equalTo(eventPayload))
           )
-          .willReturn(ok("").withFixedDelay((idleTimeout.toMillis + 500).toInt))
+          .willReturn(aResponse().withFixedDelay((requestTimeout.toMillis + 500).toInt))
       }
 
       sender
@@ -152,7 +152,7 @@ class EventsSenderSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
 
   private trait TestCase {
     val categoryName         = categoryNames.generateOne
-    val idleTimeout          = 500 millis
+    val requestTimeout       = 500 millis
     val event                = testCategoryEvents.generateOne
     val subscriberUrl        = SubscriberUrl(externalServiceBaseUrl)
     val categoryEventEncoder = mock[EventEncoder[TestCategoryEvent]]
@@ -160,7 +160,7 @@ class EventsSenderSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
     val sender = new EventsSenderImpl[TestCategoryEvent](categoryName,
                                                          categoryEventEncoder,
                                                          logger,
-                                                         idleTimeoutOverride = Some(idleTimeout)
+                                                         requestTimeoutOverride = Some(requestTimeout)
     )
 
     def expectEventEncoding(event: TestCategoryEvent) = {
