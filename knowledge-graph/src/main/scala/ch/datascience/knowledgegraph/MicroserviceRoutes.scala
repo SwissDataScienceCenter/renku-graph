@@ -38,10 +38,10 @@ import ch.datascience.knowledgegraph.graphql.{IOQueryEndpoint, QueryEndpoint}
 import ch.datascience.knowledgegraph.projects.rest.{IOProjectEndpoint, ProjectEndpoint}
 import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import org.typelevel.log4cats.Logger
 import org.http4s.dsl.Http4sDsl
 import org.http4s.server.AuthMiddleware
 import org.http4s.{AuthedRoutes, ParseFailure, Response}
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 

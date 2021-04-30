@@ -24,17 +24,16 @@ import ch.datascience.config.renku
 import ch.datascience.graph.model.datasets.{Identifier, PublishedDate}
 import ch.datascience.http.InfoMessage._
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
-import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import org.typelevel.log4cats.Logger
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal

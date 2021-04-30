@@ -22,14 +22,13 @@ import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.graph.model.datasets.{DateCreatedInProject, Identifier}
 import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.{Path, ResourceId, Visibility}
-import ch.datascience.http.server.security.model.AuthUser
+import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.knowledgegraph.datasets.model.{AddedToProject, DatasetAgent, DatasetProject}
 import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
-import org.typelevel.log4cats.Logger
 import io.circe.Decoder.decodeList
 import io.circe.DecodingFailure
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.Try

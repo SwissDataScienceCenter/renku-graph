@@ -20,7 +20,6 @@ package ch.datascience.tokenrepository.repository
 
 import cats.MonadError
 import ch.datascience.db.DBConfigProvider
-import ch.datascience.db.DBConfigProvider._
 import eu.timepit.refined.auto._
 
 sealed trait ProjectsTokensDB
