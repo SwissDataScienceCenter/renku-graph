@@ -19,7 +19,6 @@
 package ch.datascience.tinytypes
 
 import java.time.{Duration, Instant, LocalDate}
-import scala.concurrent.duration.FiniteDuration
 
 private object TestTinyTypes {
 

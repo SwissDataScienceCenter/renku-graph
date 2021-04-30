@@ -24,7 +24,6 @@ import cats.{MonadError, Parallel}
 import ch.datascience.events.consumers.EventSchedulingResult.UnsupportedEventType
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
 import ch.datascience.graph.model.events.CategoryName
-import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
@@ -69,10 +68,10 @@ class EventConsumersRegistryImpl[Interpretation[_]](eventHandlers:           Lis
 }
 
 object EventConsumersRegistry {
-  def apply(logger:     Logger[IO], subscriptionFactories: (EventHandler[IO], SubscriptionMechanism[IO])*)(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
+  def apply(subscriptionFactories: (EventHandler[IO], SubscriptionMechanism[IO])*)(implicit
+      executionContext:            ExecutionContext,
+      contextShift:                ContextShift[IO],
+      timer:                       Timer[IO]
   ): IO[EventConsumersRegistry[IO]] = IO {
     new EventConsumersRegistryImpl[IO](subscriptionFactories.toList.map(_._1), subscriptionFactories.toList.map(_._2))
   }

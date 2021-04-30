@@ -33,10 +33,10 @@ import io.renku.eventlog.{CreatedDate, Event, EventDate, ExecutionDate}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk._
-import skunk.implicits._
 import skunk.codec.all._
+import skunk.implicits._
 
-import java.time.{Instant, LocalDateTime, ZoneId, ZoneOffset}
+import java.time.{LocalDateTime, ZoneOffset}
 
 class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
 

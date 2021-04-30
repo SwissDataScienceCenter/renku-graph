@@ -30,13 +30,13 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.metrics.MetricsRegistry
-import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
+import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater
 import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater._
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator
-import org.typelevel.log4cats.Logger
 import io.prometheus.client.Histogram
+import org.typelevel.log4cats.Logger
 
 import java.time.Duration
 import scala.concurrent.ExecutionContext
@@ -209,8 +209,6 @@ private class CommitEventProcessor[Interpretation[_]](
 }
 
 private object IOCommitEventProcessor {
-  import ch.datascience.config.GitLab
-  import ch.datascience.control.Throttler
 
   private[events] lazy val eventsProcessingTimesBuilder =
     Histogram
@@ -222,8 +220,6 @@ private object IOCommitEventProcessor {
 
   def apply(
       metricsRegistry: MetricsRegistry[IO],
-      gitLabThrottler: Throttler[IO, GitLab],
-      timeRecorder:    SparqlQueryTimeRecorder[IO],
       logger:          Logger[IO]
   )(implicit
       contextShift:     ContextShift[IO],

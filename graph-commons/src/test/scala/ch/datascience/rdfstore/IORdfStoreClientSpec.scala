@@ -41,7 +41,6 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.language.postfixOps
 import scala.util.Try
 
 class IORdfStoreClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockFactory with should.Matchers {

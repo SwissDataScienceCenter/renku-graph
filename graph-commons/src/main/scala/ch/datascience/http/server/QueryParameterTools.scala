@@ -20,16 +20,15 @@ package ch.datascience.http.server
 
 import cats.MonadError
 import cats.data.NonEmptyList
-import cats.effect.ConcurrentEffect
-import ch.datascience.http.ErrorMessage._
 import ch.datascience.http.ErrorMessage
+import ch.datascience.http.ErrorMessage._
 import io.circe.syntax._
 import org.http4s.circe._
 import org.http4s.{ParseFailure, Response, Status}
 
 object QueryParameterTools {
 
-  def toBadRequest[F[_]: ConcurrentEffect]()(
+  def toBadRequest[F[_]]()(
       errors:    NonEmptyList[ParseFailure]
   )(implicit ME: MonadError[F, Throwable]): F[Response[F]] = ME.pure {
     Response[F](Status.BadRequest)

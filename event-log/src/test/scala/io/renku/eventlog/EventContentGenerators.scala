@@ -24,8 +24,6 @@ import ch.datascience.graph.model.EventsGenerators._
 import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
 import org.scalacheck.Gen
 
-import scala.language.postfixOps
-
 object EventContentGenerators {
 
   implicit val eventDates:     Gen[EventDate]     = timestampsNotInTheFuture map EventDate.apply

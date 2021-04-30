@@ -20,7 +20,6 @@ package io.renku.eventlog.init
 
 import cats.data.Kleisli
 import cats.effect.IO
-import ch.datascience.db.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventId, EventStatus}

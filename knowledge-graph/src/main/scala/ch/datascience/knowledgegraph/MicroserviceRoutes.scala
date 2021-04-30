@@ -23,14 +23,13 @@ import cats.effect.{Clock, ConcurrentEffect, ContextShift, IO, Resource, Timer}
 import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.{RateLimit, Throttler}
-import ch.datascience.graph.http.server.security.{GitLabAuthenticator, ProjectAuthorizer}
+import ch.datascience.graph.http.server.security.GitLabAuthenticator
 import ch.datascience.graph.model
 import ch.datascience.http.rest.SortBy.Direction
 import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.http.rest.paging.PagingRequest.Decoders._
 import ch.datascience.http.rest.paging.model.{Page, PerPage}
 import ch.datascience.http.server.QueryParameterTools._
-import ch.datascience.http.server.security.Authentication
 import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import ch.datascience.knowledgegraph.datasets.rest._
@@ -51,8 +50,6 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     projectDatasetsEndpoint: ProjectDatasetsEndpoint[F],
     datasetEndpoint:         DatasetEndpoint[F],
     datasetsSearchEndpoint:  DatasetsSearchEndpoint[F],
-    authMiddleware:          AuthMiddleware[F, Option[AuthUser]],
-    projectAuthorizer:       ProjectAuthorizer[F],
     routesMetrics:           RoutesMetrics[F]
 )(implicit clock:            Clock[F])
     extends Http4sDsl[F] {
@@ -147,16 +144,12 @@ private object MicroserviceRoutes {
       datasetEndpoint         <- IODatasetEndpoint(sparqlTimeRecorder)
       datasetsSearchEndpoint  <- IODatasetsSearchEndpoint(sparqlTimeRecorder)
       authenticator           <- GitLabAuthenticator(gitLabThrottler, logger)
-      authMiddleware          <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
-      projectAuthorizer       <- ProjectAuthorizer(sparqlTimeRecorder, logger = logger)
       routesMetrics = new RoutesMetrics[IO](metricsRegistry)
     } yield new MicroserviceRoutes(queryEndpoint,
                                    projectEndpoint,
                                    projectDatasetsEndpoint,
                                    datasetEndpoint,
                                    datasetsSearchEndpoint,
-                                   authMiddleware,
-                                   projectAuthorizer,
                                    routesMetrics
     )
 }

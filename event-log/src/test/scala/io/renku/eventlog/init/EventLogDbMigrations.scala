@@ -25,7 +25,7 @@ import io.renku.eventlog.InMemoryEventLogDb
 trait EventLogDbMigrations {
   self: InMemoryEventLogDb =>
 
-  private val logger = TestLogger[IO]()
+  private lazy val logger = TestLogger[IO]()
 
   protected lazy val eventLogTableCreator:     Migration = EventLogTableCreator(sessionResource, logger)
   protected lazy val projectPathAdder:         Migration = ProjectPathAdder(sessionResource, logger)

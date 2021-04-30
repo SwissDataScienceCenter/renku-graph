@@ -111,7 +111,7 @@ trait EventHandler[Interpretation[_]] {
 
     private def as(
         result: EventSchedulingResult
-    ): PartialFunction[Throwable, Either[EventSchedulingResult, T]] = { case NonFatal(e) =>
+    ): PartialFunction[Throwable, Either[EventSchedulingResult, T]] = { case NonFatal(_) =>
       Left(result)
     }
 

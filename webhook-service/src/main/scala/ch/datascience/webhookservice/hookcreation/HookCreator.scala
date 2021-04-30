@@ -26,7 +26,6 @@ import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.AccessToken
-import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.webhookservice.CommitSyncRequestSender
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.hookcreation.HookCreator.{CreationResult, HookAlreadyCreated}
@@ -113,11 +112,10 @@ private object HookCreator {
   case class HookAlreadyCreated(projectId: Id, projectHookUrl: ProjectHookUrl)
 
   def apply(
-      projectHookUrl:        ProjectHookUrl,
-      gitLabThrottler:       Throttler[IO, GitLab],
-      hookTokenCrypto:       HookTokenCrypto[IO],
-      executionTimeRecorder: ExecutionTimeRecorder[IO],
-      logger:                Logger[IO]
+      projectHookUrl:  ProjectHookUrl,
+      gitLabThrottler: Throttler[IO, GitLab],
+      hookTokenCrypto: HookTokenCrypto[IO],
+      logger:          Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],

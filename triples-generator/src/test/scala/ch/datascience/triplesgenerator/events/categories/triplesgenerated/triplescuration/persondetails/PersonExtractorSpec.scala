@@ -22,8 +22,7 @@ package persondetails
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
-import PersonDetailsGenerators._
-import ch.datascience.graph.model.users.{Email, Name, ResourceId}
+import ch.datascience.graph.model.users.ResourceId
 import ch.datascience.rdfstore.JsonLDTriples
 import io.circe.literal.JsonStringContext
 import io.circe.syntax._

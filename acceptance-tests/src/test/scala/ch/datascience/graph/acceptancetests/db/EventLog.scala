@@ -32,7 +32,6 @@ import skunk._
 import skunk.implicits._
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.language.postfixOps
 
 object EventLog extends TypeSerializers {
 

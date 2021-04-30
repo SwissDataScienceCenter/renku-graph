@@ -36,7 +36,6 @@ import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.trip
 
 import java.security.SecureRandom
 import scala.concurrent.ExecutionContext
-import scala.language.postfixOps
 
 private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
     gitRepoUrlFinder:    GitLabRepoUrlFinder[IO],

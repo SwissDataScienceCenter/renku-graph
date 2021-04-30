@@ -18,8 +18,6 @@
 
 package ch.datascience.rdfstore.entities
 
-import java.util.UUID.randomUUID
-
 import cats.syntax.all._
 import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.rdfstore.FusekiBaseUrl
@@ -39,7 +37,7 @@ import io.renku.jsonld.JsonLDEncoder._
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, EntityTypes, JsonLDEncoder}
 
-import scala.language.postfixOps
+import java.util.UUID.randomUUID
 
 sealed abstract class CommandParameter(val maybePrefix: Option[Prefix], val runPlan: Entity with RunPlan) {
   val value: Value

@@ -24,8 +24,6 @@ import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import org.typelevel.log4cats.Logger
 
-import scala.util.Try
-
 class IOTokenRemover(
     sessionResource:  SessionResource[IO, ProjectsTokensDB],
     queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]

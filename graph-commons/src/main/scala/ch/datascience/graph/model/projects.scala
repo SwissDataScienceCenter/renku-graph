@@ -21,7 +21,6 @@ package ch.datascience.graph.model
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
-import io.circe.Decoder
 import io.renku.jsonld.EntityId
 
 import java.time.Instant

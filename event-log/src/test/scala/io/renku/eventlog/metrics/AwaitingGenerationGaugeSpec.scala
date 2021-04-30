@@ -27,7 +27,6 @@ import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Path
-import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.MetricsTools._
 import ch.datascience.metrics.{LabeledGauge, MetricsRegistry}
 import io.prometheus.client.{Gauge => LibGauge}
@@ -55,7 +54,7 @@ class AwaitingGenerationGaugeSpec extends AnyWordSpec with MockFactory with shou
           actual.pure[IO]
         }
 
-      val gauge = AwaitingGenerationGauge(metricsRegistry, statsFinder, TestLogger()).unsafeRunSync()
+      val gauge = AwaitingGenerationGauge(metricsRegistry, statsFinder).unsafeRunSync()
 
       gauge.isInstanceOf[LabeledGauge[IO, projects.Path]] shouldBe true
     }
@@ -72,7 +71,7 @@ class AwaitingGenerationGaugeSpec extends AnyWordSpec with MockFactory with shou
         .expects(Set(New, GenerationRecoverableFailure), Some(NumberOfProjects))
         .returning(waitingEvents.pure[IO])
 
-      AwaitingGenerationGauge(metricsRegistry, statsFinder, TestLogger()).flatMap(_.reset()).unsafeRunSync()
+      AwaitingGenerationGauge(metricsRegistry, statsFinder).flatMap(_.reset()).unsafeRunSync()
 
       underlying.collectAllSamples should contain theSameElementsAs waitingEvents.map { case (project, count) =>
         ("project", project.value, count.toDouble)
