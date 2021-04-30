@@ -934,10 +934,10 @@ class IODatasetsFinderSpec
       ).generateOne.toJsonLDsAndDatasets(noSameAs = true)()
       val datasets3AndJsons = nonModifiedDatasets(
         usedInProjects = NonEmptyList(privateProject.toDatasetProject, Nil)
-      ).generateOne.toJsonLDsAndDatasets(noSameAs = false)()
+      ).generateOne.toJsonLDsAndDatasets(noSameAs = true)()
       val datasets4AndJsons = nonModifiedDatasets(
         usedInProjects = NonEmptyList(projectWithoutVisibility.toDatasetProject, Nil)
-      ).generateOne.toJsonLDsAndDatasets(noSameAs = false)()
+      ).generateOne.toJsonLDsAndDatasets(noSameAs = true)()
 
       loadToStore(
         List(publicProject.asJsonLD,
@@ -967,8 +967,8 @@ class IODatasetsFinderSpec
       result.pagingInfo.total shouldBe Total(3)
     }
 
-    s"return public datasets and private datasets from project the user is a member of" +
-      s" but not count project the user is not a member of" in new TestCase {
+    s"return public datasets and private datasets from project the user is a member of " +
+      s"but not count project the user is not a member of" in new TestCase {
         val userWithGitlabId = persons(userGitLabIds.toGeneratorOfSomes).generateOne
         val publicProject    = projectEntities.generateOne.copy(maybeVisibility = Visibility.Public.some)
         val privateProject   = projectEntities.generateOne.copy(maybeVisibility = Visibility.Private.some)
