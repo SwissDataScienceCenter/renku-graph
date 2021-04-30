@@ -24,8 +24,7 @@ import ch.datascience.graph.acceptancetests.flows.AccessTokenPresence.givenAcces
 import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning.`wait for events to be processed`
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
-import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
-import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplicits, RDFStore}
+import ch.datascience.graph.acceptancetests.tooling._
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.http.client.AccessToken
@@ -37,6 +36,7 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.Eventually
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
+import org.scalatest.time.{Millis, Minutes, Span}
 
 class EventFlowsSpec
     extends AnyFeatureSpec
@@ -44,8 +44,12 @@ class EventFlowsSpec
     with GivenWhenThen
     with GraphServices
     with Eventually
-    with AcceptanceTestPatience
     with should.Matchers {
+
+  implicit override val patienceConfig: PatienceConfig = PatienceConfig(
+    timeout = scaled(Span(2, Minutes)),
+    interval = scaled(Span(1000, Millis))
+  )
 
   Feature("Push events from GitLab should be translated into triples in the RDF Store") {
 

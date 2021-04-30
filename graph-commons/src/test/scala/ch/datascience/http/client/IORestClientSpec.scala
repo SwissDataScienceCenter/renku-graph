@@ -39,7 +39,8 @@ import org.http4s.Method.{GET, POST}
 import org.http4s.client.ConnectionFailure
 import org.http4s.{multipart => _, _}
 import MediaType._
-import com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER
+import com.github.tomakehurst.wiremock.http.Fault
+import com.github.tomakehurst.wiremock.http.Fault._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -224,27 +225,29 @@ class IORestClientSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
       )
     }
 
-    "fail after retrying if there is a persistent java.net.ConnectException" in new TestCase {
+    Fault.values().filterNot(_ == MALFORMED_RESPONSE_CHUNK) foreach { fault =>
+      s"fail after retrying if there is a persistent $fault problem" in new TestCase {
 
-      stubFor {
-        get("/resource")
-          .willReturn(aResponse.withFault(CONNECTION_RESET_BY_PEER))
+        stubFor {
+          get("/resource")
+            .willReturn(aResponse.withFault(fault))
+        }
+
+        verifyThrottling()
+
+        val exceptionMessage = s"Failed to connect to endpoint: $hostUrl"
+
+        val exception = intercept[ConnectivityException] {
+          client.callRemote.unsafeRunSync()
+        }
+        exception.getMessage shouldBe s"GET $hostUrl/resource error: $exceptionMessage"
+        exception.getCause   shouldBe a[ConnectException]
+
+        logger.loggedOnly(
+          Warn(s"GET $hostUrl/resource timed out -> retrying attempt 1 error: $exceptionMessage"),
+          Warn(s"GET $hostUrl/resource timed out -> retrying attempt 2 error: $exceptionMessage")
+        )
       }
-
-      verifyThrottling()
-
-      val exceptionMessage = s"Failed to connect to endpoint: $hostUrl"
-
-      val exception = intercept[ConnectivityException] {
-        client.callRemote.unsafeRunSync()
-      }
-      exception.getMessage shouldBe s"GET $hostUrl/resource error: $exceptionMessage"
-      exception.getCause   shouldBe a[ConnectException]
-
-      logger.loggedOnly(
-        Warn(s"GET $hostUrl/resource timed out -> retrying attempt 1 error: $exceptionMessage"),
-        Warn(s"GET $hostUrl/resource timed out -> retrying attempt 2 error: $exceptionMessage")
-      )
     }
 
     "use the overridden idle timeout" in new TestCase {
