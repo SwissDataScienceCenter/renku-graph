@@ -22,8 +22,9 @@ import cats.effect._
 import cats.syntax.all._
 import ch.datascience.graph.Schemas._
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.projects.{Path, ResourceId}
+import ch.datascience.graph.model.projects.{Path, ResourceId, Visibility}
 import ch.datascience.graph.model.views.RdfResource
+import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.knowledgegraph.lineage.model._
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
@@ -34,7 +35,7 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.ExecutionContext
 
 private trait EdgesFinder[Interpretation[_]] {
-  def findEdges(projectPath: Path): Interpretation[EdgeMap]
+  def findEdges(projectPath: Path, maybeUser: Option[AuthUser]): Interpretation[EdgeMap]
 }
 
 private class EdgesFinderImpl(
@@ -48,8 +49,8 @@ private class EdgesFinderImpl(
 
   private type EdgeData = (RunInfo, Option[Node.Location], Option[Node.Location])
 
-  override def findEdges(projectPath: Path): IO[EdgeMap] =
-    queryEdges(using = query(projectPath)) map toNodesLocations
+  override def findEdges(projectPath: Path, maybeUser: Option[AuthUser]): IO[EdgeMap] =
+    queryEdges(using = query(projectPath, maybeUser: Option[AuthUser])) map toNodesLocations
 
   private def queryEdges(using: SparqlQuery): IO[Set[EdgeData]] = {
     val pageSize = 2000
@@ -68,7 +69,7 @@ private class EdgesFinderImpl(
     fetchPaginatedResult(Set.empty[EdgeData], using, offset = 0)
   }
 
-  private def query(path: Path) = SparqlQuery.of(
+  private def query(path: Path, maybeUser: Option[AuthUser]) = SparqlQuery.of(
     name = "lineage - edges",
     Prefixes.of(prov -> "prov", renku -> "renku", wfprov -> "wfprov", schema -> "schema"),
     s"""|SELECT DISTINCT ?runPlan ?date ?sourceEntityLocation ?targetEntityLocation
@@ -80,6 +81,7 @@ private class EdgesFinderImpl(
         |    ?activity prov:qualifiedAssociation/prov:hadPlan ?runPlan;
         |              prov:startedAtTime ?date.
         |    FILTER NOT EXISTS {?activity a wfprov:WorkflowRun}
+        |    ${projectMemberFilterQuery(ResourceId(renkuBaseUrl, path).showAs[RdfResource])(maybeUser)}
         |  } UNION {
         |    ?targetEntity schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
         |                  prov:atLocation ?targetEntityLocation.
@@ -87,6 +89,7 @@ private class EdgesFinderImpl(
         |    ?activity prov:qualifiedAssociation/prov:hadPlan ?runPlan;
         |              prov:startedAtTime ?date.
         |    FILTER NOT EXISTS {?activity a wfprov:WorkflowRun}
+        |    ${projectMemberFilterQuery(ResourceId(renkuBaseUrl, path).showAs[RdfResource])(maybeUser)}
         |  }
         |}
         |ORDER BY ASC(?date)
@@ -140,6 +143,32 @@ private class EdgesFinderImpl(
   private def matching(runInfo: RunInfo): ((RunInfo, FromAndToNodes)) => Boolean = {
     case (RunInfo(runInfo.entityId, _), _) => true
     case _                                 => false
+  }
+
+  private def projectMemberFilterQuery(projectResourceId: String): Option[AuthUser] => String = {
+    case Some(user) =>
+      s"""
+         |OPTIONAL { 
+         |    $projectResourceId renku:projectVisibility ?visibility;
+         |               schema:member/schema:sameAs ?memberId.
+         |    ?memberId  schema:additionalType 'GitLab';
+         |               schema:identifier ?userGitlabId .
+         |}
+         |BIND (IF (BOUND (?visibility), ?visibility,  '${Visibility.Public.value}') as ?projectVisibility)
+         |FILTER (
+         |  ?projectVisibility = '${Visibility.Public.value}' || 
+         |  ((?projectVisibility = '${Visibility.Private.value}' || ?projectVisibility = '${Visibility.Internal.value}') && 
+         |  ?userGitlabId = ${user.id.value})
+         |)
+         |""".stripMargin
+    case _ =>
+      s"""
+         |OPTIONAL {
+         |  $projectResourceId renku:projectVisibility ?visibility .
+         |}
+         |BIND(IF (BOUND (?visibility), ?visibility, '${Visibility.Public.value}' ) as ?projectVisibility)
+         |FILTER(?projectVisibility = '${Visibility.Public.value}')
+         |""".stripMargin
   }
 }
 

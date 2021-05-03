@@ -45,7 +45,7 @@ class EdgesFinderSpec extends AnyWordSpec with InMemoryRdfStore with ExternalSer
       import exemplarData._
 
       edgesFinder
-        .findEdges(projectPath)
+        .findEdges(projectPath, None)
         .unsafeRunSync() shouldBe Map(
         RunInfo(`sha8 renku run`.toEntityId, RunDate(`sha12 parquet date`)) -> (
           Set(`sha3 zhbikes`.toNodeLocation, `sha7 clean_data`.toNodeLocation),
@@ -64,7 +64,7 @@ class EdgesFinderSpec extends AnyWordSpec with InMemoryRdfStore with ExternalSer
 
     "return None if there's no lineage for the project" in new TestCase {
       edgesFinder
-        .findEdges(projectPath)
+        .findEdges(projectPath, None)
         .unsafeRunSync() shouldBe empty
     }
   }

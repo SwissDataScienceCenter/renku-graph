@@ -40,7 +40,7 @@ import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
 import ch.datascience.knowledgegraph.datasets.rest._
-import ch.datascience.knowledgegraph.graphql.{QueryContext, QueryEndpoint, QueryRunner}
+import ch.datascience.knowledgegraph.graphql.{LineageQueryContext, QueryEndpoint, QueryRunner}
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
@@ -50,7 +50,6 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-import sangria.schema.Schema
 
 import scala.concurrent.ExecutionContext
 import scala.language.reflectiveCalls
@@ -234,7 +233,10 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
       val id = datasetIdentifiers.generateOne
 
       val request: Request[IO] = Request(Method.POST, uri"knowledge-graph/graphql")
-      (queryEndpoint.handleQuery _).expects(request).returning(IO.pure(Response[IO](Ok)))
+      (queryEndpoint
+        .handleQuery(_: Request[IO], _: Option[AuthUser]))
+        .expects(request, maybeAuthUser)
+        .returning(IO.pure(Response[IO](Ok)))
 
       val response = routes.call(request)
 
@@ -304,6 +306,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
     ).routes.map(_.or(notAvailableResponse))
   }
 
-  class IOQueryEndpoint(querySchema: Schema[QueryContext[IO], Unit], queryRunner: QueryRunner[IO, QueryContext[IO]])
-      extends QueryEndpoint[IO](querySchema, queryRunner)
+  class IOQueryEndpoint(
+      queryRunner: QueryRunner[IO, LineageQueryContext[IO]]
+  ) extends QueryEndpoint[IO](queryRunner)
 }

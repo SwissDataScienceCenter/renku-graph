@@ -23,8 +23,8 @@ import sangria.schema._
 object QuerySchema {
 
   def apply[Interpretation[_]](
-      fields: List[Field[QueryContext[Interpretation], Unit]]*
-  ): Schema[QueryContext[Interpretation], Unit] = Schema {
+      fields: List[Field[LineageQueryContext[Interpretation], Unit]]*
+  ): Schema[LineageQueryContext[Interpretation], Unit] = Schema {
     ObjectType(
       name = "Query",
       fields = fields.flatten.toList

@@ -21,6 +21,7 @@ package ch.datascience.knowledgegraph.graphql
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.projects.Path
+import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.knowledgegraph.lineage
 import ch.datascience.knowledgegraph.lineage.LineageFinder
 import ch.datascience.knowledgegraph.lineage.LineageGenerators._
@@ -83,7 +84,7 @@ class QuerySchemaSpec
         .execute(
           QuerySchema[IO](lineage.graphql.QueryFields()),
           query,
-          new QueryContext[IO](lineageFinder)
+          new LineageQueryContext[IO](lineageFinder)
         )
         .futureValue
   }
@@ -93,8 +94,8 @@ class QuerySchemaSpec
     def givenFindLineage(projectPath: Path, location: Location) = new {
       def returning(result: IO[Option[Lineage]]) =
         (lineageFinder
-          .find(_: Path, _: Location))
-          .expects(projectPath, location)
+          .find(_: Path, _: Location, _: Option[AuthUser]))
+          .expects(projectPath, location, None)
           .returning(result)
     }
 

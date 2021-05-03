@@ -21,7 +21,7 @@ package ch.datascience.knowledgegraph.lineage.graphql
 import cats.effect.IO
 import ch.datascience.knowledgegraph.graphql.Arguments._
 import ch.datascience.knowledgegraph.graphql.CommonQueryFields._
-import ch.datascience.knowledgegraph.graphql.QueryContext
+import ch.datascience.knowledgegraph.graphql.LineageQueryContext
 import ch.datascience.knowledgegraph.lineage.model.Node.Location
 import eu.timepit.refined.auto._
 import sangria.schema._
@@ -30,8 +30,8 @@ object QueryFields {
 
   import modelSchema._
 
-  def apply(): List[Field[QueryContext[IO], Unit]] =
-    fields[QueryContext[IO], Unit](
+  def apply(): List[Field[LineageQueryContext[IO], Unit]] =
+    fields[LineageQueryContext[IO], Unit](
       Field(
         name = "lineage",
         fieldType = OptionType(lineageType),
@@ -39,7 +39,7 @@ object QueryFields {
         arguments = List(projectPathArgument, locationArgument),
         resolve = context =>
           context.ctx.lineageFinder
-            .find(context.args arg projectPathArgument, context.args arg locationArgument)
+            .find(context.args arg projectPathArgument, context.args arg locationArgument, context.ctx.maybeUser)
             .unsafeToFuture()
       )
     )

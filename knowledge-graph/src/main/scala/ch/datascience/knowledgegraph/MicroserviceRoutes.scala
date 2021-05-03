@@ -70,6 +70,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   private lazy val authorizedRoutes: HttpRoutes[F] = authMiddleware {
     AuthedRoutes.of {
       case GET  -> Root / "knowledge-graph" /  "datasets" :? query(maybePhrase) +& sort(maybeSortBy) +& page(page) +& perPage(perPage) as maybeUser => searchForDatasets(maybePhrase, maybeSortBy,page, perPage, maybeUser)
+    case authedRequest@POST -> Root / "knowledge-graph" /  "graphql" as maybeUser                                                                         => handleQuery(authedRequest.req, maybeUser)
     }
   }
 
@@ -77,7 +78,6 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     case         GET  -> Root / "ping"                                                                                                       => Ok("pong")
     case         GET ->  Root / "knowledge-graph" /  "datasets" / DatasetId(id)                                                              => getDataset(id)
     case         GET ->  Root / "knowledge-graph" /  "graphql"                                                                               => schema()
-    case request@POST -> Root / "knowledge-graph" /  "graphql"                                                                               => handleQuery(request)
     case         GET ->         "knowledge-graph" /: "projects" /: path => routeToProjectsEndpoints(path, maybeAuthUser = None)
   }
   // format: on
