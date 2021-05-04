@@ -2,6 +2,28 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+webhookService:
+  image:
+    repository: renku/webhook-service
+    tag: 'latest'
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    requests:
+      memory: 150Mi
+    limits:
+      memory: 350Mi
+  jvmXmx: 100M
+  gitlab:
+    rateLimit: 100/sec
+  threadsNumber: 3
+  hookToken:
+    ## A secret for signing request header tokens to be sent by GitLab with the Push Events
+    ## Generated using: `openssl rand -hex 8|base64`
+    secret:
+
 tokenRepository:
   image:
     repository: renku/token-repository
@@ -11,8 +33,10 @@ tokenRepository:
     type: ClusterIP
     port: 9003
   resources:
+    requests:
+      memory: 150Mi
     limits:
-      memory: 1900Mi
+      memory: 350Mi
   jvmXmx: 100M
   gitlab:
     rateLimit: 50/sec
@@ -32,6 +56,8 @@ triplesGenerator:
     type: ClusterIP
     port: 9002
   resources:
+    requests:
+      memory: 2000Mi
     limits:
       memory: 5000Mi
   jvmXmx: 2g
@@ -46,26 +72,6 @@ triplesGenerator:
   # set this to a pip-installable renku-python version which will be installed on startup
   renkuPythonDevVersion:
 
-webhookService:
-  image:
-    repository: renku/webhook-service
-    tag: 'latest'
-    pullPolicy: IfNotPresent
-  service:
-    type: ClusterIP
-    port: 80
-  resources:
-    limits:
-      memory: 1900Mi
-  jvmXmx: 100M
-  gitlab:
-    rateLimit: 100/sec
-  threadsNumber: 3
-  hookToken:
-    ## A secret for signing request header tokens to be sent by GitLab with the Push Events
-    ## Generated using: `openssl rand -hex 8|base64`
-    secret:
-
 knowledgeGraph:
   image:
     repository: renku/knowledge-graph
@@ -75,11 +81,13 @@ knowledgeGraph:
     type: ClusterIP
     port: 80
   resources:
+    requests:
+      memory: 250Mi
     limits:
-      memory: 2200Mi
+      memory: 400Mi
   gitlab:
     rateLimit: 100/sec
-  jvmXmx: 500M
+  jvmXmx: 200M
   threadsNumber: 4
   services:
     renku:
@@ -96,23 +104,27 @@ eventLog:
     type: ClusterIP
     port: 9005
   resources:
+    requests:
+      memory: 250Mi
     limits:
-      memory: 2000Mi
+      memory: 450Mi
   jvmXmx: 200M
   threadsNumber: 6
   connectionPool: 10
 
 commitEventService:
   image:
-    repository: jachro/commit-event-service
+    repository: renku/commit-event-service
     tag: 'latest'
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
     port: 9006
   resources:
+    requests:
+      memory: 250Mi
     limits:
-      memory: 2000Mi
+      memory: 450Mi
   jvmXmx: 200M
   gitlab:
     rateLimit: 100/sec

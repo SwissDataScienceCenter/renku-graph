@@ -29,8 +29,11 @@ import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.EventStatus.FailureStatus
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventProcessingTime, EventStatus}
 import ch.datascience.http.client.IORestClient
-import ch.datascience.http.client.RestClientError.{ConnectivityException, UnexpectedResponseException}
+import ch.datascience.http.client.IORestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
+import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
 import ch.datascience.rdfstore.JsonLDTriples
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.numeric.NonNegative
 import org.typelevel.log4cats.Logger
 import org.http4s.Status.{BadGateway, GatewayTimeout, ServiceUnavailable}
 import org.http4s.{Status, Uri}
@@ -54,16 +57,24 @@ private trait EventStatusUpdater[Interpretation[_]] {
 }
 
 private class EventStatusUpdaterImpl(
-    eventLogUrl:  EventLogUrl,
-    categoryName: CategoryName,
-    retryDelay:   FiniteDuration,
-    logger:       Logger[IO]
+    eventLogUrl:            EventLogUrl,
+    categoryName:           CategoryName,
+    retryDelay:             FiniteDuration,
+    logger:                 Logger[IO],
+    retryInterval:          FiniteDuration = SleepAfterConnectionIssue,
+    maxRetries:             Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
+    requestTimeoutOverride: Option[Duration] = None
 )(implicit
     ME:               MonadError[IO, Throwable],
     executionContext: ExecutionContext,
     contextShift:     ContextShift[IO],
     timer:            Timer[IO]
-) extends IORestClient(Throttler.noThrottling, logger)
+) extends IORestClient(Throttler.noThrottling,
+                       logger,
+                       retryInterval = retryInterval,
+                       maxRetries = maxRetries,
+                       requestTimeoutOverride = requestTimeoutOverride
+    )
     with EventStatusUpdater[IO] {
 
   import cats.effect._
@@ -137,7 +148,8 @@ private class EventStatusUpdaterImpl(
   private def retryOnServerError(retry: Eval[IO[Unit]]): PartialFunction[Throwable, IO[Unit]] = {
     case UnexpectedResponseException(ServiceUnavailable | GatewayTimeout | BadGateway, message) =>
       waitAndRetry(retry, message)
-    case ConnectivityException(message, _) => waitAndRetry(retry, message)
+    case exception @ (_: ConnectivityException | _: ClientException) =>
+      waitAndRetry(retry, exception.getMessage)
   }
 
   private def waitAndRetry(retry: Eval[IO[Unit]], errorMessage: String) = for {

@@ -24,11 +24,13 @@ import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.http.client.IORestClient
-import ch.datascience.http.client.RestClientError.{ConnectivityException, UnexpectedResponseException}
+import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
 import ch.datascience.webhookservice.model.CommitSyncRequest
-import org.typelevel.log4cats.Logger
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.numeric.NonNegative
 import org.http4s.Status.{Accepted, BadGateway, GatewayTimeout, ServiceUnavailable}
 import org.http4s.{Status, Uri}
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -39,14 +41,22 @@ private trait CommitSyncRequestSender[Interpretation[_]] {
 }
 
 private class CommitSyncRequestSenderImpl(
-    eventLogUrl: EventLogUrl,
-    logger:      Logger[IO],
-    retryDelay:  FiniteDuration
+    eventLogUrl:            EventLogUrl,
+    logger:                 Logger[IO],
+    retryDelay:             FiniteDuration,
+    retryInterval:          FiniteDuration = IORestClient.SleepAfterConnectionIssue,
+    maxRetries:             Int Refined NonNegative = IORestClient.MaxRetriesAfterConnectionTimeout,
+    requestTimeoutOverride: Option[Duration] = None
 )(implicit
     executionContext: ExecutionContext,
     contextShift:     ContextShift[IO],
     timer:            Timer[IO]
-) extends IORestClient(Throttler.noThrottling, logger)
+) extends IORestClient(Throttler.noThrottling,
+                       logger,
+                       retryInterval = retryInterval,
+                       maxRetries = maxRetries,
+                       requestTimeoutOverride = requestTimeoutOverride
+    )
     with CommitSyncRequestSender[IO] {
 
   import cats.effect._
@@ -70,8 +80,8 @@ private class CommitSyncRequestSenderImpl(
   private def retryDelivery(commitSyncRequest: CommitSyncRequest): PartialFunction[Throwable, IO[Unit]] = {
     case UnexpectedResponseException(ServiceUnavailable | GatewayTimeout | BadGateway, message) =>
       waitAndRetry(Eval.always(sendCommitSyncRequest(commitSyncRequest)), message)
-    case ConnectivityException(message, _) =>
-      waitAndRetry(Eval.always(sendCommitSyncRequest(commitSyncRequest)), message)
+    case exception @ (_: ConnectivityException | _: ClientException) =>
+      waitAndRetry(Eval.always(sendCommitSyncRequest(commitSyncRequest)), exception.getMessage)
   }
 
   private def waitAndRetry(retry: Eval[IO[Unit]], errorMessage: String) = for {

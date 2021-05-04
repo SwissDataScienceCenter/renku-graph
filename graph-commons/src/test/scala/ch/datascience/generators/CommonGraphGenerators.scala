@@ -30,6 +30,7 @@ import ch.datascience.graph.Schemas
 import ch.datascience.graph.config.{GitLabUrl, RenkuBaseUrl, RenkuLogTimeout}
 import ch.datascience.graph.model.CliVersion
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
+import ch.datascience.http.client.RestClientError._
 import ch.datascience.http.client._
 import ch.datascience.http.rest.Links.{Href, Link, Rel}
 import ch.datascience.http.rest.paging.model.Total
@@ -237,4 +238,19 @@ object CommonGraphGenerators {
   } yield sparqlQuery
 
   implicit lazy val schemas: Gen[Schema] = Gen.oneOf(Schemas.all)
+
+  implicit val unexpectedResponseExceptions: Gen[UnexpectedResponseException] = for {
+    status  <- serverErrorHttpStatuses
+    message <- nonBlankStrings()
+  } yield UnexpectedResponseException(status, message.value)
+
+  implicit val connectivityExceptions: Gen[ConnectivityException] = for {
+    message   <- nonBlankStrings()
+    exception <- exceptions
+  } yield ConnectivityException(message.value, exception)
+
+  implicit val clientExceptions: Gen[ClientException] = for {
+    message   <- nonBlankStrings()
+    exception <- exceptions
+  } yield ClientException(message.value, exception)
 }
