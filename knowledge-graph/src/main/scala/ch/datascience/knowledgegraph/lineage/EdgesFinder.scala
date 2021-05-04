@@ -149,7 +149,7 @@ private class EdgesFinderImpl(
     case Some(user) =>
       s"""
          |OPTIONAL { 
-         |    $projectResourceId renku:projectVisibility ?visibility;
+         |    $projectResourceId renku:projectVisibility ?visibility .
          |}
          |OPTIONAL {
          |    $projectResourceId schema:member/schema:sameAs ?memberId.

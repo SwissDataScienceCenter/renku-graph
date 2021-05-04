@@ -52,8 +52,10 @@ private class PersonTrimmerSpec extends AnyWordSpec with should.Matchers with Mo
 
         val expectedPerson = Person(personData.id, None, expectedName, email.some)
 
-        personTrimmer.getTriplesAndTrimmedPersons(triples, projectId, eventId, maybeAccessToken) shouldBe Success(
-          expectedTriples -> Set(expectedPerson)
+        personTrimmer.getTriplesAndTrimmedPersons(triples, projectId, eventId, maybeAccessToken).value shouldBe Success(
+          Right(
+            expectedTriples -> Set(expectedPerson)
+          )
         )
       }
 
@@ -82,9 +84,11 @@ private class PersonTrimmerSpec extends AnyWordSpec with should.Matchers with Mo
             EitherT.right(Success(CommitPersonsInfo(commitId, NonEmptyList(commitPerson, otherCommitPersons))))
           )
 
-        personTrimmer.getTriplesAndTrimmedPersons(triples, projectId, eventId, maybeAccessToken) shouldBe Success(
-          expectedTriples -> Set(
-            expectedPerson
+        personTrimmer.getTriplesAndTrimmedPersons(triples, projectId, eventId, maybeAccessToken).value shouldBe Success(
+          Right(
+            expectedTriples -> Set(
+              expectedPerson
+            )
           )
         )
       }
@@ -110,9 +114,11 @@ private class PersonTrimmerSpec extends AnyWordSpec with should.Matchers with Mo
             EitherT.right(Success(CommitPersonsInfo(commitId, NonEmptyList(commitPerson, otherCommitPersons))))
           )
 
-        personTrimmer.getTriplesAndTrimmedPersons(triples, projectId, eventId, maybeAccessToken) shouldBe Success(
-          expectedTriples -> Set(
-            expectedPerson
+        personTrimmer.getTriplesAndTrimmedPersons(triples, projectId, eventId, maybeAccessToken).value shouldBe Success(
+          Right(
+            expectedTriples -> Set(
+              expectedPerson
+            )
           )
         )
       }
@@ -128,9 +134,11 @@ private class PersonTrimmerSpec extends AnyWordSpec with should.Matchers with Mo
 
         val expectedPerson = Person(personData.id, None, expectedName, None)
 
-        personTrimmer.getTriplesAndTrimmedPersons(triples, projectId, eventId, maybeAccessToken) shouldBe Success(
-          expectedTriples -> Set(
-            expectedPerson
+        personTrimmer.getTriplesAndTrimmedPersons(triples, projectId, eventId, maybeAccessToken).value shouldBe Success(
+          Right(
+            expectedTriples -> Set(
+              expectedPerson
+            )
           )
         )
       }

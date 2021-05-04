@@ -348,7 +348,8 @@ object bundles extends Schemas {
         projectPath:         Path = projectPaths.generateOne,
         cliVersion:          CliVersion = cliVersions.generateOne,
         projectVisibility:   Option[Visibility] = projectVisibilities.generateSome,
-        projectMembers:      Set[Person] = Set.empty[Person]
+        projectMembers:      Set[Person] = Set.empty[Person],
+        shaprefix:           String = f"${positiveInts(999).generateOne.value}%03d"
     )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): (List[JsonLD], ExemplarData) = {
       val project = Project(
         projectPath,
@@ -386,7 +387,7 @@ object bundles extends Schemas {
         )
 
       val commit2DataSetCreation = Activity(
-        CommitId("000002"),
+        CommitId(s"${shaprefix}002"),
         relativeTimestamps(moreThanAgo = Duration.ofDays(30)).generateAs(CommittedDate),
         persons.generateOne,
         project,
@@ -396,7 +397,7 @@ object bundles extends Schemas {
       )
 
       val commit3AddingDataSetFile = Activity(
-        CommitId("000003"),
+        CommitId(s"${shaprefix}003"),
         CommittedDate(commit2DataSetCreation.committedDate.value.plus(1, DAYS)),
         persons.generateOne,
         project,
@@ -411,7 +412,7 @@ object bundles extends Schemas {
       )
 
       val commit4Activity = Activity(
-        CommitId("000004"),
+        CommitId(s"${shaprefix}004"),
         CommittedDate(commit3AddingDataSetFile.committedDate.value.plus(1, DAYS)),
         persons.generateOne,
         project,
@@ -431,7 +432,7 @@ object bundles extends Schemas {
       )
 
       val commit5Activity = Activity(
-        CommitId("000005"),
+        CommitId(s"${shaprefix}005"),
         CommittedDate(commit4Activity.committedDate.value.plus(1, DAYS)),
         committer = persons.generateOne,
         project,
@@ -444,7 +445,7 @@ object bundles extends Schemas {
       )
 
       val commit6Activity = Activity(
-        CommitId("000006"),
+        CommitId(s"${shaprefix}006"),
         CommittedDate(commit5Activity.committedDate.value.plus(1, DAYS)),
         committer = persons.generateOne,
         project,
@@ -457,7 +458,7 @@ object bundles extends Schemas {
       )
 
       val commit7Activity = Activity(
-        CommitId("000007"),
+        CommitId(s"${shaprefix}007"),
         CommittedDate(commit6Activity.committedDate.value.plus(1, DAYS)),
         committer = persons.generateOne,
         project,
@@ -485,7 +486,7 @@ object bundles extends Schemas {
 
       val commit8ParquetEntityFactory = (activity: Activity) => Entity(Generation(bikesParquet, activity))
       val commit8ProcessRun = ProcessRun.standAlone(
-        CommitId("000008"),
+        CommitId(s"${shaprefix}008"),
         CommittedDate(commit7Activity.committedDate.value.plus(1, DAYS)),
         persons.generateOne,
         project,
@@ -522,7 +523,7 @@ object bundles extends Schemas {
 
       val commit9GridPlotEntityFactory = (activity: Activity) => Entity(Generation(gridPlotPng, activity))
       val commit9ProcessRun = ProcessRun.standAlone(
-        CommitId("000009"),
+        CommitId(s"${shaprefix}009"),
         CommittedDate(commit8ProcessRun.committedDate.value.plus(1, DAYS)),
         persons.generateOne,
         project,
@@ -547,7 +548,7 @@ object bundles extends Schemas {
       )
 
       val commit10Activity = Activity(
-        CommitId("0000010"),
+        CommitId(s"${shaprefix}010"),
         CommittedDate(commit9ProcessRun.committedDate.value.plus(1, DAYS)),
         persons.generateOne,
         project,
@@ -560,7 +561,7 @@ object bundles extends Schemas {
       )
 
       val commit11Activity = Activity(
-        CommitId("0000011"),
+        CommitId(s"${shaprefix}011"),
         CommittedDate(commit10Activity.committedDate.value.plus(1, DAYS)),
         persons.generateOne,
         project,
@@ -624,7 +625,7 @@ object bundles extends Schemas {
       val commit12ParquetEntityFactory       = (activity: Activity) => Entity(Generation(bikesParquet, activity))
       val commit12Committer                  = persons.generateOne
       val commit12Workflow = WorkflowRun(
-        CommitId("0000012"),
+        CommitId(s"${shaprefix}012"),
         CommittedDate(commit11Activity.committedDate.value.plus(1, DAYS)),
         commit12Committer,
         project,
