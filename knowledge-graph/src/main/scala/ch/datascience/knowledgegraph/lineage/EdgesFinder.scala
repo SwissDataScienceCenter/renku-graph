@@ -150,10 +150,13 @@ private class EdgesFinderImpl(
       s"""
          |OPTIONAL { 
          |    $projectResourceId renku:projectVisibility ?visibility;
-         |               schema:member/schema:sameAs ?memberId.
+         |}
+         |OPTIONAL {
+         |    $projectResourceId schema:member/schema:sameAs ?memberId.
          |    ?memberId  schema:additionalType 'GitLab';
          |               schema:identifier ?userGitlabId .
          |}
+         |
          |BIND (IF (BOUND (?visibility), ?visibility,  '${Visibility.Public.value}') as ?projectVisibility)
          |FILTER (
          |  ?projectVisibility = '${Visibility.Public.value}' || 
