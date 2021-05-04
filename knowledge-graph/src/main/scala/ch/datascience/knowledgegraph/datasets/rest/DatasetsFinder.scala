@@ -101,7 +101,9 @@ private class IODatasetsFinder(
       s"""
          |OPTIONAL { 
          |    ?projectId renku:projectVisibility ?visibility;
-         |               schema:member/schema:sameAs ?memberId.
+         |}
+         |OPTIONAL { 
+         |    ?projectId schema:member/schema:sameAs ?memberId.
          |    ?memberId  schema:additionalType 'GitLab';
          |               schema:identifier ?userGitlabId .
          |}
