@@ -164,7 +164,7 @@ private class EdgesFinderImpl(
          |BIND (IF (BOUND (?visibility), ?visibility,  '${Visibility.Public.value}') as ?projectVisibility)
          |FILTER (
          |  lcase(str(?projectVisibility)) = '${Visibility.Public.value}' || 
-         |  (?projectVisibility != '${Visibility.Public.value}'  && ?userGitlabId = ${user.id.value})
+         |  (lcase(str(?projectVisibility)) != '${Visibility.Public.value}'  && ?userGitlabId = ${user.id.value})
          |)
          |""".stripMargin
     case _ =>
@@ -173,7 +173,7 @@ private class EdgesFinderImpl(
          |  $projectResourceId renku:projectVisibility ?visibility .
          |}
          |BIND(IF (BOUND (?visibility), ?visibility, '${Visibility.Public.value}' ) as ?projectVisibility)
-         |FILTER(?projectVisibility = '${Visibility.Public.value}')
+         |FILTER(lcase(str(?projectVisibility)) = '${Visibility.Public.value}')
          |""".stripMargin
   }
 }

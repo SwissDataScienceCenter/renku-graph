@@ -100,7 +100,7 @@ private class IODatasetsFinder(
     case Some(user) =>
       s"""
          |OPTIONAL { 
-         |    ?projectId renku:projectVisibility ?visibility;
+         |    ?projectId renku:projectVisibility ?visibility .
          |}
          |OPTIONAL { 
          |    ?projectId schema:member/schema:sameAs ?memberId.
@@ -109,9 +109,8 @@ private class IODatasetsFinder(
          |}
          |BIND (IF (BOUND (?visibility), ?visibility,  '${Visibility.Public.value}') as ?projectVisibility)
          |FILTER (
-         |  ?projectVisibility = '${Visibility.Public.value}' || 
-         |  ((?projectVisibility = '${Visibility.Private.value}' || ?projectVisibility = '${Visibility.Internal.value}') && 
-         |  ?userGitlabId = ${user.id.value})
+         |  lcase(str(?projectVisibility)) = '${Visibility.Public.value}' || 
+         |  (lcase(str(?projectVisibility)) != '${Visibility.Public.value}' && ?userGitlabId = ${user.id.value})
          |)
          |""".stripMargin
     case _ =>
@@ -120,7 +119,7 @@ private class IODatasetsFinder(
          |  ?projectId renku:projectVisibility ?visibility .
          |}
          |BIND(IF (BOUND (?visibility), ?visibility, '${Visibility.Public.value}' ) as ?projectVisibility)
-         |FILTER(?projectVisibility = '${Visibility.Public.value}')
+         |FILTER(lcase(str(?projectVisibility)) = '${Visibility.Public.value}')
          |""".stripMargin
   }
 
