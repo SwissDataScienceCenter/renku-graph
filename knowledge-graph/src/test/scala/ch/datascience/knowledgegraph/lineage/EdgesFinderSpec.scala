@@ -84,20 +84,8 @@ class EdgesFinderSpec extends AnyWordSpec with InMemoryRdfStore with ExternalSer
 
         loadToStore(jsons: _*)
 
-        val aU = authUsers.generateOption
-
-        val a = runQuery(s"""SELECT ?projectResourceId  ?visibility ?memberId
-                            |WHERE {
-                            | OPTIONAL {
-                            |  ?projectResourceId renku:projectVisibility ?visibility;
-                            |  }
-                            |  OPTIONAL {
-                            |             ?projectResourceId  schema:member/schema:sameAs ?memberId .
-                            |               }
-                            | }""".stripMargin).unsafeRunSync()
-
         edgesFinder
-          .findEdges(projectPath, aU)
+          .findEdges(projectPath, authUsers.generateOption)
           .unsafeRunSync() shouldBe empty
 
         logger.logged(

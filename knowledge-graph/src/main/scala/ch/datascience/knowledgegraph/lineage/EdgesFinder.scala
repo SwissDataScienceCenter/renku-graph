@@ -75,21 +75,25 @@ private class EdgesFinderImpl(
     s"""|SELECT DISTINCT ?runPlan ?date ?sourceEntityLocation ?targetEntityLocation
         |WHERE {
         |  {
+        |    ${projectMemberFilterQuery(ResourceId(renkuBaseUrl, path).showAs[RdfResource])(maybeUser)}
         |    ?sourceEntity schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
         |                  prov:atLocation ?sourceEntityLocation.
-        |    ?runPlan renku:hasInputs/renku:consumes ?sourceEntity.
-        |    ?activity prov:qualifiedAssociation/prov:hadPlan ?runPlan;
+        |    ?runPlan schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
+        |             renku:hasInputs/renku:consumes ?sourceEntity.
+        |    ?activity schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
+        |              prov:qualifiedAssociation/prov:hadPlan ?runPlan;
         |              prov:startedAtTime ?date.
         |    FILTER NOT EXISTS {?activity a wfprov:WorkflowRun}
-        |    ${projectMemberFilterQuery(ResourceId(renkuBaseUrl, path).showAs[RdfResource])(maybeUser)}
         |  } UNION {
+        |    ${projectMemberFilterQuery(ResourceId(renkuBaseUrl, path).showAs[RdfResource])(maybeUser)}
         |    ?targetEntity schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
         |                  prov:atLocation ?targetEntityLocation.
-        |    ?runPlan renku:hasOutputs/renku:produces ?targetEntity.
-        |    ?activity prov:qualifiedAssociation/prov:hadPlan ?runPlan;
+        |    ?runPlan schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
+        |             renku:hasOutputs/renku:produces ?targetEntity.
+        |    ?activity schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
+        |              prov:qualifiedAssociation/prov:hadPlan ?runPlan;
         |              prov:startedAtTime ?date.
         |    FILTER NOT EXISTS {?activity a wfprov:WorkflowRun}
-        |    ${projectMemberFilterQuery(ResourceId(renkuBaseUrl, path).showAs[RdfResource])(maybeUser)}
         |  }
         |}
         |ORDER BY ASC(?date)
@@ -159,9 +163,8 @@ private class EdgesFinderImpl(
          |
          |BIND (IF (BOUND (?visibility), ?visibility,  '${Visibility.Public.value}') as ?projectVisibility)
          |FILTER (
-         |  ?projectVisibility = '${Visibility.Public.value}' || 
-         |  ((?projectVisibility = '${Visibility.Private.value}' || ?projectVisibility = '${Visibility.Internal.value}') && 
-         |  ?userGitlabId = ${user.id.value})
+         |  lcase(str(?projectVisibility)) = '${Visibility.Public.value}' || 
+         |  (?projectVisibility != '${Visibility.Public.value}'  && ?userGitlabId = ${user.id.value})
          |)
          |""".stripMargin
     case _ =>
