@@ -21,6 +21,7 @@ package ch.datascience.knowledgegraph.graphql
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.GraphModelGenerators.authUsers
 import ch.datascience.http.ErrorMessage
 import ch.datascience.http.ErrorMessage._
 import ch.datascience.http.server.EndpointTester._
@@ -51,10 +52,10 @@ class QueryEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
       val queryResult = jsons.generateOne
       (queryRunner
         .run(_: UserQuery, _: Option[AuthUser]))
-        .expects(queryMatchingRequest, None)
+        .expects(queryMatchingRequest, maybeAuthUser)
         .returning(IO.pure(queryResult))
 
-      val response = handleQuery(request, None).unsafeRunSync()
+      val response = handleQuery(request, maybeAuthUser).unsafeRunSync()
 
       response.status                   shouldBe Ok
       response.contentType              shouldBe Some(`Content-Type`(application.json))
@@ -68,10 +69,10 @@ class QueryEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
       val queryResult = jsons.generateOne
       (queryRunner
         .run(_: UserQuery, _: Option[AuthUser]))
-        .expects(queryAndVariablesMatchingRequest, None)
+        .expects(queryAndVariablesMatchingRequest, maybeAuthUser)
         .returning(IO.pure(queryResult))
 
-      val response = handleQuery(request, None).unsafeRunSync()
+      val response = handleQuery(request, maybeAuthUser).unsafeRunSync()
 
       response.status                   shouldBe Ok
       response.contentType              shouldBe Some(`Content-Type`(application.json))
@@ -82,7 +83,7 @@ class QueryEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
 
       val request = Request[IO](Method.POST, uri"graphql").withEntity("")
 
-      val response = handleQuery(request, None).unsafeRunSync()
+      val response = handleQuery(request, maybeAuthUser).unsafeRunSync()
 
       response.status                               shouldBe BadRequest
       response.contentType                          shouldBe Some(`Content-Type`(application.json))
@@ -96,10 +97,10 @@ class QueryEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
       val exception = queryAnalysisErrors.generateOne
       (queryRunner
         .run(_: UserQuery, _: Option[AuthUser]))
-        .expects(queryMatchingRequest, None)
+        .expects(queryMatchingRequest, maybeAuthUser)
         .returning(IO.raiseError(exception))
 
-      val response = handleQuery(request, None).unsafeRunSync()
+      val response = handleQuery(request, maybeAuthUser).unsafeRunSync()
 
       response.status                   shouldBe BadRequest
       response.contentType              shouldBe Some(`Content-Type`(application.json))
@@ -114,10 +115,10 @@ class QueryEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
 
       (queryRunner
         .run(_: UserQuery, _: Option[AuthUser]))
-        .expects(queryMatchingRequest, None)
+        .expects(queryMatchingRequest, maybeAuthUser)
         .returning(IO.raiseError(exception))
 
-      val response = handleQuery(request, None).unsafeRunSync()
+      val response = handleQuery(request, maybeAuthUser).unsafeRunSync()
 
       response.status                   shouldBe InternalServerError
       response.contentType              shouldBe Some(`Content-Type`(application.json))
@@ -126,9 +127,10 @@ class QueryEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
   }
 
   private trait TestCase {
-    val queryRunner  = mock[IOQueryRunner]
-    val queryContext = mock[IOLineageQueryContext]
-    val handleQuery  = new QueryEndpoint[IO](queryRunner).handleQuery _
+
+    val maybeAuthUser = authUsers.generateOption
+    val queryRunner   = mock[IOQueryRunner]
+    val handleQuery   = new QueryEndpoint[IO](queryRunner).handleQuery _
 
     private val queryWithNoVariables     = """{ resource { property } }"""
     lazy val queryWithNoVariablesPayload = json"""

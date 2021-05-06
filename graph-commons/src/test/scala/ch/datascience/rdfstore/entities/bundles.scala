@@ -547,7 +547,7 @@ object bundles extends Schemas {
       )
 
       val commit10Activity = Activity(
-        CommitId("000010"),
+        CommitId("0000010"),
         CommittedDate(commit9ProcessRun.committedDate.value.plus(1, DAYS)),
         persons.generateOne,
         project,
@@ -560,7 +560,7 @@ object bundles extends Schemas {
       )
 
       val commit11Activity = Activity(
-        CommitId("000011"),
+        CommitId("0000011"),
         CommittedDate(commit10Activity.committedDate.value.plus(1, DAYS)),
         persons.generateOne,
         project,
@@ -624,7 +624,7 @@ object bundles extends Schemas {
       val commit12ParquetEntityFactory       = (activity: Activity) => Entity(Generation(bikesParquet, activity))
       val commit12Committer                  = persons.generateOne
       val commit12Workflow = WorkflowRun(
-        CommitId("000012"),
+        CommitId("0000012"),
         CommittedDate(commit11Activity.committedDate.value.plus(1, DAYS)),
         commit12Committer,
         project,
