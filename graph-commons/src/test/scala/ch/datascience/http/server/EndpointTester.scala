@@ -103,4 +103,9 @@ object EndpointTester {
     AuthMiddleware {
       Kleisli liftF returning
     }
+
+  def givenAuthFailing(): AuthMiddleware[IO, Option[AuthUser]] =
+    AuthMiddleware {
+      Kleisli(_ => OptionT.none)
+    }
 }
