@@ -375,7 +375,7 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
           |}
           |""".stripMargin
     ).unsafeRunSync()
-      .flatMap(row => row.get("visibility").map(visibility => Visibility.apply(visibility.toLowerCase)))
+      .flatMap(row => row.get("visibility").map(visibility => Visibility.apply(visibility)))
       .headOption
 
   private def findName(projectId: ResourceId): Name =

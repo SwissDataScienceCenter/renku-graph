@@ -20,7 +20,9 @@ package ch.datascience.knowledgegraph.graphql
 
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.GraphModelGenerators.authUsers
 import ch.datascience.graph.model.projects.Path
+import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.knowledgegraph.lineage
 import ch.datascience.knowledgegraph.lineage.LineageFinder
 import ch.datascience.knowledgegraph.lineage.LineageGenerators._
@@ -29,9 +31,9 @@ import ch.datascience.knowledgegraph.lineage.model._
 import io.circe.Json
 import io.circe.literal._
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import sangria.ast.Document
 import sangria.execution.Executor
@@ -78,12 +80,13 @@ class QuerySchemaSpec
   private trait TestCase {
     val lineageFinder = mock[LineageFinder[IO]]
 
+    val maybeAuthUser = authUsers.generateOption
     def execute(query: Document): Json =
       Executor
         .execute(
           QuerySchema[IO](lineage.graphql.QueryFields()),
           query,
-          new QueryContext[IO](lineageFinder)
+          new LineageQueryContext[IO](lineageFinder, maybeAuthUser)
         )
         .futureValue
   }
@@ -93,8 +96,8 @@ class QuerySchemaSpec
     def givenFindLineage(projectPath: Path, location: Location) = new {
       def returning(result: IO[Option[Lineage]]) =
         (lineageFinder
-          .find(_: Path, _: Location))
-          .expects(projectPath, location)
+          .find(_: Path, _: Location, _: Option[AuthUser]))
+          .expects(projectPath, location, maybeAuthUser)
           .returning(result)
     }
 

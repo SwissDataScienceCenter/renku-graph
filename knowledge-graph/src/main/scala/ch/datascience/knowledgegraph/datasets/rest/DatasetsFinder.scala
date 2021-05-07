@@ -21,8 +21,10 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.graph.model.datasets.{DateCreated, Dates, Description, Identifier, ImageUri, Keyword, Name, PublishedDate, Title}
+import ch.datascience.graph.model.projects.Visibility
 import ch.datascience.http.rest.paging.Paging.PagedResultsFinder
 import ch.datascience.http.rest.paging.{Paging, PagingRequest, PagingResponse}
+import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.knowledgegraph.datasets.model.DatasetCreator
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.DatasetSearchResult
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
@@ -39,7 +41,8 @@ import scala.concurrent.ExecutionContext
 private trait DatasetsFinder[Interpretation[_]] {
   def findDatasets(maybePhrase: Option[Phrase],
                    sort:        Sort.By,
-                   paging:      PagingRequest
+                   paging:      PagingRequest,
+                   maybeUser:   Option[AuthUser]
   ): Interpretation[PagingResponse[DatasetSearchResult]]
 }
 
@@ -79,11 +82,12 @@ private class IODatasetsFinder(
 
   override def findDatasets(maybePhrase:   Option[Phrase],
                             sort:          Sort.By,
-                            pagingRequest: PagingRequest
+                            pagingRequest: PagingRequest,
+                            maybeUser:     Option[AuthUser]
   ): IO[PagingResponse[DatasetSearchResult]] = {
     val phrase = maybePhrase getOrElse Phrase("*")
     implicit val resultsFinder: PagedResultsFinder[IO, DatasetSearchResult] = pagedResultsFinder(
-      sparqlQuery(phrase, sort)
+      sparqlQuery(phrase, sort, maybeUser)
     )
     for {
       page                 <- findPage(pagingRequest)
@@ -92,7 +96,34 @@ private class IODatasetsFinder(
     } yield updatedPage
   }
 
-  private def sparqlQuery(phrase: Phrase, sort: Sort.By): SparqlQuery = SparqlQuery(
+  private lazy val projectMemberFilterQuery: Option[AuthUser] => String = {
+    case Some(user) =>
+      s"""
+         |OPTIONAL { 
+         |    ?projectId renku:projectVisibility ?visibility .
+         |}
+         |OPTIONAL { 
+         |    ?projectId schema:member/schema:sameAs ?memberId.
+         |    ?memberId  schema:additionalType 'GitLab';
+         |               schema:identifier ?userGitlabId .
+         |}
+         |BIND (IF (BOUND (?visibility), ?visibility,  '${Visibility.Public.value}') as ?projectVisibility)
+         |FILTER (
+         |  lcase(str(?projectVisibility)) = '${Visibility.Public.value}' || 
+         |  (lcase(str(?projectVisibility)) != '${Visibility.Public.value}' && ?userGitlabId = ${user.id.value})
+         |)
+         |""".stripMargin
+    case _ =>
+      s"""
+         |OPTIONAL {
+         |  ?projectId renku:projectVisibility ?visibility .
+         |}
+         |BIND(IF (BOUND (?visibility), ?visibility, '${Visibility.Public.value}' ) as ?projectVisibility)
+         |FILTER(lcase(str(?projectVisibility)) = '${Visibility.Public.value}')
+         |""".stripMargin
+  }
+
+  private def sparqlQuery(phrase: Phrase, sort: Sort.By, maybeUser: Option[AuthUser]): SparqlQuery = SparqlQuery(
     name = "ds free-text search",
     Set(
       "PREFIX prov: <http://www.w3.org/ns/prov#>",
@@ -142,6 +173,7 @@ private class IODatasetsFinder(
         |              ?someId prov:wasDerivedFrom/schema:url ?dsId.
         |              ?someId schema:isPartOf ?projectId.
         |          }
+        |          ${projectMemberFilterQuery(maybeUser)}
         |        }
         |      }
         |      GROUP BY ?sameAs

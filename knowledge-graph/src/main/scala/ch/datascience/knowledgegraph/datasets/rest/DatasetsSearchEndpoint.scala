@@ -18,7 +18,6 @@
 
 package ch.datascience.knowledgegraph.datasets.rest
 
-import cats.MonadError
 import cats.effect._
 import cats.syntax.all._
 import ch.datascience.config._
@@ -28,26 +27,26 @@ import ch.datascience.http.ErrorMessage
 import ch.datascience.http.InfoMessage._
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.rest.paging.PagingRequest
+import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.knowledgegraph.datasets.model.DatasetCreator
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
-import org.typelevel.log4cats.Logger
 import org.http4s._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.dsl.impl.OptionalValidatingQueryParamDecoderMatcher
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-class DatasetsSearchEndpoint[Interpretation[_]: Effect](
+class DatasetsSearchEndpoint[Interpretation[_]: Effect: MonadThrow](
     datasetsFinder:        DatasetsFinder[Interpretation],
     renkuResourcesUrl:     renku.ResourcesUrl,
     executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
     logger:                Logger[Interpretation]
-)(implicit ME:             MonadError[Interpretation, Throwable])
-    extends Http4sDsl[Interpretation] {
+) extends Http4sDsl[Interpretation] {
 
   import DatasetsFinder.DatasetSearchResult
   import DatasetsSearchEndpoint.Query._
@@ -61,13 +60,13 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
 
   def searchForDatasets(maybePhrase: Option[Phrase],
                         sort:        Sort.By,
-                        paging:      PagingRequest
+                        paging:      PagingRequest,
+                        maybeUser:   Option[AuthUser]
   ): Interpretation[Response[Interpretation]] =
     measureExecutionTime {
       implicit val datasetsUrl: renku.ResourceUrl = requestedUrl(maybePhrase, sort, paging)
-
       datasetsFinder
-        .findDatasets(maybePhrase, sort, paging)
+        .findDatasets(maybePhrase, sort, paging, maybeUser)
         .map(_.toHttpResponse)
         .recoverWith(httpResult(maybePhrase))
     } map logExecutionTimeWhen(finishedSuccessfully(maybePhrase))

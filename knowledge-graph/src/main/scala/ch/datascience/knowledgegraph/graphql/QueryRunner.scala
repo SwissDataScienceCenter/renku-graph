@@ -28,15 +28,22 @@ import sangria.schema.Schema
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
 
-class QueryRunner[Interpretation[_]: Async, +QueryContextT](
-    schema:                  Schema[QueryContextT, Unit],
-    repository:              QueryContextT
+class QueryRunner[Interpretation[_]: Async, T <: QueryContext[T]](
+    val schema:              Schema[T, Unit],
+    val repository:          T
 )(implicit executionContext: ExecutionContext) {
 
-  def run(userQuery: UserQuery): Interpretation[Json] = Async[Interpretation].async { callback =>
-    Executor.execute(schema, userQuery.query, repository, variables = mapVars(userQuery.variables)).onComplete {
-      case Success(result)    => callback(Right(result))
-      case Failure(exception) => callback(Left(exception))
+  def run(userQuery: UserQuery, updateCtxParameters: repository.Params): Interpretation[Json] =
+    Async[Interpretation].async { callback =>
+      Executor
+        .execute(schema,
+                 userQuery.query,
+                 repository.updateContext(updateCtxParameters),
+                 variables = mapVars(userQuery.variables)
+        )
+        .onComplete {
+          case Success(result)    => callback(Right(result))
+          case Failure(exception) => callback(Left(exception))
+        }
     }
-  }
 }

@@ -30,6 +30,7 @@ import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.http.rest.paging.PagingRequest.Decoders._
 import ch.datascience.http.rest.paging.model.{Page, PerPage}
 import ch.datascience.http.server.QueryParameterTools._
+import ch.datascience.http.server.security.Authentication
 import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import ch.datascience.knowledgegraph.datasets.rest._
@@ -38,7 +39,8 @@ import ch.datascience.knowledgegraph.projects.rest.{IOProjectEndpoint, ProjectEn
 import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import org.http4s.dsl.Http4sDsl
-import org.http4s.{ParseFailure, Response}
+import org.http4s.server.AuthMiddleware
+import org.http4s.{AuthedRoutes, ParseFailure, Response}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -49,6 +51,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     projectDatasetsEndpoint: ProjectDatasetsEndpoint[F],
     datasetEndpoint:         DatasetEndpoint[F],
     datasetsSearchEndpoint:  DatasetsSearchEndpoint[F],
+    authMiddleware:          AuthMiddleware[F, Option[AuthUser]],
     routesMetrics:           RoutesMetrics[F]
 )(implicit clock:            Clock[F])
     extends Http4sDsl[F] {
@@ -64,29 +67,37 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   import routesMetrics._
 
   // format: off
+  private lazy val authorizedRoutes: HttpRoutes[F] = authMiddleware {
+    AuthedRoutes.of {
+      case GET  -> Root / "knowledge-graph" /  "datasets" :? query(maybePhrase) +& sort(maybeSortBy) +& page(page) +& perPage(perPage) as maybeUser => searchForDatasets(maybePhrase, maybeSortBy,page, perPage, maybeUser)
+    case authedRequest@POST -> Root / "knowledge-graph" /  "graphql" as maybeUser                                                                         => handleQuery(authedRequest.req, maybeUser)
+    }
+  }
+
   private lazy val nonAuthorizedRoutes: HttpRoutes[F] = HttpRoutes.of[F] {
     case         GET  -> Root / "ping"                                                                                                       => Ok("pong")
-    case         GET  -> Root / "knowledge-graph" /  "datasets" :? query(maybePhrase) +& sort(maybeSortBy) +& page(page) +& perPage(perPage) => searchForDatasets(maybePhrase, maybeSortBy,page, perPage)
     case         GET ->  Root / "knowledge-graph" /  "datasets" / DatasetId(id)                                                              => getDataset(id)
     case         GET ->  Root / "knowledge-graph" /  "graphql"                                                                               => schema()
-    case request@POST -> Root / "knowledge-graph" /  "graphql"                                                                               => handleQuery(request)
     case         GET ->         "knowledge-graph" /: "projects" /: path => routeToProjectsEndpoints(path, maybeAuthUser = None)
   }
   // format: on
 
-  lazy val routes: Resource[F, HttpRoutes[F]] = nonAuthorizedRoutes.withMetrics
+  lazy val routes: Resource[F, HttpRoutes[F]] = (nonAuthorizedRoutes <+> authorizedRoutes).withMetrics
 
   private def searchForDatasets(
-      maybePhrase:  Option[ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Query.Phrase]],
-      maybeSort:    Option[ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Sort.By]],
-      maybePage:    Option[ValidatedNel[ParseFailure, Page]],
-      maybePerPage: Option[ValidatedNel[ParseFailure, PerPage]]
+      maybePhrase:   Option[ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Query.Phrase]],
+      maybeSort:     Option[ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Sort.By]],
+      maybePage:     Option[ValidatedNel[ParseFailure, Page]],
+      maybePerPage:  Option[ValidatedNel[ParseFailure, PerPage]],
+      maybeAuthUser: Option[AuthUser]
   ): F[Response[F]] =
     (maybePhrase.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Phrase])),
      maybeSort getOrElse Validated.validNel(Sort.By(TitleProperty, Direction.Asc)),
      PagingRequest(maybePage, maybePerPage)
     )
-      .mapN(datasetsSearchEndpoint.searchForDatasets)
+      .mapN { case (maybePhrase, sort, paging) =>
+        datasetsSearchEndpoint.searchForDatasets(maybePhrase, sort, paging, maybeAuthUser)
+      }
       .fold(toBadRequest(), identity)
 
   private def routeToProjectsEndpoints(
@@ -135,12 +146,14 @@ private object MicroserviceRoutes {
       datasetEndpoint         <- IODatasetEndpoint(sparqlTimeRecorder)
       datasetsSearchEndpoint  <- IODatasetsSearchEndpoint(sparqlTimeRecorder)
       authenticator           <- GitLabAuthenticator(gitLabThrottler, logger)
+      authMiddleware          <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
       routesMetrics = new RoutesMetrics[IO](metricsRegistry)
     } yield new MicroserviceRoutes(queryEndpoint,
                                    projectEndpoint,
                                    projectDatasetsEndpoint,
                                    datasetEndpoint,
                                    datasetsSearchEndpoint,
+                                   authMiddleware,
                                    routesMetrics
     )
 }

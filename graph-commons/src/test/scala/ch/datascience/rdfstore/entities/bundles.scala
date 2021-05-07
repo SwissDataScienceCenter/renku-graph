@@ -346,14 +346,17 @@ object bundles extends Schemas {
 
     def apply(
         projectPath:         Path = projectPaths.generateOne,
-        cliVersion:          CliVersion = cliVersions.generateOne
+        cliVersion:          CliVersion = cliVersions.generateOne,
+        projectVisibility:   Option[Visibility] = projectVisibilities.generateSome,
+        projectMembers:      Set[Person] = Set.empty[Person]
     )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): (List[JsonLD], ExemplarData) = {
       val project = Project(
         projectPath,
         projectNames.generateOne,
         projectCreatedDates.generateOne,
         projectCreators.generateOption,
-        projectVisibilities.generateSome,
+        projectVisibility,
+        members = projectMembers,
         version = projectSchemaVersions.generateOne
       )
       val agent           = Agent(cliVersion)

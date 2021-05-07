@@ -26,9 +26,9 @@ import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.knowledgegraph.datasets.model.{AddedToProject, DatasetAgent, DatasetProject}
 import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
-import org.typelevel.log4cats.Logger
 import io.circe.Decoder.decodeList
 import io.circe.DecodingFailure
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.Try
@@ -95,6 +95,7 @@ private class ProjectsFinder(
         |ORDER BY ASC(?projectName)
         |""".stripMargin
   )
+
 }
 
 private object ProjectsFinder {

@@ -36,9 +36,9 @@ package object entities extends Schemas with EntitiesGenerators {
   implicit val renkuBaseUrlToEntityId:  RenkuBaseUrl => EntityId  = url => EntityId of url.value
 
   implicit lazy val visibilityEncoder: JsonLDEncoder[Visibility] = JsonLDEncoder.instance {
-    case Private  => JsonLDEncoder.encodeString("Private")
-    case Public   => JsonLDEncoder.encodeString("Public")
-    case Internal => JsonLDEncoder.encodeString("Internal")
+    case Private  => JsonLDEncoder.encodeString(Private.value)
+    case Public   => JsonLDEncoder.encodeString(Public.value)
+    case Internal => JsonLDEncoder.encodeString(Internal.value)
   }
 
   implicit def sameAsEncoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[SameAs] = JsonLDEncoder.instance {

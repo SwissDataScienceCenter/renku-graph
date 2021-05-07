@@ -114,7 +114,6 @@ class ProjectAuthorizerImpl(
             .downField("maybeVisibility")
             .downField("value")
             .as[Option[String]]
-            .map(_.map(_.toLowerCase))
             .flatMap {
               case None        => Right(Public)
               case Some(value) => Visibility.from(value).leftMap(ex => DecodingFailure(ex.getMessage, Nil))

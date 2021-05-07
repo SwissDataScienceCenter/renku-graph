@@ -19,17 +19,30 @@
 package ch.datascience.knowledgegraph.graphql
 
 import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.knowledgegraph.lineage.LineageFinder
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-class QueryContext[Interpretation[_]](
-    val lineageFinder: LineageFinder[Interpretation]
-)
+trait QueryContext[QueryContextT] {
+  self: QueryContextT =>
+  type Params
+  def updateContext(p: Params): QueryContextT
+}
 
-object QueryContext {
+class LineageQueryContext[Interpretation[_]](
+    val lineageFinder: LineageFinder[Interpretation],
+    val maybeUser:     Option[AuthUser] = None
+) extends QueryContext[LineageQueryContext[Interpretation]] {
+
+  override type Params = Option[AuthUser]
+  override def updateContext(p: Option[AuthUser]): LineageQueryContext[Interpretation] =
+    new LineageQueryContext[Interpretation](lineageFinder, p)
+}
+
+object LineageQueryContext {
   def apply(
       timeRecorder: SparqlQueryTimeRecorder[IO],
       logger:       Logger[IO]
@@ -37,5 +50,5 @@ object QueryContext {
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[QueryContext[IO]] = LineageFinder(timeRecorder, logger) map (new QueryContext[IO](_))
+  ): IO[LineageQueryContext[IO]] = LineageFinder(timeRecorder, logger) map (new LineageQueryContext[IO](_))
 }

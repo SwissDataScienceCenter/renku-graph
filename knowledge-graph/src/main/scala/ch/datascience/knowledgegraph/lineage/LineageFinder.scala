@@ -22,6 +22,7 @@ import cats.MonadThrow
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.graph.model.projects.Path
+import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.knowledgegraph.lineage.model.Node.Location
 import ch.datascience.knowledgegraph.lineage.model._
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
@@ -30,7 +31,7 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.ExecutionContext
 
 trait LineageFinder[Interpretation[_]] {
-  def find(projectPath: Path, location: Location): Interpretation[Option[Lineage]]
+  def find(projectPath: Path, location: Location, maybeUser: Option[AuthUser]): Interpretation[Option[Lineage]]
 }
 
 class LineageFinderImpl[Interpretation[_]: MonadThrow](
@@ -47,8 +48,8 @@ class LineageFinderImpl[Interpretation[_]: MonadThrow](
 
   import scala.util.control.NonFatal
 
-  def find(projectPath: Path, location: Location): Interpretation[Option[Lineage]] =
-    findEdges(projectPath) flatMap {
+  def find(projectPath: Path, location: Location, maybeUser: Option[AuthUser]): Interpretation[Option[Lineage]] =
+    findEdges(projectPath, maybeUser) flatMap {
       case edges if edges.isEmpty => Option.empty[Lineage].pure[Interpretation]
       case edges =>
         trim(edges, location) flatMap {

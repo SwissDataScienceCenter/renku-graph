@@ -24,7 +24,7 @@ import sangria.schema.Schema
 import scala.concurrent.ExecutionContext
 
 private class IOQueryRunner(
-    schema:                  Schema[QueryContext[IO], Unit],
-    repository:              QueryContext[IO]
+    override val schema:     Schema[LineageQueryContext[IO], Unit],
+    override val repository: LineageQueryContext[IO]
 )(implicit executionContext: ExecutionContext)
-    extends QueryRunner[IO, QueryContext[IO]](schema, repository)
+    extends QueryRunner[IO, LineageQueryContext[IO]](schema, repository)

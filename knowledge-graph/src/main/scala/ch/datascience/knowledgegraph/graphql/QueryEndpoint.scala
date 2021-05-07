@@ -22,25 +22,23 @@ import cats.MonadError
 import cats.effect._
 import cats.syntax.all._
 import ch.datascience.http.ErrorMessage
+import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.knowledgegraph.lineage
-import org.typelevel.log4cats.Logger
 import io.circe.Json
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{EntityDecoder, Request, Response}
+import org.typelevel.log4cats.Logger
 import sangria.execution.QueryAnalysisError
 import sangria.parser.QueryParser
 import sangria.renderer.SchemaRenderer.renderSchema
-import sangria.schema.Schema
 
 import scala.concurrent.ExecutionContext
 import scala.util.Try
 import scala.util.control.NonFatal
 
-class QueryEndpoint[Interpretation[_]: Effect](
-    querySchema: Schema[QueryContext[Interpretation], Unit],
-    queryRunner: QueryRunner[Interpretation, QueryContext[Interpretation]]
-)(implicit ME:   MonadError[Interpretation, Throwable])
-    extends Http4sDsl[Interpretation] {
+class QueryEndpoint[Interpretation[_]: Effect: MonadThrow](
+    queryRunner: QueryRunner[Interpretation, LineageQueryContext[Interpretation]]
+) extends Http4sDsl[Interpretation] {
 
   import ErrorMessage._
   import QueryEndpoint._
@@ -48,24 +46,27 @@ class QueryEndpoint[Interpretation[_]: Effect](
 
   def schema(): Interpretation[Response[Interpretation]] =
     for {
-      schema <- ME.fromTry(Try(renderSchema(querySchema)))
+      schema <- MonadError[Interpretation, Throwable].fromTry(Try(renderSchema(queryRunner.schema)))
       result <- Ok(schema)
     } yield result
 
-  def handleQuery(request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
+  def handleQuery(request:   Request[Interpretation],
+                  maybeUser: Option[AuthUser]
+  ): Interpretation[Response[Interpretation]] = {
     for {
-      query    <- request.as[UserQuery] recoverWith badRequest
-      result   <- queryRunner run query recoverWith badRequestForInvalidQuery
+      query <- request.as[UserQuery] recoverWith badRequest
+      result <-
+        queryRunner run (query, maybeUser) recoverWith badRequestForInvalidQuery
       response <- Ok(result)
     } yield response
   } recoverWith httpResponse
 
   private lazy val badRequest: PartialFunction[Throwable, Interpretation[UserQuery]] = { case NonFatal(exception) =>
-    ME.raiseError(BadRequestError(exception))
+    BadRequestError(exception).raiseError[Interpretation, UserQuery]
   }
 
   private lazy val badRequestForInvalidQuery: PartialFunction[Throwable, Interpretation[Json]] = {
-    case exception: QueryAnalysisError => ME.raiseError(BadRequestError(exception))
+    case exception: QueryAnalysisError => BadRequestError(exception).raiseError[Interpretation, Json]
   }
 
   private case class BadRequestError(cause: Throwable) extends Exception(cause)
@@ -117,7 +118,7 @@ object IOQueryEndpoint {
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[QueryEndpoint[IO]] = for {
-    queryContext <- QueryContext(timeRecorder, logger)
+    queryContext <- LineageQueryContext(timeRecorder, logger)
     querySchema = QuerySchema[IO](lineage.graphql.QueryFields())
-  } yield new QueryEndpoint[IO](querySchema, new QueryRunner(querySchema, queryContext))
+  } yield new QueryEndpoint[IO](new QueryRunner(querySchema, queryContext))
 }
