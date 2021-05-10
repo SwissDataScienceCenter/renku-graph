@@ -108,7 +108,7 @@ eventLog:
       memory: 250Mi
     limits:
       memory: 1000Mi
-  jvmXmx: 200M
+  jvmXmx: 512M
   threadsNumber: 6
   connectionPool: 10
 
