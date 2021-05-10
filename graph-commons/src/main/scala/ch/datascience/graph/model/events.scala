@@ -89,7 +89,8 @@ object events {
         GenerationRecoverableFailure,
         GenerationNonRecoverableFailure,
         TransformationRecoverableFailure,
-        TransformationNonRecoverableFailure
+        TransformationNonRecoverableFailure,
+        AwaitingDeletion
       )
 
     type New = New.type
@@ -119,6 +120,10 @@ object events {
     }
     final case object Skipped extends EventStatus with FinalStatus {
       override val value: String = "SKIPPED"
+    }
+
+    final case object AwaitingDeletion extends EventStatus with FinalStatus {
+      override val value: String = "AWAITING_DELETION"
     }
 
     sealed trait FailureStatus extends EventStatus

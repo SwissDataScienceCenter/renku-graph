@@ -235,7 +235,7 @@ Currently, only status changing payloads are allowed:
 }
 ```
 
-- for transitioning event from status `TRANSFORMING_TRIPLES` to `TRANFORMATION_RECOVERABLE_FAILURE`
+- for transitioning event from status `TRANSFORMING_TRIPLES` to `TRANSFORMATION_RECOVERABLE_FAILURE`
 
 ```json
 {
@@ -252,6 +252,15 @@ Currently, only status changing payloads are allowed:
   "status": "TRANSFORMATION_NON_RECOVERABLE_FAILURE",
   "message": "error message",
   "processing_time (optional)": "P2DT3H4M"
+}
+```
+
+- for transitioning event from any status to `AWAITING_DELETION`
+
+```json
+{
+  "status": "AWAITING_DELETION",
+  "processing_time (optional)": "PT15M"
 }
 ```
 
