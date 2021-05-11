@@ -34,6 +34,9 @@ object Reverse {
   def ofEntities(first: (Property, JsonLDEntity), other: (Property, JsonLDEntity)*): Reverse =
     new Reverse((first +: other).toMap)
 
+  def ofJsonLDsUnsafe(first: (Property, JsonLD), other: (Property, JsonLD)*): Reverse =
+    fromList((first +: other).toList).fold(throw _, identity)
+
   def of(first: (Property, JsonLD), other: (Property, JsonLD)*): Either[Exception, Reverse] =
     fromList((first +: other).toList)
 

@@ -18,13 +18,14 @@
 
 package io.renku.jsonld
 
-import java.util.UUID
-
 import io.circe.{Decoder, Encoder, Json}
+
+import java.util.UUID
 
 abstract class EntityId extends Product with Serializable {
   type Value
-  def value: Value
+  def value:  Value
+  def asJson: Json
 }
 
 object EntityId {
@@ -35,16 +36,15 @@ object EntityId {
   private[jsonld] final case class StandardEntityId(override val value: String) extends EntityId {
     type Value = String
     override lazy val toString: String = value
+    override lazy val asJson:   Json   = Json.fromString(value)
   }
   private[jsonld] final case class BlankNodeEntityId(override val value: UUID) extends EntityId {
     type Value = UUID
     override lazy val toString: String = s"_:$value"
+    override lazy val asJson:   Json   = Json.fromString(s"_:$value")
   }
 
-  implicit val entityIdJsonEncoder: Encoder[EntityId] = Encoder.instance {
-    case StandardEntityId(url)   => Json.fromString(url)
-    case BlankNodeEntityId(uuid) => Json.fromString(s"_:$uuid")
-  }
+  implicit val entityIdJsonEncoder: Encoder[EntityId] = Encoder.instance(_.asJson)
 
   implicit val entityIdJsonDecoder: Decoder[EntityId] = Decoder.instance {
     _.as[String].map {

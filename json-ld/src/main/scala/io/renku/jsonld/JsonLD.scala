@@ -18,13 +18,13 @@
 
 package io.renku.jsonld
 
-import java.io.Serializable
-import java.time.{Instant, LocalDate}
-
 import cats.implicits.catsSyntaxEitherId
 import io.circe.{Encoder, Json}
 import io.renku.jsonld.JsonLD.MalformedJsonLD
 import io.renku.jsonld.flatten.{JsonLDArrayFlatten, JsonLDEntityFlatten}
+
+import java.io.Serializable
+import java.time.{Instant, LocalDate}
 
 abstract class JsonLD extends Product with Serializable {
   def toJson: Json
