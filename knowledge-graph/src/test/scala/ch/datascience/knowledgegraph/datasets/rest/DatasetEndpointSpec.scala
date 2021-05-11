@@ -177,7 +177,7 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       name             <- cursor.downField("name").as[Name]
       url              <- cursor.downField("url").as[Url]
       maybeDescription <- cursor.downField("description").as[Option[Description]]
-      published        <- cursor.downField("published").as[(Set[DatasetCreator], Option[PublishedDate])]
+      published        <- cursor.downField("published").as[(Set[DatasetCreator], Option[DatePublished])]
       maybeDateCreated <- cursor.downField("created").as[Option[DateCreated]]
       parts            <- cursor.downField("hasPart").as[List[DatasetPart]]
       project          <- cursor.downField("project").as[DatasetProject]
@@ -229,9 +229,9 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       )
       .getOrElse(fail("Cannot decode payload as Dataset"))
 
-  private implicit lazy val publishingDecoder: Decoder[(Set[DatasetCreator], Option[PublishedDate])] = cursor =>
+  private implicit lazy val publishingDecoder: Decoder[(Set[DatasetCreator], Option[DatePublished])] = cursor =>
     for {
-      maybeDate <- cursor.downField("datePublished").as[Option[PublishedDate]]
+      maybeDate <- cursor.downField("datePublished").as[Option[DatePublished]]
       creators  <- cursor.downField("creator").as[List[DatasetCreator]].map(_.toSet)
     } yield creators -> maybeDate
 

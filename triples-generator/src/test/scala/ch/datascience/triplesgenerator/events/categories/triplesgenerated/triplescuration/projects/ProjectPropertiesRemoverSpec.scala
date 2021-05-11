@@ -25,7 +25,6 @@ import ch.datascience.graph.model.projects.{DateCreated, Name, ResourceId}
 import ch.datascience.graph.model.{SchemaVersion, users}
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.rdfstore.entities.Project
-import ch.datascience.rdfstore.entities.bundles.fileCommit
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
 import io.circe.optics.JsonOptics._
@@ -46,22 +45,7 @@ class ProjectPropertiesRemoverSpec extends AnyWordSpec with ScalaCheckPropertyCh
 
     "remove schema:dateCreated, and schema:creator, and schema:name properties from all the Project entities in the given JSON" in {
       forAll { project: Project =>
-        val triples = JsonLDTriples {
-          JsonLD
-            .arr(
-              fileCommit()(
-                projectPath = project.path,
-                projectName = project.name,
-                maybeVisibility = project.maybeVisibility,
-                projectDateCreated = project.dateCreated,
-                maybeProjectCreator = project.maybeCreator,
-                maybeParent = project.maybeParentProject,
-                projectVersion = project.version
-              ),
-              project.asJsonLD
-            )
-            .toJson
-        }
+        val triples = JsonLDTriples(JsonLD.arr(project.asJsonLD).toJson)
 
         // assume there are names, createdDates and creators initially
         triples.collectAllProjects shouldBe Set(

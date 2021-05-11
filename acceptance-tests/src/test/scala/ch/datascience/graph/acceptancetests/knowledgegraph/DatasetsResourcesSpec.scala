@@ -32,7 +32,7 @@ import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TestReadabilityTools._
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{Description, Identifier, Name, PublishedDate, Title}
+import ch.datascience.graph.model.datasets.{DatePublished, Description, Identifier, Name, Title}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.projects.Visibility
 import ch.datascience.graph.model.users.{Name => UserName}
@@ -60,6 +60,7 @@ import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 
 import scala.util.Random
+import ch.datascience.rdfstore.entities.EntitiesGenerators._
 
 class DatasetsResourcesSpec
     extends AnyFeatureSpec
@@ -88,14 +89,7 @@ class DatasetsResourcesSpec
                            project.created.maybeCreator.map(_.name).getOrElse(userNames.generateOne)
       )
     )
-    val dataset1CommitId  = commitIds.generateOne
-    val dataset1Committer = Person(dataset1Creation.agent.name, dataset1Creation.agent.maybeEmail)
-    val dataset1 = nonModifiedDatasets().generateOne.copy(
-      maybeDescription = Some(datasetDescriptions.generateOne),
-      usedIn = List(DatasetProject(project.path, project.name, dataset1Creation))
-    )
-    val dataset2Creation = addedToProjectObjects.generateOne
-    val dataset2CommitId = commitIds.generateOne
+    val dataset1 = datasetEntities(provenanceGen = datasetProvenanceInternal, projectsGen = fixed(project)).generateOne
     val dataset2 = nonModifiedDatasets().generateOne.copy(
       maybeDescription = None,
       usedIn = List(DatasetProject(project.path, project.name, dataset2Creation))
@@ -123,9 +117,9 @@ class DatasetsResourcesSpec
           datasetName = dataset1.name,
           maybeDatasetSameAs = dataset1.sameAs.some,
           maybeDatasetDescription = dataset1.maybeDescription,
-          dates = dataset1.dates,
+          dates = dataset1.date,
           datasetCreators = dataset1.creators map toPerson,
-          datasetParts = dataset1.parts.map(part => (part.name, part.atLocation)),
+          datasetParts = dataset1.parts.map(part => (part.name, part.location)),
           datasetKeywords = dataset1.keywords,
           datasetImages = dataset1.images
         ),
@@ -146,9 +140,9 @@ class DatasetsResourcesSpec
           datasetName = dataset2.name,
           maybeDatasetSameAs = dataset2.sameAs.some,
           maybeDatasetDescription = dataset2.maybeDescription,
-          dates = dataset2.dates,
+          dates = dataset2.date,
           datasetCreators = dataset2.creators map toPerson,
-          datasetParts = dataset2.parts.map(part => (part.name, part.atLocation)),
+          datasetParts = dataset2.parts.map(part => (part.name, part.location)),
           datasetKeywords = dataset2.keywords,
           datasetImages = dataset2.images
         ),
@@ -170,9 +164,9 @@ class DatasetsResourcesSpec
           datasetName = modifiedDataset2.name,
           datasetDerivedFrom = modifiedDataset2.derivedFrom,
           maybeDatasetDescription = modifiedDataset2.maybeDescription,
-          dates = modifiedDataset2.dates,
+          dates = modifiedDataset2.date,
           datasetCreators = modifiedDataset2.creators map toPerson,
-          datasetParts = modifiedDataset2.parts.map(part => (part.name, part.atLocation)),
+          datasetParts = modifiedDataset2.parts.map(part => (part.name, part.location)),
           datasetKeywords = modifiedDataset2.keywords,
           datasetImages = modifiedDataset2.images
         )
@@ -553,7 +547,7 @@ class DatasetsResourcesSpec
         datasetName = dataset.name,
         maybeDatasetSameAs = dataset.sameAs.some,
         maybeDatasetDescription = dataset.maybeDescription,
-        dates = dataset.dates,
+        dates = dataset.date,
         datasetCreators = dataset.creators map toPerson,
         datasetKeywords = dataset.keywords,
         datasetImages = dataset.images
@@ -612,8 +606,8 @@ object DatasetsResources {
       "identifier": ${actualIdentifier.value},
       "title": ${dataset.title.value},
       "name": ${dataset.name.value},
-      "published": ${dataset.creators -> dataset.dates.maybeDatePublished},
-      "date": ${dataset.dates.date}, 
+      "published": ${dataset.creators -> dataset.date.maybeDatePublished},
+      "date": ${dataset.date.date}, 
       "projectsCount": ${dataset.usedIn.size},
       "images": ${dataset.images.map(_.value)},
       "keywords": ${dataset.keywords.sorted.map(_.value)}
@@ -626,8 +620,8 @@ object DatasetsResources {
       }
   }
 
-  private implicit lazy val publishingEncoder: Encoder[(Set[DatasetCreator], Option[PublishedDate])] =
-    Encoder.instance[(Set[DatasetCreator], Option[PublishedDate])] {
+  private implicit lazy val publishingEncoder: Encoder[(Set[DatasetCreator], Option[DatePublished])] =
+    Encoder.instance[(Set[DatasetCreator], Option[DatePublished])] {
       case (creators, Some(date)) =>
         json"""{
           "creator": ${creators.toList},

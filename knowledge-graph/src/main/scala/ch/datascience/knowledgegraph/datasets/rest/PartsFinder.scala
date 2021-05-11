@@ -21,6 +21,8 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.model.datasets._
 import ch.datascience.knowledgegraph.datasets.model.DatasetPart
+import ch.datascience.rdfstore.SparqlQuery.Prefixes
+import ch.datascience.graph.Schemas._
 import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
 import org.typelevel.log4cats.Logger
@@ -40,20 +42,15 @@ private class PartsFinder(
   def findParts(identifier: Identifier): IO[List[DatasetPart]] =
     queryExpecting[List[DatasetPart]](using = query(identifier))
 
-  private def query(identifier: Identifier) = SparqlQuery(
+  private def query(identifier: Identifier) = SparqlQuery.of(
     name = "ds by id - parts",
-    Set(
-      "PREFIX prov: <http://www.w3.org/ns/prov#>",
-      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-      "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
-      "PREFIX schema: <http://schema.org/>"
-    ),
+    Prefixes.of(prov -> "prov", rdf -> "rdf", rdfs -> "rdfs", schema -> "schema"),
     s"""|SELECT DISTINCT ?partName ?partLocation
         |WHERE {
         |  ?dataset rdf:type <http://schema.org/Dataset> ;
         |           schema:identifier "$identifier" ;
         |           schema:hasPart ?partResource .
-        |  ?partResource rdf:type <http://schema.org/DigitalDocument> ;
+        |  ?partResource a schema:DigitalDocument;
         |                schema:name ?partName ;
         |                prov:atLocation ?partLocation .
         |}
@@ -71,9 +68,8 @@ private object PartsFinder {
 
     implicit val datasetDecoder: Decoder[DatasetPart] = { cursor =>
       for {
-        partName     <- cursor.downField("partName").downField("value").as[PartName]
         partLocation <- cursor.downField("partLocation").downField("value").as[PartLocation]
-      } yield DatasetPart(partName, partLocation)
+      } yield DatasetPart(partLocation)
     }
 
     _.downField("results").downField("bindings").as(decodeList[DatasetPart])

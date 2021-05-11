@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.graph.model.datasets.{DerivedFrom, IdSameAs, SameAs, TopmostDerivedFrom, TopmostSameAs}
+import ch.datascience.graph.model.datasets.{DerivedFrom, InternalSameAs, SameAs, TopmostDerivedFrom, TopmostSameAs}
 import ch.datascience.rdfstore._
 import org.typelevel.log4cats.Logger
 import io.circe.Decoder
@@ -28,7 +28,7 @@ import io.circe.Decoder.decodeList
 import scala.concurrent.ExecutionContext
 
 private trait KGDatasetInfoFinder[Interpretation[_]] {
-  def findTopmostSameAs(idSameAs: IdSameAs): Interpretation[Option[TopmostSameAs]]
+  def findTopmostSameAs(idSameAs: InternalSameAs): Interpretation[Option[TopmostSameAs]]
 
   def findTopmostDerivedFrom(derivedFrom: DerivedFrom): Interpretation[Option[TopmostDerivedFrom]]
 }
@@ -45,11 +45,11 @@ private class KGDatasetInfoFinderImpl(
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import eu.timepit.refined.auto._
 
-  override def findTopmostSameAs(sameAs: IdSameAs): IO[Option[TopmostSameAs]] =
+  override def findTopmostSameAs(sameAs: InternalSameAs): IO[Option[TopmostSameAs]] =
     queryExpecting[Set[TopmostSameAs]](using = queryFindingSameAs(sameAs))
-      .flatMap(toOption[TopmostSameAs, IdSameAs](sameAs))
+      .flatMap(toOption[TopmostSameAs, InternalSameAs](sameAs))
 
-  private def queryFindingSameAs(sameAs: IdSameAs) = SparqlQuery(
+  private def queryFindingSameAs(sameAs: InternalSameAs) = SparqlQuery(
     name = "upload - ds topmostSameAs",
     Set(
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",

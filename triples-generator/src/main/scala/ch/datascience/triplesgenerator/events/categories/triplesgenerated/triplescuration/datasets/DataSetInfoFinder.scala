@@ -19,11 +19,11 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration
 package datasets
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.data.OptionT
 import cats.syntax.all._
 import ch.datascience.graph.Schemas._
-import ch.datascience.graph.model.datasets.{DerivedFrom, SameAs}
+import ch.datascience.graph.model.datasets.{DerivedFrom, InternalSameAs, SameAs}
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.tinytypes.TinyType
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
@@ -39,8 +39,7 @@ private trait DataSetInfoFinder[Interpretation[_]] {
   def findDatasetsInfo(triples: JsonLDTriples): Interpretation[Set[DatasetInfo]]
 }
 
-private class DataSetInfoFinderImpl[Interpretation[_]]()(implicit ME: MonadError[Interpretation, Throwable])
-    extends DataSetInfoFinder[Interpretation] {
+private class DataSetInfoFinderImpl[Interpretation[_]: MonadThrow]() extends DataSetInfoFinder[Interpretation] {
 
   import CollectedInfo._
 
@@ -59,7 +58,7 @@ private class DataSetInfoFinderImpl[Interpretation[_]]()(implicit ME: MonadError
       case types if types contains (schema / "URL").toString =>
         json
           .getId[Interpretation, EntityId]
-          .semiflatMap(collectEntityInfo[SameAs](collected, json, SameAs.fromId))
+          .semiflatMap(collectEntityInfo[SameAs](collected, json, InternalSameAs.from))
           .semiflatMap(collectEntityInfo[DerivedFrom](collected, json, DerivedFrom.from))
           .fold(json)(_ => json)
       case _ => json.pure[Interpretation]
@@ -105,10 +104,11 @@ private class DataSetInfoFinderImpl[Interpretation[_]]()(implicit ME: MonadError
       fromId:         String => Either[IllegalArgumentException, T]
   )(implicit decoder: Decoder[T]): Interpretation[Option[T]] = {
     val idSameAs: Decoder[T] = Decoder.decodeString.emap(value => fromId(value).leftMap(_.toString))
+    val monadThrow = implicitly[MonadThrow[Interpretation]]
 
     urlJson.get[Json]((schema / "url").toString) match {
       case None       => OptionT.none[Interpretation, T]
-      case Some(json) => json.getValue[Interpretation, T] orElse json.getId[Interpretation, T](idSameAs, ME)
+      case Some(json) => json.getValue[Interpretation, T] orElse json.getId[Interpretation, T](monadThrow, idSameAs)
     }
   }.value
 

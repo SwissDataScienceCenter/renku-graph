@@ -18,15 +18,16 @@
 
 package ch.datascience.graph.model
 
-import cats.syntax.all._
 import ch.datascience.graph.Schemas._
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.string
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 
 import java.time.{Instant, LocalDate, ZoneOffset}
-import java.util.UUID
 
 object datasets {
 
@@ -58,6 +59,12 @@ object datasets {
   final class Description private (val value: String) extends AnyVal with StringTinyType
   implicit object Description extends TinyTypeFactory[Description](new Description(_)) with NonBlank
 
+  final class License private (val value: String) extends AnyVal with StringTinyType
+  implicit object License extends TinyTypeFactory[License](new License(_)) with NonBlank
+
+  final class Version private (val value: String) extends AnyVal with StringTinyType
+  implicit object Version extends TinyTypeFactory[Version](new Version(_)) with NonBlank
+
   final class Keyword private (val value: String) extends AnyVal with StringTinyType
   implicit object Keyword extends TinyTypeFactory[Keyword](new Keyword(_)) with NonBlank
 
@@ -67,6 +74,9 @@ object datasets {
   final class ImageUri private (val value: String) extends AnyVal with StringTinyType
   implicit object ImageUri extends TinyTypeFactory[ImageUri](new ImageUri(_)) with constraints.RelativePath
 
+  final class PartLocation private (val value: String) extends AnyVal with StringTinyType
+  implicit object PartLocation extends TinyTypeFactory[PartLocation](new PartLocation(_)) with constraints.RelativePath
+
   final class DerivedFrom private (val value: String) extends AnyVal with StringTinyType
   implicit object DerivedFrom extends TinyTypeFactory[DerivedFrom](new DerivedFrom(_)) with constraints.Url {
 
@@ -74,7 +84,7 @@ object datasets {
 
     implicit val derivedFromJsonLdEncoder: JsonLDEncoder[DerivedFrom] = JsonLDEncoder.instance { derivedFrom =>
       JsonLD.entity(
-        EntityId of s"_:${UUID.randomUUID()}",
+        EntityId of s"_:${java.util.UUID.randomUUID()}",
         EntityTypes of (schema / "URL"),
         schema / "url" -> EntityId.of(derivedFrom.value).asJsonLD
       )
@@ -105,39 +115,44 @@ object datasets {
 
     override def hashCode(): Int = value.hashCode
   }
-  final class IdSameAs private[datasets] (val value: String) extends SameAs
-  final class UrlSameAs private[datasets] (val value: String) extends SameAs
-  implicit object SameAs extends TinyTypeFactory[SameAs](new UrlSameAs(_)) with constraints.Url {
 
-    final def fromId(value: String): Either[IllegalArgumentException, IdSameAs] =
-      from(value) map (sameAs => new IdSameAs(sameAs.value))
+  final class InternalSameAs private[datasets] (val value: String) extends SameAs
+  final class ExternalSameAs private[datasets] (val value: String) extends SameAs
 
-    final def fromUrl(value: String): Either[IllegalArgumentException, UrlSameAs] =
-      from(value) map (sameAs => new UrlSameAs(sameAs.value))
+  implicit object InternalSameAs extends TinyTypeFactory[InternalSameAs](new InternalSameAs(_)) with constraints.Url
 
-    def apply(datasetEntityId: EntityId): IdSameAs = new IdSameAs(datasetEntityId.toString)
+  implicit object SameAs extends TinyTypeFactory[SameAs](new ExternalSameAs(_)) with constraints.Url {
+
+    final def internal(value: RenkuBaseUrl): Either[IllegalArgumentException, InternalSameAs] =
+      from(value.value) map (sameAs => new InternalSameAs(sameAs.value))
+
+    final def external(value: String Refined string.Url): Either[IllegalArgumentException, ExternalSameAs] =
+      from(value.value) map (sameAs => new ExternalSameAs(sameAs.value))
+
+    def apply(datasetEntityId: EntityId): InternalSameAs = new InternalSameAs(datasetEntityId.toString)
 
     implicit val sameAsJsonLdEncoder: JsonLDEncoder[SameAs] = JsonLDEncoder.instance {
-      case v: IdSameAs  => idSameAsJsonLdEncoder(v)
-      case v: UrlSameAs => urlSameAsJsonLdEncoder(v)
+      case v: InternalSameAs => internalSameAsEncoder(v)
+      case v: ExternalSameAs => externalSameAsEncoder(v)
     }
 
-    private lazy val idSameAsJsonLdEncoder: JsonLDEncoder[IdSameAs] = JsonLDEncoder.instance { sameAs =>
+    private lazy val internalSameAsEncoder: JsonLDEncoder[InternalSameAs] = JsonLDEncoder.instance { sameAs =>
       JsonLD.entity(
-        EntityId of s"_:${UUID.randomUUID()}",
+        EntityId of s"_:${java.util.UUID.randomUUID()}",
         EntityTypes of (schema / "URL"),
         schema / "url" -> EntityId.of(sameAs.value).asJsonLD
       )
     }
 
-    private lazy val urlSameAsJsonLdEncoder: JsonLDEncoder[UrlSameAs] = JsonLDEncoder.instance { sameAs =>
+    private lazy val externalSameAsEncoder: JsonLDEncoder[ExternalSameAs] = JsonLDEncoder.instance { sameAs =>
       JsonLD.entity(
-        EntityId of s"_:${UUID.randomUUID()}",
+        EntityId of s"_:${java.util.UUID.randomUUID()}",
         EntityTypes of (schema / "URL"),
         schema / "url" -> sameAs.value.asJsonLD
       )
     }
   }
+
   final class TopmostSameAs private[datasets] (val value: String) extends AnyVal with UrlTinyType
   implicit object TopmostSameAs extends TinyTypeFactory[TopmostSameAs](new TopmostSameAs(_)) with constraints.Url {
 
@@ -149,56 +164,35 @@ object datasets {
       sameAs => EntityId.of(sameAs.value).asJsonLD
   }
 
-  final class DateCreatedInProject private (val value: Instant) extends AnyVal with InstantTinyType
-  implicit object DateCreatedInProject
-      extends TinyTypeFactory[DateCreatedInProject](new DateCreatedInProject(_))
-      with InstantNotInTheFuture
+  sealed trait Date extends Any {
+    def instant: Instant
+  }
 
-  final class DateCreated private (val value: Instant) extends AnyVal with InstantTinyType
+  final class DateCreated private (val value: Instant) extends AnyVal with Date with InstantTinyType {
+    override def instant: Instant = value
+  }
   implicit object DateCreated extends TinyTypeFactory[DateCreated](new DateCreated(_)) with InstantNotInTheFuture
 
-  final class PublishedDate private (val value: LocalDate) extends AnyVal with LocalDateTinyType
-  implicit object PublishedDate
-      extends TinyTypeFactory[PublishedDate](new PublishedDate(_))
+  final class DatePublished private (val value: LocalDate) extends AnyVal with Date with LocalDateTinyType {
+    override def instant: Instant = value.atStartOfDay().toInstant(ZoneOffset.UTC)
+  }
+  implicit object DatePublished
+      extends TinyTypeFactory[DatePublished](new DatePublished(_))
       with LocalDateNotInTheFuture
 
-  sealed trait Dates {
-    val date: Instant
-    val maybeDateCreated:   Option[DateCreated]   = None
-    val maybeDatePublished: Option[PublishedDate] = None
-  }
-  final object Dates {
-
-    def apply(created:   DateCreated, published: PublishedDate): Dates = AllDatasetDates(published, created)
-    def apply(published: PublishedDate): Dates = ImportedDatasetDates(published)
-    def apply(created:   DateCreated): Dates = RenkuDatasetDates(created)
-
-    def from: (Option[DateCreated], Option[PublishedDate]) => Either[IllegalArgumentException, Dates] = {
-      case (Some(created), Some(published)) => AllDatasetDates(published, created).asRight[IllegalArgumentException]
-      case (Some(created), None)            => RenkuDatasetDates(created).asRight[IllegalArgumentException]
-      case (None, Some(published))          => ImportedDatasetDates(published).asRight[IllegalArgumentException]
-      case _                                => new IllegalArgumentException("No datasets dates").asLeft[Dates]
-    }
-
-    final case class ImportedDatasetDates(publishedDate: PublishedDate) extends Dates {
-      override lazy val date:          Instant               = publishedDate.value.atStartOfDay().toInstant(ZoneOffset.UTC)
-      override val maybeDatePublished: Option[PublishedDate] = Some(publishedDate)
-    }
-    final case class RenkuDatasetDates(dateCreated: DateCreated) extends Dates {
-      override lazy val date:        Instant             = dateCreated.value
-      override val maybeDateCreated: Option[DateCreated] = Some(dateCreated)
-    }
-    final case class AllDatasetDates(publishedDate: PublishedDate, dateCreated: DateCreated) extends Dates {
-      override lazy val date:          Instant               = publishedDate.value.atStartOfDay().toInstant(ZoneOffset.UTC)
-      override val maybeDateCreated:   Option[DateCreated]   = Some(dateCreated)
-      override val maybeDatePublished: Option[PublishedDate] = Some(publishedDate)
+  final class PartId private (val value: String) extends AnyVal with StringTinyType
+  implicit object PartId extends TinyTypeFactory[PartId](new PartId(_)) with UUID {
+    def generate: PartId = PartId {
+      java.util.UUID.randomUUID.toString
     }
   }
 
-  final class PartName private (val value: String) extends AnyVal with StringTinyType
-  implicit object PartName extends TinyTypeFactory[PartName](new PartName(_)) with NonBlank
+  final class PartExternal private (val value: Boolean) extends AnyVal with BooleanTinyType
+  implicit object PartExternal extends TinyTypeFactory[PartExternal](new PartExternal(_)) {
+    val yes: PartExternal = PartExternal(true)
+    val no:  PartExternal = PartExternal(false)
+  }
 
-  final class PartLocation private (val value: String) extends AnyVal with RelativePathTinyType
-  implicit object PartLocation extends TinyTypeFactory[PartLocation](new PartLocation(_)) with RelativePath
-
+  final class PartSource private (val value: String) extends AnyVal with UrlTinyType
+  implicit object PartSource extends TinyTypeFactory[PartSource](new PartSource(_))
 }

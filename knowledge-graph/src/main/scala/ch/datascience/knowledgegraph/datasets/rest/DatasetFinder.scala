@@ -44,28 +44,27 @@ private class IODatasetFinder(
   import partsFinder._
   import projectsFinder._
 
-  def findDataset(identifier: Identifier): IO[Option[Dataset]] =
-    for {
-      usedIn            <- findUsedIn(identifier)
-      maybeDetailsFiber <- findBaseDetails(identifier, usedIn).start
-      keywordsFiber     <- findKeywords(identifier).start
-      imagesFiber       <- findImages(identifier).start
-      creatorsFiber     <- findCreators(identifier).start
-      partsFiber        <- findParts(identifier).start
-      maybeDetails      <- maybeDetailsFiber.join
-      keywords          <- keywordsFiber.join
-      imageUrls         <- imagesFiber.join
-      creators          <- creatorsFiber.join
-      parts             <- partsFiber.join
-    } yield maybeDetails map { details =>
-      details.copy(
-        creators = creators,
-        parts = parts,
-        usedIn = usedIn,
-        keywords = keywords,
-        images = imageUrls
-      )
-    }
+  def findDataset(identifier: Identifier): IO[Option[Dataset]] = for {
+    usedIn            <- findUsedIn(identifier)
+    maybeDetailsFiber <- findBaseDetails(identifier, usedIn).start
+    keywordsFiber     <- findKeywords(identifier).start
+    imagesFiber       <- findImages(identifier).start
+    creatorsFiber     <- findCreators(identifier).start
+    partsFiber        <- findParts(identifier).start
+    maybeDetails      <- maybeDetailsFiber.join
+    keywords          <- keywordsFiber.join
+    imageUrls         <- imagesFiber.join
+    creators          <- creatorsFiber.join
+    parts             <- partsFiber.join
+  } yield maybeDetails map { details =>
+    details.copy(
+      creators = creators,
+      parts = parts,
+      usedIn = usedIn,
+      keywords = keywords,
+      images = imageUrls
+    )
+  }
 
   private implicit class DatasetOps(dataset: Dataset) {
     def copy(creators: Set[DatasetCreator],

@@ -28,8 +28,8 @@ import ch.datascience.knowledgegraph.datasets.model.{Dataset, DatasetProject}
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
-import org.typelevel.log4cats.Logger
 import io.circe.{DecodingFailure, HCursor}
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.Try
@@ -49,34 +49,28 @@ private class BaseDetailsFinder(
   import ch.datascience.graph.Schemas._
 
   def findBaseDetails(identifier: Identifier, usedIn: List[DatasetProject]): IO[Option[Dataset]] =
-    queryExpecting[List[Dataset]](using = queryForDatasetDetails(identifier))(datasetsDecoder(usedIn)) flatMap {
-      dataset =>
-        toSingleDataset(dataset)
+    queryExpecting[List[Dataset]](using = queryForDatasetDetails(identifier))(datasetsDecoder(usedIn)) >>= { dataset =>
+      toSingleDataset(dataset)
     }
 
   private def queryForDatasetDetails(identifier: Identifier) = SparqlQuery.of(
     name = "ds by id - details",
-    Prefixes.of(
-      prov   -> "prov",
-      rdf    -> "rdf",
-      renku  -> "renku",
-      schema -> "schema"
-    ),
+    Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema"),
     s"""|SELECT DISTINCT ?identifier ?name ?maybeDateCreated ?alternateName ?url ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?maybePublishedDate ?projectId
         |WHERE {        
         |    {
         |         SELECT  ?projectId  ?dateCreated
         |         WHERE {
-        |             ?datasetId rdf:type <http://schema.org/Dataset>;
-        |                  schema:identifier '$identifier';
-        |                  prov:atLocation ?location ;
-        |                  schema:isPartOf ?projectId .
+        |             ?datasetId a schema:Dataset;
+        |                        schema:identifier '$identifier';
+        |                        prov:atLocation ?location ;
+        |                        schema:isPartOf ?projectId .
         |             ?projectId schema:dateCreated ?dateCreated ;
         |                        schema:name ?projectName .
         |             BIND(CONCAT(?location, "/metadata.yml") AS ?metaDataLocation) .
         |             FILTER NOT EXISTS {
         |             # Removing dataset that have an activity that invalidates them
-        |               ?deprecationEntity rdf:type <http://www.w3.org/ns/prov#Entity>;
+        |             ?deprecationEntity a prov:Entity;
         |                                prov:atLocation ?metaDataLocation ;
         |                                prov:wasInvalidatedBy ?invalidationActivity ;
         |                                schema:isPartOf ?projectId .
@@ -86,10 +80,9 @@ private class BaseDetailsFinder(
         |         LIMIT 1
         |    }
         |  
-        |  
         |    ?datasetId schema:identifier '$identifier';
         |               schema:identifier ?identifier;
-        |               rdf:type <http://schema.org/Dataset>;
+        |               a schema:Dataset;
         |               schema:isPartOf ?projectId;   
         |               schema:url ?url;
         |               schema:name ?name;
@@ -128,9 +121,9 @@ private class BaseDetailsFinder(
         |WHERE {
         |    ?datasetId schema:identifier "$identifier" ;
         |               schema:image ?imageId .
-        |    ?imageId   a schema:ImageObject;
-        |               schema:contentUrl ?contentUrl ;
-        |               schema:position ?position .
+        |    ?imageId a schema:ImageObject;
+        |             schema:contentUrl ?contentUrl ;
+        |             schema:position ?position .
         |}ORDER BY ASC(?position)
         |""".stripMargin
   )
@@ -150,66 +143,97 @@ private object BaseDetailsFinder {
   import ch.datascience.knowledgegraph.datasets.model._
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
+  private lazy val createDataset: (Identifier,
+                                   Title,
+                                   Name,
+                                   Url,
+                                   Option[DerivedFrom],
+                                   SameAs,
+                                   InitialVersion,
+                                   Date,
+                                   Option[Description],
+                                   DatasetProject
+  ) => Result[Dataset] = {
+    case (id, title, name, url, Some(derived), _, initialVersion, dates: DateCreated, maybeDesc, project) =>
+      ModifiedDataset(
+        id,
+        title,
+        name,
+        url,
+        derived,
+        DatasetVersions(initialVersion),
+        maybeDesc,
+        creators = Set.empty,
+        date = dates,
+        parts = List.empty,
+        project = project,
+        usedIn = List.empty,
+        keywords = List.empty,
+        images = List.empty
+      ).asRight[DecodingFailure]
+    case (identifier, title, name, url, None, sameAs, initialVersion, date, maybeDescription, project) =>
+      NonModifiedDataset(
+        identifier,
+        title,
+        name,
+        url,
+        sameAs,
+        DatasetVersions(initialVersion),
+        maybeDescription,
+        creators = Set.empty,
+        date = date,
+        parts = List.empty,
+        project = project,
+        usedIn = List.empty,
+        keywords = List.empty,
+        images = List.empty
+      ).asRight[DecodingFailure]
+    case (identifier, title, _, _, _, _, _, _, _, _) =>
+      DecodingFailure(
+        s"'$title' dataset with id '$identifier' does not meet validation for modified nor non-modified dataset",
+        Nil
+      ).asLeft[Dataset]
+  }
+
   private[rest] def datasetsDecoder(usedIns: List[DatasetProject]): Decoder[List[Dataset]] = {
     val dataset: Decoder[Dataset] = { implicit cursor =>
       for {
-        identifier         <- extract[Identifier]("identifier")
-        title              <- extract[Title]("name")
-        name               <- extract[Name]("alternateName")
-        url                <- extract[Url]("url")
-        maybeDerivedFrom   <- extract[Option[DerivedFrom]]("maybeDerivedFrom")
-        sameAs             <- extract[SameAs]("topmostSameAs")
-        initialVersion     <- extract[InitialVersion]("initialVersion")
-        maybePublishedDate <- extract[Option[PublishedDate]]("maybePublishedDate")
-        maybeDateCreated   <- extract[Option[DateCreated]]("maybeDateCreated")
+        identifier       <- extract[Identifier]("identifier")
+        title            <- extract[Title]("name")
+        name             <- extract[Name]("alternateName")
+        url              <- extract[Url]("url")
+        maybeDerivedFrom <- extract[Option[DerivedFrom]]("maybeDerivedFrom")
+        sameAs           <- extract[SameAs]("topmostSameAs")
+        initialVersion   <- extract[InitialVersion]("initialVersion")
+        date <- maybeDerivedFrom match {
+                  case Some(_) => extract[DateCreated]("maybeDateCreated").widen[Date]
+                  case _ =>
+                    extract[Option[DatePublished]]("maybePublishedDate")
+                      .flatMap {
+                        case Some(published) => published.asRight
+                        case None            => extract[DateCreated]("maybeDateCreated")
+                      }
+                      .widen[Date]
+                }
         maybeDescription <- extract[Option[String]]("description")
                               .map(blankToNone)
                               .flatMap(toOption[Description])
-        dates <- Dates
-                   .from(maybeDateCreated, maybePublishedDate)
-                   .leftMap(e => DecodingFailure(e.getMessage, Nil))
-        path <-
-          extract[projects.ResourceId]("projectId")
-            .flatMap(toProjectPath)
+        path <- extract[projects.ResourceId]("projectId").flatMap(toProjectPath)
         project <- Either.fromOption(usedIns.find(_.path == path),
                                      ifNone = DecodingFailure("Could not find project in UsedIns", Nil)
                    )
-      } yield maybeDerivedFrom match {
-        case Some(derivedFrom) =>
-          ModifiedDataset(
-            identifier,
-            title,
-            name,
-            url,
-            derivedFrom,
-            DatasetVersions(initialVersion),
-            maybeDescription,
-            creators = Set.empty,
-            dates = dates,
-            parts = List.empty,
-            project = project,
-            usedIn = List.empty,
-            keywords = List.empty,
-            images = List.empty
-          )
-        case None =>
-          NonModifiedDataset(
-            identifier,
-            title,
-            name,
-            url,
-            sameAs,
-            DatasetVersions(initialVersion),
-            maybeDescription,
-            creators = Set.empty,
-            dates = dates,
-            parts = List.empty,
-            project = project,
-            usedIn = List.empty,
-            keywords = List.empty,
-            images = List.empty
-          )
-      }
+        dataset <- createDataset(identifier,
+                                 title,
+                                 name,
+                                 url,
+                                 maybeDerivedFrom,
+                                 sameAs,
+                                 initialVersion,
+                                 date,
+                                 maybeDescription,
+                                 project
+                   )
+      } yield dataset
     }
 
     _.downField("results").downField("bindings").as(decodeList(dataset))

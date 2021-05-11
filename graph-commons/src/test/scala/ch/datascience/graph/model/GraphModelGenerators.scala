@@ -30,6 +30,7 @@ import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 import org.scalacheck.Gen.{alphaChar, choose, const, frequency, numChar, oneOf, uuid}
 
+import java.time.{Instant, LocalDate, ZoneOffset}
 import java.util.UUID
 
 object GraphModelGenerators {
@@ -80,7 +81,8 @@ object GraphModelGenerators {
   implicit val projectNames:        Gen[projects.Name]        = nonBlankStrings(minLength = 5) map (n => projects.Name(n.value))
   implicit val projectDescriptions: Gen[projects.Description] = paragraphs() map (v => projects.Description(v.value))
   implicit val projectVisibilities: Gen[Visibility]           = Gen.oneOf(Visibility.all.toList)
-  implicit val projectCreatedDates: Gen[projects.DateCreated] = timestampsNotInTheFuture map projects.DateCreated.apply
+  def projectCreatedDates(min: Instant = Instant.EPOCH): Gen[projects.DateCreated] =
+    timestamps(min, max = Instant.now()) map projects.DateCreated.apply
   implicit val projectPaths: Gen[Path] = {
     val firstCharGen    = frequency(6 -> alphaChar, 2 -> numChar, 1 -> const('_'))
     val nonFirstCharGen = frequency(6 -> alphaChar, 2 -> numChar, 1 -> oneOf('_', '.', '-'))
@@ -118,34 +120,42 @@ object GraphModelGenerators {
       } yield s"$first.$second/zenodo.$third"
     )
     .map(Identifier.apply)
-  implicit val datasetInitialVersions:     Gen[InitialVersion]     = datasetIdentifiers map (id => InitialVersion(id.toString))
-  implicit val datasetTitles:              Gen[datasets.Title]     = nonEmptyStrings() map datasets.Title.apply
-  implicit val datasetNames:               Gen[datasets.Name]      = nonEmptyStrings() map datasets.Name.apply
-  implicit val datasetDescriptions:        Gen[Description]        = paragraphs() map (_.value) map Description.apply
-  implicit val datasetUrls:                Gen[Url]                = validatedUrls map (_.value) map Url.apply
-  implicit val imageUris:                  Gen[ImageUri]           = relativePaths() map ImageUri.apply
-  val datasetUrlSameAs:                    Gen[UrlSameAs]          = validatedUrls map (_.value) map SameAs.fromUrl map (_.fold(throw _, identity))
-  val datasetIdSameAs:                     Gen[IdSameAs]           = validatedUrls map (_.value) map SameAs.fromId map (_.fold(throw _, identity))
-  implicit val datasetSameAs:              Gen[SameAs]             = Gen.oneOf(datasetUrlSameAs, datasetIdSameAs)
+  implicit val datasetInitialVersions: Gen[InitialVersion] = datasetIdentifiers map (id => InitialVersion(id.toString))
+  implicit val datasetTitles:          Gen[datasets.Title] = nonEmptyStrings() map datasets.Title.apply
+  implicit val datasetNames:           Gen[datasets.Name]  = nonEmptyStrings() map datasets.Name.apply
+  implicit val datasetDescriptions:    Gen[Description]    = paragraphs() map (_.value) map Description.apply
+  implicit val datasetUrls:            Gen[Url]            = validatedUrls map (_.value) map Url.apply
+  implicit val datasetImageUris:       Gen[ImageUri]       = relativePaths() map ImageUri.apply
+  implicit val datasetExternalSameAs: Gen[ExternalSameAs] =
+    validatedUrls map SameAs.external map (_.fold(throw _, identity))
+  implicit val datasetInternalSameAs: Gen[InternalSameAs] = for {
+    url <- renkuBaseUrls
+    id  <- datasetIdentifiers
+  } yield SameAs.internal(url / "datasets" / id).fold(throw _, identity)
+  implicit val datasetSameAs:              Gen[SameAs]             = Gen.oneOf(datasetExternalSameAs, datasetInternalSameAs)
   implicit val datasetTopmostSameAs:       Gen[TopmostSameAs]      = datasetSameAs.map(TopmostSameAs.apply)
   implicit val datasetDerivedFroms:        Gen[DerivedFrom]        = validatedUrls map (_.value) map DerivedFrom.apply
   implicit val datasetTopmostDerivedFroms: Gen[TopmostDerivedFrom] = datasetDerivedFroms.map(TopmostDerivedFrom.apply)
-  implicit val datasetPublishedDates:      Gen[PublishedDate]      = localDatesNotInTheFuture map PublishedDate.apply
-  implicit val datasetCreatedDates:        Gen[DateCreated]        = timestampsNotInTheFuture map DateCreated.apply
-  implicit val datasetDates: Gen[Dates] = Gen.oneOf(
-    for {
-      published <- datasetPublishedDates
-      created   <- datasetCreatedDates
-    } yield Dates.AllDatasetDates(published, created),
-    datasetCreatedDates.map(Dates.RenkuDatasetDates),
-    datasetPublishedDates.map(Dates.ImportedDatasetDates)
-  )
-  implicit val datasetKeywords:  Gen[Keyword]  = nonBlankStrings(minLength = 5) map (_.value) map Keyword.apply
-  implicit val datasetPartNames: Gen[PartName] = nonBlankStrings(minLength = 5) map (v => PartName(v.value))
+
+  def datasetPublishedDates(min: DatePublished = LocalDate.EPOCH): Gen[DatePublished] =
+    timestamps(min.value.atStartOfDay().toInstant(ZoneOffset.UTC), max = Instant.now())
+      .map(LocalDate.ofInstant(_, ZoneOffset.UTC))
+      .map(DatePublished)
+
+  def datasetCreatedDates(min: Instant = Instant.EPOCH): Gen[DateCreated] =
+    timestamps(min, max = Instant.now()) map DateCreated.apply
+
+  lazy val datasetDates: Gen[Date] =
+    Gen.oneOf(datasetCreatedDates(), datasetPublishedDates(DatePublished(LocalDate.EPOCH)))
+
+  implicit val datasetKeywords: Gen[Keyword] = nonBlankStrings(minLength = 5) map (_.value) map Keyword.apply
+  implicit val datasetLicenses: Gen[License] = httpUrls() map License.apply
+  implicit val datasetVersions: Gen[Version] = semanticVersions map Version.apply
+
+  implicit val datasetPartExternals: Gen[PartExternal] = booleans map PartExternal.apply
+  implicit val datasetPartSources:   Gen[PartSource]   = httpUrls() map PartSource.apply
   implicit val datasetPartLocations: Gen[PartLocation] =
     relativePaths(minSegments = 2, maxSegments = 2)
       .map(path => s"data/$path")
       .map(PartLocation.apply)
-  implicit val datasetInProjectCreationDates: Gen[DateCreatedInProject] =
-    timestampsNotInTheFuture map DateCreatedInProject.apply
 }

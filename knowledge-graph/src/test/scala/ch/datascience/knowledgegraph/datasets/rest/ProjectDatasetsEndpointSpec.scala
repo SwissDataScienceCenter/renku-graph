@@ -173,6 +173,6 @@ class ProjectDatasetsEndpointSpec
     title                   <- datasetTitles
     name                    <- datasetNames
     sameAsEitherDerivedFrom <- Gen.oneOf(datasetSameAs map (Left(_)), datasetDerivedFroms map (Right(_)))
-    images                  <- listOf(imageUris)
+    images                  <- listOf(datasetImageUris)
   } yield (id, initialVersion, title, name, sameAsEitherDerivedFrom, images)
 }

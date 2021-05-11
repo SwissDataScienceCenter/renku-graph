@@ -18,9 +18,9 @@
 
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 
-import cats.MonadError
 import cats.data.{EitherT, OptionT}
 import cats.syntax.all._
+import cats.{MonadError, MonadThrow}
 import ch.datascience.rdfstore.SparqlValueEncoder.sparqlEncode
 import ch.datascience.tinytypes.TinyType
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
@@ -52,8 +52,8 @@ package object triplescuration {
     def get[T](property: String)(implicit decode: Decoder[T], encode: Encoder[T]): Option[T] =
       root.selectDynamic(property).as[T].getOption(json)
 
-    def getValue[F[_], T](implicit decode: Decoder[T], ME: MonadError[F, Throwable]): OptionT[F, T] =
-      singleValueJson(ME).flatMap {
+    def getValue[F[_]: MonadThrow, T](implicit decode: Decoder[T]): OptionT[F, T] =
+      singleValueJson >>= {
         _.hcursor
           .downField("@value")
           .as[Option[T]]
@@ -63,27 +63,25 @@ package object triplescuration {
           )
       }
 
-    def getId[F[_], T](implicit decode: Decoder[T], ME: MonadError[F, Throwable]): OptionT[F, T] =
-      singleValueJson(ME).flatMap {
+    def getId[F[_]: MonadThrow, T](implicit decode: Decoder[T]): OptionT[F, T] =
+      singleValueJson >>= {
         _.hcursor
           .downField("@id")
           .as[Option[T]]
           .fold(
-            fail("No @value property found in Json"),
+            fail("No @id property found in Json"),
             OptionT.fromOption[F](_)
           )
       }
 
-    private def singleValueJson[F[_]](implicit ME: MonadError[F, Throwable]) =
-      if (json.isArray) toSingleValue(ME)(json.asArray.map(_.toList))
+    private def singleValueJson[F[_]: MonadThrow]: OptionT[F, Json] =
+      if (json.isArray) toSingleValue[F, Json](json.asArray.map(_.toList))
       else OptionT.some[F](json)
 
-    private def fail[F[_], T](
-        message: String
-    )(exception: Throwable)(implicit ME: MonadError[F, Throwable]): OptionT[F, T] =
+    private def fail[F[_]: MonadThrow, T](message: String)(exception: Throwable): OptionT[F, T] =
       OptionT.liftF(new IllegalStateException(message, exception).raiseError[F, T])
 
-    private def toSingleValue[F[_], T](implicit ME: MonadError[F, Throwable]): Option[List[T]] => OptionT[F, T] = {
+    private def toSingleValue[F[_]: MonadThrow, T](maybeList: Option[List[T]]): OptionT[F, T] = maybeList match {
       case Some(v +: Nil) => OptionT.some[F](v)
       case Some(Nil)      => OptionT.none[F, T]
       case None           => OptionT.none[F, T]

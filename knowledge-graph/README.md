@@ -168,11 +168,9 @@ Response body example:
   "created" : "2012-10-15T03:02:25.639Z",         // optional property
   "hasPart" : [
     {
-      "name" : "o",
       "atLocation" : "data/dataset-name/file1"
     },
     {
-      "name" : "rldzpwo",
       "atLocation" : "data/dataset-name/file2"
     }
   ],
@@ -184,14 +182,7 @@ Response body example:
       }
     ],
     "path" : "namespace1/project1-name",
-    "name" : "project1 name",
-    "created" : {
-      "dateCreated" : "1970-05-12T06:06:41.448Z",
-      "agent" : {
-        "email" : "n@ulQdsXl",                  // optional property
-        "name" : "v imzn"
-      }
-    }
+    "name" : "project1 name"
   },
   "isPartOf" : [
     {
@@ -202,14 +193,7 @@ Response body example:
         }
       ],
       "path" : "namespace1/project1-name",
-      "name" : "project1 name",
-      "created" : {
-        "dateCreated" : "1970-05-12T06:06:41.448Z",
-        "agent" : {
-          "email" : "n@ulQdsXl",                  // optional property
-          "name" : "v imzn"
-        }
-      }
+      "name" : "project1 name"
     },
     {
       "_links" : [
@@ -219,14 +203,7 @@ Response body example:
         }
       ],
       "path" : "namespace2/project2-name",
-      "name" : "project2 name",
-      "created" : {
-        "dateCreated" : "1970-06-12T06:06:41.448Z",
-        "agent" : {
-          "email" : "name@ulQdsXl",               // optional property
-          "name" : "v imzn"
-        }
-      }
+      "name" : "project2 name"
     }
   ],
   "usedIn" : [
@@ -238,14 +215,7 @@ Response body example:
         }
       ],
       "path" : "namespace1/project1-name",
-      "name" : "project1 name",
-      "created" : {
-        "dateCreated" : "1970-05-12T06:06:41.448Z",
-        "agent" : {
-          "email" : "n@ulQdsXl",                  // optional property
-          "name" : "v imzn"
-        }
-      }
+      "name" : "project1 name"
     },
     {
       "_links" : [
@@ -255,14 +225,7 @@ Response body example:
         }
       ],
       "path" : "namespace2/project2-name",
-      "name" : "project2 name",
-      "created" : {
-        "dateCreated" : "1970-06-12T06:06:41.448Z",
-        "agent" : {
-          "email" : "name@ulQdsXl",               // optional property
-          "name" : "v imzn"
-        }
-      }
+      "name" : "project2 name"
     }
   ],
   "keywords": [

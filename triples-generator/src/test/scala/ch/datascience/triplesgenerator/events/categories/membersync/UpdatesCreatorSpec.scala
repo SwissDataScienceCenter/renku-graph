@@ -42,7 +42,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
       val memberToRemove1 = persons(userGitLabIds.toGeneratorOfSomes).generateOne
       val memberToStay    = persons(userGitLabIds.toGeneratorOfSomes).generateOne
       val allMembers      = Set(memberToRemove0, memberToRemove1, memberToStay)
-      val project         = projectEntities.generateOne.copy(members = allMembers)
+      val project         = projectEntities().generateOne.copy(members = allMembers)
 
       loadToStore(project.asJsonLD)
 
@@ -68,7 +68,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
       )
       val personJsonLD = personInKG.asJsonLD
 
-      val project = projectEntities.generateOne.copy(members = Set.empty)
+      val project = projectEntities().generateOne.copy(members = Set.empty)
 
       loadToStore(project.asJsonLD, personJsonLD)
 
@@ -89,7 +89,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
     "prepare queries to insert links and new person for members non-existing in KG" in new TestCase {
       val member = gitLabProjectMembers.generateOne
 
-      val project = projectEntities.generateOne.copy(members = Set.empty)
+      val project = projectEntities().generateOne.copy(members = Set.empty)
 
       loadToStore(project.asJsonLD)
 

@@ -18,13 +18,15 @@
 
 package ch.datascience.graph.acceptancetests.stubs
 
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.tooling.TestLogger
 import ch.datascience.graph.model.CliVersion
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.knowledgegraph.projects.model.Project
-import ch.datascience.rdfstore.entities.Person
+import ch.datascience.rdfstore.entities.EntitiesGenerators._
 import ch.datascience.rdfstore.entities.bundles._
+import ch.datascience.rdfstore.entities.{Activity, ExecutionPlanner, Person, RunPlan}
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.client.{MappingBuilder, WireMock}
@@ -34,6 +36,8 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.jsonld.JsonLD
+import io.renku.jsonld.syntax._
+import org.scalatest.Assertions.fail
 
 object RemoteTriplesGenerator {
 
@@ -43,23 +47,19 @@ object RemoteTriplesGenerator {
   def `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(
       project:    Project,
       commitId:   CommitId,
-      committer:  Person,
+      author:     Person,
       cliVersion: CliVersion = currentVersionPair.cliVersion
   ): Unit =
     `GET <triples-generator>/projects/:id/commits/:id returning OK`(
       project,
       commitId,
-      fileCommit(
-        commitId = commitId,
-        committer = committer,
-        cliVersion = cliVersion
-      )(
-        projectPath = project.path,
-        projectName = project.name,
-        projectDateCreated = project.created.date,
-        maybeProjectCreator = project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail)),
-        projectVersion = project.version
-      )
+      ExecutionPlanner(
+        RunPlan(runPlanNames.generateOne, runPlanCommands.generateOne, commandParameterFactories = Nil),
+        (Activity.StartTime(project.created.date.value), author, cliVersion),
+        project.toEntitiesProject(cliVersion),
+        argumentsValueOverrides = Nil,
+        inputsValueOverrides = Nil
+      ).buildProvenanceGraph.fold(fail, identity).asJsonLD
     )
 
   def `GET <triples-generator>/projects/:id/commits/:id returning OK`(

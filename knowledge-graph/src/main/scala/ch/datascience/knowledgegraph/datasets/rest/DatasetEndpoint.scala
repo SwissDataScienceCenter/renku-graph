@@ -21,7 +21,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.effect._
 import cats.syntax.all._
 import ch.datascience.config.renku
-import ch.datascience.graph.model.datasets.{Identifier, PublishedDate}
+import ch.datascience.graph.model.datasets.{Date, DateCreated, DatePublished, Identifier}
 import ch.datascience.http.InfoMessage._
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.{ErrorMessage, InfoMessage}
@@ -91,8 +91,11 @@ class DatasetEndpoint[Interpretation[_]: Effect](
         },
         ("versions" -> dataset.versions.asJson).some,
         dataset.maybeDescription.map(description => "description" -> description.asJson),
-        ("published" -> (dataset.creators -> dataset.dates.maybeDatePublished).asJson).some,
-        dataset.dates.maybeDateCreated.map(date => "created" -> date.asJson),
+        ("published" -> (dataset.creators -> dataset.date).asJson).some,
+        dataset.date match {
+          case DatePublished(_)  => Option.empty[(String, Json)]
+          case DateCreated(date) => ("created" -> date.asJson).some
+        },
         ("hasPart" -> dataset.parts.asJson).some,
         ("project" -> dataset.project.asJson).some,
         ("isPartOf" -> dataset.usedIn.asJson).some,
@@ -107,14 +110,14 @@ class DatasetEndpoint[Interpretation[_]: Effect](
   }
   // format: on
 
-  private implicit lazy val publishingEncoder: Encoder[(Set[DatasetCreator], Option[PublishedDate])] =
-    Encoder.instance[(Set[DatasetCreator], Option[PublishedDate])] {
-      case (creators, Some(published)) =>
+  private implicit lazy val publishingEncoder: Encoder[(Set[DatasetCreator], Date)] =
+    Encoder.instance {
+      case (creators, DatePublished(date)) =>
         Json.obj(
-          "datePublished" -> published.asJson,
+          "datePublished" -> date.asJson,
           "creator"       -> creators.toList.asJson
         )
-      case (creators, None) =>
+      case (creators, _) =>
         Json.obj(
           "creator" -> creators.toList.asJson
         )
@@ -132,22 +135,14 @@ class DatasetEndpoint[Interpretation[_]: Effect](
 
   private implicit lazy val partEncoder: Encoder[DatasetPart] = Encoder.instance[DatasetPart] { part =>
     json"""{
-      "name": ${part.name},
-      "atLocation": ${part.atLocation}
+      "atLocation": ${part.location}
     }"""
   }
 
   private implicit lazy val projectEncoder: Encoder[DatasetProject] = Encoder.instance[DatasetProject] { project =>
     json"""{
       "path": ${project.path},
-      "name": ${project.name},
-      "created": {
-        "dateCreated": ${project.created.date},
-        "agent": {
-          "email": ${project.created.agent.maybeEmail},
-          "name": ${project.created.agent.name}
-        }
-      }
+      "name": ${project.name}
     }""" deepMerge _links(
       Link(Rel("project-details") -> Href(renkuResourcesUrl / "projects" / project.path))
     )

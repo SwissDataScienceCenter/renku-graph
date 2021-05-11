@@ -70,23 +70,18 @@ object projects {
   }
 
   final class Name private (val value: String) extends AnyVal with StringTinyType
-
   implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank
 
   final class DateCreated private (val value: Instant) extends AnyVal with InstantTinyType
-
   implicit object DateCreated extends TinyTypeFactory[DateCreated](new DateCreated(_)) with InstantNotInTheFuture
 
   final class FilePath private (val value: String) extends AnyVal with RelativePathTinyType
-
   object FilePath extends TinyTypeFactory[FilePath](new FilePath(_)) with RelativePath with RelativePathOps[FilePath]
 
   final class Description private (val value: String) extends AnyVal with StringTinyType
-
   implicit object Description extends TinyTypeFactory[Description](new Description(_)) with NonBlank
 
   sealed trait Visibility extends StringTinyType with Product with Serializable
-
   object Visibility extends TinyTypeFactory[Visibility](VisibilityInstantiator) {
 
     val all: Set[Visibility] = Set(Public, Private, Internal)

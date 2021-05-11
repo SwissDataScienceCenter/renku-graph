@@ -21,25 +21,26 @@ package ch.datascience.graph.http.server.security
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.GraphModelGenerators.{authUsers, projectPaths}
 import ch.datascience.graph.model.projects.Visibility._
 import ch.datascience.http.server.security.EndpointSecurityException.AuthorizationFailure
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.EntitiesGenerators._
-import ch.datascience.rdfstore.entities.bundles.{gitLabApiUrl, renkuBaseUrl}
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.jsonld.syntax._
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import ch.datascience.generators.CommonGraphGenerators._
 
 class ProjectAuthorizerSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers {
 
   "authorize" should {
 
     "succeed if the given project is public and there's no auth user" in new TestCase {
-      val project = projectEntities.generateOne.copy(
+      val project = projectEntities().generateOne.copy(
         maybeVisibility = Public.some
       )
 
@@ -50,7 +51,7 @@ class ProjectAuthorizerSpec extends AnyWordSpec with InMemoryRdfStore with shoul
 
     "succeed if the given project is public and the user has rights for the project" in new TestCase {
       val authUser = authUsers.generateOne
-      val project = projectEntities.generateOne.copy(
+      val project = projectEntities().generateOne.copy(
         maybeVisibility = Public.some,
         members = Set(persons.generateOne.copy(maybeGitLabId = authUser.id.some))
       )
@@ -62,7 +63,7 @@ class ProjectAuthorizerSpec extends AnyWordSpec with InMemoryRdfStore with shoul
 
     "succeed if the given project is non-public and the user has rights for the project" in new TestCase {
       val authUser = authUsers.generateOne
-      val project = projectEntities.generateOne.copy(
+      val project = projectEntities().generateOne.copy(
         maybeVisibility = Gen.oneOf(Private, Internal).generateSome,
         members = Set(persons.generateOne.copy(maybeGitLabId = authUser.id.some))
       )
@@ -83,7 +84,7 @@ class ProjectAuthorizerSpec extends AnyWordSpec with InMemoryRdfStore with shoul
     }
 
     "fail if the given project is non-public and the user does not have rights for it" in new TestCase {
-      val project = projectEntities.generateOne.copy(
+      val project = projectEntities().generateOne.copy(
         maybeVisibility = Gen.oneOf(Private, Internal).generateSome,
         members = persons.generateSet()
       )
@@ -96,7 +97,7 @@ class ProjectAuthorizerSpec extends AnyWordSpec with InMemoryRdfStore with shoul
     }
 
     "fail if the given project is non-public and there's no authorized user" in new TestCase {
-      val project = projectEntities.generateOne.copy(
+      val project = projectEntities().generateOne.copy(
         maybeVisibility = Gen.oneOf(Private, Internal).generateSome,
         members = persons.generateSet()
       )
@@ -108,6 +109,9 @@ class ProjectAuthorizerSpec extends AnyWordSpec with InMemoryRdfStore with shoul
       )
     }
   }
+
+  private implicit lazy val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
+  private implicit lazy val gitLabApiUrl: GitLabApiUrl = gitLabUrls.generateOne.apiV4
 
   private trait TestCase {
     private val logger       = TestLogger[IO]()

@@ -22,8 +22,8 @@ import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.{fusekiBaseUrls, jsonLDTriples}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{IdSameAs, UrlSameAs}
-import ch.datascience.rdfstore.entities.DataSet
+import ch.datascience.graph.model.datasets.{ExternalSameAs, InternalSameAs}
+import ch.datascience.rdfstore.entities.Dataset
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{FusekiBaseUrl, JsonLDTriples}
 import org.scalatest.matchers.should
@@ -43,7 +43,7 @@ class DataSetInfoFinderSpec extends AnyWordSpec with should.Matchers {
 
     "return the DataSetInfo without sameAs and derivedFrom when they are not present in the json" in new TestCase {
       val identifier = datasetIdentifiers.generateOne
-      val entityId   = DataSet.entityId(identifier)(renkuBaseUrl)
+      val entityId   = Dataset.entityId(identifier)
       val triples = JsonLDTriples {
         nonModifiedDataSetCommit()()(datasetIdentifier = identifier, maybeDatasetSameAs = None).toJson
       }
@@ -53,8 +53,8 @@ class DataSetInfoFinderSpec extends AnyWordSpec with should.Matchers {
 
     "return the DataSetInfo with UrlSameAs and no derivedFrom as reflected in json" in new TestCase {
       val identifier = datasetIdentifiers.generateOne
-      val entityId   = DataSet.entityId(identifier)(renkuBaseUrl)
-      val sameAs     = datasetUrlSameAs.generateSome
+      val entityId   = Dataset.entityId(identifier)
+      val sameAs     = datasetExternalSameAs.generateSome
       val triples = JsonLDTriples {
         nonModifiedDataSetCommit()()(datasetIdentifier = identifier, maybeDatasetSameAs = sameAs).toJson
       }
@@ -62,13 +62,13 @@ class DataSetInfoFinderSpec extends AnyWordSpec with should.Matchers {
       val Success(datasetInfos) = infoFinder.findDatasetsInfo(triples)
 
       datasetInfos             shouldBe Set((entityId, sameAs, None))
-      datasetInfos.head._2.get shouldBe an[UrlSameAs]
+      datasetInfos.head._2.get shouldBe an[ExternalSameAs]
     }
 
     "return the DataSetInfo with IdSameAs and no derivedFrom as reflected in json" in new TestCase {
       val identifier = datasetIdentifiers.generateOne
-      val entityId   = DataSet.entityId(identifier)(renkuBaseUrl)
-      val sameAs     = datasetIdSameAs.generateSome
+      val entityId   = Dataset.entityId(identifier)
+      val sameAs     = datasetInternalSameAs.generateSome
       val triples = JsonLDTriples {
         nonModifiedDataSetCommit()()(datasetIdentifier = identifier, maybeDatasetSameAs = sameAs).toJson
       }
@@ -76,12 +76,12 @@ class DataSetInfoFinderSpec extends AnyWordSpec with should.Matchers {
       val Success(datasetInfos) = infoFinder.findDatasetsInfo(triples)
 
       datasetInfos             shouldBe Set((entityId, sameAs, None))
-      datasetInfos.head._2.get shouldBe an[IdSameAs]
+      datasetInfos.head._2.get shouldBe an[InternalSameAs]
     }
 
     "return the DataSetInfo with derivedFrom and no sameAs as reflected in json" in new TestCase {
       val identifier  = datasetIdentifiers.generateOne
-      val entityId    = DataSet.entityId(identifier)(renkuBaseUrl)
+      val entityId    = Dataset.entityId(identifier)
       val derivedFrom = datasetDerivedFroms.generateOne
       val triples = JsonLDTriples {
         modifiedDataSetCommit()()(datasetIdentifier = identifier, datasetDerivedFrom = derivedFrom).toJson

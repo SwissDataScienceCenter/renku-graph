@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.model.datasets.{DateCreated, Dates, Description, Identifier, ImageUri, Keyword, Name, PublishedDate, Title}
+import ch.datascience.graph.model.datasets.{Date, DateCreated, DatePublished, Description, Identifier, ImageUri, Keyword, Name, Title}
 import ch.datascience.graph.model.projects.Visibility
 import ch.datascience.http.rest.paging.Paging.PagedResultsFinder
 import ch.datascience.http.rest.paging.{Paging, PagingRequest, PagingResponse}
@@ -33,8 +33,8 @@ import ch.datascience.rdfstore._
 import ch.datascience.tinytypes.constraints.NonNegativeInt
 import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
 import eu.timepit.refined.auto._
-import org.typelevel.log4cats.Logger
 import io.circe.DecodingFailure
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
@@ -54,7 +54,7 @@ private object DatasetsFinder {
       name:             Name,
       maybeDescription: Option[Description],
       creators:         Set[DatasetCreator],
-      dates:            Dates,
+      date:             Date,
       projectsCount:    ProjectsCount,
       keywords:         List[Keyword],
       images:           List[ImageUri]
@@ -261,7 +261,7 @@ private object IODatasetsFinder {
       title              <- cursor.downField("name").downField("value").as[Title]
       name               <- cursor.downField("alternateName").downField("value").as[Name]
       maybeDateCreated   <- cursor.downField("maybeDateCreated").downField("value").as[Option[DateCreated]]
-      maybePublishedDate <- cursor.downField("maybePublishedDate").downField("value").as[Option[PublishedDate]]
+      maybePublishedDate <- cursor.downField("maybePublishedDate").downField("value").as[Option[DatePublished]]
       projectsCount      <- cursor.downField("projectsCount").downField("value").as[ProjectsCount]
       keywords           <- cursor.downField("keywords").downField("value").as[Option[String]].map(toListOfKeywords)
       images             <- cursor.downField("images").downField("value").as[Option[String]].map(toListOfImageUrls)
@@ -271,16 +271,17 @@ private object IODatasetsFinder {
                             .as[Option[String]]
                             .map(blankToNone)
                             .flatMap(toOption[Description])
-      dates <- Dates
-                 .from(maybeDateCreated, maybePublishedDate)
-                 .leftMap(e => DecodingFailure(e.getMessage, Nil))
+      date <- maybeDateCreated
+                .orElse(maybePublishedDate)
+                .map(_.asRight)
+                .getOrElse(DecodingFailure("No dateCreated or publishedDate found", Nil).asLeft)
     } yield DatasetSearchResult(
       id,
       title,
       name,
       maybeDescription,
       Set.empty,
-      dates,
+      date,
       projectsCount,
       keywords,
       images

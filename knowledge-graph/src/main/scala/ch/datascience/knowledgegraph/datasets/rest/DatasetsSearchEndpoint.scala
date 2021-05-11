@@ -22,7 +22,7 @@ import cats.effect._
 import cats.syntax.all._
 import ch.datascience.config._
 import ch.datascience.config.renku.ResourceUrl
-import ch.datascience.graph.model.datasets.PublishedDate
+import ch.datascience.graph.model.datasets.{Date, DatePublished}
 import ch.datascience.http.ErrorMessage
 import ch.datascience.http.InfoMessage._
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
@@ -94,14 +94,14 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect: MonadThrow](
   }
 
   private implicit val datasetEncoder: Encoder[DatasetSearchResult] = Encoder.instance[DatasetSearchResult] {
-    case DatasetSearchResult(id, title, name, maybeDescription, creators, dates, projectsCount, keywords, images) =>
+    case DatasetSearchResult(id, title, name, maybeDescription, creators, date, projectsCount, keywords, images) =>
       json"""
       {
         "identifier": $id,
         "title": $title,
         "name": $name,
-        "published": ${creators -> dates.maybeDatePublished},
-        "date": ${dates.date},
+        "published": ${creators -> date},
+        "date": ${date.instant},
         "projectsCount": $projectsCount,
         "keywords": $keywords,
         "images": $images
@@ -110,14 +110,14 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect: MonadThrow](
         .deepMerge(_links(Link(Rel("details") -> Href(renkuResourcesUrl / "datasets" / id))))
   }
 
-  private implicit lazy val publishingEncoder: Encoder[(Set[DatasetCreator], Option[PublishedDate])] =
-    Encoder.instance[(Set[DatasetCreator], Option[PublishedDate])] {
-      case (creators, Some(date)) =>
+  private implicit lazy val publishingEncoder: Encoder[(Set[DatasetCreator], Date)] =
+    Encoder.instance {
+      case (creators, DatePublished(date)) =>
         json"""{
           "creator": $creators,
           "datePublished": $date
         }"""
-      case (creators, None) =>
+      case (creators, _) =>
         json"""{
           "creator": $creators
         }"""

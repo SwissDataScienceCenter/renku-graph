@@ -22,12 +22,12 @@ import ch.datascience.generators.CommonGraphGenerators.{renkuBaseUrls, renkuReso
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.datasets.{Dates, SameAs}
-import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.datasets.SameAs
+import ch.datascience.graph.model.{datasets, projects}
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
-import ch.datascience.knowledgegraph.datasets.model.{Dataset, DatasetProject, ModifiedDataset, NonModifiedDataset}
-import ch.datascience.rdfstore.entities.DataSet
+import ch.datascience.knowledgegraph.datasets.model._
+import ch.datascience.rdfstore.entities
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
 import io.circe.literal._
 import io.circe.{Encoder, Json}
@@ -49,7 +49,7 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
         resultSet(dataset, description).as[List[Dataset]](datasetsDecoder(List(dataset.project))) shouldBe Right {
           List(
             dataset
-              .copy(sameAs = SameAs(DataSet.entityId(dataset.id)))
+              .copy(sameAs = SameAs(entities.Dataset.entityId(dataset.id)))
               .copy(creators = Set.empty)
               .copy(maybeDescription = None)
               .copy(parts = Nil)
@@ -86,67 +86,54 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
 
   private def resultSet(dataset: NonModifiedDataset, blank: String) = {
     val binding = json"""{
-      "datasetId": {"value": ${DataSet.entityId(dataset.id).value.toString}},
+      "datasetId": {"value": ${entities.Dataset.entityId(dataset.id).value.toString}},
       "identifier": {"value": ${dataset.id.value}},
       "name": {"value": ${dataset.title.value}},
       "alternateName": {"value": ${dataset.name.value}},
       "description": {"value": $blank},
       "url": {"value": ${dataset.url.value}},
-      "topmostSameAs": {"value": ${SameAs(DataSet.entityId(dataset.id)).toString}},
+      "topmostSameAs": {"value": ${datasets.SameAs(entities.Dataset.entityId(dataset.id)).toString}},
       "initialVersion": {"value": ${dataset.versions.initial.toString}},
       "keywords": {"value": ${dataset.keywords.map(_.value).asJson}},
       "projectId": {"value": ${projects.ResourceId.apply(renkuBaseUrl, dataset.project.path).asJson}}
-    }""".addDates(dataset.dates)
+    }""".addDates(dataset.date)
 
     json"""{"results": {"bindings": [$binding]}}"""
   }
 
   private def resultSet(dataset: ModifiedDataset, blank: String) = {
     val binding = json"""{
-      "datasetId": {"value": ${DataSet.entityId(dataset.id).value.toString}},
+      "datasetId": {"value": ${entities.Dataset.entityId(dataset.id).value.toString}},
       "identifier": {"value": ${dataset.id.value}},
       "name": {"value": ${dataset.title.value}},
       "alternateName": {"value": ${dataset.name.value}},
       "description": {"value": $blank},
       "url": {"value": ${dataset.url.value}},
-      "topmostSameAs": {"value": ${DataSet.entityId(dataset.id).toString} },
+      "topmostSameAs": {"value": ${entities.Dataset.entityId(dataset.id).toString} },
       "maybeDerivedFrom": {"value": ${dataset.derivedFrom.value}},
       "initialVersion": {"value": ${dataset.versions.initial.toString} },
       "keywords": {"value": ${dataset.keywords.map(_.value).asJson}},
       "images": {"value": ${dataset.images.map(_.value).asJson}},
       "projectId": {"value": ${projects.ResourceId.apply(renkuBaseUrl, dataset.project.path).asJson}}
-    }""".addDates(dataset.dates)
+    }""".addDates(dataset.date)
 
     json"""{"results": {"bindings": [$binding]}}"""
   }
 
   private implicit class JsonOps(json: Json) {
 
-    def addDates(dates: Dates) =
-      json
-        .deepMerge(
-          dates.maybeDatePublished
-            .map(date => json"""{"maybePublishedDate": {"value": ${date.value}}}""")
-            .getOrElse(Json.obj())
-        )
-        .deepMerge(
-          dates.maybeDateCreated
-            .map(date => json"""{"maybeDateCreated": {"value": ${date.value}}}""")
-            .getOrElse(Json.obj())
-        )
+    lazy val addDates: datasets.Date => Json = {
+      case datasets.DatePublished(published) =>
+        json.deepMerge(json"""{"maybePublishedDate": {"value": $published}}""")
+      case datasets.DateCreated(created) =>
+        json.deepMerge(json"""{"maybeDateCreated": {"value": $created}}""")
+    }
   }
 
   private implicit lazy val projectEncoder: Encoder[DatasetProject] = Encoder.instance[DatasetProject] { project =>
     json"""{
       "path": ${project.path.value},
-      "name": ${project.name.value},
-      "created": {
-        "dateCreated": ${project.created.date.value},
-        "agent": {
-          "email": ${project.created.agent.maybeEmail.map(_.value)},
-          "name": ${project.created.agent.name.value}
-        }
-      }
+      "name": ${project.name.value}
     }""" deepMerge _links(
       Link(
         Rel("project-details") -> Href(renkuResourcesUrls.generateOne / "projects" / project.path)

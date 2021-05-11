@@ -29,10 +29,10 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.lineage.LineageGenerators._
 import ch.datascience.knowledgegraph.lineage.model._
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory
-import ch.datascience.rdfstore.entities.CommandParameter.Mapping.IOStream._
-import ch.datascience.rdfstore.entities.CommandParameter.Output.OutputFactory
-import ch.datascience.rdfstore.entities.CommandParameter.{Input, Output}
+import ch.datascience.rdfstore.entities.CommandParameterBase.Input.InputFactory
+import ch.datascience.rdfstore.entities.CommandParameterBase.Mapping.IOStream._
+import ch.datascience.rdfstore.entities.CommandParameterBase.Output.OutputFactory
+import ch.datascience.rdfstore.entities.CommandParameterBase.{Input, Output}
 import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
 import ch.datascience.rdfstore.entities.RunPlan.Command
 import ch.datascience.rdfstore.entities._
@@ -57,9 +57,9 @@ class NodeDetailsFinderSpec
 
     "find details of all entities with the given locations" in new TestCase {
 
-      val input         = locations.generateOne
+      val input         = entityLocations.generateOne
       val inputActivity = activity(creating = input)
-      val output        = locations.generateOne
+      val output        = entityLocations.generateOne
       val processRunActivity = processRun(
         inputs = List(Input.withoutPositionFrom(inputActivity.entity(input))),
         outputs = List(Output.withoutPositionFactory(activity => Entity(Generation(output, activity)))),
@@ -85,9 +85,9 @@ class NodeDetailsFinderSpec
 
     "fail if details of the given location cannot be found" in new TestCase {
 
-      val input         = locations.generateOne
+      val input         = entityLocations.generateOne
       val inputActivity = activity(creating = input)
-      val output        = locations.generateOne
+      val output        = entityLocations.generateOne
       val processRunActivity = processRun(
         inputs = List(Input.withoutPositionFrom(inputActivity.entity(input))),
         outputs = List(Output.withoutPositionFactory(activity => Entity(Generation(output, activity)))),
@@ -115,9 +115,9 @@ class NodeDetailsFinderSpec
 
     "find details of all RunPlans with the given ids" in new TestCase {
 
-      val input         = locations.generateOne
+      val input         = entityLocations.generateOne
       val inputActivity = activity(creating = input)
-      val output        = locations.generateOne
+      val output        = entityLocations.generateOne
       val processRun1Activity = processRun(
         inputs = List(Input.withoutPositionFrom(inputActivity.entity(input))),
         outputs = List(Output.withoutPositionFactory(activity => Entity(Generation(output, activity)))),
@@ -146,11 +146,12 @@ class NodeDetailsFinderSpec
     }
 
     "find details of a RunPlan with command parameters without a position" in new TestCase {
-      val input         = locations.generateOne
+      val input         = entityLocations.generateOne
       val inputActivity = activity(creating = input)
       val processRunActivity = processRun(
         inputs = List(Input.withoutPositionFrom(inputActivity.entity(input))),
-        outputs = List(Output.withoutPositionFactory(activity => Entity(Generation(locations.generateOne, activity)))),
+        outputs =
+          List(Output.withoutPositionFactory(activity => Entity(Generation(entityLocations.generateOne, activity)))),
         previousActivity = inputActivity
       )
 
@@ -169,8 +170,9 @@ class NodeDetailsFinderSpec
     }
 
     "find details of a RunPlan with mapped command parameters" in new TestCase {
-      val input +: output +: errOutput +: Nil = locations.generateNonEmptyList(minElements = 3, maxElements = 3).toList
-      val inputActivity                       = activity(creating = input)
+      val input +: output +: errOutput +: Nil =
+        entityLocations.generateNonEmptyList(minElements = 3, maxElements = 3).toList
+      val inputActivity = activity(creating = input)
       val processRunActivity = processRun(
         inputs = List(Input.streamFrom(inputActivity.entity(input))),
         outputs = List(
@@ -203,9 +205,9 @@ class NodeDetailsFinderSpec
 
     "fail if details of the given location cannot be found" in new TestCase {
 
-      val input         = locations.generateOne
+      val input         = entityLocations.generateOne
       val inputActivity = activity(creating = input)
-      val output        = locations.generateOne
+      val output        = entityLocations.generateOne
       val processRunActivity = processRun(
         inputs = List(Input.withoutPositionFrom(inputActivity.entity(input))),
         outputs = List(Output.withoutPositionFactory(activity => Entity(Generation(output, activity)))),
@@ -237,8 +239,8 @@ class NodeDetailsFinderSpec
 
   private trait TestCase {
     val projectPath     = projectPaths.generateOne
-    private val agent   = generateAgent
-    private val project = generateProject(projectPath)
+    private val agent   = agentEntities.generateOne
+    private val project = projectEntities.generateOne.copy(path = projectPath)
 
     val logger                = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)

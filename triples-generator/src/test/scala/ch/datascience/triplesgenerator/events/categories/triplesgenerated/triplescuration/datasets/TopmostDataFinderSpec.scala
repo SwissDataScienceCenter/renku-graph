@@ -45,7 +45,7 @@ class TopmostDataFinderSpec extends AnyWordSpec with MockFactory with should.Mat
       }
 
     "return a TopmostDataInfo with sameAs from DatasetInfo if sameAs is pointing to a non renku url" in new TestCase {
-      val sameAs = datasetUrlSameAs.generateOne
+      val sameAs = datasetExternalSameAs.generateOne
 
       topmostDataFinder.findTopmostData(entityId, Some(sameAs), None) shouldBe TopmostData(
         entityId,
@@ -56,7 +56,7 @@ class TopmostDataFinderSpec extends AnyWordSpec with MockFactory with should.Mat
 
     "return a TopmostDataInfo with parent's topmostSameAs " +
       "if sameAs is pointing to a renku dataset and there's a parent dataset" in new TestCase {
-        val sameAs = datasetIdSameAs.generateOne
+        val sameAs = datasetInternalSameAs.generateOne
 
         val parentTopmostSameAs = datasetTopmostSameAs.generateOne
 
@@ -71,7 +71,7 @@ class TopmostDataFinderSpec extends AnyWordSpec with MockFactory with should.Mat
 
     "return a TopmostDataInfo with the given sameAs " +
       "if the parent dataset cannot be found" in new TestCase {
-        val sameAs = datasetIdSameAs.generateOne
+        val sameAs = datasetInternalSameAs.generateOne
 
         (kgDatasetInfoFinder.findTopmostSameAs _).expects(sameAs).returning(None.pure[Try])
 

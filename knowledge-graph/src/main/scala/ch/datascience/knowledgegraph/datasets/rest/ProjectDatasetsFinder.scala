@@ -24,6 +24,7 @@ import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.{DerivedFrom, Identifier, ImageUri, InitialVersion, Name, SameAs, Title}
 import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.graph.model.views.RdfResource
+import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
 import org.typelevel.log4cats.Logger
 
@@ -48,22 +49,18 @@ private class IOProjectDatasetsFinder(
     with ProjectDatasetsFinder[IO] {
 
   import IOProjectDatasetsFinder._
+  import ch.datascience.graph.Schemas._
   import eu.timepit.refined.auto._
 
   def findProjectDatasets(projectPath: Path): IO[List[ProjectDataset]] =
     queryExpecting[List[ProjectDataset]](using = query(projectPath))
 
-  private def query(path: Path) = SparqlQuery(
+  private def query(path: Path) = SparqlQuery.of(
     name = "ds projects",
-    Set(
-      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-      "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>",
-      "PREFIX schema: <http://schema.org/>",
-      "PREFIX prov: <http://www.w3.org/ns/prov#>"
-    ),
+    Prefixes.of(renku -> "renku", schema -> "schema", prov -> "prov"),
     s"""|SELECT ?identifier ?name ?alternateName ?topmostSameAs ?maybeDerivedFrom ?initialVersion (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
         |WHERE {
-        |    ?datasetId rdf:type <http://schema.org/Dataset>;
+        |    ?datasetId a schema:Dataset;
         |               schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
         |               schema:identifier ?identifier;
         |               schema:name ?name;
@@ -77,7 +74,7 @@ private class IOProjectDatasetsFinder(
         |    
         |    FILTER NOT EXISTS { 
         |      # Removing dataset that have an activity that invalidates them
-        |      ?deprecationEntity rdf:type <http://www.w3.org/ns/prov#Entity>;
+        |      ?deprecationEntity a prov:Entity;
         |                         prov:atLocation ?metaDataLocation ;
         |                         schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
         |                         prov:wasInvalidatedBy ?invalidationActivity .	
@@ -92,7 +89,6 @@ private class IOProjectDatasetsFinder(
         |
         |GROUP BY ?identifier ?name ?alternateName ?topmostSameAs ?maybeDerivedFrom ?initialVersion 
         |ORDER BY ?name
-        |
         |""".stripMargin
   )
 }

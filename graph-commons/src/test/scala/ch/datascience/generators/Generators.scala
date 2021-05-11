@@ -196,6 +196,8 @@ object Generators {
     port <- httpPorts
   } yield s"$protocol://localhost:$port"
 
+  lazy val semanticVersions: Gen[String] = Gen.listOfN(3, positiveInts(max = 150)).map(_.mkString("."))
+
   lazy val httpStatuses: Gen[Status] = Gen.oneOf(successHttpStatuses, clientErrorHttpStatuses, serverErrorHttpStatuses)
 
   lazy val successHttpStatuses: Gen[Status] = Gen.oneOf(Ok, Created, Accepted)
@@ -381,6 +383,10 @@ object Generators {
       def toGeneratorOfNonEmptyList(minElements: Int Refined Positive = 1,
                                     maxElements: Int Refined Positive = 5
       ): Gen[NonEmptyList[T]] = nonEmptyList(generator, minElements, maxElements)
+
+      def toGeneratorOfList(minElements: Int Refined NonNegative = 0,
+                            maxElements: Int Refined Positive = 5
+      ): Gen[List[T]] = listOf(generator, minElements, maxElements)
 
       def toGeneratorOfSet(minElements: Int Refined NonNegative = 1,
                            maxElements: Int Refined Positive = 5

@@ -29,10 +29,8 @@ import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
 import ch.datascience.rdfstore.entities.RunPlan.Command
 import ch.datascience.rdfstore.entities._
-import ch.datascience.rdfstore.entities.bundles.{generateProject, gitLabApiUrl, nonModifiedDataSetCommit, renkuBaseUrl}
+import ch.datascience.rdfstore.entities.bundles.{nonModifiedDataSetCommit, renkuBaseUrl}
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
-import eu.timepit.refined.auto._
-import io.renku.jsonld.syntax._
 import io.renku.jsonld.{JsonLD, Property}
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
@@ -146,7 +144,7 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
         commitId,
         commitDate,
         committer,
-        generateProject(projectPath),
+        projectEntities.generateOne.copy(path = projectPath),
         agent,
         comment,
         None,
@@ -174,7 +172,7 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
       agent = Agent(cliVersion)
       comment <- nonEmptyStrings()
     } yield {
-      val project = generateProject(projectPath)
+      val project = projectEntities.generateOne.copy(path = projectPath)
       WorkflowRun(
         workflowCommitId,
         workflowCommitDate,

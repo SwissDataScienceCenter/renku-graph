@@ -26,7 +26,7 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.PublishedDate
+import ch.datascience.graph.model.datasets.DatePublished
 import ch.datascience.http.ErrorMessage
 import ch.datascience.http.InfoMessage._
 import ch.datascience.http.rest.paging.PagingRequest.Decoders.{page, perPage}
@@ -179,8 +179,8 @@ class DatasetsSearchEndpointSpec
         }""" addIfDefined "description" -> maybeDescription
     }
 
-    private implicit lazy val publishingEncoder: Encoder[(Set[DatasetCreator], Option[PublishedDate])] =
-      Encoder.instance[(Set[DatasetCreator], Option[PublishedDate])] {
+    private implicit lazy val publishingEncoder: Encoder[(Set[DatasetCreator], Option[DatePublished])] =
+      Encoder.instance[(Set[DatasetCreator], Option[DatePublished])] {
         case (creators, Some(date)) =>
           json"""{
           "creator": $creators,
@@ -216,6 +216,6 @@ class DatasetsSearchEndpointSpec
     dates            <- datasetDates
     projectsCount    <- nonNegativeInts() map (_.value) map ProjectsCount.apply
     keywords         <- listOf(datasetKeywords)
-    images           <- listOf(imageUris)
+    images           <- listOf(datasetImageUris)
   } yield DatasetSearchResult(id, title, name, maybeDescription, creators, dates, projectsCount, keywords, images)
 }

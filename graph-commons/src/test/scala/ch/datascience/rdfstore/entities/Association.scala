@@ -18,102 +18,28 @@
 
 package ch.datascience.rdfstore.entities
 
-import ch.datascience.graph.config.GitLabApiUrl
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.rdfstore.entities.RunPlan.{ProcessRunPlan, WorkflowRunPlan}
-import ch.datascience.rdfstore.entities.WorkflowRun.ActivityWorkflowRun
+import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
+import io.renku.jsonld._
 
-sealed trait Association[RunPlanType <: Entity with RunPlan] {
-  val commitId:         CommitId
-  val associationAgent: Agent
-  val runPlan:          RunPlanType
-}
+final case class Association(activity: Activity, agent: Agent, runPlan: RunPlan)
 
 object Association {
 
-  trait ChildRunPlanAssociation extends Association[Entity with ProcessRunPlan] {
-    val workflowStep: Step
-  }
+  def factory(agent: Agent, runPlan: RunPlan): Activity => Association =
+    Association(_, agent, runPlan)
 
-  trait WorkflowRunPlanAssociation extends Association[Entity with WorkflowRunPlan]
-  trait ProcessRunPlanAssociation  extends Association[Entity with ProcessRunPlan]
-
-  def child(
-      agent:  Agent
-  )(workflow: ActivityWorkflowRun)(step: Step): ChildRunPlanAssociation =
-    new ChildRunPlanAssociation {
-      override val commitId:         CommitId = workflow.commitId
-      override val associationAgent: Agent    = agent
-      override val workflowStep:     Step     = step
-      override val runPlan: Entity with ProcessRunPlan =
-        workflow.processRunAssociation.runPlan.runSubprocesses(step.value)
-    }
-
-  def workflow(
-      agent:          Agent,
-      runPlanFactory: Project => Activity => WorkflowFile => Entity with WorkflowRunPlan
-  ): Project => Activity => WorkflowFile => WorkflowRunPlanAssociation =
-    project =>
-      activity =>
-        workflowFile =>
-          new WorkflowRunPlanAssociation {
-            override val commitId:         CommitId                    = activity.commitId
-            override val associationAgent: Agent                       = agent
-            override val runPlan:          Entity with WorkflowRunPlan = runPlanFactory(project)(activity)(workflowFile)
-          }
-
-  def process[RunPlanType <: Entity with RunPlan](
-      agent:          Agent,
-      runPlanFactory: Activity => Entity with ProcessRunPlan
-  ): Activity => ProcessRunPlanAssociation =
-    activity =>
-      new ProcessRunPlanAssociation {
-        override val commitId:         CommitId                   = activity.commitId
-        override val associationAgent: Agent                      = agent
-        override val runPlan:          Entity with ProcessRunPlan = runPlanFactory(activity)
-      }
-
-  import ch.datascience.graph.config.RenkuBaseUrl
-  import ch.datascience.rdfstore.FusekiBaseUrl
-  import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  implicit def childRunPlanAssociationEncoder(implicit
-      renkuBaseUrl:  RenkuBaseUrl,
-      gitLabApiUrl:  GitLabApiUrl,
-      fusekiBaseUrl: FusekiBaseUrl
-  ): JsonLDEncoder[ChildRunPlanAssociation] = JsonLDEncoder.instance { entity =>
-    JsonLD.entity(
-      EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId / entity.workflowStep / "association",
-      EntityTypes of prov / "Association",
-      prov / "agent"   -> entity.associationAgent.asJsonLD,
-      prov / "hadPlan" -> entity.runPlan.asJsonLD
-    )
-  }
+  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Association] =
+    JsonLDEncoder.instance { entity =>
+      JsonLD.entity(
+        entity.asEntityId,
+        EntityTypes of (prov / "Association"),
+        prov / "agent"   -> entity.agent.asJsonLD,
+        prov / "hadPlan" -> entity.runPlan.asEntityId.asJsonLD
+      )
+    }
 
-  implicit def workflowRunPlanAssociationEncoder(implicit
-      renkuBaseUrl:  RenkuBaseUrl,
-      gitLabApiUrl:  GitLabApiUrl,
-      fusekiBaseUrl: FusekiBaseUrl
-  ): JsonLDEncoder[WorkflowRunPlanAssociation] = JsonLDEncoder.instance { entity =>
-    JsonLD.entity(
-      EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId / "association",
-      EntityTypes of prov / "Association",
-      prov / "agent"   -> entity.associationAgent.asJsonLD,
-      prov / "hadPlan" -> entity.runPlan.asJsonLD
-    )
-  }
-
-  implicit def processRunPlanAssociationEncoder(implicit
-      renkuBaseUrl:  RenkuBaseUrl,
-      gitLabApiUrl:  GitLabApiUrl,
-      fusekiBaseUrl: FusekiBaseUrl
-  ): JsonLDEncoder[ProcessRunPlanAssociation] = JsonLDEncoder.instance { entity =>
-    JsonLD.entity(
-      EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId / "association",
-      EntityTypes of prov / "Association",
-      prov / "agent"   -> entity.associationAgent.asJsonLD,
-      prov / "hadPlan" -> entity.runPlan.asJsonLD
-    )
-  }
+  implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[Association] =
+    EntityIdEncoder.instance(entity => entity.activity.asEntityId.asUrlEntityId / "association")
 }

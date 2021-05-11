@@ -21,7 +21,7 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated.tripl
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.model.datasets.{IdSameAs, TopmostDerivedFrom, TopmostSameAs, UrlSameAs}
+import ch.datascience.graph.model.datasets.{ExternalSameAs, InternalSameAs, TopmostDerivedFrom, TopmostSameAs}
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.DataSetInfoFinder.DatasetInfo
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.TopmostDataFinder.TopmostData
@@ -42,9 +42,9 @@ private class TopmostDataFinderImpl[Interpretation[_]](
   def findTopmostData(datasetInfo: DatasetInfo): Interpretation[TopmostData] = datasetInfo match {
     case (entityId, None, None) =>
       TopmostData(entityId, TopmostSameAs(entityId), TopmostDerivedFrom(entityId)).pure[Interpretation]
-    case (entityId, Some(sameAs: UrlSameAs), None) =>
+    case (entityId, Some(sameAs: ExternalSameAs), None) =>
       TopmostData(entityId, TopmostSameAs(sameAs), TopmostDerivedFrom(entityId)).pure[Interpretation]
-    case (entityId, Some(sameAs: IdSameAs), None) =>
+    case (entityId, Some(sameAs: InternalSameAs), None) =>
       kgDatasetInfoFinder.findTopmostSameAs(sameAs).map {
         case Some(parentTopmostSameAs) => TopmostData(entityId, parentTopmostSameAs, TopmostDerivedFrom(entityId))
         case None                      => TopmostData(entityId, TopmostSameAs(sameAs), TopmostDerivedFrom(entityId))

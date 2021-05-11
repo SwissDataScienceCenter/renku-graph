@@ -19,18 +19,20 @@
 package ch.datascience.knowledgegraph.projects.rest
 
 import cats.effect.IO
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.CommittedDate
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder.{Parent, ProjectCreator}
 import ch.datascience.logging.TestExecutionTimeRecorder
+import ch.datascience.rdfstore.entities.EntitiesGenerators._
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder, entities}
+import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -45,22 +47,17 @@ class IOKGProjectFinderSpec
 
     "return details of the project with the given path when there's no parent" in new TestCase {
       forAll(kgProjects(parentsGen = emptyOptionOf[Parent])) { project =>
-        val maybeProjectCreator = project.created.maybeCreator
         loadToStore(
-          fileCommit(commitId = commitIds.generateOne)(projectPath = projectPaths.generateOne,
-                                                       projectVersion = projectSchemaVersions.generateOne
-          ),
-          fileCommit(
-            commitId = commitIds.generateOne,
-            committedDate = CommittedDate(project.created.date.value)
-          )(
-            projectPath = project.path,
-            projectName = project.name,
-            projectDateCreated = project.created.date,
-            maybeProjectCreator = maybeProjectCreator.toMaybePerson,
-            maybeParent = None,
-            projectVersion = project.version
-          )
+          projectEntities.generateOne.asJsonLD,
+          entities
+            .Project(project.path,
+                     project.name,
+                     cliVersions.generateOne,
+                     project.created.date,
+                     project.created.maybeCreator.toMaybePerson,
+                     project.version
+            )
+            .asJsonLD
         )
 
         metadataFinder.findProject(project.path).unsafeRunSync() shouldBe Some(project)
@@ -70,26 +67,26 @@ class IOKGProjectFinderSpec
     "return details of the project with the given path if it has a parent project" in new TestCase {
       forAll(kgProjects(parentsGen = parents.toGeneratorOfSomes)) { project =>
         loadToStore(
-          fileCommit(
-            commitId = commitIds.generateOne
-          )(
-            projectPath = project.path,
-            projectName = project.name,
-            projectDateCreated = project.created.date,
-            maybeProjectCreator = project.created.maybeCreator.toMaybePerson,
-            maybeParent = project.maybeParent.map { parent =>
-              entities.Project(
-                parent.resourceId.toUnsafe[Path],
-                parent.name,
-                parent.created.date,
-                maybeCreator = parent.created.maybeCreator.toMaybePerson,
-                maybeVisibility = None,
-                maybeParentProject = None,
-                version = projectSchemaVersions.generateOne
-              )
-            },
-            projectVersion = project.version
-          )
+          entities
+            .Project(
+              project.path,
+              project.name,
+              cliVersions.generateOne,
+              project.created.date,
+              project.created.maybeCreator.toMaybePerson,
+              project.version,
+              maybeParentProject = project.maybeParent.map { parent =>
+                entities.Project(
+                  parent.resourceId.toUnsafe[Path],
+                  parent.name,
+                  cliVersions.generateOne,
+                  parent.created.date,
+                  maybeCreator = parent.created.maybeCreator.toMaybePerson,
+                  schemaVersion = projectSchemaVersions.generateOne
+                )
+              }
+            )
+            .asJsonLD
         )
 
         metadataFinder.findProject(project.path).unsafeRunSync() shouldBe Some(project)

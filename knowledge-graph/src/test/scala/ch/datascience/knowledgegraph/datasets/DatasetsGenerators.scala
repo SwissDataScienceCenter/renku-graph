@@ -20,21 +20,21 @@ package ch.datascience.knowledgegraph.datasets
 
 import cats.Order
 import cats.data.NonEmptyList
-import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{DerivedFrom, InitialVersion, SameAs, Url}
 import ch.datascience.knowledgegraph.datasets.model._
-import ch.datascience.rdfstore.entities.DataSet
+import ch.datascience.rdfstore.entities
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 
 object DatasetsGenerators {
 
-  implicit def datasets(implicit renkuBaseUrl: RenkuBaseUrl): Gen[NonModifiedDataset] = nonModifiedDatasets()
+  implicit def datasetsDEPRECATED(implicit renkuBaseUrl: RenkuBaseUrl): Gen[NonModifiedDataset] =
+    nonModifiedDatasetsDEPRECATED()
 
-  def nonModifiedDatasets(
+  def nonModifiedDatasetsDEPRECATED(
       sameAs:              Gen[SameAs] = datasetSameAs,
       usedInProjects:      Gen[NonEmptyList[DatasetProject]] = nonEmptyList(datasetProjects)
   )(implicit renkuBaseUrl: RenkuBaseUrl): Gen[NonModifiedDataset] =
@@ -46,7 +46,7 @@ object DatasetsGenerators {
       sameAs           <- sameAs
       maybeDescription <- Gen.option(datasetDescriptions)
       keywords         <- listOf(datasetKeywords)
-      images           <- listOf(imageUris)
+      images           <- listOf(datasetImageUris)
       creators         <- nonEmptySet(datasetCreators, maxElements = 4)
       dates            <- datasetDates
       part             <- listOf(datasetParts)
@@ -76,19 +76,19 @@ object DatasetsGenerators {
     for {
       id        <- datasetIdentifiers
       creators  <- nonEmptySet(datasetCreators, maxElements = 4)
-      dates     <- datasetDates
+      date      <- datasetCreatedDates()
       keywords  <- listOf(datasetKeywords)
-      imageUrls <- listOf(imageUris)
+      imageUrls <- listOf(datasetImageUris)
     } yield ModifiedDataset(
       id,
       dataset.title,
       dataset.name,
-      Url(DataSet.entityId(id).toString),
-      derivedFromOverride getOrElse DerivedFrom(DataSet.entityId(dataset.id)),
+      Url(entities.Dataset.entityId(id).toString),
+      derivedFromOverride getOrElse DerivedFrom(entities.Dataset.entityId(dataset.id)),
       versionsOverride getOrElse DatasetVersions(dataset.versions.initial),
       dataset.maybeDescription,
       creators,
-      dates,
+      date,
       dataset.parts,
       dataset.usedIn.headOption getOrElse (throw new IllegalStateException("No projects on a dataset")),
       List(dataset.usedIn.headOption getOrElse (throw new IllegalStateException("No projects on a dataset"))),
@@ -106,25 +106,13 @@ object DatasetsGenerators {
     (creator1: DatasetCreator, creator2: DatasetCreator) => creator1.name compareTo creator2.name
 
   private implicit lazy val datasetParts: Gen[DatasetPart] = for {
-    name     <- datasetPartNames
     location <- datasetPartLocations
-  } yield DatasetPart(name, location)
+  } yield DatasetPart(location)
 
   implicit lazy val datasetProjects: Gen[DatasetProject] = for {
-    path    <- projectPaths
-    name    <- projectNames
-    created <- addedToProjectObjects
-  } yield DatasetProject(path, name, created)
-
-  implicit lazy val addedToProjectObjects: Gen[AddedToProject] = for {
-    createdDate <- datasetInProjectCreationDates
-    agent       <- datasetAgents
-  } yield AddedToProject(createdDate, agent)
-
-  private implicit lazy val datasetAgents: Gen[DatasetAgent] = for {
-    maybeEmail <- userEmails.toGeneratorOfOptions
-    name       <- userNames
-  } yield DatasetAgent(maybeEmail, name)
+    path <- projectPaths
+    name <- projectNames
+  } yield DatasetProject(path, name)
 
   private implicit lazy val datasetVersions: Gen[DatasetVersions] = for {
     initialVersion <- datasetInitialVersions

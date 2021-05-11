@@ -18,124 +18,51 @@
 
 package ch.datascience.rdfstore.entities
 
-import cats.syntax.all._
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.rdfstore.FusekiBaseUrl
-import ch.datascience.rdfstore.entities.Collection.EntityCollection
-import ch.datascience.rdfstore.entities.DataSet.DataSetEntity
+import ch.datascience.rdfstore.entities.Entity.Checksum
+import ch.datascience.tinytypes.constraints.NonBlank
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 
-class Entity(val commitId:                  CommitId,
-             val location:                  Location,
-             val project:                   Project,
-             val maybeInvalidationActivity: Option[Activity],
-             val maybeGeneration:           Option[Generation]
-)
+sealed trait Entity {
+  val location: Location
+  val checksum: Checksum
+}
 
 object Entity {
 
-  def apply(generation: Generation): Entity with Artifact =
-    new Entity(generation.activity.commitId,
-               generation.location,
-               generation.activity.project,
-               maybeInvalidationActivity = None,
-               maybeGeneration = Some(generation)
-    ) with Artifact
+  final case class InputEntity(location: Location, checksum: Checksum) extends Entity
+  final case class OutputEntity(location: Location, checksum: Checksum, generation: Generation) extends Entity
 
-  def factory(location: Location)(activity: Activity): Entity with Artifact =
-    new Entity(activity.commitId, location, activity.project, maybeInvalidationActivity = None, maybeGeneration = None)
-      with Artifact
+  object OutputEntity {
+    def factory(location: Location): Generation => OutputEntity =
+      (generation: Generation) => OutputEntity(location, entityChecksums.generateOne, generation)
+  }
 
-  private[entities] implicit def converter(implicit
-      renkuBaseUrl:  RenkuBaseUrl,
-      gitLabApiUrl:  GitLabApiUrl,
-      fusekiBaseUrl: FusekiBaseUrl
-  ): PartialEntityConverter[Entity] =
-    new PartialEntityConverter[Entity] {
-      override def convert[T <: Entity]: T => Either[Exception, PartialEntity] =
-        entity =>
-          PartialEntity(
-            EntityTypes of prov / "Entity",
-            rdfs / "label"               -> s"${entity.location}@${entity.commitId}".asJsonLD,
-            schema / "isPartOf"          -> entity.project.asJsonLD,
-            prov / "atLocation"          -> entity.location.asJsonLD,
-            prov / "wasInvalidatedBy"    -> entity.maybeInvalidationActivity.asJsonLD,
-            prov / "qualifiedGeneration" -> entity.maybeGeneration.asJsonLD
-          ).asRight
+  final class Checksum private (val value: String) extends AnyVal with StringTinyType
+  object Checksum extends TinyTypeFactory[Checksum](new Checksum(_)) with NonBlank
 
-      override def toEntityId: Entity => Option[EntityId] =
-        entity => (EntityId of fusekiBaseUrl / "blob" / entity.commitId / entity.location).some
-    }
-
-  implicit def encoderWithArtifact(implicit
-      renkuBaseUrl:  RenkuBaseUrl,
-      gitLabApiUrl:  GitLabApiUrl,
-      fusekiBaseUrl: FusekiBaseUrl
-  ): JsonLDEncoder[Entity with Artifact] =
+  implicit def encoder[E <: Entity](implicit renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[E] =
     JsonLDEncoder.instance {
-      case e: EntityCollection     => e.asJsonLD
-      case e: DataSetEntity        => e.asJsonLD
-      case e: Entity with Artifact => e.asPartialJsonLD[Entity] combine e.asPartialJsonLD[Artifact] getOrFail
-    }
-}
-
-trait Collection {
-  self: Entity =>
-
-  def collectionMembers: List[Entity with Artifact]
-}
-
-object Collection {
-
-  type EntityCollection = Entity with Collection with Artifact
-
-  def factory(location: Location, membersLocations: List[Location])(activity: Activity): EntityCollection =
-    new Entity(
-      commitId = activity.commitId,
-      location = location,
-      project = activity.project,
-      maybeInvalidationActivity = None,
-      maybeGeneration = None
-    ) with Collection with Artifact {
-      override val collectionMembers: List[Entity with Artifact] = membersLocations.map { memberLocation =>
-        new Entity(activity.commitId,
-                   memberLocation,
-                   activity.project,
-                   maybeInvalidationActivity = None,
-                   maybeGeneration = None
-        ) with Artifact
-      }
+      case entity @ InputEntity(location, checksum) =>
+        JsonLD.entity(
+          entity.asEntityId,
+          EntityTypes of (prov / "Entity", wfprov / "Artifact"),
+          prov / "atLocation" -> location.asJsonLD,
+          renku / "checksum"  -> checksum.asJsonLD
+        )
+      case entity @ OutputEntity(location, checksum, generation) =>
+        JsonLD.entity(
+          entity.asEntityId,
+          EntityTypes of (prov / "Entity", wfprov / "Artifact"),
+          prov / "atLocation"          -> location.asJsonLD,
+          renku / "checksum"           -> checksum.asJsonLD,
+          prov / "qualifiedGeneration" -> generation.asEntityId.asJsonLD
+        )
     }
 
-  private implicit def converter(implicit
-      renkuBaseUrl:  RenkuBaseUrl,
-      gitLabApiUrl:  GitLabApiUrl,
-      fusekiBaseUrl: FusekiBaseUrl
-  ): PartialEntityConverter[EntityCollection] =
-    new PartialEntityConverter[EntityCollection] {
-      override def convert[T <: EntityCollection]: T => Either[Exception, PartialEntity] =
-        entity =>
-          PartialEntity(
-            EntityTypes of prov / "Collection",
-            prov / "hadMember" -> entity.collectionMembers.asJsonLD
-          ).asRight
-
-      override def toEntityId: EntityCollection => Option[EntityId] =
-        entity => (EntityId of fusekiBaseUrl / "blob" / entity.commitId / entity.location).some
-    }
-
-  implicit def encoder(implicit
-      renkuBaseUrl:  RenkuBaseUrl,
-      gitLabApiUrl:  GitLabApiUrl,
-      fusekiBaseUrl: FusekiBaseUrl
-  ): JsonLDEncoder[EntityCollection] =
-    JsonLDEncoder.instance { entity =>
-      entity
-        .asPartialJsonLD[Entity]
-        .combine(entity.asPartialJsonLD[EntityCollection])
-        .combine(entity.asPartialJsonLD[Artifact])
-        .getOrFail
-    }
+  implicit def entityIdEncoder[E <: Entity](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[E] =
+    EntityIdEncoder.instance(entity => EntityId of renkuBaseUrl / "blob" / entity.checksum / entity.location)
 }
