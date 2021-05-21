@@ -75,6 +75,6 @@ class EventDetailsFinderSpec extends AnyWordSpec with MockFactory with ExternalS
   private trait TestCase {
     val event              = newCommitEvents.generateOne
     val eventLogUrl        = EventLogUrl(externalServiceBaseUrl)
-    val eventDetailsFinder = new EventDetailsFinderImpl(eventLogUrl, TestLogger())
+    val eventDetailsFinder = new EventDetailsFinderImpl[IO](eventLogUrl, TestLogger())
   }
 }

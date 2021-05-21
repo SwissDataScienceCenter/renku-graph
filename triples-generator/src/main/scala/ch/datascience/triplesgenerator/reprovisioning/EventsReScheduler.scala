@@ -21,7 +21,7 @@ package ch.datascience.triplesgenerator.reprovisioning
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.EventLogUrl
-import ch.datascience.http.client.IORestClient
+import ch.datascience.http.client.RestClient
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -34,7 +34,7 @@ private class IOEventsReScheduler(
     eventLogUrl:             EventLogUrl,
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORestClient(Throttler.noThrottling, logger)
+    extends RestClient(Throttler.noThrottling, logger)
     with EventsReScheduler[IO] {
 
   import cats.effect._

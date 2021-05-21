@@ -18,53 +18,95 @@
 
 package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, IO, Timer}
+import cats.syntax.all._
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitInfo
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects.Id
-import ch.datascience.http.client.{AccessToken, IORestClient}
-import org.typelevel.log4cats.Logger
+import ch.datascience.http.client.{AccessToken, RestClient}
+import org.http4s.Status.NotFound
 import org.http4s.circe.jsonOf
 import org.http4s.{EntityDecoder, Status}
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private trait CommitInfoFinder[Interpretation[_]] {
+private[eventgeneration] trait CommitInfoFinder[Interpretation[_]] {
   def findCommitInfo(
       projectId:        Id,
       commitId:         CommitId,
       maybeAccessToken: Option[AccessToken]
   ): Interpretation[CommitInfo]
+
+  def getMaybeCommitInfo(projectId:        Id,
+                         commitId:         CommitId,
+                         maybeAccessToken: Option[AccessToken]
+  ): Interpretation[Option[CommitInfo]]
 }
 
-private class CommitInfoFinderImpl(
+private[eventgeneration] class CommitInfoFinderImpl[Interpretation[_]: ConcurrentEffect: Timer](
     gitLabUrl:               GitLabUrl,
-    gitLabThrottler:         Throttler[IO, GitLab],
-    logger:                  Logger[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORestClient(gitLabThrottler, logger)
-    with CommitInfoFinder[IO] {
+    gitLabThrottler:         Throttler[Interpretation, GitLab],
+    logger:                  Logger[Interpretation]
+)(implicit executionContext: ExecutionContext)
+    extends RestClient(gitLabThrottler, logger)
+    with CommitInfoFinder[Interpretation] {
 
   import CommitInfo._
-  import cats.effect._
   import ch.datascience.http.client.RestClientError.UnauthorizedException
   import org.http4s.Method.GET
   import org.http4s.Status.{Ok, Unauthorized}
   import org.http4s.{Request, Response}
 
-  def findCommitInfo(projectId: Id, commitId: CommitId, maybeAccessToken: Option[AccessToken]): IO[CommitInfo] =
+  def findCommitInfo(projectId:        Id,
+                     commitId:         CommitId,
+                     maybeAccessToken: Option[AccessToken]
+  ): Interpretation[CommitInfo] =
+    fetchCommitInfo(projectId, commitId, maybeAccessToken)(mapToCommitOrThrow)
+
+  def getMaybeCommitInfo(projectId:        Id,
+                         commitId:         CommitId,
+                         maybeAccessToken: Option[AccessToken]
+  ): Interpretation[Option[CommitInfo]] =
+    fetchCommitInfo(projectId, commitId, maybeAccessToken)(mapToMaybeCommit)
+
+  private def fetchCommitInfo[ResultType](projectId: Id, commitId: CommitId, maybeAccessToken: Option[AccessToken])(
+      mapResponse: PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[
+        ResultType
+      ]]
+  ) =
     for {
       uri    <- validateUri(s"$gitLabUrl/api/v4/projects/$projectId/repository/commits/$commitId")
       result <- send(request(GET, uri, maybeAccessToken))(mapResponse)
     } yield result
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[CommitInfo]] = {
+  private lazy val mapToCommitOrThrow
+      : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[CommitInfo]] = {
     case (Ok, _, response)    => response.as[CommitInfo]
-    case (Unauthorized, _, _) => IO.raiseError(UnauthorizedException)
+    case (Unauthorized, _, _) => UnauthorizedException.raiseError
   }
 
-  private implicit val commitInfoEntityDecoder: EntityDecoder[IO, CommitInfo] = jsonOf[IO, CommitInfo]
+  private lazy val mapToMaybeCommit: PartialFunction[(Status, Request[Interpretation], Response[Interpretation]),
+                                                     Interpretation[Option[CommitInfo]]
+  ] = {
+    case (Ok, _, response)    => response.as[CommitInfo].map(Some(_))
+    case (NotFound, _, _)     => Option.empty[CommitInfo].pure[Interpretation]
+    case (Unauthorized, _, _) => UnauthorizedException.raiseError
+  }
+
+  private implicit val commitInfoEntityDecoder: EntityDecoder[Interpretation, CommitInfo] =
+    jsonOf[Interpretation, CommitInfo]
+}
+
+object CommitInfoFinder {
+  def apply(gitLabThrottler: Throttler[IO, GitLab], logger: Logger[IO])(implicit
+      executionContext:      ExecutionContext,
+      concurrentEffect:      ConcurrentEffect[IO],
+      timer:                 Timer[IO]
+  ) = for {
+    gitLabUrl <- GitLabUrl[IO]()
+  } yield new CommitInfoFinderImpl[IO](gitLabUrl, gitLabThrottler, logger)
 }

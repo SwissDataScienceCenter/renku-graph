@@ -20,7 +20,7 @@ package ch.datascience.graph.acceptancetests.tooling
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
-import ch.datascience.http.client.{AccessToken, IORestClient}
+import ch.datascience.http.client.{AccessToken, RestClient}
 import ch.datascience.interpreters.TestLogger
 import eu.timepit.refined.auto._
 import org.http4s.{Method, Request, Response, Status}
@@ -30,7 +30,7 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 
 class RestClient()(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORestClient(Throttler.noThrottling, TestLogger(), retryInterval = 500 millis, maxRetries = 1) {
+    extends RestClient(Throttler.noThrottling, TestLogger(), retryInterval = 500 millis, maxRetries = 1) {
 
   def GET(url: String): Response[IO] = {
     for {

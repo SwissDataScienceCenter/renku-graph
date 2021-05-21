@@ -19,8 +19,9 @@
 package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration
 package historytraversal
 
-import Generators._
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
+import cats.syntax.all._
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.Generators._
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
@@ -142,8 +143,117 @@ class CommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSer
     }
   }
 
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO]        = IO.timer(global)
+  "getMaybeCommitInfo" should {
+
+    "get commit info from the configured url " +
+      "and return some CommitInfo if OK returned with valid body - case with Personal Access Token" in new TestCase {
+
+        val accessToken = personalAccessTokens.generateOne
+
+        stubFor {
+          get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
+            .withHeader("PRIVATE-TOKEN", equalTo(accessToken.value))
+            .willReturn(okJson(responseJson.toString()))
+        }
+
+        finder.getMaybeCommitInfo(projectId, commitId, Some(accessToken)).unsafeRunSync() shouldBe CommitInfo(
+          id = commitId,
+          message = commitMessage,
+          committedDate = committedDate,
+          author = author,
+          committer = committer,
+          parents = parents
+        ).some
+      }
+
+    "get commit info from the configured url " +
+      "and return some CommitInfo if OK returned with valid body - case with OAuth Access Token" in new TestCase {
+
+        val accessToken = oauthAccessTokens.generateOne
+
+        stubFor {
+          get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
+            .withHeader("Authorization", equalTo(s"Bearer ${accessToken.value}"))
+            .willReturn(okJson(responseJson.toString()))
+        }
+
+        finder.getMaybeCommitInfo(projectId, commitId, Some(accessToken)).unsafeRunSync() shouldBe CommitInfo(
+          id = commitId,
+          message = commitMessage,
+          committedDate = committedDate,
+          author = author,
+          committer = committer,
+          parents = parents
+        ).some
+      }
+
+    "get commit info from the configured url " +
+      "and return some CommitInfo if OK returned with valid body - case with no access token" in new TestCase {
+
+        stubFor {
+          get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
+            .willReturn(okJson(responseJson.toString()))
+        }
+
+        finder.getMaybeCommitInfo(projectId, commitId, maybeAccessToken = None).unsafeRunSync() shouldBe CommitInfo(
+          id = commitId,
+          message = commitMessage,
+          committedDate = committedDate,
+          author = author,
+          committer = committer,
+          parents = parents
+        ).some
+      }
+
+    "return None if remote client responds with Not found" in new TestCase {
+
+      stubFor {
+        get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
+          .willReturn(notFound())
+      }
+      finder.getMaybeCommitInfo(projectId, commitId, maybeAccessToken = None).unsafeRunSync() shouldBe None
+
+    }
+
+    "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
+
+      stubFor {
+        get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
+          .willReturn(unauthorized())
+      }
+
+      intercept[Exception] {
+        finder.findCommitInfo(projectId, commitId, maybeAccessToken = None).unsafeRunSync()
+      } shouldBe UnauthorizedException
+    }
+
+    "return an Error if remote client responds with invalid json" in new TestCase {
+
+      stubFor {
+        get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
+          .willReturn(okJson("{}"))
+      }
+
+      intercept[Exception] {
+        finder.findCommitInfo(projectId, commitId, maybeAccessToken = None).unsafeRunSync()
+      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId/repository/commits/$commitId returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+    }
+
+    "return an Error if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
+
+      stubFor {
+        get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
+          .willReturn(notFound().withBody("some message"))
+      }
+
+      intercept[Exception] {
+        finder.findCommitInfo(projectId, commitId, maybeAccessToken = None).unsafeRunSync()
+      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId/repository/commits/$commitId returned ${Status.NotFound}; body: some message"
+    }
+  }
+
+  private implicit val ce:    ConcurrentEffect[IO] = IO.ioConcurrentEffect(global)
+  private implicit val timer: Timer[IO]            = IO.timer(global)
 
   private trait TestCase {
     val gitLabUrl     = GitLabUrl(externalServiceBaseUrl)

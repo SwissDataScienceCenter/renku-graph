@@ -23,7 +23,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.events.CategoryName
-import ch.datascience.http.client.IORestClient
+import ch.datascience.http.client.RestClient
 import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException}
 import org.typelevel.log4cats.Logger
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
@@ -55,10 +55,10 @@ private class EventsSenderImpl[CategoryEvent](
     executionContext: ExecutionContext,
     contextShift:     ContextShift[IO],
     timer:            Timer[IO]
-) extends IORestClient(Throttler.noThrottling,
-                       logger,
-                       retryInterval = retryInterval,
-                       requestTimeoutOverride = requestTimeoutOverride
+) extends RestClient(Throttler.noThrottling,
+                     logger,
+                     retryInterval = retryInterval,
+                     requestTimeoutOverride = requestTimeoutOverride
     )
     with EventsSender[IO, CategoryEvent] {
 

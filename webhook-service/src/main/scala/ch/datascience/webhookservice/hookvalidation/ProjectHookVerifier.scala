@@ -24,7 +24,7 @@ import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.projects.Id
-import ch.datascience.http.client.{AccessToken, IORestClient}
+import ch.datascience.http.client.{AccessToken, RestClient}
 import ch.datascience.webhookservice.model.ProjectHookUrl
 import org.typelevel.log4cats.Logger
 import io.circe.Decoder.decodeList
@@ -47,7 +47,7 @@ private class IOProjectHookVerifier(
     gitLabThrottler:         Throttler[IO, GitLab],
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORestClient(gitLabThrottler, logger)
+    extends RestClient(gitLabThrottler, logger)
     with ProjectHookVerifier[IO] {
 
   import cats.effect._

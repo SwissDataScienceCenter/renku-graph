@@ -25,7 +25,7 @@ import cats.syntax.all._
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.EventStatus.{GenerationNonRecoverableFailure, GenerationRecoverableFailure}
 import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
-import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
+import ch.datascience.graph.tokenrepository.{AccessTokenFinder, AccessTokenFinder}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
@@ -59,7 +59,7 @@ private class CommitEventProcessor[Interpretation[_]](
 )(implicit ME:               MonadError[Interpretation, Throwable])
     extends EventProcessor[Interpretation] {
 
-  import IOAccessTokenFinder._
+  import AccessTokenFinder._
   import TriplesGenerationResult._
   import accessTokenFinder._
   import triplesGenerator._
@@ -228,7 +228,7 @@ private object IOCommitEventProcessor {
   ): IO[CommitEventProcessor[IO]] =
     for {
       triplesGenerator        <- TriplesGenerator()
-      accessTokenFinder       <- IOAccessTokenFinder(logger)
+      accessTokenFinder       <- AccessTokenFinder(logger)
       eventStatusUpdater      <- EventStatusUpdater(categoryName, logger)
       eventsProcessingTimes   <- metricsRegistry.register[Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
       allEventsTimeRecorder   <- ExecutionTimeRecorder[IO](logger, maybeHistogram = Some(eventsProcessingTimes))

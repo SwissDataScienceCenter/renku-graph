@@ -23,7 +23,7 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.projects.Id
-import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
+import ch.datascience.graph.tokenrepository.{AccessTokenFinder, AccessTokenFinder}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.interpreters.TestLogger
@@ -40,7 +40,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import scala.util.{Failure, Try}
 
 class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matchers {
-  import IOAccessTokenFinder._
+  import AccessTokenFinder._
 
   s"validateHook - finding access token" should {
 

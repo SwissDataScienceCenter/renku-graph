@@ -28,8 +28,8 @@ import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.EventStatus.FailureStatus
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventProcessingTime, EventStatus}
-import ch.datascience.http.client.IORestClient
-import ch.datascience.http.client.IORestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
+import ch.datascience.http.client.RestClient
+import ch.datascience.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
 import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
 import ch.datascience.rdfstore.JsonLDTriples
 import eu.timepit.refined.api.Refined
@@ -69,11 +69,11 @@ private class EventStatusUpdaterImpl(
     executionContext: ExecutionContext,
     contextShift:     ContextShift[IO],
     timer:            Timer[IO]
-) extends IORestClient(Throttler.noThrottling,
-                       logger,
-                       retryInterval = retryInterval,
-                       maxRetries = maxRetries,
-                       requestTimeoutOverride = requestTimeoutOverride
+) extends RestClient(Throttler.noThrottling,
+                     logger,
+                     retryInterval = retryInterval,
+                     maxRetries = maxRetries,
+                     requestTimeoutOverride = requestTimeoutOverride
     )
     with EventStatusUpdater[IO] {
 

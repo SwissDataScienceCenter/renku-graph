@@ -18,49 +18,62 @@
 
 package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.all._
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitInfo
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects
-import ch.datascience.http.client.IORestClient
-import org.typelevel.log4cats.Logger
+import ch.datascience.http.client.RestClient
 import org.http4s.Status.{NotFound, Ok}
 import org.http4s.{Request, Response, Status}
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private trait EventDetailsFinder[Interpretation[_]] {
-  def checkIfExists(commitId: CommitId, projectId: projects.Id): Interpretation[Boolean]
+private[eventgeneration] trait EventDetailsFinder[Interpretation[_]] {
+  def checkIfExists(commitId:   CommitId, projectId: projects.Id): Interpretation[Boolean]
+  def getEventDetails(commitId: CommitId, projectId: projects.Id): Interpretation[Option[CommitInfo]]
 }
 
-private class EventDetailsFinderImpl(
+private[eventgeneration] class EventDetailsFinderImpl[Interpretation[_]: ContextShift: Timer: ConcurrentEffect](
     eventLogUrl:             EventLogUrl,
-    logger:                  Logger[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORestClient(Throttler.noThrottling, logger)
-    with EventDetailsFinder[IO] {
+    logger:                  Logger[Interpretation]
+)(implicit executionContext: ExecutionContext)
+    extends RestClient[Interpretation, EventDetailsFinder[Interpretation]](Throttler.noThrottling, logger)
+    with EventDetailsFinder[Interpretation] {
 
   import org.http4s.Method.GET
 
-  override def checkIfExists(commitId: CommitId, projectId: projects.Id): IO[Boolean] =
+  override def checkIfExists(commitId: CommitId, projectId: projects.Id): Interpretation[Boolean] =
+    fetchEventDetails(commitId, projectId)(mapResponseToBoolean)
+
+  override def getEventDetails(commitId: CommitId, projectId: projects.Id): Interpretation[Option[CommitInfo]] =
+    ???
+
+  private def fetchEventDetails[ResultType](commitId: CommitId, projectId: projects.Id)(
+      mapResponse: PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[
+        ResultType
+      ]]
+  ) =
     validateUri(s"$eventLogUrl/events/$commitId/$projectId") >>= (uri => send(request(GET, uri))(mapResponse))
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Boolean]] = {
-    case (Ok, _, _)       => true.pure[IO]
-    case (NotFound, _, _) => false.pure[IO]
+  private lazy val mapResponseToBoolean
+      : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[Boolean]] = {
+    case (Ok, _, _)       => true.pure[Interpretation]
+    case (NotFound, _, _) => false.pure[Interpretation]
   }
 }
 
-private object EventDetailsFinder {
+private[eventgeneration] object EventDetailsFinder {
   def apply(
       logger: Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[EventDetailsFinderImpl] = for {
+  ): IO[EventDetailsFinderImpl[IO]] = for {
     eventLogUrl <- EventLogUrl[IO]()
   } yield new EventDetailsFinderImpl(eventLogUrl, logger)
 }

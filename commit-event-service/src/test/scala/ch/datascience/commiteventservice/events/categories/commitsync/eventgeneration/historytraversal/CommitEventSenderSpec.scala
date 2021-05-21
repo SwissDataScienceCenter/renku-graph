@@ -131,7 +131,7 @@ class CommitEventSenderSpec extends AnyWordSpec with MockFactory with ExternalSe
     val eventLogUrl = EventLogUrl(externalServiceBaseUrl)
     class TestCommitEventSerializer extends CommitEventSerializer[IO]
     val eventSerializer = mock[TestCommitEventSerializer]
-    val eventSender     = new CommitEventSenderImpl(eventLogUrl, eventSerializer, TestLogger())
+    val eventSender     = new CommitEventSenderImpl[IO](eventLogUrl, eventSerializer, TestLogger())
   }
 
   private def commitEventEncoder[T <: CommitEvent](eventBody: String): Encoder[T] = Encoder.instance[T] {

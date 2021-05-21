@@ -22,7 +22,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.http.client.IORestClient
+import ch.datascience.http.client.RestClient
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.http.rest.paging.Paging.PagedResultsFinder
 import ch.datascience.http.rest.paging._
@@ -49,7 +49,7 @@ class IORdfStoreClientSpec extends AnyWordSpec with ExternalServiceStubbing with
 
     "be a IORestClient" in new QueryClientTestCase {
       client shouldBe a[IORdfStoreClient]
-      client shouldBe a[IORestClient[_]]
+      client shouldBe a[RestClient[IO, _]]
     }
   }
 

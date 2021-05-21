@@ -22,8 +22,8 @@ import cats.MonadError
 import cats.effect._
 import cats.syntax.all._
 import ch.datascience.control.Throttler
-import ch.datascience.http.client.IORestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
-import ch.datascience.http.client.{HttpRequest, IORestClient}
+import ch.datascience.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
+import ch.datascience.http.client.{HttpRequest, RestClient}
 import ch.datascience.http.rest.paging.Paging.PagedResultsFinder
 import ch.datascience.http.rest.paging.PagingRequest
 import eu.timepit.refined.api.Refined
@@ -47,7 +47,12 @@ abstract class IORdfStoreClient(
     contextShift:     ContextShift[IO],
     timer:            Timer[IO],
     ME:               MonadError[IO, Throwable]
-) extends IORestClient(Throttler.noThrottling, logger, Some(timeRecorder.instance), retryInterval, maxRetries) {
+) extends RestClient[IO, IORdfStoreClient](Throttler.noThrottling,
+                                           logger,
+                                           Some(timeRecorder.instance),
+                                           retryInterval,
+                                           maxRetries
+    ) {
 
   import IORdfStoreClient._
   import ch.datascience.http.client.UrlEncoder.urlEncode

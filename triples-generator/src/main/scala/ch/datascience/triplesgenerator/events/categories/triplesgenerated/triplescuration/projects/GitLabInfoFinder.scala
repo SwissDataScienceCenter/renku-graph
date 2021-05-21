@@ -25,7 +25,7 @@ import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.projects.{DateCreated, Name, Path}
 import ch.datascience.graph.model.{projects, users}
 import ch.datascience.graph.model.users.GitLabId
-import ch.datascience.http.client.{AccessToken, IORestClient}
+import ch.datascience.http.client.{AccessToken, RestClient}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -40,7 +40,7 @@ private class IOGitLabInfoFinder(
     gitLabThrottler:         Throttler[IO, GitLab],
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORestClient(gitLabThrottler, logger)
+    extends RestClient(gitLabThrottler, logger)
     with GitLabInfoFinder[IO] {
 
   import cats.data.OptionT

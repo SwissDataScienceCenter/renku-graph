@@ -27,7 +27,7 @@ import ch.datascience.control.Throttler
 import ch.datascience.events.consumers.Project
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events.EventId
-import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
+import ch.datascience.graph.tokenrepository.{AccessTokenFinder, AccessTokenFinder}
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import org.typelevel.log4cats.Logger
 
@@ -49,7 +49,7 @@ private class PersonDetailsUpdaterImpl[Interpretation[_]: Monad](
 )(implicit ME:                       MonadError[Interpretation, Throwable])
     extends PersonDetailsUpdater[Interpretation] {
 
-  import IOAccessTokenFinder._
+  import AccessTokenFinder._
   import accessTokenFinder._
   import personsAndProjectMembersMatcher._
   import projectMembersFinder._
@@ -89,7 +89,7 @@ private[triplescuration] object PersonDetailsUpdater {
       timer:            Timer[IO]
   ): IO[PersonDetailsUpdater[IO]] = for {
     projectMembersFinder <- IOGitLabProjectMembersFinder(gitLabThrottler, logger)
-    accessTokenFinder    <- IOAccessTokenFinder(logger)
+    accessTokenFinder    <- AccessTokenFinder(logger)
     gitLabUrl            <- GitLabUrl[IO]()
     personTrimmer        <- IOPersonTrimmer(gitLabThrottler, logger)
   } yield new PersonDetailsUpdaterImpl[IO](

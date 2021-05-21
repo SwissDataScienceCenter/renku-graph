@@ -21,8 +21,8 @@ package io.renku.eventlog.subscriptions.zombieevents
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.control.Throttler
-import ch.datascience.http.client.IORestClient
-import ch.datascience.http.client.IORestClient.MaxRetriesAfterConnectionTimeout
+import ch.datascience.http.client.RestClient
+import ch.datascience.http.client.RestClient.MaxRetriesAfterConnectionTimeout
 import ch.datascience.microservices.MicroserviceBaseUrl
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
@@ -55,7 +55,7 @@ private class ServiceHealthCheckerImpl(
     retryInterval:           FiniteDuration = 1 second,
     maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
 )(implicit executionContext: ExecutionContext, concurrentEffect: ConcurrentEffect[IO], timer: Timer[IO])
-    extends IORestClient(Throttler.noThrottling, logger, retryInterval = retryInterval, maxRetries = maxRetries)
+    extends RestClient(Throttler.noThrottling, logger, retryInterval = retryInterval, maxRetries = maxRetries)
     with ServiceHealthChecker[IO] {
 
   override def ping(microserviceBaseUrl: MicroserviceBaseUrl): IO[Boolean] = {

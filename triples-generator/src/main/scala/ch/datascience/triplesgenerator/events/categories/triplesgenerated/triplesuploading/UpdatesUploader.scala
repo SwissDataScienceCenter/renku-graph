@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated.tripl
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.http.client.IORestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
+import ch.datascience.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
 import ch.datascience.rdfstore._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative

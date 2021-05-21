@@ -18,11 +18,11 @@
 
 package ch.datascience.commiteventservice.events.categories.commitsync
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.data.EitherT.fromEither
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.MissedEventsGenerator
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.events.consumers
@@ -30,15 +30,15 @@ import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadReque
 import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult}
 import ch.datascience.graph.model.events.{CategoryName, CommitId, LastSyncedDate}
 import ch.datascience.logging.ExecutionTimeRecorder
-import org.typelevel.log4cats.Logger
 import io.circe.Decoder
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-private[events] class EventHandler[Interpretation[_]: MonadError[*[_], Throwable]](
+private[events] class EventHandler[Interpretation[_]: MonadThrow](
     override val categoryName: CategoryName,
-    missedEventGenerator:      MissedEventsGenerator[Interpretation],
+    commitEventSynchronizer:   CommitEventSynchronizer[Interpretation],
     logger:                    Logger[Interpretation]
 )(implicit
     contextShift: ContextShift[Interpretation],
@@ -47,7 +47,7 @@ private[events] class EventHandler[Interpretation[_]: MonadError[*[_], Throwable
 
   import ch.datascience.graph.model.projects
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
-  import missedEventGenerator._
+  import commitEventSynchronizer._
 
   override def handle(request: EventRequestContent): Interpretation[EventSchedulingResult] = {
     for {
@@ -57,7 +57,7 @@ private[events] class EventHandler[Interpretation[_]: MonadError[*[_], Throwable
           request.event.as[CommitSyncEvent].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult]
         )
       result <- (contextShift.shift *> concurrent
-                  .start(generateMissedEvents(event) recoverWith logError(event))).toRightT
+                  .start(synchronizeEvents(event) recoverWith logError(event))).toRightT
                   .map(_ => Accepted)
                   .semiflatTap(logger log event)
                   .leftSemiflatTap(logger log event)
@@ -102,6 +102,6 @@ private[events] object EventHandler {
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[EventHandler[IO]] = for {
-    missedEventsGenerator <- MissedEventsGenerator(gitLabThrottler, executionTimeRecorder, logger)
-  } yield new EventHandler[IO](categoryName, missedEventsGenerator, logger)
+    commitEventSynchronizer <- CommitEventSynchronizer(gitLabThrottler, executionTimeRecorder, logger)
+  } yield new EventHandler[IO](categoryName, commitEventSynchronizer, logger)
 }

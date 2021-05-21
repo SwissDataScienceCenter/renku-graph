@@ -30,4 +30,5 @@ package object eventgeneration {
       case _ => Json.Null
     }
   }
+
 }

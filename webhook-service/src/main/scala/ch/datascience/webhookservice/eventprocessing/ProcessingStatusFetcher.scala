@@ -25,7 +25,7 @@ import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.projects
-import ch.datascience.http.client.IORestClient
+import ch.datascience.http.client.RestClient
 import ch.datascience.webhookservice.eventprocessing.ProcessingStatusFetcher.ProcessingStatus
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
@@ -82,7 +82,7 @@ private class IOProcessingStatusFetcher(
     executionContext: ExecutionContext,
     contextShift:     ContextShift[IO],
     timer:            Timer[IO]
-) extends IORestClient(Throttler.noThrottling, logger)
+) extends RestClient(Throttler.noThrottling, logger)
     with ProcessingStatusFetcher[IO] {
 
   import IOProcessingStatusFetcher._

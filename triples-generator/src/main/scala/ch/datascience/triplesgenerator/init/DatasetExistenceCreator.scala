@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.init
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
-import ch.datascience.http.client.IORestClient
+import ch.datascience.http.client.RestClient
 import ch.datascience.triplesgenerator.config.FusekiAdminConfig
 import org.typelevel.log4cats.Logger
 
@@ -34,7 +34,7 @@ private class IODatasetExistenceCreator(fusekiAdminConfig: FusekiAdminConfig, lo
     executionContext:                                      ExecutionContext,
     contextShift:                                          ContextShift[IO],
     timer:                                                 Timer[IO]
-) extends IORestClient(Throttler.noThrottling, logger)
+) extends RestClient(Throttler.noThrottling, logger)
     with DatasetExistenceCreator[IO] {
 
   import cats.effect._

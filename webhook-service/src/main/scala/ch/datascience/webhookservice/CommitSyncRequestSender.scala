@@ -23,7 +23,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.EventLogUrl
-import ch.datascience.http.client.IORestClient
+import ch.datascience.http.client.RestClient
 import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
 import ch.datascience.webhookservice.model.CommitSyncRequest
 import eu.timepit.refined.api.Refined
@@ -44,18 +44,18 @@ private class CommitSyncRequestSenderImpl(
     eventLogUrl:            EventLogUrl,
     logger:                 Logger[IO],
     retryDelay:             FiniteDuration,
-    retryInterval:          FiniteDuration = IORestClient.SleepAfterConnectionIssue,
-    maxRetries:             Int Refined NonNegative = IORestClient.MaxRetriesAfterConnectionTimeout,
+    retryInterval:          FiniteDuration = RestClient.SleepAfterConnectionIssue,
+    maxRetries:             Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
     requestTimeoutOverride: Option[Duration] = None
 )(implicit
     executionContext: ExecutionContext,
     contextShift:     ContextShift[IO],
     timer:            Timer[IO]
-) extends IORestClient(Throttler.noThrottling,
-                       logger,
-                       retryInterval = retryInterval,
-                       maxRetries = maxRetries,
-                       requestTimeoutOverride = requestTimeoutOverride
+) extends RestClient(Throttler.noThrottling,
+                     logger,
+                     retryInterval = retryInterval,
+                     maxRetries = maxRetries,
+                     requestTimeoutOverride = requestTimeoutOverride
     )
     with CommitSyncRequestSender[IO] {
 

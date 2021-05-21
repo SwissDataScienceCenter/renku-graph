@@ -21,8 +21,8 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated.tripl
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.control.Throttler
-import ch.datascience.http.client.IORestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
-import ch.datascience.http.client.{HttpRequest, IORestClient}
+import ch.datascience.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
+import ch.datascience.http.client.{HttpRequest, RestClient}
 import ch.datascience.rdfstore.{JsonLDTriples, RdfStoreConfig, SparqlQueryTimeRecorder}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -47,13 +47,13 @@ private class IOTriplesUploader(
     idleTimeout:             Duration = 6 minutes,
     requestTimeout:          Duration = 5 minutes
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORestClient[Any](Throttler.noThrottling,
-                              logger,
-                              maybeTimeRecorder = timeRecorder.instance.some,
-                              retryInterval = retryInterval,
-                              maxRetries = maxRetries,
-                              idleTimeoutOverride = idleTimeout.some,
-                              requestTimeoutOverride = requestTimeout.some
+    extends RestClient[Any](Throttler.noThrottling,
+                            logger,
+                            maybeTimeRecorder = timeRecorder.instance.some,
+                            retryInterval = retryInterval,
+                            maxRetries = maxRetries,
+                            idleTimeoutOverride = idleTimeout.some,
+                            requestTimeoutOverride = requestTimeout.some
     )
     with TriplesUploader[IO] {
 

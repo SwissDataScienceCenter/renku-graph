@@ -22,7 +22,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
-import ch.datascience.http.client.{AccessToken, BasicAuthCredentials, IORestClient}
+import ch.datascience.http.client.{AccessToken, BasicAuthCredentials, RestClient}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.model.HookToken
@@ -174,7 +174,7 @@ abstract class ServiceClient(implicit
     executionContext: ExecutionContext,
     contextShift:     ContextShift[IO],
     timer:            Timer[IO]
-) extends IORestClient(Throttler.noThrottling, TestLogger(), retryInterval = 500 millis, maxRetries = 1) {
+) extends RestClient(Throttler.noThrottling, TestLogger(), retryInterval = 500 millis, maxRetries = 1) {
 
   import ServiceClient.ServiceReadiness
   import ServiceClient.ServiceReadiness._

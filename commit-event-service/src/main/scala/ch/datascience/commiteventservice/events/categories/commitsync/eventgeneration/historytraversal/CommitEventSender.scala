@@ -18,17 +18,18 @@
 
 package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal
 
-import cats.MonadError
-import cats.effect.{ContextShift, IO, Timer}
+import cats.MonadThrow
+import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
+import cats.syntax.all._
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEvent
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.events.EventBody
-import ch.datascience.http.client.IORestClient
-import org.typelevel.log4cats.Logger
+import ch.datascience.http.client.RestClient
 import org.http4s.Status
 import org.http4s.Status.Accepted
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
@@ -36,19 +37,14 @@ private trait CommitEventSender[Interpretation[_]] {
   def send(commitEvent: CommitEvent): Interpretation[Unit]
 }
 
-private class CommitEventSenderImpl(
-    eventLogUrl:           EventLogUrl,
-    commitEventSerializer: CommitEventSerializer[IO],
-    logger:                Logger[IO]
-)(implicit
-    ME:               MonadError[IO, Throwable],
-    executionContext: ExecutionContext,
-    contextShift:     ContextShift[IO],
-    timer:            Timer[IO]
-) extends IORestClient(Throttler.noThrottling, logger)
-    with CommitEventSender[IO] {
+private class CommitEventSenderImpl[Interpretation[_]: MonadThrow: ContextShift: Timer: ConcurrentEffect](
+    eventLogUrl:             EventLogUrl,
+    commitEventSerializer:   CommitEventSerializer[Interpretation],
+    logger:                  Logger[Interpretation]
+)(implicit executionContext: ExecutionContext)
+    extends RestClient[Interpretation, CommitEventSender[Interpretation]](Throttler.noThrottling, logger)
+    with CommitEventSender[Interpretation] {
 
-  import cats.effect._
   import commitEventSerializer._
   import io.circe.Encoder
   import io.circe.literal._
@@ -56,9 +52,9 @@ private class CommitEventSenderImpl(
   import org.http4s.Method.POST
   import org.http4s.{Request, Response}
 
-  def send(commitEvent: CommitEvent): IO[Unit] = for {
+  def send(commitEvent: CommitEvent): Interpretation[Unit] = for {
     serialisedEvent <- serialiseToJsonString(commitEvent)
-    eventBody       <- ME.fromEither(EventBody.from(serialisedEvent))
+    eventBody       <- MonadThrow[Interpretation].fromEither(EventBody.from(serialisedEvent))
     uri             <- validateUri(s"$eventLogUrl/events")
     sendingResult <-
       send(request(POST, uri).withMultipartBuilder.addPart("event", (commitEvent -> eventBody).asJson).build())(
@@ -97,8 +93,9 @@ private class CommitEventSenderImpl(
       }"""
     }
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
-    case (Accepted, _, _) => IO.unit
+  private lazy val mapResponse
+      : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[Unit]] = {
+    case (Accepted, _, _) => ().pure[Interpretation]
   }
 }
 

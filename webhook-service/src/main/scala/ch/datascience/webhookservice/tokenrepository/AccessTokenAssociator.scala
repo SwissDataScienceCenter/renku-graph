@@ -22,7 +22,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
-import ch.datascience.http.client.{AccessToken, IORestClient}
+import ch.datascience.http.client.{AccessToken, RestClient}
 import org.typelevel.log4cats.Logger
 import org.http4s.Status
 
@@ -36,7 +36,7 @@ class IOAccessTokenAssociator(
     tokenRepositoryUrl:      TokenRepositoryUrl,
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORestClient(Throttler.noThrottling, logger)
+    extends RestClient(Throttler.noThrottling, logger)
     with AccessTokenAssociator[IO] {
 
   import cats.effect._

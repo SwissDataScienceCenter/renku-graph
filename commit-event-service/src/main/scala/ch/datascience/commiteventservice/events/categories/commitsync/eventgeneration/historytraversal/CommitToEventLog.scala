@@ -19,14 +19,13 @@
 package ch.datascience.commiteventservice.events.categories.commitsync
 package eventgeneration.historytraversal
 
-import cats.MonadError
 import cats.effect._
 import cats.syntax.all._
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.EventCreationResult.{Created, Existed, Failed}
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.{CommitEvent, StartCommit}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
+import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import org.typelevel.log4cats.Logger
@@ -38,7 +37,7 @@ private[eventgeneration] trait CommitToEventLog[Interpretation[_]] {
   def storeCommitsInEventLog(startCommit: StartCommit): Interpretation[Unit]
 }
 
-private class CommitToEventLogImpl[Interpretation[_]: MonadError[*[_], Throwable]](
+private class CommitToEventLogImpl[Interpretation[_]: MonadThrow](
     accessTokenFinder:     AccessTokenFinder[Interpretation],
     commitEventsSource:    CommitEventsSourceBuilder[Interpretation],
     commitEventSender:     CommitEventSender[Interpretation],
@@ -48,7 +47,7 @@ private class CommitToEventLogImpl[Interpretation[_]: MonadError[*[_], Throwable
     clock:                 java.time.Clock = java.time.Clock.systemUTC()
 ) extends CommitToEventLog[Interpretation] {
 
-  import IOAccessTokenFinder._
+  import AccessTokenFinder._
   import accessTokenFinder._
   import commitEventSender._
   import commitEventsSource._
@@ -138,7 +137,7 @@ private[eventgeneration] object CommitToEventLog {
   ): IO[CommitToEventLog[IO]] =
     for {
       eventSender               <- CommitEventSender(logger)
-      accessTokenFinder         <- IOAccessTokenFinder(logger)
+      accessTokenFinder         <- AccessTokenFinder(logger)
       commitEventsSourceBuilder <- CommitEventsSourceBuilder(gitLabThrottler)
       eventDetailsFinder        <- EventDetailsFinder(logger)
     } yield new CommitToEventLogImpl[IO](

@@ -53,7 +53,7 @@ import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 import scala.language.postfixOps
 
-class IORestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockFactory with should.Matchers {
+class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockFactory with should.Matchers {
 
   "send" should {
 
@@ -355,13 +355,13 @@ class IORestClientSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
                                maybeTimeRecorder:           Option[ExecutionTimeRecorder[IO]],
                                idleTimeoutOverride:         Option[Duration] = None,
                                maybeRequestTimeoutOverride: Option[Duration] = None
-  ) extends IORestClient(throttler,
-                         logger,
-                         maybeTimeRecorder,
-                         retryInterval = 1 millisecond,
-                         maxRetries = 2,
-                         idleTimeoutOverride,
-                         maybeRequestTimeoutOverride
+  ) extends RestClient(throttler,
+                       logger,
+                       maybeTimeRecorder,
+                       retryInterval = 1 millisecond,
+                       maxRetries = 2,
+                       idleTimeoutOverride,
+                       maybeRequestTimeoutOverride
       ) {
 
     def callRemote: IO[Int] =

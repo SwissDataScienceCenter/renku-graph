@@ -22,7 +22,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabApiUrl
-import ch.datascience.http.client.{AccessToken, IORestClient}
+import ch.datascience.http.client.{AccessToken, RestClient}
 import ch.datascience.http.server.security.EndpointSecurityException.AuthenticationFailure
 import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.http.server.security.{Authenticator, EndpointSecurityException}
@@ -35,7 +35,7 @@ class GitLabAuthenticatorImpl(
     gitLabThrottler:         Throttler[IO, GitLab],
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORestClient(gitLabThrottler, logger)
+    extends RestClient(gitLabThrottler, logger)
     with Authenticator[IO] {
 
   import cats.effect._

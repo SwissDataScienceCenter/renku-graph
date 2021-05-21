@@ -32,7 +32,7 @@ import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Path
-import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
+import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level._
@@ -50,7 +50,7 @@ import scala.util._
 
 class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
-  import IOAccessTokenFinder._
+  import AccessTokenFinder._
 
   "storeCommitsInEventLog" should {
 
