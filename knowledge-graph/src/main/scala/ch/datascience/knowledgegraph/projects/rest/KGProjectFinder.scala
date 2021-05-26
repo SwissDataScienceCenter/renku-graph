@@ -46,7 +46,7 @@ object KGProjectFinder {
 
   final case class ProjectCreation(date: DateCreated, maybeCreator: Option[ProjectCreator])
 
-  final case class Parent(resourceId: ResourceId, name: Name, created: ProjectCreation)
+  final case class Parent(resourceId: ResourceId, name: Name, created: ProjectCreation, visibility: Visibility)
 
   final case class ProjectCreator(maybeEmail: Option[users.Email], name: users.Name)
 
@@ -126,6 +126,7 @@ private class IOKGProjectFinder(
         maybeParentId          <- cursor.downField("maybeParentId").downField("value").as[Option[ResourceId]]
         maybeParentName        <- cursor.downField("maybeParentName").downField("value").as[Option[Name]]
         maybeParentDateCreated <- cursor.downField("maybeParentDateCreated").downField("value").as[Option[DateCreated]]
+        maybeParentVisibility  <- cursor.downField("maybeParentVisibility").downField("value").as[Option[Visibility]]
         maybeParentCreatorName <- cursor.downField("maybeParentCreatorName").downField("value").as[Option[users.Name]]
         maybeParentCreatorEmail <- cursor
                                      .downField("maybeParentCreatorEmail")
@@ -136,15 +137,16 @@ private class IOKGProjectFinder(
         path,
         name,
         ProjectCreation(dateCreated, maybeCreatorName map (name => ProjectCreator(maybeCreatorEmail, name))),
-        maybeParent =
-          (maybeParentId, maybeParentName, maybeParentDateCreated) mapN { case (parentId, name, dateCreated) =>
+        maybeParent = (maybeParentId, maybeParentName, maybeParentDateCreated, maybeParentVisibility) mapN {
+          case (parentId, name, dateCreated, visibility) =>
             Parent(parentId,
                    name,
                    ProjectCreation(dateCreated,
                                    maybeParentCreatorName.map(name => ProjectCreator(maybeParentCreatorEmail, name))
-                   )
+                   ),
+                   visibility
             )
-          },
+        },
         version
       )
     }

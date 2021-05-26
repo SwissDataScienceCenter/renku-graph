@@ -27,7 +27,7 @@ final case class Project(path:               Path,
                          agent:              CliVersion,
                          dateCreated:        DateCreated,
                          maybeCreator:       Option[Person],
-                         maybeVisibility:    Option[Visibility],
+                         visibility:         Visibility,
                          maybeParentProject: Option[Project],
                          members:            Set[Person],
                          version:            SchemaVersion
@@ -46,7 +46,7 @@ object Project {
             dateCreated:        DateCreated,
             maybeCreator:       Option[Person],
             schemaVersion:      SchemaVersion,
-            maybeVisibility:    Option[Visibility] = None,
+            visibility:         Visibility,
             maybeParentProject: Option[Project] = None,
             members:            Set[Person] = Set.empty
   ): Project = Project(
@@ -55,7 +55,7 @@ object Project {
     agent,
     dateCreated,
     maybeCreator,
-    maybeVisibility,
+    visibility,
     maybeParentProject,
     members,
     schemaVersion
@@ -70,7 +70,7 @@ object Project {
         schema / "agent"            -> project.agent.asJsonLD,
         schema / "dateCreated"      -> project.dateCreated.asJsonLD,
         schema / "creator"          -> project.maybeCreator.asJsonLD,
-        renku / "projectVisibility" -> project.maybeVisibility.asJsonLD,
+        renku / "projectVisibility" -> project.visibility.asJsonLD,
         schema / "member"           -> project.members.toList.asJsonLD,
         schema / "schemaVersion"    -> project.version.asJsonLD,
         prov / "wasDerivedFrom"     -> project.maybeParentProject.asJsonLD

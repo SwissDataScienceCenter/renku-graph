@@ -35,6 +35,7 @@ import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.knowledgegraph.projects.model.Permissions._
 import ch.datascience.knowledgegraph.projects.model.{ParentProject, Permissions, Project}
+import ch.datascience.rdfstore.entities
 import ch.datascience.rdfstore.entities.Person
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
@@ -171,7 +172,7 @@ object GitLab {
 
   def `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(
       projectPath:        Path,
-      persons:            NonEmptyList[(users.GitLabId, users.Username, users.Name)]
+      persons:            NonEmptyList[entities.Person]
   )(implicit accessToken: AccessToken): Unit = {
     implicit val personEncoder: Encoder[(users.GitLabId, users.Username, users.Name)] = Encoder.instance {
       case (gitLabId, username, name) =>
@@ -225,7 +226,6 @@ object GitLab {
 
   def `GET <gitlabApi>/projects/:path returning OK with`(
       project:            Project,
-      maybeCreator:       Option[Person] = None,
       withStatistics:     Boolean = false
   )(implicit accessToken: AccessToken): Unit = {
 
@@ -291,7 +291,7 @@ object GitLab {
                   .getOrElse(Json.obj())
               )
               .deepMerge(
-                maybeCreator
+                project.created.maybeCreator
                   .flatMap(_.maybeGitLabId)
                   .map(creatorId => json"""{"creator_id": ${creatorId.value}}""")
                   .getOrElse(Json.obj())

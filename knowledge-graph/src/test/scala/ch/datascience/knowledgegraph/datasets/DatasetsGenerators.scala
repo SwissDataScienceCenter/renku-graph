@@ -31,10 +31,7 @@ import org.scalacheck.Gen
 
 object DatasetsGenerators {
 
-  implicit def datasetsDEPRECATED(implicit renkuBaseUrl: RenkuBaseUrl): Gen[NonModifiedDataset] =
-    nonModifiedDatasetsDEPRECATED()
-
-  def nonModifiedDatasetsDEPRECATED(
+  def nonModifiedDatasets(
       sameAs:              Gen[SameAs] = datasetSameAs,
       usedInProjects:      Gen[NonEmptyList[DatasetProject]] = nonEmptyList(datasetProjects)
   )(implicit renkuBaseUrl: RenkuBaseUrl): Gen[NonModifiedDataset] =

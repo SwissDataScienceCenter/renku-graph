@@ -19,6 +19,7 @@
 package ch.datascience.graph.acceptancetests
 
 import ch.datascience.config.renku
+import cats.syntax.all._
 import ch.datascience.graph.acceptancetests.tooling.RDFStore
 import ch.datascience.graph.model.{CliVersion, SchemaVersion}
 import ch.datascience.rdfstore.{FusekiBaseUrl, entities}
@@ -28,8 +29,9 @@ import ch.datascience.knowledgegraph.projects.model.{Creator, Project}
 import ch.datascience.rdfstore.entities.Person
 
 package object data {
-  val currentVersionPair:     RenkuVersionPair   = RenkuVersionPair(CliVersion("0.12.2"), SchemaVersion("8"))
   val renkuResourcesUrl:      renku.ResourcesUrl = renku.ResourcesUrl("http://localhost:9004/knowledge-graph")
+  val currentVersionPair:     RenkuVersionPair   = RenkuVersionPair(CliVersion("0.12.2"), SchemaVersion("8"))
+  implicit val cliVersion:    CliVersion         = currentVersionPair.cliVersion
   implicit val fusekiBaseUrl: FusekiBaseUrl      = RDFStore.fusekiBaseUrl
 
   implicit class ProjectCreatorOps(creator: Creator) {
@@ -37,14 +39,14 @@ package object data {
   }
 
   implicit class ProjectOps(project: Project) {
-    def toEntitiesProject(cliVersion: CliVersion): entities.Project = entities.Project(
+
+    def toEntitiesProject(members: Set[Person])(implicit cliVersion: CliVersion): entities.Project = entities.Project(
       project.path,
       project.name,
-      cliVersion,
+      agent = cliVersion,
       project.created.date,
       project.created.maybeCreator.map(_.toEntitiesPerson),
-      None,
-      project.created.maybeCreator.map(_.toEntitiesPerson).toList.toSet,
+      project.visibility,
       maybeParentProject = project.forking.maybeParent.map(parent =>
         entities.Project(
           parent.path,
@@ -52,12 +54,13 @@ package object data {
           cliVersion,
           parent.created.date,
           parent.created.maybeCreator.map(_.toEntitiesPerson),
-          None,
-          parent.created.maybeCreator.map(_.toEntitiesPerson).toList.toSet,
+          parent.visibility,
           maybeParentProject = None,
+          members = Set.empty,
           project.version
         )
       ),
+      members,
       project.version
     )
   }

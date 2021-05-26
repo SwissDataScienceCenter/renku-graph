@@ -75,7 +75,7 @@ object model {
     implicit object ForksCount extends TinyTypeFactory[ForksCount](new ForksCount(_)) with NonNegativeInt
   }
 
-  final case class ParentProject(path: Path, name: Name, created: Creation)
+  final case class ParentProject(path: Path, name: Name, created: Creation, visibility: Visibility)
 
   sealed trait Permissions extends Product with Serializable
 

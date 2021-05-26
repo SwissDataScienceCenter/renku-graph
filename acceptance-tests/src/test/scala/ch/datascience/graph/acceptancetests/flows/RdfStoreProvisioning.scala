@@ -30,8 +30,7 @@ import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.{projects, users}
 import ch.datascience.http.client.AccessToken
-import ch.datascience.knowledgegraph.projects.model.Project
-import ch.datascience.rdfstore.entities.Person
+import ch.datascience.rdfstore.entities._
 import ch.datascience.webhookservice.model.HookToken
 import io.renku.jsonld.JsonLD
 import org.http4s.Status._
@@ -41,16 +40,11 @@ import org.scalatest.matchers.should
 
 object RdfStoreProvisioning extends ModelImplicits with Eventually with AcceptanceTestPatience with should.Matchers {
 
-  def `data in the RDF store`(
-      project:   Project,
-      commitId:  CommitId,
-      committer: Person,
-      triples:   JsonLD
-  )(
-      members: NonEmptyList[(users.GitLabId, users.Username, users.Name)] = committer.asMembersList()
-  )(implicit
-      accessToken: AccessToken
-  ): Assertion = {
+  def `data in the RDF store`(project:  Project,
+                              commitId: CommitId,
+                              triples:  JsonLD,
+                              members:  NonEmptyList[(users.GitLabId, users.Username, users.Name)]
+  )(implicit accessToken:               AccessToken): Assertion = {
     val projectId = project.id
 
     givenAccessTokenPresentFor(project)
@@ -59,11 +53,11 @@ object RdfStoreProvisioning extends ModelImplicits with Eventually with Acceptan
 
     `GET <gitlabApi>/projects/:id/repository/commits returning OK with a commit`(projectId, commitId)
 
-    `GET <gitlabApi>/projects/:path returning OK with`(project, maybeCreator = Some(committer))
+    `GET <gitlabApi>/projects/:path returning OK with`(project, maybeCreator = project.created.maybeCreator)
 
     `GET <triples-generator>/projects/:id/commits/:id returning OK`(project, commitId, triples)
 
-    `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project.path, members)
+    `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project.path, project.members)
 
     webhookServiceClient
       .POST("webhooks/events", HookToken(projectId), data.GitLab.pushEvent(project, commitId))

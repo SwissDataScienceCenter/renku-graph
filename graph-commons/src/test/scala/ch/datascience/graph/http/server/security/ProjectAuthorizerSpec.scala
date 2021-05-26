@@ -41,7 +41,7 @@ class ProjectAuthorizerSpec extends AnyWordSpec with InMemoryRdfStore with shoul
 
     "succeed if the given project is public and there's no auth user" in new TestCase {
       val project = projectEntities().generateOne.copy(
-        maybeVisibility = Public.some
+        visibility = Public
       )
 
       loadToStore(project.asJsonLD)
@@ -52,7 +52,7 @@ class ProjectAuthorizerSpec extends AnyWordSpec with InMemoryRdfStore with shoul
     "succeed if the given project is public and the user has rights for the project" in new TestCase {
       val authUser = authUsers.generateOne
       val project = projectEntities().generateOne.copy(
-        maybeVisibility = Public.some,
+        visibility = Public,
         members = Set(persons.generateOne.copy(maybeGitLabId = authUser.id.some))
       )
 
@@ -64,7 +64,7 @@ class ProjectAuthorizerSpec extends AnyWordSpec with InMemoryRdfStore with shoul
     "succeed if the given project is non-public and the user has rights for the project" in new TestCase {
       val authUser = authUsers.generateOne
       val project = projectEntities().generateOne.copy(
-        maybeVisibility = Gen.oneOf(Private, Internal).generateSome,
+        visibility = Gen.oneOf(Private, Internal).generateOne,
         members = Set(persons.generateOne.copy(maybeGitLabId = authUser.id.some))
       )
 
@@ -85,7 +85,7 @@ class ProjectAuthorizerSpec extends AnyWordSpec with InMemoryRdfStore with shoul
 
     "fail if the given project is non-public and the user does not have rights for it" in new TestCase {
       val project = projectEntities().generateOne.copy(
-        maybeVisibility = Gen.oneOf(Private, Internal).generateSome,
+        visibility = Gen.oneOf(Private, Internal).generateOne,
         members = persons.generateSet()
       )
 
@@ -98,7 +98,7 @@ class ProjectAuthorizerSpec extends AnyWordSpec with InMemoryRdfStore with shoul
 
     "fail if the given project is non-public and there's no authorized user" in new TestCase {
       val project = projectEntities().generateOne.copy(
-        maybeVisibility = Gen.oneOf(Private, Internal).generateSome,
+        visibility = Gen.oneOf(Private, Internal).generateOne,
         members = persons.generateSet()
       )
 

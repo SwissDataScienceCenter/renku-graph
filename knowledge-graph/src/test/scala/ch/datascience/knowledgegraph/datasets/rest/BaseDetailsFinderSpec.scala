@@ -18,18 +18,18 @@
 
 package ch.datascience.knowledgegraph.datasets.rest
 
-import ch.datascience.generators.CommonGraphGenerators.{renkuBaseUrls, renkuResourcesUrls}
+import ch.datascience.generators.CommonGraphGenerators.renkuResourcesUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.SameAs
 import ch.datascience.graph.model.{datasets, projects}
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
-import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.rdfstore.entities
+import ch.datascience.rdfstore.entities.EntitiesGenerators._
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
 import io.circe.literal._
+import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -37,15 +37,15 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
-  private implicit val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
-
   import BaseDetailsFinder._
-  import io.circe.syntax._
 
   "non modified dataset decoder" should {
 
     "decode result-set with a blank description, url, sameAs, and images to a Dataset object" in {
-      forAll(nonModifiedDatasets(), blankStrings()) { (dataset, description) =>
+      forAll(
+        datasetEntities(datasetProvenanceInternal).map(_.to[NonModifiedDataset]),
+        blankStrings()
+      ) { (dataset, description) =>
         resultSet(dataset, description).as[List[Dataset]](datasetsDecoder(List(dataset.project))) shouldBe Right {
           List(
             dataset
@@ -65,13 +65,13 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
   "modified dataset decoder" should {
 
     "decode result-set with a blank description, url, sameAs, and images to a Dataset object" in {
-      forAll(nonModifiedDatasets(), blankStrings()) { (dataset, description) =>
-        val modifiedDataset = modifiedDatasetsOnFirstProject(dataset).generateOne
-        resultSet(modifiedDataset, description).as[List[Dataset]](
-          datasetsDecoder(List(dataset.project))
-        ) shouldBe Right {
+      forAll(
+        datasetEntities(datasetProvenanceModified).map(_.to[ModifiedDataset]),
+        blankStrings()
+      ) { (dataset, description) =>
+        resultSet(dataset, description).as[List[Dataset]](datasetsDecoder(List(dataset.project))) shouldBe Right {
           List(
-            modifiedDataset
+            dataset
               .copy(creators = Set.empty)
               .copy(maybeDescription = None)
               .copy(parts = Nil)

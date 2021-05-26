@@ -37,7 +37,7 @@ import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.EntitiesGenerators.projectEntities
-import ch.datascience.rdfstore.entities._
+import ch.datascience.rdfstore.entities.{DatasetOps, _}
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder, entities}
 import eu.timepit.refined.api.Refined

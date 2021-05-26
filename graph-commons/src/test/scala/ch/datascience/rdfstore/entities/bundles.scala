@@ -21,11 +21,11 @@ package ch.datascience.rdfstore.entities
 import ch.datascience.generators.CommonGraphGenerators.gitLabUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.Schemas
-import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
+import ch.datascience.graph.config.GitLabApiUrl
 
 object bundles extends Schemas {
 
-  implicit lazy val renkuBaseUrl: RenkuBaseUrl = RenkuBaseUrl("https://dev.renku.ch")
+//  implicit lazy val renkuBaseUrl: RenkuBaseUrl = RenkuBaseUrl("https://dev.renku.ch")
   implicit lazy val gitLabApiUrl: GitLabApiUrl = gitLabUrls.generateOne.apiV4
 
 //  def randomDataSetActivity: Activity =

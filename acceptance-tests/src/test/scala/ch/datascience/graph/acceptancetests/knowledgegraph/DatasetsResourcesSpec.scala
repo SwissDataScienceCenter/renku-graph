@@ -41,18 +41,17 @@ import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.http.rest.Links.{Href, Rel, _links}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.http.server.security.model.AuthUser
-import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.knowledgegraph.projects.model.Project
-import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
+import ch.datascience.rdfstore.entities.EntitiesGenerators._
 import ch.datascience.rdfstore.entities.Person
-import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import eu.timepit.refined.auto._
 import io.circe.literal._
 import io.circe.{Encoder, Json}
 import io.renku.jsonld.JsonLD
+import io.renku.jsonld.syntax._
 import org.http4s.Status._
 import org.scalacheck.Gen
 import org.scalatest.GivenWhenThen
@@ -60,7 +59,6 @@ import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 
 import scala.util.Random
-import ch.datascience.rdfstore.entities.EntitiesGenerators._
 
 class DatasetsResourcesSpec
     extends AnyFeatureSpec
@@ -76,100 +74,23 @@ class DatasetsResourcesSpec
     val user = authUsers.generateOne
     implicit val accessToken: AccessToken = user.accessToken
 
-    val project = {
-      val initProject = projects.generateOne
-      initProject.copy(
-        maybeDescription = projectDescriptions.generateSome,
-        forking = initProject.forking.copy(maybeParent = None),
-        created = initProject.created.copy(maybeCreator = None)
-      )
-    }
-    val dataset1Creation = addedToProjectObjects.generateOne.copy(
-      agent = DatasetAgent(project.created.maybeCreator.flatMap(_.maybeEmail),
-                           project.created.maybeCreator.map(_.name).getOrElse(userNames.generateOne)
-      )
+    val project = projectEntities().generateOne.copy(
+      visibility = Visibility.Public,
+      maybeParentProject = None,
+      maybeCreator = None
     )
-    val dataset1 = datasetEntities(provenanceGen = datasetProvenanceInternal, projectsGen = fixed(project)).generateOne
-    val dataset2 = nonModifiedDatasets().generateOne.copy(
-      maybeDescription = None,
-      usedIn = List(DatasetProject(project.path, project.name, dataset2Creation))
-    )
-    val modifiedDataset2 = modifiedDatasetsOnFirstProject(dataset2).generateOne
+    val dataset1         = datasetEntities(datasetProvenanceInternal, projectsGen = fixed(project)).generateOne
+    val dataset2         = datasetEntities(datasetProvenanceInternal, projectsGen = fixed(project)).generateOne
+    val dataset2Modified = modifiedDatasetEntities(dataset2).generateOne
 
     Scenario("As a user I would like to find project's datasets by calling a REST endpoint") {
 
       Given("some data in the RDF Store")
       val jsonLDTriples = JsonLD.arr(
-        nonModifiedDataSetCommit(
-          commitId = dataset1CommitId,
-          committedDate = dataset1Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
-          committer = dataset1Committer,
-          cliVersion = currentVersionPair.cliVersion
-        )(
-          projectPath = project.path,
-          projectName = project.name,
-          projectDateCreated = project.created.date,
-          maybeProjectCreator = project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail)),
-          projectVersion = project.version
-        )(
-          datasetIdentifier = dataset1.id,
-          datasetTitle = dataset1.title,
-          datasetName = dataset1.name,
-          maybeDatasetSameAs = dataset1.sameAs.some,
-          maybeDatasetDescription = dataset1.maybeDescription,
-          dates = dataset1.date,
-          datasetCreators = dataset1.creators map toPerson,
-          datasetParts = dataset1.parts.map(part => (part.name, part.location)),
-          datasetKeywords = dataset1.keywords,
-          datasetImages = dataset1.images
-        ),
-        nonModifiedDataSetCommit(
-          commitId = dataset2CommitId,
-          committedDate = dataset2Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
-          committer = Person(dataset2Creation.agent.name, dataset2Creation.agent.maybeEmail),
-          cliVersion = currentVersionPair.cliVersion
-        )(
-          projectPath = project.path,
-          projectName = project.name,
-          projectDateCreated = project.created.date,
-          maybeProjectCreator = project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail)),
-          projectVersion = project.version
-        )(
-          datasetIdentifier = dataset2.id,
-          datasetTitle = dataset2.title,
-          datasetName = dataset2.name,
-          maybeDatasetSameAs = dataset2.sameAs.some,
-          maybeDatasetDescription = dataset2.maybeDescription,
-          dates = dataset2.date,
-          datasetCreators = dataset2.creators map toPerson,
-          datasetParts = dataset2.parts.map(part => (part.name, part.location)),
-          datasetKeywords = dataset2.keywords,
-          datasetImages = dataset2.images
-        ),
-        modifiedDataSetCommit(
-          committedDate = modifiedDataset2.usedIn.head.created.date.toUnsafe(date => CommittedDate.from(date.value)),
-          committer = Person(modifiedDataset2.usedIn.head.created.agent.name,
-                             modifiedDataset2.usedIn.head.created.agent.maybeEmail
-          ),
-          cliVersion = currentVersionPair.cliVersion
-        )(
-          projectPath = project.path,
-          projectName = project.name,
-          projectDateCreated = project.created.date,
-          maybeProjectCreator = project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail)),
-          projectVersion = project.version
-        )(
-          datasetIdentifier = modifiedDataset2.id,
-          datasetTitle = modifiedDataset2.title,
-          datasetName = modifiedDataset2.name,
-          datasetDerivedFrom = modifiedDataset2.derivedFrom,
-          maybeDatasetDescription = modifiedDataset2.maybeDescription,
-          dates = modifiedDataset2.date,
-          datasetCreators = modifiedDataset2.creators map toPerson,
-          datasetParts = modifiedDataset2.parts.map(part => (part.name, part.location)),
-          datasetKeywords = modifiedDataset2.keywords,
-          datasetImages = modifiedDataset2.images
-        )
+        project.asJsonLD,
+        dataset1.asJsonLD,
+        dataset2.asJsonLD,
+        dataset2Modified.asJsonLD
       )
 
       `data in the RDF store`(project, dataset1CommitId, dataset1Committer, jsonLDTriples)(
@@ -187,7 +108,7 @@ class DatasetsResourcesSpec
       Then("he should get OK response with project's datasets")
       projectDatasetsResponse.status shouldBe Ok
       val Right(foundDatasets) = projectDatasetsResponse.bodyAsJson.as[List[Json]]
-      foundDatasets should contain theSameElementsAs List(briefJson(dataset1), briefJson(modifiedDataset2))
+      foundDatasets should contain theSameElementsAs List(briefJson(dataset1), briefJson(dataset2Modified))
 
       When("user then fetches details of the chosen dataset with the link from the response")
       val someDatasetDetailsLink =
@@ -201,7 +122,7 @@ class DatasetsResourcesSpec
       Then("he should get OK response with dataset details")
       datasetDetailsResponse.status shouldBe Ok
       val foundDatasetDetails = datasetDetailsResponse.bodyAsJson
-      val expectedDataset = List(dataset1, modifiedDataset2)
+      val expectedDataset = List(dataset1, dataset2Modified)
         .find(dataset => someDatasetDetailsLink.value contains urlEncode(dataset.id.value))
         .getOrFail(message = "Returned 'details' link does not point to any dataset in the RDF store")
       findIdentifier(foundDatasetDetails) shouldBe expectedDataset.id
@@ -240,8 +161,8 @@ class DatasetsResourcesSpec
 
       When("user fetches initial version of the modified dataset with the link from the response")
       val modifiedDataset2Json = foundDatasets
-        .find(json => findIdentifier(json) == modifiedDataset2.id)
-        .getOrFail(s"No modified dataset with ${modifiedDataset2.id} id")
+        .find(json => findIdentifier(json) == dataset2Modified.id)
+        .getOrFail(s"No modified dataset with ${dataset2Modified.id} id")
 
       val modifiedDatasetInitialVersionLink = modifiedDataset2Json.hcursor._links
         .get(Rel("initial-version"))

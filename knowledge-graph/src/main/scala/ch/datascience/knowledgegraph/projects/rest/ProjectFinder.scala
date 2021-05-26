@@ -87,7 +87,8 @@ class IOProjectFinder(
           parent.name,
           Creation(parent.created.date,
                    parent.created.maybeCreator.map(creator => Creator(creator.maybeEmail, creator.name))
-          )
+          ),
+          parent.visibility
         )
       }
   }

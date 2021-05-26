@@ -67,6 +67,7 @@ trait EntitiesGenerators {
     agent        <- cliVersions
     dateCreated  <- projectCreatedDates(minDateCreated.value)
     maybeCreator <- persons.toGeneratorOfOptions
+    visibility   <- projectVisibilities
     members      <- persons(userGitLabIds.toGeneratorOfSomes).toGeneratorOfSet(minElements = 0)
     version      <- projectSchemaVersions
   } yield Project(path,
@@ -74,7 +75,7 @@ trait EntitiesGenerators {
                   agent,
                   dateCreated,
                   maybeCreator,
-                  maybeVisibility = None,
+                  visibility,
                   maybeParentProject = None,
                   members = members,
                   version
