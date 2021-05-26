@@ -18,7 +18,7 @@
 
 package ch.datascience.graph.acceptancetests.tooling
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
@@ -172,7 +172,7 @@ object EventLogClient {
 
 abstract class ServiceClient(implicit
     executionContext: ExecutionContext,
-    contextShift:     ContextShift[IO],
+    concurrentEffect: ConcurrentEffect[IO],
     timer:            Timer[IO]
 ) extends RestClient(Throttler.noThrottling, TestLogger(), retryInterval = 500 millis, maxRetries = 1) {
 

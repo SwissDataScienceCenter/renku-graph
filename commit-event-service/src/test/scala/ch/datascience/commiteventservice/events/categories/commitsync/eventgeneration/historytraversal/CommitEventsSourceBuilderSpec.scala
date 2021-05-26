@@ -27,7 +27,6 @@ import ch.datascience.commiteventservice.events.categories.commitsync.eventgener
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.AccessToken
@@ -54,7 +53,7 @@ class CommitEventsSourceBuilderSpec extends AnyWordSpec with MockFactory with sh
 
         source.transformEventsWith(
           send(returning = SendExpectations[NewCommitEvent](startCommit.id, Created))
-        ) shouldBe List(Created).pure[Try]
+        ) shouldBe Some(Created).pure[Try]
       }
 
     "map a single commit event with the transform function " +
@@ -66,7 +65,7 @@ class CommitEventsSourceBuilderSpec extends AnyWordSpec with MockFactory with sh
 
         source.transformEventsWith(
           send(returning = SendExpectations[NewCommitEvent](startCommit.id, Existed))
-        ) shouldBe List(Existed).pure[Try]
+        ) shouldBe Some(Existed).pure[Try]
       }
 
     "map a single commit event with the transform function " +
@@ -78,159 +77,62 @@ class CommitEventsSourceBuilderSpec extends AnyWordSpec with MockFactory with sh
 
         source.transformEventsWith(
           send(returning = SendExpectations[NewCommitEvent](startCommit.id, Existed))
-        ) shouldBe List(Existed).pure[Try]
-      }
-
-    "map commit events with the transform function " +
-      "starting from the given start commit to the ancestor matching the latest event in the Event Log" in new TestCase {
-
-        val level1Info = commitInfos(startCommit.id, singleParent).generateOne
-
-        val level2Infos = level1Info.parents map { parentId =>
-          commitInfos(parentId, singleParent).generateOne
-        }
-
-        givenFindingCommitInfoReturns(level1Info, level2Infos)
-
-        source.transformEventsWith(
-          send(returning = SendExpectations[NewCommitEvent](startCommit.id, Created),
-               SendExpectations[NewCommitEvent](level2Infos.head.id, Existed)
-          )
-        ) shouldBe List(Created, Existed).pure[Try]
-      }
-
-    "map commit events with the transform function " +
-      "starting from the given start commit to the oldest ancestor " +
-      "if there are no events in the Event Log" in new TestCase {
-
-        val level1Parent = commitIds.generateOne
-        val level1Info   = commitInfos(startCommit.id, level1Parent).generateOne
-
-        val level2Parent = commitIds.generateOne
-        val level2Infos = List(
-          commitInfos(level1Parent, level2Parent).generateOne
-        )
-
-        val level3Infos = List(
-          commitInfos(level2Parent, noParents).generateOne
-        )
-
-        givenFindingCommitInfoReturns(level1Info, level2Infos, level3Infos)
-
-        source.transformEventsWith(
-          send(
-            returning = SendExpectations[NewCommitEvent](startCommit.id, Created),
-            SendExpectations[NewCommitEvent](level1Parent, Created),
-            SendExpectations[NewCommitEvent](level2Parent, Created)
-          )
-        ) shouldBe List(Created, Created, Created).pure[Try]
-      }
-
-    "map commit events with the transform function " +
-      "starting from the given start commit to the oldest ancestor and multiple parents, " +
-      "skipping traversing history of commits already in the Event Log" in new TestCase {
-
-        val level1Parent1 = commitIds.generateOne
-        val level1Parent2 = commitIds.generateOne
-        val level1Info    = commitInfos(startCommit.id, level1Parent1, level1Parent2).generateOne
-
-        val level2Parent = commitIds.generateOne
-        val level2Infos = List(
-          commitInfos(level1Parent1, someParents).generateOne,
-          commitInfos(level1Parent2, level2Parent).generateOne
-        )
-        val level3Info = commitInfos(level2Parent, noParents).generateOne
-
-        givenFindingCommitInfoReturns(level1Info, level2Infos, List(level3Info))
-
-        source.transformEventsWith(
-          send(
-            SendExpectations[NewCommitEvent](startCommit.id, Created),
-            SendExpectations[NewCommitEvent](level1Parent1, Existed),
-            SendExpectations[NewCommitEvent](level1Parent2, Created),
-            SendExpectations[NewCommitEvent](level2Parent, Created)
-          )
-        ) shouldBe List(Created, Existed, Created, Created).pure[Try]
+        ) shouldBe Some(Existed).pure[Try]
       }
 
     "map commit events with the transform function " +
       "starting from given start commit to the oldest ancestor " +
       "skipping commits with the 'don't care' 0000000000000000000000000000000000000000 ref" in new TestCase {
 
-        val level1Parent1 = CommitId("0000000000000000000000000000000000000000")
-        val level1Parent2 = commitIds.generateOne
-        val level1Info    = commitInfos(startCommit.id, level1Parent1, level1Parent2).generateOne
-        val level2Info    = commitInfos(level1Parent2, noParents).generateOne
-
-        givenFindingCommitInfoReturns(level1Info, level2Info)
+        val commitId = CommitId("0000000000000000000000000000000000000000")
 
         source.transformEventsWith(
-          send(
-            SendExpectations[NewCommitEvent](startCommit.id, Created),
-            SendExpectations[NewCommitEvent](level1Parent2, Created)
-          )
-        ) shouldBe List(Created, Created).pure[Try]
+          send(SendExpectations[NewCommitEvent](commitId, Created))
+        ) shouldBe Option.empty[EventCreationResult].pure[Try]
       }
 
     "map commit events with the transform function " +
       "starting from given start commit to the oldest ancestor " +
       "creating SkippedCommitEvents for commits with a message containing 'renku migrate'" in new TestCase {
 
-        val level1CommitMessage = CommitMessage(sentenceContaining("renku migrate").generateOne)
-        val level1Parent        = commitIds.generateOne
-        val level1Info          = commitInfos(startCommit.id, level1Parent).generateOne.copy(message = level1CommitMessage)
-        val level2Info          = commitInfos(level1Parent, noParents).generateOne
+        val commitMessage = CommitMessage(sentenceContaining("renku migrate").generateOne)
+        val commitInfo    = commitInfos(startCommit.id).generateOne.copy(message = commitMessage)
 
-        givenFindingCommitInfoReturns(level1Info, level2Info)
+        givenFindingCommitInfoReturns(commitInfo)
 
         source.transformEventsWith(
-          send(
-            SendExpectations[SkippedCommitEvent](startCommit.id, Created),
-            SendExpectations[NewCommitEvent](level1Parent, Created)
-          )
-        ) shouldBe List(Created, Created).pure[Try]
+          send(SendExpectations[SkippedCommitEvent](startCommit.id, Created))
+        ) shouldBe Some(Created).pure[Try]
       }
 
     "fail mapping the events " +
       "if finding commit info fails" in new TestCase {
 
-        val level1Info = commitInfos(startCommit.id, parentsIdsLists(minNumber = 2, maxNumber = 2)).generateOne
-        val level2Info1 +: level2Info2 +: Nil = level1Info.parents map { parentId =>
-          commitInfos(parentId, noParents).generateOne
-        }
+        val commitInfo = commitInfos(startCommit.id, parentsIdsLists(minNumber = 2, maxNumber = 2)).generateOne
 
-        givenFindingCommitInfoReturns(level1Info, level2Info2)
+        givenFindingCommitInfoReturns(commitInfo)
 
         val exception = exceptions.generateOne
         (commitInfoFinder
           .findCommitInfo(_: Id, _: CommitId, _: Option[AccessToken]))
-          .expects(startCommit.project.id, level2Info1.id, maybeAccessToken)
+          .expects(startCommit.project.id, startCommit.id, maybeAccessToken)
           .returning(context.raiseError(exception))
 
         source.transformEventsWith(
-          send(
-            SendExpectations[NewCommitEvent](startCommit.id, Created),
-            SendExpectations[NewCommitEvent](level2Info2.id, Created)
-          )
-        ) shouldBe exception.raiseError[Try, List[EventCreationResult]]
+          send(SendExpectations[NewCommitEvent](startCommit.id, Created))
+        ) shouldBe exception.raiseError[Try, Option[EventCreationResult]]
       }
 
     "fail mapping the events " +
       "if the transform function fails on one of the events" in new TestCase {
 
-        val level1Parent1 = commitIds.generateOne
-        val level1Parent2 = commitIds.generateOne
-        val level1Info    = commitInfos(startCommit.id, level1Parent1, level1Parent2).generateOne
+        val commitInfo = commitInfos(startCommit.id).generateOne
 
-        val level2Infos @ level2Info1 +: _ = List(
-          commitInfos(level1Parent1, noParents).generateOne,
-          commitInfos(level1Parent2, noParents).generateOne
-        )
-        givenFindingCommitInfoReturns(level1Info, level2Infos)
+        givenFindingCommitInfoReturns(commitInfo)
 
         val exception = exceptions.generateOne
         val failingSend: CommitEvent => Try[EventCreationResult] = event =>
-          if (event.id == level2Info1.id) exception.raiseError[Try, EventCreationResult]
+          if (event.id == commitInfo.id) exception.raiseError[Try, EventCreationResult]
           else Created.pure[Try]
         source.transformEventsWith(failingSend) shouldBe exception.raiseError[Try, List[EventCreationResult]]
       }
@@ -264,9 +166,6 @@ class CommitEventsSourceBuilderSpec extends AnyWordSpec with MockFactory with sh
     private val sourceBuilder = new CommitEventsSourceBuilder[Try](commitInfoFinder)
     val Success(source)       = sourceBuilder.buildEventsSource(startCommit, maybeAccessToken, clock)
 
-    def givenFindingCommitInfoReturns(commitInfo: CommitInfo, otherInfos: Seq[CommitInfo]*): Unit =
-      givenFindingCommitInfoReturns(commitInfo +: otherInfos.flatten: _*)
-
     def givenFindingCommitInfoReturns(commitInfos: CommitInfo*): Unit =
       commitInfos foreach { commitInfo =>
         (commitInfoFinder
@@ -286,8 +185,6 @@ class CommitEventsSourceBuilderSpec extends AnyWordSpec with MockFactory with sh
     } yield info.copy(id = commitId, parents = parentsIds)
 
   private lazy val noParents: Gen[List[CommitId]] = Gen.const(List.empty)
-
-  private lazy val singleParent: Gen[List[CommitId]] = parentsIdsLists(minNumber = 1, maxNumber = 1)
 
   private lazy val someParents: Gen[List[CommitId]] = parentsIdsLists(minNumber = 1, maxNumber = 5)
 }

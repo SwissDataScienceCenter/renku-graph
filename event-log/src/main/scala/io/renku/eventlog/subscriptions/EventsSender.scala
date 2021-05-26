@@ -18,15 +18,14 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.MonadError
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.http.client.RestClient
 import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException}
-import org.typelevel.log4cats.Logger
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -44,32 +43,28 @@ private object EventsSender {
   }
 }
 
-private class EventsSenderImpl[CategoryEvent](
-    categoryName:           CategoryName,
-    categoryEventEncoder:   EventEncoder[CategoryEvent],
-    logger:                 Logger[IO],
-    retryInterval:          FiniteDuration = 1 second,
-    requestTimeoutOverride: Option[Duration] = None
-)(implicit
-    ME:               MonadError[IO, Throwable],
-    executionContext: ExecutionContext,
-    contextShift:     ContextShift[IO],
-    timer:            Timer[IO]
-) extends RestClient(Throttler.noThrottling,
-                     logger,
-                     retryInterval = retryInterval,
-                     requestTimeoutOverride = requestTimeoutOverride
+private class EventsSenderImpl[Interpretation[_]: ConcurrentEffect: Timer, CategoryEvent](
+    categoryName:            CategoryName,
+    categoryEventEncoder:    EventEncoder[CategoryEvent],
+    logger:                  Logger[Interpretation],
+    retryInterval:           FiniteDuration = 1 second,
+    requestTimeoutOverride:  Option[Duration] = None
+)(implicit executionContext: ExecutionContext)
+    extends RestClient[Interpretation, EventsSender[Interpretation, CategoryEvent]](Throttler.noThrottling,
+                                                                                    logger,
+                                                                                    retryInterval = retryInterval,
+                                                                                    requestTimeoutOverride =
+                                                                                      requestTimeoutOverride
     )
-    with EventsSender[IO, CategoryEvent] {
+    with EventsSender[Interpretation, CategoryEvent] {
 
   import SendingResult._
-  import cats.effect._
   import cats.syntax.all._
   import org.http4s.Method.POST
   import org.http4s.Status._
   import org.http4s.{Request, Response, Status}
 
-  def sendEvent(subscriberUrl: SubscriberUrl, categoryEvent: CategoryEvent): IO[SendingResult] = {
+  def sendEvent(subscriberUrl: SubscriberUrl, categoryEvent: CategoryEvent): Interpretation[SendingResult] = {
     for {
       uri <- validateUri(subscriberUrl.value)
       sendingResult <-
@@ -82,18 +77,23 @@ private class EventsSenderImpl[CategoryEvent](
     } yield sendingResult
   } recoverWith exceptionToSendingResult
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[SendingResult]] = {
-    case (Accepted, _, _)           => Delivered.pure[IO]
-    case (TooManyRequests, _, _)    => TemporarilyUnavailable.pure[IO]
-    case (ServiceUnavailable, _, _) => TemporarilyUnavailable.pure[IO]
-    case (NotFound, _, _)           => TemporarilyUnavailable.pure[IO] // to mitigate k8s problems
-    case (BadGateway, _, _)         => TemporarilyUnavailable.pure[IO] // to mitigate k8s problems
+  private lazy val mapResponse
+      : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[SendingResult]] = {
+    case (Accepted, _, _)           => Delivered.pure[Interpretation].widen[SendingResult]
+    case (TooManyRequests, _, _)    => TemporarilyUnavailable.pure[Interpretation].widen[SendingResult]
+    case (ServiceUnavailable, _, _) => TemporarilyUnavailable.pure[Interpretation].widen[SendingResult]
+    case (NotFound, _, _) =>
+      TemporarilyUnavailable.pure[Interpretation].widen[SendingResult] // to mitigate k8s problems
+    case (BadGateway, _, _) =>
+      TemporarilyUnavailable.pure[Interpretation].widen[SendingResult] // to mitigate k8s problems
   }
 
-  private lazy val exceptionToSendingResult: PartialFunction[Throwable, IO[SendingResult]] = {
-    case _:         ConnectivityException => Misdelivered.pure[IO]
+  private lazy val exceptionToSendingResult: PartialFunction[Throwable, Interpretation[SendingResult]] = {
+    case _:         ConnectivityException => Misdelivered.pure[Interpretation].widen[SendingResult]
     case exception: ClientException =>
-      logger.error(exception)(s"$categoryName: sending event failed") >> TemporarilyUnavailable.pure[IO]
+      logger.error(exception)(s"$categoryName: sending event failed") >> TemporarilyUnavailable
+        .pure[Interpretation]
+        .widen[SendingResult]
   }
 }
 

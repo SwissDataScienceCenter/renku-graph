@@ -34,7 +34,7 @@ import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 private[commitsync] trait MissedEventsGenerator[Interpretation[_]] {
-  def generateMissedEvents(latestCommitId: CommitId, project: CommitProject): Interpretation[UpdateResult]
+  def generateMissedEvents(project: CommitProject, latestCommitId: CommitId): Interpretation[UpdateResult]
 }
 
 private class MissedEventsGeneratorImpl[Interpretation[_]: MonadThrow](
@@ -44,23 +44,23 @@ private class MissedEventsGeneratorImpl[Interpretation[_]: MonadThrow](
   import UpdateResult._
   import commitToEventLog._
 
-  def generateMissedEvents(latestCommitId: CommitId, project: CommitProject): Interpretation[UpdateResult] =
-    addEventsIfMissing(latestCommitId, project) recoverWith toUpdateResult
+  def generateMissedEvents(project: CommitProject, latestCommitId: CommitId): Interpretation[UpdateResult] =
+    addEventsIfMissing(project, latestCommitId) recoverWith toUpdateResult
 
-  private def addEventsIfMissing(latestCommitId: CommitId, project: CommitProject): Interpretation[UpdateResult] =
+  private def addEventsIfMissing(project: CommitProject, latestCommitId: CommitId): Interpretation[UpdateResult] =
     for {
-      startCommit <- startCommitFrom(latestCommitId, project)
+      startCommit <- startCommitFrom(project, latestCommitId)
       _           <- storeCommitsInEventLog(startCommit)
     } yield Updated: UpdateResult
 
-  private def startCommitFrom(commitId: CommitId, project: CommitProject) = StartCommit(
+  private def startCommitFrom(project: CommitProject, commitId: CommitId) = StartCommit(
     id = commitId,
     project = Project(project.id, project.path)
   ).pure[Interpretation]
 
   private lazy val toUpdateResult: PartialFunction[Throwable, Interpretation[UpdateResult]] = {
     case NonFatal(exception) =>
-      Failed("synchronization failed", exception).pure[Interpretation].widen[UpdateResult]
+      Failed("event generation failed", exception).pure[Interpretation].widen[UpdateResult]
   }
 
 }

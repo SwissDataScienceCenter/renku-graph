@@ -35,7 +35,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class IOProjectDatasetsFinderSpec
+class ProjectDatasetsFinderSpec
     extends AnyWordSpec
     with InMemoryRdfStore
     with ExternalServiceStubbing
@@ -205,6 +205,6 @@ class IOProjectDatasetsFinderSpec
   private trait TestCase {
     private val logger       = TestLogger[IO]()
     private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
-    val datasetsFinder       = new IOProjectDatasetsFinder(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
+    val datasetsFinder       = new ProjectDatasetsFinderImpl[IO](rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
   }
 }

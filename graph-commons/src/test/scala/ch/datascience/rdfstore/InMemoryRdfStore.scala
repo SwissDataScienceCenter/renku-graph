@@ -158,7 +158,7 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
       .unsafeRunSync()
 
   private lazy val logger = TestLogger[IO]()
-  private lazy val queryRunner = new IORdfStoreClient(
+  private lazy val queryRunner = new RdfStoreClientImpl(
     rdfStoreConfig,
     logger,
     new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))

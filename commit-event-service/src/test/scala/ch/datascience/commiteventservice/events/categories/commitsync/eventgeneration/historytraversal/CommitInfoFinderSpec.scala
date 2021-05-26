@@ -19,7 +19,7 @@
 package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration
 package historytraversal
 
-import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.Generators._
 import ch.datascience.control.Throttler
@@ -252,7 +252,7 @@ class CommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSer
     }
   }
 
-  private implicit val ce:    ConcurrentEffect[IO] = IO.ioConcurrentEffect(global)
+  private implicit val ce:    ConcurrentEffect[IO] = IO.ioConcurrentEffect(IO.contextShift(global))
   private implicit val timer: Timer[IO]            = IO.timer(global)
 
   private trait TestCase {

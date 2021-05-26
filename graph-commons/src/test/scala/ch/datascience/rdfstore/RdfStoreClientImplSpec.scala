@@ -43,10 +43,10 @@ import org.scalatest.wordspec.AnyWordSpec
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Try
 
-class IORdfStoreClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockFactory with should.Matchers {
+class RdfStoreClientImplSpec extends AnyWordSpec with ExternalServiceStubbing with MockFactory with should.Matchers {
 
   "IORdfStoreClient" should {
-
+    type IORdfStoreClient = RdfStoreClientImpl[IO]
     "be a IORestClient" in new QueryClientTestCase {
       client shouldBe a[IORdfStoreClient]
       client shouldBe a[RestClient[IO, _]]
@@ -233,7 +233,7 @@ class IORdfStoreClientSpec extends AnyWordSpec with ExternalServiceStubbing with
 
     "fail if sparql body does not end with the ORDER BY clause" in new TestCase {
 
-      val client = new TestRdfQueryClient(
+      val client = new TestRdfQueryClientImpl(
         query = SparqlQuery(name = "test query", Set.empty, "SELECT ?s ?p ?o WHERE { ?s ?p ?o}"),
         rdfStoreConfig
       )
@@ -326,7 +326,7 @@ class IORdfStoreClientSpec extends AnyWordSpec with ExternalServiceStubbing with
   }
 
   private trait QueryClientTestCase extends TestCase {
-    val client = new TestRdfQueryClient(
+    val client = new TestRdfQueryClientImpl(
       query = SparqlQuery(name = "find all triples",
                           prefixes = Set.empty,
                           body = """SELECT ?s ?p ?o WHERE { ?s ?p ?o } ORDER BY ASC(?s)"""
@@ -336,7 +336,7 @@ class IORdfStoreClientSpec extends AnyWordSpec with ExternalServiceStubbing with
   }
 
   private trait UpdateClientTestCase extends TestCase {
-    val client = new TestRdfClient(
+    val client = new TestRdfClientImpl(
       query = SparqlQuery(name = "insert", Set.empty, """INSERT { 'o' 'p' 's' } {}"""),
       rdfStoreConfig
     )
@@ -345,11 +345,11 @@ class IORdfStoreClientSpec extends AnyWordSpec with ExternalServiceStubbing with
   private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
-  private class TestRdfClient(
+  private class TestRdfClientImpl(
       val query:      SparqlQuery,
       rdfStoreConfig: RdfStoreConfig,
       logger:         Logger[IO] = TestLogger[IO]()
-  ) extends IORdfStoreClient(rdfStoreConfig, logger, new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))) {
+  ) extends RdfStoreClientImpl(rdfStoreConfig, logger, new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))) {
 
     def sendUpdate: IO[Unit] = updateWithNoResult(query)
 
@@ -358,10 +358,10 @@ class IORdfStoreClientSpec extends AnyWordSpec with ExternalServiceStubbing with
     ): IO[ResultType] = updateWitMapping(query, mapResponse)
   }
 
-  private class TestRdfQueryClient(val query:      SparqlQuery,
-                                   rdfStoreConfig: RdfStoreConfig,
-                                   logger:         Logger[IO] = TestLogger[IO]()
-  ) extends IORdfStoreClient(rdfStoreConfig, logger, new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger)))
+  private class TestRdfQueryClientImpl(val query:      SparqlQuery,
+                                       rdfStoreConfig: RdfStoreConfig,
+                                       logger:         Logger[IO] = TestLogger[IO]()
+  ) extends RdfStoreClientImpl(rdfStoreConfig, logger, new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger)))
       with Paging[IO, String] {
 
     def callRemote: IO[Json] = queryExpecting[Json](query)

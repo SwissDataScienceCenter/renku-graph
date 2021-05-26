@@ -18,26 +18,25 @@
 
 package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.CommitEventsSourceBuilder.EventsFlowBuilder
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.{CommitEvent, CommitInfo, StartCommit}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events.{BatchDate, CommitId}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.CommitEventsSourceBuilder.EventsFlowBuilder
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.EventCreationResult.Existed
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.{CommitEvent, CommitInfo, StartCommit}
 
 import java.time.Clock
 import scala.concurrent.ExecutionContext
 
-private class CommitEventsSourceBuilder[Interpretation[_]](
+private class CommitEventsSourceBuilder[Interpretation[_]: MonadThrow](
     commitInfoFinder: CommitInfoFinder[Interpretation]
-)(implicit ME:        MonadError[Interpretation, Throwable]) {
+) {
 
   import commitInfoFinder._
   private val DontCareCommitId = CommitId("0000000000000000000000000000000000000000")
@@ -45,7 +44,7 @@ private class CommitEventsSourceBuilder[Interpretation[_]](
   def buildEventsSource(startCommit:      StartCommit,
                         maybeAccessToken: Option[AccessToken],
                         clock:            Clock
-  ): Interpretation[EventsFlowBuilder[Interpretation]] = ME.pure {
+  ): Interpretation[EventsFlowBuilder[Interpretation]] = MonadThrow[Interpretation].pure {
     transform: Function1[CommitEvent, Interpretation[EventCreationResult]] =>
       new EventsFlow(startCommit, maybeAccessToken, transform, clock).run()
   }
@@ -56,22 +55,10 @@ private class CommitEventsSourceBuilder[Interpretation[_]](
                            clock:            Clock
   ) {
 
-    def run(): Interpretation[List[EventCreationResult]] = findEventAndTransform(startCommit.id, List.empty)
-
-    private def findEventAndTransform(commitId:         CommitId,
-                                      transformResults: List[EventCreationResult],
-                                      batchDate:        BatchDate = BatchDate(clock)
-    ): Interpretation[List[EventCreationResult]] =
-      maybeCommitEvent(commitId, batchDate) flatMap {
-        case None => transformResults.pure[Interpretation]
-        case Some(commitEvent) =>
-          for {
-            currentTransformResult <- transform(commitEvent)
-            mergedResults          <- (transformResults :+ currentTransformResult).pure[Interpretation]
-            parentsResults <- if (currentTransformResult == Existed)
-                                List.empty[EventCreationResult].pure[Interpretation]
-                              else transformParents(commitEvent, batchDate)
-          } yield mergedResults ++ parentsResults
+    def run(): Interpretation[Option[EventCreationResult]] =
+      maybeCommitEvent(startCommit.id, BatchDate(clock)) flatMap {
+        case None              => Option.empty[EventCreationResult].pure[Interpretation]
+        case Some(commitEvent) => transform(commitEvent).map(_.some)
       }
 
     private def maybeCommitEvent(commitId: CommitId, batchDate: BatchDate): Interpretation[Option[CommitEvent]] =
@@ -105,12 +92,6 @@ private class CommitEventsSourceBuilder[Interpretation[_]](
           batchDate = batchDate
         )
     }
-
-    private def transformParents(commitEvent: CommitEvent, batchDate: BatchDate) =
-      for {
-        parents                 <- commitEvent.parents.pure[Interpretation]
-        parentsTransformResults <- parents.map(findEventAndTransform(_, transformResults = Nil, batchDate)).sequence
-      } yield parentsTransformResults.flatten
   }
 }
 
@@ -119,7 +100,7 @@ private object CommitEventsSourceBuilder {
   abstract class EventsFlowBuilder[Interpretation[_]] {
     def transformEventsWith(
         transform: CommitEvent => Interpretation[EventCreationResult]
-    ): Interpretation[List[EventCreationResult]]
+    ): Interpretation[Option[EventCreationResult]]
   }
 
   def apply(

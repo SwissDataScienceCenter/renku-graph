@@ -63,6 +63,6 @@ class ServiceHealthCheckerSpec extends AnyWordSpec with ExternalServiceStubbing 
 
   private trait TestCase {
     val microserviceUrl = MicroserviceBaseUrl(externalServiceBaseUrl)
-    val healthChecker   = new ServiceHealthCheckerImpl(TestLogger(), retryInterval = 50 millis, maxRetries = 1)
+    val healthChecker   = new ServiceHealthCheckerImpl[IO](TestLogger(), retryInterval = 50 millis, maxRetries = 1)
   }
 }

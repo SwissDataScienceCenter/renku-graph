@@ -19,7 +19,7 @@
 package ch.datascience.webhookservice
 
 import cats.Eval
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.EventLogUrl
@@ -40,24 +40,22 @@ private trait CommitSyncRequestSender[Interpretation[_]] {
   def sendCommitSyncRequest(commitSyncRequest: CommitSyncRequest): Interpretation[Unit]
 }
 
-private class CommitSyncRequestSenderImpl(
-    eventLogUrl:            EventLogUrl,
-    logger:                 Logger[IO],
-    retryDelay:             FiniteDuration,
-    retryInterval:          FiniteDuration = RestClient.SleepAfterConnectionIssue,
-    maxRetries:             Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
-    requestTimeoutOverride: Option[Duration] = None
-)(implicit
-    executionContext: ExecutionContext,
-    contextShift:     ContextShift[IO],
-    timer:            Timer[IO]
-) extends RestClient(Throttler.noThrottling,
-                     logger,
-                     retryInterval = retryInterval,
-                     maxRetries = maxRetries,
-                     requestTimeoutOverride = requestTimeoutOverride
+private class CommitSyncRequestSenderImpl[Interpretation[_]: ConcurrentEffect: Timer](
+    eventLogUrl:             EventLogUrl,
+    logger:                  Logger[Interpretation],
+    retryDelay:              FiniteDuration,
+    retryInterval:           FiniteDuration = RestClient.SleepAfterConnectionIssue,
+    maxRetries:              Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
+    requestTimeoutOverride:  Option[Duration] = None
+)(implicit executionContext: ExecutionContext)
+    extends RestClient[Interpretation, CommitSyncRequestSender[Interpretation]](Throttler.noThrottling,
+                                                                                logger,
+                                                                                retryInterval = retryInterval,
+                                                                                maxRetries = maxRetries,
+                                                                                requestTimeoutOverride =
+                                                                                  requestTimeoutOverride
     )
-    with CommitSyncRequestSender[IO] {
+    with CommitSyncRequestSender[Interpretation] {
 
   import cats.effect._
   import io.circe.Encoder
@@ -66,7 +64,7 @@ private class CommitSyncRequestSenderImpl(
   import org.http4s.Method.POST
   import org.http4s.{Request, Response}
 
-  def sendCommitSyncRequest(syncRequest: CommitSyncRequest): IO[Unit] = for {
+  def sendCommitSyncRequest(syncRequest: CommitSyncRequest): Interpretation[Unit] = for {
     uri           <- validateUri(s"$eventLogUrl/events")
     sendingResult <- send(prepareRequest(uri, syncRequest))(mapResponse) recoverWith retryDelivery(syncRequest)
     _             <- logInfo(syncRequest)
@@ -77,16 +75,16 @@ private class CommitSyncRequestSenderImpl(
       .addPart("event", commitSyncRequest.asJson)
       .build()
 
-  private def retryDelivery(commitSyncRequest: CommitSyncRequest): PartialFunction[Throwable, IO[Unit]] = {
+  private def retryDelivery(commitSyncRequest: CommitSyncRequest): PartialFunction[Throwable, Interpretation[Unit]] = {
     case UnexpectedResponseException(ServiceUnavailable | GatewayTimeout | BadGateway, message) =>
       waitAndRetry(Eval.always(sendCommitSyncRequest(commitSyncRequest)), message)
     case exception @ (_: ConnectivityException | _: ClientException) =>
       waitAndRetry(Eval.always(sendCommitSyncRequest(commitSyncRequest)), exception.getMessage)
   }
 
-  private def waitAndRetry(retry: Eval[IO[Unit]], errorMessage: String) = for {
+  private def waitAndRetry(retry: Eval[Interpretation[Unit]], errorMessage: String) = for {
     _      <- logger.error(s"Sending commit sync request event failed - retrying in $retryDelay - $errorMessage")
-    _      <- timer sleep retryDelay
+    _      <- Timer[Interpretation] sleep retryDelay
     result <- retry.value
   } yield result
 
@@ -100,11 +98,12 @@ private class CommitSyncRequestSenderImpl(
     }"""
   }
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
-    case (Accepted, _, _) => IO.unit
+  private lazy val mapResponse
+      : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[Unit]] = {
+    case (Accepted, _, _) => ().pure[Interpretation]
   }
 
-  private lazy val logInfo: CommitSyncRequest => IO[Unit] = { case CommitSyncRequest(project) =>
+  private lazy val logInfo: CommitSyncRequest => Interpretation[Unit] = { case CommitSyncRequest(project) =>
     logger.info(s"CommitSyncRequest sent for projectId = ${project.id}, projectPath = ${project.path}")
   }
 }

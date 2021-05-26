@@ -36,7 +36,7 @@ import org.scalatest._
 import matchers._
 import org.scalatest.wordspec.AnyWordSpec
 
-class IORenkuVersionFinderSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers {
+class RenkuVersionFinderSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers {
 
   private implicit lazy val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
 
@@ -74,7 +74,7 @@ class IORenkuVersionFinderSpec extends AnyWordSpec with InMemoryRdfStore with sh
     val logger                = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder(logger)
     private val timeRecorder  = new SparqlQueryTimeRecorder(executionTimeRecorder)
-    val versionPairFinder     = new IORenkuVersionPairFinder(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
+    val versionPairFinder     = new RenkuVersionPairFinderImpl[IO](rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
   }
 
   private def versionPairOnTG(version: RenkuVersionPair) =

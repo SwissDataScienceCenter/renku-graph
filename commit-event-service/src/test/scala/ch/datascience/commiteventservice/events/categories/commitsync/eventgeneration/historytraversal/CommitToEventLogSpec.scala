@@ -30,7 +30,6 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events._
-import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.http.client.AccessToken
@@ -78,15 +77,13 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
       val eventCreationResults = commitEvents map { commitEvent =>
         val doesExist = Random.nextBoolean()
         if (doesExist) {
-          (eventDetailsFinder
-            .checkIfExists(_: CommitId, _: projects.Id))
-            .expects(commitEvent.id, commitEvent.project.id)
+          (eventDetailsFinder.checkIfExists _)
+            .expects(commitEvent.project.id, commitEvent.id)
             .returning(doesExist.pure[Try])
           Existed
         } else {
-          (eventDetailsFinder
-            .checkIfExists(_: CommitId, _: projects.Id))
-            .expects(commitEvent.id, commitEvent.project.id)
+          (eventDetailsFinder.checkIfExists _)
+            .expects(commitEvent.project.id, commitEvent.id)
             .returning(doesExist.pure[Try])
           (commitEventSender
             .send(_: CommitEvent))
@@ -239,9 +236,8 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
         }
 
       val sendException = exceptions.generateOne
-      (eventDetailsFinder
-        .checkIfExists(_: CommitId, _: projects.Id))
-        .expects(failingToSendEvent.id, failingToSendEvent.project.id)
+      (eventDetailsFinder.checkIfExists _)
+        .expects(failingToSendEvent.project.id, failingToSendEvent.id)
         .returning(false.pure[Try])
       (commitEventSender
         .send(_: CommitEvent))
@@ -249,14 +245,12 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
         .returning(context raiseError sendException)
 
       val checkIfExistsException = exceptions.generateOne
-      (eventDetailsFinder
-        .checkIfExists(_: CommitId, _: projects.Id))
-        .expects(failingToCheckIfExistEvent.id, failingToCheckIfExistEvent.project.id)
+      (eventDetailsFinder.checkIfExists _)
+        .expects(failingToCheckIfExistEvent.project.id, failingToCheckIfExistEvent.id)
         .returning(context raiseError checkIfExistsException)
       passingEvents foreach { event =>
-        (eventDetailsFinder
-          .checkIfExists(_: CommitId, _: projects.Id))
-          .expects(event.id, event.project.id)
+        (eventDetailsFinder.checkIfExists _)
+          .expects(event.project.id, event.id)
           .returning(false.pure[Try])
         (commitEventSender
           .send(_: CommitEvent))

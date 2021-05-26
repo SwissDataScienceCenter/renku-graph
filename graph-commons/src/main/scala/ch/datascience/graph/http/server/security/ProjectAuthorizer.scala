@@ -72,7 +72,7 @@ class ProjectAuthorizerImpl(
     contextShift:     ContextShift[IO],
     timer:            Timer[IO],
     ME:               MonadError[IO, Throwable]
-) extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
+) extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
     with ProjectAuthorizer[IO] {
   override def authorize(path:          projects.Path,
                          maybeAuthUser: Option[AuthUser]

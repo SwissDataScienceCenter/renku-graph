@@ -18,7 +18,8 @@
 
 package ch.datascience.triplesgenerator.reprovisioning
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, IO, Timer}
+import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.http.client.RestClient
@@ -30,28 +31,28 @@ private trait EventsReScheduler[Interpretation[_]] {
   def triggerEventsReScheduling(): Interpretation[Unit]
 }
 
-private class IOEventsReScheduler(
+private class EventsReSchedulerImpl[Interpretation[_]: ConcurrentEffect: Timer](
     eventLogUrl:             EventLogUrl,
-    logger:                  Logger[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends RestClient(Throttler.noThrottling, logger)
-    with EventsReScheduler[IO] {
+    logger:                  Logger[Interpretation]
+)(implicit executionContext: ExecutionContext)
+    extends RestClient[Interpretation, EventsReScheduler[Interpretation]](Throttler.noThrottling, logger)
+    with EventsReScheduler[Interpretation] {
 
-  import cats.effect._
   import io.circe.literal._
   import org.http4s.Method.PATCH
   import org.http4s.Status.Accepted
   import org.http4s.circe._
   import org.http4s.{Request, Response, Status}
 
-  override def triggerEventsReScheduling(): IO[Unit] =
+  override def triggerEventsReScheduling(): Interpretation[Unit] =
     for {
       uri           <- validateUri(s"$eventLogUrl/events")
       sendingResult <- send(request(PATCH, uri).withEntity(json"""{"status": "NEW"}"""))(mapResponse)
     } yield sendingResult
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
-    case (Accepted, _, _) => IO.unit
+  private lazy val mapResponse
+      : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[Unit]] = {
+    case (Accepted, _, _) => ().pure[Interpretation]
   }
 }
 
@@ -60,10 +61,10 @@ private object IOEventsReScheduler {
       logger: Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
+      concurrentEffect: ConcurrentEffect[IO],
       timer:            Timer[IO]
   ): IO[EventsReScheduler[IO]] =
     for {
       eventLogUrl <- EventLogUrl[IO]()
-    } yield new IOEventsReScheduler(eventLogUrl, logger)
+    } yield new EventsReSchedulerImpl(eventLogUrl, logger)
 }

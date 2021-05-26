@@ -27,7 +27,7 @@ import ch.datascience.control.Throttler
 import ch.datascience.events.consumers.Project
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events.EventId
-import ch.datascience.graph.tokenrepository.{AccessTokenFinder, AccessTokenFinder}
+import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import org.typelevel.log4cats.Logger
 

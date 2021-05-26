@@ -187,10 +187,10 @@ object IODatasetsSearchEndpoint {
       renkuResourceUrl      <- renku.ResourcesUrl[IO]()
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     } yield new DatasetsSearchEndpoint[IO](
-      new IODatasetsFinder(rdfStoreConfig,
-                           new CreatorsFinder(rdfStoreConfig, ApplicationLogger, timeRecorder),
-                           ApplicationLogger,
-                           timeRecorder
+      new DatasetsFinderImpl(rdfStoreConfig,
+                             new CreatorsFinder(rdfStoreConfig, ApplicationLogger, timeRecorder),
+                             ApplicationLogger,
+                             timeRecorder
       ),
       renkuResourceUrl,
       executionTimeRecorder,

@@ -18,8 +18,8 @@
 
 package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration
 
-import Generators._
-import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, IO, Timer}
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.Generators._
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators.{oauthAccessTokens, personalAccessTokens}
 import ch.datascience.generators.Generators.Implicits._

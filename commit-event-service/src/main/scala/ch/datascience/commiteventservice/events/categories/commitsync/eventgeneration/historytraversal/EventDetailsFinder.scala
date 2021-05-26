@@ -20,21 +20,24 @@ package ch.datascience.commiteventservice.events.categories.commitsync.eventgene
 
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitInfo
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitWithParents
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects
 import ch.datascience.http.client.RestClient
+import io.circe.Decoder
+import io.circe.Decoder.decodeList
 import org.http4s.Status.{NotFound, Ok}
-import org.http4s.{Request, Response, Status}
+import org.http4s.circe.jsonOf
+import org.http4s.{EntityDecoder, Request, Response, Status}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
 private[eventgeneration] trait EventDetailsFinder[Interpretation[_]] {
-  def checkIfExists(commitId:   CommitId, projectId: projects.Id): Interpretation[Boolean]
-  def getEventDetails(commitId: CommitId, projectId: projects.Id): Interpretation[Option[CommitInfo]]
+  def checkIfExists(projectId:   projects.Id, commitId: CommitId): Interpretation[Boolean]
+  def getEventDetails(projectId: projects.Id, commitId: CommitId): Interpretation[Option[CommitWithParents]]
 }
 
 private[eventgeneration] class EventDetailsFinderImpl[Interpretation[_]: ContextShift: Timer: ConcurrentEffect](
@@ -46,13 +49,13 @@ private[eventgeneration] class EventDetailsFinderImpl[Interpretation[_]: Context
 
   import org.http4s.Method.GET
 
-  override def checkIfExists(commitId: CommitId, projectId: projects.Id): Interpretation[Boolean] =
-    fetchEventDetails(commitId, projectId)(mapResponseToBoolean)
+  override def checkIfExists(projectId: projects.Id, commitId: CommitId): Interpretation[Boolean] =
+    fetchEventDetails(projectId, commitId)(mapResponseToBoolean)
 
-  override def getEventDetails(commitId: CommitId, projectId: projects.Id): Interpretation[Option[CommitInfo]] =
-    ???
+  override def getEventDetails(projectId: projects.Id, commitId: CommitId): Interpretation[Option[CommitWithParents]] =
+    fetchEventDetails(projectId, commitId)(mapResponseCommitDetails)
 
-  private def fetchEventDetails[ResultType](commitId: CommitId, projectId: projects.Id)(
+  private def fetchEventDetails[ResultType](projectId: projects.Id, commitId: CommitId)(
       mapResponse: PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[
         ResultType
       ]]
@@ -64,6 +67,26 @@ private[eventgeneration] class EventDetailsFinderImpl[Interpretation[_]: Context
     case (Ok, _, _)       => true.pure[Interpretation]
     case (NotFound, _, _) => false.pure[Interpretation]
   }
+
+  private lazy val mapResponseCommitDetails
+      : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[
+        Option[CommitWithParents]
+      ]] = {
+    case (Ok, response, _) => response.as[CommitWithParents].map(_.some)
+    case (NotFound, _, _)  => Option.empty[CommitWithParents].pure[Interpretation]
+  }
+
+  import ch.datascience.tinytypes.json.TinyTypeDecoders._
+  private implicit val commitDetailsEntityDecoder: EntityDecoder[Interpretation, CommitWithParents] = {
+    implicit val commitDecoder: Decoder[CommitWithParents] = cursor =>
+      for {
+        id        <- cursor.downField("id").as[CommitId]
+        projectId <- cursor.downField("project").downField("id").as[projects.Id]
+        parents   <- cursor.downField("parent_ids").as[List[CommitId]]
+      } yield CommitWithParents(id, projectId, parents)
+    jsonOf[Interpretation, CommitWithParents]
+  }
+
 }
 
 private[eventgeneration] object EventDetailsFinder {

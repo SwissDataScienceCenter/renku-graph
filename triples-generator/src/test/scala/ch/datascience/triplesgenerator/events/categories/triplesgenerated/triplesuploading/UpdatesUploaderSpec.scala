@@ -95,7 +95,7 @@ class UpdatesUploaderSpec extends AnyWordSpec with ExternalServiceStubbing with 
     val rdfStoreConfig = rdfStoreConfigs.generateOne.copy(
       fusekiBaseUrl = FusekiBaseUrl(externalServiceBaseUrl)
     )
-    lazy val updater = new IOUpdatesUploader(
+    lazy val updater = new UpdatesUploaderImpl[IO](
       rdfStoreConfig,
       logger,
       timeRecorder,

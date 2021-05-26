@@ -24,7 +24,7 @@ import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.projects
-import ch.datascience.graph.tokenrepository.{AccessTokenFinder, AccessTokenFinder}
+import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.rdfstore._
@@ -104,7 +104,7 @@ private object MembersSynchronizer {
     kGPersonFinder             <- KGPersonFinder(logger, timeRecorder)
     updatesCreator             <- UpdatesCreator()
     rdfStoreConfig             <- RdfStoreConfig[IO]()
-    querySender <- IO(new IORdfStoreClient(rdfStoreConfig, logger, timeRecorder) with QuerySender[IO] {
+    querySender <- IO(new RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder) with QuerySender[IO] {
                      override def send(query: SparqlQuery): IO[Unit] = updateWithNoResult(query)
                    })
     executionTimeRecorder <- ExecutionTimeRecorder[IO](logger, maybeHistogram = None)

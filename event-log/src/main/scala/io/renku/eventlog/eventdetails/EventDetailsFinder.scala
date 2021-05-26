@@ -20,15 +20,16 @@ package io.renku.eventlog.eventdetails
 
 import cats.effect.{BracketThrow, IO}
 import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
-import ch.datascience.graph.model.events.{CompoundEventId, EventId}
+import ch.datascience.graph.model.events.{CommitId, CompoundEventId, EventBody, EventDetails, EventId}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
+import io.circe.parser._
 import io.renku.eventlog.{EventLogDB, TypeSerializers}
 import skunk._
 import skunk.implicits._
 
 private trait EventDetailsFinder[Interpretation[_]] {
-  def findDetails(eventId: CompoundEventId): Interpretation[Option[CompoundEventId]]
+  def findDetails(eventId: CompoundEventId): Interpretation[Option[EventDetails]]
 }
 
 private class EventDetailsFinderImpl[Interpretation[_]: BracketThrow](
@@ -38,20 +39,32 @@ private class EventDetailsFinderImpl[Interpretation[_]: BracketThrow](
     with EventDetailsFinder[Interpretation]
     with TypeSerializers {
 
+  import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import eu.timepit.refined.auto._
 
-  override def findDetails(eventId: CompoundEventId): Interpretation[Option[CompoundEventId]] =
+  override def findDetails(eventId: CompoundEventId): Interpretation[Option[EventDetails]] =
     sessionResource.useK(measureExecutionTime(find(eventId)))
 
   private def find(eventId: CompoundEventId) =
     SqlStatement[Interpretation](name = "find event details")
-      .select[EventId ~ projects.Id, CompoundEventId](
-        sql"""SELECT evt.event_id, evt.project_id
+      .select[EventId ~ projects.Id, CompoundEventId ~ EventBody](
+        sql"""SELECT evt.event_id, evt.project_id, evt.event_body
                 FROM event evt WHERE evt.event_id = $eventIdEncoder and evt.project_id = $projectIdEncoder
-          """.query(compoundEventIdDecoder)
+          """.query(compoundEventIdDecoder ~ eventBodyDecoder)
       )
       .arguments(eventId.id ~ eventId.projectId)
       .build(_.option)
+      .mapResult {
+        case Some((eventId, eventBody)) =>
+          val parents = parse(eventBody.value)
+            .map(eventBodyJson =>
+              eventBodyJson.hcursor.downField("parent_ids").as[List[CommitId]].getOrElse(List.empty[CommitId])
+            )
+            .getOrElse(List.empty[CommitId])
+          Some(EventDetails(eventId, parents))
+        case None => None
+      }
+
 }
 
 private object EventDetailsFinder {

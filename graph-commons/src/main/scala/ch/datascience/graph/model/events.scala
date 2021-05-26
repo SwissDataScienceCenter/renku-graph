@@ -39,6 +39,16 @@ object events {
     override lazy val toString: String = s"id = $id, projectId = $projectId"
   }
 
+  final case class EventDetails(id: EventId, projectId: projects.Id, parents: List[CommitId]) {
+    override lazy val toString: String          = s"id = $id, projectId = $projectId"
+    lazy val compoundEventId:   CompoundEventId = CompoundEventId(id, projectId)
+  }
+
+  object EventDetails {
+    def apply(compoundEventId: CompoundEventId, parents: List[CommitId]): EventDetails =
+      EventDetails(compoundEventId.id, compoundEventId.projectId, parents)
+  }
+
   final class CommitId private (val value: String) extends AnyVal with StringTinyType
   implicit object CommitId extends TinyTypeFactory[CommitId](new CommitId(_)) with GitSha
 

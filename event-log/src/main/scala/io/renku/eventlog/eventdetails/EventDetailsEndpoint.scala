@@ -21,17 +21,17 @@ package io.renku.eventlog.eventdetails
 import cats.effect.{Effect, IO}
 import cats.syntax.all._
 import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.graph.model.events.CompoundEventId
-import ch.datascience.http.{ErrorMessage, InfoMessage}
+import ch.datascience.graph.model.events.{CompoundEventId, EventDetails}
 import ch.datascience.http.InfoMessage._
+import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.metrics.LabeledHistogram
-import org.typelevel.log4cats.Logger
 import io.circe.Encoder
 import io.circe.literal.JsonStringContext
 import io.circe.syntax.EncoderOps
 import io.renku.eventlog.EventLogDB
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
+import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
@@ -45,10 +45,11 @@ class EventDetailsEndpointImpl[Interpretation[_]: Effect](eventDetailsFinder: Ev
     with EventDetailsEndpoint[Interpretation] {
 
   import org.http4s.circe._
+
   override def getDetails(eventId: CompoundEventId): Interpretation[Response[Interpretation]] =
     eventDetailsFinder.findDetails(eventId).flatMap {
-      case Some(eventId) => Ok(eventId.asJson)
-      case None          => NotFound(InfoMessage("Event not found"))
+      case Some(eventDetails) => Ok(eventDetails.asJson)
+      case None               => NotFound(InfoMessage("Event not found"))
     } recoverWith internalServerError
 
   private lazy val internalServerError: PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
@@ -58,12 +59,13 @@ class EventDetailsEndpointImpl[Interpretation[_]: Effect](eventDetailsFinder: Ev
       InternalServerError(errorMessage)
   }
 
-  private implicit lazy val encoder: Encoder[CompoundEventId] = Encoder.instance[CompoundEventId] { eventId =>
+  private implicit lazy val encoder: Encoder[EventDetails] = Encoder.instance[EventDetails] { eventDetails =>
     json"""{
-      "id":     ${eventId.id.value},
+      "id": ${eventDetails.id.value},
       "project": {
-        "id":   ${eventId.projectId.value}
-      }
+        "id": ${eventDetails.projectId.value}
+      },
+      "parent_ids": ${eventDetails.parents.map(_.value)}
     }"""
   }
 }

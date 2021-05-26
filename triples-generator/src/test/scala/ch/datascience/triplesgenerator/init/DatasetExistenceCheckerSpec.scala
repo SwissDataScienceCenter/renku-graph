@@ -32,37 +32,47 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class IODatasetExistenceCreatorSpec
+class DatasetExistenceCheckerSpec
     extends AnyWordSpec
     with ExternalServiceStubbing
     with MockFactory
     with should.Matchers {
 
-  "createDataset" should {
+  "doesDatasetExists" should {
 
-    "succeed if POST /$/datasets returns OK" in new TestCase {
+    "return true if client responds with OK" in new TestCase {
 
       stubFor {
-        post("/$/datasets")
-          .withHeader("content-type", containing("application/x-www-form-urlencoded"))
+        get(s"/$$/datasets/${fusekiConfig.datasetName}")
           .withBasicAuth(fusekiConfig.authCredentials.username.value, fusekiConfig.authCredentials.password.value)
-          .withRequestBody(equalTo(s"dbName=${fusekiConfig.datasetName}&dbType=${fusekiConfig.datasetType}"))
           .willReturn(ok())
       }
 
-      datasetExistenceCreator.createDataset().unsafeRunSync() shouldBe ((): Unit)
+      datasetExistenceChecker.doesDatasetExists().unsafeRunSync() shouldBe true
     }
 
-    "fail if POST /$/datasets returns status different than OK" in new TestCase {
+    "return false if client responds with NOT_FOUND" in new TestCase {
 
       stubFor {
-        post("/$/datasets")
+        get(s"/$$/datasets/${fusekiConfig.datasetName}")
+          .withBasicAuth(fusekiConfig.authCredentials.username.value, fusekiConfig.authCredentials.password.value)
+          .willReturn(notFound())
+      }
+
+      datasetExistenceChecker.doesDatasetExists().unsafeRunSync() shouldBe false
+    }
+
+    "fail if client responds with neither OK nor NOT_FOUND" in new TestCase {
+
+      stubFor {
+        get(s"/$$/datasets/${fusekiConfig.datasetName}")
+          .withBasicAuth(fusekiConfig.authCredentials.username.value, fusekiConfig.authCredentials.password.value)
           .willReturn(unauthorized().withBody("some message"))
       }
 
       intercept[Exception] {
-        datasetExistenceCreator.createDataset().unsafeRunSync()
-      }.getMessage shouldBe s"POST $fusekiBaseUrl/$$/datasets returned ${Status.Unauthorized}; body: some message"
+        datasetExistenceChecker.doesDatasetExists().unsafeRunSync()
+      }.getMessage shouldBe s"GET $fusekiBaseUrl/$$/datasets/${fusekiConfig.datasetName} returned ${Status.Unauthorized}; body: some message"
     }
   }
 
@@ -73,6 +83,6 @@ class IODatasetExistenceCreatorSpec
     val fusekiBaseUrl = FusekiBaseUrl(externalServiceBaseUrl)
     val fusekiConfig  = fusekiAdminConfigs.generateOne.copy(fusekiBaseUrl = fusekiBaseUrl)
 
-    val datasetExistenceCreator = new IODatasetExistenceCreator(fusekiConfig, TestLogger())
+    val datasetExistenceChecker = new DatasetExistenceCheckerImpl[IO](fusekiConfig, TestLogger())
   }
 }

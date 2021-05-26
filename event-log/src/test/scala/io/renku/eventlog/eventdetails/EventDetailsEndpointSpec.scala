@@ -22,8 +22,8 @@ import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators.compoundEventIds
-import ch.datascience.graph.model.events.CompoundEventId
+import ch.datascience.graph.model.EventsGenerators.{commitIds, compoundEventIds}
+import ch.datascience.graph.model.events.{CommitId, EventDetails}
 import ch.datascience.http.ErrorMessage.ErrorMessage
 import ch.datascience.http.InfoMessage._
 import ch.datascience.http.server.EndpointTester._
@@ -35,6 +35,7 @@ import io.circe.literal.JsonStringContext
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s.headers.`Content-Type`
+import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -45,22 +46,41 @@ class EventDetailsEndpointSpec extends AnyWordSpec with MockFactory with should.
 
     s"$Ok if the event is found in the event log " in new TestCase {
 
-      (eventDetailsFinder.findDetails _).expects(eventId).returning(eventId.some.pure[IO])
+      (eventDetailsFinder.findDetails _).expects(event.compoundEventId).returning(event.some.pure[IO])
 
-      val response = eventDetailEndpoint.getDetails(eventId).unsafeRunSync()
+      val response = eventDetailEndpoint.getDetails(event.compoundEventId).unsafeRunSync()
 
       response.status      shouldBe Ok
       response.contentType shouldBe Some(`Content-Type`(application.json))
       response
         .as[Json]
-        .unsafeRunSync() shouldBe json"""{ "id":${eventId.id.value}, "project": {"id": ${eventId.projectId.value}} } """
+        .unsafeRunSync() shouldBe json"""{ "id":${event.id.value}, "project": {"id": ${event.projectId.value}}, "parent_ids":${List
+        .empty[String]} } """
+    }
+
+    s"$Ok if the event is found in the event log and the event has parents" in new TestCase {
+      val eventWithParents = eventDetails(withParents = commitIds.generateNonEmptyList().toList).generateOne
+      (eventDetailsFinder.findDetails _)
+        .expects(eventWithParents.compoundEventId)
+        .returning(eventWithParents.some.pure[IO])
+
+      val response = eventDetailEndpoint.getDetails(eventWithParents.compoundEventId).unsafeRunSync()
+
+      response.status      shouldBe Ok
+      response.contentType shouldBe Some(`Content-Type`(application.json))
+      response
+        .as[Json]
+        .unsafeRunSync() shouldBe json"""{ "id":${eventWithParents.id.value}, "project": {"id": ${eventWithParents.projectId.value}}, "parent_ids":${eventWithParents.parents
+        .map(_.value)} } """
     }
 
     s"$NotFound if the event is not found in the event log " in new TestCase {
 
-      (eventDetailsFinder.findDetails _).expects(eventId).returning(Option.empty[CompoundEventId].pure[IO])
+      (eventDetailsFinder.findDetails _)
+        .expects(event.compoundEventId)
+        .returning(Option.empty[EventDetails].pure[IO])
 
-      val response = eventDetailEndpoint.getDetails(eventId).unsafeRunSync()
+      val response = eventDetailEndpoint.getDetails(event.compoundEventId).unsafeRunSync()
 
       response.status                          shouldBe NotFound
       response.contentType                     shouldBe Some(`Content-Type`(application.json))
@@ -70,9 +90,11 @@ class EventDetailsEndpointSpec extends AnyWordSpec with MockFactory with should.
     s"$InternalServerError if finding the details fails" in new TestCase {
       val exception = exceptions.generateOne
 
-      (eventDetailsFinder.findDetails _).expects(eventId).returning(exception.raiseError[IO, Option[CompoundEventId]])
+      (eventDetailsFinder.findDetails _)
+        .expects(event.compoundEventId)
+        .returning(exception.raiseError[IO, Option[EventDetails]])
 
-      val response = eventDetailEndpoint.getDetails(eventId).unsafeRunSync()
+      val response = eventDetailEndpoint.getDetails(event.compoundEventId).unsafeRunSync()
 
       response.status                           shouldBe InternalServerError
       response.contentType                      shouldBe Some(`Content-Type`(application.json))
@@ -83,7 +105,11 @@ class EventDetailsEndpointSpec extends AnyWordSpec with MockFactory with should.
   }
 
   private trait TestCase {
-    val eventId = compoundEventIds.generateOne
+    val event = eventDetails().generateOne
+
+    def eventDetails(withParents: List[CommitId] = Nil): Gen[EventDetails] = for {
+      eventId <- compoundEventIds
+    } yield EventDetails(eventId.id, eventId.projectId, withParents)
 
     val logger = TestLogger[IO]()
 

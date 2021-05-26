@@ -64,7 +64,7 @@ private class CommitToEventLogImpl[Interpretation[_]: MonadThrow](
 
   private def sendEvent(startCommit: StartCommit)(commitEvent: CommitEvent): Interpretation[EventCreationResult] =
     eventDetailsFinder
-      .checkIfExists(commitEvent.id, commitEvent.project.id)
+      .checkIfExists(commitEvent.project.id, commitEvent.id)
       .flatMap {
         case true => Existed.pure[Interpretation].widen[EventCreationResult]
         case false =>

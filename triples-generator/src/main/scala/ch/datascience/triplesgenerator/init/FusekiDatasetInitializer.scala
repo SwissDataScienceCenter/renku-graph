@@ -69,8 +69,8 @@ object IOFusekiDatasetInitializer {
       fusekiAdminConfig <- FusekiAdminConfig[IO]()
     } yield new FusekiDatasetInitializer[IO](
       fusekiAdminConfig,
-      new IODatasetExistenceChecker(fusekiAdminConfig, ApplicationLogger),
-      new IODatasetExistenceCreator(fusekiAdminConfig, ApplicationLogger),
+      new DatasetExistenceCheckerImpl(fusekiAdminConfig, ApplicationLogger),
+      new DatasetExistenceCreatorImpl(fusekiAdminConfig, ApplicationLogger),
       ApplicationLogger
     )
 }

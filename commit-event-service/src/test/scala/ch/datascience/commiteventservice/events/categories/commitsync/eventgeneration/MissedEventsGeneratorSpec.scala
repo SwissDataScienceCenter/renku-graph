@@ -19,22 +19,12 @@
 package ch.datascience.commiteventservice.events.categories.commitsync
 package eventgeneration
 
-import cats.data.OptionT
 import cats.effect.{ContextShift, IO}
-import cats.syntax.all._
 import ch.datascience.commiteventservice.events.categories.commitsync.Generators._
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.UpdateResult.{Failed, Updated}
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.Generators.{commitInfos, projectInfos}
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.CommitToEventLog
-import ch.datascience.generators.CommonGraphGenerators.{accessTokens, personalAccessTokens}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.Id
-import ch.datascience.http.client.AccessToken
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
-import ch.datascience.logging.TestExecutionTimeRecorder
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -56,46 +46,10 @@ class MissedEventsGeneratorSpec extends AnyWordSpec with MockFactory with should
         ).returning(IO.unit)
 
         eventsGenerator
-          .generateMissedEvents(commitSyncEvent.id, commitSyncEvent.project)
+          .generateMissedEvents(commitSyncEvent.project, commitSyncEvent.id)
           .unsafeRunSync() shouldBe Updated
 
       }
-
-//    "add all events to the Event Log in the case of the minimal commit sync event" in new TestCase {
-//      val commitSyncEvent = minimalCommitSyncEvents.generateOne
-//
-//      val projectInfo = projectInfos.generateOne.copy(id = commitSyncEvent.project.id)
-//
-//      val commitInfo = commitInfos.generateOne
-//      givenFetchLatestCommit(commitSyncEvent.project.id, maybeAccessToken)
-//        .returning(OptionT.some[IO](commitInfo))
-//
-//      givenFindingProjectInfo(commitSyncEvent, maybeAccessToken)
-//        .returning(projectInfo.pure[IO])
-//
-//      givenStoring(
-//        StartCommit(id = commitInfo.id, project = Project(projectInfo.id, projectInfo.path))
-//      ).returning(IO.unit)
-//
-//      eventsGenerator.generateMissedEvents(commitSyncEvent, maybeAccessToken).unsafeRunSync() shouldBe ()
-//
-//      logger.logged(
-//        Info(s"${logMessageCommon(commitSyncEvent)} -> new events found in ${executionTimeRecorder.elapsedTime}ms")
-//      )
-//    }
-
-//    "do nothing if there are no commits in GitLab (e.g. project removed)" in new TestCase {
-//      val commitSyncEvent = commitSyncEvents.generateOne
-//
-//      givenFetchLatestCommit(commitSyncEvent.project.id, maybeAccessToken)
-//        .returning(OptionT.none[IO, CommitInfo])
-//
-//      eventsGenerator.generateMissedEvents(commitSyncEvent, maybeAccessToken).unsafeRunSync() shouldBe ()
-//
-//      logger.logged(
-//        Info(s"${logMessageCommon(commitSyncEvent)} -> no new events found in ${executionTimeRecorder.elapsedTime}ms")
-//      )
-//    }
 
     "not break processing if storing start Commit for one of the events fails" in new TestCase {
       val commitSyncEvent = fullCommitSyncEvents.generateOne
@@ -107,8 +61,8 @@ class MissedEventsGeneratorSpec extends AnyWordSpec with MockFactory with should
         )
       ).returning(IO.raiseError(exception))
 
-      eventsGenerator.generateMissedEvents(commitSyncEvent.id, commitSyncEvent.project).unsafeRunSync() shouldBe Failed(
-        "synchronization failed",
+      eventsGenerator.generateMissedEvents(commitSyncEvent.project, commitSyncEvent.id).unsafeRunSync() shouldBe Failed(
+        "event generation failed",
         exception
       )
 

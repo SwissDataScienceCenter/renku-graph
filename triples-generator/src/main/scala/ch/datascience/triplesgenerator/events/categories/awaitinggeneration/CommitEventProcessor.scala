@@ -25,7 +25,7 @@ import cats.syntax.all._
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.EventStatus.{GenerationNonRecoverableFailure, GenerationRecoverableFailure}
 import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
-import ch.datascience.graph.tokenrepository.{AccessTokenFinder, AccessTokenFinder}
+import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime

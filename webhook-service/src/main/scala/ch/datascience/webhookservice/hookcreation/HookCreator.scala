@@ -35,7 +35,7 @@ import ch.datascience.webhookservice.hookvalidation.HookValidator
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult.HookMissing
 import ch.datascience.webhookservice.model.{CommitSyncRequest, HookToken, ProjectHookUrl}
-import ch.datascience.webhookservice.tokenrepository.{AccessTokenAssociator, IOAccessTokenAssociator}
+import ch.datascience.webhookservice.tokenrepository.{AccessTokenAssociator, AccessTokenAssociatorImpl}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -127,7 +127,7 @@ private object HookCreator {
       hookValidator           <- HookValidator(projectHookUrl, gitLabThrottler)
       projectInfoFinder       <- ProjectInfoFinder(gitLabThrottler, logger)
       hookCreator             <- IOProjectHookCreator(gitLabThrottler, logger)
-      tokenAssociator         <- IOAccessTokenAssociator(logger)
+      tokenAssociator         <- AccessTokenAssociatorImpl(logger)
     } yield new HookCreatorImpl[IO](
       projectHookUrl,
       hookValidator,

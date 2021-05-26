@@ -31,13 +31,13 @@ private trait TriplesRemover[Interpretation[_]] {
   def removeAllTriples(): Interpretation[Unit]
 }
 
-private class IOTriplesRemover(
+private class TriplesRemoverImpl(
     removalBatchSize:        Long Refined Positive,
     rdfStoreConfig:          RdfStoreConfig,
     logger:                  Logger[IO],
     timeRecorder:            SparqlQueryTimeRecorder[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
+    extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
     with TriplesRemover[IO] {
 
   import eu.timepit.refined.auto._
@@ -104,7 +104,7 @@ private class IOTriplesRemover(
   }
 }
 
-private object IOTriplesRemover {
+private object TriplesRemoverImpl {
 
   import ch.datascience.config.ConfigLoader._
   import eu.timepit.refined.pureconfig._
@@ -120,6 +120,6 @@ private object IOTriplesRemover {
       timer:            Timer[IO]
   ): IO[TriplesRemover[IO]] =
     find[IO, Long Refined Positive]("re-provisioning-removal-batch-size", config) map { removalBatchSize =>
-      new IOTriplesRemover(removalBatchSize, rdfStoreConfig, logger, timeRecorder)
+      new TriplesRemoverImpl(removalBatchSize, rdfStoreConfig, logger, timeRecorder)
     }
 }

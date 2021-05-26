@@ -66,17 +66,17 @@ private object DatasetsFinder {
 
 }
 
-private class IODatasetsFinder(
+private class DatasetsFinderImpl(
     rdfStoreConfig:          RdfStoreConfig,
     creatorsFinder:          CreatorsFinder,
     logger:                  Logger[IO],
     timeRecorder:            SparqlQueryTimeRecorder[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
+    extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
     with DatasetsFinder[IO]
     with Paging[IO, DatasetSearchResult] {
 
-  import IODatasetsFinder._
+  import DatasetsFinderImpl._
   import cats.syntax.all._
   import creatorsFinder._
 
@@ -224,7 +224,7 @@ private class IODatasetsFinder(
         .map(creators => dataset.copy(creators = creators))
 }
 
-private object IODatasetsFinder {
+private object DatasetsFinderImpl {
   import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.ProjectsCount
   import io.circe.Decoder
 
