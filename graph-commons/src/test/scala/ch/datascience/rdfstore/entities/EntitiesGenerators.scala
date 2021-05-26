@@ -19,11 +19,11 @@
 package ch.datascience.rdfstore.entities
 
 import cats.Applicative
-import ch.datascience.generators.CommonGraphGenerators.cliVersions
+import ch.datascience.generators.CommonGraphGenerators.{cliVersions, gitLabApiUrls, renkuBaseUrls}
 import ch.datascience.generators.Generators.Implicits.GenOps
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.GraphModelGenerators.{datasetIdentifiers, _}
+import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{Date, DerivedFrom, ExternalSameAs, Identifier, PartId, TopmostDerivedFrom}
 import ch.datascience.graph.model.users.{Email, GitLabId}
 import ch.datascience.graph.model.{datasets, projects}
@@ -39,6 +39,8 @@ import java.time.Instant
 object EntitiesGenerators extends EntitiesGenerators
 
 trait EntitiesGenerators {
+  implicit val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
+  implicit val gitLabApiUrl: GitLabApiUrl = gitLabApiUrls.generateOne
 
   val activityIds:        Gen[Activity.Id]        = Gen.uuid.map(uuid => Activity.Id(uuid.toString))
   val activityStartTimes: Gen[Activity.StartTime] = timestampsNotInTheFuture.map(Activity.StartTime.apply)

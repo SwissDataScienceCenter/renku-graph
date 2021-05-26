@@ -27,7 +27,7 @@ import ch.datascience.crypto.AesCrypto
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.Schemas
-import ch.datascience.graph.config.{GitLabUrl, RenkuBaseUrl, RenkuLogTimeout}
+import ch.datascience.graph.config.{GitLabApiUrl, GitLabUrl, RenkuBaseUrl, RenkuLogTimeout}
 import ch.datascience.graph.model.CliVersion
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.RestClientError._
@@ -119,20 +119,24 @@ object CommonGraphGenerators {
   } yield MicroserviceBaseUrl(s"$protocol://$ip1$ip2$ip3$ip4:$port")
 
   implicit val renkuBaseUrls: Gen[RenkuBaseUrl] = httpUrls() map RenkuBaseUrl.apply
+
   implicit val renkuResourcesUrls: Gen[renku.ResourcesUrl] = for {
     url  <- httpUrls()
     path <- relativePaths(maxSegments = 1)
   } yield renku.ResourcesUrl(s"$url/$path")
+
   def renkuResourceUrls(
       renkuResourcesUrl: renku.ResourcesUrl = renkuResourcesUrls.generateOne
-  ): Gen[renku.ResourceUrl] =
-    for {
-      path <- relativePaths(maxSegments = 1)
-    } yield renkuResourcesUrl / path
+  ): Gen[renku.ResourceUrl] = for {
+    path <- relativePaths(maxSegments = 1)
+  } yield renkuResourcesUrl / path
+
   implicit val gitLabUrls: Gen[GitLabUrl] = for {
     url  <- httpUrls()
     path <- relativePaths(maxSegments = 2)
   } yield GitLabUrl(s"$url/$path")
+
+  implicit val gitLabApiUrls: Gen[GitLabApiUrl] = gitLabUrls.map(_.apiV4)
 
   private implicit val sentryBaseUrls: Gen[SentryBaseUrl] = for {
     url         <- httpUrls()

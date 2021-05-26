@@ -23,7 +23,8 @@ import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{Identifier, TopmostDerivedFrom, TopmostSameAs}
-import ch.datascience.rdfstore.entities.bundles._
+import ch.datascience.rdfstore.entities._
+import ch.datascience.rdfstore.entities.Dataset._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQuery}
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CurationGenerators.curatedTriplesObjects
@@ -38,8 +39,10 @@ class DescendantsUpdaterSpec extends AnyWordSpec with InMemoryRdfStore with shou
 
     "add update queries for all datasets which topmostSameAs or topmostDerivedFrom points to the given datasetId" in new TestCase {
 
+      val dataset1                   = datasetEntities(datasetProvenanceImportedExternal()).generateOne
       val dataset1Id                 = datasetIdentifiers.generateOne
       val dataset1TopmostDerivedFrom = datasetTopmostDerivedFroms.generateOne
+
       val dataset2Id                 = datasetIdentifiers.generateOne
       val dataset2TopmostDerivedFrom = datasetTopmostDerivedFroms.generateOne
       val dataset3Id                 = datasetIdentifiers.generateOne
@@ -49,6 +52,7 @@ class DescendantsUpdaterSpec extends AnyWordSpec with InMemoryRdfStore with shou
       val dataset5Id                 = datasetIdentifiers.generateOne
       val dataset5TopmostSameAs      = datasetTopmostSameAs.generateOne
       val dataset5TopmostDerivedFrom = datasetTopmostDerivedFroms.generateOne
+
       loadToStore(
         nonModifiedDataSetCommit()()(datasetIdentifier = dataset1Id,
                                      overrideTopmostSameAs = topmostData.topmostSameAs.some,
@@ -97,8 +101,8 @@ class DescendantsUpdaterSpec extends AnyWordSpec with InMemoryRdfStore with shou
   }
 
   private trait TestCase {
-    val curatedTriples: CuratedTriples[IO] = curatedTriplesObjects[IO].generateOne.copy(updatesGroups = Nil)
-    val topmostData = topmostDatas.generateOne
+    val curatedTriples = curatedTriplesObjects[IO].generateOne.copy(updatesGroups = Nil)
+    val topmostData    = topmostDatas.generateOne
 
     val updater = new DescendantsUpdater()
   }
@@ -112,7 +116,7 @@ class DescendantsUpdaterSpec extends AnyWordSpec with InMemoryRdfStore with shou
   private def findTopmostData(id: Identifier): (TopmostSameAs, TopmostDerivedFrom) =
     runQuery(s"""|SELECT ?topmostSameAs ?topmostDerivedFrom
                  |WHERE {
-                 |  ?dsId rdf:type schema:Dataset;
+                 |  ?dsId a schema:Dataset;
                  |        schema:identifier '$id';
                  |        renku:topmostSameAs ?topmostSameAs;
                  |        renku:topmostDerivedFrom ?topmostDerivedFrom.

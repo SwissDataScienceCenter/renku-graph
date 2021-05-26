@@ -20,10 +20,11 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated.tripl
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.model.datasets.{DerivedFrom, InternalSameAs, SameAs, TopmostDerivedFrom, TopmostSameAs}
+import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
-import org.typelevel.log4cats.Logger
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
@@ -42,6 +43,7 @@ private class KGDatasetInfoFinderImpl(
     with KGDatasetInfoFinder[IO] {
 
   import cats.syntax.all._
+  import ch.datascience.graph.Schemas.{renku, schema}
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import eu.timepit.refined.auto._
 
@@ -49,16 +51,12 @@ private class KGDatasetInfoFinderImpl(
     queryExpecting[Set[TopmostSameAs]](using = queryFindingSameAs(sameAs))
       .flatMap(toOption[TopmostSameAs, InternalSameAs](sameAs))
 
-  private def queryFindingSameAs(sameAs: InternalSameAs) = SparqlQuery(
+  private def queryFindingSameAs(sameAs: InternalSameAs) = SparqlQuery.of(
     name = "upload - ds topmostSameAs",
-    Set(
-      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-      "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>",
-      "PREFIX schema: <http://schema.org/>"
-    ),
+    Prefixes.of(renku -> "renku", schema -> "schema"),
     s"""|SELECT ?maybeTopmostSameAs
         |WHERE {
-        |  <$sameAs> rdf:type <http://schema.org/Dataset>;
+        |  <$sameAs> a schema:Dataset;
         |            renku:topmostSameAs ?maybeTopmostSameAs.
         |}
         |""".stripMargin
@@ -74,15 +72,12 @@ private class KGDatasetInfoFinderImpl(
     queryExpecting[Set[TopmostDerivedFrom]](using = queryFindingDerivedFrom(derivedFrom))
       .flatMap(toOption[TopmostDerivedFrom, DerivedFrom](derivedFrom))
 
-  private def queryFindingDerivedFrom(derivedFrom: DerivedFrom) = SparqlQuery(
+  private def queryFindingDerivedFrom(derivedFrom: DerivedFrom) = SparqlQuery.of(
     name = "upload - ds topmostDerivedFrom",
-    Set(
-      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-      "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>"
-    ),
+    Prefixes.of(renku -> "renku", schema -> "schema"),
     s"""|SELECT ?maybeTopmostDerivedFrom
         |WHERE {
-        |  <$derivedFrom> rdf:type <http://schema.org/Dataset>;
+        |  <$derivedFrom> a schema:Dataset;
         |                 renku:topmostDerivedFrom ?maybeTopmostDerivedFrom.
         |}
         |""".stripMargin
@@ -113,7 +108,5 @@ private object IOKGDatasetInfoFinder {
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[KGDatasetInfoFinderImpl] =
-    for {
-      rdfStoreConfig <- RdfStoreConfig[IO]()
-    } yield new KGDatasetInfoFinderImpl(rdfStoreConfig, logger, timeRecorder)
+    RdfStoreConfig[IO]() map (new KGDatasetInfoFinderImpl(_, logger, timeRecorder))
 }

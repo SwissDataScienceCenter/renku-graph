@@ -319,23 +319,22 @@ object Dataset {
   implicit def encoder[P <: Provenance](implicit
       renkuBaseUrl: RenkuBaseUrl,
       gitLabApiUrl: GitLabApiUrl
-  ): JsonLDEncoder[Dataset[P]] =
-    JsonLDEncoder.instance {
-      case dataset @ Dataset(identification, provenance, additionalInfo, publishing, parts, project) =>
-        JsonLD
-          .entity(
-            dataset.entityId,
-            EntityTypes of (schema / "Dataset", prov / "Entity"),
-            List(
-              identification.asJsonLDProperties,
-              provenance.asJsonLDProperties,
-              additionalInfo.asJsonLDProperties(AdditionalInfo.encoder(dataset.entityId)),
-              publishing.asJsonLDProperties
-            ).flatten.toMap,
-            schema / "hasPart"  -> parts.asJsonLD,
-            schema / "isPartOf" -> project.asEntityId.asJsonLD
-          )
-    }
+  ): JsonLDEncoder[Dataset[P]] = JsonLDEncoder.instance {
+    case dataset @ Dataset(identification, provenance, additionalInfo, publishing, parts, project) =>
+      JsonLD
+        .entity(
+          dataset.entityId,
+          EntityTypes of (schema / "Dataset", prov / "Entity"),
+          List(
+            identification.asJsonLDProperties,
+            provenance.asJsonLDProperties,
+            additionalInfo.asJsonLDProperties(AdditionalInfo.encoder(dataset.entityId)),
+            publishing.asJsonLDProperties
+          ).flatten.toMap,
+          schema / "hasPart"  -> parts.asJsonLD,
+          schema / "isPartOf" -> project.asEntityId.asJsonLD
+        )
+  }
 
   private implicit class SerializationOps[T](obj: T) {
     def asJsonLDProperties(implicit encoder: T => Map[Property, JsonLD]): Map[Property, JsonLD] = encoder(obj)

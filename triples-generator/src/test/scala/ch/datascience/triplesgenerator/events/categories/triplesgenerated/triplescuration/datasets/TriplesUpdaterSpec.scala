@@ -21,14 +21,15 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated.tripl
 import ch.datascience.generators.CommonGraphGenerators.fusekiBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.rdfstore.entities.DataSet
-import ch.datascience.rdfstore.entities.bundles._
+import ch.datascience.rdfstore.entities.Dataset._
+import ch.datascience.rdfstore.entities._
 import ch.datascience.rdfstore.{FusekiBaseUrl, JsonLDTriples}
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CurationGenerators.curatedTriplesObjects
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.TopmostDataFinder.TopmostData
 import io.circe.Json
 import io.circe.optics.JsonPath.root
 import io.circe.optics.{JsonPath, JsonTraversalPath}
+import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, Property}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -37,22 +38,21 @@ import scala.util.Try
 
 class TriplesUpdaterSpec extends AnyWordSpec with should.Matchers {
 
-  private implicit val fusekiBaseUrl: FusekiBaseUrl = fusekiBaseUrls.generateOne
-
   "mergeTopmostDataIntoTriples" should {
 
     "add given topmost SameAs and DerivedFrom to Dataset entity in the given triples" in new TestCase {
-      val identifier = datasetIdentifiers.generateOne
-      val datasetId  = DataSet.entityId(identifier)(renkuBaseUrl)
-      val triples = JsonLDTriples {
-        nonModifiedDataSetCommit()()(datasetIdentifier = identifier, maybeDatasetSameAs = None).toJson
-      }
+      val dataset         = datasetEntities(datasetProvenanceInternal).generateOne
+      val identifier      = dataset.identifier
+      val datasetEntityId = dataset.asEntityId
 
-      val topmostData = topmostDatas(datasetId).generateOne
+      val topmostData = topmostDatas(datasetEntityId).generateOne
 
-      val updatedTriples = updater.mergeTopmostDataIntoTriples[Try](curatedTriples.copy(triples = triples), topmostData)
+      val updatedTriples = updater.mergeTopmostDataIntoTriples[Try](
+        curatedTriples.copy(triples = JsonLDTriples(dataset.asJsonLD.toJson)),
+        topmostData
+      )
 
-      val Some(updatedDataset) = updatedTriples.triples.findDataset(datasetId)
+      val Some(updatedDataset) = updatedTriples.triples.findDataset(datasetEntityId)
 
       findIdentifier(updatedDataset)         shouldBe Some(identifier.toString)
       findTopmostSameAs(updatedDataset)      shouldBe Some(topmostData.topmostSameAs.toString)
@@ -61,6 +61,8 @@ class TriplesUpdaterSpec extends AnyWordSpec with should.Matchers {
       updatedTriples.updatesGroups shouldBe curatedTriples.updatesGroups
     }
   }
+
+  private implicit val fusekiBaseUrl: FusekiBaseUrl = fusekiBaseUrls.generateOne
 
   private trait TestCase {
     val curatedTriples = curatedTriplesObjects[Try].generateOne

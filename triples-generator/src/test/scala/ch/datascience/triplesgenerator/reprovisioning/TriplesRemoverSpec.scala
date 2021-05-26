@@ -23,8 +23,7 @@ import ch.datascience.generators.Generators.Implicits.GenOps
 import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.entities.bundles._
-import ch.datascience.rdfstore.entities.datasetEntities
+import ch.datascience.rdfstore.entities._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.generators.VersionGenerators.renkuVersionPairs
 import io.renku.jsonld.syntax._
@@ -32,7 +31,7 @@ import io.renku.jsonld.{EntityTypes, JsonLD}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class IOTriplesRemoverSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers {
+class TriplesRemoverSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers {
 
   "removeAllTriples" should {
 
@@ -52,8 +51,8 @@ class IOTriplesRemoverSpec extends AnyWordSpec with InMemoryRdfStore with should
       )
 
       loadToStore(
-        datasetEntities.generateOne.asJsonLD,
-        datasetEntities.generateOne.asJsonLD,
+        datasetEntities(ofAnyProvenance).generateOne.asJsonLD,
+        datasetEntities(ofAnyProvenance).generateOne.asJsonLD,
         versionPairJsonLD,
         reprovisioningJsonLD
       )
@@ -72,7 +71,7 @@ class IOTriplesRemoverSpec extends AnyWordSpec with InMemoryRdfStore with should
 
   private trait TestCase {
     private val removalBatchSize      = positiveLongs(max = 100000).generateOne
-    val logger                        = TestLogger[IO]()
+    private val logger                = TestLogger[IO]()
     private val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
     private val sparqlTimeRecorder    = new SparqlQueryTimeRecorder(executionTimeRecorder)
     val triplesRemover                = new IOTriplesRemover(removalBatchSize, rdfStoreConfig, logger, sparqlTimeRecorder)
