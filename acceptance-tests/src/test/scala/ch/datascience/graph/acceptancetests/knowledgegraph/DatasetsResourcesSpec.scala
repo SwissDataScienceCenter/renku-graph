@@ -76,7 +76,7 @@ class DatasetsResourcesSpec
 
     val project = projectEntities().generateOne.copy(
       visibility = Visibility.Public,
-      maybeParentProject = None,
+      maybeParent = None,
       maybeCreator = None
     )
     val dataset1         = datasetEntities(datasetProvenanceInternal, projectsGen = fixed(project)).generateOne

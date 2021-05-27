@@ -22,13 +22,16 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{nonEmptyStrings, positiveInts}
 import ch.datascience.graph.model.GraphModelGenerators.userEmails
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.knowledgegraph.projects.model.Project
+import ch.datascience.graph.model.projects.{Description, Id, Name, Path}
+import ch.datascience.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount, Tag}
+import ch.datascience.knowledgegraph.projects.model.{Permissions, Statistics, Urls}
+import ch.datascience.rdfstore.entities
 import io.circe.Json
 import io.circe.literal._
 
 object GitLab {
 
-  def pushEvent(project: Project, commitId: CommitId): Json = json"""{
+  def pushEvent(project: Project[entities.Project.ForksCount], commitId: CommitId): Json = json"""{
     "after":         ${commitId.value},
     "user_id":       ${positiveInts().generateOne.value}, 
     "user_username": ${nonEmptyStrings().generateOne},
@@ -38,4 +41,18 @@ object GitLab {
       "path_with_namespace": ${project.path.value}
     }
   }"""
+
+  final case class Project[FC <: entities.Project.ForksCount](entitiesProject:  entities.Project[FC],
+                                                              id:               Id,
+                                                              maybeDescription: Option[Description],
+                                                              updatedAt:        DateUpdated,
+                                                              urls:             Urls,
+                                                              tags:             Set[Tag],
+                                                              starsCount:       StarsCount,
+                                                              permissions:      Permissions,
+                                                              statistics:       Statistics
+  ) {
+    val path: Path = entitiesProject.path
+    val name: Name = entitiesProject.name
+  }
 }

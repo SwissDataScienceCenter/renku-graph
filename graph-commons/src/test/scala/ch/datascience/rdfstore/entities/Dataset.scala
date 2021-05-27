@@ -34,7 +34,7 @@ final case class Dataset[P <: Provenance](identification: Identification,
                                           additionalInfo: AdditionalInfo,
                                           publishing:     Publishing,
                                           parts:          List[DatasetPart],
-                                          project:        Project
+                                          project:        Project[Project.ForksCount]
 ) {
 
   def entityId(implicit renkuBaseUrl: RenkuBaseUrl): EntityId = Dataset.entityId(identification.identifier)
@@ -228,7 +228,7 @@ object Dataset {
                             additionalInfo: AdditionalInfo,
                             publishing:     Publishing,
                             parts:          List[DatasetPart],
-                            project:        Project
+                            project:        Project[Project.ForksCount]
   ): ValidatedNel[String, Dataset[P]] =
     validateState(identification.identifier,
                   provenance.date,
@@ -249,7 +249,7 @@ object Dataset {
 
   private[Dataset] def validateState(identifier:        Identifier,
                                      date:              Date,
-                                     project:           Project,
+                                     project:           Project[Project.ForksCount],
                                      creators:          Set[Person],
                                      parts:             List[DatasetPart],
                                      publicationEvents: List[PublicationEvent]
@@ -266,7 +266,7 @@ object Dataset {
     Validated.condNel(creators.nonEmpty, creators, s"No creators on dataset with id: $identifier")
 
   private[Dataset] def validateDateCreated(identifier: Identifier,
-                                           project:    Project,
+                                           project:    Project[Project.ForksCount],
                                            date:       Date
   ): ValidatedNel[String, Date] = date match {
     case created: DateCreated =>

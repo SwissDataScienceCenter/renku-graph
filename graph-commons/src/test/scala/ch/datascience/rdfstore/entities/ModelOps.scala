@@ -26,19 +26,54 @@ import ch.datascience.graph.model.GraphModelGenerators.datasetIdentifiers
 import ch.datascience.graph.model.datasets.{DateCreated, DatePublished, Description, InternalSameAs, Keyword, Name, SameAs, Title}
 import ch.datascience.graph.model.{datasets, users}
 import ch.datascience.rdfstore.entities.Dataset.Provenance.{ImportedExternal, ImportedInternalAncestorExternal, Internal}
+import ch.datascience.rdfstore.entities.ModelOps.DatasetForkingResult
+import ch.datascience.rdfstore.entities.Project.ForksCount
 import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
 import io.renku.jsonld.EntityId
+import org.scalacheck.Gen
 
 trait ModelOps {
+
+  implicit class ProjectOps[FC <: ForksCount](project: Project[FC])(implicit renkuBaseUrl: RenkuBaseUrl) {
+
+    def fork(): (Project[ForksCount.NonZero], Gen[Project[ForksCount.Zero] with HavingParent]) = {
+      val parentProject = incrementForksCount()
+      parentProject -> projectEntities[ForksCount.Zero](parentProject.dateCreated).map(child =>
+        new Project(
+          child.path,
+          child.name,
+          child.agent,
+          child.dateCreated,
+          child.maybeCreator,
+          child.visibility,
+          child.forksCount,
+          child.members,
+          child.version
+        ) with HavingParent {
+          override val parent: Project[ForksCount.NonZero] = parentProject
+        }
+      )
+    }
+
+    private def incrementForksCount(): Project[ForksCount.NonZero] =
+      project.copy(forksCount = Project.ForksCount(Refined.unsafeApply(project.forksCount.value + 1)))
+  }
 
   implicit class DatasetOps[P <: Dataset.Provenance](dataset: Dataset[P])(implicit renkuBaseUrl: RenkuBaseUrl) {
 
     lazy val identifier: datasets.Identifier = dataset.identification.identifier
 
-    def fork(forkProject: Project = projectEntities().generateOne): Dataset[P] = dataset.copy(project = forkProject)
+    def forkProject(): DatasetForkingResult[P] = {
+      val (updatedOriginalProject, forkProjectGen) = dataset.project.fork()
+      DatasetForkingResult(
+        dataset.copy(project = updatedOriginalProject),
+        dataset.copy(project = forkProjectGen.generateOne)
+      )
+    }
 
     def importTo[POUT <: Dataset.Provenance](
-        project:              Project
+        project:              Project[Project.ForksCount]
     )(implicit newProvenance: (EntityId, InternalSameAs, P) => POUT): Dataset[POUT] = {
       val intermediate = dataset.copy(
         project = project,
@@ -202,4 +237,6 @@ trait ModelOps {
   }
 }
 
-object ModelOps extends ModelOps
+object ModelOps extends ModelOps {
+  final case class DatasetForkingResult[DP <: Dataset.Provenance](original: Dataset[DP], fork: Dataset[DP])
+}

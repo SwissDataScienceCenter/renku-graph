@@ -28,9 +28,7 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities._
-import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
-import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -43,10 +41,7 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
       "- a case of a non-modified renku dataset used in a single project" in new TestCase {
 
         forAll(datasetEntities(provenanceGen = datasetProvenanceInternal)) { dataset =>
-          loadToStore(
-            dataset.asJsonLD,
-            datasetEntities(ofAnyProvenance).generateOne.asJsonLD
-          )
+          loadToStore(dataset, datasetEntities(ofAnyProvenance).generateOne)
 
           datasetFinder
             .findDataset(dataset.identifier)
@@ -58,11 +53,7 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
       "- a case when unrelated projects are using the same imported dataset" in new TestCase {
         val dataset1 :: dataset2 :: Nil = importedExternalDatasetEntities(sharedInProjects = 2).generateOne
 
-        loadToStore(
-          dataset1.asJsonLD,
-          dataset2.asJsonLD,
-          datasetEntities(ofAnyProvenance).generateOne.asJsonLD
-        )
+        loadToStore(dataset1, dataset2, datasetEntities(ofAnyProvenance).generateOne)
 
         datasetFinder.findDataset(dataset1.identifier).unsafeRunSync() shouldBe Some(
           dataset1
@@ -93,11 +84,7 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
 
         val modifiedDatasetOnProject1 = modifiedDatasetEntities(dataset1).generateOne
 
-        loadToStore(
-          dataset1.asJsonLD,
-          dataset2.asJsonLD,
-          modifiedDatasetOnProject1.asJsonLD
-        )
+        loadToStore(dataset1, dataset2, modifiedDatasetOnProject1)
 
         datasetFinder
           .findDataset(dataset2.identifier)
@@ -111,14 +98,14 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
     "return details of the dataset with the given id " +
       "- a case when unrelated projects are using the same dataset created in a Renku project" in new TestCase {
         forAll(datasetEntities(datasetProvenanceInternal)) { sourceDataset =>
-          val datasetOnProject1 = sourceDataset.importTo(projectEntities().generateOne)
-          val datasetOnProject2 = sourceDataset.importTo(projectEntities().generateOne)
+          val datasetOnProject1 = sourceDataset.importTo(projectEntities[Project.ForksCount.Zero]().generateOne)
+          val datasetOnProject2 = sourceDataset.importTo(projectEntities[Project.ForksCount.Zero]().generateOne)
 
           loadToStore(
-            sourceDataset.asJsonLD,
-            datasetOnProject1.asJsonLD,
-            datasetOnProject2.asJsonLD,
-            datasetEntities(ofAnyProvenance).generateOne.asJsonLD
+            sourceDataset,
+            datasetOnProject1,
+            datasetOnProject2,
+            datasetEntities(ofAnyProvenance).generateOne
           )
 
           datasetFinder.findDataset(sourceDataset.identifier).unsafeRunSync() shouldBe
@@ -158,12 +145,9 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
       "- a case when a Renku created dataset is defined on a project which has a fork" in new TestCase {
 
         forAll(datasetEntities(datasetProvenanceInternal)) { originalDataset =>
-          val datasetOnForkedProject = originalDataset.fork()
+          val datasetOnForkedProject = originalDataset.forkProject().fork
 
-          loadToStore(
-            originalDataset.asJsonLD,
-            datasetOnForkedProject.asJsonLD
-          )
+          loadToStore(originalDataset, datasetOnForkedProject)
 
           datasetFinder.findDataset(originalDataset.identifier).unsafeRunSync() shouldBe
             originalDataset
@@ -192,13 +176,9 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
     "return details of the dataset with the given id " +
       "- a case when unrelated projects are sharing a dataset and one of the projects is forked" in new TestCase {
         val dataset1 :: dataset2 :: Nil = importedExternalDatasetEntities(sharedInProjects = 2).generateOne
-        val dataset2Fork                = dataset2.fork()
+        val dataset2Fork                = dataset2.forkProject().fork
 
-        loadToStore(
-          dataset1.asJsonLD,
-          dataset2.asJsonLD,
-          dataset2Fork.asJsonLD
-        )
+        loadToStore(dataset1, dataset2, dataset2Fork)
 
         datasetFinder.findDataset(dataset1.identifier).unsafeRunSync() shouldBe
           dataset1
@@ -228,14 +208,10 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
     "return details of the dataset with the given id " +
       "- a case when a Renku created dataset is defined on a grandparent project with two levels of forks" in new TestCase {
         forAll(datasetEntities(datasetProvenanceInternal)) { grandparentDataset =>
-          val parentDataset = grandparentDataset.fork()
-          val childDataset  = parentDataset.fork()
+          val parentDataset = grandparentDataset.forkProject().fork
+          val childDataset  = parentDataset.forkProject().fork
 
-          loadToStore(
-            grandparentDataset.asJsonLD,
-            parentDataset.asJsonLD,
-            childDataset.asJsonLD
-          )
+          loadToStore(grandparentDataset, parentDataset, childDataset)
 
           datasetFinder.findDataset(grandparentDataset.identifier).unsafeRunSync() shouldBe
             grandparentDataset
@@ -255,13 +231,9 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
       "- case when modification is followed by forking" in new TestCase {
         forAll(datasetEntities(datasetProvenanceInternal)) { originalDataset =>
           val modifiedDataset     = modifiedDatasetEntities(originalDataset).generateOne
-          val modifiedDatasetFork = modifiedDataset.fork()
+          val modifiedDatasetFork = modifiedDataset.forkProject().fork
 
-          loadToStore(
-            originalDataset.asJsonLD,
-            modifiedDataset.asJsonLD,
-            modifiedDatasetFork.asJsonLD
-          )
+          loadToStore(originalDataset, modifiedDataset, modifiedDatasetFork)
 
           datasetFinder.findDataset(originalDataset.identifier).unsafeRunSync() shouldBe Some(
             originalDataset.to[NonModifiedDataset].copy(usedIn = Nil)
@@ -283,14 +255,10 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
     "return details of the dataset with the given id " +
       "- case when forking is followed by modification" in new TestCase {
         forAll(datasetEntities(datasetProvenanceInternal)) { originalDataset =>
-          val datasetForked   = originalDataset.fork()
+          val datasetForked   = originalDataset.forkProject().fork
           val modifiedDataset = modifiedDatasetEntities(datasetForked).generateOne
 
-          loadToStore(
-            originalDataset.asJsonLD,
-            datasetForked.asJsonLD,
-            modifiedDataset.asJsonLD
-          )
+          loadToStore(originalDataset, datasetForked, modifiedDataset)
 
           datasetFinder.findDataset(originalDataset.identifier).unsafeRunSync() shouldBe Some(
             originalDataset.to[NonModifiedDataset]
@@ -318,13 +286,9 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
     "return details of the dataset with the given id " +
       "- case when the first dataset is imported from a third party provider" in new TestCase {
         val dataset1 :: dataset2 :: Nil = importedExternalDatasetEntities(sharedInProjects = 2).generateOne
-        val dataset3                    = dataset2.importTo(projectEntities().generateOne)
+        val dataset3                    = dataset2.importTo(projectEntities[Project.ForksCount.Zero]().generateOne)
 
-        loadToStore(
-          dataset1.asJsonLD,
-          dataset2.asJsonLD,
-          dataset3.asJsonLD
-        )
+        loadToStore(dataset1, dataset2, dataset3)
 
         datasetFinder.findDataset(dataset1.identifier).unsafeRunSync() shouldBe Some(
           dataset1
@@ -355,14 +319,10 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
       "- case when the first dataset is renku created" in new TestCase {
 
         val dataset1 = datasetEntities(datasetProvenanceInternal).generateOne
-        val dataset2 = dataset1.importTo(projectEntities().generateOne)
-        val dataset3 = dataset2.importTo(projectEntities().generateOne)
+        val dataset2 = dataset1.importTo(projectEntities[Project.ForksCount.Zero]().generateOne)
+        val dataset3 = dataset2.importTo(projectEntities[Project.ForksCount.Zero]().generateOne)
 
-        loadToStore(
-          dataset1.asJsonLD,
-          dataset2.asJsonLD,
-          dataset3.asJsonLD
-        )
+        loadToStore(dataset1, dataset2, dataset3)
 
         datasetFinder
           .findDataset(dataset1.identifier)
@@ -396,16 +356,11 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
     "return details of the dataset with the given id " +
       "- case when the sameAs hierarchy is broken by dataset modification" in new TestCase {
         val dataset1         = datasetEntities(datasetProvenanceInternal).generateOne
-        val dataset2         = dataset1.importTo(projectEntities().generateOne)
+        val dataset2         = dataset1.importTo(projectEntities[Project.ForksCount.Zero]().generateOne)
         val dataset2Modified = modifiedDatasetEntities(dataset2).generateOne
-        val dataset3         = dataset2Modified.importTo(projectEntities().generateOne)
+        val dataset3         = dataset2Modified.importTo(projectEntities[Project.ForksCount.Zero]().generateOne)
 
-        loadToStore(
-          dataset1.asJsonLD,
-          dataset2.asJsonLD,
-          dataset2Modified.asJsonLD,
-          dataset3.asJsonLD
-        )
+        loadToStore(dataset1, dataset2, dataset2Modified, dataset3)
 
         datasetFinder.findDataset(dataset1.identifier).unsafeRunSync() shouldBe Some(dataset1.to[NonModifiedDataset])
         datasetFinder.findDataset(dataset2Modified.identifier).unsafeRunSync() shouldBe Some(

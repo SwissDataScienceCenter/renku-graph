@@ -33,7 +33,7 @@ import ch.datascience.rdfstore.entities.ParameterValue.{PathParameterValue, Vari
 
 final case class ExecutionPlanner(runPlan:                 RunPlan,
                                   activityData:            (Activity.StartTime, Person, CliVersion),
-                                  project:                 Project,
+                                  project:                 Project[Project.ForksCount],
                                   argumentsValueOverrides: List[(ParameterDefaultValue, ValueOverride)],
                                   inputsValueOverrides:    List[(InputDefaultValue, Location, Checksum)]
 ) {
@@ -134,6 +134,6 @@ object ExecutionPlanner {
          activityTime: Activity.StartTime,
          author:       Person,
          cliVersion:   CliVersion,
-         project:      Project
+         project:      Project[Project.ForksCount]
   ): ExecutionPlanner = ExecutionPlanner(runPlan, (activityTime, author, cliVersion), project, List.empty, List.empty)
 }

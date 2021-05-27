@@ -31,7 +31,9 @@ import ch.datascience.rdfstore.entities.Activity.Order
 import ch.datascience.rdfstore.entities.Dataset.{AdditionalInfo, Identification, Provenance}
 import ch.datascience.rdfstore.entities.Entity.{Checksum, InputEntity}
 import ch.datascience.rdfstore.entities.PublicationEvent.AboutEvent
+import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
+import eu.timepit.refined.numeric.Positive
 import org.scalacheck.Gen
 
 import java.time.Instant
@@ -59,9 +61,9 @@ trait EntitiesGenerators {
   implicit val commandParameterNames: Gen[CommandParameterBase.Name] =
     nonBlankStrings().map(_.value).generateAs[CommandParameterBase.Name]
 
-  def projectEntities(
-      minDateCreated: projects.DateCreated = projects.DateCreated(Instant.EPOCH)
-  ): Gen[Project] = for {
+  def projectEntities[FC <: Project.ForksCount](
+      minDateCreated:       projects.DateCreated = projects.DateCreated(Instant.EPOCH)
+  )(implicit forksCountGen: Gen[FC]): Gen[Project[FC]] = for {
     path         <- projectPaths
     name         <- projectNames
     agent        <- cliVersions
@@ -70,16 +72,13 @@ trait EntitiesGenerators {
     visibility   <- projectVisibilities
     members      <- persons(userGitLabIds.toGeneratorOfSomes).toGeneratorOfSet(minElements = 0)
     version      <- projectSchemaVersions
-  } yield Project(path,
-                  name,
-                  agent,
-                  dateCreated,
-                  maybeCreator,
-                  visibility,
-                  maybeParentProject = None,
-                  members = members,
-                  version
-  )
+    forksCount   <- forksCountGen
+  } yield Project[FC](path, name, agent, dateCreated, maybeCreator, visibility, forksCount, members, version)
+
+  implicit val zeroForksProject: Gen[Project.ForksCount.Zero] = Gen.const(Project.ForksCount.Zero)
+  implicit val nonZeroForksProject: Gen[Project.ForksCount.NonZero] =
+    positiveInts(max = 100) map Project.ForksCount.apply
+  def fixedForksCount(count: Int Refined Positive): Gen[Project.ForksCount.NonZero] = Project.ForksCount(count)
 
   val datasetIdentifications: Gen[Dataset.Identification] = for {
     identifier <- datasetIdentifiers
@@ -158,7 +157,7 @@ trait EntitiesGenerators {
         datasetProvenanceModified(identifier, projectDateCreated)(renkuBaseUrl)
       )
 
-  def datasetPublishing(date: Date, project: Project): Gen[Dataset.Publishing] = for {
+  def datasetPublishing(date: Date, project: Project[_]): Gen[Dataset.Publishing] = for {
     publicationEvents <-
       publicationEventEntities(date match {
         case dateCreated: datasets.DateCreated => dateCreated.value
@@ -183,7 +182,7 @@ trait EntitiesGenerators {
     } yield (1 until sharedInProjects).foldLeft(List(dataset)) { (datasets, _) =>
       datasets :+ dataset.copy(
         identification = dataset.identification.copy(identifier = datasetIdentifiers.generateOne),
-        project = projectEntities().generateOne
+        project = projectEntities[Project.ForksCount.Zero]().generateOne
       )
     }
 
@@ -193,7 +192,7 @@ trait EntitiesGenerators {
       provenanceGen:       ProvenanceGen[P],
       identificationGen:   Gen[Identification] = datasetIdentifications,
       additionalInfoGen:   Gen[AdditionalInfo] = datasetAdditionalInfos,
-      projectsGen:         Gen[Project] = projectEntities()
+      projectsGen:         Gen[Project[Project.ForksCount]] = projectEntities[Project.ForksCount.Zero]()
   )(implicit renkuBaseUrl: RenkuBaseUrl): Gen[Dataset[P]] = for {
     project        <- projectsGen
     identification <- identificationGen

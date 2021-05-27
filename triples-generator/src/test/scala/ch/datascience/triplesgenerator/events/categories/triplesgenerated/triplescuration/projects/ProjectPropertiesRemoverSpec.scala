@@ -55,7 +55,7 @@ class ProjectPropertiesRemoverSpec extends AnyWordSpec with ScalaCheckPropertyCh
             project.dateCreated.some,
             project.maybeCreator.asJsonLD.entityId
           ).some,
-          project.maybeParentProject.map { parent =>
+          project.maybeParent.map { parent =>
             TransformedProject(
               parent,
               parent.name.some,
@@ -72,7 +72,7 @@ class ProjectPropertiesRemoverSpec extends AnyWordSpec with ScalaCheckPropertyCh
             maybeCreatedDate = None,
             maybeCreatorId = None
           ).some,
-          project.maybeParentProject.map { parent =>
+          project.maybeParent.map { parent =>
             TransformedProject(
               parent,
               maybeName = None,
@@ -148,7 +148,7 @@ class ProjectPropertiesRemoverSpec extends AnyWordSpec with ScalaCheckPropertyCh
         maybeName.map(List(_)).getOrElse(Nil),
         maybeCreatedDate.map(List(_)).getOrElse(Nil),
         maybeCreatorId.map(id => users.ResourceId(id)),
-        project.maybeParentProject.flatMap(_.asJsonLD.entityId).map(id => ResourceId(id)),
+        project.maybeParent.flatMap(_.asJsonLD.entityId).map(id => ResourceId(id)),
         List(SchemaVersion(project.version.toString))
       )
   }

@@ -24,7 +24,6 @@ import ch.datascience.graph.acceptancetests.tooling.RDFStore
 import ch.datascience.graph.model.{CliVersion, SchemaVersion}
 import ch.datascience.rdfstore.{FusekiBaseUrl, entities}
 import ch.datascience.graph.model.RenkuVersionPair
-import ch.datascience.knowledgegraph.projects.model
 import ch.datascience.knowledgegraph.projects.model.{Creator, Project}
 import ch.datascience.rdfstore.entities.Person
 
@@ -47,7 +46,7 @@ package object data {
       project.created.date,
       project.created.maybeCreator.map(_.toEntitiesPerson),
       project.visibility,
-      maybeParentProject = project.forking.maybeParent.map(parent =>
+      maybeParent = project.forking.maybeParent.map(parent =>
         entities.Project(
           parent.path,
           parent.name,
@@ -55,7 +54,7 @@ package object data {
           parent.created.date,
           parent.created.maybeCreator.map(_.toEntitiesPerson),
           parent.visibility,
-          maybeParentProject = None,
+          maybeParent = None,
           members = Set.empty,
           project.version
         )

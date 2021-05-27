@@ -53,7 +53,7 @@ class ApiTest extends AnyWordSpec {
 
     implicit val gitLabApiUrl: GitLabApiUrl = gitLabUrls.generateOne.apiV4
 
-    val project = projectEntities().generateOne.copy(members = Set.empty)
+    val project = projectEntities[Project.ForksCount.Zero]().generateOne.copy(members = Set.empty)
 
     val activity = ExecutionPlanner
       .of(runPlan, activityStartTimes.generateOne, persons.generateOne, project.agent, project)
