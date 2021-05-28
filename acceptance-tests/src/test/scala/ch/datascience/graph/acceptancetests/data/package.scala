@@ -29,6 +29,8 @@ import ch.datascience.knowledgegraph.projects.model.Project.DateUpdated
 import ch.datascience.rdfstore.{FusekiBaseUrl, entities}
 import org.scalacheck.Gen
 
+import scala.language.implicitConversions
+
 package object data {
   val renkuResourcesUrl:      renku.ResourcesUrl = renku.ResourcesUrl("http://localhost:9004/knowledge-graph")
   val currentVersionPair:     RenkuVersionPair   = RenkuVersionPair(CliVersion("0.12.2"), SchemaVersion("8"))

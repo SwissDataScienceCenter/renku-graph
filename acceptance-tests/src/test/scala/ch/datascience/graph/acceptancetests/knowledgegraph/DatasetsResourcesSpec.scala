@@ -484,23 +484,9 @@ object DatasetsResources {
   import ch.datascience.json.JsonOps._
   import ch.datascience.tinytypes.json.TinyTypeEncoders._
 
-  def briefJson(dataset: NonModifiedDataset): Json = json"""{
-    "identifier": ${dataset.id.value},
-    "versions": {
-      "initial": ${dataset.versions.initial.value}
-    },
-    "title": ${dataset.title.value},
-    "name": ${dataset.name.value},
-    "sameAs": ${dataset.sameAs.value},
-    "images": ${dataset.images.map(_.value)}
-  }""" deepMerge {
-    _links(
-      Rel("details")         -> Href(renkuResourcesUrl / "datasets" / dataset.id),
-      Rel("initial-version") -> Href(renkuResourcesUrl / "datasets" / dataset.versions.initial)
-    )
-  }
-
-  def briefJson(dataset: ModifiedDataset): Json = json"""{
+  def briefJson: entities.Dataset[entities.Dataset.Provenance] => Json = {
+    case dataset: entities.Dataset[entities.Dataset.Provenance.Modified] =>
+      json"""{
     "identifier": ${dataset.id.value},
     "versions": {
       "initial": ${dataset.versions.initial.value}
@@ -510,10 +496,27 @@ object DatasetsResources {
     "derivedFrom": ${dataset.derivedFrom.value},
     "images": ${dataset.images.map(_.value)}
   }""" deepMerge {
-    _links(
-      Rel("details")         -> Href(renkuResourcesUrl / "datasets" / dataset.id),
-      Rel("initial-version") -> Href(renkuResourcesUrl / "datasets" / dataset.versions.initial)
-    )
+        _links(
+          Rel("details")         -> Href(renkuResourcesUrl / "datasets" / dataset.id),
+          Rel("initial-version") -> Href(renkuResourcesUrl / "datasets" / dataset.versions.initial)
+        )
+      }
+    case dataset =>
+      json"""{
+    "identifier": ${dataset.identification.identifier.value},
+    "versions": {
+      "initial": ${dataset.provenance.topmostSameAs.value}
+    },
+    "title": ${dataset.identification.title.value},
+    "name": ${dataset.identification.name.value},
+    "sameAs": ${dataset.provenance.sameAs.value},
+    "images": ${dataset.additionalInfo.images.map(_.value)}
+  }""" deepMerge {
+        _links(
+          Rel("details")         -> Href(renkuResourcesUrl / "datasets" / dataset.identification.identifier),
+          Rel("initial-version") -> Href(renkuResourcesUrl / "datasets" / dataset.provenance.topmostSameAs.value)
+        )
+      }
   }
 
   def searchResultJson(dataset: Dataset, sameAsIds: List[Identifier], actualResults: List[Json]): Json = {
