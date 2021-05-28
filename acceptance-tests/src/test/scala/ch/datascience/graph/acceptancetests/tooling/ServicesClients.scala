@@ -174,7 +174,11 @@ abstract class ServiceClient(implicit
     executionContext: ExecutionContext,
     concurrentEffect: ConcurrentEffect[IO],
     timer:            Timer[IO]
-) extends RestClient(Throttler.noThrottling, TestLogger(), retryInterval = 500 millis, maxRetries = 1) {
+) extends RestClient[IO, ServiceClient](Throttler.noThrottling,
+                                        TestLogger(),
+                                        retryInterval = 500 millis,
+                                        maxRetries = 1
+    ) {
 
   import ServiceClient.ServiceReadiness
   import ServiceClient.ServiceReadiness._

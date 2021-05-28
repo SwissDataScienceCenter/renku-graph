@@ -42,7 +42,7 @@ private class CommitEventsRemoverImpl[Interpretation[_]: MonadThrow](
     eventStatusPatcher
       .sendDeletionStatus(project.id, commitId)
       .map(_ => Deleted: UpdateResult) recoverWith { case NonFatal(e) =>
-      Failed(s"Commit Remover failed to send commit deletion status", e)
+      Failed(s"$categoryName - Commit Remover failed to send commit deletion status", e)
         .pure[Interpretation]
         .widen[UpdateResult]
     }

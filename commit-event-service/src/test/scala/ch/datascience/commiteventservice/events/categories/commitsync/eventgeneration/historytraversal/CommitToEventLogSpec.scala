@@ -23,19 +23,15 @@ package historytraversal
 import cats.MonadError
 import cats.syntax.all._
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEvent._
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.UpdateResult._
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.Generators._
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.EventCreationResult._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events._
-import ch.datascience.graph.model.projects.Path
-import ch.datascience.graph.tokenrepository.AccessTokenFinder
-import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level._
-import ch.datascience.logging.TestExecutionTimeRecorder
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.NonNegative
@@ -49,282 +45,150 @@ import scala.util._
 
 class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
-  import AccessTokenFinder._
-
   "storeCommitsInEventLog" should {
 
-    "convert the Start Commit into commit events and store them in the Event Log if they do not exist yet" in new TestCase {
+    "transform the Start Commit into commit events and store them in the Event Log if they do not exist yet" in new TestCase {
 
-      val maybeAccessToken = Gen.option(accessTokens).generateOne
-      (accessTokenFinder
-        .findAccessToken(_: Path)(_: Path => String))
-        .expects(projectPath, projectPathToPath)
-        .returning(context pure maybeAccessToken)
+      val commitEvent = commitEventFrom(startCommit, minParents = 0).generateOne
+      val doesExist   = Random.nextBoolean()
 
-      (commitEventsSource
-        .buildEventsSource(_: StartCommit, _: Option[AccessToken], _: Clock))
-        .expects(startCommit, maybeAccessToken, clock)
-        .returning(context pure eventsFlowBuilder)
+      (commitInfoFinder.findCommitInfo _)
+        .expects(startCommit.project.id, startCommit.id, maybeAccessToken)
+        .returning(commitEvent.toCommitInfo.pure[Try])
 
-      val commitEvents = commitEventsFrom(startCommit).generateOne
-      (eventsFlowBuilder
-        .transformEventsWith(_: CommitEvent => Try[EventCreationResult]))
-        .expects(*)
-        .onCall { transform: Function1[CommitEvent, Try[EventCreationResult]] =>
-          commitEvents.map(transform).sequence
-        }
-
-      val eventCreationResults = commitEvents map { commitEvent =>
-        val doesExist = Random.nextBoolean()
-        if (doesExist) {
-          (eventDetailsFinder.checkIfExists _)
-            .expects(commitEvent.project.id, commitEvent.id)
-            .returning(doesExist.pure[Try])
-          Existed
-        } else {
-          (eventDetailsFinder.checkIfExists _)
-            .expects(commitEvent.project.id, commitEvent.id)
-            .returning(doesExist.pure[Try])
-          (commitEventSender
-            .send(_: CommitEvent))
-            .expects(commitEvent)
-            .returning(().pure[Try])
-          Created
-        }
-      }
-
-      commitToEventLog.storeCommitsInEventLog(startCommit) shouldBe Success(())
-
-      logger.loggedOnly(
-        Info(
-          successfulStoring(startCommit,
-                            created = eventCreationResults.count(_ == Created),
-                            existed = eventCreationResults.count(_ == Existed),
-                            failed = 0
-          )
-        )
-      )
-    }
-
-    "do nothing (skip logging) if there are no events to send" in new TestCase {
-
-      val maybeAccessToken = Gen.option(accessTokens).generateOne
-      (accessTokenFinder
-        .findAccessToken(_: Path)(_: Path => String))
-        .expects(projectPath, projectPathToPath)
-        .returning(context pure maybeAccessToken)
-
-      (commitEventsSource
-        .buildEventsSource(_: StartCommit, _: Option[AccessToken], _: Clock))
-        .expects(startCommit, maybeAccessToken, clock)
-        .returning(context pure eventsFlowBuilder)
-
-      val commitEvents = List.empty[CommitEvent]
-      (eventsFlowBuilder
-        .transformEventsWith(_: CommitEvent => Try[EventCreationResult]))
-        .expects(*)
-        .onCall { transform: Function1[CommitEvent, Try[EventCreationResult]] =>
-          commitEvents.map(transform).sequence
-        }
-
-      commitToEventLog.storeCommitsInEventLog(startCommit) shouldBe Success(())
-
-      logger.expectNoLogs()
-    }
-
-    "fail if finding access token fails" in new TestCase {
-
-      val exception = exceptions.generateOne
-      (accessTokenFinder
-        .findAccessToken(_: Path)(_: Path => String))
-        .expects(projectPath, projectPathToPath)
-        .returning(context raiseError exception)
-
-      commitToEventLog.storeCommitsInEventLog(startCommit) shouldBe Failure(exception)
-
-      logger.loggedOnly(Error(generalFailure(startCommit), exception))
-    }
-
-    "fail if building commit events source fails" in new TestCase {
-
-      val maybeAccessToken = Gen.option(accessTokens).generateOne
-      (accessTokenFinder
-        .findAccessToken(_: Path)(_: Path => String))
-        .expects(projectPath, projectPathToPath)
-        .returning(context pure maybeAccessToken)
-
-      val exception = exceptions.generateOne
-      (commitEventsSource
-        .buildEventsSource(_: StartCommit, _: Option[AccessToken], _: Clock))
-        .expects(startCommit, maybeAccessToken, clock)
-        .returning(context raiseError exception)
-
-      commitToEventLog.storeCommitsInEventLog(startCommit) shouldBe Failure(exception)
-
-      logger.loggedOnly(Error(generalFailure(startCommit), exception))
-    }
-
-    "fail if finding commit events fails" in new TestCase {
-
-      val maybeAccessToken = Gen.option(accessTokens).generateOne
-      (accessTokenFinder
-        .findAccessToken(_: Path)(_: Path => String))
-        .expects(projectPath, projectPathToPath)
-        .returning(context.pure(maybeAccessToken))
-
-      (commitEventsSource
-        .buildEventsSource(_: StartCommit, _: Option[AccessToken], _: Clock))
-        .expects(startCommit, maybeAccessToken, clock)
-        .returning(context pure eventsFlowBuilder)
-
-      val exception = exceptions.generateOne
-      (eventsFlowBuilder
-        .transformEventsWith(_: CommitEvent => Try[EventCreationResult]))
-        .expects(*)
-        .returning(context raiseError exception)
-
-      commitToEventLog.storeCommitsInEventLog(startCommit) shouldBe Failure(exception)
-
-      logger.loggedOnly(Error(failedFinding(startCommit), exception))
-    }
-
-    "fail if transforming to commit events fails" in new TestCase {
-
-      val maybeAccessToken = Gen.option(accessTokens).generateOne
-      (accessTokenFinder
-        .findAccessToken(_: Path)(_: Path => String))
-        .expects(projectPath, projectPathToPath)
-        .returning(context.pure(maybeAccessToken))
-
-      (commitEventsSource
-        .buildEventsSource(_: StartCommit, _: Option[AccessToken], _: Clock))
-        .expects(startCommit, maybeAccessToken, clock)
-        .returning(context pure eventsFlowBuilder)
-
-      val exception = exceptions.generateOne
-      (eventsFlowBuilder
-        .transformEventsWith(_: CommitEvent => Try[EventCreationResult]))
-        .expects(*)
-        .onCall { _: Function1[CommitEvent, Try[EventCreationResult]] =>
-          context raiseError exception
-        }
-
-      commitToEventLog.storeCommitsInEventLog(startCommit) shouldBe Failure(exception)
-
-      logger.loggedOnly(Error(failedFinding(startCommit), exception))
-    }
-
-    "store all non failing events and log errors for these which failed" in new TestCase {
-      val maybeAccessToken = Gen.option(accessTokens).generateOne
-      (accessTokenFinder
-        .findAccessToken(_: Path)(_: Path => String))
-        .expects(projectPath, projectPathToPath)
-        .returning(context.pure(maybeAccessToken))
-
-      (commitEventsSource
-        .buildEventsSource(_: StartCommit, _: Option[AccessToken], _: Clock))
-        .expects(startCommit, maybeAccessToken, clock)
-        .returning(context pure eventsFlowBuilder)
-
-      val commitEvents @ failingToSendEvent +: failingToCheckIfExistEvent +: passingEvents =
-        commitEventsFrom(startCommit, minParents = 2).generateOne
-      (eventsFlowBuilder
-        .transformEventsWith(_: CommitEvent => Try[EventCreationResult]))
-        .expects(*)
-        .onCall { transform: Function1[CommitEvent, Try[EventCreationResult]] =>
-          commitEvents.map(transform).sequence
-        }
-
-      val sendException = exceptions.generateOne
-      (eventDetailsFinder.checkIfExists _)
-        .expects(failingToSendEvent.project.id, failingToSendEvent.id)
-        .returning(false.pure[Try])
-      (commitEventSender
-        .send(_: CommitEvent))
-        .expects(failingToSendEvent)
-        .returning(context raiseError sendException)
-
-      val checkIfExistsException = exceptions.generateOne
-      (eventDetailsFinder.checkIfExists _)
-        .expects(failingToCheckIfExistEvent.project.id, failingToCheckIfExistEvent.id)
-        .returning(context raiseError checkIfExistsException)
-      passingEvents foreach { event =>
+      val eventCreationResults = if (doesExist) {
         (eventDetailsFinder.checkIfExists _)
-          .expects(event.project.id, event.id)
-          .returning(false.pure[Try])
+          .expects(commitEvent.project.id, commitEvent.id)
+          .returning(doesExist.pure[Try])
+        Existed
+      } else {
+        (eventDetailsFinder.checkIfExists _)
+          .expects(commitEvent.project.id, commitEvent.id)
+          .returning(doesExist.pure[Try])
         (commitEventSender
           .send(_: CommitEvent))
-          .expects(event)
+          .expects(commitEvent)
           .returning(().pure[Try])
+        Created
 
       }
+      commitToEventLog.storeCommitsInEventLog(startCommit, maybeAccessToken) shouldBe Success(eventCreationResults)
+    }
 
-      commitToEventLog.storeCommitsInEventLog(startCommit) shouldBe Success(())
+    "transform the Start Commit into a SkippedCommitEvent if the commit event message is 'renku migrate'" in new TestCase {
 
-      logger.loggedOnly(
-        Error(failedStoring(startCommit, failingToSendEvent), sendException),
-        Error(failedEventFinding(startCommit, failingToCheckIfExistEvent), checkIfExistsException),
-        Info(
-          successfulStoring(startCommit,
-                            created = passingEvents.size,
-                            existed = 0,
-                            failed = commitEvents.size - passingEvents.size
-          )
-        )
-      )
+      val commitMessage = CommitMessage(sentenceContaining("renku migrate").generateOne)
+      val commitEvent =
+        skippedCommitEventFrom(startCommit.id, startCommit.project, withMessage = commitMessage).generateOne
+
+      (commitInfoFinder.findCommitInfo _)
+        .expects(startCommit.project.id, startCommit.id, maybeAccessToken)
+        .returning(commitEvent.toCommitInfo.pure[Try])
+
+      (eventDetailsFinder.checkIfExists _)
+        .expects(commitEvent.project.id, commitEvent.id)
+        .returning(false.pure[Try])
+
+      (commitEventSender
+        .send(_: CommitEvent))
+        .expects(commitEvent)
+        .returning(().pure[Try])
+
+      commitToEventLog.storeCommitsInEventLog(startCommit, maybeAccessToken) shouldBe Success(Created)
+    }
+
+    "skip the event if it has the commit id  0000000000000000000000000000000000000000 ref " in new TestCase {
+      val skippedCommit = startCommits.generateOne.copy(id = CommitId("0000000000000000000000000000000000000000"))
+
+      commitToEventLog.storeCommitsInEventLog(skippedCommit, maybeAccessToken) shouldBe Success(Skipped)
+    }
+
+    "fail if finding commit info fails" in new TestCase {
+      val exception = exceptions.generateOne
+
+      (commitInfoFinder.findCommitInfo _)
+        .expects(startCommit.project.id, startCommit.id, maybeAccessToken)
+        .returning(context raiseError exception)
+
+      commitToEventLog.storeCommitsInEventLog(startCommit, maybeAccessToken) shouldBe Failure(exception)
+
+      logger.loggedOnly(Error(failedEventFinding(startCommit), exception))
+    }
+
+    "return a Failed status if check if the event exists fails" in new TestCase {
+
+      val commitEvent = commitEventFrom(startCommit, minParents = 0).generateOne
+
+      (commitInfoFinder.findCommitInfo _)
+        .expects(startCommit.project.id, startCommit.id, maybeAccessToken)
+        .returning(commitEvent.toCommitInfo.pure[Try])
+
+      val exception = exceptions.generateOne
+
+      (eventDetailsFinder.checkIfExists _)
+        .expects(commitEvent.project.id, commitEvent.id)
+        .returning(exception.raiseError[Try, Boolean])
+
+      commitToEventLog.storeCommitsInEventLog(startCommit, maybeAccessToken) shouldBe
+        Failed(failedCheckIfExists(startCommit, commitEvent), exception).pure[Try]
+    }
+
+    "return a Failed status if sending the event fails" in new TestCase {
+
+      val commitEvent = commitEventFrom(startCommit, minParents = 0).generateOne
+
+      (commitInfoFinder.findCommitInfo _)
+        .expects(startCommit.project.id, startCommit.id, maybeAccessToken)
+        .returning(commitEvent.toCommitInfo.pure[Try])
+
+      (eventDetailsFinder.checkIfExists _)
+        .expects(commitEvent.project.id, commitEvent.id)
+        .returning(false.pure[Try])
+
+      val exception = exceptions.generateOne
+      (commitEventSender
+        .send(_: CommitEvent))
+        .expects(commitEvent)
+        .returning(exception.raiseError[Try, Unit])
+
+      commitToEventLog.storeCommitsInEventLog(startCommit, maybeAccessToken) shouldBe
+        Failed(failedStoring(startCommit, commitEvent), exception).pure[Try]
     }
   }
 
   private trait TestCase {
     val context = MonadError[Try, Throwable]
 
+    val maybeAccessToken = Gen.option(accessTokens).generateOne
+
     val startCommit = startCommits.generateOne
-    val projectPath = startCommit.project.path
     val batchDate   = BatchDate(Instant.now)
     val clock       = Clock.fixed(batchDate.value, ZoneId.of(ZoneOffset.UTC.getId))
 
-    val accessTokenFinder     = mock[AccessTokenFinder[Try]]
-    val commitEventSender     = mock[CommitEventSender[Try]]
-    val commitEventsSource    = mock[TryCommitEventsSourceBuilder]
-    val eventDetailsFinder    = mock[EventDetailsFinder[Try]]
-    val eventsFlowBuilder     = mock[CommitEventsSourceBuilder.EventsFlowBuilder[Try]]
-    val logger                = TestLogger[Try]()
-    val executionTimeRecorder = TestExecutionTimeRecorder[Try](logger)
+    val commitEventSender  = mock[CommitEventSender[Try]]
+    val eventDetailsFinder = mock[EventDetailsFinder[Try]]
+    val commitInfoFinder   = mock[CommitInfoFinder[Try]]
+    val logger             = TestLogger[Try]()
+
     val commitToEventLog = new CommitToEventLogImpl[Try](
-      accessTokenFinder,
-      commitEventsSource,
       commitEventSender,
       eventDetailsFinder,
+      commitInfoFinder,
       logger,
-      executionTimeRecorder,
       clock
     )
 
-    def successfulStoring(startCommit: StartCommit, created: Int, existed: Int, failed: Int): String =
-      s"$categoryName: id = ${startCommit.id}, projectId = ${startCommit.project.id}, projectPath = ${startCommit.project.path} -> " +
-        s"events generation result: $created created, $existed existed, $failed failed in ${executionTimeRecorder.elapsedTime}ms"
-
-    def failedFinding(startCommit: StartCommit): String =
-      s"$categoryName: id = ${startCommit.id}, projectId = ${startCommit.project.id}, projectPath = ${startCommit.project.path} -> " +
-        "finding commit events failed"
-
-    def generalFailure(startCommit: StartCommit): String =
-      s"$categoryName: id = ${startCommit.id}, projectId = ${startCommit.project.id}, projectPath = ${startCommit.project.path} -> " +
-        "converting to commit events failed"
+    def failedCheckIfExists(startCommit: StartCommit, commitEvent: CommitEvent): String =
+      s"$categoryName: id = ${startCommit.id}, addedId = ${commitEvent.id}, projectId = ${startCommit.project.id}, projectPath = ${startCommit.project.path} -> " +
+        "checking if event exists in the event log failed"
 
     def failedStoring(startCommit: StartCommit, commitEvent: CommitEvent): String =
       s"$categoryName: id = ${startCommit.id}, addedId = ${commitEvent.id}, projectId = ${startCommit.project.id}, projectPath = ${startCommit.project.path} -> " +
         "storing in the event log failed"
 
-    def failedEventFinding(startCommit: StartCommit, commitEvent: CommitEvent): String =
-      s"$categoryName: id = ${startCommit.id}, addedId = ${commitEvent.id}, projectId = ${startCommit.project.id}, projectPath = ${startCommit.project.path} -> " +
-        "finding event in the event log failed"
-
-    def commitEventsFrom(startCommit: StartCommit, minParents: Int Refined NonNegative = 0): Gen[List[CommitEvent]] =
-      for {
-        commitEvent <- commitEventFrom(startCommit, minParents)
-      } yield commitEvent +: commitEvent.parents
-        .map(commitEventFrom(_, startCommit.project).generateOne)
+    def failedEventFinding(startCommit: StartCommit): String =
+      s"$categoryName: id = ${startCommit.id}, projectId = ${startCommit.project.id}, projectPath = ${startCommit.project.path} -> " +
+        "finding commit events failed"
 
     def commitEventFrom(startCommit: StartCommit, minParents: Int Refined NonNegative): Gen[CommitEvent] =
       commitEventFrom(
@@ -352,5 +216,35 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
       project = project,
       batchDate = batchDate
     )
+
+    def skippedCommitEventFrom(commitId:    CommitId,
+                               project:     Project,
+                               withMessage: CommitMessage = commitMessages.generateOne,
+                               minParents:  Int Refined NonNegative = 0
+    ): Gen[CommitEvent] = for {
+      committedDate <- committedDates
+      author        <- authors
+      committer     <- committers
+      parentsIds    <- listOf(commitIds, minParents)
+    } yield SkippedCommitEvent(
+      id = commitId,
+      message = withMessage,
+      committedDate = committedDate,
+      author = author,
+      committer = committer,
+      parents = parentsIds,
+      project = project,
+      batchDate = batchDate
+    )
+
+    implicit class CommitEventOps(commitEvent: CommitEvent) {
+      lazy val toCommitInfo = CommitInfo(commitEvent.id,
+                                         commitEvent.message,
+                                         commitEvent.committedDate,
+                                         commitEvent.author,
+                                         commitEvent.committer,
+                                         commitEvent.parents
+      )
+    }
   }
 }

@@ -21,7 +21,7 @@ package ch.datascience.commiteventservice.events.categories.commitsync.eventgene
 import cats.data.OptionT
 import cats.syntax.all._
 import ch.datascience.commiteventservice.events.categories.commitsync.Generators.fullCommitSyncEvents
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.UpdateResult.{Deleted, Failed, Updated}
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.UpdateResult._
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.Generators.commitInfos
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.{CommitInfoFinder, EventDetailsFinder}
 import ch.datascience.commiteventservice.events.categories.commitsync.{categoryName, logMessageCommon}
@@ -85,8 +85,8 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
         .returning(Success(latestCommitInfo.some))
 
       (missedEventsGenerator.generateMissedEvents _)
-        .expects(event.project, latestCommitInfo.id)
-        .returning(Success(Updated))
+        .expects(event.project, latestCommitInfo.id, maybeAccessToken)
+        .returning(Success(Created))
 
       (eventDetailsFinder.getEventDetails _).expects(event.project.id, parentCommit.id).returning(Success(None))
       (commitInfoFinder.getMaybeCommitInfo _)
@@ -94,8 +94,8 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
         .returning(Success(parentCommit.some))
 
       (missedEventsGenerator.generateMissedEvents _)
-        .expects(event.project, parentCommit.id)
-        .returning(Success(Updated))
+        .expects(event.project, parentCommit.id, maybeAccessToken)
+        .returning(Success(Created))
 
       commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
 
@@ -105,6 +105,9 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
         ),
         Info(
           s"$categoryName: id = ${parentCommit.id}, projectId = ${event.project.id}, projectPath = ${event.project.path} -> new events found in ${executionTimeRecorder.elapsedTime}ms"
+        ),
+        Info(
+          s"$categoryName: id = ${latestCommitInfo.id}, projectId = ${event.project.id}, projectPath = ${event.project.path} -> events generation result: 2 created, 0 existed, 0 deleted, 0 failed in ${executionTimeRecorder.elapsedTime}ms"
         )
       )
 
@@ -151,6 +154,9 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
         ),
         Info(
           s"$categoryName: id = ${parentCommit.id}, projectId = ${event.project.id}, projectPath = ${event.project.path} -> events found for deletion in ${executionTimeRecorder.elapsedTime}ms"
+        ),
+        Info(
+          s"$categoryName: id = ${event.id}, projectId = ${event.project.id}, projectPath = ${event.project.path} -> events generation result: 0 created, 0 existed, 2 deleted, 0 failed in ${executionTimeRecorder.elapsedTime}ms"
         )
       )
     }
@@ -175,8 +181,8 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
         .returning(Success(latestCommitInfo.some))
 
       (missedEventsGenerator.generateMissedEvents _)
-        .expects(event.project, latestCommitInfo.id)
-        .returning(Success(Updated))
+        .expects(event.project, latestCommitInfo.id, maybeAccessToken)
+        .returning(Success(Created))
 
       (eventDetailsFinder.getEventDetails _)
         .expects(event.project.id, parentCommit.id)
@@ -197,6 +203,9 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
         ),
         Info(
           s"$categoryName: id = ${parentCommit.id}, projectId = ${event.project.id}, projectPath = ${event.project.path} -> events found for deletion in ${executionTimeRecorder.elapsedTime}ms"
+        ),
+        Info(
+          s"$categoryName: id = ${latestCommitInfo.id}, projectId = ${event.project.id}, projectPath = ${event.project.path} -> events generation result: 1 created, 0 existed, 1 deleted, 0 failed in ${executionTimeRecorder.elapsedTime}ms"
         )
       )
     }
@@ -224,6 +233,9 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       logger.loggedOnly(
         Info(
           s"$categoryName: id = ${latestCommitInfo.id}, projectId = ${event.project.id}, projectPath = ${event.project.path} -> no new events found in ${executionTimeRecorder.elapsedTime}ms"
+        ),
+        Info(
+          s"$categoryName: id = ${latestCommitInfo.id}, projectId = ${event.project.id}, projectPath = ${event.project.path} -> events generation result: 0 created, 0 existed, 0 deleted, 0 failed in ${executionTimeRecorder.elapsedTime}ms"
         )
       )
     }
@@ -250,8 +262,8 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
         .returning(Success(latestCommitInfo.some))
 
       (missedEventsGenerator.generateMissedEvents _)
-        .expects(event.project, latestCommitInfo.id)
-        .returning(Success(Updated))
+        .expects(event.project, latestCommitInfo.id, maybeAccessToken)
+        .returning(Success(Created))
 
       val exception = exceptions.generateOne
       (eventDetailsFinder.getEventDetails _)
@@ -266,8 +278,8 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
         .returning(Success(parent2Commit.some))
 
       (missedEventsGenerator.generateMissedEvents _)
-        .expects(event.project, parent2Commit.id)
-        .returning(Success(Updated))
+        .expects(event.project, parent2Commit.id, maybeAccessToken)
+        .returning(Success(Created))
 
       commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
 
@@ -281,6 +293,9 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
         ),
         Info(
           s"$categoryName: id = ${latestCommitInfo.id}, projectId = ${event.project.id}, projectPath = ${event.project.path} -> new events found in ${executionTimeRecorder.elapsedTime}ms"
+        ),
+        Info(
+          s"$categoryName: id = ${latestCommitInfo.id}, projectId = ${event.project.id}, projectPath = ${event.project.path} -> events generation result: 2 created, 0 existed, 0 deleted, 1 failed in ${executionTimeRecorder.elapsedTime}ms"
         )
       )
     }
@@ -307,8 +322,8 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
         .returning(Success(latestCommitInfo.some))
 
       (missedEventsGenerator.generateMissedEvents _)
-        .expects(event.project, latestCommitInfo.id)
-        .returning(Success(Updated))
+        .expects(event.project, latestCommitInfo.id, maybeAccessToken)
+        .returning(Success(Created))
 
       (eventDetailsFinder.getEventDetails _).expects(event.project.id, parent1Commit.id).returning(Success(None))
 
@@ -325,8 +340,8 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
         .returning(Success(parent2Commit.some))
 
       (missedEventsGenerator.generateMissedEvents _)
-        .expects(event.project, parent2Commit.id)
-        .returning(Success(Updated))
+        .expects(event.project, parent2Commit.id, maybeAccessToken)
+        .returning(Success(Created))
 
       commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
 
@@ -340,6 +355,9 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
         ),
         Info(
           s"$categoryName: id = ${parent2Commit.id}, projectId = ${event.project.id}, projectPath = ${event.project.path} -> new events found in ${executionTimeRecorder.elapsedTime}ms"
+        ),
+        Info(
+          s"$categoryName: id = ${latestCommitInfo.id}, projectId = ${event.project.id}, projectPath = ${event.project.path} -> events generation result: 2 created, 0 existed, 0 deleted, 1 failed in ${executionTimeRecorder.elapsedTime}ms"
         )
       )
     }
@@ -367,7 +385,7 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       val exception = exceptions.generateOne
 
       (missedEventsGenerator.generateMissedEvents _)
-        .expects(event.project, latestCommitInfo.id)
+        .expects(event.project, latestCommitInfo.id, maybeAccessToken)
         .returning(Success(Failed(exception.getMessage, exception)))
 
       (eventDetailsFinder.getEventDetails _)
@@ -378,8 +396,8 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
         .returning(Success(parent1Commit.some))
 
       (missedEventsGenerator.generateMissedEvents _)
-        .expects(event.project, parent1Commit.id)
-        .returning(Success(Updated))
+        .expects(event.project, parent1Commit.id, maybeAccessToken)
+        .returning(Success(Created))
 
       commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
 
@@ -390,6 +408,9 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
         ),
         Info(
           s"$categoryName: id = ${parent1Commit.id}, projectId = ${event.project.id}, projectPath = ${event.project.path} -> new events found in ${executionTimeRecorder.elapsedTime}ms"
+        ),
+        Info(
+          s"$categoryName: id = ${latestCommitInfo.id}, projectId = ${event.project.id}, projectPath = ${event.project.path} -> events generation result: 1 created, 0 existed, 0 deleted, 1 failed in ${executionTimeRecorder.elapsedTime}ms"
         )
       )
     }
@@ -428,8 +449,8 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
         .returning(Success(parent1Commit.some))
 
       (missedEventsGenerator.generateMissedEvents _)
-        .expects(event.project, parent1Commit.id)
-        .returning(Success(Updated))
+        .expects(event.project, parent1Commit.id, maybeAccessToken)
+        .returning(Success(Created))
 
       commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
 
@@ -440,6 +461,9 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
         ),
         Info(
           s"$categoryName: id = ${parent1Commit.id}, projectId = ${event.project.id}, projectPath = ${event.project.path} -> new events found in ${executionTimeRecorder.elapsedTime}ms"
+        ),
+        Info(
+          s"$categoryName: id = ${latestCommitInfo.id}, projectId = ${event.project.id}, projectPath = ${event.project.path} -> events generation result: 1 created, 0 existed, 0 deleted, 1 failed in ${executionTimeRecorder.elapsedTime}ms"
         )
       )
     }

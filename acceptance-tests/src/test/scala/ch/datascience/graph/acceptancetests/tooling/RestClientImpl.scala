@@ -18,7 +18,7 @@
 
 package ch.datascience.graph.acceptancetests.tooling
 
-import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.{AccessToken, RestClient}
 import ch.datascience.interpreters.TestLogger
@@ -29,11 +29,15 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class RestClient()(implicit
+class RestClientImpl()(implicit
     executionContext: ExecutionContext,
     concurrentEffect: ConcurrentEffect[IO],
     timer:            Timer[IO]
-) extends RestClient(Throttler.noThrottling, TestLogger(), retryInterval = 500 millis, maxRetries = 1) {
+) extends RestClient[IO, RestClientImpl](Throttler.noThrottling,
+                                         TestLogger(),
+                                         retryInterval = 500 millis,
+                                         maxRetries = 1
+    ) {
 
   def GET(url: String): Response[IO] = {
     for {

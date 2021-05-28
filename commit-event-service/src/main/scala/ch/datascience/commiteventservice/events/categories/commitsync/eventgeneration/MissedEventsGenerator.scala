@@ -27,14 +27,17 @@ import ch.datascience.commiteventservice.events.categories.commitsync.eventgener
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.logging.ExecutionTimeRecorder
+import ch.datascience.http.client.AccessToken
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 private[commitsync] trait MissedEventsGenerator[Interpretation[_]] {
-  def generateMissedEvents(project: CommitProject, latestCommitId: CommitId): Interpretation[UpdateResult]
+  def generateMissedEvents(project:          CommitProject,
+                           latestCommitId:   CommitId,
+                           maybeAccessToken: Option[AccessToken]
+  ): Interpretation[UpdateResult]
 }
 
 private class MissedEventsGeneratorImpl[Interpretation[_]: MonadThrow](
@@ -44,14 +47,20 @@ private class MissedEventsGeneratorImpl[Interpretation[_]: MonadThrow](
   import UpdateResult._
   import commitToEventLog._
 
-  def generateMissedEvents(project: CommitProject, latestCommitId: CommitId): Interpretation[UpdateResult] =
-    addEventsIfMissing(project, latestCommitId) recoverWith toUpdateResult
+  def generateMissedEvents(project:          CommitProject,
+                           latestCommitId:   CommitId,
+                           maybeAccessToken: Option[AccessToken]
+  ): Interpretation[UpdateResult] =
+    addEventsIfMissing(project, latestCommitId, maybeAccessToken) recoverWith toUpdateResult
 
-  private def addEventsIfMissing(project: CommitProject, latestCommitId: CommitId): Interpretation[UpdateResult] =
+  private def addEventsIfMissing(project:          CommitProject,
+                                 latestCommitId:   CommitId,
+                                 maybeAccessToken: Option[AccessToken]
+  ): Interpretation[UpdateResult] =
     for {
-      startCommit <- startCommitFrom(project, latestCommitId)
-      _           <- storeCommitsInEventLog(startCommit)
-    } yield Updated: UpdateResult
+      startCommit         <- startCommitFrom(project, latestCommitId)
+      maybeCreationResult <- storeCommitsInEventLog(startCommit, maybeAccessToken)
+    } yield maybeCreationResult
 
   private def startCommitFrom(project: CommitProject, commitId: CommitId) = StartCommit(
     id = commitId,
@@ -67,15 +76,14 @@ private class MissedEventsGeneratorImpl[Interpretation[_]: MonadThrow](
 
 private[commitsync] object MissedEventsGenerator {
   def apply(
-      gitLabThrottler:       Throttler[IO, GitLab],
-      executionTimeRecorder: ExecutionTimeRecorder[IO],
-      logger:                Logger[IO]
+      gitLabThrottler: Throttler[IO, GitLab],
+      logger:          Logger[IO]
   )(implicit
       timer:            Timer[IO],
       contextShift:     ContextShift[IO],
       executionContext: ExecutionContext
   ): IO[MissedEventsGenerator[IO]] =
     for {
-      commitToEventLog <- CommitToEventLog(gitLabThrottler, executionTimeRecorder, logger)
+      commitToEventLog <- CommitToEventLog(gitLabThrottler, logger)
     } yield new MissedEventsGeneratorImpl(commitToEventLog)
 }

@@ -37,7 +37,7 @@ trait GraphServices extends BeforeAndAfterAll {
   protected implicit lazy val concurrent:       ConcurrentEffect[IO] = GraphServices.concurrent
   protected implicit lazy val timer:            Timer[IO]            = GraphServices.timer
 
-  protected val restClient:             RestClient           = new RestClient()
+  protected val restClient:             RestClientImpl       = new RestClientImpl()
   protected val webhookServiceClient:   WebhookServiceClient = GraphServices.webhookServiceClient
   protected val tokenRepositoryClient:  ServiceClient        = GraphServices.tokenRepositoryClient
   protected val triplesGeneratorClient: ServiceClient        = GraphServices.triplesGeneratorClient

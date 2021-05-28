@@ -20,11 +20,15 @@ package ch.datascience.commiteventservice.events.categories.commitsync
 package eventgeneration
 
 import cats.effect.{ContextShift, IO}
+import cats.syntax.all._
 import ch.datascience.commiteventservice.events.categories.commitsync.Generators._
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.UpdateResult.{Failed, Updated}
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.UpdateResult
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.UpdateResult._
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.CommitToEventLog
+import ch.datascience.generators.CommonGraphGenerators.personalAccessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.http.client.AccessToken
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -42,12 +46,13 @@ class MissedEventsGeneratorSpec extends AnyWordSpec with MockFactory with should
         givenStoring(
           StartCommit(id = commitSyncEvent.id,
                       project = Project(commitSyncEvent.project.id, commitSyncEvent.project.path)
-          )
-        ).returning(IO.unit)
+          ),
+          maybeAccessToken
+        ).returning(Created.pure[IO].widen[UpdateResult])
 
         eventsGenerator
-          .generateMissedEvents(commitSyncEvent.project, commitSyncEvent.id)
-          .unsafeRunSync() shouldBe Updated
+          .generateMissedEvents(commitSyncEvent.project, commitSyncEvent.id, maybeAccessToken)
+          .unsafeRunSync() shouldBe Created
 
       }
 
@@ -58,10 +63,13 @@ class MissedEventsGeneratorSpec extends AnyWordSpec with MockFactory with should
       givenStoring(
         StartCommit(id = commitSyncEvent.id,
                     project = Project(commitSyncEvent.project.id, commitSyncEvent.project.path)
-        )
+        ),
+        maybeAccessToken
       ).returning(IO.raiseError(exception))
 
-      eventsGenerator.generateMissedEvents(commitSyncEvent.project, commitSyncEvent.id).unsafeRunSync() shouldBe Failed(
+      eventsGenerator
+        .generateMissedEvents(commitSyncEvent.project, commitSyncEvent.id, maybeAccessToken)
+        .unsafeRunSync() shouldBe Failed(
         "event generation failed",
         exception
       )
@@ -73,12 +81,13 @@ class MissedEventsGeneratorSpec extends AnyWordSpec with MockFactory with should
 
   private trait TestCase {
 
+    val maybeAccessToken = personalAccessTokens.generateOption
     val commitToEventLog = mock[CommitToEventLog[IO]]
     val eventsGenerator  = new MissedEventsGeneratorImpl[IO](commitToEventLog)
 
-    def givenStoring(pushEvent: StartCommit) =
+    def givenStoring(pushEvent: StartCommit, maybeAccessToken: Option[AccessToken]) =
       (commitToEventLog
-        .storeCommitsInEventLog(_: StartCommit))
-        .expects(pushEvent)
+        .storeCommitsInEventLog(_: StartCommit, _: Option[AccessToken]))
+        .expects(pushEvent, maybeAccessToken)
   }
 }
