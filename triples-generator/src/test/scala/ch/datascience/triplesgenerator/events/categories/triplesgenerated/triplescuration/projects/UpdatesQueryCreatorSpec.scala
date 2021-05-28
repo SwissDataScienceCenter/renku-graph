@@ -39,9 +39,9 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
   "updateWasDerivedFrom" should {
 
     "generate query deleting 'prov:wasDerivedFrom' triple from a given project when there is no fork" in new TestCase {
-      val maybeParent @ Some(parent) = entitiesProjects().generateSome
-      val child1                     = entitiesProjects(maybeParentProject = maybeParent).generateOne
-      val child2                     = entitiesProjects(maybeParentProject = maybeParent).generateOne
+      val (parent, children) = projectEntities[Project.ForksCount.Zero]().generateOne.fork(times = 2)
+      val child1             = children.head
+      val child2             = children.tail.head
 
       loadToStore(child1.asJsonLD, child2.asJsonLD)
 

@@ -18,6 +18,7 @@
 
 package ch.datascience.rdfstore.entities
 
+import cats.data.NonEmptyList
 import ch.datascience.generators.Generators
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.sentenceContaining
@@ -30,16 +31,31 @@ import ch.datascience.rdfstore.entities.ModelOps.DatasetForkingResult
 import ch.datascience.rdfstore.entities.Project.ForksCount
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
+import eu.timepit.refined.numeric.Positive
 import io.renku.jsonld.EntityId
-import org.scalacheck.Gen
 
 trait ModelOps {
 
   implicit class ProjectOps[FC <: ForksCount](project: Project[FC])(implicit renkuBaseUrl: RenkuBaseUrl) {
 
-    def fork(): (Project[ForksCount.NonZero], Gen[Project[ForksCount.Zero] with HavingParent]) = {
-      val parentProject = incrementForksCount()
-      parentProject -> projectEntities[ForksCount.Zero](parentProject.dateCreated).map(child =>
+    def forkOnce(): (Project[ForksCount.NonZero], Project[ForksCount.Zero] with HavingParent) = {
+      val (parent, childGen) = fork(times = 1)
+      parent -> childGen.head
+    }
+
+    def fork(
+        times: Int Refined Positive
+    ): (Project[ForksCount.NonZero], NonEmptyList[Project[ForksCount.Zero] with HavingParent]) = {
+      val parent = project.copy(
+        forksCount = Project.ForksCount(Refined.unsafeApply(project.forksCount.value + times.value))
+      )
+      parent -> (1 to times.value).foldLeft(NonEmptyList.one(newChildGen(parent).generateOne))((childrenGens, _) =>
+        childrenGens :+ newChildGen(parent).generateOne
+      )
+    }
+
+    private def newChildGen(parentProject: Project[Project.ForksCount.NonZero]) =
+      projectEntities[ForksCount.Zero](parentProject.dateCreated).map(child =>
         new Project(
           child.path,
           child.name,
@@ -54,10 +70,6 @@ trait ModelOps {
           override val parent: Project[ForksCount.NonZero] = parentProject
         }
       )
-    }
-
-    private def incrementForksCount(): Project[ForksCount.NonZero] =
-      project.copy(forksCount = Project.ForksCount(Refined.unsafeApply(project.forksCount.value + 1)))
   }
 
   implicit class DatasetOps[P <: Dataset.Provenance](dataset: Dataset[P])(implicit renkuBaseUrl: RenkuBaseUrl) {
@@ -65,10 +77,10 @@ trait ModelOps {
     lazy val identifier: datasets.Identifier = dataset.identification.identifier
 
     def forkProject(): DatasetForkingResult[P] = {
-      val (updatedOriginalProject, forkProjectGen) = dataset.project.fork()
+      val (updatedOriginalProject, forkProject) = dataset.project.forkOnce()
       DatasetForkingResult(
         dataset.copy(project = updatedOriginalProject),
-        dataset.copy(project = forkProjectGen.generateOne)
+        dataset.copy(project = forkProject)
       )
     }
 
