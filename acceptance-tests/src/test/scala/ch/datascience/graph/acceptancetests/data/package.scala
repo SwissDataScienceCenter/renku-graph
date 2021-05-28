@@ -19,13 +19,15 @@
 package ch.datascience.graph.acceptancetests
 
 import ch.datascience.config.renku
-import cats.syntax.all._
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.tooling.RDFStore
-import ch.datascience.graph.model.{CliVersion, SchemaVersion}
+import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.{CliVersion, RenkuVersionPair, SchemaVersion}
+import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
+import ch.datascience.knowledgegraph.projects.model.Project.DateUpdated
 import ch.datascience.rdfstore.{FusekiBaseUrl, entities}
-import ch.datascience.graph.model.RenkuVersionPair
-import ch.datascience.knowledgegraph.projects.model.{Creator, Project}
-import ch.datascience.rdfstore.entities.Person
+import org.scalacheck.Gen
 
 package object data {
   val renkuResourcesUrl:      renku.ResourcesUrl = renku.ResourcesUrl("http://localhost:9004/knowledge-graph")
@@ -33,34 +35,16 @@ package object data {
   implicit val cliVersion:    CliVersion         = currentVersionPair.cliVersion
   implicit val fusekiBaseUrl: FusekiBaseUrl      = RDFStore.fusekiBaseUrl
 
-  implicit class ProjectCreatorOps(creator: Creator) {
-    def toEntitiesPerson: entities.Person = entities.Person(creator.name, creator.maybeEmail)
-  }
-
-  implicit class ProjectOps(project: Project) {
-
-    def toEntitiesProject(members: Set[Person])(implicit cliVersion: CliVersion): entities.Project = entities.Project(
-      project.path,
-      project.name,
-      agent = cliVersion,
-      project.created.date,
-      project.created.maybeCreator.map(_.toEntitiesPerson),
-      project.visibility,
-      maybeParent = project.forking.maybeParent.map(parent =>
-        entities.Project(
-          parent.path,
-          parent.name,
-          cliVersion,
-          parent.created.date,
-          parent.created.maybeCreator.map(_.toEntitiesPerson),
-          parent.visibility,
-          maybeParent = None,
-          members = Set.empty,
-          project.version
-        )
-      ),
-      members,
-      project.version
-    )
-  }
+  implicit def gitLabProjects[FC <: entities.Project.ForksCount](
+      project: entities.Project[FC]
+  ): Gen[Project[FC]] = for {
+    id               <- projectIds
+    maybeDescription <- projectDescriptions.toGeneratorOfOptions
+    updatedAt        <- timestamps(min = project.dateCreated.value).toGeneratorOf[DateUpdated]
+    urls             <- urlsObjects
+    tags             <- tagsObjects.toGeneratorOfSet()
+    starsCount       <- starsCounts
+    permissions      <- permissionsObjects
+    statistics       <- statisticsObjects
+  } yield Project(project, id, maybeDescription, updatedAt, urls, tags, starsCount, permissions, statistics)
 }

@@ -120,7 +120,7 @@ object ProjectsGenerators {
                         statistics
   )
 
-  private implicit lazy val urlsObjects: Gen[Urls] = for {
+  implicit lazy val urlsObjects: Gen[Urls] = for {
     sshUrl         <- sshUrls
     httpUrl        <- httpUrls
     webUrl         <- webUrls
@@ -136,8 +136,8 @@ object ProjectsGenerators {
       created    <- projectCreations
     } yield Parent(resourceId, name, created)
 
-  private implicit lazy val starsCounts: Gen[StarsCount] = nonNegativeInts() map (v => StarsCount.apply(v.value))
-  private implicit lazy val tagsObjects: Gen[Tag]        = nonBlankStrings() map (v => Tag(v.value))
+  implicit lazy val starsCounts: Gen[StarsCount] = nonNegativeInts() map (v => StarsCount.apply(v.value))
+  implicit lazy val tagsObjects: Gen[Tag]        = nonBlankStrings() map (v => Tag(v.value))
 
   private implicit lazy val sshUrls: Gen[SshUrl] = for {
     hostParts   <- nonEmptyList(nonBlankStrings())
@@ -180,7 +180,7 @@ object ProjectsGenerators {
 
   implicit lazy val accessLevels: Gen[AccessLevel] = Gen.oneOf(AccessLevel.all.toList)
 
-  private implicit lazy val statisticsObjects: Gen[Statistics] = for {
+  implicit lazy val statisticsObjects: Gen[Statistics] = for {
     commitsCount     <- nonNegativeInts() map (v => CommitsCount(v.value))
     storageSize      <- nonNegativeInts() map (v => StorageSize(v.value))
     repositorySize   <- nonNegativeInts() map (v => RepositorySize(v.value))

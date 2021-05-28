@@ -26,7 +26,6 @@ import ch.datascience.graph.model.datasets.InitialVersion
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities._
-import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import ch.datascience.stubbing.ExternalServiceStubbing
 import io.renku.jsonld.syntax._
@@ -49,10 +48,10 @@ class ProjectDatasetsFinderSpec
         val datasetModification2 = modifiedDatasetEntities(datasetModification1).generateOne
 
         loadToStore(
-          datasetEntities(ofAnyProvenance).generateOne.asJsonLD,
-          originalDataset.asJsonLD,
-          datasetModification1.asJsonLD,
-          datasetModification2.asJsonLD
+          datasetEntities(ofAnyProvenance).generateOne,
+          originalDataset,
+          datasetModification1,
+          datasetModification2
         )
 
         datasetsFinder
@@ -75,9 +74,9 @@ class ProjectDatasetsFinderSpec
         val dataset2Modification = modifiedDatasetEntities(dataset2).generateOne
 
         loadToStore(
-          dataset1.asJsonLD,
-          dataset2.asJsonLD,
-          dataset2Modification.asJsonLD
+          dataset1,
+          dataset2,
+          dataset2Modification
         )
 
         datasetsFinder.findProjectDatasets(dataset1.project.path).unsafeRunSync() shouldBe List(
@@ -100,13 +99,13 @@ class ProjectDatasetsFinderSpec
     }
 
     "return all datasets of the given project without merging datasets having the same sameAs" in new TestCase {
-      val project                     = projectEntities().generateOne
+      val project                     = projectEntities[Project.ForksCount.Zero]().generateOne
       val dataset1 :: dataset2 :: Nil = importedExternalDatasetEntities(sharedInProjects = 2).generateOne
 
       loadToStore(
-        datasetEntities(ofAnyProvenance).generateOne.asJsonLD,
-        dataset1.asJsonLD,
-        dataset2.asJsonLD
+        datasetEntities(ofAnyProvenance).generateOne,
+        dataset1,
+        dataset2
       )
 
       datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() should contain theSameElementsAs List(

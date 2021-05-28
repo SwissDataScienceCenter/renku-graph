@@ -18,7 +18,6 @@
 
 package ch.datascience.knowledgegraph.datasets.rest
 
-import cats.MonadError
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.{renkuBaseUrls, renkuResourcesUrls}
@@ -38,9 +37,10 @@ import ch.datascience.http.server.EndpointTester._
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
-import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
+import ch.datascience.knowledgegraph.datasets.model
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.logging.TestExecutionTimeRecorder
+import ch.datascience.rdfstore.entities._
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import io.circe.Decoder._
 import io.circe.syntax._
@@ -49,6 +49,7 @@ import org.http4s.Status._
 import org.http4s._
 import org.http4s.circe.jsonOf
 import org.http4s.headers.`Content-Type`
+import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -58,18 +59,23 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
 
   "getDataset" should {
 
-    "respond with OK and the found dataset" in new TestCase {
-      forAll(datasets) { dataset =>
+    "respond with OK and the found NonModifiedDataset" in new TestCase {
+      forAll(
+        Gen.oneOf(
+          datasetEntities(datasetProvenanceImportedExternal).map(_.to[NonModifiedDataset]),
+          datasetEntities(datasetProvenanceModified).map(_.to[ModifiedDataset])
+        )
+      ) { dataset =>
         (datasetsFinder
           .findDataset(_: Identifier))
           .expects(dataset.id)
-          .returning(context.pure(Some(dataset)))
+          .returning(dataset.some.pure[IO])
 
         val response = getDataset(dataset.id).unsafeRunSync()
 
-        response.status                      shouldBe Ok
-        response.contentType                 shouldBe Some(`Content-Type`(MediaType.application.json))
-        response.as[Dataset].unsafeRunSync() shouldBe dataset
+        response.status                            shouldBe Ok
+        response.contentType                       shouldBe Some(`Content-Type`(MediaType.application.json))
+        response.as[model.Dataset].unsafeRunSync() shouldBe dataset
         response.as[Json].unsafeRunSync()._links shouldBe Links
           .of(
             Self                   -> Href(renkuResourcesUrl / "datasets" / dataset.id),
@@ -119,7 +125,7 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       (datasetsFinder
         .findDataset(_: Identifier))
         .expects(identifier)
-        .returning(context.pure(None))
+        .returning(Option.empty[model.Dataset].pure[IO])
 
       val response = getDataset(identifier).unsafeRunSync()
 
@@ -139,7 +145,7 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       (datasetsFinder
         .findDataset(_: Identifier))
         .expects(identifier)
-        .returning(context.raiseError(exception))
+        .returning(exception.raiseError[IO, Option[model.Dataset]])
 
       val response = getDataset(identifier).unsafeRunSync()
 
@@ -153,7 +159,6 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
   }
 
   private trait TestCase {
-    val context = MonadError[IO, Throwable]
     implicit val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
 
     val datasetsFinder        = mock[DatasetFinder[IO]]
@@ -168,9 +173,9 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
     ).getDataset _
   }
 
-  private implicit val datasetEntityDecoder: EntityDecoder[IO, Dataset] = jsonOf[IO, Dataset]
+  private implicit val datasetEntityDecoder: EntityDecoder[IO, model.Dataset] = jsonOf[IO, model.Dataset]
 
-  private implicit lazy val datasetDecoder: Decoder[Dataset] = cursor =>
+  private implicit lazy val datasetDecoder: Decoder[model.Dataset] = cursor =>
     for {
       id               <- cursor.downField("identifier").as[Identifier]
       title            <- cursor.downField("title").as[Title]
@@ -179,7 +184,7 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       maybeDescription <- cursor.downField("description").as[Option[Description]]
       published        <- cursor.downField("published").as[(Set[DatasetCreator], Option[DatePublished])]
       maybeDateCreated <- cursor.downField("created").as[Option[DateCreated]]
-      parts            <- cursor.downField("hasPart").as[List[DatasetPart]]
+      parts            <- cursor.downField("hasPart").as[List[model.DatasetPart]]
       project          <- cursor.downField("project").as[DatasetProject]
       usedIn           <- cursor.downField("usedIn").as[List[DatasetProject]]
       keywords         <- cursor.downField("keywords").as[List[Keyword]]
@@ -187,11 +192,14 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       maybeDerivedFrom <- cursor.downField("derivedFrom").as[Option[DerivedFrom]]
       versions         <- cursor.downField("versions").as[DatasetVersions]
       images           <- cursor.downField("images").as[List[ImageUri]]
-      dates <- Dates
-                 .from(maybeDateCreated, published._2)
-                 .leftMap(e => DecodingFailure(e.getMessage, Nil))
-    } yield maybeSameAs
-      .map { sameAs =>
+      date <-
+        maybeDateCreated
+          .orElse(published._2)
+          .widen[Date]
+          .map(_.asRight)
+          .getOrElse(DecodingFailure("No date found", Nil).asLeft)
+    } yield (maybeSameAs, maybeDateCreated, maybeDerivedFrom) match {
+      case (Some(sameAs), _, None) =>
         NonModifiedDataset(id,
                            title,
                            name,
@@ -200,34 +208,31 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
                            versions,
                            maybeDescription,
                            published._1,
-                           dates,
+                           date,
                            parts,
                            project,
                            usedIn,
                            keywords,
                            images
         )
-      }
-      .orElse(
-        maybeDerivedFrom map { derivedFrom =>
-          ModifiedDataset(id,
-                          title,
-                          name,
-                          url,
-                          derivedFrom,
-                          versions,
-                          maybeDescription,
-                          published._1,
-                          dates,
-                          parts,
-                          project,
-                          usedIn,
-                          keywords,
-                          images
-          )
-        }
-      )
-      .getOrElse(fail("Cannot decode payload as Dataset"))
+      case (None, Some(dateCreated), Some(derivedFrom)) =>
+        ModifiedDataset(id,
+                        title,
+                        name,
+                        url,
+                        derivedFrom,
+                        versions,
+                        maybeDescription,
+                        published._1,
+                        dateCreated,
+                        parts,
+                        project,
+                        usedIn,
+                        keywords,
+                        images
+        )
+      case _ => fail("Cannot decode payload as Dataset")
+    }
 
   private implicit lazy val publishingDecoder: Decoder[(Set[DatasetCreator], Option[DatePublished])] = cursor =>
     for {
@@ -242,25 +247,16 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       maybeAffiliation <- cursor.downField("affiliation").as[Option[Affiliation]]
     } yield DatasetCreator(maybeEmail, name, maybeAffiliation)
 
-  private implicit lazy val partDecoder: Decoder[DatasetPart] = cursor =>
+  private implicit lazy val partDecoder: Decoder[model.DatasetPart] = cursor =>
     for {
-      name     <- cursor.downField("name").as[PartName]
       location <- cursor.downField("atLocation").as[PartLocation]
-    } yield DatasetPart(name, location)
+    } yield model.DatasetPart(location)
 
   private implicit lazy val projectDecoder: Decoder[DatasetProject] = cursor =>
     for {
-      path    <- cursor.downField("path").as[Path]
-      name    <- cursor.downField("name").as[projects.Name]
-      created <- cursor.downField("created").as[AddedToProject]
-    } yield DatasetProject(path, name, created)
-
-  private implicit lazy val addedToProjectDecoder: Decoder[AddedToProject] = cursor =>
-    for {
-      date            <- cursor.downField("dateCreated").as[DateCreatedInProject]
-      maybeAgentEmail <- cursor.downField("agent").downField("email").as[Option[Email]]
-      agentName       <- cursor.downField("agent").downField("name").as[UserName]
-    } yield AddedToProject(date, DatasetAgent(maybeAgentEmail, agentName))
+      path <- cursor.downField("path").as[Path]
+      name <- cursor.downField("name").as[projects.Name]
+    } yield DatasetProject(path, name)
 
   private implicit lazy val versionsDecoder: Decoder[DatasetVersions] = cursor =>
     for {

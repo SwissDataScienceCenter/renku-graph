@@ -52,7 +52,7 @@ package object rest {
           DatasetCreator(person.maybeEmail, person.name, person.maybeAffiliation)
         ),
         dataset.provenance.date,
-        dataset.parts.map(part => DatasetPart(PartLocation(part.entity.location.value))),
+        dataset.parts.map(part => model.DatasetPart(PartLocation(part.entity.location.value))),
         DatasetProject(dataset.project.path, dataset.project.name),
         usedIn = List(DatasetProject(dataset.project.path, dataset.project.name)),
         dataset.additionalInfo.keywords.sorted,
@@ -75,7 +75,7 @@ package object rest {
           DatasetCreator(person.maybeEmail, person.name, person.maybeAffiliation)
         ),
         dataset.provenance.date,
-        dataset.parts.map(part => DatasetPart(PartLocation(part.entity.location.value))),
+        dataset.parts.map(part => model.DatasetPart(PartLocation(part.entity.location.value))),
         DatasetProject(dataset.project.path, dataset.project.name),
         usedIn = List(DatasetProject(dataset.project.path, dataset.project.name)),
         dataset.additionalInfo.keywords.sorted,
@@ -98,7 +98,7 @@ package object rest {
           DatasetCreator(person.maybeEmail, person.name, person.maybeAffiliation)
         ),
         dataset.provenance.date,
-        dataset.parts.map(part => DatasetPart(PartLocation(part.entity.location.value))),
+        dataset.parts.map(part => model.DatasetPart(PartLocation(part.entity.location.value))),
         DatasetProject(dataset.project.path, dataset.project.name),
         usedIn = List(DatasetProject(dataset.project.path, dataset.project.name)),
         dataset.additionalInfo.keywords.sorted,
@@ -121,7 +121,7 @@ package object rest {
           DatasetCreator(person.maybeEmail, person.name, person.maybeAffiliation)
         ),
         dataset.provenance.date,
-        dataset.parts.map(part => DatasetPart(PartLocation(part.entity.location.value))),
+        dataset.parts.map(part => model.DatasetPart(PartLocation(part.entity.location.value))),
         DatasetProject(dataset.project.path, dataset.project.name),
         usedIn = List(DatasetProject(dataset.project.path, dataset.project.name)),
         dataset.additionalInfo.keywords.sorted,

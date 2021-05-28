@@ -19,13 +19,15 @@
 package ch.datascience.graph.acceptancetests.stubs
 
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.acceptancetests.data
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.tooling.TestLogger
+import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.CliVersion
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.knowledgegraph.projects.model.Project
+import ch.datascience.rdfstore.entities
 import ch.datascience.rdfstore.entities.EntitiesGenerators._
-import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.entities.{Activity, ExecutionPlanner, Person, RunPlan}
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
@@ -44,26 +46,28 @@ object RemoteTriplesGenerator {
   private val logger = TestLogger()
   private val port: Int Refined Positive = 8080
 
-  def `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(
-      project:    Project,
-      commitId:   CommitId,
-      author:     Person,
-      cliVersion: CliVersion = currentVersionPair.cliVersion
-  ): Unit =
+  def `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`[
+      FC <: entities.Project.ForksCount
+  ](
+      project:             data.Project[FC],
+      commitId:            CommitId,
+      author:              Person,
+      cliVersion:          CliVersion = currentVersionPair.cliVersion
+  )(implicit gitLabApiUrl: GitLabApiUrl, renkuBaseUrl: RenkuBaseUrl): Unit =
     `GET <triples-generator>/projects/:id/commits/:id returning OK`(
       project,
       commitId,
       ExecutionPlanner(
         RunPlan(runPlanNames.generateOne, runPlanCommands.generateOne, commandParameterFactories = Nil),
-        (Activity.StartTime(project.created.date.value), author, cliVersion),
-        project.toEntitiesProject(cliVersion),
+        (Activity.StartTime(project.entitiesProject.dateCreated.value), author, cliVersion),
+        project.entitiesProject,
         argumentsValueOverrides = Nil,
         inputsValueOverrides = Nil
       ).buildProvenanceGraph.fold(fail, identity).asJsonLD
     )
 
   def `GET <triples-generator>/projects/:id/commits/:id returning OK`(
-      project:  Project,
+      project:  data.Project[_],
       commitId: CommitId,
       triples:  JsonLD
   ): Unit = {

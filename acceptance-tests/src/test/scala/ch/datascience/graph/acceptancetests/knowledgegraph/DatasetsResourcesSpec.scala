@@ -44,6 +44,7 @@ import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.knowledgegraph.projects.model.Project
+import ch.datascience.rdfstore.entities
 import ch.datascience.rdfstore.entities.EntitiesGenerators._
 import ch.datascience.rdfstore.entities.Person
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
@@ -74,28 +75,27 @@ class DatasetsResourcesSpec
     val user = authUsers.generateOne
     implicit val accessToken: AccessToken = user.accessToken
 
-    val project = projectEntities().generateOne.copy(
-      visibility = Visibility.Public,
-      maybeParent = None,
-      maybeCreator = None
-    )
-    val dataset1         = datasetEntities(datasetProvenanceInternal, projectsGen = fixed(project)).generateOne
-    val dataset2         = datasetEntities(datasetProvenanceInternal, projectsGen = fixed(project)).generateOne
+    val project = gitLabProjects(
+      projectEntities[entities.Project.ForksCount.Zero]().generateOne.copy(
+        visibility = Visibility.Public,
+        maybeCreator = None
+      )
+    ).generateOne
+    val dataset1         = datasetEntities(datasetProvenanceInternal, projectsGen = fixed(project.entitiesProject)).generateOne
+    val dataset2         = datasetEntities(datasetProvenanceInternal, projectsGen = fixed(project.entitiesProject)).generateOne
     val dataset2Modified = modifiedDatasetEntities(dataset2).generateOne
 
     Scenario("As a user I would like to find project's datasets by calling a REST endpoint") {
 
       Given("some data in the RDF Store")
       val jsonLDTriples = JsonLD.arr(
-        project.asJsonLD,
+        project.entitiesProject.asJsonLD,
         dataset1.asJsonLD,
         dataset2.asJsonLD,
         dataset2Modified.asJsonLD
       )
 
-      `data in the RDF store`(project, dataset1CommitId, dataset1Committer, jsonLDTriples)(
-        NonEmptyList.of(dataset1Committer, persons.generateOne.copy(maybeGitLabId = user.id.some)).map(_.asMember())
-      )
+      `data in the RDF store`(project, commitIds.generateOne, jsonLDTriples)
 
       `wait for events to be processed`(project.id)
 

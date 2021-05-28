@@ -18,25 +18,24 @@
 
 package ch.datascience.graph.acceptancetests.stubs
 
-import cats.data.NonEmptyList
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.acceptancetests.data
 import ch.datascience.graph.acceptancetests.tooling.GraphServices.webhookServiceClient
 import ch.datascience.graph.acceptancetests.tooling.TestLogger
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.{DateCreated, Id, Name, Path, Visibility}
+import ch.datascience.graph.model.projects.Id
 import ch.datascience.graph.model.users
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.http.server.security.model.AuthUser
+import ch.datascience.knowledgegraph.projects.model.Permissions
 import ch.datascience.knowledgegraph.projects.model.Permissions._
-import ch.datascience.knowledgegraph.projects.model.{ParentProject, Permissions, Project}
 import ch.datascience.rdfstore.entities
-import ch.datascience.rdfstore.entities.Person
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.client.{MappingBuilder, WireMock}
@@ -171,69 +170,47 @@ object GitLab {
   }
 
   def `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(
-      projectPath:        Path,
-      persons:            NonEmptyList[entities.Person]
+      project:            data.Project[_]
   )(implicit accessToken: AccessToken): Unit = {
-    implicit val personEncoder: Encoder[(users.GitLabId, users.Username, users.Name)] = Encoder.instance {
-      case (gitLabId, username, name) =>
-        json"""{
-          "id":       ${gitLabId.value},
-          "username": ${username.value},
-          "name":     ${name.value}
+    implicit val personEncoder: Encoder[entities.Person] = Encoder.instance { person =>
+      json"""{
+          "id":       ${person.maybeGitLabId.map(_.value)},
+          "username": ${person.name.value},
+          "name":     ${person.name.value}
         }"""
     }
 
     stubFor {
-      get(s"/api/v4/projects/${urlEncode(projectPath.value)}/members").withAccessTokenInHeader
-        .willReturn(okJson(persons.toList.asJson.noSpaces))
+      get(s"/api/v4/projects/${urlEncode(project.path.value)}/members").withAccessTokenInHeader
+        .willReturn(okJson(project.entitiesProject.members.toList.asJson.noSpaces))
     }
     stubFor {
-      get(s"/api/v4/projects/${urlEncode(projectPath.value)}/users").withAccessTokenInHeader
-        .willReturn(okJson(persons.toList.asJson.noSpaces))
+      get(s"/api/v4/projects/${urlEncode(project.path.value)}/users").withAccessTokenInHeader
+        .willReturn(okJson(project.entitiesProject.members.toList.asJson.noSpaces))
     }
     ()
   }
 
-  def `GET <gitlabApi>/projects/:id returning OK`(
-      project:            Project
-  )(implicit accessToken: AccessToken): Unit =
-    `GET <gitlabApi>/projects/:id returning OK`(project.id,
-                                                project.path,
-                                                project.name,
-                                                project.visibility,
-                                                project.created.date
-    )
-
-  def `GET <gitlabApi>/projects/:id returning OK`(
-      projectId:          Id,
-      projectPath:        Path = projectPaths.generateOne,
-      projectName:        Name = projectNames.generateOne,
-      projectVisibility:  Visibility = projectVisibilities.generateOne,
-      dateCreated:        DateCreated = projectCreatedDates.generateOne
+  def `GET <gitlabApi>/projects/:id returning OK`[FC <: entities.Project.ForksCount](
+      project:            data.Project[FC]
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
-      get(s"/api/v4/projects/$projectId").withAccessTokenInHeader
+      get(s"/api/v4/projects/${project.id}").withAccessTokenInHeader
         .willReturn(okJson(json"""{
-          "id":                  ${projectId.value}, 
-          "visibility":          ${projectVisibility.value},
-          "name":                ${projectName.value},
-          "path_with_namespace": ${projectPath.value},
-          "created_at":          ${dateCreated.value}
+          "id":                  ${project.id.value}, 
+          "visibility":          ${project.entitiesProject.visibility.value},
+          "name":                ${project.name.value},
+          "path_with_namespace": ${project.path.value},
+          "created_at":          ${project.entitiesProject.dateCreated.value}
         }""".noSpaces))
     }
     ()
   }
 
-  def `GET <gitlabApi>/projects/:path returning OK with`(
-      project:            Project,
+  def `GET <gitlabApi>/projects/:path returning OK with`[FC <: entities.Project.ForksCount](
+      project:            data.Project[FC],
       withStatistics:     Boolean = false
   )(implicit accessToken: AccessToken): Unit = {
-
-    implicit class ParentProjectOps(parent: ParentProject) {
-      lazy val toJson: Json = json"""{
-        "path_with_namespace": ${parent.path.value}
-      }"""
-    }
 
     implicit class PermissionsOps(permissions: Permissions) {
       lazy val toJson: Json = permissions match {
@@ -256,6 +233,11 @@ object GitLab {
       }"""
     }
 
+    implicit val parentProjectEncoder: Encoder[entities.Project[FC] with entities.HavingParent] =
+      Encoder.instance(project => json"""{
+        "forked_from_project": ${project.parent.path}
+      }""")
+
     val queryParams = if (withStatistics) "?statistics=true" else ""
     stubFor {
       get(s"/api/v4/projects/${urlEncode(project.path.value)}$queryParams").withAccessTokenInHeader
@@ -265,16 +247,16 @@ object GitLab {
               "id":                   ${project.id.value},
               "name":                 ${project.name.value},
               "description":          ${project.maybeDescription.map(_.value)},
-              "visibility":           ${project.visibility.value},
+              "visibility":           ${project.entitiesProject.visibility.value},
               "path_with_namespace":  ${project.path.value},
               "ssh_url_to_repo":      ${project.urls.ssh.value},
               "http_url_to_repo":     ${project.urls.http.value},
               "web_url":              ${project.urls.web.value},
               "readme_url":           ${project.urls.maybeReadme.map(_.value)},
-              "forks_count":          ${project.forking.forksCount.value},
+              "forks_count":          ${project.entitiesProject.forksCount.value},
               "tag_list":             ${project.tags.map(_.value).toList},
               "star_count":           ${project.starsCount.value},
-              "created_at":           ${project.created.date.value},
+              "created_at":           ${project.entitiesProject.dateCreated.value},
               "last_activity_at":     ${project.updatedAt.value},
               "permissions":          ${project.permissions.toJson},
               "statistics": {
@@ -286,12 +268,13 @@ object GitLab {
               }
             }"""
               .deepMerge(
-                project.forking.maybeParent
-                  .map(parent => Json.obj("forked_from_project" -> parent.toJson))
-                  .getOrElse(Json.obj())
+                project.entitiesProject match {
+                  case hasParent: entities.Project[FC] with entities.HavingParent => hasParent.asJson
+                  case _ => Json.obj()
+                }
               )
               .deepMerge(
-                project.created.maybeCreator
+                project.entitiesProject.maybeCreator
                   .flatMap(_.maybeGitLabId)
                   .map(creatorId => json"""{"creator_id": ${creatorId.value}}""")
                   .getOrElse(Json.obj())
@@ -301,22 +284,23 @@ object GitLab {
         )
     }
 
-    (project.created.maybeCreator -> maybeCreator.flatMap(_.maybeGitLabId)) mapN { (creator, creatorId) =>
-      stubFor {
-        get(s"/api/v4/users/$creatorId").withAccessTokenInHeader
-          .willReturn(
-            okJson(json"""{
+    (project.entitiesProject.maybeCreator -> project.entitiesProject.maybeCreator.flatMap(_.maybeGitLabId)) mapN {
+      (creator, creatorId) =>
+        stubFor {
+          get(s"/api/v4/users/$creatorId").withAccessTokenInHeader
+            .willReturn(
+              okJson(json"""{
               "id":   ${creatorId.value},
               "name": ${creator.name.value}
             }""".noSpaces)
-          )
-      }
+            )
+        }
     }
     ()
   }
 
   def `GET <gitlabApi>/projects/:path returning BadRequest`(
-      project:            Project
+      project:            data.Project[_]
   )(implicit accessToken: AccessToken): StubMapping =
     stubFor {
       get(s"/api/v4/projects/${urlEncode(project.path.value)}").withAccessTokenInHeader
@@ -324,7 +308,7 @@ object GitLab {
     }
 
   def `GET <gitlabApi>/projects/:path having connectivity issues`(
-      project:            Project
+      project:            data.Project[_]
   )(implicit accessToken: AccessToken): StubMapping =
     stubFor {
       get(s"/api/v4/projects/${urlEncode(project.path.value)}").withAccessTokenInHeader

@@ -18,10 +18,11 @@
 
 package ch.datascience.graph.acceptancetests.flows
 
+import ch.datascience.graph.acceptancetests.data.Project
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices.tokenRepositoryClient
 import ch.datascience.http.client.AccessToken
-import ch.datascience.knowledgegraph.projects.model.Project
+import ch.datascience.rdfstore.entities
 import io.circe.syntax._
 import org.http4s.Status._
 import org.scalatest.Assertion
@@ -29,7 +30,9 @@ import org.scalatest.matchers.should
 
 object AccessTokenPresence extends should.Matchers {
 
-  def givenAccessTokenPresentFor(project: Project)(implicit accessToken: AccessToken): Assertion = {
+  def givenAccessTokenPresentFor[FC <: entities.Project.ForksCount](
+      project:            Project[FC]
+  )(implicit accessToken: AccessToken): Assertion = {
 
     `GET <gitlabApi>/projects/:id returning OK`(project)
 

@@ -31,7 +31,7 @@ import io.circe.literal._
 
 object GitLab {
 
-  def pushEvent(project: Project[entities.Project.ForksCount], commitId: CommitId): Json = json"""{
+  def pushEvent(project: Project[_], commitId: CommitId): Json = json"""{
     "after":         ${commitId.value},
     "user_id":       ${positiveInts().generateOne.value}, 
     "user_username": ${nonEmptyStrings().generateOne},
@@ -42,17 +42,4 @@ object GitLab {
     }
   }"""
 
-  final case class Project[FC <: entities.Project.ForksCount](entitiesProject:  entities.Project[FC],
-                                                              id:               Id,
-                                                              maybeDescription: Option[Description],
-                                                              updatedAt:        DateUpdated,
-                                                              urls:             Urls,
-                                                              tags:             Set[Tag],
-                                                              starsCount:       StarsCount,
-                                                              permissions:      Permissions,
-                                                              statistics:       Statistics
-  ) {
-    val path: Path = entitiesProject.path
-    val name: Name = entitiesProject.name
-  }
 }
