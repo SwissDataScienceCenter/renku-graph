@@ -29,7 +29,6 @@ import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
 import ch.datascience.rdfstore.entities.RunPlan.Command
 import ch.datascience.rdfstore.entities._
-import ch.datascience.rdfstore.entities.bundles.{nonModifiedDataSetCommit, renkuBaseUrl}
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.jsonld.{JsonLD, Property}
 import org.scalacheck.Gen
@@ -160,7 +159,7 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
       )
       .asJsonLD
 
-  private lazy val workflows =
+  private lazy val workflows: Gen[JsonLD] =
     for {
       projectPath          <- projectPaths
       workflowCommitId     <- commitIds

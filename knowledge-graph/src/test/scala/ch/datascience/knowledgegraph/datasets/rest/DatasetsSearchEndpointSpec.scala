@@ -162,13 +162,13 @@ class DatasetsSearchEndpointSpec
     ).searchForDatasets _
 
     lazy val toJson: DatasetSearchResult => Json = {
-      case DatasetSearchResult(id, title, name, maybeDescription, creators, dates, projectsCount, keywords, images) =>
+      case DatasetSearchResult(id, title, name, maybeDescription, creators, date, projectsCount, keywords, images) =>
         json"""{
           "identifier": $id,
           "title": $title,
           "name": $name,
-          "published": ${creators -> dates.maybeDatePublished},
-          "date": ${dates.date},
+          "published": ${creators -> date},
+          "date": ${date},
           "projectsCount": ${projectsCount.value},
           "keywords": ${keywords.map(_.value)},
           "images": ${images.map(_.value)},

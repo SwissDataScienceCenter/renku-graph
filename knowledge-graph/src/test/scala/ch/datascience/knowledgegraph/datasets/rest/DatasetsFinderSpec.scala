@@ -659,9 +659,10 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
           )
         ).generateOne
 
-        val publicDatasetOnPrivateProject = publicDataset.importTo(
-          projectEntities[Project.ForksCount.Zero]().generateOne.copy(visibility = nonPublic)
-        )
+        val publicDatasetOnPrivateProject = publicDataset
+          .importTo(
+            projectEntities[Project.ForksCount.Zero]().generateOne.copy(visibility = nonPublic)
+          ) w
 
         loadToStore(publicDataset, publicDatasetOnPrivateProject)
 

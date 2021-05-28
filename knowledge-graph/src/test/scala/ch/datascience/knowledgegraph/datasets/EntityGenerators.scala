@@ -19,23 +19,20 @@
 package ch.datascience.knowledgegraph.datasets
 
 import ch.datascience.generators.CommonGraphGenerators.cliVersions
-import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.nonEmptyStrings
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
-import ch.datascience.graph.model.datasets.{Identifier, TopmostDerivedFrom}
-import ch.datascience.knowledgegraph.datasets.DatasetsGenerators.addedToProjectObjects
 import ch.datascience.knowledgegraph.datasets.model.DatasetProject
 import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
-import ch.datascience.rdfstore.entities.{Activity, Agent, InvalidationEntity, Project}
+import ch.datascience.rdfstore.entities.{Activity, Agent, Project}
 import org.scalacheck.Gen
 
 object EntityGenerators {
-  implicit class ProjectOps(project: Project) {
+  implicit class ProjectOps(project: Project[_]) {
     lazy val toDatasetProject: DatasetProject =
-      DatasetProject(project.path, project.name, addedToProjectObjects.generateOne)
+      DatasetProject(project.path, project.name)
   }
 
-  private def activities(project: Project): Gen[Activity] = for {
+  private def activities(project: Project[_]): Gen[Activity] = for {
     commitId      <- commitIds
     committedDate <- committedDates
     committer     <- persons
@@ -54,15 +51,4 @@ object EntityGenerators {
     Nil
   )
 
-  def invalidationEntity(datasetId:          Identifier,
-                         project:            Project,
-                         topmostDerivedFrom: Option[TopmostDerivedFrom] = None
-  ): Gen[InvalidationEntity] = for {
-    activity <- activities(project)
-  } yield InvalidationEntity(
-    activity.commitId,
-    topmostDerivedFrom.map(_.value).getOrElse(datasetId.value),
-    project,
-    activity
-  )
 }
