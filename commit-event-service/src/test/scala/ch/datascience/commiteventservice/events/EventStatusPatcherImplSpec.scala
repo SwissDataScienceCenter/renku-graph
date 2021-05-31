@@ -40,17 +40,18 @@ class EventStatusPatcherImplSpec extends AnyWordSpec with ExternalServiceStubbin
     "return unit if the status change was accepted" in new TestCase {
       stubFor {
         patch(urlEqualTo(s"/events/$eventId/$projectId"))
-          .willReturn(aResponse().withStatus(Accepted.code))
+          .willReturn(aResponse().withStatus(Ok.code))
       }
 
       patcher.sendDeletionStatus(projectId, eventId).unsafeRunSync() shouldBe ()
     }
-    "fail if the status change was not accepted" in new TestCase {
+
+    "fail if the status change was not Ok" in new TestCase {
       stubFor {
         patch(urlEqualTo(s"/events/$eventId/$projectId"))
           .willReturn(
             aResponse().withStatus(
-              Gen.oneOf(Gen.oneOf(Ok, Created), clientErrorHttpStatuses, serverErrorHttpStatuses).generateOne.code
+              Gen.oneOf(Gen.oneOf(Accepted, Created), clientErrorHttpStatuses, serverErrorHttpStatuses).generateOne.code
             )
           )
       }
@@ -62,7 +63,7 @@ class EventStatusPatcherImplSpec extends AnyWordSpec with ExternalServiceStubbin
       } shouldBe a[Exception]
     }
 
-    "fail if an error was encountered" in new TestCase {
+    "fail if an connection error was encountered" in new TestCase {
       stubFor {
         patch(urlEqualTo(s"/events/$eventId/$projectId"))
           .willReturn(aResponse().withFault(CONNECTION_RESET_BY_PEER))

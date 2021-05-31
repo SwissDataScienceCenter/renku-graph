@@ -28,8 +28,7 @@ import ch.datascience.graph.model.projects
 import ch.datascience.http.client.RestClient
 import io.circe.literal.JsonStringContext
 import org.http4s.Method.PATCH
-import org.http4s.Status.Accepted
-import org.http4s.multipart.{Multipart, Part}
+import org.http4s.Status._
 import org.http4s.{Request, Response, Status}
 import org.typelevel.log4cats.Logger
 
@@ -45,19 +44,18 @@ private class EventStatusPatcherImpl[Interpretation[_]: MonadThrow: ConcurrentEf
 )(implicit executionContext: ExecutionContext)
     extends RestClient[Interpretation, EventStatusPatcher[Interpretation]](Throttler.noThrottling, logger)
     with EventStatusPatcher[Interpretation] {
-  override def sendDeletionStatus(projectId: projects.Id, eventId: CommitId): Interpretation[Unit] = {
-    val entity = Multipart[Interpretation](
-      Vector(Part.formData[Interpretation]("event", json"""{"status": "AWAITING_DELETION"}""".noSpaces))
-    )
+  override def sendDeletionStatus(projectId: projects.Id, eventId: CommitId): Interpretation[Unit] =
     for {
-      uri           <- validateUri(s"$eventLogUrl/events/$eventId/$projectId")
-      sendingResult <- send(request(PATCH, uri).withEntity(entity))(mapResponse)
+      uri <- validateUri(s"$eventLogUrl/events/$eventId/$projectId")
+      sendingResult <-
+        send(
+          request(PATCH, uri).withMultipartBuilder.addPart("event", json"""{"status": "AWAITING_DELETION"}""").build()
+        )(mapResponse)
     } yield sendingResult
-  }
 
   private lazy val mapResponse
       : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[Unit]] = {
-    case (Accepted, _, _) => ().pure[Interpretation]
+    case (Ok, _, _) => ().pure[Interpretation]
   }
 
 }
