@@ -58,7 +58,7 @@ private class EventDetailsFinderImpl[Interpretation[_]: BracketThrow](
         case Some((eventId, eventBody)) =>
           val parents = parse(eventBody.value)
             .map(eventBodyJson =>
-              eventBodyJson.hcursor.downField("parent_ids").as[List[CommitId]].getOrElse(List.empty[CommitId])
+              eventBodyJson.hcursor.downField("parents").as[List[CommitId]].getOrElse(List.empty[CommitId])
             )
             .getOrElse(List.empty[CommitId])
           Some(EventDetails(eventId, parents))

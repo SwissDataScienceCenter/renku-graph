@@ -50,7 +50,7 @@ class EventDetailsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
     "return the details of the event if found" in new TestCase {
       val parents = commitIds.generateNonEmptyList().toList
       val eventBodyWithParents = jsons
-        .map(json => json.deepMerge(json"""{"parent_ids": ${parents.map(_.value)}}""").noSpaces)
+        .map(json => json.deepMerge(json"""{"parents": ${parents.map(_.value)}}""").noSpaces)
         .map(EventBody.apply)
 
       storeEvent(
