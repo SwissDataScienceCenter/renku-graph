@@ -72,7 +72,7 @@ private[eventgeneration] class EventDetailsFinderImpl[Interpretation[_]: Context
       : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[
         Option[CommitWithParents]
       ]] = {
-    case (Ok, response, _) => response.as[CommitWithParents].map(_.some)
+    case (Ok, _, response) => response.as[CommitWithParents].map(_.some)
     case (NotFound, _, _)  => Option.empty[CommitWithParents].pure[Interpretation]
   }
 
