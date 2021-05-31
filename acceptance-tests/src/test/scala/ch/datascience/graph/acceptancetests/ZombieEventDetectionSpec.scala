@@ -22,6 +22,7 @@ import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.acceptancetests.data.{Project, dataProjects}
 import ch.datascience.graph.acceptancetests.db.EventLog
 import ch.datascience.graph.acceptancetests.flows.AccessTokenPresence.givenAccessTokenPresentFor
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
@@ -29,14 +30,14 @@ import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import ch.datascience.graph.model.EventsGenerators.commitIds
-import ch.datascience.graph.model.events.{BatchDate, CommitId, EventBody, EventId, EventStatus}
 import ch.datascience.graph.model.events.EventStatus._
+import ch.datascience.graph.model.events.{BatchDate, CommitId, EventBody, EventId, EventStatus}
 import ch.datascience.graph.model.projects._
 import ch.datascience.http.client.AccessToken
-import ch.datascience.knowledgegraph.projects.ProjectsGenerators.projects
-import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.microservices.MicroserviceIdentifier
 import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
+import ch.datascience.rdfstore.entities.Project.ForksCount
+import ch.datascience.rdfstore.entities.{projectEntities, visibilityPublic}
 import io.circe.literal._
 import io.renku.eventlog.EventContentGenerators.eventDates
 import io.renku.eventlog.{CreatedDate, EventDate, ExecutionDate, TypeSerializers}
@@ -66,7 +67,7 @@ class ZombieEventDetectionSpec
   ) {
 
     implicit val accessToken: AccessToken = accessTokens.generateOne
-    val project   = projects.generateOne
+    val project   = dataProjects(projectEntities[ForksCount.Zero](visibilityPublic)).generateOne
     val projectId = project.id
     val commitId  = commitIds.generateOne
     val committer = persons.generateOne
@@ -76,10 +77,7 @@ class ZombieEventDetectionSpec
     `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId, committer)
 
     And("project members/users exists in GitLab")
-    `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(
-      project.path,
-      committer.asMembersList()
-    )
+    `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project)
 
     And("project exists in GitLab")
     `GET <gitlabApi>/projects/:path returning OK with`(project)
@@ -103,7 +101,7 @@ class ZombieEventDetectionSpec
     }
   }
 
-  private def insertProjectToDB(project: Project, eventDate: EventDate) = EventLog.execute { session =>
+  private def insertProjectToDB(project: Project[_], eventDate: EventDate) = EventLog.execute { session =>
     val query: Command[Id ~ Path ~ EventDate] =
       sql"""INSERT INTO project (project_id, project_path, latest_event_date)
           VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
@@ -118,7 +116,7 @@ class ZombieEventDetectionSpec
     }
   }
 
-  private def insertEventToDB(commitId: CommitId, project: Project, eventDate: EventDate)(implicit
+  private def insertEventToDB(commitId: CommitId, project: Project[_], eventDate: EventDate)(implicit
       session:                          Session[IO]
   ) = {
     val query: Command[EventId ~ Id ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody] =
@@ -148,7 +146,7 @@ class ZombieEventDetectionSpec
       )
   }
 
-  private def insertEventDeliveryToDB(commitId: CommitId, project: Project)(implicit session: Session[IO]) = {
+  private def insertEventDeliveryToDB(commitId: CommitId, project: Project[_])(implicit session: Session[IO]) = {
     val query: Command[EventId ~ Id ~ MicroserviceIdentifier] = sql"""
           INSERT INTO event_delivery (event_id, project_id, delivery_id)
           VALUES ($eventIdEncoder, $projectIdEncoder, $microserviceIdentifierEncoder)

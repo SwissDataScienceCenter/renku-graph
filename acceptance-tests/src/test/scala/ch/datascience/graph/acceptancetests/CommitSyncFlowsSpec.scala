@@ -20,6 +20,7 @@ package ch.datascience.graph.acceptancetests
 
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.acceptancetests.data.dataProjects
 import ch.datascience.graph.acceptancetests.flows.AccessTokenPresence.givenAccessTokenPresentFor
 import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning.`wait for events to be processed`
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
@@ -29,8 +30,10 @@ import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplici
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.AccessToken
-import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
+import ch.datascience.rdfstore.entities._
 import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
+import ch.datascience.rdfstore.entities.Project.ForksCount
+import ch.datascience.rdfstore.entities.{projectEntities, visibilityPublic}
 import ch.datascience.webhookservice.model.HookToken
 import io.renku.eventlog.TypeSerializers
 import org.http4s.Status._
@@ -39,11 +42,11 @@ import org.scalatest.concurrent.Eventually
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 import skunk.Command
+import skunk.implicits._
 
 import java.lang.Thread.sleep
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import skunk.implicits._
 
 class CommitSyncFlowsSpec
     extends AnyFeatureSpec
@@ -60,7 +63,7 @@ class CommitSyncFlowsSpec
     Scenario("There's a commit in GitLab for which there's no event in EL") {
 
       implicit val accessToken: AccessToken = accessTokens.generateOne
-      val project           = projects.generateOne
+      val project           = dataProjects(projectEntities[ForksCount.Zero](visibilityPublic)).generateOne
       val projectId         = project.id
       val nonMissedCommitId = commitIds.generateOne
       val missedCommitId    = commitIds.generateOne
@@ -90,10 +93,7 @@ class CommitSyncFlowsSpec
       givenAccessTokenPresentFor(project)
 
       And("project members/users exists in GitLab")
-      `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(
-        project.path,
-        committer.asMembersList()
-      )
+      `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project)
 
       And("project exists in GitLab")
       `GET <gitlabApi>/projects/:path returning OK with`(project)

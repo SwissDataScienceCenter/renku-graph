@@ -23,15 +23,15 @@ import ch.datascience.knowledgegraph.projects.model.Project.{DateUpdated, StarsC
 import ch.datascience.knowledgegraph.projects.model.{Permissions, Statistics, Urls}
 import ch.datascience.rdfstore.entities
 
-final case class Project[FC <: entities.Project.ForksCount](entitiesProject:  entities.Project[FC],
-                                                            id:               Id,
-                                                            maybeDescription: Option[Description],
-                                                            updatedAt:        DateUpdated,
-                                                            urls:             Urls,
-                                                            tags:             Set[Tag],
-                                                            starsCount:       StarsCount,
-                                                            permissions:      Permissions,
-                                                            statistics:       Statistics
+final case class Project[+FC <: entities.Project.ForksCount](entitiesProject:  entities.Project[FC],
+                                                             id:               Id,
+                                                             maybeDescription: Option[Description],
+                                                             updatedAt:        DateUpdated,
+                                                             urls:             Urls,
+                                                             tags:             Set[Tag],
+                                                             starsCount:       StarsCount,
+                                                             permissions:      Permissions,
+                                                             statistics:       Statistics
 ) {
   val path: Path = entitiesProject.path
   val name: Name = entitiesProject.name

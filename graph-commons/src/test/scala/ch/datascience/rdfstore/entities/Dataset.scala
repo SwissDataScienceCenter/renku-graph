@@ -29,12 +29,12 @@ import io.renku.jsonld.{EntityId, JsonLD, Property}
 
 import scala.language.implicitConversions
 
-final case class Dataset[P <: Provenance](identification: Identification,
-                                          provenance:     P,
-                                          additionalInfo: AdditionalInfo,
-                                          publishing:     Publishing,
-                                          parts:          List[DatasetPart],
-                                          project:        Project[Project.ForksCount]
+final case class Dataset[+P <: Provenance](identification: Identification,
+                                           provenance:     P,
+                                           additionalInfo: AdditionalInfo,
+                                           publishing:     Publishing,
+                                           parts:          List[DatasetPart],
+                                           project:        Project[Project.ForksCount]
 ) {
 
   def entityId(implicit renkuBaseUrl: RenkuBaseUrl): EntityId = Dataset.entityId(identification.identifier)
@@ -70,28 +70,30 @@ object Dataset {
   sealed trait Provenance {
     type D <: Date
     val topmostSameAs:      TopmostSameAs
+    val initialVersion:     InitialVersion
     val topmostDerivedFrom: TopmostDerivedFrom
     val date:               D
     val creators:           Set[Person]
 
-    private[Dataset] lazy val originalIdentifier: Identifier = topmostDerivedFrom.value match {
-      case s"$_/datasets/$identifier" => Identifier(identifier)
-      case url                        => throw new Exception(s"Unknown derivedFrom URL pattern: $url")
-    }
   }
 
   object Provenance {
 
-    final case class Internal(entityId: EntityId, date: DateCreated, creators: Set[Person]) extends Provenance {
+    final case class Internal(entityId:       EntityId,
+                              initialVersion: InitialVersion,
+                              date:           DateCreated,
+                              creators:       Set[Person]
+    ) extends Provenance {
       override type D = DateCreated
       override lazy val topmostSameAs:      TopmostSameAs      = TopmostSameAs(entityId)
       override lazy val topmostDerivedFrom: TopmostDerivedFrom = TopmostDerivedFrom(entityId)
     }
 
-    final case class ImportedExternal(entityId: EntityId,
-                                      sameAs:   ExternalSameAs,
-                                      date:     DatePublished,
-                                      creators: Set[Person]
+    final case class ImportedExternal(entityId:       EntityId,
+                                      sameAs:         ExternalSameAs,
+                                      initialVersion: InitialVersion,
+                                      date:           DatePublished,
+                                      creators:       Set[Person]
     ) extends Provenance {
       override type D = DatePublished
       override lazy val topmostSameAs:      TopmostSameAs      = TopmostSameAs(sameAs)
@@ -106,19 +108,21 @@ object Dataset {
       val creators:      Set[Person]
       override lazy val topmostDerivedFrom: TopmostDerivedFrom = TopmostDerivedFrom(entityId)
     }
-    final case class ImportedInternalAncestorExternal(entityId:      EntityId,
-                                                      sameAs:        InternalSameAs,
-                                                      topmostSameAs: TopmostSameAs,
-                                                      date:          DatePublished,
-                                                      creators:      Set[Person]
+    final case class ImportedInternalAncestorExternal(entityId:       EntityId,
+                                                      sameAs:         InternalSameAs,
+                                                      topmostSameAs:  TopmostSameAs,
+                                                      initialVersion: InitialVersion,
+                                                      date:           DatePublished,
+                                                      creators:       Set[Person]
     ) extends ImportedInternal {
       override type D = DatePublished
     }
-    final case class ImportedInternalAncestorInternal(entityId:      EntityId,
-                                                      sameAs:        InternalSameAs,
-                                                      topmostSameAs: TopmostSameAs,
-                                                      date:          DateCreated,
-                                                      creators:      Set[Person]
+    final case class ImportedInternalAncestorInternal(entityId:       EntityId,
+                                                      sameAs:         InternalSameAs,
+                                                      topmostSameAs:  TopmostSameAs,
+                                                      initialVersion: InitialVersion,
+                                                      date:           DateCreated,
+                                                      creators:       Set[Person]
     ) extends ImportedInternal {
       override type D = DateCreated
     }
@@ -126,6 +130,7 @@ object Dataset {
     final case class Modified(entityId:           EntityId,
                               derivedFrom:        DerivedFrom,
                               topmostDerivedFrom: TopmostDerivedFrom,
+                              initialVersion:     InitialVersion,
                               date:               DateCreated,
                               creators:           Set[Person]
     ) extends Provenance {
@@ -137,49 +142,49 @@ object Dataset {
         renkuBaseUrl: RenkuBaseUrl,
         gitLabApiUrl: GitLabApiUrl
     ): Provenance => Map[Property, JsonLD] = {
-      case provenance @ Internal(_, date, creators) =>
+      case provenance @ Internal(_, initialVersion, date, creators) =>
         Map(
           schema / "dateCreated"       -> date.asJsonLD,
           schema / "creator"           -> creators.asJsonLD,
           renku / "topmostSameAs"      -> provenance.topmostSameAs.asJsonLD,
           renku / "topmostDerivedFrom" -> provenance.topmostDerivedFrom.asJsonLD,
-          renku / "originalIdentifier" -> provenance.originalIdentifier.asJsonLD
+          renku / "originalIdentifier" -> initialVersion.asJsonLD
         )
-      case provenance @ ImportedExternal(_, sameAs, date, creators) =>
+      case provenance @ ImportedExternal(_, sameAs, initialVersion, date, creators) =>
         Map(
           schema / "datePublished"     -> date.asJsonLD,
           schema / "sameAs"            -> sameAs.asJsonLD,
           schema / "creator"           -> creators.asJsonLD,
           renku / "topmostSameAs"      -> provenance.topmostSameAs.asJsonLD,
           renku / "topmostDerivedFrom" -> provenance.topmostDerivedFrom.asJsonLD,
-          renku / "originalIdentifier" -> provenance.originalIdentifier.asJsonLD
+          renku / "originalIdentifier" -> initialVersion.asJsonLD
         )
-      case provenance @ ImportedInternalAncestorExternal(_, sameAs, topmostSameAs, date, creators) =>
+      case provenance @ ImportedInternalAncestorExternal(_, sameAs, topmostSameAs, initialVersion, date, creators) =>
         Map(
           schema / "datePublished"     -> date.asJsonLD,
           schema / "sameAs"            -> sameAs.asJsonLD,
           schema / "creator"           -> creators.asJsonLD,
           renku / "topmostSameAs"      -> topmostSameAs.asJsonLD,
           renku / "topmostDerivedFrom" -> provenance.topmostDerivedFrom.asJsonLD,
-          renku / "originalIdentifier" -> provenance.originalIdentifier.asJsonLD
+          renku / "originalIdentifier" -> initialVersion.asJsonLD
         )
-      case provenance @ ImportedInternalAncestorInternal(_, sameAs, topmostSameAs, date, creators) =>
+      case provenance @ ImportedInternalAncestorInternal(_, sameAs, topmostSameAs, initialVersion, date, creators) =>
         Map(
           schema / "dateCreated"       -> date.asJsonLD,
           schema / "sameAs"            -> sameAs.asJsonLD,
           schema / "creator"           -> creators.asJsonLD,
           renku / "topmostSameAs"      -> topmostSameAs.asJsonLD,
           renku / "topmostDerivedFrom" -> provenance.topmostDerivedFrom.asJsonLD,
-          renku / "originalIdentifier" -> provenance.originalIdentifier.asJsonLD
+          renku / "originalIdentifier" -> initialVersion.asJsonLD
         )
-      case provenance @ Modified(_, derivedFrom, topmostDerivedFrom, date, creators) =>
+      case provenance @ Modified(_, derivedFrom, topmostDerivedFrom, initialVersion, date, creators) =>
         Map(
           schema / "dateCreated"       -> date.asJsonLD,
           prov / "wasDerivedFrom"      -> derivedFrom.asJsonLD,
           schema / "creator"           -> creators.asJsonLD,
           renku / "topmostSameAs"      -> provenance.topmostSameAs.asJsonLD,
           renku / "topmostDerivedFrom" -> topmostDerivedFrom.asJsonLD,
-          renku / "originalIdentifier" -> provenance.originalIdentifier.asJsonLD
+          renku / "originalIdentifier" -> initialVersion.asJsonLD
         )
     }
 

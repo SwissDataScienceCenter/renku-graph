@@ -25,7 +25,6 @@ import ch.datascience.graph.acceptancetests.tooling.TestLogger
 import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.CliVersion
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.rdfstore.entities
 import ch.datascience.rdfstore.entities.EntitiesGenerators._
 import ch.datascience.rdfstore.entities.{Activity, ExecutionPlanner, Person, RunPlan}
@@ -81,7 +80,7 @@ object RemoteTriplesGenerator {
   }
 
   def `GET <triples-generator>/projects/:id/commits/:id fails non recoverably`(
-      project:  Project,
+      project:  data.Project[_],
       commitId: CommitId
   ): Unit = {
     stubFor {
@@ -92,7 +91,7 @@ object RemoteTriplesGenerator {
   }
 
   def `GET <triples-generator>/projects/:id/commits/:id fails recoverably`(
-      project:  Project,
+      project:  data.Project[_],
       commitId: CommitId
   ): Unit = {
     stubFor {

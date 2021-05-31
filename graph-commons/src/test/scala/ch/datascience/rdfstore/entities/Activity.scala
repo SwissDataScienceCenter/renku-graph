@@ -21,6 +21,7 @@ package ch.datascience.rdfstore.entities
 import cats.syntax.all._
 import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.rdfstore.entities.Activity._
+import ch.datascience.rdfstore.entities.Entity.Checksum
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints.{BoundedInstant, PositiveInt, UUID}
 
@@ -43,6 +44,12 @@ final case class Activity(id:                  Id,
   lazy val usages:      List[Usage]          = usageFactories.map(_.apply(this))
   lazy val parameters:  List[ParameterValue] = parameterFactories.map(_.apply(this))
   lazy val generations: List[Generation]     = generationFactories.map(_.apply(this))
+
+  def findGenerationChecksum(location: Location): Option[Checksum] =
+    generations.find(_.entity.location == location).map(_.entity.checksum)
+
+  def findUsagesChecksum(location: Location): Option[Checksum] =
+    usages.find(_.entity.location == location).map(_.entity.checksum)
 }
 
 object Activity {

@@ -119,7 +119,15 @@ object datasets {
   final class InternalSameAs private[datasets] (val value: String) extends SameAs
   final class ExternalSameAs private[datasets] (val value: String) extends SameAs
 
-  implicit object InternalSameAs extends TinyTypeFactory[InternalSameAs](new InternalSameAs(_)) with constraints.Url
+  implicit object InternalSameAs extends TinyTypeFactory[InternalSameAs](new InternalSameAs(_)) with constraints.Url {
+    implicit class InternalSameAsOps(internalSameAs: InternalSameAs) {
+      lazy val asIdentifier: Identifier = internalSameAs.value match {
+        case s"$_/datasets/$identifier" => Identifier(identifier)
+        case url                        => throw new Exception(s"Unknown sameAs URL pattern: $url")
+      }
+
+    }
+  }
 
   implicit object SameAs extends TinyTypeFactory[SameAs](new ExternalSameAs(_)) with constraints.Url {
 

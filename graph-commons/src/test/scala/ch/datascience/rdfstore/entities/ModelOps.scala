@@ -55,7 +55,7 @@ trait ModelOps {
     }
 
     private def newChildGen(parentProject: Project[Project.ForksCount.NonZero]) =
-      projectEntities[ForksCount.Zero](parentProject.dateCreated).map(child =>
+      projectEntities[ForksCount.Zero](fixed(parentProject.visibility), parentProject.dateCreated).map(child =>
         new Project(
           child.path,
           child.name,
@@ -137,6 +137,7 @@ trait ModelOps {
           sentenceContaining(Refined.unsafeApply(phrase)).map(_.value).map(Description.apply).generateSome
         )
       )
+
   }
 
   implicit class DatasetOpsImportedExternal(dataset: Dataset[ImportedExternal])(implicit renkuBaseUrl: RenkuBaseUrl) {
@@ -165,6 +166,7 @@ trait ModelOps {
     Dataset.Provenance.ImportedInternalAncestorInternal(newEntityId,
                                                         sameAsToParent,
                                                         provenance.topmostSameAs,
+                                                        provenance.initialVersion,
                                                         provenance.date,
                                                         provenance.creators
     )
@@ -177,6 +179,7 @@ trait ModelOps {
     Dataset.Provenance.ImportedInternalAncestorExternal(newEntityId,
                                                         sameAsToParent,
                                                         provenance.topmostSameAs,
+                                                        provenance.initialVersion,
                                                         provenance.date,
                                                         provenance.creators
     )
@@ -189,6 +192,7 @@ trait ModelOps {
     Dataset.Provenance.ImportedInternalAncestorExternal(newEntityId,
                                                         sameAsToParent,
                                                         provenance.topmostSameAs,
+                                                        provenance.initialVersion,
                                                         provenance.date,
                                                         provenance.creators
     )
@@ -201,6 +205,7 @@ trait ModelOps {
     Dataset.Provenance.ImportedInternalAncestorInternal(newEntityId,
                                                         sameAsToParent,
                                                         provenance.topmostSameAs,
+                                                        provenance.initialVersion,
                                                         provenance.date,
                                                         provenance.creators
     )
@@ -214,6 +219,7 @@ trait ModelOps {
       newEntityId,
       sameAsToParent,
       provenance.topmostSameAs,
+      provenance.initialVersion,
       provenance.date,
       provenance.creators
     )

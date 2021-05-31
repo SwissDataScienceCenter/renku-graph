@@ -18,38 +18,33 @@
 
 package ch.datascience.graph.acceptancetests.knowledgegraph
 
-import cats.data.NonEmptyList
 import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.acceptancetests.data
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning._
-import ch.datascience.graph.acceptancetests.knowledgegraph.DatasetsResources.briefJson
+import ch.datascience.graph.acceptancetests.knowledgegraph.DatasetsResources._
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TestReadabilityTools._
-import ch.datascience.graph.model.EventsGenerators.commitIds
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.projects.Visibility
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.server.EndpointTester._
-import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
-import ch.datascience.knowledgegraph.datasets.model._
-import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.knowledgegraph.projects.model.Permissions._
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.rdfstore.entities
-import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
-import ch.datascience.rdfstore.entities.Person
-import ch.datascience.rdfstore.entities.bundles._
-import io.circe.Json
+import ch.datascience.rdfstore.entities.Project.ForksCount
+import ch.datascience.rdfstore.entities._
 import io.circe.literal._
+import io.circe.{Encoder, Json}
 import io.renku.jsonld.JsonLD
+import io.renku.jsonld.syntax.JsonEncoderOps
 import org.http4s.Status._
-import org.scalacheck.Gen
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
@@ -66,38 +61,16 @@ class ProjectsResourcesSpec
   private val user = authUsers.generateOne
   private implicit val accessToken: AccessToken = user.accessToken
 
-  private val fullParentProject = projects.generateOne.copy(
-    created = Creation(projectCreatedDates.generateOne, maybeCreator = None)
-  )
-
-  private val parentProject = ParentProject(
-    fullParentProject.path,
-    fullParentProject.name,
-    Creation(fullParentProject.created.date,
-             fullParentProject.created.maybeCreator.map(creator => Creator(creator.maybeEmail, creator.name))
-    )
-  )
-
-  private val dataset1Committer = persons(userGitLabIds.generateSome, userEmails.generateSome).generateOne
-  private val project = {
-    val initProject = projects.generateOne
-    initProject.copy(
-      maybeDescription = projectDescriptions.generateSome,
-      forking = initProject.forking.copy(
-        maybeParent = parentProject.some
-      ),
-      created = initProject.created.copy(
-        maybeCreator = Creator(dataset1Committer.maybeEmail, dataset1Committer.name).some
-      ),
-      visibility = Gen.oneOf(Visibility.Private, Visibility.Internal).generateOne
-    )
+  private val (parentProject, project) = {
+    val (parent, child) = projectEntities[entities.Project.ForksCount.Zero](visibilityPublic).generateOne.forkOnce()
+    dataProjects(parent).generateOne -> dataProjects(
+      child.copy(visibility = visibilityNonPublic.generateOne,
+                 members = child.members + persons.generateOne.copy(maybeGitLabId = user.id.some)
+      )
+    ).generateOne
   }
-  private val dataset1CommitId    = commitIds.generateOne
-  private val parentProjectCommit = commitIds.generateOne
-  private val dataset = nonModifiedDatasets().generateOne.copy(
-    maybeDescription = Some(datasetDescriptions.generateOne),
-    usedIn = List(DatasetProject(project.path, project.name, addedToProjectObjects.generateOne))
-  )
+
+  private val dataset = datasetEntities(datasetProvenanceInternal, fixed(project.entitiesProject)).generateOne
 
   Feature("GET knowledge-graph/projects/<namespace>/<name> to find project's details") {
 
@@ -107,66 +80,24 @@ class ProjectsResourcesSpec
       `GET <gitlabApi>/user returning OK`(user)
 
       Given("some data in the RDF Store")
-      val parentProjectEntity = entities
-        .Project(
-          parentProject.path,
-          parentProject.name,
-          parentProject.created.date,
-          maybeCreator =
-            parentProject.created.maybeCreator.map(creator => entities.Person(creator.name, creator.maybeEmail)),
-          maybeVisibility = None,
-          version = projectSchemaVersions.generateOne
-        )
 
-      val parentProjectCommitter = persons.generateOne
       val jsonLDParentProjectTriples = JsonLD.arr(
-        nonModifiedDataSetCommit(commitId = parentProjectCommit, committer = parentProjectCommitter)(
-          projectPath = parentProject.path,
-          projectName = parentProject.name,
-          projectDateCreated = parentProject.created.date,
-          maybeProjectCreator =
-            parentProject.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail)),
-          projectVersion = fullParentProject.version
-        )()
+        datasetEntities(datasetProvenanceInternal, fixed(parentProject.entitiesProject)).generateOne.asJsonLD,
+        parentProject.entitiesProject.asJsonLD
       )
-      `data in the RDF store`(fullParentProject,
-                              parentProjectCommit,
-                              parentProjectCommitter,
-                              jsonLDParentProjectTriples
-      )()
+
+      `data in the RDF store`(parentProject, commitIds.generateOne, jsonLDParentProjectTriples)
 
       val jsonLDTriples = JsonLD.arr(
-        nonModifiedDataSetCommit(
-          commitId = dataset1CommitId,
-          committer = dataset1Committer,
-          cliVersion = currentVersionPair.cliVersion
-        )(
-          projectPath = project.path,
-          projectName = project.name,
-          maybeVisibility = project.visibility.some,
-          projectDateCreated = project.created.date,
-          maybeProjectCreator = project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail)),
-          maybeParent = parentProjectEntity.some,
-          projectVersion = project.version
-        )(
-          datasetIdentifier = dataset.id,
-          datasetTitle = dataset.title,
-          datasetName = dataset.name,
-          maybeDatasetSameAs = dataset.sameAs.some,
-          datasetImages = dataset.images
-        )
+        dataset.asJsonLD,
+        project.entitiesProject.asJsonLD
       )
-      `data in the RDF store`(project, dataset1CommitId, dataset1Committer, jsonLDTriples)(
-        NonEmptyList.of(dataset1Committer, persons.generateOne.copy(maybeGitLabId = user.id.some)).map(_.asMember())
-      )
+      `data in the RDF store`(project, commitIds.generateOne, jsonLDTriples)
 
       `wait for events to be processed`(project.id)
 
       And("the project exists in GitLab")
-      `GET <gitlabApi>/projects/:path returning OK with`(project,
-                                                         maybeCreator = dataset1Committer.some,
-                                                         withStatistics = true
-      )
+      `GET <gitlabApi>/projects/:path returning OK with`(project, withStatistics = true)
 
       When("user fetches project's details with GET knowledge-graph/projects/<namespace>/<name>")
       val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)
@@ -201,16 +132,16 @@ class ProjectsResourcesSpec
 
 object ProjectsResources {
 
-  def fullJson(project: Project): Json = json"""{
+  def fullJson(project: data.Project[_]): Json = json"""{
     "identifier":  ${project.id.value}, 
     "path":        ${project.path.value}, 
     "name":        ${project.name.value},
     "description": ${(project.maybeDescription getOrElse (throw new Exception("Description expected"))).value},
-    "visibility":  ${project.visibility.value},
-    "created":     ${project.created.toJson},
+    "visibility":  ${project.entitiesProject.visibility.value},
+    "created":     ${project.entitiesProject.dateCreated.value},
     "updatedAt":   ${project.updatedAt.value},
     "urls":        ${project.urls.toJson},
-    "forking":     ${project.forking.toJson},
+    "forking":     ${project.entitiesProject.forksCount -> project.entitiesProject},
     "tags":        ${project.tags.map(_.value).toList},
     "starsCount":  ${project.starsCount.value},
     "permissions": ${toJson(project.permissions)},
@@ -221,7 +152,7 @@ object ProjectsResources {
       "lfsObjectsSize":   ${project.statistics.lsfObjectsSize.value},
       "jobArtifactsSize": ${project.statistics.jobArtifactsSize.value}
     },
-    "version": ${project.version.value}
+    "version": ${project.entitiesProject.version.value}
   }""" deepMerge {
     _links(
       Link(Rel.Self        -> Href(renkuResourcesUrl / "projects" / project.path)),
@@ -247,19 +178,17 @@ object ProjectsResources {
     }""" addIfDefined ("creator" -> created.maybeCreator.map(_.toJson))
   }
 
-  private implicit class ForkingOps(forking: Forking) {
-    import ch.datascience.json.JsonOps._
-
-    lazy val toJson: Json = json"""{
-      "forksCount": ${forking.forksCount.value}
-    }""" addIfDefined ("parent" -> forking.maybeParent.map(_.toJson))
-  }
-
-  private implicit class ParentOps(parent: ParentProject) {
-    lazy val toJson: Json = json"""{
-      "path":    ${parent.path.value},
-      "name":    ${parent.name.value},
-      "created": ${parent.created.toJson}
+  private implicit lazy val forkingEncoder: Encoder[(ForksCount, entities.Project[ForksCount])] = Encoder.instance {
+    case (forksCount, project: entities.Project[ForksCount] with entities.HavingParent) => json"""{
+      "forksCount": ${forksCount.value},
+      "parent": {
+        "path":    ${project.parent.path.value},
+        "name":    ${project.parent.name.value},
+        "created": ${project.parent.dateCreated.value}
+      }
+    }"""
+    case (forksCount, _) => json"""{
+      "forksCount": ${forksCount.value}
     }"""
   }
 

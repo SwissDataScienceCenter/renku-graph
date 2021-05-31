@@ -20,6 +20,7 @@ package ch.datascience.graph.acceptancetests
 
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.acceptancetests.data.dataProjects
 import ch.datascience.graph.acceptancetests.db.EventLog
 import ch.datascience.graph.acceptancetests.flows.AccessTokenPresence.givenAccessTokenPresentFor
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
@@ -30,12 +31,10 @@ import ch.datascience.graph.acceptancetests.tooling.TokenRepositoryClient._
 import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.projects.Visibility.Public
-import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.http.client.AccessToken
-import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
-import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
+import ch.datascience.rdfstore.entities.Project.ForksCount
+import ch.datascience.rdfstore.entities.{projectEntities, visibilityPublic, _}
 import ch.datascience.webhookservice.model.HookToken
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -61,7 +60,7 @@ class EventsProcessingStatusSpec
 
     Scenario("As a user I would like to see progress of events processing for my project") {
 
-      val project   = projects.generateOne
+      val project   = dataProjects(projectEntities[ForksCount.Zero](visibilityPublic)).generateOne
       val projectId = project.id
       implicit val accessToken: AccessToken = accessTokens.generateOne
 
@@ -70,7 +69,7 @@ class EventsProcessingStatusSpec
       webhookServiceClient.GET(s"projects/$projectId/events/status").status shouldBe NotFound
 
       When("there is a webhook but no events in the Event Log")
-      givenHookValidationToHookExists(projectId, project.path)
+      givenHookValidationToHookExists(project)
 
       Then("the status endpoint should return OK with done = total = 0")
       val noEventsResponse = webhookServiceClient GET s"projects/$projectId/events/status"
@@ -106,18 +105,17 @@ class EventsProcessingStatusSpec
   }
 
   private def givenHookValidationToHookExists(
-      projectId:          Id,
-      projectPath:        Path
+      project:            data.Project[_]
   )(implicit accessToken: AccessToken): Unit = {
-    `GET <gitlabApi>/projects/:id returning OK`(projectId, projectPath)
+    `GET <gitlabApi>/projects/:id returning OK`(project)
     tokenRepositoryClient
-      .PUT(s"projects/$projectId/tokens", accessToken.toJson, maybeAccessToken = None)
+      .PUT(s"projects/${project.id}/tokens", accessToken.toJson, maybeAccessToken = None)
       .status shouldBe NoContent
-    `GET <gitlabApi>/projects/:id returning OK`(projectId, projectVisibility = Public)
-    `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(projectId)
+    `GET <gitlabApi>/projects/:id returning OK`(project)
+    `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(project.id)
   }
 
-  private def sendEventsForProcessing(project: Project)(implicit accessToken: AccessToken) = {
+  private def sendEventsForProcessing(project: data.Project[_])(implicit accessToken: AccessToken) = {
 
     val allCommitIds = commitIds.generateNonEmptyList(minElements = numberOfEvents, maxElements = numberOfEvents).toList
 
@@ -141,10 +139,7 @@ class EventsProcessingStatusSpec
       // making the triples generation process happy and not throwing exceptions to the logs
       val committer = persons.generateOne
       `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId, committer)
-      `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(
-        project.path,
-        committer.asMembersList()
-      )
+      `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project)
     }
 
     webhookServiceClient

@@ -26,6 +26,7 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.{CliVersion, RenkuVersionPair, SchemaVersion}
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.knowledgegraph.projects.model.Project.DateUpdated
+import ch.datascience.rdfstore.entities.fixed
 import ch.datascience.rdfstore.{FusekiBaseUrl, entities}
 import org.scalacheck.Gen
 
@@ -37,9 +38,10 @@ package object data {
   implicit val cliVersion:    CliVersion         = currentVersionPair.cliVersion
   implicit val fusekiBaseUrl: FusekiBaseUrl      = RDFStore.fusekiBaseUrl
 
-  implicit def gitLabProjects[FC <: entities.Project.ForksCount](
-      project: entities.Project[FC]
+  def dataProjects[FC <: entities.Project.ForksCount](
+      projectGen: Gen[entities.Project[FC]]
   ): Gen[Project[FC]] = for {
+    project          <- projectGen
     id               <- projectIds
     maybeDescription <- projectDescriptions.toGeneratorOfOptions
     updatedAt        <- timestamps(min = project.dateCreated.value).toGeneratorOf[DateUpdated]
@@ -49,4 +51,8 @@ package object data {
     permissions      <- permissionsObjects
     statistics       <- statisticsObjects
   } yield Project(project, id, maybeDescription, updatedAt, urls, tags, starsCount, permissions, statistics)
+
+  def dataProjects[FC <: entities.Project.ForksCount](
+      project: entities.Project[FC]
+  ): Gen[Project[FC]] = dataProjects(fixed(project))
 }

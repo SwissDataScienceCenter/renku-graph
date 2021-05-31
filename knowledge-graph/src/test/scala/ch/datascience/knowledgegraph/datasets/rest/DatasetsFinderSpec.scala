@@ -54,8 +54,9 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
     Option(Phrase("*")) +: Option.empty[Phrase] +: Nil foreach { maybePhrase =>
       s"return all datasets when the given phrase is $maybePhrase " +
         "- case of datasets that has neither sameAs nor are imported to and/or from other projects" in new TestCase {
-          val dataset1         = datasetEntities(datasetProvenanceInternal).generateOne
-          val dataset2Imported = dataset1 importTo projectEntities[Project.ForksCount.Zero]().generateOne
+          val dataset1 = datasetEntities(datasetProvenanceInternal).generateOne
+          val dataset2Imported =
+            dataset1 importTo projectEntities[Project.ForksCount.Zero](visibilityPublic).generateOne
 
           val dataset3 = datasetEntities(datasetProvenanceInternal).generateOne
 
@@ -628,16 +629,12 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
       s"not return dataset from project with visibility $nonPublic" in new TestCase {
         val publicDataset = datasetEntities(
           provenanceGen = datasetProvenanceInternal,
-          projectsGen = fixed(
-            projectEntities[Project.ForksCount.Zero]().generateOne.copy(visibility = Visibility.Public)
-          )
+          projectsGen = projectEntities[Project.ForksCount.Zero](visibilityPublic)
         ).generateOne
 
         val privateDataset = datasetEntities(
           provenanceGen = datasetProvenanceInternal,
-          projectsGen = fixed(
-            projectEntities[Project.ForksCount.Zero]().generateOne.copy(visibility = nonPublic)
-          )
+          projectsGen = projectEntities[Project.ForksCount.Zero](fixed(nonPublic))
         ).generateOne
 
         loadToStore(publicDataset, privateDataset)
@@ -654,15 +651,11 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
       s"not count projects with visibility $nonPublic" in new TestCase {
         val publicDataset = datasetEntities(
           provenanceGen = datasetProvenanceInternal,
-          projectsGen = fixed(
-            projectEntities[Project.ForksCount.Zero]().generateOne.copy(visibility = Visibility.Public)
-          )
+          projectsGen = projectEntities[Project.ForksCount.Zero](visibilityPublic)
         ).generateOne
 
         val publicDatasetOnPrivateProject = publicDataset
-          .importTo(
-            projectEntities[Project.ForksCount.Zero]().generateOne.copy(visibility = nonPublic)
-          ) w
+          .importTo(projectEntities[Project.ForksCount.Zero](visibilityNonPublic).generateOne)
 
         loadToStore(publicDataset, publicDatasetOnPrivateProject)
 
@@ -681,20 +674,18 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
       val userWithGitlabId = persons(userGitLabIds.toGeneratorOfSomes).generateOne
       val publicDataset = datasetEntities(
         provenanceGen = datasetProvenanceInternal,
-        projectsGen = fixed(projectEntities[Project.ForksCount.Zero]().generateOne.copy(visibility = Visibility.Public))
+        projectsGen = projectEntities[Project.ForksCount.Zero](visibilityPublic)
       ).generateOne
 
       val privateDatasetWithAccess = datasetEntities(
         provenanceGen = datasetProvenanceInternal,
-        projectsGen = projectEntities[Project.ForksCount.Zero]().generateOne
-          .copy(visibility = Visibility.Private, members = Set(userWithGitlabId))
+        projectsGen =
+          projectEntities[Project.ForksCount.Zero](visibilityNonPublic).map(_.copy(members = Set(userWithGitlabId)))
       ).generateOne
 
       val privateDatasetWithoutAccess = datasetEntities(
         provenanceGen = datasetProvenanceInternal,
-        projectsGen = fixed(
-          projectEntities[Project.ForksCount.Zero]().generateOne.copy(visibility = Visibility.Private)
-        )
+        projectsGen = projectEntities[Project.ForksCount.Zero](visibilityNonPublic)
       ).generateOne
 
       loadToStore(publicDataset, privateDatasetWithAccess, privateDatasetWithoutAccess)
@@ -722,21 +713,17 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
         val userWithGitlabId = persons(userGitLabIds.toGeneratorOfSomes).generateOne
         val publicDataset = datasetEntities(
           provenanceGen = datasetProvenanceInternal,
-          projectsGen = fixed(
-            projectEntities[Project.ForksCount.Zero]().generateOne.copy(visibility = Visibility.Public)
-          )
+          projectsGen = projectEntities[Project.ForksCount.Zero](visibilityPublic)
         ).generateOne
 
         val privateDataset = datasetEntities(
           provenanceGen = datasetProvenanceInternal,
-          projectsGen = fixed(
-            projectEntities[Project.ForksCount.Zero]().generateOne.copy(visibility = Visibility.Private)
-          )
+          projectsGen = projectEntities[Project.ForksCount.Zero](visibilityNonPublic)
         ).generateOne
 
         val privateDatasetWithAccess = privateDataset.importTo(
-          projectEntities[Project.ForksCount.Zero]().generateOne
-            .copy(visibility = Visibility.Private, members = Set(userWithGitlabId))
+          projectEntities[Project.ForksCount.Zero](visibilityNonPublic).generateOne
+            .copy(members = Set(userWithGitlabId))
         )
 
         loadToStore(privateDataset, publicDataset, privateDatasetWithAccess)

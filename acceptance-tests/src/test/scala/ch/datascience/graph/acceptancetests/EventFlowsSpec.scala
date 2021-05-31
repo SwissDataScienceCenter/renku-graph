@@ -19,6 +19,7 @@
 package ch.datascience.graph.acceptancetests
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.acceptancetests.data.dataProjects
 import ch.datascience.graph.acceptancetests.db.EventLog
 import ch.datascience.graph.acceptancetests.flows.AccessTokenPresence.givenAccessTokenPresentFor
 import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning.`wait for events to be processed`
@@ -28,8 +29,9 @@ import ch.datascience.graph.acceptancetests.tooling._
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.http.client.AccessToken
-import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
+import ch.datascience.rdfstore.entities.Project.ForksCount
+import ch.datascience.rdfstore.entities._
 import ch.datascience.webhookservice.model.HookToken
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
@@ -56,7 +58,7 @@ class EventFlowsSpec
     Scenario("Valid events get through to the RDF store") {
 
       implicit val accessToken: AccessToken = accessTokens.generateOne
-      val project   = projects.generateOne
+      val project   = dataProjects(projectEntities[ForksCount.Zero](visibilityPublic)).generateOne
       val projectId = project.id
       val commitId  = commitIds.generateOne
       val committer = persons.generateOne
@@ -72,10 +74,7 @@ class EventFlowsSpec
       givenAccessTokenPresentFor(project)
 
       And("project members/users exists in GitLab")
-      `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(
-        project.path,
-        committer.asMembersList()
-      )
+      `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project)
 
       And("project exists in GitLab")
       `GET <gitlabApi>/projects/:path returning OK with`(project)
@@ -99,7 +98,7 @@ class EventFlowsSpec
     Scenario("A non recoverable generation error arises and the events are reported as failed") {
 
       implicit val accessToken: AccessToken = accessTokens.generateOne
-      val project   = projects.generateOne
+      val project   = dataProjects(projectEntities[ForksCount.Zero](visibilityPublic)).generateOne
       val projectId = project.id
       val commitId  = commitIds.generateOne
       val committer = persons.generateOne
@@ -115,10 +114,7 @@ class EventFlowsSpec
       givenAccessTokenPresentFor(project)
 
       And("project members/users exists in GitLab")
-      `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(
-        project.path,
-        committer.asMembersList()
-      )
+      `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project)
 
       And("project exists in GitLab")
       `GET <gitlabApi>/projects/:path returning OK with`(project)
@@ -143,7 +139,7 @@ class EventFlowsSpec
     ) {
 
       implicit val accessToken: AccessToken = accessTokens.generateOne
-      val project   = projects.generateOne
+      val project   = dataProjects(projectEntities[ForksCount.Zero](visibilityPublic)).generateOne
       val projectId = project.id
       val commitId  = commitIds.generateOne
       val committer = persons.generateOne
@@ -159,10 +155,7 @@ class EventFlowsSpec
       givenAccessTokenPresentFor(project)
 
       And("project members/users exists in GitLab")
-      `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(
-        project.path,
-        committer.asMembersList()
-      )
+      `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project)
 
       And("project exists in GitLab")
       `GET <gitlabApi>/projects/:path returning OK with`(project)
@@ -184,7 +177,7 @@ class EventFlowsSpec
     Scenario("A non recoverable transformation error arises and the events are reported as a non recoverable failure") {
 
       implicit val accessToken: AccessToken = accessTokens.generateOne
-      val project   = projects.generateOne
+      val project   = dataProjects(projectEntities[ForksCount.Zero](visibilityPublic)).generateOne
       val projectId = project.id
       val commitId  = commitIds.generateOne
       val committer = persons.generateOne
@@ -200,10 +193,7 @@ class EventFlowsSpec
       givenAccessTokenPresentFor(project)
 
       And("project members/users exists in GitLab")
-      `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(
-        project.path,
-        committer.asMembersList()
-      )
+      `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project)
 
       And("the transformation failed non recoverably")
       `GET <gitlabApi>/projects/:path returning BadRequest`(project)
@@ -226,7 +216,7 @@ class EventFlowsSpec
     Scenario("A recoverable transformation error arises and the events are reported as a recoverable failure") {
 
       implicit val accessToken: AccessToken = accessTokens.generateOne
-      val project   = projects.generateOne
+      val project   = dataProjects(projectEntities[ForksCount.Zero](visibilityPublic)).generateOne
       val projectId = project.id
       val commitId  = commitIds.generateOne
       val committer = persons.generateOne
@@ -242,10 +232,7 @@ class EventFlowsSpec
       givenAccessTokenPresentFor(project)
 
       And("project members/users exists in GitLab")
-      `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(
-        project.path,
-        committer.asMembersList()
-      )
+      `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project)
 
       And("the transformation fails recoverably ")
       `GET <gitlabApi>/projects/:path having connectivity issues`(project)

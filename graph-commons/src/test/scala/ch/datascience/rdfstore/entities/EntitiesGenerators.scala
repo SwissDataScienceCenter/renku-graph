@@ -24,12 +24,14 @@ import ch.datascience.generators.Generators.Implicits.GenOps
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{Date, DerivedFrom, ExternalSameAs, Identifier, PartId, TopmostDerivedFrom}
+import ch.datascience.graph.model.datasets.{Date, DerivedFrom, ExternalSameAs, Identifier, InitialVersion, PartId, TopmostDerivedFrom, TopmostSameAs}
+import ch.datascience.graph.model.projects.Visibility
 import ch.datascience.graph.model.users.{Email, GitLabId}
 import ch.datascience.graph.model.{datasets, projects}
 import ch.datascience.rdfstore.entities.Activity.Order
 import ch.datascience.rdfstore.entities.Dataset.{AdditionalInfo, Identification, Provenance}
 import ch.datascience.rdfstore.entities.Entity.{Checksum, InputEntity}
+import ch.datascience.rdfstore.entities.Project.ForksCount
 import ch.datascience.rdfstore.entities.PublicationEvent.AboutEvent
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -61,7 +63,11 @@ trait EntitiesGenerators {
   implicit val commandParameterNames: Gen[CommandParameterBase.Name] =
     nonBlankStrings().map(_.value).generateAs[CommandParameterBase.Name]
 
+  lazy val visibilityPublic:    Gen[Visibility] = fixed(Visibility.Public)
+  lazy val visibilityNonPublic: Gen[Visibility] = Gen.oneOf(Visibility.Internal, Visibility.Private)
+
   def projectEntities[FC <: Project.ForksCount](
+      visibilityGen:        Gen[Visibility],
       minDateCreated:       projects.DateCreated = projects.DateCreated(Instant.EPOCH)
   )(implicit forksCountGen: Gen[FC]): Gen[Project[FC]] = for {
     path         <- projectPaths
@@ -69,7 +75,7 @@ trait EntitiesGenerators {
     agent        <- cliVersions
     dateCreated  <- projectCreatedDates(minDateCreated.value)
     maybeCreator <- persons.toGeneratorOfOptions
-    visibility   <- projectVisibilities
+    visibility   <- visibilityGen
     members      <- persons(userGitLabIds.toGeneratorOfSomes).toGeneratorOfSet(minElements = 0)
     version      <- projectSchemaVersions
     forksCount   <- forksCountGen
@@ -93,7 +99,7 @@ trait EntitiesGenerators {
       for {
         date     <- datasetCreatedDates(projectDateCreated.value)
         creators <- persons.toGeneratorOfSet(maxElements = 1)
-      } yield Dataset.Provenance.Internal(Dataset.entityId(identifier), date, creators)
+      } yield Dataset.Provenance.Internal(Dataset.entityId(identifier), InitialVersion(identifier), date, creators)
 
   val datasetProvenanceImportedExternal: ProvenanceGen[Dataset.Provenance.ImportedExternal] =
     datasetProvenanceImportedExternal(datasetExternalSameAs)
@@ -106,34 +112,42 @@ trait EntitiesGenerators {
         date     <- datasetPublishedDates()
         sameAs   <- sameAsGen
         creators <- persons.toGeneratorOfSet(maxElements = 1)
-      } yield Dataset.Provenance.ImportedExternal(Dataset.entityId(identifier), sameAs, date, creators)
+      } yield Dataset.Provenance.ImportedExternal(Dataset.entityId(identifier),
+                                                  sameAs,
+                                                  InitialVersion(identifier),
+                                                  date,
+                                                  creators
+      )
 
-  val datasetProvenanceImportedInternalParentExternal
+  val datasetProvenanceImportedInternalAncestorExternal
       : ProvenanceGen[Dataset.Provenance.ImportedInternalAncestorExternal] = (identifier, _) =>
     implicit renkuBaseUrl =>
       for {
-        date          <- datasetPublishedDates()
-        sameAs        <- datasetInternalSameAs
-        topmostSameAs <- datasetTopmostSameAs
-        creators      <- persons.toGeneratorOfSet(maxElements = 1)
+        date           <- datasetPublishedDates()
+        sameAs         <- datasetInternalSameAs
+        topmostSameAs  <- datasetExternalSameAs.map(TopmostSameAs(_))
+        initialVersion <- datasetInitialVersions
+        creators       <- persons.toGeneratorOfSet(maxElements = 1)
       } yield Dataset.Provenance.ImportedInternalAncestorExternal(Dataset.entityId(identifier),
                                                                   sameAs,
                                                                   topmostSameAs,
+                                                                  initialVersion,
                                                                   date,
                                                                   creators
       )
 
-  val datasetProvenanceImportedInternalParentInternal
+  val datasetProvenanceImportedInternalAncestorInternal
       : ProvenanceGen[Dataset.Provenance.ImportedInternalAncestorInternal] = (identifier, projectDateCreated) =>
     implicit renkuBaseUrl =>
       for {
         date          <- datasetCreatedDates(projectDateCreated.value)
         sameAs        <- datasetInternalSameAs
-        topmostSameAs <- datasetTopmostSameAs
+        topmostSameAs <- datasetInternalSameAs
         creators      <- persons.toGeneratorOfSet(maxElements = 1)
       } yield Dataset.Provenance.ImportedInternalAncestorInternal(Dataset.entityId(identifier),
                                                                   sameAs,
-                                                                  topmostSameAs,
+                                                                  TopmostSameAs(topmostSameAs),
+                                                                  InitialVersion(topmostSameAs.asIdentifier),
                                                                   date,
                                                                   creators
       )
@@ -145,15 +159,21 @@ trait EntitiesGenerators {
         derivedFrom        <- datasetDerivedFroms
         topmostDerivedFrom <- datasetTopmostDerivedFroms
         creators           <- persons.toGeneratorOfSet(maxElements = 1)
-      } yield Dataset.Provenance.Modified(Dataset.entityId(identifier), derivedFrom, topmostDerivedFrom, date, creators)
+      } yield Dataset.Provenance.Modified(Dataset.entityId(identifier),
+                                          derivedFrom,
+                                          topmostDerivedFrom,
+                                          InitialVersion(identifier),
+                                          date,
+                                          creators
+      )
 
   val ofAnyProvenance: ProvenanceGen[Dataset.Provenance] = (identifier, projectDateCreated) =>
     renkuBaseUrl =>
       Gen.oneOf(
         datasetProvenanceInternal(identifier, projectDateCreated)(renkuBaseUrl),
         datasetProvenanceImportedExternal(identifier, projectDateCreated)(renkuBaseUrl),
-        datasetProvenanceImportedInternalParentExternal(identifier, projectDateCreated)(renkuBaseUrl),
-        datasetProvenanceImportedInternalParentInternal(identifier, projectDateCreated)(renkuBaseUrl),
+        datasetProvenanceImportedInternalAncestorExternal(identifier, projectDateCreated)(renkuBaseUrl),
+        datasetProvenanceImportedInternalAncestorInternal(identifier, projectDateCreated)(renkuBaseUrl),
         datasetProvenanceModified(identifier, projectDateCreated)(renkuBaseUrl)
       )
 
@@ -175,14 +195,15 @@ trait EntitiesGenerators {
   } yield Dataset.AdditionalInfo(url, maybeDescription, keywords, images, maybeLicense)
 
   def importedExternalDatasetEntities(
-      sharedInProjects:    Int = 1
+      sharedInProjects:    Int = 1,
+      projectGen:          Gen[Project[Project.ForksCount.Zero]] = projectEntities(visibilityPublic)
   )(implicit renkuBaseUrl: RenkuBaseUrl): Gen[List[Dataset[Dataset.Provenance.ImportedExternal]]] =
     for {
-      dataset <- datasetEntities(provenanceGen = datasetProvenanceImportedExternal)
+      dataset <- datasetEntities(datasetProvenanceImportedExternal, projectGen)
     } yield (1 until sharedInProjects).foldLeft(List(dataset)) { (datasets, _) =>
       datasets :+ dataset.copy(
         identification = dataset.identification.copy(identifier = datasetIdentifiers.generateOne),
-        project = projectEntities[Project.ForksCount.Zero]().generateOne
+        project = projectGen.generateOne
       )
     }
 
@@ -190,9 +211,9 @@ trait EntitiesGenerators {
 
   def datasetEntities[P <: Dataset.Provenance](
       provenanceGen:       ProvenanceGen[P],
+      projectsGen:         Gen[Project[Project.ForksCount]] = projectEntities[ForksCount.Zero](visibilityPublic),
       identificationGen:   Gen[Identification] = datasetIdentifications,
-      additionalInfoGen:   Gen[AdditionalInfo] = datasetAdditionalInfos,
-      projectsGen:         Gen[Project[Project.ForksCount]] = projectEntities[Project.ForksCount.Zero]()
+      additionalInfoGen:   Gen[AdditionalInfo] = datasetAdditionalInfos
   )(implicit renkuBaseUrl: RenkuBaseUrl): Gen[Dataset[P]] = for {
     project        <- projectsGen
     identification <- identificationGen
@@ -230,6 +251,7 @@ trait EntitiesGenerators {
       Dataset.entityId(identifier),
       DerivedFrom(original.entityId),
       findTopmostDerivedFrom(original.provenance),
+      InitialVersion(identifier),
       date,
       original.provenance.creators + modifyingPerson
     ),
@@ -284,7 +306,7 @@ trait EntitiesGenerators {
   } yield Person(name, maybeEmail, maybeAffiliation, maybeGitLabId)
 
   private implicit lazy val genApplicative: Applicative[Gen] = new Applicative[Gen] {
-    override def pure[A](x:   A) = Gen.const(x)
+    override def pure[A](x:   A): Gen[A] = Gen.const(x)
     override def ap[A, B](ff: Gen[A => B])(fa: Gen[A]): Gen[B] = fa.flatMap(a => ff.map(f => f(a)))
   }
 }

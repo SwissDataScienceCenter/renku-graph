@@ -27,6 +27,7 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.logging.TestExecutionTimeRecorder
+import ch.datascience.rdfstore.entities.Project.ForksCount
 import ch.datascience.rdfstore.entities._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import org.scalatest.matchers.should
@@ -40,7 +41,7 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
     "return details of the dataset with the given id " +
       "- a case of a non-modified renku dataset used in a single project" in new TestCase {
 
-        forAll(datasetEntities(provenanceGen = datasetProvenanceInternal)) { dataset =>
+        forAll(datasetEntities(datasetProvenanceInternal)) { dataset =>
           loadToStore(dataset, datasetEntities(ofAnyProvenance).generateOne)
 
           datasetFinder
@@ -98,8 +99,10 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
     "return details of the dataset with the given id " +
       "- a case when unrelated projects are using the same dataset created in a Renku project" in new TestCase {
         forAll(datasetEntities(datasetProvenanceInternal)) { sourceDataset =>
-          val datasetOnProject1 = sourceDataset.importTo(projectEntities[Project.ForksCount.Zero]().generateOne)
-          val datasetOnProject2 = sourceDataset.importTo(projectEntities[Project.ForksCount.Zero]().generateOne)
+          val datasetOnProject1 =
+            sourceDataset.importTo(projectEntities[Project.ForksCount.Zero](visibilityPublic).generateOne)
+          val datasetOnProject2 =
+            sourceDataset.importTo(projectEntities[Project.ForksCount.Zero](visibilityPublic).generateOne)
 
           loadToStore(
             sourceDataset,
@@ -286,7 +289,7 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
     "return details of the dataset with the given id " +
       "- case when the first dataset is imported from a third party provider" in new TestCase {
         val dataset1 :: dataset2 :: Nil = importedExternalDatasetEntities(sharedInProjects = 2).generateOne
-        val dataset3                    = dataset2.importTo(projectEntities[Project.ForksCount.Zero]().generateOne)
+        val dataset3                    = dataset2.importTo(projectEntities[Project.ForksCount.Zero](visibilityPublic).generateOne)
 
         loadToStore(dataset1, dataset2, dataset3)
 
@@ -319,8 +322,8 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
       "- case when the first dataset is renku created" in new TestCase {
 
         val dataset1 = datasetEntities(datasetProvenanceInternal).generateOne
-        val dataset2 = dataset1.importTo(projectEntities[Project.ForksCount.Zero]().generateOne)
-        val dataset3 = dataset2.importTo(projectEntities[Project.ForksCount.Zero]().generateOne)
+        val dataset2 = dataset1.importTo(projectEntities[Project.ForksCount.Zero](visibilityPublic).generateOne)
+        val dataset3 = dataset2.importTo(projectEntities[Project.ForksCount.Zero](visibilityPublic).generateOne)
 
         loadToStore(dataset1, dataset2, dataset3)
 
@@ -356,9 +359,9 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
     "return details of the dataset with the given id " +
       "- case when the sameAs hierarchy is broken by dataset modification" in new TestCase {
         val dataset1         = datasetEntities(datasetProvenanceInternal).generateOne
-        val dataset2         = dataset1.importTo(projectEntities[Project.ForksCount.Zero]().generateOne)
+        val dataset2         = dataset1.importTo(projectEntities[Project.ForksCount.Zero](visibilityPublic).generateOne)
         val dataset2Modified = modifiedDatasetEntities(dataset2).generateOne
-        val dataset3         = dataset2Modified.importTo(projectEntities[Project.ForksCount.Zero]().generateOne)
+        val dataset3         = dataset2Modified.importTo(projectEntities[Project.ForksCount.Zero](visibilityPublic).generateOne)
 
         loadToStore(dataset1, dataset2, dataset2Modified, dataset3)
 
