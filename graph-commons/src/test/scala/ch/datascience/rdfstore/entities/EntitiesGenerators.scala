@@ -33,6 +33,7 @@ import ch.datascience.rdfstore.entities.Dataset.{AdditionalInfo, Identification,
 import ch.datascience.rdfstore.entities.Entity.{Checksum, InputEntity}
 import ch.datascience.rdfstore.entities.Project.ForksCount
 import ch.datascience.rdfstore.entities.PublicationEvent.AboutEvent
+import ch.datascience.tinytypes.InstantTinyType
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
@@ -48,7 +49,9 @@ trait EntitiesGenerators {
 
   val activityIds:        Gen[Activity.Id]        = Gen.uuid.map(uuid => Activity.Id(uuid.toString))
   val activityStartTimes: Gen[Activity.StartTime] = timestampsNotInTheFuture.map(Activity.StartTime.apply)
-  val activityOrders:     Gen[Activity.Order]     = positiveInts(999999).map(_.value).map(Order.apply)
+  def activityStartTimes(after: InstantTinyType): Gen[Activity.StartTime] =
+    timestampsNotInTheFuture(after.value).map(Activity.StartTime.apply)
+  val activityOrders: Gen[Activity.Order] = positiveInts(999999).map(_.value).map(Order.apply)
 
   val entityLocations: Gen[Location] = relativePaths() map Location.apply
   val entityChecksums: Gen[Checksum] = nonBlankStrings(40, 40).map(_.value).map(Checksum.apply)

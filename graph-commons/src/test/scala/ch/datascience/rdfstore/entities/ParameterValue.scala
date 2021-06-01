@@ -29,36 +29,45 @@ import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder, _}
 
 sealed trait ParameterValue {
-  val id:       Id
-  val name:     Name
-  val activity: Activity
+  type ValueReference <: CommandParameterBase
+  val id:             Id
+  val name:           Name
+  val valueReference: ValueReference
+  val activity:       Activity
 }
 
 object ParameterValue {
 
   sealed trait PathParameterValue extends ParameterValue {
-    type ValueReference <: CommandParameterBase
-    val id:             Id
-    val name:           Name
-    val valueReference: ValueReference
-    val activity:       Activity
+    val id:       Id
+    val name:     Name
+    val location: Location
+    val activity: Activity
   }
 
   object PathParameterValue {
 
-    def factory(valueReference: CommandInput): Activity => PathParameterValue =
-      InputParameterValue(Id.generate, valueReference.name, valueReference, _)
+    def factory(location: Location, valueReference: CommandInput): Activity => PathParameterValue =
+      InputParameterValue(Id.generate, valueReference.name, location, valueReference, _)
 
-    def factory(valueReference: CommandOutput): Activity => PathParameterValue =
-      OutputParameterValue(Id.generate, valueReference.name, valueReference, _)
+    def factory(location: Location, valueReference: CommandOutput): Activity => PathParameterValue =
+      OutputParameterValue(Id.generate, valueReference.name, location, valueReference, _)
 
-    final case class InputParameterValue(id: Id, name: Name, valueReference: CommandInput, activity: Activity)
-        extends PathParameterValue {
+    final case class InputParameterValue(id:             Id,
+                                         name:           Name,
+                                         location:       Location,
+                                         valueReference: CommandInput,
+                                         activity:       Activity
+    ) extends PathParameterValue {
       type ValueReference = CommandInput
     }
 
-    final case class OutputParameterValue(id: Id, name: Name, valueReference: CommandOutput, activity: Activity)
-        extends PathParameterValue {
+    final case class OutputParameterValue(id:             Id,
+                                          name:           Name,
+                                          location:       Location,
+                                          valueReference: CommandOutput,
+                                          activity:       Activity
+    ) extends PathParameterValue {
       type ValueReference = CommandOutput
     }
   }
@@ -68,7 +77,9 @@ object ParameterValue {
                                           value:          ValueOverride,
                                           valueReference: CommandParameter,
                                           activity:       Activity
-  ) extends ParameterValue
+  ) extends ParameterValue {
+    type ValueReference = CommandParameter
+  }
 
   object VariableParameterValue {
 
@@ -81,20 +92,20 @@ object ParameterValue {
 
   implicit def encoder[PV <: ParameterValue](implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[PV] =
     JsonLDEncoder.instance {
-      case value @ InputParameterValue(_, name, valueReference, _) =>
+      case value @ InputParameterValue(_, name, location, valueReference, _) =>
         JsonLD.entity(
           value.asEntityId,
           EntityTypes of (renku / "ParameterValue", renku / "PathParameterValue"),
           schema / "name"           -> name.asJsonLD,
-          prov / "atLocation"       -> valueReference.defaultValue.asJsonLD,
+          prov / "atLocation"       -> location.asJsonLD,
           schema / "valueReference" -> valueReference.asEntityId.asJsonLD
         )
-      case value @ OutputParameterValue(_, name, valueReference, _) =>
+      case value @ OutputParameterValue(_, name, location, valueReference, _) =>
         JsonLD.entity(
           value.asEntityId,
           EntityTypes of (renku / "ParameterValue", renku / "PathParameterValue"),
           schema / "name"           -> name.asJsonLD,
-          prov / "atLocation"       -> valueReference.defaultValue.asJsonLD,
+          prov / "atLocation"       -> location.asJsonLD,
           schema / "valueReference" -> valueReference.asEntityId.asJsonLD
         )
       case value @ VariableParameterValue(_, name, valueOverride, valueReference, _) =>

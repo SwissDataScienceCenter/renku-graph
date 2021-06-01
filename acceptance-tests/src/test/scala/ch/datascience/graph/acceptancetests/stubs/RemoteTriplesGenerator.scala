@@ -60,8 +60,9 @@ object RemoteTriplesGenerator {
         RunPlan(runPlanNames.generateOne, runPlanCommands.generateOne, commandParameterFactories = Nil),
         (Activity.StartTime(project.entitiesProject.dateCreated.value), author, cliVersion),
         project.entitiesProject,
-        argumentsValueOverrides = Nil,
-        inputsValueOverrides = Nil
+        parametersValueOverrides = Nil,
+        inputsValueOverrides = Nil,
+        outputsValueOverrides = Nil
       ).buildProvenanceGraph.fold(fail, identity).asJsonLD
     )
 

@@ -18,6 +18,8 @@
 
 package ch.datascience.rdfstore.entities
 
+import cats.Show
+import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.Schemas
@@ -26,8 +28,11 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects.{Path, Visibility}
 import ch.datascience.graph.model.{CliVersion, datasets}
 import ch.datascience.rdfstore.FusekiBaseUrl
+import ch.datascience.rdfstore.entities.CommandParameterBase.CommandInput._
 import ch.datascience.rdfstore.entities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter, IOStream, Position}
 import ch.datascience.rdfstore.entities.Entity.InputEntity
+import ch.datascience.rdfstore.entities.ParameterValue.PathParameterValue.InputParameterValue
+import ch.datascience.rdfstore.entities.ParameterValue.{PathParameterValue, VariableParameterValue}
 import ch.datascience.rdfstore.entities.Project.ForksCount
 import ch.datascience.rdfstore.entities.RunPlan.{Command, CommandParameters}
 import io.renku.jsonld.JsonLD
@@ -38,235 +43,6 @@ import scala.jdk.CollectionConverters._
 
 object bundles extends Schemas {
 
-//  implicit lazy val renkuBaseUrl: RenkuBaseUrl = RenkuBaseUrl("https://dev.renku.ch")
-
-//  def randomDataSetActivity: Activity =
-//    Gen.oneOf(nonModifiedDataSetActivity()()(), modifiedDataSetActivity()()()).generateOne
-//
-//  def nonModifiedDataSetCommit(
-//      commitId:      CommitId = commitIds.generateOne,
-//      committedDate: CommittedDate = committedDates.generateOne,
-//      committer:     Person = Person(userNames.generateOne, userEmails.generateOne),
-//      cliVersion:    CliVersion = cliVersions.generateOne
-//  )(
-//      projectPath:         Path = projectPaths.generateOne,
-//      projectName:         projects.Name = projectNames.generateOne,
-//      maybeVisibility:     Option[Visibility] = None,
-//      projectDateCreated:  projects.DateCreated = DateCreated(committedDate.value),
-//      maybeProjectCreator: Option[Person] = projectCreators.generateOption,
-//      maybeParent:         Option[Project] = None,
-//      projectVersion:      SchemaVersion = projectSchemaVersions.generateOne
-//  )(
-//      datasetIdentifier:          Identifier = datasetIdentifiers.generateOne,
-//      datasetTitle:               Title = datasetTitles.generateOne,
-//      datasetName:                Name = datasetNames.generateOne,
-//      datasetUrl:                 Url = datasetUrls.generateOne,
-//      maybeDatasetSameAs:         Option[SameAs] = Gen.option(datasetSameAs).generateOne,
-//      maybeDatasetDescription:    Option[Description] = Gen.option(datasetDescriptions).generateOne,
-//      dates:                      Dates = datasetDates.generateOne,
-//      datasetCreators:            Set[Person] = setOf(persons).generateOne,
-//      datasetParts:               List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
-//      datasetKeywords:            List[Keyword] = listOf(GraphModelGenerators.datasetKeywords).generateOne,
-//      datasetImages:              List[ImageUri] = listOf(datasetImageUris).generateOne,
-//      overrideTopmostSameAs:      Option[TopmostSameAs] = None,
-//      overrideTopmostDerivedFrom: Option[TopmostDerivedFrom] = None
-//  )(implicit renkuBaseUrl:        RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD =
-//    nonModifiedDataSetActivity(
-//      commitId,
-//      committedDate,
-//      committer,
-//      cliVersion
-//    )(projectPath, projectName, maybeVisibility, projectDateCreated, maybeProjectCreator, maybeParent, projectVersion)(
-//      datasetIdentifier,
-//      datasetTitle,
-//      datasetName,
-//      datasetUrl,
-//      maybeDatasetSameAs,
-//      maybeDatasetDescription,
-//      dates,
-//      datasetCreators,
-//      datasetParts,
-//      datasetKeywords,
-//      datasetImages,
-//      overrideTopmostSameAs,
-//      overrideTopmostDerivedFrom
-//    ).asJsonLD
-//
-//  def nonModifiedDataSetActivity(
-//      commitId:      CommitId = commitIds.generateOne,
-//      committedDate: CommittedDate = committedDates.generateOne,
-//      committer:     Person = Person(userNames.generateOne, userEmails.generateOne),
-//      cliVersion:    CliVersion = cliVersions.generateOne
-//  )(
-//      projectPath:         Path = projectPaths.generateOne,
-//      projectName:         projects.Name = projectNames.generateOne,
-//      maybeVisibility:     Option[Visibility] = None,
-//      projectDateCreated:  projects.DateCreated = DateCreated(committedDate.value),
-//      maybeProjectCreator: Option[Person] = projectCreators.generateOption,
-//      maybeParent:         Option[Project] = None,
-//      projectVersion:      SchemaVersion = projectSchemaVersions.generateOne
-//  )(
-//      datasetIdentifier:          Identifier = datasetIdentifiers.generateOne,
-//      datasetTitle:               Title = datasetTitles.generateOne,
-//      datasetName:                Name = datasetNames.generateOne,
-//      datasetUrl:                 Url = datasetUrls.generateOne,
-//      maybeDatasetSameAs:         Option[SameAs] = Gen.option(datasetSameAs).generateOne,
-//      maybeDatasetDescription:    Option[Description] = Gen.option(datasetDescriptions).generateOne,
-//      dates:                      Dates = datasetDates.generateOne,
-//      datasetCreators:            Set[Person] = setOf(persons).generateOne,
-//      datasetParts:               List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
-//      datasetKeywords:            List[Keyword] = listOf(GraphModelGenerators.datasetKeywords).generateOne,
-//      datasetImages:              List[ImageUri] = listOf(datasetImageUris).generateOne,
-//      overrideTopmostSameAs:      Option[TopmostSameAs] = None,
-//      overrideTopmostDerivedFrom: Option[TopmostDerivedFrom] = None
-//  ): Activity = Activity(
-//    commitId,
-//    committedDate,
-//    committer,
-//    Project(projectPath,
-//            projectName,
-//            projectDateCreated,
-//            maybeProjectCreator,
-//            maybeVisibility,
-//            maybeParentProject = maybeParent,
-//            version = projectVersion
-//    ),
-//    Agent(cliVersion),
-//    maybeGenerationFactories = List(
-//      Generation.factory(
-//        DataSet.nonModifiedFactory(
-//          datasetIdentifier,
-//          datasetTitle,
-//          datasetName,
-//          datasetUrl,
-//          maybeDatasetSameAs,
-//          maybeDatasetDescription,
-//          dates,
-//          datasetCreators,
-//          datasetParts.map { case (name, location) =>
-//            DataSetPart.factory(name, location, None)(_)
-//          },
-//          datasetKeywords,
-//          datasetImages,
-//          overrideTopmostSameAs = overrideTopmostSameAs,
-//          overrideTopmostDerivedFrom = overrideTopmostDerivedFrom
-//        )
-//      )
-//    )
-//  )
-//
-//  def modifiedDataSetCommit(
-//      commitId:      CommitId = commitIds.generateOne,
-//      committedDate: CommittedDate = committedDates.generateOne,
-//      committer:     Person = Person(userNames.generateOne, userEmails.generateOne),
-//      cliVersion:    CliVersion = cliVersions.generateOne
-//  )(
-//      projectPath:         Path = projectPaths.generateOne,
-//      projectName:         projects.Name = projectNames.generateOne,
-//      projectDateCreated:  projects.DateCreated = DateCreated(committedDate.value),
-//      maybeProjectCreator: Option[Person] = projectCreators.generateOption,
-//      maybeVisibility:     Option[Visibility] = None,
-//      maybeParent:         Option[Project] = None,
-//      projectVersion:      SchemaVersion = projectSchemaVersions.generateOne
-//  )(
-//      datasetIdentifier:          Identifier = datasetIdentifiers.generateOne,
-//      datasetTitle:               Title = datasetTitles.generateOne,
-//      datasetName:                Name = datasetNames.generateOne,
-//      datasetUrl:                 Url = datasetUrls.generateOne,
-//      datasetDerivedFrom:         DerivedFrom = datasetDerivedFroms.generateOne,
-//      maybeDatasetDescription:    Option[Description] = Gen.option(datasetDescriptions).generateOne,
-//      dates:                      Dates = datasetDates.generateOne,
-//      datasetCreators:            Set[Person] = setOf(persons).generateOne,
-//      datasetParts:               List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
-//      datasetKeywords:            List[Keyword] = listOf(GraphModelGenerators.datasetKeywords).generateOne,
-//      datasetImages:              List[ImageUri] = listOf(datasetImageUris).generateOne,
-//      overrideTopmostSameAs:      Option[TopmostSameAs] = None,
-//      overrideTopmostDerivedFrom: Option[TopmostDerivedFrom] = None
-//  )(implicit renkuBaseUrl:        RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD =
-//    modifiedDataSetActivity(
-//      commitId,
-//      committedDate,
-//      committer,
-//      cliVersion
-//    )(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeVisibility, maybeParent, projectVersion)(
-//      datasetIdentifier,
-//      datasetTitle,
-//      datasetName,
-//      datasetUrl,
-//      datasetDerivedFrom,
-//      maybeDatasetDescription,
-//      dates,
-//      datasetCreators,
-//      datasetParts,
-//      datasetKeywords,
-//      datasetImages,
-//      overrideTopmostSameAs,
-//      overrideTopmostDerivedFrom
-//    ).asJsonLD
-//
-//  def modifiedDataSetActivity(
-//      commitId:      CommitId = commitIds.generateOne,
-//      committedDate: CommittedDate = committedDates.generateOne,
-//      committer:     Person = Person(userNames.generateOne, userEmails.generateOne),
-//      cliVersion:    CliVersion = cliVersions.generateOne
-//  )(
-//      projectPath:         Path = projectPaths.generateOne,
-//      projectName:         projects.Name = projectNames.generateOne,
-//      projectDateCreated:  projects.DateCreated = DateCreated(committedDate.value),
-//      maybeProjectCreator: Option[Person] = projectCreators.generateOption,
-//      maybeVisibility:     Option[Visibility] = None,
-//      maybeParent:         Option[Project] = None,
-//      projectVersion:      SchemaVersion = projectSchemaVersions.generateOne
-//  )(
-//      datasetIdentifier:          Identifier = datasetIdentifiers.generateOne,
-//      datasetTitle:               Title = datasetTitles.generateOne,
-//      datasetName:                Name = datasetNames.generateOne,
-//      datasetUrl:                 Url = datasetUrls.generateOne,
-//      datasetDerivedFrom:         DerivedFrom = datasetDerivedFroms.generateOne,
-//      maybeDatasetDescription:    Option[Description] = Gen.option(datasetDescriptions).generateOne,
-//      dates:                      Dates = datasetDates.generateOne,
-//      datasetCreators:            Set[Person] = setOf(persons).generateOne,
-//      datasetParts:               List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
-//      datasetKeywords:            List[Keyword] = listOf(GraphModelGenerators.datasetKeywords).generateOne,
-//      datasetImages:              List[ImageUri] = listOf(datasetImageUris).generateOne,
-//      overrideTopmostSameAs:      Option[TopmostSameAs] = None,
-//      overrideTopmostDerivedFrom: Option[TopmostDerivedFrom] = None
-//  ): Activity = Activity(
-//    commitId,
-//    committedDate,
-//    committer,
-//    Project(projectPath,
-//            projectName,
-//            projectDateCreated,
-//            maybeProjectCreator,
-//            maybeVisibility,
-//            maybeParentProject = maybeParent,
-//            version = projectVersion
-//    ),
-//    Agent(cliVersion),
-//    maybeGenerationFactories = List(
-//      Generation.factory(
-//        DataSet.modifiedFactory(
-//          datasetIdentifier,
-//          datasetTitle,
-//          datasetName,
-//          datasetUrl,
-//          datasetDerivedFrom,
-//          maybeDatasetDescription,
-//          dates,
-//          datasetCreators,
-//          datasetParts.map { case (name, location) =>
-//            DataSetPart.factory(name, location, None)(_)
-//          },
-//          datasetKeywords,
-//          datasetImages,
-//          overrideTopmostSameAs = overrideTopmostSameAs,
-//          overrideTopmostDerivedFrom = overrideTopmostDerivedFrom
-//        )
-//      )
-//    )
-//  )
-//
   object exemplarLineageFlow {
 
     final case class ExemplarData(
@@ -295,7 +71,7 @@ object bundles extends Schemas {
       val project =
         projectEntities[ForksCount.Zero](fixed(projectVisibility)).map(_.copy(agent = cliVersion)).generateOne
 
-      val dataSetFolder    = Location("data/zhbikes")
+      val datasetFolder    = Location("data/zhbikes")
       val plotData         = Location("src/plot_data.py")
       val cleanData        = Location("src/clean_data.py")
       val bikesParquet     = Location("data/preprocessed/zhbikes.parquet")
@@ -326,16 +102,21 @@ object bundles extends Schemas {
         runPlanNames.generateOne,
         Command("python"),
         CommandParameters.of(CommandInput.fromLocation(cleanData),
-                             CommandInput.fromLocation(dataSetFolder),
+                             CommandInput.fromLocation(datasetFolder),
                              CommandOutput.fromLocation(bikesParquet)
         )
       )
 
       val activity1RunPlan1 = ExecutionPlanner
-        .of(runPlan1, activityStartTimes.generateOne, persons.generateOne, project.agent, project)
+        .of(runPlan1,
+            activityStartTimes(after = project.dateCreated).generateOne,
+            persons.generateOne,
+            project.agent,
+            project
+        )
         .planParameterInputsValues(
           cleanData     -> entityChecksums.generateOne,
-          dataSetFolder -> entityChecksums.generateOne
+          datasetFolder -> entityChecksums.generateOne
         )
         .buildProvenanceGraph
         .fold(errors => throw new Exception(errors.toList.mkString), identity)
@@ -352,7 +133,12 @@ object bundles extends Schemas {
       )
 
       val activity2RunPlan2 = ExecutionPlanner
-        .of(runPlan1, activityStartTimes.generateOne, persons.generateOne, project.agent, project)
+        .of(runPlan1,
+            activityStartTimes(after = activity1RunPlan1.startTime).generateOne,
+            persons.generateOne,
+            project.agent,
+            project
+        )
         .planParameterInputsValues(
           plotData -> entityChecksums.generateOne,
           bikesParquet -> activity1RunPlan1
@@ -363,16 +149,26 @@ object bundles extends Schemas {
         .fold(errors => throw new Exception(errors.toList.mkString), identity)
 
       val activity3RunPlan1 = ExecutionPlanner
-        .of(runPlan1, activityStartTimes.generateOne, persons.generateOne, project.agent, project)
+        .of(runPlan1,
+            activityStartTimes(after = activity2RunPlan2.startTime).generateOne,
+            persons.generateOne,
+            project.agent,
+            project
+        )
         .planParameterInputsValues(
           cleanData     -> activity1RunPlan1.findUsagesChecksum(cleanData).getOrElse(s"No usage for $cleanData"),
-          dataSetFolder -> entityChecksums.generateOne
+          datasetFolder -> entityChecksums.generateOne
         )
         .buildProvenanceGraph
         .fold(errors => throw new Exception(errors.toList.mkString), identity)
 
       val activity4RunPlan2 = ExecutionPlanner
-        .of(runPlan1, activityStartTimes.generateOne, persons.generateOne, project.agent, project)
+        .of(runPlan1,
+            activityStartTimes(after = activity3RunPlan1.startTime).generateOne,
+            persons.generateOne,
+            project.agent,
+            project
+        )
         .planParameterInputsValues(
           plotData -> activity2RunPlan2
             .findUsagesChecksum(plotData)
@@ -386,7 +182,7 @@ object bundles extends Schemas {
 
       val examplarData = ExemplarData(
         gridPlotPng,
-        NodeDef(commit3AddingDataSetFile.entity(dataSetFolder)),
+        NodeDef(commit3AddingDataSetFile.entity(datasetFolder)),
         NodeDef(commit7Activity.entity(plotData)),
         NodeDef(commit7Activity.entity(cleanData)),
         NodeDef(commit8ProcessRun),
@@ -396,7 +192,7 @@ object bundles extends Schemas {
         commit9ProcessRun.committedDate.value,
         NodeDef(commit9ProcessRun.processRunAssociation.runPlan.output(gridPlotPng)),
         NodeDef(commit9ProcessRun.processRunAssociation.runPlan.output(cumulativePng)),
-        NodeDef(commit10Activity.entity(dataSetFolder)),
+        NodeDef(commit10Activity.entity(datasetFolder)),
         NodeDef(commit12Workflow.processRunAssociation.runPlan.output(bikesParquet)),
         commit12Workflow.committedDate.value
       )
@@ -441,48 +237,43 @@ object bundles extends Schemas {
     )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): NodeDef =
       NodeDef(
         activity.association.runPlan.asJsonLD.entityId
-          .getOrElse(throw new Exception("Non entity id found for ProcessRun"))
+          .getOrElse(throw new Exception("Non entity id found for Activity"))
           .toString,
-        activity.association.runPlan.asLabel,
+        activity.show,
         activity.asJsonLD.entityTypes
           .map(_.toList.map(_.toString))
           .getOrElse(throw new Exception("No entityTypes found"))
           .toSet
       )
 
-    private implicit class RunPlanOps(runPlan: RunPlan) {
+    private implicit lazy val activityShow: Show[Activity] = Show.show {
+      _.parameters.sortBy(_.valueReference.position).map(_.show).mkString(" ")
+    }
 
-      lazy val asLabel: String =
-        (runPlan.parameters ++ runPlan.inputs ++ runPlan.outputs)
-          .sortBy(_.position)
-          .foldLeft(List.empty[(Position, String)].asJava) {
-            case (allParams, parameter: Mapping) =>
-              parameter.mappedTo match {
-                case _: IOStream.StdIn.type  => (Position.first  -> asString(parameter)) +: allParams
-                case _: IOStream.StdOut.type => (Position.second -> asString(parameter)) +: allParams
-                case _: IOStream.StdErr.type => (Position.third  -> asString(parameter)) +: allParams
-              }
-            case (allParams, parameter: PositionInfo) => (parameter.position -> asString(parameter)) +: allParams
-            case (allParams, _) => allParams
-          }
-          .sortBy(_._1)
-          .map(_._2)
-          .mkString(s"${runPlan.runCommand} ", " ", "")
-          .trim
+    private implicit lazy val parameterValueShow: Show[ParameterValue] = Show.show {
+      case value: VariableParameterValue => (value.valueReference -> value.value).show
+      case value: InputParameterValue    => (value.valueReference -> value.location).show
+    }
 
-      private def asString(parameter: CommandParameter): String = parameter match {
-        case param: Mapping =>
-          param.maybePrefix.fold(s"${asSign(param)} ${param.value}")(prefix =>
-            s"$prefix ${asSign(param)} ${param.value}"
+    private implicit lazy val variableParameterValueShow
+        : Show[(CommandParameter, VariableParameterValue.ValueOverride)] = Show.show { case (param, valueOverride) =>
+      param.maybePrefix.fold(valueOverride.toString)(prefix => s"$prefix$valueOverride")
+    }
+
+    private implicit def pathParameterValueShow[P <: CommandParameterBase]: Show[(P, Location)] =
+      Show.show {
+        case (param: LocationCommandInput, location) =>
+          param.maybePrefix.fold(location.toString)(prefix => s"$prefix$location")
+        case (param: MappedCommandInput, location) =>
+          param.maybePrefix.fold(s"${param.mappedTo.show} $location")(prefix =>
+            s"$prefix ${param.mappedTo.show} $location"
           )
-        case param => param.maybePrefix.fold(param.value.toString)(prefix => s"$prefix${param.value}")
       }
 
-      private def asSign(parameter: Mapping): String = parameter.mappedTo match {
-        case _: IOStream.StdIn.type  => "<"
-        case _: IOStream.StdOut.type => ">"
-        case _: IOStream.StdErr.type => "2>"
-      }
+    private implicit def mappingShow[S <: IOStream]: Show[S] = Show.show {
+      case _: IOStream.StdIn.type  => "<"
+      case _: IOStream.StdOut.type => ">"
+      case _: IOStream.StdErr.type => "2>"
     }
   }
 }

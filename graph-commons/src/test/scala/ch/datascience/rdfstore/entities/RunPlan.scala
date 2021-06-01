@@ -37,6 +37,8 @@ final case class RunPlan(id:                        Id,
   lazy val parameters:                List[CommandParameter]     = commandParameters.collect { case param: CommandParameter => param }
   lazy val inputs:                    List[CommandInput]         = commandParameters.collect { case in: CommandInput => in }
   lazy val outputs:                   List[CommandOutput]        = commandParameters.collect { case out: CommandOutput => out }
+
+  def getInput(location: Location): Option[CommandInput] = inputs.find(_.defaultValue.asLocation == location)
 }
 
 object RunPlan {

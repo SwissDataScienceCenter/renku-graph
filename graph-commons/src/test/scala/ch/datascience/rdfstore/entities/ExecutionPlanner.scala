@@ -23,19 +23,21 @@ import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.CliVersion
-import ch.datascience.rdfstore.entities.CommandParameterBase.CommandParameter.ParameterDefaultValue
 import ch.datascience.rdfstore.entities.CommandParameterBase.CommandInput._
-import ch.datascience.rdfstore.entities.CommandParameterBase.CommandOutput.LocationCommandOutput
-import ch.datascience.rdfstore.entities.CommandParameterBase.{CommandInput, CommandParameter}
+import ch.datascience.rdfstore.entities.CommandParameterBase.CommandOutput._
+import ch.datascience.rdfstore.entities.CommandParameterBase.CommandParameter.ParameterDefaultValue
+import ch.datascience.rdfstore.entities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
 import ch.datascience.rdfstore.entities.Entity.{Checksum, InputEntity, OutputEntity}
+import ch.datascience.rdfstore.entities.ExecutionPlanner.ActivityData
 import ch.datascience.rdfstore.entities.ParameterValue.VariableParameterValue.ValueOverride
 import ch.datascience.rdfstore.entities.ParameterValue.{PathParameterValue, VariableParameterValue}
 
-final case class ExecutionPlanner(runPlan:                 RunPlan,
-                                  activityData:            (Activity.StartTime, Person, CliVersion),
-                                  project:                 Project[Project.ForksCount],
-                                  argumentsValueOverrides: List[(ParameterDefaultValue, ValueOverride)],
-                                  inputsValueOverrides:    List[(InputDefaultValue, Location, Checksum)]
+final case class ExecutionPlanner(runPlan:                  RunPlan,
+                                  activityData:             ActivityData,
+                                  project:                  Project[Project.ForksCount],
+                                  parametersValueOverrides: List[(ParameterDefaultValue, ValueOverride)],
+                                  inputsValueOverrides:     List[(InputDefaultValue, Location, Checksum)],
+                                  outputsValueOverrides:    List[(OutputDefaultValue, Location)]
 ) {
 
   def planParameterArgumentsValues(
@@ -50,7 +52,7 @@ final case class ExecutionPlanner(runPlan:                 RunPlan,
         .toValidNel(s"No execution value for argument with default value ${argument.defaultValue}")
     }
 
-    validatedValues.map(_ => this.copy(argumentsValueOverrides = valuesOverrides.toList))
+    validatedValues.map(_ => this.copy(parametersValueOverrides = valuesOverrides.toList))
   }
 
   def planParameterInputsValues(
@@ -65,11 +67,16 @@ final case class ExecutionPlanner(runPlan:                 RunPlan,
       valuesOverrides: (InputDefaultValue, Location, Checksum)*
   ): ExecutionPlanner = this.copy(inputsValueOverrides = valuesOverrides.toList)
 
+  def planParameterOutputsOverrides(
+      valuesOverrides: (OutputDefaultValue, Location)*
+  ): ExecutionPlanner = this.copy(outputsValueOverrides = valuesOverrides.toList)
+
   def buildProvenanceGraph: ValidatedNel[String, Activity] = (
     validateInputsValueOverride,
+    validateOutputsValueOverride,
     createParameterFactories,
-    activityData.validNel[String]
-  ) mapN { case (_, parameterFactories, (activityTime, author, cliVersion)) =>
+    validateStartTime
+  ) mapN { case (_, _, parameterFactories, (activityTime, author, cliVersion)) =>
     Activity(
       activityIds.generateOne,
       activityTime,
@@ -98,6 +105,18 @@ final case class ExecutionPlanner(runPlan:                 RunPlan,
     case input: MappedCommandInput => Validated.validNel(input)
   }
 
+  private lazy val validateOutputsValueOverride: ValidatedNel[String, List[CommandOutput]] =
+    outputsValueOverrides
+      .filterNot { case (defaultValue, _) =>
+        runPlan.outputs.exists(_.defaultValue == defaultValue)
+      } match {
+      case Nil => Validated.validNel(runPlan.outputs)
+      case invalidOverrides =>
+        invalidOverrides.map { case (defaultValue, _) =>
+          Validated.invalidNel[String, CommandOutput](s"RunPlan output override defined for non-existing $defaultValue")
+        }.sequence
+    }
+
   private lazy val usageFactories = inputsValueOverrides.map { case (_, location, checksum) =>
     Usage.factory(InputEntity(location, checksum))
   }
@@ -107,33 +126,74 @@ final case class ExecutionPlanner(runPlan:                 RunPlan,
       case (commandOutputs, output: LocationCommandOutput) => commandOutputs :+ output
       case (commandOutputs, _) => commandOutputs
     }
-    .map(commandOutput => Generation.factory(OutputEntity.factory(commandOutput.defaultValue.asLocation)))
+    .map(output =>
+      outputsValueOverrides
+        .find { case (defaultValue, _) => defaultValue == output.defaultValue }
+        .map { case (_, locationOverride) => locationOverride }
+        .getOrElse(output.defaultValue.asLocation)
+    )
+    .map(location => Generation.factory(OutputEntity.factory(location)))
 
-  private lazy val createParameterFactories = createVariableParameterFactories map {
-    _ :++ runPlan.inputs.map(PathParameterValue.factory) :++ runPlan.outputs.map(PathParameterValue.factory)
-  }
+  private lazy val createParameterFactories =
+    createVariableParameterFactories |+| createPathParameterFactoriesForInputs |+| createPathParameterFactoriesForOutputs
 
-  private lazy val createVariableParameterFactories = runPlan.parameters.traverse { planArgument =>
-    argumentsValueOverrides
+  private lazy val createVariableParameterFactories = runPlan.parameters.traverse { planParameter =>
+    parametersValueOverrides
       .foldMapK {
         case (defaultValue, valueOverride) =>
-          Option.when(defaultValue == planArgument.defaultValue)(
-            VariableParameterValue.factory(valueOverride, planArgument)
+          Option.when(defaultValue == planParameter.defaultValue)(
+            VariableParameterValue.factory(valueOverride, planParameter)
           )
         case _ => Option.empty[Activity => ParameterValue]
       }
-      .toValidNel(s"No execution value for argument with default value ${planArgument.defaultValue}")
+      .toValidNel(s"No execution value for parameter with default value ${planParameter.defaultValue}")
+  }
+
+  private lazy val createPathParameterFactoriesForInputs = runPlan.inputs.traverse { planInput =>
+    inputsValueOverrides
+      .foldMapK {
+        case (defaultValue, locationOverride, _) =>
+          Option.when(defaultValue == planInput.defaultValue)(
+            PathParameterValue.factory(locationOverride, planInput)
+          )
+        case _ => Option.empty[Activity => ParameterValue]
+      }
+      .toValidNel(s"No execution value for input with default value ${planInput.defaultValue}")
+  }
+
+  private lazy val createPathParameterFactoriesForOutputs = runPlan.outputs.traverse { planOutput =>
+    val location = outputsValueOverrides
+      .find { case (defaultValue, _) => defaultValue == planOutput.defaultValue }
+      .map { case (_, locationOverride) => locationOverride }
+      .getOrElse(planOutput.defaultValue.asLocation)
+
+    Validated.validNel[String, Activity => ParameterValue] {
+      PathParameterValue.factory(location, planOutput)
+    }
   }
 
   private implicit lazy val semigroup: Semigroup[ExecutionPlanner] = (x: ExecutionPlanner, y: ExecutionPlanner) =>
     if (x == y) x else throw new IllegalStateException("Two different ExecutionPlanners cannot be combined")
+
+  private lazy val validateStartTime: ValidatedNel[String, ActivityData] = {
+    val (startTime, _, _) = activityData
+    Validated.condNel(
+      (startTime.value compareTo project.dateCreated.value) >= 0,
+      activityData,
+      s"Activity start time $startTime cannot be older than project ${project.dateCreated}"
+    )
+  }
 }
 
 object ExecutionPlanner {
+
+  private type ActivityData = (Activity.StartTime, Person, CliVersion)
+
   def of(runPlan:      RunPlan,
          activityTime: Activity.StartTime,
          author:       Person,
          cliVersion:   CliVersion,
          project:      Project[Project.ForksCount]
-  ): ExecutionPlanner = ExecutionPlanner(runPlan, (activityTime, author, cliVersion), project, List.empty, List.empty)
+  ): ExecutionPlanner =
+    ExecutionPlanner(runPlan, (activityTime, author, cliVersion), project, List.empty, List.empty, List.empty)
 }
