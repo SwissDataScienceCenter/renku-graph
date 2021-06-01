@@ -20,6 +20,7 @@ package ch.datascience.commiteventservice.events.categories.commitsync.eventgene
 
 import ch.datascience.commiteventservice.events.categories.commitsync.ProjectInfo
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
+import ch.datascience.events.consumers.Project
 import ch.datascience.generators.Generators.listOf
 import ch.datascience.graph.model.EventsGenerators.{batchDates, commitIds, commitMessages, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths, projectVisibilities, userEmails, userNames}

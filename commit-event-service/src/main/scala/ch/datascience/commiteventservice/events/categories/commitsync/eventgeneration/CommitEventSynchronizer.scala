@@ -25,11 +25,12 @@ import cats.{Applicative, MonadThrow}
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.SynchronizationSummary.{SummaryState, add}
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.UpdateResult._
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.{SynchronizationSummary, UpdateResult}
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.{CommitInfoFinder, EventDetailsFinder}
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.{CommitInfoFinder, CommitToEventLog, EventDetailsFinder}
 import ch.datascience.commiteventservice.events.categories.commitsync._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.graph.model.events.CommitId
+import ch.datascience.events.consumers.Project
+import ch.datascience.graph.model.events.{BatchDate, CommitId}
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.graph.tokenrepository.AccessTokenFinder._
 import ch.datascience.http.client.AccessToken
@@ -48,10 +49,11 @@ private[commitsync] class CommitEventSynchronizerImpl[Interpretation[_]: MonadTh
     latestCommitFinder:    LatestCommitFinder[Interpretation],
     eventDetailsFinder:    EventDetailsFinder[Interpretation],
     commitInfoFinder:      CommitInfoFinder[Interpretation],
-    missedEventsGenerator: MissedEventsGenerator[Interpretation],
+    commitToEventLog:      CommitToEventLog[Interpretation],
     commitEventsRemover:   CommitEventsRemover[Interpretation],
     executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
-    logger:                Logger[Interpretation]
+    logger:                Logger[Interpretation],
+    clock:                 java.time.Clock = java.time.Clock.systemUTC()
 ) extends CommitEventSynchronizer[Interpretation] {
 
   import executionTimeRecorder._
@@ -68,23 +70,25 @@ private[commitsync] class CommitEventSynchronizerImpl[Interpretation[_]: MonadTh
     case (Some(commitInfo), FullCommitSyncEvent(id, _, _)) if commitInfo.id == id =>
       measureExecutionTime(Skipped.pure[Interpretation].widen[UpdateResult]) >>= logResult(event)
     case (Some(commitInfo), event) =>
-      measureExecutionTime(
-        processCommits(List(commitInfo.id), event.project, maybeAccessToken).run(SynchronizationSummary())
-      ) flatMap { case (elapsedTime: ElapsedTime, summary) =>
-        logSummary(commitInfo.id, event.project)(elapsedTime, summary._2)
-      }
+      processCommitsAndLogSummary(commitInfo.id, event.project, maybeAccessToken)
     case (None, FullCommitSyncEvent(id, _, _)) =>
-      measureExecutionTime(
-        processCommits(List(id), event.project, maybeAccessToken).run(SynchronizationSummary())
-      ) flatMap { case (elapsedTime: ElapsedTime, summary) =>
-        logSummary(id, event.project)(elapsedTime, summary._2)
-      }
+      processCommitsAndLogSummary(id, event.project, maybeAccessToken)
     case (None, MinimalCommitSyncEvent(_)) =>
       measureExecutionTime(Skipped.pure[Interpretation].widen[UpdateResult]) >>= logResult(event)
   }
 
+  private def processCommitsAndLogSummary(commitId: CommitId, project: Project, maybeAccessToken: Option[AccessToken]) =
+    measureExecutionTime(
+      processCommits(List(commitId), project, BatchDate(clock), maybeAccessToken).run(SynchronizationSummary())
+    ) flatMap { case (elapsedTime: ElapsedTime, summary) =>
+      logSummary(commitId, project)(elapsedTime, summary._2)
+    }
+
+  private val DontCareCommitId = CommitId("0000000000000000000000000000000000000000")
+
   private def processCommits(commitList: List[CommitId],
-                             project:    CommitProject,
+                             project:    Project,
+                             batchDate:  BatchDate,
                              maybeToken: Option[AccessToken]
   ): SummaryState[Interpretation, SynchronizationSummary] =
     commitList match {
@@ -94,14 +98,22 @@ private[commitsync] class CommitEventSynchronizerImpl[Interpretation[_]: MonadTh
             measureExecutionTime(
               getInfoFromELandGL(commitId, project, maybeToken)
                 .flatMap {
+                  case (_, Some(CommitInfo(DontCareCommitId, _, _, _, _, _))) =>
+                    Skipped.pure[Interpretation].widen[UpdateResult].map(result => (result, commitId, commitIds))
+                  case (Some(_), Some(_)) =>
+                    Existed.pure[Interpretation].widen[UpdateResult].map(result => (result, commitId, commitIds))
                   case (None, Some(commitFromGL)) =>
-                    missedEventsGenerator
-                      .generateMissedEvents(project, commitFromGL.id, maybeToken)
-                      .map(result => (result, commitId, commitIds ++: commitFromGL.parents))
+                    commitToEventLog
+                      .storeCommitsInEventLog(project, commitFromGL, batchDate, maybeToken)
+                      .map(result =>
+                        (result, commitId, commitIds ++: commitFromGL.parents.filterNot(_ == DontCareCommitId))
+                      )
                   case (Some(commitFromEL), None) =>
                     commitEventsRemover
                       .removeDeletedEvent(project, commitFromEL.id)
-                      .map(result => (result, commitId, commitIds ++: commitFromEL.parents))
+                      .map(result =>
+                        (result, commitId, commitIds ++: commitFromEL.parents.filterNot(_ == DontCareCommitId))
+                      )
                   case _ =>
                     Skipped.pure[Interpretation].widen[UpdateResult].map(result => (result, commitId, commitIds))
                 }
@@ -117,14 +129,14 @@ private[commitsync] class CommitEventSynchronizerImpl[Interpretation[_]: MonadTh
             for {
               _               <- add[Interpretation](result)
               _               <- StateT.liftF(logResult(commitId, project)(elapsedTime -> result))
-              continueProcess <- processCommits(commits, project, maybeToken)
+              continueProcess <- processCommits(commits, project, batchDate, maybeToken)
             } yield continueProcess
           }
       case Nil => StateT.get[Interpretation, SynchronizationSummary]
     }
 
   private def getInfoFromELandGL(commitId:         CommitId,
-                                 project:          CommitProject,
+                                 project:          Project,
                                  maybeAccessToken: Option[AccessToken]
   ): Interpretation[(Option[CommitWithParents], Option[CommitInfo])] =
     for {
@@ -142,8 +154,10 @@ private[commitsync] class CommitEventSynchronizerImpl[Interpretation[_]: MonadTh
 
   private def logResult(event: CommitSyncEvent): ((ElapsedTime, UpdateResult)) => Interpretation[Unit] = {
     case (elapsedTime, Skipped) =>
-      logger.info(s"${logMessageCommon(event)} -> no new events found in ${elapsedTime}ms")
-    case (elapsedTime, Created | Existed) =>
+      logger.info(s"${logMessageCommon(event)} -> event skipped in ${elapsedTime}ms")
+    case (elapsedTime, Existed) =>
+      logger.info(s"${logMessageCommon(event)} -> no new event found in ${elapsedTime}ms")
+    case (elapsedTime, Created) =>
       logger.info(s"${logMessageCommon(event)} -> new events found in ${elapsedTime}ms")
     case (elapsedTime, Deleted) =>
       logger.info(s"${logMessageCommon(event)} -> events found for deletion in ${elapsedTime}ms")
@@ -151,12 +165,12 @@ private[commitsync] class CommitEventSynchronizerImpl[Interpretation[_]: MonadTh
       logger.error(exception)(s"${logMessageCommon(event)} -> $message in ${elapsedTime}ms")
   }
 
-  private def logResult(eventId: CommitId,
-                        project: CommitProject
-  ): ((ElapsedTime, UpdateResult)) => Interpretation[Unit] = {
+  private def logResult(eventId: CommitId, project: Project): ((ElapsedTime, UpdateResult)) => Interpretation[Unit] = {
     case (elapsedTime, Skipped) =>
+      logger.info(logMessageFor(eventId, project, s"event skipped in ${elapsedTime}ms"))
+    case (elapsedTime, Existed) =>
       logger.info(logMessageFor(eventId, project, s"no new events found in ${elapsedTime}ms"))
-    case (elapsedTime, Created | Existed) =>
+    case (elapsedTime, Created) =>
       logger.info(logMessageFor(eventId, project, s"new events found in ${elapsedTime}ms"))
     case (elapsedTime, Deleted) =>
       logger.info(
@@ -167,19 +181,19 @@ private[commitsync] class CommitEventSynchronizerImpl[Interpretation[_]: MonadTh
   }
 
   private def logSummary(eventId: CommitId,
-                         project: CommitProject
+                         project: Project
   ): ((ElapsedTime, SynchronizationSummary)) => Interpretation[Unit] = { case (elapsedTime, summary) =>
     logger.info(
       logMessageFor(
         eventId,
         project,
-        s"events generation result: ${summary.created} created, ${summary.existed} existed, ${summary.deleted} deleted, ${summary.failed} failed in ${elapsedTime}ms"
+        s"events generation result: ${summary.created} created, ${summary.existed} existed, ${summary.skipped} skipped, ${summary.deleted} deleted, ${summary.failed} failed in ${elapsedTime}ms"
       )
     )
 
   }
 
-  private def logMessageFor(eventId: CommitId, project: CommitProject, message: String) =
+  private def logMessageFor(eventId: CommitId, project: Project, message: String) =
     s"$categoryName: id = $eventId, projectId = ${project.id}, projectPath = ${project.path} -> $message"
 
 }
@@ -193,18 +207,18 @@ private[commitsync] object CommitEventSynchronizer {
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ) = for {
-    accessTokenFinder     <- AccessTokenFinder(logger)
-    latestCommitFinder    <- LatestCommitFinder(gitLabThrottler, logger)
-    eventDetailsFinder    <- EventDetailsFinder(logger)
-    commitInfoFinder      <- CommitInfoFinder(gitLabThrottler, logger)
-    missedEventsGenerator <- MissedEventsGenerator(gitLabThrottler, logger)
-    commitEventRemover    <- CommitEventsRemover(logger)
+    accessTokenFinder  <- AccessTokenFinder(logger)
+    latestCommitFinder <- LatestCommitFinder(gitLabThrottler, logger)
+    eventDetailsFinder <- EventDetailsFinder(logger)
+    commitInfoFinder   <- CommitInfoFinder(gitLabThrottler, logger)
+    commitToEventLog   <- CommitToEventLog(logger)
+    commitEventRemover <- CommitEventsRemover(logger)
 
   } yield new CommitEventSynchronizerImpl[IO](accessTokenFinder,
                                               latestCommitFinder,
                                               eventDetailsFinder,
                                               commitInfoFinder,
-                                              missedEventsGenerator,
+                                              commitToEventLog,
                                               commitEventRemover,
                                               executionTimeRecorder,
                                               logger
@@ -238,7 +252,6 @@ private[commitsync] object CommitEventSynchronizer {
           case Deleted      => (SynchronizationSummary(s, c, e, d + 1, f), ()).pure[F]
           case Failed(_, _) => (SynchronizationSummary(s, c, e, d, f + 1), ()).pure[F]
         }
-
     }
   }
 

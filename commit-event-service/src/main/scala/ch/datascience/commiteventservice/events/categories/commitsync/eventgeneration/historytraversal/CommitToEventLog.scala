@@ -24,10 +24,9 @@ import cats.syntax.all._
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.UpdateResult
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.UpdateResult._
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.{CommitEvent, CommitInfo, Project, StartCommit}
-import ch.datascience.config.GitLab
-import ch.datascience.control.Throttler
-import ch.datascience.graph.model.events.{BatchDate, CommitId}
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.{CommitEvent, CommitInfo}
+import ch.datascience.events.consumers.Project
+import ch.datascience.graph.model.events.BatchDate
 import ch.datascience.http.client.AccessToken
 import org.typelevel.log4cats.Logger
 
@@ -35,65 +34,29 @@ import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 private[eventgeneration] trait CommitToEventLog[Interpretation[_]] {
-  def storeCommitsInEventLog(startCommit:      StartCommit,
+  def storeCommitsInEventLog(project:          Project,
+                             startCommit:      CommitInfo,
+                             batchDate:        BatchDate,
                              maybeAccessToken: Option[AccessToken]
   ): Interpretation[UpdateResult]
 }
 
 private class CommitToEventLogImpl[Interpretation[_]: MonadThrow](
-    commitEventSender:  CommitEventSender[Interpretation],
-    eventDetailsFinder: EventDetailsFinder[Interpretation],
-    commitInfoFinder:   CommitInfoFinder[Interpretation],
-    logger:             Logger[Interpretation],
-    clock:              java.time.Clock = java.time.Clock.systemUTC()
+    commitEventSender: CommitEventSender[Interpretation]
 ) extends CommitToEventLog[Interpretation] {
 
   import commitEventSender._
 
-  private val DontCareCommitId = CommitId("0000000000000000000000000000000000000000")
-
-  def storeCommitsInEventLog(startCommit:      StartCommit,
+  def storeCommitsInEventLog(project:          Project,
+                             startCommit:      CommitInfo,
+                             batchDate:        BatchDate,
                              maybeAccessToken: Option[AccessToken]
   ): Interpretation[UpdateResult] = {
-    maybeCommitEvent(startCommit.project, startCommit.id, BatchDate(clock), maybeAccessToken) flatMap {
-      case None              => Skipped.pure[Interpretation].widen[UpdateResult]
-      case Some(commitEvent) => sendEvent(startCommit)(commitEvent)
-    } recoverWith eventFindingException
-  } recoverWith loggingError(startCommit)
-
-  private def sendEvent(startCommit: StartCommit)(commitEvent: CommitEvent): Interpretation[UpdateResult] =
-    eventDetailsFinder
-      .checkIfExists(commitEvent.project.id, commitEvent.id)
-      .flatMap {
-        case true => Existed.pure[Interpretation].widen[UpdateResult]
-        case false =>
-          send(commitEvent)
-            .map(_ => Created)
-            .widen[UpdateResult]
-            .recover { case NonFatal(exception) =>
-              Failed(logMessageFor(startCommit, "storing in the event log failed", Some(commitEvent)), exception)
-            }
-      }
-      .recover { case NonFatal(exception) =>
-        Failed(logMessageFor(startCommit, "checking if event exists in the event log failed", Some(commitEvent)),
-               exception
-        )
-      }
-
-  private def maybeCommitEvent(project:          Project,
-                               commitId:         CommitId,
-                               batchDate:        BatchDate,
-                               maybeAccessToken: Option[AccessToken]
-  ): Interpretation[Option[CommitEvent]] =
-    if (commitId == DontCareCommitId) Option.empty[CommitEvent].pure[Interpretation]
-    else findCommitEvent(project, commitId, batchDate, maybeAccessToken).map(Option.apply)
-
-  private def findCommitEvent(project:          Project,
-                              commitId:         CommitId,
-                              batchDate:        BatchDate,
-                              maybeAccessToken: Option[AccessToken]
-  ): Interpretation[CommitEvent] =
-    commitInfoFinder.findCommitInfo(project.id, commitId, maybeAccessToken) map toCommitEvent(project, batchDate)
+    val commitEvent = toCommitEvent(project, batchDate)(startCommit)
+    send(commitEvent).map(_ => Created).widen[UpdateResult] recover { case NonFatal(exception) =>
+      Failed(failureMessageFor(commitEvent, "storing in the event log failed"), exception)
+    }
+  }
 
   private def toCommitEvent(project: Project, batchDate: BatchDate)(commitInfo: CommitInfo) =
     commitInfo.message.value match {
@@ -104,7 +67,7 @@ private class CommitToEventLogImpl[Interpretation[_]: MonadThrow](
           committedDate = commitInfo.committedDate,
           author = commitInfo.author,
           committer = commitInfo.committer,
-          parents = commitInfo.parents.filterNot(_ == DontCareCommitId),
+          parents = commitInfo.parents,
           project = project,
           batchDate = batchDate
         )
@@ -115,40 +78,23 @@ private class CommitToEventLogImpl[Interpretation[_]: MonadThrow](
           committedDate = commitInfo.committedDate,
           author = commitInfo.author,
           committer = commitInfo.committer,
-          parents = commitInfo.parents.filterNot(_ == DontCareCommitId),
+          parents = commitInfo.parents,
           project = project,
           batchDate = batchDate
         )
     }
 
-  private lazy val eventFindingException: PartialFunction[Throwable, Interpretation[UpdateResult]] = {
-    case NonFatal(exception) => EventFindingException(exception).raiseError[Interpretation, UpdateResult]
-  }
+  private def failureMessageFor(
+      startCommit: CommitEvent,
+      message:     String
+  ) =
+    s"$categoryName: id = ${startCommit.id}, projectId = ${startCommit.project.id}, projectPath = ${startCommit.project.path} -> $message"
 
-  private case class EventFindingException(cause: Throwable)
-      extends RuntimeException("finding commit events failed", cause)
-
-  private def loggingError(
-      startCommit: StartCommit
-  ): PartialFunction[Throwable, Interpretation[UpdateResult]] = { case exception @ EventFindingException(cause) =>
-    logger.error(cause)(logMessageFor(startCommit, exception.getMessage)) >>
-      cause.raiseError[Interpretation, UpdateResult]
-  }
-
-  private def logMessageFor(
-      startCommit:      StartCommit,
-      message:          String,
-      maybeCommitEvent: Option[CommitEvent] = None
-  ) = {
-    val maybeAddedId = maybeCommitEvent.map(event => s", addedId = ${event.id}") getOrElse ""
-    s"$categoryName: id = ${startCommit.id}$maybeAddedId, projectId = ${startCommit.project.id}, projectPath = ${startCommit.project.path} -> $message"
-  }
 }
 
 private[eventgeneration] object CommitToEventLog {
   def apply(
-      gitLabThrottler: Throttler[IO, GitLab],
-      logger:          Logger[IO]
+      logger: Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
@@ -156,13 +102,6 @@ private[eventgeneration] object CommitToEventLog {
       timer:            Timer[IO]
   ): IO[CommitToEventLog[IO]] =
     for {
-      eventSender        <- CommitEventSender(logger)
-      eventDetailsFinder <- EventDetailsFinder(logger)
-      commitInfoFinder   <- CommitInfoFinder(gitLabThrottler, logger)
-    } yield new CommitToEventLogImpl[IO](
-      eventSender,
-      eventDetailsFinder,
-      commitInfoFinder,
-      logger
-    )
+      eventSender <- CommitEventSender(logger)
+    } yield new CommitToEventLogImpl[IO](eventSender)
 }

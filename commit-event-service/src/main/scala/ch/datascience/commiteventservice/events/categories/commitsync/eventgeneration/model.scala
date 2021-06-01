@@ -18,6 +18,7 @@
 
 package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration
 
+import ch.datascience.events.consumers.Project
 import ch.datascience.graph.model.events.EventStatus.{New, Skipped}
 import ch.datascience.graph.model.events.{BatchDate, CommitId, CommitMessage, CommittedDate, CompoundEventId, EventId, EventStatus}
 import ch.datascience.graph.model.users.Email
@@ -70,8 +71,6 @@ private object CommitEvent {
     override def status: EventStatus = Skipped
   }
 }
-
-private final case class Project(id: projects.Id, path: projects.Path)
 
 private sealed trait Person extends Product with Serializable {
   def name: users.Name

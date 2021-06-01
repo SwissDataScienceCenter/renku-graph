@@ -25,6 +25,7 @@ import cats.syntax.all._
 import ch.datascience.commiteventservice.events.EventStatusPatcher
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.UpdateResult
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.UpdateResult._
+import ch.datascience.events.consumers.Project
 import ch.datascience.graph.model.events.CommitId
 import org.typelevel.log4cats.Logger
 
@@ -32,13 +33,13 @@ import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 private[commitsync] trait CommitEventsRemover[Interpretation[_]] {
-  def removeDeletedEvent(project: CommitProject, commitId: CommitId): Interpretation[UpdateResult]
+  def removeDeletedEvent(project: Project, commitId: CommitId): Interpretation[UpdateResult]
 }
 
 private class CommitEventsRemoverImpl[Interpretation[_]: MonadThrow](
     eventStatusPatcher: EventStatusPatcher[Interpretation]
 ) extends CommitEventsRemover[Interpretation] {
-  override def removeDeletedEvent(project: CommitProject, commitId: CommitId): Interpretation[UpdateResult] =
+  override def removeDeletedEvent(project: Project, commitId: CommitId): Interpretation[UpdateResult] =
     eventStatusPatcher
       .sendDeletionStatus(project.id, commitId)
       .map(_ => Deleted: UpdateResult) recoverWith { case NonFatal(e) =>

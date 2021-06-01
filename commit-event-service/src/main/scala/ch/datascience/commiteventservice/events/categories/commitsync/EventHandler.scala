@@ -27,7 +27,7 @@ import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
-import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult}
+import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult, Project}
 import ch.datascience.graph.model.events.{CategoryName, CommitId, LastSyncedDate}
 import ch.datascience.logging.ExecutionTimeRecorder
 import io.circe.Decoder
@@ -76,20 +76,20 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow](
     cursor.downField("id").as[Option[CommitId]] flatMap {
       case Some(id) =>
         for {
-          project    <- cursor.downField("project").as[CommitProject]
+          project    <- cursor.downField("project").as[Project]
           lastSynced <- cursor.downField("lastSynced").as[LastSyncedDate]
         } yield FullCommitSyncEvent(id, project, lastSynced)
       case None =>
         for {
-          project <- cursor.downField("project").as[CommitProject]
+          project <- cursor.downField("project").as[Project]
         } yield MinimalCommitSyncEvent(project)
     }
 
-  private implicit lazy val projectDecoder: Decoder[CommitProject] = cursor =>
+  private implicit lazy val projectDecoder: Decoder[Project] = cursor =>
     for {
       id   <- cursor.downField("id").as[projects.Id]
       path <- cursor.downField("path").as[projects.Path]
-    } yield CommitProject(id, path)
+    } yield Project(id, path)
 }
 
 private[events] object EventHandler {
