@@ -22,8 +22,8 @@ import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators.{commitIds, compoundEventIds}
-import ch.datascience.graph.model.events.{CommitId, EventDetails}
+import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
+import ch.datascience.graph.model.events.EventDetails
 import ch.datascience.http.ErrorMessage.ErrorMessage
 import ch.datascience.http.InfoMessage._
 import ch.datascience.http.server.EndpointTester._
@@ -54,24 +54,7 @@ class EventDetailsEndpointSpec extends AnyWordSpec with MockFactory with should.
       response.contentType shouldBe Some(`Content-Type`(application.json))
       response
         .as[Json]
-        .unsafeRunSync() shouldBe json"""{ "id":${event.id.value}, "project": {"id": ${event.projectId.value}}, "parent_ids":${List
-        .empty[String]} } """
-    }
-
-    s"$Ok if the event is found in the event log and the event has parents" in new TestCase {
-      val eventWithParents = eventDetails(withParents = commitIds.generateNonEmptyList().toList).generateOne
-      (eventDetailsFinder.findDetails _)
-        .expects(eventWithParents.compoundEventId)
-        .returning(eventWithParents.some.pure[IO])
-
-      val response = eventDetailEndpoint.getDetails(eventWithParents.compoundEventId).unsafeRunSync()
-
-      response.status      shouldBe Ok
-      response.contentType shouldBe Some(`Content-Type`(application.json))
-      response
-        .as[Json]
-        .unsafeRunSync() shouldBe json"""{ "id":${eventWithParents.id.value}, "project": {"id": ${eventWithParents.projectId.value}}, "parent_ids":${eventWithParents.parents
-        .map(_.value)} } """
+        .unsafeRunSync() shouldBe json"""{ "id":${event.id.value}, "project": {"id": ${event.projectId.value}}, "body":${event.eventBody.value} } """
     }
 
     s"$NotFound if the event is not found in the event log " in new TestCase {
@@ -105,11 +88,12 @@ class EventDetailsEndpointSpec extends AnyWordSpec with MockFactory with should.
   }
 
   private trait TestCase {
-    val event = eventDetails().generateOne
+    val event = eventDetails.generateOne
 
-    def eventDetails(withParents: List[CommitId] = Nil): Gen[EventDetails] = for {
-      eventId <- compoundEventIds
-    } yield EventDetails(eventId.id, eventId.projectId, withParents)
+    lazy val eventDetails: Gen[EventDetails] = for {
+      eventId   <- compoundEventIds
+      eventBody <- eventBodies
+    } yield EventDetails(eventId, eventBody)
 
     val logger = TestLogger[IO]()
 

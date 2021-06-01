@@ -65,7 +65,7 @@ class EventDetailsEndpointImpl[Interpretation[_]: Effect](eventDetailsFinder: Ev
       "project": {
         "id": ${eventDetails.projectId.value}
       },
-      "parent_ids": ${eventDetails.parents.map(_.value)}
+      "body": ${eventDetails.eventBody.value}
     }"""
   }
 }

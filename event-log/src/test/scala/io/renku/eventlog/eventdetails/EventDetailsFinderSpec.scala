@@ -21,12 +21,10 @@ package io.renku.eventlog.eventdetails
 import cats.syntax.all._
 import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators.{commitIds, compoundEventIds, eventBodies, eventStatuses}
-import ch.datascience.graph.model.events.{CommitId, CompoundEventId, EventBody, EventDetails}
+import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventStatuses}
+import ch.datascience.graph.model.events.{CompoundEventId, EventDetails}
 import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
-import io.circe.literal.JsonStringContext
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.InMemoryEventLogDbSpec
 import org.scalatest.matchers.should
@@ -36,31 +34,15 @@ class EventDetailsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
 
   "findDetails" should {
 
-    "return the details of the event if found case where there are no parents" in new TestCase {
-      storeEvent(
-        eventId,
-        eventStatuses.generateOne,
-        executionDates.generateOne,
-        eventDates.generateOne,
-        eventBodies.generateOne
-      )
-      eventDetailsFinder.findDetails(eventId).unsafeRunSync() shouldBe EventDetails(eventId, List.empty[CommitId]).some
-    }
-
     "return the details of the event if found" in new TestCase {
-      val parents = commitIds.generateNonEmptyList().toList
-      val eventBodyWithParents = jsons
-        .map(json => json.deepMerge(json"""{"parents": ${parents.map(_.value)}}""").noSpaces)
-        .map(EventBody.apply)
-
       storeEvent(
         eventId,
         eventStatuses.generateOne,
         executionDates.generateOne,
         eventDates.generateOne,
-        eventBodyWithParents.generateOne
+        eventBody
       )
-      eventDetailsFinder.findDetails(eventId).unsafeRunSync() shouldBe EventDetails(eventId, parents).some
+      eventDetailsFinder.findDetails(eventId).unsafeRunSync() shouldBe EventDetails(eventId, eventBody).some
     }
 
     "return None if the event is not found" in new TestCase {
@@ -69,7 +51,9 @@ class EventDetailsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
   }
 
   private trait TestCase {
-    val eventId            = compoundEventIds.generateOne
+    val eventId   = compoundEventIds.generateOne
+    val eventBody = eventBodies.generateOne
+
     val queriesExecTimes   = TestLabeledHistogram[SqlStatement.Name]("query_id")
     val eventDetailsFinder = new EventDetailsFinderImpl(sessionResource, queriesExecTimes)
   }

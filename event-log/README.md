@@ -34,7 +34,8 @@ Response body example:
   "id": "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
     "id": 123
-  }
+  },
+  "body": "JSON payload"
 }
 ```
 
