@@ -28,6 +28,7 @@ import ch.datascience.graph.model.projects
 import ch.datascience.http.client.RestClient
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
+import io.circe.parser.parse
 import org.http4s.Status.{NotFound, Ok}
 import org.http4s.circe.jsonOf
 import org.http4s.{EntityDecoder, Request, Response, Status}
@@ -80,9 +81,14 @@ private[eventgeneration] class EventDetailsFinderImpl[Interpretation[_]: Context
   private implicit val commitDetailsEntityDecoder: EntityDecoder[Interpretation, CommitWithParents] = {
     implicit val commitDecoder: Decoder[CommitWithParents] = cursor =>
       for {
-        id        <- cursor.downField("id").as[CommitId]
-        projectId <- cursor.downField("project").downField("id").as[projects.Id]
-        parents   <- cursor.downField("parent_ids").as[List[CommitId]]
+        id         <- cursor.downField("id").as[CommitId]
+        projectId  <- cursor.downField("project").downField("id").as[projects.Id]
+        bodyString <- cursor.downField("body").as[String]
+        parents = parse(bodyString)
+                    .map(eventBodyJson =>
+                      eventBodyJson.hcursor.downField("parents").as[List[CommitId]].getOrElse(List.empty[CommitId])
+                    )
+                    .getOrElse(List.empty[CommitId])
       } yield CommitWithParents(id, projectId, parents)
     jsonOf[Interpretation, CommitWithParents]
   }
