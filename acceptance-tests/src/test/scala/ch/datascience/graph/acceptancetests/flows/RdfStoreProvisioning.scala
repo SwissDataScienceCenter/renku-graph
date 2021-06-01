@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.acceptancetests.flows
 
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.data
 import ch.datascience.graph.acceptancetests.flows.AccessTokenPresence._
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
@@ -26,7 +27,7 @@ import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices._
 import ch.datascience.graph.acceptancetests.tooling.ModelImplicits
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
-import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.entities
@@ -41,10 +42,10 @@ object RdfStoreProvisioning extends ModelImplicits with Eventually with Acceptan
 
   def `data in the RDF store`[FC <: entities.Project.ForksCount](
       project:            data.Project[FC],
-      commitId:           CommitId,
       triples:            JsonLD
   )(implicit accessToken: AccessToken): Assertion = {
     val projectId = project.id
+    val commitId  = commitIds.generateOne
 
     givenAccessTokenPresentFor(project)
 

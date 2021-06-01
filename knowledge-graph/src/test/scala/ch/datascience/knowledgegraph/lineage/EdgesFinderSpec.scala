@@ -26,8 +26,8 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Warn
 import ch.datascience.knowledgegraph.lineage.model._
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.entities.bundles._
-import ch.datascience.rdfstore.entities.persons
+import ch.datascience.rdfstore.entities._
+import ch.datascience.rdfstore.entities.{LineageExemplarData, persons}
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import ch.datascience.stubbing.ExternalServiceStubbing
 import io.renku.jsonld.EntityId
@@ -42,8 +42,7 @@ class EdgesFinderSpec extends AnyWordSpec with InMemoryRdfStore with ExternalSer
     "return all the edges of the given project " +
       "case when the user is not authenticated and the project is public" in new TestCase {
 
-        val (jsons, exemplarData) =
-          exemplarLineageFlow(projectPath, projectVisibility = Gen.oneOf(Some(Visibility.Public), None).generateOne)
+        val (jsons, exemplarData) = LineageExemplarData(projectPath)
 
         loadToStore(jsons: _*)
 
@@ -52,13 +51,13 @@ class EdgesFinderSpec extends AnyWordSpec with InMemoryRdfStore with ExternalSer
         edgesFinder
           .findEdges(projectPath, None)
           .unsafeRunSync() shouldBe Map(
-          RunInfo(`sha8 renku run`.toEntityId, RunDate(`sha12 parquet date`)) -> (
-            Set(`sha3 zhbikes`.toNodeLocation, `sha7 clean_data`.toNodeLocation),
+          RunInfo(`plan1 execution1`.toEntityId, RunDate(`sha12 parquet date`)) -> (
+            Set(`zhbikes folder`.toNodeLocation, `clean_data entity`.toNodeLocation),
             Set(`sha8 parquet`.toNodeLocation)
           ),
           RunInfo(`sha9 renku run`.toEntityId, RunDate(`sha12 parquet date`)) -> (
-            Set(`sha7 plot_data`.toNodeLocation, `sha8 parquet`.toNodeLocation),
-            Set(`sha9 grid_plot`.toNodeLocation, `sha9 cumulative`.toNodeLocation)
+            Set(`plot_data entity`.toNodeLocation, `sha8 parquet`.toNodeLocation),
+            Set(`grid_plot entity`.toNodeLocation, `cumulative entity`.toNodeLocation)
           )
         )
 

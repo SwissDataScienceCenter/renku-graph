@@ -86,13 +86,13 @@ class ProjectsResourcesSpec
         parentProject.entitiesProject.asJsonLD
       )
 
-      `data in the RDF store`(parentProject, commitIds.generateOne, jsonLDParentProjectTriples)
+      `data in the RDF store`(parentProject, jsonLDParentProjectTriples)
 
       val jsonLDTriples = JsonLD.arr(
         dataset.asJsonLD,
         project.entitiesProject.asJsonLD
       )
-      `data in the RDF store`(project, commitIds.generateOne, jsonLDTriples)
+      `data in the RDF store`(project, jsonLDTriples)
 
       `wait for events to be processed`(project.id)
 

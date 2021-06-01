@@ -18,6 +18,7 @@
 
 package io.renku.jsonld
 
+import cats.syntax.all._
 import io.renku.jsonld.generators.Generators.Implicits._
 import io.renku.jsonld.generators.JsonLDGenerators._
 import org.scalatest.matchers.should
@@ -26,12 +27,17 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class EntityTypeSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
-  "toString" should {
+  "show" should {
 
     "return the value" in {
-      forAll { typ: EntityType =>
-        typ.toString shouldBe typ.value
-      }
+      forAll { t: EntityType => t.show shouldBe t.value }
+    }
+  }
+
+  "EntityTypes.show" should {
+
+    "return string representations of all the types separated with `; `" in {
+      forAll { t: EntityTypes => t.show shouldBe t.list.map(_.value).nonEmptyIntercalate("; ") }
     }
   }
 }

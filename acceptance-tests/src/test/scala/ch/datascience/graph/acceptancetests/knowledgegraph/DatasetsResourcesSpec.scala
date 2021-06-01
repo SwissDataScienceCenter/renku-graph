@@ -97,7 +97,7 @@ class DatasetsResourcesSpec
         dataset2Modified.asJsonLD
       )
 
-      `data in the RDF store`(project, commitIds.generateOne, jsonLDTriples)
+      `data in the RDF store`(project, jsonLDTriples)
 
       `wait for events to be processed`(project.id)
 
@@ -329,7 +329,7 @@ class DatasetsResourcesSpec
         accessToken:         AccessToken
     ): Unit = {
       val project = dataProjects(dataset.project).generateOne
-      `data in the RDF store`(project, commitIds.generateOne, JsonLD.arr(dataset.asJsonLD, dataset.project.asJsonLD))
+      `data in the RDF store`(project, JsonLD.arr(dataset.asJsonLD, dataset.project.asJsonLD))
       `wait for events to be processed`(project.id)
       ()
     }

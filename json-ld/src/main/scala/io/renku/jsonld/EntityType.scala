@@ -18,11 +18,11 @@
 
 package io.renku.jsonld
 
+import cats.Show
+import cats.syntax.all._
 import io.circe.{Encoder, Json}
 
-abstract class EntityType(val value: String) extends Product with Serializable {
-  override lazy val toString: String = value
-}
+sealed abstract class EntityType(val value: String) extends Product with Serializable
 
 object EntityType {
 
@@ -32,6 +32,8 @@ object EntityType {
   private[jsonld] final case class UrlEntityType(override val value: String) extends EntityType(value)
 
   implicit val entityTypeJsonEncoder: Encoder[EntityType] = Encoder.instance(t => Json.fromString(t.value))
+
+  implicit val show: Show[EntityType] = Show.show[EntityType] { case UrlEntityType(value) => value }
 }
 
 import cats.data.NonEmptyList
@@ -55,4 +57,6 @@ object EntityTypes {
       case multiple    => Json.arr(multiple.map(_.asJson): _*)
     }
   }
+
+  implicit val show: Show[EntityTypes] = Show.show[EntityTypes](_.list.map(_.show).nonEmptyIntercalate("; "))
 }

@@ -30,12 +30,14 @@ import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplici
 import ch.datascience.graph.model
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.GraphModelGenerators.authUsers
+import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Visibility
 import ch.datascience.http.client.AccessToken
-import ch.datascience.knowledgegraph.projects.ProjectsGenerators.projects
-import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
-import ch.datascience.rdfstore.entities.bundles._
-import ch.datascience.rdfstore.entities.bundles.exemplarLineageFlow.ExemplarData
+import ch.datascience.rdfstore.entities
+import ch.datascience.rdfstore.entities._
+import ch.datascience.rdfstore.entities.EntitiesGenerators._
+import ch.datascience.rdfstore.entities.LineageExemplarData
+import ch.datascience.rdfstore.entities.LineageExemplarData.ExemplarData
 import io.circe.Json
 import io.circe.literal._
 import io.renku.jsonld.JsonLD
@@ -57,25 +59,23 @@ class LineageQuerySpec
     with should.Matchers
     with ModelImplicits {
 
-  /**  ========================================== ORIGINAL GRAPH  ======================================================
-    *                                                   sha7 plot_data +----------------+
-    *                                                                                   |
-    *                                                                                   v
-    * sha3 zhbikes+---------------> sha8 renku run +------->bikesParquet +------------>sha9 renku run+------> grid_plot
-    *                                       ^                                                +
-    *                                       |                                                |
-    * sha7 clean_data +--------------------+                                                 +-----------> cumulative
-    */
-
   Feature("GraphQL query to find lineage") {
-    implicit val accessToken: AccessToken = accessTokens.generateOne
-    val project =
-      projects.generateOne.copy(path = model.projects.Path("public/lineage-project"), visibility = Visibility.Public)
 
-    val (jsons, exemplarData) = exemplarLineageFlow(project.path)
+    implicit val accessToken: AccessToken = accessTokens.generateOne
+    val project = dataProjects(
+      projectEntities[entities.Project.ForksCount.Zero](visibilityPublic)
+        .map(
+          _.copy(
+            path = projects.Path("public/lineage-project"),
+            agent = cliVersion
+          )
+        )
+    ).generateOne
+
+    val (jsons, exemplarData) = LineageExemplarData(project.entitiesProject)
 
     /**  ========================================== EXPECTED GRAPH  ====================================================
-      *  When looking for figs/grid_plot of commit 9
+      *  When looking for grid_plot of commit 9
       *                                                   sha7 plot_data +--------------+
       *                                                                                 |
       *                                                                                 v                   ------------
@@ -88,12 +88,7 @@ class LineageQuerySpec
     Scenario("As a user I would like to find project's lineage with a GraphQL query") {
 
       Given("some data in the RDF Store")
-      `data in the RDF store`(
-        project,
-        exemplarData.commitId,
-        exemplarData.committer,
-        JsonLD.arr(jsons: _*)
-      )()
+      `data in the RDF store`(project, JsonLD.arr(jsons: _*))
 
       When("user posts a graphql query to fetch lineage")
       val response = knowledgeGraphClient POST lineageQuery
@@ -115,7 +110,7 @@ class LineageQuerySpec
         namedLineageQuery,
         variables = Map(
           "projectPath" -> project.path.toString,
-          "filePath"    -> exemplarData.location.toString
+          "filePath"    -> exemplarData.`grid_plot entity`.location
         )
       )
 
@@ -137,15 +132,12 @@ class LineageQuerySpec
                                                           Gen.oneOf(Visibility.Private, Visibility.Internal).generateOne
       )
 
-      val (accessibleJsons, accessibleExemplarData) = exemplarLineageFlow(accessibleProject.path)
+      val (accessibleJsons, accessibleExemplarData) = LineageExemplarData(accessibleProject.path)
 
       Given("some data in the RDF Store with a project I am a member of")
-      `data in the RDF store`(
-        accessibleProject,
-        accessibleExemplarData.commitId,
-        accessibleExemplarData.committer,
-        JsonLD.arr(accessibleJsons: _*)
-      )(members = persons.generateOne.copy(maybeGitLabId = user.id.some).asMembersList())
+      `data in the RDF store`(accessibleProject, JsonLD.arr(accessibleJsons: _*))(members =
+        persons.generateOne.copy(maybeGitLabId = user.id.some).asMembersList()
+      )
 
       And("a project I am not a member of")
       val privateProject = projects.generateOne.copy(path = model.projects.Path("private/secret-project"),
@@ -153,13 +145,8 @@ class LineageQuerySpec
                                                        Gen.oneOf(Visibility.Private, Visibility.Internal).generateOne
       )
 
-      val (privateJsons, privateExemplarData) = exemplarLineageFlow(privateProject.path)
-      `data in the RDF store`(
-        privateProject,
-        privateExemplarData.commitId,
-        privateExemplarData.committer,
-        JsonLD.arr(privateJsons: _*)
-      )()
+      val (privateJsons, privateExemplarData) = LineageExemplarData(privateProject.path)
+      `data in the RDF store`(privateProject, JsonLD.arr(privateJsons: _*))
 
       And("I am authenticated")
       `GET <gitlabApi>/user returning OK`(user)
@@ -208,13 +195,8 @@ class LineageQuerySpec
                                                        Gen.oneOf(Visibility.Private, Visibility.Internal).generateOne
       )
 
-      val (privateJsons, examplarData) = exemplarLineageFlow(privateProject.path)
-      `data in the RDF store`(
-        privateProject,
-        commitIds.generateOne,
-        persons.generateOne,
-        JsonLD.arr(privateJsons: _*)
-      )()
+      val (privateJsons, examplarData) = LineageExemplarData(privateProject.path)
+      `data in the RDF store`(privateProject, JsonLD.arr(privateJsons: _*))
 
       When("user posts a graphql query to fetch lineage")
       val response = knowledgeGraphClient.POST(namedLineageQuery,
@@ -265,12 +247,12 @@ class LineageQuerySpec
     import exemplarData._
     Right {
       Set(
-        json"""{"source": ${`sha3 zhbikes`.location},    "target": ${`sha8 renku run`.location}}""",
-        json"""{"source": ${`sha7 plot_data`.location},  "target": ${`sha9 renku run`.location}}""",
-        json"""{"source": ${`sha7 clean_data`.location}, "target": ${`sha8 renku run`.location}}""",
-        json"""{"source": ${`sha8 renku run`.location},  "target": ${`sha8 parquet`.location}}""",
+        json"""{"source": ${`zhbikes folder`.location},    "target": ${`plan1 execution1`.location}}""",
+        json"""{"source": ${`plot_data entity`.location},  "target": ${`sha9 renku run`.location}}""",
+        json"""{"source": ${`clean_data entity`.location}, "target": ${`plan1 execution1`.location}}""",
+        json"""{"source": ${`plan1 execution1`.location},  "target": ${`sha8 parquet`.location}}""",
         json"""{"source": ${`sha8 parquet`.location},    "target": ${`sha9 renku run`.location}}""",
-        json"""{"source": ${`sha9 renku run`.location},  "target": ${`sha9 grid_plot`.location}}"""
+        json"""{"source": ${`sha9 renku run`.location},  "target": ${`grid_plot entity`.location}}"""
       )
     }
   }
@@ -279,13 +261,13 @@ class LineageQuerySpec
     import exemplarData._
     Right {
       Set(
-        json"""{"id": ${`sha3 zhbikes`.location},    "location": ${`sha3 zhbikes`.location},    "label": ${`sha3 zhbikes`.label},    "type": ${`sha3 zhbikes`.singleWordType}   }""",
-        json"""{"id": ${`sha7 clean_data`.location}, "location": ${`sha7 clean_data`.location}, "label": ${`sha7 clean_data`.label}, "type": ${`sha7 clean_data`.singleWordType}}""",
-        json"""{"id": ${`sha7 plot_data`.location},  "location": ${`sha7 plot_data`.location},  "label": ${`sha7 plot_data`.label},  "type": ${`sha7 plot_data`.singleWordType} }""",
-        json"""{"id": ${`sha8 renku run`.location},  "location": ${`sha8 renku run`.location},  "label": ${`sha8 renku run`.label},  "type": ${`sha8 renku run`.singleWordType} }""",
+        json"""{"id": ${`zhbikes folder`.location},    "location": ${`zhbikes folder`.location},    "label": ${`zhbikes folder`.label},    "type": ${`zhbikes folder`.singleWordType}   }""",
+        json"""{"id": ${`clean_data entity`.location}, "location": ${`clean_data entity`.location}, "label": ${`clean_data entity`.label}, "type": ${`clean_data entity`.singleWordType}}""",
+        json"""{"id": ${`plot_data entity`.location},  "location": ${`plot_data entity`.location},  "label": ${`plot_data entity`.label},  "type": ${`plot_data entity`.singleWordType} }""",
+        json"""{"id": ${`plan1 execution1`.location},  "location": ${`plan1 execution1`.location},  "label": ${`plan1 execution1`.label},  "type": ${`plan1 execution1`.singleWordType} }""",
         json"""{"id": ${`sha8 parquet`.location},    "location": ${`sha8 parquet`.location},    "label": ${`sha8 parquet`.label},    "type": ${`sha8 parquet`.singleWordType}   }""",
         json"""{"id": ${`sha9 renku run`.location},  "location": ${`sha9 renku run`.location},  "label": ${`sha9 renku run`.label},  "type": ${`sha9 renku run`.singleWordType} }""",
-        json"""{"id": ${`sha9 grid_plot`.location},  "location": ${`sha9 grid_plot`.location},  "label": ${`sha9 grid_plot`.label},  "type": ${`sha9 grid_plot`.singleWordType} }"""
+        json"""{"id": ${`grid_plot entity`.location},  "location": ${`grid_plot entity`.location},  "label": ${`grid_plot entity`.label},  "type": ${`grid_plot entity`.singleWordType} }"""
       )
     }
   }
