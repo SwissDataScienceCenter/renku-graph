@@ -19,7 +19,7 @@
 package ch.datascience.rdfstore.entities
 
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.rdfstore.entities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter, Name}
+import ch.datascience.rdfstore.entities.CommandParameterBase.{CommandInput, CommandInputOrOutput, CommandOutput, CommandParameter, Name}
 import ch.datascience.rdfstore.entities.ParameterValue.PathParameterValue.{InputParameterValue, OutputParameterValue}
 import ch.datascience.rdfstore.entities.ParameterValue.VariableParameterValue.ValueOverride
 import ch.datascience.rdfstore.entities.ParameterValue._
@@ -39,6 +39,7 @@ sealed trait ParameterValue {
 object ParameterValue {
 
   sealed trait PathParameterValue extends ParameterValue {
+    override type ValueReference <: CommandInputOrOutput
     val id:       Id
     val name:     Name
     val location: Location

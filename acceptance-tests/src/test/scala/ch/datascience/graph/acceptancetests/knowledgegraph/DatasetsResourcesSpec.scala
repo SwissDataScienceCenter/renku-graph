@@ -18,12 +18,10 @@
 
 package ch.datascience.graph.acceptancetests.knowledgegraph
 
-import cats.data.NonEmptyList
 import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.acceptancetests.data
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning._
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
@@ -31,27 +29,19 @@ import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TestReadabilityTools._
-import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets
-import ch.datascience.graph.model.datasets.{DatePublished, Description, Identifier, Name, Title}
-import ch.datascience.graph.model.events.{CommitId, CommittedDate}
+import ch.datascience.graph.model.datasets.{DatePublished, Identifier, Title}
 import ch.datascience.graph.model.projects.Visibility
-import ch.datascience.graph.model.users.{Name => UserName}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.http.rest.Links.{Href, Rel, _links}
 import ch.datascience.http.server.EndpointTester._
-import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.knowledgegraph.datasets.model._
-import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
-import ch.datascience.knowledgegraph.projects.model.Forking.ForksCount
-import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.rdfstore.entities
 import ch.datascience.rdfstore.entities.EntitiesGenerators._
 import ch.datascience.rdfstore.entities.ModelOps.DatasetForkingResult
 import ch.datascience.rdfstore.entities.Person
-import ch.datascience.rdfstore.entities.Project.ForksCount
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import eu.timepit.refined.auto._
 import io.circe.literal._

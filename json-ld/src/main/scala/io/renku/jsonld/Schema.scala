@@ -18,6 +18,8 @@
 
 package io.renku.jsonld
 
+import cats.Show
+
 abstract class Schema(url: String, separator: String) extends Product with Serializable {
   def /(name: String): Property = Property(s"$url$separator$name")
   def /(name: Number): Property = Property(s"$url$separator$name")
@@ -28,6 +30,10 @@ abstract class Schema(url: String, separator: String) extends Product with Seria
 
 final case class Property(url: String) {
   override lazy val toString: String = url
+}
+
+object Property {
+  implicit val show: Show[Property] = Show.show(_.url)
 }
 
 object Schema {

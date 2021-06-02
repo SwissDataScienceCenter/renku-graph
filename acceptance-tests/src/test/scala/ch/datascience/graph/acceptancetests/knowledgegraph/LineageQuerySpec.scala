@@ -28,21 +28,17 @@ import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import ch.datascience.graph.model
-import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.GraphModelGenerators.authUsers
 import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.Visibility
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.entities
-import ch.datascience.rdfstore.entities._
-import ch.datascience.rdfstore.entities.EntitiesGenerators._
-import ch.datascience.rdfstore.entities.LineageExemplarData
 import ch.datascience.rdfstore.entities.LineageExemplarData.ExemplarData
+import ch.datascience.rdfstore.entities.Project.ForksCount
+import ch.datascience.rdfstore.entities.{LineageExemplarData, prov, wfprov, _}
 import io.circe.Json
 import io.circe.literal._
 import io.renku.jsonld.JsonLD
 import org.http4s.Status._
-import org.scalacheck.Gen
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
@@ -74,7 +70,7 @@ class LineageQuerySpec
 
     val (jsons, exemplarData) = LineageExemplarData(project.entitiesProject)
 
-    /**  ========================================== EXPECTED GRAPH  ====================================================
+    /**  ========================================== EXPECTED GRAPH  ==========================================
       *  When looking for grid_plot of commit 9
       *                                                   sha7 plot_data +--------------+
       *                                                                                 |
@@ -127,26 +123,24 @@ class LineageQuerySpec
     implicit val accessToken: AccessToken = user.accessToken
     Scenario("As an authenticated user I would like to find lineage of project I am a member of with a GraphQL query") {
 
-      val accessibleProject = projects.generateOne.copy(path = model.projects.Path("accessible/member-project"),
-                                                        visibility =
-                                                          Gen.oneOf(Visibility.Private, Visibility.Internal).generateOne
+      val accessibleProject = projectEntities[ForksCount.Zero](visibilityNonPublic).generateOne.copy(
+        path = model.projects.Path("accessible/member-project"),
+        members = Set(persons.generateOne.copy(maybeGitLabId = user.id.some))
       )
 
-      val (accessibleJsons, accessibleExemplarData) = LineageExemplarData(accessibleProject.path)
+      val (accessibleJsons, accessibleExemplarData) = LineageExemplarData(accessibleProject)
 
       Given("some data in the RDF Store with a project I am a member of")
-      `data in the RDF store`(accessibleProject, JsonLD.arr(accessibleJsons: _*))(members =
-        persons.generateOne.copy(maybeGitLabId = user.id.some).asMembersList()
-      )
+      `data in the RDF store`(dataProjects(accessibleProject).generateOne, JsonLD.arr(accessibleJsons: _*))
 
       And("a project I am not a member of")
-      val privateProject = projects.generateOne.copy(path = model.projects.Path("private/secret-project"),
-                                                     visibility =
-                                                       Gen.oneOf(Visibility.Private, Visibility.Internal).generateOne
-      )
+      val privateProject =
+        projectEntities[entities.Project.ForksCount.Zero](visibilityNonPublic).generateOne.copy(
+          path = model.projects.Path("private/secret-project")
+        )
 
-      val (privateJsons, privateExemplarData) = LineageExemplarData(privateProject.path)
-      `data in the RDF store`(privateProject, JsonLD.arr(privateJsons: _*))
+      val (privateJsons, privateExemplarData) = LineageExemplarData(privateProject)
+      `data in the RDF store`(dataProjects(privateProject).generateOne, JsonLD.arr(privateJsons: _*))
 
       And("I am authenticated")
       `GET <gitlabApi>/user returning OK`(user)
@@ -157,7 +151,7 @@ class LineageQuerySpec
           namedLineageQuery,
           variables = Map(
             "projectPath" -> accessibleProject.path.toString,
-            "filePath"    -> accessibleExemplarData.location.toString
+            "filePath"    -> accessibleExemplarData.`grid_plot entity`.location
           ),
           maybeAccessToken = accessToken.some
         )
@@ -175,7 +169,7 @@ class LineageQuerySpec
           namedLineageQuery,
           variables = Map(
             "projectPath" -> privateProject.path.toString,
-            "filePath"    -> privateExemplarData.location.toString
+            "filePath"    -> privateExemplarData.`grid_plot entity`.location
           ),
           maybeAccessToken = accessToken.some
         )
@@ -190,19 +184,18 @@ class LineageQuerySpec
 
     Scenario("As an unauthenticated user I should not be able to find a lineage from a private project") {
       Given("some data in the RDF Store with a project I am a member of")
-      val privateProject = projects.generateOne.copy(path = model.projects.Path("unauthenticated/private-project"),
-                                                     visibility =
-                                                       Gen.oneOf(Visibility.Private, Visibility.Internal).generateOne
+      val privateProject = projectEntities[ForksCount.Zero](visibilityNonPublic).generateOne.copy(
+        path = model.projects.Path("unauthenticated/private-project")
       )
 
-      val (privateJsons, examplarData) = LineageExemplarData(privateProject.path)
-      `data in the RDF store`(privateProject, JsonLD.arr(privateJsons: _*))
+      val (privateJsons, examplarData) = LineageExemplarData(privateProject)
+      `data in the RDF store`(dataProjects(privateProject).generateOne, JsonLD.arr(privateJsons: _*))
 
       When("user posts a graphql query to fetch lineage")
       val response = knowledgeGraphClient.POST(namedLineageQuery,
                                                variables = Map(
                                                  "projectPath" -> privateProject.path.toString,
-                                                 "filePath"    -> examplarData.location.toString
+                                                 "filePath"    -> examplarData.`grid_plot entity`.location
                                                )
       )
 
@@ -243,43 +236,43 @@ class LineageQuerySpec
       }
     }"""
 
-  def theExpectedEdges(exemplarData: ExemplarData) = {
+  private def theExpectedEdges(exemplarData: ExemplarData) = {
     import exemplarData._
     Right {
       Set(
-        json"""{"source": ${`zhbikes folder`.location},    "target": ${`plan1 execution1`.location}}""",
-        json"""{"source": ${`plot_data entity`.location},  "target": ${`sha9 renku run`.location}}""",
-        json"""{"source": ${`clean_data entity`.location}, "target": ${`plan1 execution1`.location}}""",
-        json"""{"source": ${`plan1 execution1`.location},  "target": ${`sha8 parquet`.location}}""",
-        json"""{"source": ${`sha8 parquet`.location},    "target": ${`sha9 renku run`.location}}""",
-        json"""{"source": ${`sha9 renku run`.location},  "target": ${`grid_plot entity`.location}}"""
+        json"""{"source": ${`zhbikes folder`.location},     "target": ${`activity3 plan1`.location}}""",
+        json"""{"source": ${`clean_data entity`.location},  "target": ${`activity3 plan1`.location}}""",
+        json"""{"source": ${`activity3 plan1`.location},    "target": ${`bikesparquet entity`.location}}""",
+        json"""{"source": ${`bikesparquet entity`.location},"target": ${`activity4 plan2`.location}}""",
+        json"""{"source": ${`plot_data entity`.location},   "target": ${`activity4 plan2`.location}}""",
+        json"""{"source": ${`activity4 plan2`.location},    "target": ${`grid_plot entity`.location}}"""
       )
     }
   }
 
-  def theExpectedNodes(exemplarData: ExemplarData) = {
+  private def theExpectedNodes(exemplarData: ExemplarData) = {
     import exemplarData._
     Right {
       Set(
-        json"""{"id": ${`zhbikes folder`.location},    "location": ${`zhbikes folder`.location},    "label": ${`zhbikes folder`.label},    "type": ${`zhbikes folder`.singleWordType}   }""",
-        json"""{"id": ${`clean_data entity`.location}, "location": ${`clean_data entity`.location}, "label": ${`clean_data entity`.label}, "type": ${`clean_data entity`.singleWordType}}""",
-        json"""{"id": ${`plot_data entity`.location},  "location": ${`plot_data entity`.location},  "label": ${`plot_data entity`.label},  "type": ${`plot_data entity`.singleWordType} }""",
-        json"""{"id": ${`plan1 execution1`.location},  "location": ${`plan1 execution1`.location},  "label": ${`plan1 execution1`.label},  "type": ${`plan1 execution1`.singleWordType} }""",
-        json"""{"id": ${`sha8 parquet`.location},    "location": ${`sha8 parquet`.location},    "label": ${`sha8 parquet`.label},    "type": ${`sha8 parquet`.singleWordType}   }""",
-        json"""{"id": ${`sha9 renku run`.location},  "location": ${`sha9 renku run`.location},  "label": ${`sha9 renku run`.label},  "type": ${`sha9 renku run`.singleWordType} }""",
-        json"""{"id": ${`grid_plot entity`.location},  "location": ${`grid_plot entity`.location},  "label": ${`grid_plot entity`.label},  "type": ${`grid_plot entity`.singleWordType} }"""
+        json"""{"id": ${`zhbikes folder`.location},      "location": ${`zhbikes folder`.location},      "label": ${`zhbikes folder`.label},      "type": ${`zhbikes folder`.singleWordType}   }""",
+        json"""{"id": ${`activity3 plan1`.location},     "location": ${`activity3 plan1`.location},     "label": ${`activity3 plan1`.label},     "type": ${`activity3 plan1`.singleWordType}}""",
+        json"""{"id": ${`clean_data entity`.location},   "location": ${`clean_data entity`.location},   "label": ${`clean_data entity`.label},   "type": ${`clean_data entity`.singleWordType}}""",
+        json"""{"id": ${`bikesparquet entity`.location}, "location": ${`bikesparquet entity`.location}, "label": ${`bikesparquet entity`.label}, "type": ${`bikesparquet entity`.singleWordType} }""",
+        json"""{"id": ${`plot_data entity`.location},    "location": ${`plot_data entity`.location},    "label": ${`plot_data entity`.label},    "type": ${`plot_data entity`.singleWordType} }""",
+        json"""{"id": ${`activity4 plan2`.location},     "location": ${`activity4 plan2`.location},     "label": ${`activity4 plan2`.label},     "type": ${`activity4 plan2`.singleWordType} }""",
+        json"""{"id": ${`grid_plot entity`.location},    "location": ${`grid_plot entity`.location},    "label": ${`grid_plot entity`.label},    "type": ${`grid_plot entity`.singleWordType} }"""
       )
     }
   }
 
   private implicit class NodeOps(node: NodeDef) {
 
-    private lazy val FileTypes = Set("http://www.w3.org/ns/prov#Entity", "http://purl.org/wf4ever/wfprov#Artifact")
+    private lazy val FileTypes = Set((prov / "Entity").show, (wfprov / "Artifact").show)
 
     lazy val singleWordType: String = node.types match {
-      case types if types contains "http://purl.org/wf4ever/wfprov#ProcessRun" => "ProcessRun"
-      case types if types contains "http://www.w3.org/ns/prov#Collection"      => "Directory"
-      case FileTypes                                                           => "File"
+      case types if types contains (prov / "Activity").show   => "ProcessRun"
+      case types if types contains (prov / "Collection").show => "Directory"
+      case FileTypes                                          => "File"
     }
   }
 }

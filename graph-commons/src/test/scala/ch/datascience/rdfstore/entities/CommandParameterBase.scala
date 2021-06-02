@@ -94,7 +94,9 @@ object CommandParameterBase {
       )
   }
 
-  sealed trait CommandInput extends CommandParameterBase {
+  sealed trait CommandInputOrOutput extends CommandParameterBase
+
+  sealed trait CommandInput extends CommandInputOrOutput {
     override type DefaultValue = InputDefaultValue
     val temporary:           Temporary
     val maybeEncodingFormat: Option[EncodingFormat]
@@ -202,7 +204,7 @@ object CommandParameterBase {
       EntityIdEncoder.instance(input => input.runPlan.asEntityId.asUrlEntityId / "inputs" / input.position)
   }
 
-  sealed trait CommandOutput extends CommandParameterBase {
+  sealed trait CommandOutput extends CommandInputOrOutput {
     override type DefaultValue = OutputDefaultValue
     val temporary:           Temporary
     val maybeEncodingFormat: Option[EncodingFormat]
@@ -351,8 +353,8 @@ object CommandParameterBase {
   }
 
   object IOStream {
-    trait In           extends IOStream
-    trait Out          extends IOStream
+    sealed trait In    extends IOStream
+    sealed trait Out   extends IOStream
     case object StdIn  extends IOStream("stdin") with In
     case object StdOut extends IOStream("stdout") with Out
     case object StdErr extends IOStream("stderr") with Out

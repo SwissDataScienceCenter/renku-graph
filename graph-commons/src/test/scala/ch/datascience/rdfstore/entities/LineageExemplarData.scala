@@ -25,9 +25,10 @@ import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.CommandParameterBase.CommandInput._
+import ch.datascience.rdfstore.entities.CommandParameterBase.CommandOutput.{LocationCommandOutput, MappedCommandOutput}
 import ch.datascience.rdfstore.entities.CommandParameterBase._
 import ch.datascience.rdfstore.entities.Entity.InputEntity
-import ch.datascience.rdfstore.entities.ParameterValue.PathParameterValue.InputParameterValue
+import ch.datascience.rdfstore.entities.ParameterValue.PathParameterValue.{InputParameterValue, OutputParameterValue}
 import ch.datascience.rdfstore.entities.ParameterValue.VariableParameterValue
 import ch.datascience.rdfstore.entities.Project.ForksCount
 import ch.datascience.rdfstore.entities.RunPlan.{Command, CommandParameters}
@@ -147,7 +148,9 @@ object LineageExemplarData {
           project
       )
       .planParameterInputsValues(
-        cleanData     -> activity1RunPlan1.findUsagesChecksum(cleanData).getOrElse(s"No usage for $cleanData"),
+        cleanData -> activity1RunPlan1
+          .findUsagesChecksum(cleanData)
+          .getOrElse(throw new Exception(s"No usage for $cleanData")),
         zhbikesFolder -> entityChecksums.generateOne
       )
       .buildProvenanceGraph
@@ -236,6 +239,7 @@ private object NodeDef {
   private implicit lazy val parameterValueShow: Show[ParameterValue] = Show.show {
     case value: VariableParameterValue => (value.valueReference -> value.value).show
     case value: InputParameterValue    => (value.valueReference -> value.location).show
+    case value: OutputParameterValue   => (value.valueReference -> value.location).show
   }
 
   private implicit lazy val variableParameterValueShow: Show[(CommandParameter, VariableParameterValue.ValueOverride)] =
@@ -243,11 +247,17 @@ private object NodeDef {
       param.maybePrefix.fold(valueOverride.toString)(prefix => s"$prefix$valueOverride")
     }
 
-  private implicit def pathParameterValueShow[P <: CommandParameterBase]: Show[(P, Location)] =
+  private implicit def pathParameterValueShow[P <: CommandInputOrOutput]: Show[(P, Location)] =
     Show.show {
       case (param: LocationCommandInput, location) =>
         param.maybePrefix.fold(location.toString)(prefix => s"$prefix$location")
       case (param: MappedCommandInput, location) =>
+        param.maybePrefix.fold(s"${param.mappedTo.show} $location")(prefix =>
+          s"$prefix ${param.mappedTo.show} $location"
+        )
+      case (param: LocationCommandOutput, location) =>
+        param.maybePrefix.fold(location.toString)(prefix => s"$prefix$location")
+      case (param: MappedCommandOutput, location) =>
         param.maybePrefix.fold(s"${param.mappedTo.show} $location")(prefix =>
           s"$prefix ${param.mappedTo.show} $location"
         )
