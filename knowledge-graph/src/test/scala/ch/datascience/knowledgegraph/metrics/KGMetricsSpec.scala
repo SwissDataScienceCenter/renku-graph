@@ -19,14 +19,13 @@
 package ch.datascience.knowledgegraph.metrics
 
 import java.lang.Thread.sleep
-
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.Schemas.{prov, schema}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
-import ch.datascience.knowledgegraph.metrics.MetricsGenerators._
 import ch.datascience.metrics.LabeledGauge
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -44,15 +43,15 @@ class KGMetricsSpec extends AnyWordSpec with MockFactory with Eventually with In
 
     "update the gauges with the fetched values" in new TestCase {
 
-      val counts = entitiesCountGen.generateOne
+      val counts = groupingCountGen.generateOne
       (statsFinder.entitiesCount _)
         .expects()
         .returning(counts.pure[IO])
         .atLeastOnce()
 
-      counts foreach { case (entityType, count) =>
+      counts foreach { case (grouping, count) =>
         (countsGauge.set _)
-          .expects(entityType -> count.value.toDouble)
+          .expects(grouping -> count.value.toDouble)
           .returning(IO.unit)
           .atLeastOnce()
       }
@@ -68,9 +67,9 @@ class KGMetricsSpec extends AnyWordSpec with MockFactory with Eventually with In
       val exception1 = exceptions.generateOne
       (statsFinder.entitiesCount _)
         .expects()
-        .returning(exception1.raiseError[IO, Map[EntityType, EntitiesCount]])
+        .returning(exception1.raiseError[IO, Map[EntityLabel, Count]])
 
-      val statuses = entitiesCountGen.generateOne
+      val statuses = groupingCountGen.generateOne
       (statsFinder.entitiesCount _)
         .expects()
         .returning(statuses.pure[IO])
@@ -94,10 +93,10 @@ class KGMetricsSpec extends AnyWordSpec with MockFactory with Eventually with In
   }
 
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
-  private implicit val timer:        Timer[IO]        = IO.timer(ExecutionContext.global)
+  private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
 
   private trait TestGauges {
-    lazy val countsGauge = mock[LabeledGauge[IO, EntityType]]
+    lazy val countsGauge = mock[LabeledGauge[IO, EntityLabel]]
   }
 
   private trait TestCase extends TestGauges {
@@ -112,10 +111,18 @@ class KGMetricsSpec extends AnyWordSpec with MockFactory with Eventually with In
     )
   }
 
-  private lazy val entitiesCountGen: Gen[Map[EntityType, EntitiesCount]] = nonEmptySet {
+  private lazy val groupingCountGen: Gen[Map[EntityLabel, Count]] = nonEmptySet {
     for {
-      entityType <- entitiesTypes
-      count      <- nonNegativeLongs() map (long => EntitiesCount(long.value))
+      entityType <- groupings
+      count <- nonNegativeLongs() map (long => Count(long.value))
     } yield entityType -> count
   }.map(_.toMap)
+
+  private lazy val groupings: Gen[EntityLabel] = Gen
+    .oneOf(
+      schema / "Dataset",
+      schema / "Project",
+      prov / "Activity"
+    )
+    .map(objectType => EntityLabel(objectType.toString))
 }

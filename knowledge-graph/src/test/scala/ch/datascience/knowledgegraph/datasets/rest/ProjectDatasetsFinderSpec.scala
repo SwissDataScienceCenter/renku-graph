@@ -99,7 +99,7 @@ class ProjectDatasetsFinderSpec
     }
 
     "return all datasets of the given project without merging datasets having the same sameAs" in new TestCase {
-      val project                     = projectEntities[Project.ForksCount.Zero]().generateOne
+      val project                     = projectEntities[Project.ForksCount.Zero](visibilityNonPublic).generateOne
       val dataset1 :: dataset2 :: Nil = importedExternalDatasetEntities(sharedInProjects = 2).generateOne
 
       loadToStore(

@@ -31,24 +31,24 @@ object EntityGenerators {
     lazy val toDatasetProject: DatasetProject =
       DatasetProject(project.path, project.name)
   }
-
-  private def activities(project: Project[_]): Gen[Activity] = for {
-    commitId      <- commitIds
-    committedDate <- committedDates
-    committer     <- persons
-    cliVersion    <- cliVersions
-    comment       <- nonEmptyStrings()
-  } yield Activity(
-    commitId,
-    committedDate,
-    committer,
-    project,
-    Agent(cliVersion),
-    comment,
-    None,
-    None,
-    None,
-    Nil
-  )
+//
+//  private def activities(project: Project[_]): Gen[Activity] = for {
+//    commitId      <- commitIds
+//    committedDate <- committedDates
+//    committer     <- persons
+//    cliVersion    <- cliVersions
+//    comment       <- nonEmptyStrings()
+//  } yield Activity(
+//    commitId,
+//    committedDate,
+//    committer,
+//    project,
+//    Agent(cliVersion),
+//    comment,
+//    None,
+//    None,
+//    None,
+//    Nil
+//  )
 
 }

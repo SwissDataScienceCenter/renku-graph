@@ -35,7 +35,7 @@ trait KGMetrics[Interpretation[_]] {
 class KGMetricsImpl(
     statsFinder:    StatsFinder[IO],
     logger:         Logger[IO],
-    countsGauge:    LabeledGauge[IO, EntityType],
+    countsGauge:    LabeledGauge[IO, EntityLabel],
     initialDelay:   FiniteDuration = IOKGMetrics.initialDelay,
     countsInterval: FiniteDuration = IOKGMetrics.countsInterval
 )(implicit ME:      MonadError[IO, Throwable], timer: Timer[IO], cs: ContextShift[IO])
@@ -44,7 +44,7 @@ class KGMetricsImpl(
   def run(): IO[Unit] =
     for {
       _ <- timer sleep initialDelay
-      _ <- updateCounts()
+      _ <- updateCounts().foreverM[Unit]
     } yield ()
 
   private def updateCounts(): IO[Unit] = {
@@ -52,21 +52,18 @@ class KGMetricsImpl(
       counts <- statsFinder.entitiesCount()
       _      <- (counts map toCountsGauge).toList.sequence
       _      <- timer sleep countsInterval
-      _      <- updateCounts()
     } yield ()
-  } recoverWith logAndRetry(continueWith = updateCounts())
+  } recoverWith logAndRetry
 
-  private lazy val toCountsGauge: ((EntityType, EntitiesCount)) => IO[Unit] = { case (status, count) =>
+  private lazy val toCountsGauge: ((EntityLabel, Count)) => IO[Unit] = { case (status, count) =>
     countsGauge set status -> count.value.toDouble
   }
 
-  private def logAndRetry(continueWith: => IO[Unit]): PartialFunction[Throwable, IO[Unit]] = {
-    case NonFatal(exception) =>
-      for {
-        _ <- logger.error(exception)("Problem with gathering metrics")
-        _ <- timer sleep initialDelay
-        _ <- continueWith
-      } yield ()
+  private lazy val logAndRetry: PartialFunction[Throwable, IO[Unit]] = { case NonFatal(exception) =>
+    for {
+      _ <- logger.error(exception)("Problem with gathering metrics")
+      _ <- timer sleep initialDelay
+    } yield ()
   }
 }
 
@@ -87,7 +84,7 @@ object IOKGMetrics {
   )(implicit contextShift: ContextShift[IO], timer: Timer[IO]): IO[KGMetrics[IO]] =
     for {
       entitiesCountGauge <-
-        Gauge[IO, EntityType](
+        Gauge[IO, EntityLabel](
           name = "entities_count",
           help = "Total object by type.",
           labelName = "entities"

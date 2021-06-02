@@ -18,15 +18,27 @@
 
 package ch.datascience.knowledgegraph.metrics
 
-import ch.datascience.tinytypes.{LongTinyType, TinyTypeFactory}
-import io.circe.Decoder
+import ch.datascience.graph.Schemas
+import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.json.TinyTypeDecoders.longDecoder
+import ch.datascience.tinytypes.{LongTinyType, StringTinyType, TinyTypeFactory}
+import io.circe.Decoder
 
-final class EntitiesCount private (val value: Long) extends AnyVal with LongTinyType
-object EntitiesCount extends TinyTypeFactory[EntitiesCount](new EntitiesCount(_)) {
-  implicit val decoder: Decoder[EntitiesCount] = longDecoder(EntitiesCount)
+private final class Count private (val value: Long) extends AnyVal with LongTinyType
+private object Count extends TinyTypeFactory[Count](new Count(_)) {
+  implicit val decoder: Decoder[Count] = longDecoder(Count)
   addConstraint(
     check = _ >= 0L,
     message = _ => s"$typeName has to be >= 0"
   )
+}
+
+private final class EntityLabel private (val value: String) extends AnyVal with StringTinyType
+private object EntityLabel extends TinyTypeFactory[EntityLabel](new EntityLabel(_)) with NonBlank {
+  private val allSchemas = Schemas.all.map(_.toString)
+  override val transform: String => Either[Throwable, String] = entityType =>
+    allSchemas
+      .find(schema => entityType.startsWith(schema))
+      .map(schema => entityType.replace(schema, ""))
+      .toRight(left = new IllegalArgumentException(s"$entityType not recognizable"))
 }
