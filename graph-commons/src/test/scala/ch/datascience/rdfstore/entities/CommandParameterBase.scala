@@ -18,10 +18,11 @@
 
 package ch.datascience.rdfstore.entities
 
+import cats.syntax.all._
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.rdfstore.entities.CommandParameterBase.CommandParameter.ParameterDefaultValue
 import ch.datascience.rdfstore.entities.CommandParameterBase.CommandInput.InputDefaultValue
 import ch.datascience.rdfstore.entities.CommandParameterBase.CommandOutput.{FolderCreation, OutputDefaultValue}
+import ch.datascience.rdfstore.entities.CommandParameterBase.CommandParameter.ParameterDefaultValue
 import ch.datascience.rdfstore.entities.CommandParameterBase._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
@@ -143,14 +144,10 @@ object CommandParameterBase {
       val mappedTo: IOStream.In = IOStream.StdIn
     }
 
-    final class InputDefaultValue private (val value: String) extends AnyVal with RelativePathTinyType {
-      def asLocation: Location = Location(value)
-    }
-    object InputDefaultValue
-        extends TinyTypeFactory[InputDefaultValue](new InputDefaultValue(_))
-        with RelativePath
-        with RelativePathOps[InputDefaultValue] {
-      def apply(location: Location): InputDefaultValue = InputDefaultValue(location.value)
+    final case class InputDefaultValue(value: Location) extends TinyType { type V = Location }
+    object InputDefaultValue {
+      implicit val jsonLDEncoder: JsonLDEncoder[InputDefaultValue] =
+        JsonLDEncoder[Location].contramap[InputDefaultValue](_.value)
     }
 
     implicit def commandInputEncoder[I <: CommandInput](implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[I] =
@@ -254,14 +251,9 @@ object CommandParameterBase {
                                          runPlan:             RunPlan
     ) extends CommandOutput
 
-    final class OutputDefaultValue private (val value: String) extends AnyVal with RelativePathTinyType {
-      def asLocation: Location = Location(value)
-    }
-    object OutputDefaultValue
-        extends TinyTypeFactory[OutputDefaultValue](new OutputDefaultValue(_))
-        with RelativePath
-        with RelativePathOps[OutputDefaultValue] {
-      def apply(location: Location): OutputDefaultValue = OutputDefaultValue(location.value)
+    final case class OutputDefaultValue(value: Location) extends TinyType { type V = Location }
+    object OutputDefaultValue {
+      implicit val jsonLDEncoder: JsonLDEncoder[OutputDefaultValue] = JsonLDEncoder[Location].contramap(_.value)
     }
 
     final class FolderCreation private (val value: Boolean) extends AnyVal with BooleanTinyType

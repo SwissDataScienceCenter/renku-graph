@@ -125,7 +125,6 @@ object datasets {
         case s"$_/datasets/$identifier" => Identifier(identifier)
         case url                        => throw new Exception(s"Unknown sameAs URL pattern: $url")
       }
-
     }
   }
 

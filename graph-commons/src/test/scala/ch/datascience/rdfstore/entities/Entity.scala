@@ -19,7 +19,7 @@
 package ch.datascience.rdfstore.entities
 
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.rdfstore.entities.Entity.Checksum
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
@@ -44,24 +44,30 @@ object Entity {
   final class Checksum private (val value: String) extends AnyVal with StringTinyType
   object Checksum extends TinyTypeFactory[Checksum](new Checksum(_)) with NonBlank
 
-  implicit def encoder[E <: Entity](implicit renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[E] =
-    JsonLDEncoder.instance {
-      case entity @ InputEntity(location, checksum) =>
-        JsonLD.entity(
-          entity.asEntityId,
-          EntityTypes of (prov / "Entity", wfprov / "Artifact"),
-          prov / "atLocation" -> location.asJsonLD,
-          renku / "checksum"  -> checksum.asJsonLD
-        )
-      case entity @ OutputEntity(location, checksum, generation) =>
-        JsonLD.entity(
-          entity.asEntityId,
-          EntityTypes of (prov / "Entity", wfprov / "Artifact"),
-          prov / "atLocation"          -> location.asJsonLD,
-          renku / "checksum"           -> checksum.asJsonLD,
-          prov / "qualifiedGeneration" -> generation.asEntityId.asJsonLD
-        )
+  implicit def encoder[E <: Entity](implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[E] = JsonLDEncoder.instance {
+    case entity @ InputEntity(location, checksum) =>
+      JsonLD.entity(
+        entity.asEntityId,
+        toEntityTypes(entity),
+        prov / "atLocation" -> location.asJsonLD,
+        renku / "checksum"  -> checksum.asJsonLD
+      )
+    case entity @ OutputEntity(location, checksum, generation) =>
+      JsonLD.entity(
+        entity.asEntityId,
+        toEntityTypes(entity),
+        prov / "atLocation"          -> location.asJsonLD,
+        renku / "checksum"           -> checksum.asJsonLD,
+        prov / "qualifiedGeneration" -> generation.asEntityId.asJsonLD
+      )
+  }
+
+  private lazy val toEntityTypes: Entity => EntityTypes = { entity =>
+    entity.location match {
+      case Location.File(_)   => EntityTypes of (prov / "Entity", wfprov / "Artifact")
+      case Location.Folder(_) => EntityTypes of (prov / "Entity", wfprov / "Artifact", prov / "Collection")
     }
+  }
 
   implicit def entityIdEncoder[E <: Entity](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[E] =
     EntityIdEncoder.instance(entity => EntityId of renkuBaseUrl / "blob" / entity.checksum / entity.location)

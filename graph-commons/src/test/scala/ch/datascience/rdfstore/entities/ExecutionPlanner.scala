@@ -130,7 +130,7 @@ final case class ExecutionPlanner(runPlan:                  RunPlan,
       outputsValueOverrides
         .find { case (defaultValue, _) => defaultValue == output.defaultValue }
         .map { case (_, locationOverride) => locationOverride }
-        .getOrElse(output.defaultValue.asLocation)
+        .getOrElse(output.defaultValue.value)
     )
     .map(location => Generation.factory(OutputEntity.factory(location)))
 
@@ -165,7 +165,7 @@ final case class ExecutionPlanner(runPlan:                  RunPlan,
     val location = outputsValueOverrides
       .find { case (defaultValue, _) => defaultValue == planOutput.defaultValue }
       .map { case (_, locationOverride) => locationOverride }
-      .getOrElse(planOutput.defaultValue.asLocation)
+      .getOrElse(planOutput.defaultValue.value)
 
     Validated.validNel[String, Activity => ParameterValue] {
       PathParameterValue.factory(location, planOutput)

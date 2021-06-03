@@ -26,8 +26,17 @@ import io.renku.jsonld.EntityId
 import java.time.Instant
 import cats.syntax.all._
 
-final class Location private (val value: String) extends AnyVal with RelativePathTinyType
-object Location extends TinyTypeFactory[Location](new Location(_)) with RelativePath with RelativePathOps[Location]
+sealed trait Location extends Any with RelativePathTinyType
+object Location {
+
+  final class File private (val value: String) extends AnyVal with Location
+  object File extends TinyTypeFactory[File](new File(_)) with RelativePath {
+    def apply(folder: Location.Folder, filename: String): Location.File = Location.File(s"$folder/$filename")
+  }
+
+  final class Folder private (val value: String) extends AnyVal with Location
+  object Folder extends TinyTypeFactory[Folder](new Folder(_)) with RelativePath
+}
 
 final class InvalidationTime private (val value: Instant) extends AnyVal with InstantTinyType
 object InvalidationTime extends TinyTypeFactory[InvalidationTime](new InvalidationTime(_)) with BoundedInstant {

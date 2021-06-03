@@ -23,7 +23,6 @@ import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets
-import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.CommandParameterBase.CommandInput._
 import ch.datascience.rdfstore.entities.CommandParameterBase.CommandOutput.{LocationCommandOutput, MappedCommandOutput}
 import ch.datascience.rdfstore.entities.CommandParameterBase._
@@ -36,13 +35,15 @@ import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax.JsonEncoderOps
 
 /**  ====================== Exemplar data visualization ======================
-  *                                                 plot_data
-  *                                                      |
-  *                                                      v
-  * zhbikes folder -> run plan 1 -> bikesParquet -> run plan 2 -> grid_plot
-  *                        ^                             |
-  *                        |                             v
-  *                   clean_data                     cumulative
+  * zhbikes folder   clean_data
+  *           \      /
+  *          run plan 1
+  *               \
+  *              bikesParquet   plot_data
+  *                       \     /
+  *                      run plan 2
+  *                       /     \
+  *                grid_plot   cumulative
   */
 object LineageExemplarData {
 
@@ -53,24 +54,22 @@ object LineageExemplarData {
       `plot_data entity`:    NodeDef,
       `grid_plot entity`:    NodeDef,
       `cumulative entity`:   NodeDef,
-      `activity1 plan1`:     NodeDef,
-      `activity2 plan2`:     NodeDef,
       `activity3 plan1`:     NodeDef,
       `activity4 plan2`:     NodeDef
   )
 
   def apply(
       project:             Project[ForksCount] = projectEntities[ForksCount.Zero](visibilityPublic).generateOne
-  )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): (List[JsonLD], ExemplarData) = {
+  )(implicit renkuBaseUrl: RenkuBaseUrl): (List[JsonLD], ExemplarData) = {
 
-    val zhbikesFolder    = Location("data/zhbikes")
-    val plotData         = Location("src/plot_data.py")
-    val cleanData        = Location("src/clean_data.py")
-    val bikesParquet     = Location("data/preprocessed/zhbikes.parquet")
-    val cumulative       = Location("figs/cumulative.png")
-    val gridPlot         = Location("figs/grid_plot.png")
-    val velo2018Location = Location("data/zhbikes/2018velo.csv")
-    val velo2019Location = Location("data/zhbikes/2019velo.csv")
+    val zhbikesFolder = Location.Folder("data/zhbikes")
+    val velo2018      = Location.File(zhbikesFolder, "2018velo.csv")
+    val velo2019      = Location.File(zhbikesFolder, "2019velo.csv")
+    val plotData      = Location.File("src/plot_data.py")
+    val cleanData     = Location.File("src/clean_data.py")
+    val bikesParquet  = Location.File("data/preprocessed/zhbikes.parquet")
+    val cumulative    = Location.File("figs/cumulative.png")
+    val gridPlot      = Location.File("figs/grid_plot.png")
 
     val zhbikesDataset = {
       val rawDataset = datasetEntities(datasetProvenanceInternal).generateOne
@@ -86,7 +85,7 @@ object LineageExemplarData {
       rawDataset.copy(
         identification =
           rawDataset.identification.copy(title = datasets.Title("zhbikes"), name = datasets.Name("zhbikes")),
-        parts = List(datasetPart(velo2018Location), datasetPart(velo2019Location))
+        parts = List(datasetPart(velo2018), datasetPart(velo2019))
       )
     }
 
@@ -189,8 +188,6 @@ object LineageExemplarData {
       NodeDef(activity4RunPlan2, plotData),
       NodeDef(activity4RunPlan2, gridPlot),
       NodeDef(activity4RunPlan2, cumulative),
-      NodeDef(activity1RunPlan1),
-      NodeDef(activity2RunPlan2),
       NodeDef(activity3RunPlan1),
       NodeDef(activity4RunPlan2)
     )

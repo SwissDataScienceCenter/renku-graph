@@ -53,8 +53,10 @@ trait EntitiesGenerators {
     timestampsNotInTheFuture(after.value).map(Activity.StartTime.apply)
   val activityOrders: Gen[Activity.Order] = positiveInts(999999).map(_.value).map(Order.apply)
 
-  val entityLocations: Gen[Location] = relativePaths() map Location.apply
-  val entityChecksums: Gen[Checksum] = nonBlankStrings(40, 40).map(_.value).map(Checksum.apply)
+  val entityFileLocations:   Gen[Location.File]   = relativePaths() map Location.File.apply
+  val entityFolderLocations: Gen[Location.Folder] = relativePaths() map Location.Folder.apply
+  val entityLocations:       Gen[Location]        = Gen.oneOf(entityFileLocations, entityFolderLocations)
+  val entityChecksums:       Gen[Checksum]        = nonBlankStrings(40, 40).map(_.value).map(Checksum.apply)
 
   implicit val runPlanNames: Gen[RunPlan.Name] = nonBlankStrings().map(_.value).generateAs[RunPlan.Name]
   implicit val runPlanDescriptions: Gen[RunPlan.Description] =
