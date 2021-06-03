@@ -27,7 +27,7 @@ import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.GraphModelGenerators.{authUsers, projectPaths}
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
-import ch.datascience.graph.tokenrepository.IOAccessTokenFinder.projectPathToPath
+import ch.datascience.graph.tokenrepository.AccessTokenFinder.projectPathToPath
 import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.knowledgegraph.projects.model._

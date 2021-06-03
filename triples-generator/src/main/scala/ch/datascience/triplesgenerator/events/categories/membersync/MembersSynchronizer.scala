@@ -24,7 +24,7 @@ import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.projects
-import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
+import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.rdfstore._
@@ -49,7 +49,7 @@ private class MembersSynchronizerImpl[Interpretation[_]](
 )(implicit ME:                  MonadError[Interpretation, Throwable])
     extends MembersSynchronizer[Interpretation] {
 
-  import ch.datascience.graph.tokenrepository.IOAccessTokenFinder._
+  import ch.datascience.graph.tokenrepository.AccessTokenFinder._
   import executionTimeRecorder._
 
   override def synchronizeMembers(projectPath: projects.Path): Interpretation[Unit] = measureExecutionTime {
@@ -98,13 +98,13 @@ private object MembersSynchronizer {
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[MembersSynchronizer[IO]] = for {
-    accessTokenFinder          <- IOAccessTokenFinder(logger)
+    accessTokenFinder          <- AccessTokenFinder(logger)
     gitLabProjectMembersFinder <- IOGitLabProjectMembersFinder(gitLabThrottler, logger)
     kGProjectMembersFinder     <- KGProjectMembersFinder(logger, timeRecorder)
     kGPersonFinder             <- KGPersonFinder(logger, timeRecorder)
     updatesCreator             <- UpdatesCreator()
     rdfStoreConfig             <- RdfStoreConfig[IO]()
-    querySender <- IO(new IORdfStoreClient(rdfStoreConfig, logger, timeRecorder) with QuerySender[IO] {
+    querySender <- IO(new RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder) with QuerySender[IO] {
                      override def send(query: SparqlQuery): IO[Unit] = updateWithNoResult(query)
                    })
     executionTimeRecorder <- ExecutionTimeRecorder[IO](logger, maybeHistogram = None)

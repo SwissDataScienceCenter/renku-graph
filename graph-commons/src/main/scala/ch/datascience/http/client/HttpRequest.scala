@@ -18,20 +18,26 @@
 
 package ch.datascience.http.client
 
-import cats.effect.IO
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import org.http4s.Request
 
-sealed trait HttpRequest {
-  def request: Request[IO]
+sealed trait HttpRequest[Interpretation[_]] {
+  def request: Request[Interpretation]
 }
 
 object HttpRequest {
 
-  def apply(request: Request[IO]): UnnamedRequest = UnnamedRequest(request)
-  def apply(request: Request[IO], name: String Refined NonEmpty): NamedRequest = NamedRequest(request, name)
+  def apply[Interpretation[_]](request: Request[Interpretation]): UnnamedRequest[Interpretation] = UnnamedRequest(
+    request
+  )
+  def apply[Interpretation[_]](request: Request[Interpretation],
+                               name:    String Refined NonEmpty
+  ): NamedRequest[Interpretation] =
+    NamedRequest(request, name)
 
-  final case class UnnamedRequest(request: Request[IO]) extends HttpRequest
-  final case class NamedRequest(request: Request[IO], name: String Refined NonEmpty) extends HttpRequest
+  final case class UnnamedRequest[Interpretation[_]](request: Request[Interpretation])
+      extends HttpRequest[Interpretation]
+  final case class NamedRequest[Interpretation[_]](request: Request[Interpretation], name: String Refined NonEmpty)
+      extends HttpRequest[Interpretation]
 }

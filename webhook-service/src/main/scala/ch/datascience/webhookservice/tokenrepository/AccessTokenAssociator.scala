@@ -18,13 +18,14 @@
 
 package ch.datascience.webhookservice.tokenrepository
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
+import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
-import ch.datascience.http.client.{AccessToken, IORestClient}
-import org.typelevel.log4cats.Logger
+import ch.datascience.http.client.{AccessToken, RestClient}
 import org.http4s.Status
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
@@ -32,33 +33,33 @@ trait AccessTokenAssociator[Interpretation[_]] {
   def associate(projectId: Id, accessToken: AccessToken): Interpretation[Unit]
 }
 
-class IOAccessTokenAssociator(
+class AccessTokenAssociatorImpl[Interpretation[_]: ConcurrentEffect: Timer](
     tokenRepositoryUrl:      TokenRepositoryUrl,
-    logger:                  Logger[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORestClient(Throttler.noThrottling, logger)
-    with AccessTokenAssociator[IO] {
+    logger:                  Logger[Interpretation]
+)(implicit executionContext: ExecutionContext)
+    extends RestClient[Interpretation, AccessTokenAssociator[Interpretation]](Throttler.noThrottling, logger)
+    with AccessTokenAssociator[Interpretation] {
 
-  import cats.effect._
   import io.circe.syntax._
   import org.http4s.Method.PUT
   import org.http4s.Status.NoContent
   import org.http4s.circe._
   import org.http4s.{Request, Response}
 
-  override def associate(projectId: Id, accessToken: AccessToken): IO[Unit] =
+  override def associate(projectId: Id, accessToken: AccessToken): Interpretation[Unit] =
     for {
       uri <- validateUri(s"$tokenRepositoryUrl/projects/$projectId/tokens")
       requestWithPayload = request(PUT, uri).withEntity(accessToken.asJson)
       _ <- send(requestWithPayload)(mapResponse)
     } yield ()
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
-    case (NoContent, _, _) => IO.unit
+  private lazy val mapResponse
+      : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[Unit]] = {
+    case (NoContent, _, _) => ().pure[Interpretation]
   }
 }
 
-object IOAccessTokenAssociator {
+object AccessTokenAssociatorImpl {
   def apply(
       logger: Logger[IO]
   )(implicit
@@ -68,5 +69,5 @@ object IOAccessTokenAssociator {
   ): IO[AccessTokenAssociator[IO]] =
     for {
       tokenRepositoryUrl <- TokenRepositoryUrl[IO]()
-    } yield new IOAccessTokenAssociator(tokenRepositoryUrl, logger)
+    } yield new AccessTokenAssociatorImpl(tokenRepositoryUrl, logger)
 }

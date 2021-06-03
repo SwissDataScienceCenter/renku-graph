@@ -18,9 +18,10 @@
 
 package ch.datascience.triplesgenerator.init
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, Timer}
+import cats.syntax.all._
 import ch.datascience.control.Throttler
-import ch.datascience.http.client.IORestClient
+import ch.datascience.http.client.RestClient
 import ch.datascience.triplesgenerator.config.FusekiAdminConfig
 import org.typelevel.log4cats.Logger
 
@@ -30,26 +31,25 @@ private trait DatasetExistenceCreator[Interpretation[_]] {
   def createDataset(): Interpretation[Unit]
 }
 
-private class IODatasetExistenceCreator(fusekiAdminConfig: FusekiAdminConfig, logger: Logger[IO])(implicit
-    executionContext:                                      ExecutionContext,
-    contextShift:                                          ContextShift[IO],
-    timer:                                                 Timer[IO]
-) extends IORestClient(Throttler.noThrottling, logger)
-    with DatasetExistenceCreator[IO] {
+private class DatasetExistenceCreatorImpl[Interpretation[_]: ConcurrentEffect: Timer](
+    fusekiAdminConfig:       FusekiAdminConfig,
+    logger:                  Logger[Interpretation]
+)(implicit executionContext: ExecutionContext)
+    extends RestClient[Interpretation, DatasetExistenceCreator[Interpretation]](Throttler.noThrottling, logger)
+    with DatasetExistenceCreator[Interpretation] {
 
-  import cats.effect._
   import fusekiAdminConfig._
   import org.http4s.Method.POST
   import org.http4s._
   import org.http4s.dsl.io._
 
-  override def createDataset(): IO[Unit] =
+  override def createDataset(): Interpretation[Unit] =
     for {
       uri    <- validateUri(s"$fusekiBaseUrl/$$/datasets")
       result <- send(postRequest(uri, fusekiAdminConfig))(mapResponse)
     } yield result
 
-  private def postRequest(uri: Uri, fusekiConfig: FusekiAdminConfig): Request[IO] =
+  private def postRequest(uri: Uri, fusekiConfig: FusekiAdminConfig): Request[Interpretation] =
     request(POST, uri, fusekiConfig.authCredentials)
       .withEntity(
         UrlForm(
@@ -58,7 +58,9 @@ private class IODatasetExistenceCreator(fusekiAdminConfig: FusekiAdminConfig, lo
         )
       )
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = { case (Ok, _, _) =>
-    IO.unit
+  private lazy val mapResponse
+      : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[Unit]] = {
+    case (Ok, _, _) =>
+      ().pure[Interpretation]
   }
 }

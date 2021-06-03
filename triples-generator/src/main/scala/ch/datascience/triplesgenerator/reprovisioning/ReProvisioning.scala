@@ -127,18 +127,19 @@ object IOReProvisioning {
       timer:            Timer[IO]
   ): IO[ReProvisioning[IO]] =
     for {
-      rdfStoreConfig        <- RdfStoreConfig[IO](configuration)
-      eventsReScheduler     <- IOEventsReScheduler(logger)
-      renkuBaseUrl          <- RenkuBaseUrl[IO]()
-      executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
-      triplesRemover        <- IOTriplesRemover(rdfStoreConfig, logger, timeRecorder)
+      rdfStoreConfig         <- RdfStoreConfig[IO](configuration)
+      eventsReScheduler      <- IOEventsReScheduler(logger)
+      renkuBaseUrl           <- RenkuBaseUrl[IO]()
+      executionTimeRecorder  <- ExecutionTimeRecorder[IO](ApplicationLogger)
+      triplesRemover         <- TriplesRemoverImpl(rdfStoreConfig, logger, timeRecorder)
+      renkuVersionPairFinder <- RenkuVersionPairFinder(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
     } yield new ReProvisioningImpl[IO](
-      new IORenkuVersionPairFinder(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder),
+      renkuVersionPairFinder,
       versionCompatibilityPairs,
       new ReprovisionJudgeImpl(),
       triplesRemover,
       eventsReScheduler,
-      new IORenkuVersionPairUpdater(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder),
+      new RenkuVersionPairUpdaterImpl(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder),
       reProvisioningStatus,
       executionTimeRecorder,
       logger,

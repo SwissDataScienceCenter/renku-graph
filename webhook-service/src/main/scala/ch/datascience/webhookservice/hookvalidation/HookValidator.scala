@@ -25,7 +25,7 @@ import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.projects.Id
-import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder, TokenRepositoryUrl}
+import ch.datascience.graph.tokenrepository.{AccessTokenFinder, AccessTokenFinderImpl, TokenRepositoryUrl}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.logging.ApplicationLogger
@@ -53,9 +53,9 @@ class HookValidatorImpl[Interpretation[_]: MonadError[*[_], Throwable]](
 
   private val applicative = Applicative[Interpretation]
 
+  import AccessTokenFinder._
   import HookValidator.HookValidationResult._
   import HookValidator._
-  import IOAccessTokenFinder._
   import Token._
   import accessTokenAssociator._
   import accessTokenFinder._
@@ -146,9 +146,9 @@ object HookValidator {
   } yield new HookValidatorImpl[IO](
     projectHookUrl,
     new IOProjectHookVerifier(gitLabUrl, gitLabThrottler, ApplicationLogger),
-    new IOAccessTokenFinder(tokenRepositoryUrl, ApplicationLogger),
-    new IOAccessTokenAssociator(tokenRepositoryUrl, ApplicationLogger),
-    new IOAccessTokenRemover(tokenRepositoryUrl, ApplicationLogger),
+    new AccessTokenFinderImpl(tokenRepositoryUrl, ApplicationLogger),
+    new AccessTokenAssociatorImpl(tokenRepositoryUrl, ApplicationLogger),
+    new AccessTokenRemoverImpl(tokenRepositoryUrl, ApplicationLogger),
     ApplicationLogger
   )
 }

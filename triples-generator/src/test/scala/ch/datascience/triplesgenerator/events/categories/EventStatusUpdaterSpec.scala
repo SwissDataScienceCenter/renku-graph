@@ -18,7 +18,6 @@
 
 package ch.datascience.triplesgenerator.events.categories
 
-import EventStatusUpdater._
 import cats.Applicative
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.data.ErrorMessage
@@ -31,6 +30,7 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
+import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER
 import com.github.tomakehurst.wiremock.stubbing.Scenario
@@ -349,13 +349,13 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
 
   private lazy val requestTimeout: Duration    = 1 second
   private lazy val eventLogUrl:    EventLogUrl = EventLogUrl(externalServiceBaseUrl)
-  private lazy val updater = new EventStatusUpdaterImpl(eventLogUrl,
-                                                        categoryNames.generateOne,
-                                                        retryDelay = 100 millis,
-                                                        TestLogger(),
-                                                        retryInterval = 100 millis,
-                                                        maxRetries = 2,
-                                                        requestTimeoutOverride = Some(requestTimeout)
+  private lazy val updater = new EventStatusUpdaterImpl[IO](eventLogUrl,
+                                                            categoryNames.generateOne,
+                                                            retryDelay = 100 millis,
+                                                            TestLogger(),
+                                                            retryInterval = 100 millis,
+                                                            maxRetries = 2,
+                                                            requestTimeoutOverride = Some(requestTimeout)
   )
 
   private lazy val eventId       = compoundEventIds.generateOne

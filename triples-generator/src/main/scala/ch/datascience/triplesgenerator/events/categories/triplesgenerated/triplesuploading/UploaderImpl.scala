@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplesuploading
 
 import cats.MonadError
-import cats.effect.{ContextShift, Timer}
+import cats.effect.{ConcurrentEffect, Timer}
 import cats.syntax.all._
 import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CuratedTriples
@@ -102,14 +102,14 @@ private[events] object IOUploader {
       timeRecorder: SparqlQueryTimeRecorder[IO]
   )(implicit
       executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
+      concurrentEffect: ConcurrentEffect[IO],
       timer:            Timer[IO]
   ): IO[UploaderImpl[IO]] =
     for {
       rdfStoreConfig <- RdfStoreConfig[IO]()
     } yield new UploaderImpl[IO](
-      new IOTriplesUploader(rdfStoreConfig, logger, timeRecorder),
-      new IOUpdatesUploader(rdfStoreConfig, logger, timeRecorder)
+      new TriplesUploaderImpl[IO](rdfStoreConfig, logger, timeRecorder),
+      new UpdatesUploaderImpl(rdfStoreConfig, logger, timeRecorder)
     )
 }
 

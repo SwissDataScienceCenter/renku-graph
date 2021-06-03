@@ -35,7 +35,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 class AccessTokenFinderSpec extends AnyWordSpec with ExternalServiceStubbing with MockFactory with should.Matchers {
 
-  import IOAccessTokenFinder._
+  import AccessTokenFinder._
 
   "findAccessToken(ProjectId)" should {
 
@@ -195,6 +195,6 @@ class AccessTokenFinderSpec extends AnyWordSpec with ExternalServiceStubbing wit
   private trait TestCase {
     val tokenRepositoryUrl = TokenRepositoryUrl(externalServiceBaseUrl)
 
-    val accessTokenFinder = new IOAccessTokenFinder(tokenRepositoryUrl, TestLogger())
+    val accessTokenFinder = new AccessTokenFinderImpl[IO](tokenRepositoryUrl, TestLogger())
   }
 }

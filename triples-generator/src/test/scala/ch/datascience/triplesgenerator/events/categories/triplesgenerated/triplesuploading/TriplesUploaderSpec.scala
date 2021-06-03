@@ -28,11 +28,11 @@ import ch.datascience.rdfstore.{FusekiBaseUrl, SparqlQueryTimeRecorder}
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult._
 import com.github.tomakehurst.wiremock.client.WireMock._
+import eu.timepit.refined.auto._
 import org.http4s.Status._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import eu.timepit.refined.auto._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -117,7 +117,7 @@ class TriplesUploaderSpec extends AnyWordSpec with MockFactory with ExternalServ
     val rdfStoreConfig = rdfStoreConfigs.generateOne.copy(
       fusekiBaseUrl = FusekiBaseUrl(externalServiceBaseUrl)
     )
-    lazy val triplesUploader = new IOTriplesUploader(
+    lazy val triplesUploader = new TriplesUploaderImpl[IO](
       rdfStoreConfig,
       logger,
       timeRecorder,

@@ -22,7 +22,7 @@ import cats.syntax.all._
 import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventStatuses}
-import ch.datascience.graph.model.events.CompoundEventId
+import ch.datascience.graph.model.events.{CompoundEventId, EventDetails}
 import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventContentGenerators._
@@ -40,9 +40,9 @@ class EventDetailsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
         eventStatuses.generateOne,
         executionDates.generateOne,
         eventDates.generateOne,
-        eventBodies.generateOne
+        eventBody
       )
-      eventDetailsFinder.findDetails(eventId).unsafeRunSync() shouldBe eventId.some
+      eventDetailsFinder.findDetails(eventId).unsafeRunSync() shouldBe EventDetails(eventId, eventBody).some
     }
 
     "return None if the event is not found" in new TestCase {
@@ -51,7 +51,9 @@ class EventDetailsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
   }
 
   private trait TestCase {
-    val eventId            = compoundEventIds.generateOne
+    val eventId   = compoundEventIds.generateOne
+    val eventBody = eventBodies.generateOne
+
     val queriesExecTimes   = TestLabeledHistogram[SqlStatement.Name]("query_id")
     val eventDetailsFinder = new EventDetailsFinderImpl(sessionResource, queriesExecTimes)
   }

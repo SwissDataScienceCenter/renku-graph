@@ -22,7 +22,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.config.ConfigLoader
 import ch.datascience.control.Throttler
-import ch.datascience.http.client.{AccessToken, IORestClient}
+import ch.datascience.http.client.{AccessToken, RestClient}
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.tinytypes.constraints.Url
@@ -58,7 +58,7 @@ private[awaitinggeneration] class RemoteTriplesGenerator(
     serviceUrl:              TriplesGenerationServiceUrl,
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORestClient[RemoteTriplesGenerator](Throttler.noThrottling, logger)
+    extends RestClient[IO, RemoteTriplesGenerator](Throttler.noThrottling, logger)
     with TriplesGenerator[IO] {
 
   import cats.data.EitherT

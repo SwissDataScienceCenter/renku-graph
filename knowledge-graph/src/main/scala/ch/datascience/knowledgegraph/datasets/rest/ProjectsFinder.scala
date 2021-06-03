@@ -38,7 +38,7 @@ private class ProjectsFinder(
     logger:                  Logger[IO],
     timeRecorder:            SparqlQueryTimeRecorder[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder) {
+    extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder) {
 
   import ProjectsFinder._
 

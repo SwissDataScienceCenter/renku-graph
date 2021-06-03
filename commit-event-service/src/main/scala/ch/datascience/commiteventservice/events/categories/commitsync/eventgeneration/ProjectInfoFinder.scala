@@ -26,7 +26,7 @@ import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Visibility
 import ch.datascience.graph.model.projects.Visibility.Public
-import ch.datascience.http.client.{AccessToken, IORestClient}
+import ch.datascience.http.client.{AccessToken, RestClient}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -43,7 +43,7 @@ private class ProjectInfoFinderImpl(
     gitLabThrottler:         Throttler[IO, GitLab],
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORestClient(gitLabThrottler, logger)
+    extends RestClient(gitLabThrottler, logger)
     with ProjectInfoFinder[IO] {
 
   import cats.effect._

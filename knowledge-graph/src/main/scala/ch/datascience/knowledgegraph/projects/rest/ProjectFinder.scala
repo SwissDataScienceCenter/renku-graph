@@ -25,8 +25,8 @@ import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.projects.Path
-import ch.datascience.graph.tokenrepository.IOAccessTokenFinder._
-import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
+import ch.datascience.graph.tokenrepository.AccessTokenFinder
+import ch.datascience.graph.tokenrepository.AccessTokenFinder._
 import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
@@ -111,6 +111,6 @@ private object IOProjectFinder {
     for {
       kgProjectFinder     <- IOKGProjectFinder(timeRecorder, logger = logger)
       gitLabProjectFinder <- IOGitLabProjectFinder(gitLabThrottler, logger)
-      accessTokenFinder   <- IOAccessTokenFinder(logger)
+      accessTokenFinder   <- AccessTokenFinder(logger)
     } yield new IOProjectFinder(kgProjectFinder, gitLabProjectFinder, accessTokenFinder)
 }

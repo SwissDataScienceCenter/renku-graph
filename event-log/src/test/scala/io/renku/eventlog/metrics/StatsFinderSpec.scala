@@ -118,7 +118,8 @@ class StatsFinderSpec
         GenerationRecoverableFailure        -> statuses.count(_ == GenerationRecoverableFailure),
         GenerationNonRecoverableFailure     -> statuses.count(_ == GenerationNonRecoverableFailure),
         TransformationRecoverableFailure    -> statuses.count(_ == TransformationRecoverableFailure),
-        TransformationNonRecoverableFailure -> statuses.count(_ == TransformationNonRecoverableFailure)
+        TransformationNonRecoverableFailure -> statuses.count(_ == TransformationNonRecoverableFailure),
+        AwaitingDeletion                    -> statuses.count(_ == AwaitingDeletion)
       )
 
       queriesExecTimes.verifyExecutionTimeMeasured("statuses count")

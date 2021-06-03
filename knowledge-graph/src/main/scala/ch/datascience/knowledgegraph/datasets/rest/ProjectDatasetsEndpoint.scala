@@ -111,8 +111,9 @@ object IOProjectDatasetsEndpoint {
       renkuBaseUrl          <- RenkuBaseUrl[IO]()
       renkuResourceUrl      <- renku.ResourcesUrl[IO]()
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
+      projectDatasetFinder  <- ProjectDatasetsFinder(rdfStoreConfig, renkuBaseUrl, ApplicationLogger, timeRecorder)
     } yield new ProjectDatasetsEndpoint[IO](
-      new IOProjectDatasetsFinder(rdfStoreConfig, renkuBaseUrl, ApplicationLogger, timeRecorder),
+      projectDatasetFinder,
       renkuResourceUrl,
       executionTimeRecorder,
       ApplicationLogger

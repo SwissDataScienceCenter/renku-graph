@@ -18,10 +18,10 @@
 
 package ch.datascience.commiteventservice.events.categories.commitsync
 
-import Generators._
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.MissedEventsGenerator
+import ch.datascience.commiteventservice.events.categories.commitsync.Generators._
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer
 import ch.datascience.events.consumers.EventRequestContent
 import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.generators.Generators.Implicits._
@@ -53,7 +53,7 @@ class EventHandlerSpec
 
         val event = fullCommitSyncEvents.generateOne
 
-        (missedEventsGenerator.generateMissedEvents _)
+        (commitEventSynchronizer.synchronizeEvents _)
           .expects(event)
           .returning(().pure[IO])
 
@@ -68,7 +68,7 @@ class EventHandlerSpec
 
         val event = minimalCommitSyncEvents.generateOne
 
-        (missedEventsGenerator.generateMissedEvents _)
+        (commitEventSynchronizer.synchronizeEvents _)
           .expects(event)
           .returning(().pure[IO])
 
@@ -77,11 +77,11 @@ class EventHandlerSpec
         logger.loggedOnly(Info(s"${logMessageCommon(event)} -> $Accepted"))
       }
 
-    s"return $Accepted and log an error if scheduling missed events generation fails" in new TestCase {
+    s"return $Accepted and log an error if scheduling event synchronization fails" in new TestCase {
 
       val event = commitSyncEvents.generateOne
 
-      (missedEventsGenerator.generateMissedEvents _)
+      (commitEventSynchronizer.synchronizeEvents _)
         .expects(event)
         .returning(exceptions.generateOne.raiseError[IO, Unit])
 
@@ -119,10 +119,10 @@ class EventHandlerSpec
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
-
-    val missedEventsGenerator = mock[MissedEventsGenerator[IO]]
-    val logger                = TestLogger[IO]()
-    val handler               = new EventHandler[IO](categoryName, missedEventsGenerator, logger)
+    val commitEventSynchronizer = mock[CommitEventSynchronizer[IO]]
+    val logger                  = TestLogger[IO]()
+    val handler =
+      new EventHandler[IO](categoryName, commitEventSynchronizer, logger)
 
     def requestContent(event: Json): EventRequestContent = EventRequestContent(event, None)
   }

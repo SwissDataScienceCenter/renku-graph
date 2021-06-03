@@ -53,7 +53,7 @@ class RenkuVersionPairUpdaterSpec extends AnyWordSpec with InMemoryRdfStore with
     private val timeRecorder         = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
     val newVersionCompatibilityPairs = renkuVersionPairs.generateOne
 
-    val renkuVersionPairUpdater = new IORenkuVersionPairUpdater(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
+    val renkuVersionPairUpdater = new RenkuVersionPairUpdaterImpl(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
 
     def findPairInDb: Set[RenkuVersionPair] =
       runQuery(s"""|SELECT DISTINCT ?schemaVersion ?cliVersion

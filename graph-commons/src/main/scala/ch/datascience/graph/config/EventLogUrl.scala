@@ -18,10 +18,10 @@
 
 package ch.datascience.graph.config
 
-import cats.MonadError
+import cats.MonadThrow
 import ch.datascience.config.ConfigLoader.{find, stringTinyTypeReader}
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import ch.datascience.tinytypes.constraints.{Url, UrlOps}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import com.typesafe.config.{Config, ConfigFactory}
 import pureconfig.ConfigReader
 
@@ -30,8 +30,8 @@ object EventLogUrl extends TinyTypeFactory[EventLogUrl](new EventLogUrl(_)) with
 
   private implicit val urlReader: ConfigReader[EventLogUrl] = stringTinyTypeReader(EventLogUrl)
 
-  def apply[Interpretation[_]](
-      config:    Config = ConfigFactory.load
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[EventLogUrl] =
+  def apply[Interpretation[_]: MonadThrow](
+      config: Config = ConfigFactory.load
+  ): Interpretation[EventLogUrl] =
     find[Interpretation, EventLogUrl]("services.event-log.url", config)
 }

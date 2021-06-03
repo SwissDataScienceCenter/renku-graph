@@ -171,6 +171,12 @@ object IOStatusChangeEndpoint {
                                        ),
                                        ToTransformationRecoverableFailure.factory(awaitingTriplesTransformationGauge,
                                                                                   underTriplesTransformationGauge
+                                       ),
+                                       ToAwaitingDeletion.factory(sessionResource,
+                                                                  awaitingTriplesGenerationGauge,
+                                                                  underTriplesGenerationGauge,
+                                                                  awaitingTriplesTransformationGauge,
+                                                                  underTriplesTransformationGauge
                                        )
                                      ),
                                      logger

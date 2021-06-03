@@ -26,7 +26,7 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
-import ch.datascience.graph.tokenrepository.IOAccessTokenFinder.projectPathToPath
+import ch.datascience.graph.tokenrepository.AccessTokenFinder.projectPathToPath
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}

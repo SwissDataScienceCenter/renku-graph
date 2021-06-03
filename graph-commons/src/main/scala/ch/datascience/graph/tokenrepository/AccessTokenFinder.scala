@@ -18,10 +18,11 @@
 
 package ch.datascience.graph.tokenrepository
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
+import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.projects.{Id, Path}
-import ch.datascience.http.client.{AccessToken, IORestClient}
+import ch.datascience.http.client.{AccessToken, RestClient}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -30,35 +31,36 @@ trait AccessTokenFinder[Interpretation[_]] {
   def findAccessToken[ID](projectId: ID)(implicit toPathSegment: ID => String): Interpretation[Option[AccessToken]]
 }
 
-class IOAccessTokenFinder(
+class AccessTokenFinderImpl[Interpretation[_]: ConcurrentEffect: Timer](
     tokenRepositoryUrl:      TokenRepositoryUrl,
-    logger:                  Logger[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORestClient(Throttler.noThrottling, logger)
-    with AccessTokenFinder[IO] {
+    logger:                  Logger[Interpretation]
+)(implicit executionContext: ExecutionContext)
+    extends RestClient[Interpretation, AccessTokenFinder[Interpretation]](Throttler.noThrottling, logger)
+    with AccessTokenFinder[Interpretation] {
 
-  import cats.effect._
   import org.http4s.Method.GET
   import org.http4s._
   import org.http4s.circe._
   import org.http4s.dsl.io._
 
-  def findAccessToken[ID](projectId: ID)(implicit toPathSegment: ID => String): IO[Option[AccessToken]] =
+  def findAccessToken[ID](projectId: ID)(implicit toPathSegment: ID => String): Interpretation[Option[AccessToken]] =
     for {
       uri         <- validateUri(s"$tokenRepositoryUrl/projects/${toPathSegment(projectId)}/tokens")
       accessToken <- send(request(GET, uri))(mapResponse)
     } yield accessToken
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[AccessToken]]] = {
+  private lazy val mapResponse: PartialFunction[(Status, Request[Interpretation], Response[Interpretation]),
+                                                Interpretation[Option[AccessToken]]
+  ] = {
     case (Ok, _, response) => response.as[Option[AccessToken]]
-    case (NotFound, _, _)  => IO.pure(None)
+    case (NotFound, _, _)  => Option.empty[AccessToken].pure[Interpretation]
   }
 
-  private implicit lazy val accessTokenEntityDecoder: EntityDecoder[IO, Option[AccessToken]] =
-    jsonOf[IO, AccessToken].map(Option.apply)
+  private implicit lazy val accessTokenEntityDecoder: EntityDecoder[Interpretation, Option[AccessToken]] =
+    jsonOf[Interpretation, AccessToken].map(Option.apply)
 }
 
-object IOAccessTokenFinder {
+object AccessTokenFinder {
 
   import ch.datascience.http.client.UrlEncoder.urlEncode
 
@@ -74,5 +76,5 @@ object IOAccessTokenFinder {
   ): IO[AccessTokenFinder[IO]] =
     for {
       tokenRepositoryUrl <- TokenRepositoryUrl[IO]()
-    } yield new IOAccessTokenFinder(tokenRepositoryUrl, logger)
+    } yield new AccessTokenFinderImpl[IO](tokenRepositoryUrl, logger)
 }

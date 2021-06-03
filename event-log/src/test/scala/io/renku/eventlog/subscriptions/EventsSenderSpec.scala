@@ -157,10 +157,10 @@ class EventsSenderSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
     val subscriberUrl        = SubscriberUrl(externalServiceBaseUrl)
     val categoryEventEncoder = mock[EventEncoder[TestCategoryEvent]]
     val logger               = TestLogger[IO]()
-    val sender = new EventsSenderImpl[TestCategoryEvent](categoryName,
-                                                         categoryEventEncoder,
-                                                         logger,
-                                                         requestTimeoutOverride = Some(requestTimeout)
+    val sender = new EventsSenderImpl[IO, TestCategoryEvent](categoryName,
+                                                             categoryEventEncoder,
+                                                             logger,
+                                                             requestTimeoutOverride = Some(requestTimeout)
     )
 
     def expectEventEncoding(event: TestCategoryEvent) = {
