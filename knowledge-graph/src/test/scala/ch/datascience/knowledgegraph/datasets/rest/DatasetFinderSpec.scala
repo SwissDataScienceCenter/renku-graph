@@ -27,7 +27,6 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.entities.Project.ForksCount
 import ch.datascience.rdfstore.entities._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import org.scalatest.matchers.should
@@ -275,12 +274,12 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
 
     "return details of the dataset with the given id " +
       "- case when a dataset on a fork is deleted" in new TestCase {
-        fail("implementation not known yet")
+        assert(false, "implementation not known yet")
       }
 
     "return details of a fork dataset with the given id " +
       "- case when the parent of a fork dataset is deleted" in new TestCase {
-        fail("implementation not known yet")
+        assert(false, "implementation not known yet")
       }
   }
 
@@ -380,12 +379,12 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
 
     "not return the details of a dataset" +
       "- case when the dataset has been invalidated" in new TestCase {
-        fail("implementation not known yet")
+        assert(false, "implementation not known yet")
       }
 
     "not return the details of a dataset" +
       "- case when the latest version of the dataset has been invalidated" in new TestCase {
-        fail("implementation not known yet")
+        assert(false, "implementation not known yet")
       }
   }
 

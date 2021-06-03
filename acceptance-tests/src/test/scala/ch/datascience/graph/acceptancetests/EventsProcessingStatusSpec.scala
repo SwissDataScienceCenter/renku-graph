@@ -32,7 +32,7 @@ import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplici
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.http.client.AccessToken
-import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
+import ch.datascience.rdfstore.entities.EntitiesGenerators.personEntities
 import ch.datascience.rdfstore.entities.Project.ForksCount
 import ch.datascience.rdfstore.entities.{projectEntities, visibilityPublic, _}
 import ch.datascience.webhookservice.model.HookToken
@@ -137,7 +137,7 @@ class EventsProcessingStatusSpec
         `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project.id, commitId)
 
       // making the triples generation process happy and not throwing exceptions to the logs
-      val committer = persons.generateOne
+      val committer = personEntities.generateOne
       `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId, committer)
       `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project)
     }

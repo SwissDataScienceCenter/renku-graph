@@ -31,21 +31,21 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-trait StatsFinder[Interpretation[_]] {
+private trait StatsFinder[Interpretation[_]] {
   def entitiesCount(): Interpretation[Map[EntityLabel, Count]]
 }
 
-class StatsFinderImpl(
-                       rdfStoreConfig: RdfStoreConfig,
-                       logger: Logger[IO],
-                       timeRecorder: SparqlQueryTimeRecorder[IO]
-                     )(implicit
-                       executionContext: ExecutionContext,
-                       contextShift: ContextShift[IO],
-                       timer: Timer[IO],
-                       ME: MonadError[IO, Throwable]
-                     ) extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
-  with StatsFinder[IO] {
+private class StatsFinderImpl(
+    rdfStoreConfig: RdfStoreConfig,
+    logger:         Logger[IO],
+    timeRecorder:   SparqlQueryTimeRecorder[IO]
+)(implicit
+    executionContext: ExecutionContext,
+    contextShift:     ContextShift[IO],
+    timer:            Timer[IO],
+    ME:               MonadError[IO, Throwable]
+) extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
+    with StatsFinder[IO] {
 
   import EntityCount._
   import ch.datascience.graph.Schemas._
@@ -55,40 +55,34 @@ class StatsFinderImpl(
 
   private lazy val query = SparqlQuery.of(
     name = "entities - counts",
-    Prefixes.of(
-      rdf -> "rdf",
-      prov -> "prov",
-      schema -> "schema",
-      wfprov -> "wfprov",
-      renku -> "renku"
-    ),
+    Prefixes.of(prov -> "prov", schema -> "schema", renku -> "renku"),
     s"""|SELECT ?type ?count
         |WHERE {
         |  {
         |    SELECT (schema:Dataset AS ?type) (COUNT(DISTINCT ?id) AS ?count)
-        |    WHERE { ?id rdf:type schema:Dataset }
+        |    WHERE { ?id a schema:Dataset }
         |  } UNION {
         |    SELECT (schema:Project AS ?type) (COUNT(DISTINCT ?id) AS ?count)
-        |    WHERE { ?id rdf:type schema:Project }
+        |    WHERE { ?id a schema:Project }
         |  } UNION {
         |    SELECT (prov:Activity AS ?type) (COUNT(DISTINCT ?id) AS ?count)
-        |    WHERE { ?id rdf:type prov:Activity }
+        |    WHERE { ?id a prov:Activity }
         |  } UNION {
         |    SELECT (renku:Run AS ?type) (COUNT(DISTINCT ?id) AS ?count)
-        |    WHERE { ?id rdf:type renku:Run }
+        |    WHERE { ?id a renku:Run }
         |  } UNION {
         |    SELECT (schema:Person AS ?type) (COUNT(DISTINCT ?id) AS ?count)
         |    WHERE { 
-        |      ?activityId rdf:type prov:Activity;
+        |      ?activityId a prov:Activity;
         |                  prov:wasAssociatedWith ?id.
-        |      ?id rdf:type schema:Person.
+        |      ?id a schema:Person.
         |    }
         |  } UNION {
         |    SELECT (CONCAT(STR(schema:Person), ' with GitLabId') AS ?type) (COUNT(DISTINCT ?id) AS ?count)
         |    WHERE { 
-        |      ?activityId rdf:type prov:Activity;
+        |      ?activityId a prov:Activity;
         |                  prov:wasAssociatedWith ?id.
-        |      ?id rdf:type schema:Person;
+        |      ?id a schema:Person;
         |          schema:sameAs/schema:additionalType 'GitLab'.
         |    }
         |  }
@@ -103,10 +97,10 @@ private object EntityCount {
     val counts: Decoder[(EntityLabel, Count)] = { cursor =>
       for {
         entityType <- cursor
-          .downField("type")
-          .downField("value")
-          .as[String]
-          .flatMap(convert[String, EntityLabel](EntityLabel))
+                        .downField("type")
+                        .downField("value")
+                        .as[String]
+                        .flatMap(convert[String, EntityLabel](EntityLabel))
         count <-
           cursor.downField("count").downField("value").as[Long].flatMap(convert[Long, Count](Count))
       } yield (entityType, count)
@@ -117,27 +111,26 @@ private object EntityCount {
       .as(decodeList(counts))
   }
 
-  private def convert[IN, OUT <: TinyType {type V = IN}](implicit
-                                                         tinyTypeFactory: TinyTypeFactory[OUT]
-                                                        ): IN => Either[DecodingFailure, OUT] =
+  private def convert[IN, OUT <: TinyType { type V = IN }](implicit
+      tinyTypeFactory: TinyTypeFactory[OUT]
+  ): IN => Either[DecodingFailure, OUT] =
     value =>
       tinyTypeFactory
         .from(value)
         .leftMap(exception => DecodingFailure(exception.getMessage, Nil))
 }
 
-object IOStatsFinder {
+private object StatsFinder {
   def apply(
-             timeRecorder: SparqlQueryTimeRecorder[IO],
-             logger: Logger[IO],
-             rdfStoreConfig: IO[RdfStoreConfig] = RdfStoreConfig[IO]()
-           )(implicit
-             executionContext: ExecutionContext,
-             contextShift: ContextShift[IO],
-             timer: Timer[IO],
-             ME: MonadError[IO, Throwable]
-           ): IO[StatsFinder[IO]] =
-    for {
-      config <- rdfStoreConfig
-    } yield new StatsFinderImpl(config, logger, timeRecorder)
+      timeRecorder:   SparqlQueryTimeRecorder[IO],
+      logger:         Logger[IO],
+      rdfStoreConfig: IO[RdfStoreConfig] = RdfStoreConfig[IO]()
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO],
+      ME:               MonadError[IO, Throwable]
+  ): IO[StatsFinder[IO]] = for {
+    config <- rdfStoreConfig
+  } yield new StatsFinderImpl(config, logger, timeRecorder)
 }

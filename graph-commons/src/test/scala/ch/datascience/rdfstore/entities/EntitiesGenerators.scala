@@ -33,6 +33,8 @@ import ch.datascience.rdfstore.entities.Dataset.{AdditionalInfo, Identification,
 import ch.datascience.rdfstore.entities.Entity.{Checksum, InputEntity}
 import ch.datascience.rdfstore.entities.Project.ForksCount
 import ch.datascience.rdfstore.entities.PublicationEvent.AboutEvent
+import ch.datascience.rdfstore.entities.RunPlan.CommandParameters
+import ch.datascience.rdfstore.entities.RunPlan.CommandParameters.CommandParameterFactory
 import ch.datascience.tinytypes.InstantTinyType
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -70,6 +72,13 @@ trait EntitiesGenerators {
 
   lazy val visibilityPublic:    Gen[Visibility] = fixed(Visibility.Public)
   lazy val visibilityNonPublic: Gen[Visibility] = Gen.oneOf(Visibility.Internal, Visibility.Private)
+  lazy val visibilityAny:       Gen[Visibility] = projectVisibilities
+
+  def projectWitParentEntities(
+      visibilityGen:  Gen[Visibility],
+      minDateCreated: projects.DateCreated = projects.DateCreated(Instant.EPOCH)
+  ): Gen[Project[ForksCount.Zero] with HavingParent] =
+    projectEntities[ForksCount.Zero](visibilityGen, minDateCreated).map(_.forkOnce()._2)
 
   def projectEntities[FC <: Project.ForksCount](
       visibilityGen:        Gen[Visibility],
@@ -79,9 +88,9 @@ trait EntitiesGenerators {
     name         <- projectNames
     agent        <- cliVersions
     dateCreated  <- projectCreatedDates(minDateCreated.value)
-    maybeCreator <- persons.toGeneratorOfOptions
+    maybeCreator <- personEntities.toGeneratorOfOptions
     visibility   <- visibilityGen
-    members      <- persons(userGitLabIds.toGeneratorOfSomes).toGeneratorOfSet(minElements = 0)
+    members      <- personsEntities(userGitLabIds.toGeneratorOfSomes).toGeneratorOfSet(minElements = 0)
     version      <- projectSchemaVersions
     forksCount   <- forksCountGen
   } yield Project[FC](path, name, agent, dateCreated, maybeCreator, visibility, forksCount, members, version)
@@ -103,7 +112,7 @@ trait EntitiesGenerators {
     implicit renkuBaseUrl =>
       for {
         date     <- datasetCreatedDates(projectDateCreated.value)
-        creators <- persons.toGeneratorOfSet(maxElements = 1)
+        creators <- personEntities.toGeneratorOfSet(maxElements = 1)
       } yield Dataset.Provenance.Internal(Dataset.entityId(identifier), InitialVersion(identifier), date, creators)
 
   val datasetProvenanceImportedExternal: ProvenanceGen[Dataset.Provenance.ImportedExternal] =
@@ -116,7 +125,7 @@ trait EntitiesGenerators {
       for {
         date     <- datasetPublishedDates()
         sameAs   <- sameAsGen
-        creators <- persons.toGeneratorOfSet(maxElements = 1)
+        creators <- personEntities.toGeneratorOfSet(maxElements = 1)
       } yield Dataset.Provenance.ImportedExternal(Dataset.entityId(identifier),
                                                   sameAs,
                                                   InitialVersion(identifier),
@@ -132,7 +141,7 @@ trait EntitiesGenerators {
         sameAs         <- datasetInternalSameAs
         topmostSameAs  <- datasetExternalSameAs.map(TopmostSameAs(_))
         initialVersion <- datasetInitialVersions
-        creators       <- persons.toGeneratorOfSet(maxElements = 1)
+        creators       <- personEntities.toGeneratorOfSet(maxElements = 1)
       } yield Dataset.Provenance.ImportedInternalAncestorExternal(Dataset.entityId(identifier),
                                                                   sameAs,
                                                                   topmostSameAs,
@@ -148,7 +157,7 @@ trait EntitiesGenerators {
         date          <- datasetCreatedDates(projectDateCreated.value)
         sameAs        <- datasetInternalSameAs
         topmostSameAs <- datasetInternalSameAs
-        creators      <- persons.toGeneratorOfSet(maxElements = 1)
+        creators      <- personEntities.toGeneratorOfSet(maxElements = 1)
       } yield Dataset.Provenance.ImportedInternalAncestorInternal(Dataset.entityId(identifier),
                                                                   sameAs,
                                                                   TopmostSameAs(topmostSameAs),
@@ -163,7 +172,7 @@ trait EntitiesGenerators {
         date               <- datasetCreatedDates(projectDateCreated.value)
         derivedFrom        <- datasetDerivedFroms
         topmostDerivedFrom <- datasetTopmostDerivedFroms
-        creators           <- persons.toGeneratorOfSet(maxElements = 1)
+        creators           <- personEntities.toGeneratorOfSet(maxElements = 1)
       } yield Dataset.Provenance.Modified(Dataset.entityId(identifier),
                                           derivedFrom,
                                           topmostDerivedFrom,
@@ -246,7 +255,7 @@ trait EntitiesGenerators {
     date <- datasetCreatedDates(
               List(original.provenance.date.instant, original.project.dateCreated.value).sorted.reverse.head
             )
-    modifyingPerson <- persons
+    modifyingPerson <- personEntities
     additionalInfo  <- datasetAdditionalInfos
     publishing      <- datasetPublishing(date, original.project)
     parts           <- datasetPartEntities(date.instant).toGeneratorOfList()
@@ -298,9 +307,9 @@ trait EntitiesGenerators {
 
   implicit val agentEntities: Gen[Agent] = cliVersions map Agent.apply
 
-  implicit lazy val persons: Gen[Person] = persons()
+  implicit lazy val personEntities: Gen[Person] = personsEntities()
 
-  def persons(
+  def personsEntities(
       maybeGitLabIds: Gen[Option[GitLabId]] = userGitLabIds.toGeneratorOfNones,
       maybeEmails:    Gen[Option[Email]] = userEmails.toGeneratorOfOptions
   ): Gen[Person] = for {
@@ -309,6 +318,20 @@ trait EntitiesGenerators {
     maybeAffiliation <- userAffiliations.toGeneratorOfOptions
     maybeGitLabId    <- maybeGitLabIds
   } yield Person(name, maybeEmail, maybeAffiliation, maybeGitLabId)
+
+  def runPlanEntities(parameterFactories: CommandParameterFactory*): Gen[RunPlan] = for {
+    name    <- runPlanNames
+    command <- runPlanCommands
+  } yield RunPlan(name, command, CommandParameters.of(parameterFactories: _*))
+
+  def executionPlanners(runPlanGen: Gen[RunPlan],
+                        projectGen: Gen[Project[ForksCount]] = projectEntities[ForksCount.Zero](visibilityAny)
+  ): Gen[ExecutionPlanner] = for {
+    runPlan    <- runPlanGen
+    project    <- projectGen
+    author     <- personEntities
+    cliVersion <- cliVersions
+  } yield ExecutionPlanner.of(runPlan, activityStartTimes(project.dateCreated).generateOne, author, cliVersion, project)
 
   private implicit lazy val genApplicative: Applicative[Gen] = new Applicative[Gen] {
     override def pure[A](x:   A): Gen[A] = Gen.const(x)

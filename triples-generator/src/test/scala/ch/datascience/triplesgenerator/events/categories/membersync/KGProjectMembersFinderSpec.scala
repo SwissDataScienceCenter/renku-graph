@@ -41,7 +41,7 @@ class KGProjectMembersFinderSpec
   "findProjectMembers" should {
 
     "return all members of a given project" in new TestCase {
-      val members = persons(userGitLabIds.toGeneratorOfSomes).generateSet()
+      val members = personsEntities(userGitLabIds.toGeneratorOfSomes).generateSet()
       val project = projectEntities().generateOne.copy(members = members)
 
       loadToStore(project.asJsonLD)

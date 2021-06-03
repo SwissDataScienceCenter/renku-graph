@@ -48,6 +48,7 @@ import io.renku.jsonld.syntax.JsonEncoderOps
 object LineageExemplarData {
 
   final case class ExemplarData(
+      project:               Project[ForksCount],
       `zhbikes folder`:      NodeDef,
       `clean_data entity`:   NodeDef,
       `bikesparquet entity`: NodeDef,
@@ -55,7 +56,9 @@ object LineageExemplarData {
       `grid_plot entity`:    NodeDef,
       `cumulative entity`:   NodeDef,
       `activity3 plan1`:     NodeDef,
-      `activity4 plan2`:     NodeDef
+      `activity3 date`:      Activity.StartTime,
+      `activity4 plan2`:     NodeDef,
+      `activity4 date`:      Activity.StartTime
   )
 
   def apply(
@@ -101,7 +104,7 @@ object LineageExemplarData {
     val activity1RunPlan1 = ExecutionPlanner
       .of(runPlan1,
           activityStartTimes(after = project.dateCreated).generateOne,
-          persons.generateOne,
+          personEntities.generateOne,
           project.agent,
           project
       )
@@ -126,7 +129,7 @@ object LineageExemplarData {
     val activity2RunPlan2 = ExecutionPlanner
       .of(runPlan2,
           activityStartTimes(after = activity1RunPlan1.startTime).generateOne,
-          persons.generateOne,
+          personEntities.generateOne,
           project.agent,
           project
       )
@@ -142,7 +145,7 @@ object LineageExemplarData {
     val activity3RunPlan1 = ExecutionPlanner
       .of(runPlan1,
           activityStartTimes(after = activity2RunPlan2.startTime).generateOne,
-          persons.generateOne,
+          personEntities.generateOne,
           project.agent,
           project
       )
@@ -158,7 +161,7 @@ object LineageExemplarData {
     val activity4RunPlan2 = ExecutionPlanner
       .of(runPlan2,
           activityStartTimes(after = activity3RunPlan1.startTime).generateOne,
-          persons.generateOne,
+          personEntities.generateOne,
           project.agent,
           project
       )
@@ -182,6 +185,7 @@ object LineageExemplarData {
       activity3RunPlan1.asJsonLD,
       activity4RunPlan2.asJsonLD
     ) -> ExemplarData(
+      project,
       NodeDef(activity3RunPlan1, zhbikesFolder),
       NodeDef(activity3RunPlan1, cleanData),
       NodeDef(activity3RunPlan1, bikesParquet),
@@ -189,14 +193,16 @@ object LineageExemplarData {
       NodeDef(activity4RunPlan2, gridPlot),
       NodeDef(activity4RunPlan2, cumulative),
       NodeDef(activity3RunPlan1),
-      NodeDef(activity4RunPlan2)
+      activity3RunPlan1.startTime,
+      NodeDef(activity4RunPlan2),
+      activity4RunPlan2.startTime
     )
   }
 }
 
 final case class NodeDef(location: String, label: String, types: Set[String])
 
-private object NodeDef {
+object NodeDef {
 
   def apply(activity: Activity, location: Location)(implicit renkuBaseUrl: RenkuBaseUrl): NodeDef =
     activity

@@ -29,7 +29,7 @@ import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
+import ProjectsGenerators._
 import ch.datascience.knowledgegraph.projects.model.Permissions
 import ch.datascience.knowledgegraph.projects.model.Permissions._
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject

@@ -38,9 +38,9 @@ class KGInfoFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheck
 
     "return ResourceId of a Person with the given gitLabId" in new TestCase {
       forAll { gitLabId: users.GitLabId =>
-        val person = persons.generateOne.copy(maybeGitLabId = Some(gitLabId))
+        val person = personEntities.generateOne.copy(maybeGitLabId = Some(gitLabId))
 
-        loadToStore(person.asJsonLD, persons.generateOne.asJsonLD)
+        loadToStore(person.asJsonLD, personEntities.generateOne.asJsonLD)
 
         val Some(resourceId) = finder.findCreatorId(gitLabId).unsafeRunSync()
 

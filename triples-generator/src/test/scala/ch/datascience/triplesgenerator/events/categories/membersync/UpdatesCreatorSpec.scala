@@ -25,7 +25,7 @@ import ch.datascience.graph.model.users.{Email, GitLabId}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.graph.model.{projects, users}
 import ch.datascience.rdfstore.InMemoryRdfStore
-import ch.datascience.rdfstore.entities.EntitiesGenerators.{persons, projectEntities}
+import ch.datascience.rdfstore.entities.EntitiesGenerators.{personEntities, projectEntities}
 import ch.datascience.rdfstore.entities.bundles.{gitLabApiUrl, renkuBaseUrl}
 import ch.datascience.triplesgenerator.events.categories.membersync.Generators._
 import ch.datascience.triplesgenerator.events.categories.membersync.PersonOps._

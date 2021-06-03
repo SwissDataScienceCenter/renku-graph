@@ -43,7 +43,6 @@ object projects {
   }
 
   class ResourceId private (val value: String) extends AnyVal with StringTinyType
-
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with Url

@@ -22,10 +22,11 @@ import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.projects._
-import ch.datascience.graph.model.{SchemaVersion, users}
 import ch.datascience.graph.model.views.RdfResource
+import ch.datascience.graph.model.{SchemaVersion, users}
 import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder._
 import ch.datascience.logging.ApplicationLogger
+import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
 import org.typelevel.log4cats.Logger
 
@@ -40,13 +41,14 @@ object KGProjectFinder {
   final case class KGProject(path:        Path,
                              name:        Name,
                              created:     ProjectCreation,
+                             visibility:  Visibility,
                              maybeParent: Option[Parent],
                              version:     SchemaVersion
   )
 
   final case class ProjectCreation(date: DateCreated, maybeCreator: Option[ProjectCreator])
 
-  final case class Parent(resourceId: ResourceId, name: Name, created: ProjectCreation, visibility: Visibility)
+  final case class Parent(resourceId: ResourceId, name: Name, created: ProjectCreation)
 
   final case class ProjectCreator(maybeEmail: Option[users.Email], name: users.Name)
 
@@ -66,6 +68,7 @@ private class IOKGProjectFinder(
     with KGProjectFinder[IO] {
 
   import cats.syntax.all._
+  import ch.datascience.graph.Schemas._
   import eu.timepit.refined.auto._
   import io.circe.Decoder
 
@@ -74,35 +77,31 @@ private class IOKGProjectFinder(
     queryExpecting[List[KGProject]](using = query(path)) flatMap toSingleProject
   }
 
-  private def query(path: Path) = SparqlQuery(
+  private def query(path: Path) = SparqlQuery.of(
     name = "project by id",
-    Set(
-      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-      "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
-      "PREFIX schema: <http://schema.org/>",
-      "PREFIX prov: <http://www.w3.org/ns/prov#>"
-    ),
-    s"""|SELECT DISTINCT ?name ?dateCreated ?maybeCreatorName ?maybeCreatorEmail ?maybeParentId ?maybeParentName ?maybeParentDateCreated ?maybeParentCreatorName ?maybeParentCreatorEmail ?schemaVersion
+    Prefixes.of(schema -> "schema", prov -> "prov", renku -> "renku"),
+    s"""|SELECT DISTINCT ?name ?visibility ?dateCreated ?maybeCreatorName ?maybeCreatorEmail ?maybeParentId ?maybeParentName ?maybeParentDateCreated ?maybeParentCreatorName ?maybeParentCreatorEmail ?schemaVersion
         |WHERE {
         |  BIND (${ResourceId(renkuBaseUrl, path).showAs[RdfResource]} AS ?projectId)
-        |  ?projectId rdf:type <http://schema.org/Project>;
+        |  ?projectId a schema:Project;
         |             schema:name ?name;
+        |             renku:projectVisibility ?visibility;
         |             schema:schemaVersion ?schemaVersion;
         |             schema:dateCreated ?dateCreated.
         |  OPTIONAL {
         |    ?projectId schema:creator ?maybeCreatorId.
-        |    ?maybeCreatorId rdf:type <http://schema.org/Person>;
+        |    ?maybeCreatorId a schema:Person;
         |                    schema:name ?maybeCreatorName.
         |    OPTIONAL { ?maybeCreatorId schema:email ?maybeCreatorEmail }
         |  }
         |  OPTIONAL {
         |    ?projectId prov:wasDerivedFrom ?maybeParentId.
-        |    ?maybeParentId rdf:type <http://schema.org/Project>;
+        |    ?maybeParentId a schema:Project;
         |                   schema:name ?maybeParentName;
         |                   schema:dateCreated ?maybeParentDateCreated.
         |    OPTIONAL {
         |      ?maybeParentId schema:creator ?maybeParentCreatorId.
-        |      ?maybeParentCreatorId rdf:type <http://schema.org/Person>;
+        |      ?maybeParentCreatorId a schema:Person;
         |                            schema:name ?maybeParentCreatorName.
         |      OPTIONAL { ?maybeParentCreatorId schema:email ?maybeParentCreatorEmail }
         |    }
@@ -120,13 +119,13 @@ private class IOKGProjectFinder(
     val project: Decoder[KGProject] = { cursor =>
       for {
         name                   <- cursor.downField("name").downField("value").as[Name]
+        visibility             <- cursor.downField("visibility").downField("value").as[Visibility]
         dateCreated            <- cursor.downField("dateCreated").downField("value").as[DateCreated]
         maybeCreatorName       <- cursor.downField("maybeCreatorName").downField("value").as[Option[users.Name]]
         maybeCreatorEmail      <- cursor.downField("maybeCreatorEmail").downField("value").as[Option[users.Email]]
         maybeParentId          <- cursor.downField("maybeParentId").downField("value").as[Option[ResourceId]]
         maybeParentName        <- cursor.downField("maybeParentName").downField("value").as[Option[Name]]
         maybeParentDateCreated <- cursor.downField("maybeParentDateCreated").downField("value").as[Option[DateCreated]]
-        maybeParentVisibility  <- cursor.downField("maybeParentVisibility").downField("value").as[Option[Visibility]]
         maybeParentCreatorName <- cursor.downField("maybeParentCreatorName").downField("value").as[Option[users.Name]]
         maybeParentCreatorEmail <- cursor
                                      .downField("maybeParentCreatorEmail")
@@ -137,16 +136,16 @@ private class IOKGProjectFinder(
         path,
         name,
         ProjectCreation(dateCreated, maybeCreatorName map (name => ProjectCreator(maybeCreatorEmail, name))),
-        maybeParent = (maybeParentId, maybeParentName, maybeParentDateCreated, maybeParentVisibility) mapN {
-          case (parentId, name, dateCreated, visibility) =>
+        visibility,
+        maybeParent =
+          (maybeParentId, maybeParentName, maybeParentDateCreated) mapN { case (parentId, name, dateCreated) =>
             Parent(parentId,
                    name,
                    ProjectCreation(dateCreated,
                                    maybeParentCreatorName.map(name => ProjectCreator(maybeParentCreatorEmail, name))
-                   ),
-                   visibility
+                   )
             )
-        },
+          },
         version
       )
     }
@@ -172,9 +171,8 @@ private object IOKGProjectFinder {
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[KGProjectFinder[IO]] =
-    for {
-      config       <- rdfStoreConfig
-      renkuBaseUrl <- renkuBaseUrl
-    } yield new IOKGProjectFinder(config, renkuBaseUrl, logger, timeRecorder)
+  ): IO[KGProjectFinder[IO]] = for {
+    config       <- rdfStoreConfig
+    renkuBaseUrl <- renkuBaseUrl
+  } yield new IOKGProjectFinder(config, renkuBaseUrl, logger, timeRecorder)
 }

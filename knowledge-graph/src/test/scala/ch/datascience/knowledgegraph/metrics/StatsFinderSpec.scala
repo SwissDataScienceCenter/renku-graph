@@ -24,7 +24,7 @@ import ch.datascience.generators.CommonGraphGenerators.cliVersions
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
+import ch.datascience.rdfstore.entities.EntitiesGenerators.personEntities
 import ch.datascience.rdfstore.entities.Project.ForksCount
 import ch.datascience.rdfstore.entities._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
@@ -42,11 +42,11 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
 
     "return zero if there are no entity in the DB" in new TestCase {
       stats.entitiesCount().unsafeRunSync() shouldBe Map(
-        EntityLabel((schema / "Dataset").show) -> Count(0L),
-        EntityLabel((schema / "Project").show) -> Count(0L),
-        EntityLabel((prov / "Activity").show) -> Count(0L),
-        EntityLabel((renku / "Run").show) -> Count(0L),
-        EntityLabel((schema / "Person").show) -> Count(0L),
+        EntityLabel((schema / "Dataset").show)              -> Count(0L),
+        EntityLabel((schema / "Project").show)              -> Count(0L),
+        EntityLabel((prov / "Activity").show)               -> Count(0L),
+        EntityLabel((renku / "Run").show)                   -> Count(0L),
+        EntityLabel((schema / "Person").show)               -> Count(0L),
         EntityLabel((schema / "Person with GitLabId").show) -> Count(0L)
       )
     }
@@ -54,7 +54,7 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
     "return info about number of objects by types" in new TestCase {
 
       val activities = activityEntities.generateNonEmptyList(minElements = 10, maxElements = 50)
-      val persons = activities.map(_.author)
+      val persons    = activities.map(_.author)
       val entitiesWithActivities = Map
         .empty[EntityLabel, Count]
         .update(schema / "Project", activities.size)
@@ -79,12 +79,12 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
   }
 
   private lazy val activityEntities: Gen[Activity] = for {
-    name <- runPlanNames
-    command <- runPlanCommands
-    startTime <- activityStartTimes
-    author <- persons
+    name       <- runPlanNames
+    command    <- runPlanCommands
+    startTime  <- activityStartTimes
+    author     <- personEntities
     cliVersion <- cliVersions
-    project <- projectEntities[ForksCount.Zero](visibilityPublic)
+    project    <- projectEntities[ForksCount.Zero](visibilityPublic)
   } yield ExecutionPlanner
     .of(RunPlan(name, command, commandParameterFactories = Nil), startTime, author, cliVersion, project)
     .buildProvenanceGraph
@@ -92,7 +92,7 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
 
   private implicit class MapOps(entitiesByType: Map[EntityLabel, Count]) {
     def update(entityType: Property, count: Long): Map[EntityLabel, Count] = {
-      val entity = EntityLabel(entityType.show)
+      val entity       = EntityLabel(entityType.show)
       val runningTotal = entitiesByType.getOrElse(entity, Count(0L)).value
       entitiesByType.updated(entity, Count(runningTotal + count))
     }

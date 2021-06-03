@@ -29,7 +29,7 @@ import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplici
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
-import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
+import ch.datascience.rdfstore.entities.EntitiesGenerators.personEntities
 import ch.datascience.rdfstore.entities.Project.ForksCount
 import ch.datascience.rdfstore.entities._
 import io.circe.literal._
@@ -88,7 +88,7 @@ class WebhookCreationSpec
       Given("some Commit exists for the project in GitLab")
       givenAccessTokenPresentFor(project)
       val commitId  = commitIds.generateOne
-      val committer = persons.generateOne
+      val committer = personEntities.generateOne
       `GET <gitlabApi>/projects/:id/repository/commits returning OK with a commit`(projectId, commitId)
       `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
 

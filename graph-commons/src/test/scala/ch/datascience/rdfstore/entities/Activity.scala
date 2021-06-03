@@ -41,6 +41,7 @@ final case class Activity(id:                  Id,
 ) {
 
   lazy val association: Association          = associationFactory(this)
+  lazy val runPlan:     RunPlan              = association.runPlan
   lazy val usages:      List[Usage]          = usageFactories.map(_.apply(this))
   lazy val parameters:  List[ParameterValue] = parameterFactories.map(_.apply(this))
   lazy val generations: List[Generation]     = generationFactories.map(_.apply(this))

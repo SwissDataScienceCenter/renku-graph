@@ -16,40 +16,41 @@
  * limitations under the License.
  */
 
-package ch.datascience.knowledgegraph.projects
+package ch.datascience.knowledgegraph.projects.rest
 
-import java.time.temporal.ChronoUnit.DAYS
-import ch.datascience.generators.CommonGraphGenerators.renkuBaseUrls
+import Converters._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{httpUrls => urls, _}
-import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.projects.{DateCreated, Path}
+import ch.datascience.graph.model.projects.Path
+import ch.datascience.graph.model.projects.ResourceId._
 import ch.datascience.knowledgegraph.projects.model.Forking.ForksCount
 import ch.datascience.knowledgegraph.projects.model.Permissions._
 import ch.datascience.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount, Tag}
-import ch.datascience.knowledgegraph.projects.model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
+import ch.datascience.knowledgegraph.projects.model.Statistics._
 import ch.datascience.knowledgegraph.projects.model.Urls.{HttpUrl, ReadmeUrl, SshUrl, WebUrl}
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
 import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder._
+import ch.datascience.rdfstore.entities
+import ch.datascience.rdfstore.entities.EntitiesGenerators._
 import org.scalacheck.Gen
 
-import java.time.Instant.now
-
-object ProjectsGenerators {
-
-  private implicit lazy val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
+private object ProjectsGenerators {
 
   implicit val projects: Gen[Project] = for {
-    kgProject     <- kgProjects
+    kgProject <- Gen
+                   .oneOf(projectEntities[entities.Project.ForksCount.Zero](visibilityAny),
+                          projectWitParentEntities(visibilityAny)
+                   )
+                   .map(_.to[KGProject])
     gitLabProject <- gitLabProjects
   } yield Project(
     id = gitLabProject.id,
     path = kgProject.path,
     name = kgProject.name,
     maybeDescription = gitLabProject.maybeDescription,
-    visibility = gitLabProject.visibility,
+    visibility = kgProject.visibility,
     created = Creation(
       date = kgProject.created.date,
       maybeCreator = kgProject.created.maybeCreator.map(creator => Creator(creator.maybeEmail, creator.name))
@@ -74,28 +75,6 @@ object ProjectsGenerators {
     statistics = gitLabProject.statistics,
     version = kgProject.version
   )
-
-  implicit lazy val kgProjects: Gen[KGProject] = kgProjects(parents.toGeneratorOfOptions)
-
-  def kgProjects(parentsGen: Gen[Option[Parent]]): Gen[KGProject] =
-    for {
-      id          <- projectPaths
-      name        <- projectNames
-      created     <- projectCreations
-      maybeParent <- parentsGen
-      version     <- projectSchemaVersions
-    } yield KGProject(id, name, created, maybeParent, version).copy(
-      maybeParent = maybeParent.map { parent =>
-        parent.copy(
-          created = parent.created.copy(
-            date = DateCreated {
-              val newDate = created.date.value.plus(2, DAYS)
-              if ((newDate compareTo now) < 0) newDate else now
-            }
-          )
-        )
-      }
-    )
 
   implicit lazy val gitLabProjects: Gen[GitLabProject] = for {
     id               <- projectIds
@@ -127,17 +106,9 @@ object ProjectsGenerators {
     maybeReadmeUrl <- readmeUrls.toGeneratorOfOptions
   } yield Urls(sshUrl, httpUrl, webUrl, maybeReadmeUrl)
 
-  private implicit lazy val forksCounts: Gen[ForksCount] = nonNegativeInts() map (v => ForksCount.apply(v.value))
-
-  implicit def parents(implicit renkuBaseUrl: RenkuBaseUrl): Gen[Parent] =
-    for {
-      resourceId <- projectResourceIds()
-      name       <- projectNames
-      created    <- projectCreations
-    } yield Parent(resourceId, name, created)
-
-  implicit lazy val starsCounts: Gen[StarsCount] = nonNegativeInts() map (v => StarsCount.apply(v.value))
-  implicit lazy val tagsObjects: Gen[Tag]        = nonBlankStrings() map (v => Tag(v.value))
+  private implicit lazy val forksCounts: Gen[ForksCount] = nonNegativeInts() map (v => ForksCount(v.value))
+  implicit lazy val starsCounts:         Gen[StarsCount] = nonNegativeInts() map (v => StarsCount(v.value))
+  implicit lazy val tagsObjects:         Gen[Tag]        = nonBlankStrings() map (v => Tag(v.value))
 
   private implicit lazy val sshUrls: Gen[SshUrl] = for {
     hostParts   <- nonEmptyList(nonBlankStrings())
@@ -154,18 +125,7 @@ object ProjectsGenerators {
     projectPath <- projectPaths
   } yield ReadmeUrl(s"$url/$projectPath/blob/master/README.md")
 
-  private implicit lazy val webUrls: Gen[WebUrl] = urls() map WebUrl.apply
-
-  implicit lazy val projectCreations: Gen[ProjectCreation] = for {
-    created      <- projectCreatedDates
-    maybeCreator <- projectCreators.toGeneratorOfOptions
-  } yield ProjectCreation(created, maybeCreator)
-
-  implicit lazy val projectCreators: Gen[ProjectCreator] = for {
-    maybeEmail <- userEmails.toGeneratorOfOptions
-    name       <- userNames
-  } yield ProjectCreator(maybeEmail, name)
-
+  private implicit lazy val webUrls:    Gen[WebUrl]      = urls() map WebUrl.apply
   private implicit lazy val updatedAts: Gen[DateUpdated] = timestampsNotInTheFuture map DateUpdated.apply
 
   implicit lazy val permissionsObjects: Gen[Permissions] =

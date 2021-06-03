@@ -34,7 +34,7 @@ import ch.datascience.http.server.EndpointTester._
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
-import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
+import ProjectsGenerators._
 import ch.datascience.knowledgegraph.projects.model.Forking.ForksCount
 import ch.datascience.knowledgegraph.projects.model.Permissions.{AccessLevel, GroupAccessLevel, ProjectAccessLevel}
 import ch.datascience.knowledgegraph.projects.model.Project._

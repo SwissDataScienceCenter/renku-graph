@@ -111,8 +111,8 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
   "swapCreator" should {
 
     "replace the current Project's creator with the given one" in new TestCase {
-      val creator1 = persons.generateOne
-      val creator2 = persons.generateOne
+      val creator1 = personEntities.generateOne
+      val creator2 = personEntities.generateOne
       val project1 = entitiesProjects(maybeCreator = creator1.some).generateOne
       val project2 = entitiesProjects(maybeCreator = creator2.some).generateOne
 
@@ -132,7 +132,7 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
     }
 
     "add a new creator to the Project when there is no creator linked to the project" in new TestCase {
-      val creator1 = persons.generateOne
+      val creator1 = personEntities.generateOne
       val project1 = entitiesProjects(maybeCreator = None).generateOne
       val project2 = entitiesProjects(maybeCreator = creator1.some).generateOne
 
@@ -154,8 +154,8 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
   "unlinkCreator" should {
 
     "remove creator from the project" in new TestCase {
-      val creator1 = persons.generateOne
-      val creator2 = persons.generateOne
+      val creator1 = personEntities.generateOne
+      val creator2 = personEntities.generateOne
       val project1 = entitiesProjects(maybeCreator = creator1.some).generateOne
       val project2 = entitiesProjects(maybeCreator = creator2.some).generateOne
 
@@ -177,8 +177,8 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
   "addNewCreator" should {
 
     "create a new Person and link it to the given Project replacing the old creator on the project" in new TestCase {
-      val creator1 = persons.generateOne
-      val creator2 = persons.generateOne
+      val creator1 = personEntities.generateOne
+      val creator2 = personEntities.generateOne
       val project1 = entitiesProjects(maybeCreator = creator1.some).generateOne
       val project2 = entitiesProjects(maybeCreator = creator2.some).generateOne
 

@@ -70,7 +70,7 @@ Response body example:
       "name": "mniouUnmal",
       "description": "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
       "published": {
-        "datePublished": "2012-10-14T03:02:25.639Z", // optional property
+        "datePublished": "2012-10-14", // optional property
         "creator": [
           {
             "name": "e wmtnxmcguz"
@@ -153,7 +153,7 @@ Response body example:
   "derivedFrom" : "http://host/url1",             // optional property when no "sameAs" exists
   "description" : "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
   "published" : {
-    "datePublished" : "2012-10-14T03:02:25.639Z", // optional property
+    "datePublished" : "2012-10-14",               // optional property
     "creator" : [
       {
         "name" : "e wmtnxmcguz"

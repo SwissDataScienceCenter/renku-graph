@@ -40,7 +40,7 @@ class KGPersonFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
 
       val memberNonExistingInKG = gitLabProjectMembers.generateOne
       val memberExistingInKG    = gitLabProjectMembers.generateOne
-      val person                = persons().generateOne.copy(maybeGitLabId = Some(memberExistingInKG.gitLabId))
+      val person                = personsEntities().generateOne.copy(maybeGitLabId = Some(memberExistingInKG.gitLabId))
       val personJsonLD          = person.asJsonLD
 
       loadToStore(personJsonLD)

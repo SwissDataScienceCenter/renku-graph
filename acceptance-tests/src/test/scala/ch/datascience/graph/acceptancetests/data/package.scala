@@ -24,7 +24,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.tooling.RDFStore
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.{CliVersion, RenkuVersionPair, SchemaVersion}
-import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
+import ch.datascience.knowledgegraph.projects.rest.ProjectsGenerators._
 import ch.datascience.knowledgegraph.projects.model.Project.DateUpdated
 import ch.datascience.rdfstore.entities.fixed
 import ch.datascience.rdfstore.{FusekiBaseUrl, entities}

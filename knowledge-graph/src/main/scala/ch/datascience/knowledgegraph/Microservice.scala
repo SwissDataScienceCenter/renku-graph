@@ -22,7 +22,7 @@ import cats.effect._
 import ch.datascience.config.certificates.CertificateLoader
 import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.http.server.HttpServer
-import ch.datascience.knowledgegraph.metrics.{IOKGMetrics, IOStatsFinder, KGMetrics}
+import ch.datascience.knowledgegraph.metrics.KGMetrics
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.microservices.IOMicroservice
@@ -48,8 +48,7 @@ object Microservice extends IOMicroservice {
     sentryInitializer  <- SentryInitializer[IO]()
     metricsRegistry    <- MetricsRegistry()
     sparqlTimeRecorder <- SparqlQueryTimeRecorder(metricsRegistry)
-    statsFinder        <- IOStatsFinder(sparqlTimeRecorder, ApplicationLogger)
-    kgMetrics          <- IOKGMetrics(statsFinder, metricsRegistry, ApplicationLogger)
+    kgMetrics          <- KGMetrics(metricsRegistry, sparqlTimeRecorder, ApplicationLogger)
     microserviceRoutes <- MicroserviceRoutes(metricsRegistry, sparqlTimeRecorder, ApplicationLogger)
     exicode <- microserviceRoutes.routes.use { routes =>
                  val httpServer = new HttpServer[IO](serverPort = 9004, routes)

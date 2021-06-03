@@ -292,7 +292,7 @@ class DatasetsResourcesSpec
       val dataset3PrivateWithAccess = datasetEntities(
         datasetProvenanceInternal,
         projectEntities[entities.Project.ForksCount.Zero](Gen.oneOf(Visibility.Private, Visibility.Internal))
-          .map(_.copy(members = Set(persons.generateOne.copy(maybeGitLabId = user.id.some))))
+          .map(_.copy(members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some))))
       ).generateOne.makeTitleContaining(text)
 
       Given("some datasets with title, description, name and author containing some arbitrary chosen text")

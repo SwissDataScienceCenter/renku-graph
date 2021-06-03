@@ -19,8 +19,8 @@
 package ch.datascience.knowledgegraph.lineage
 
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.Schemas._
 import ch.datascience.knowledgegraph.lineage.model._
-import ch.datascience.rdfstore.entities.bundles._
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 

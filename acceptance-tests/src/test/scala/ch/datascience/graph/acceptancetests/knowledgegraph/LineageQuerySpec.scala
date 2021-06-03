@@ -125,7 +125,7 @@ class LineageQuerySpec
 
       val accessibleProject = projectEntities[ForksCount.Zero](visibilityNonPublic).generateOne.copy(
         path = model.projects.Path("accessible/member-project"),
-        members = Set(persons.generateOne.copy(maybeGitLabId = user.id.some))
+        members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some))
       )
 
       val (accessibleJsons, accessibleExemplarData) = LineageExemplarData(accessibleProject)

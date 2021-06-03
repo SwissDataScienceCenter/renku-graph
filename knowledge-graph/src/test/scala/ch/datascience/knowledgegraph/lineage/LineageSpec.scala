@@ -21,9 +21,9 @@ package ch.datascience.knowledgegraph.lineage
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.Schemas.{prov, schema, wfprov}
 import ch.datascience.knowledgegraph.lineage.LineageGenerators._
 import ch.datascience.knowledgegraph.lineage.model.{Edge, Lineage, Node}
-import ch.datascience.rdfstore.entities.bundles.{prov, schema, wfprov}
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 import org.scalatest.matchers.should

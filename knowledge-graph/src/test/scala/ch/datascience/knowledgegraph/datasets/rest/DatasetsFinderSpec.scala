@@ -292,24 +292,25 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
 
       s"not return deleted datasets when the given phrase is $maybePhrase" +
         "- case with unrelated datasets" in new TestCase {
-          fail("to be implemented")
+          assert(false, "implementation not known yet")
+
         }
 
       s"not return deleted datasets when the given phrase is $maybePhrase" +
         "- case with forks on renku created datasets and the fork dataset is deleted" in new TestCase {
-          fail("to be implemented")
+          assert(false, "implementation not known yet")
 
         }
 
       s"not return deleted datasets when the given phrase is $maybePhrase" +
         "- case with forks on renku created datasets and original dataset is deleted" in new TestCase {
-          fail("to be implemented")
+          assert(false, "implementation not known yet")
 
         }
 
       s"not return deleted datasets when the given phrase is $maybePhrase" +
         "- case with modification on renku created datasets" in new TestCase {
-          fail("to be implemented")
+          assert(false, "implementation not known yet")
 
         }
     }
@@ -450,7 +451,7 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
 
     s"not return deleted datasets even if the phrase match" +
       "- case with unrelated datasets" in new TestCase {
-        fail("To be implemented")
+        assert(false, "implementation not known yet")
       }
   }
 
@@ -671,7 +672,7 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
 
   "findDatasets with authorized user" should {
     s"return public datasets and private datasets from project the user is a member of" in new TestCase {
-      val userWithGitlabId = persons(userGitLabIds.toGeneratorOfSomes).generateOne
+      val userWithGitlabId = personsEntities(userGitLabIds.toGeneratorOfSomes).generateOne
       val publicDataset = datasetEntities(
         provenanceGen = datasetProvenanceInternal,
         projectsGen = projectEntities[Project.ForksCount.Zero](visibilityPublic)
@@ -710,7 +711,7 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
 
     s"return public datasets and private datasets from project the user is a member of " +
       s"but not count project the user is not a member of" in new TestCase {
-        val userWithGitlabId = persons(userGitLabIds.toGeneratorOfSomes).generateOne
+        val userWithGitlabId = personsEntities(userGitLabIds.toGeneratorOfSomes).generateOne
         val publicDataset = datasetEntities(
           provenanceGen = datasetProvenanceInternal,
           projectsGen = projectEntities[Project.ForksCount.Zero](visibilityPublic)

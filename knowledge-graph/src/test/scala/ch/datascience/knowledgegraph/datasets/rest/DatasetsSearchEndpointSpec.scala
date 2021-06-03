@@ -26,7 +26,7 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.DatePublished
+import ch.datascience.graph.model.datasets._
 import ch.datascience.http.ErrorMessage
 import ch.datascience.http.InfoMessage._
 import ch.datascience.http.rest.paging.PagingRequest.Decoders.{page, perPage}
@@ -168,7 +168,7 @@ class DatasetsSearchEndpointSpec
           "title": $title,
           "name": $name,
           "published": ${creators -> date},
-          "date": ${date},
+          "date": ${date.instant},
           "projectsCount": ${projectsCount.value},
           "keywords": ${keywords.map(_.value)},
           "images": ${images.map(_.value)},
@@ -179,14 +179,14 @@ class DatasetsSearchEndpointSpec
         }""" addIfDefined "description" -> maybeDescription
     }
 
-    private implicit lazy val publishingEncoder: Encoder[(Set[DatasetCreator], Option[DatePublished])] =
-      Encoder.instance[(Set[DatasetCreator], Option[DatePublished])] {
-        case (creators, Some(date)) =>
+    private implicit lazy val publishingEncoder: Encoder[(Set[DatasetCreator], Date)] =
+      Encoder.instance[(Set[DatasetCreator], Date)] {
+        case (creators, DatePublished(date)) =>
           json"""{
           "creator": $creators,
           "datePublished": $date
         }"""
-        case (creators, None) =>
+        case (creators, _) =>
           json"""{
           "creator": $creators
         }"""
@@ -195,8 +195,8 @@ class DatasetsSearchEndpointSpec
     private implicit lazy val creatorEncoder: Encoder[DatasetCreator] = Encoder.instance[DatasetCreator] {
       case DatasetCreator(maybeEmail, name, _) =>
         json"""{
-        "name": $name
-      }""" addIfDefined ("email" -> maybeEmail)
+          "name": $name
+        }""" addIfDefined ("email" -> maybeEmail)
     }
 
     def warn(maybePhrase: Option[Phrase]) = maybePhrase match {

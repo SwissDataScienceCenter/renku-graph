@@ -18,8 +18,8 @@
 
 package ch.datascience.knowledgegraph
 
+import ch.datascience.graph.Schemas._
 import ch.datascience.knowledgegraph.lineage.model._
-import ch.datascience.rdfstore.entities.bundles.{prov, wfprov}
 import io.renku.jsonld.EntityId
 
 import java.time.Instant

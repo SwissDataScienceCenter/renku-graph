@@ -71,7 +71,7 @@ private class EdgesFinderImpl(
 
   private def query(path: Path, maybeUser: Option[AuthUser]) = SparqlQuery.of(
     name = "lineage - edges",
-    Prefixes.of(prov -> "prov", renku -> "renku", wfprov -> "wfprov", schema -> "schema"),
+    Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema"),
     s"""|SELECT DISTINCT ?runPlan ?date ?sourceEntityLocation ?targetEntityLocation
         |WHERE {
         |  {
@@ -83,7 +83,6 @@ private class EdgesFinderImpl(
         |    ?activity schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
         |              prov:qualifiedAssociation/prov:hadPlan ?runPlan;
         |              prov:startedAtTime ?date.
-        |    FILTER NOT EXISTS {?activity a wfprov:WorkflowRun}
         |  } UNION {
         |    ${projectMemberFilterQuery(ResourceId(renkuBaseUrl, path).showAs[RdfResource])(maybeUser)}
         |    ?targetEntity schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
@@ -93,7 +92,6 @@ private class EdgesFinderImpl(
         |    ?activity schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
         |              prov:qualifiedAssociation/prov:hadPlan ?runPlan;
         |              prov:startedAtTime ?date.
-        |    FILTER NOT EXISTS {?activity a wfprov:WorkflowRun}
         |  }
         |}
         |ORDER BY ASC(?date)

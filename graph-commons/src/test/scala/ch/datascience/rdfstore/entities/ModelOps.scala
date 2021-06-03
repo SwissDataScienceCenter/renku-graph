@@ -38,6 +38,8 @@ trait ModelOps {
 
   implicit class ProjectOps[FC <: ForksCount](project: Project[FC])(implicit renkuBaseUrl: RenkuBaseUrl) {
 
+    def to[T](implicit convert: Project[FC] => T): T = convert(project)
+
     def forkOnce(): (Project[ForksCount.NonZero], Project[ForksCount.Zero] with HavingParent) = {
       val (parent, childGen) = fork(times = 1)
       parent -> childGen.head
@@ -226,32 +228,32 @@ trait ModelOps {
 
   implicit val creatorUsernameUpdaterInternal
       : (users.Name, Dataset.Provenance.Internal) => Dataset.Provenance.Internal = { case (userName, prov) =>
-    prov.copy(creators = prov.creators + persons.generateOne.copy(name = userName))
+    prov.copy(creators = prov.creators + personEntities.generateOne.copy(name = userName))
   }
 
   implicit val creatorUsernameUpdaterImportedInternalAncestorInternal
       : (users.Name,
          Dataset.Provenance.ImportedInternalAncestorInternal
       ) => Dataset.Provenance.ImportedInternalAncestorInternal = { case (userName, prov) =>
-    prov.copy(creators = prov.creators + persons.generateOne.copy(name = userName))
+    prov.copy(creators = prov.creators + personEntities.generateOne.copy(name = userName))
   }
 
   implicit val creatorUsernameUpdaterImportedInternalAncestorExternal
       : (users.Name,
          Dataset.Provenance.ImportedInternalAncestorExternal
       ) => Dataset.Provenance.ImportedInternalAncestorExternal = { case (userName, prov) =>
-    prov.copy(creators = prov.creators + persons.generateOne.copy(name = userName))
+    prov.copy(creators = prov.creators + personEntities.generateOne.copy(name = userName))
   }
 
   implicit val creatorUsernameUpdaterImportedExternal
       : (users.Name, Dataset.Provenance.ImportedExternal) => Dataset.Provenance.ImportedExternal = {
     case (userName, prov) =>
-      prov.copy(creators = prov.creators + persons.generateOne.copy(name = userName))
+      prov.copy(creators = prov.creators + personEntities.generateOne.copy(name = userName))
   }
 
   implicit val creatorUsernameUpdaterModified
       : (users.Name, Dataset.Provenance.Modified) => Dataset.Provenance.Modified = { case (userName, prov) =>
-    prov.copy(creators = prov.creators + persons.generateOne.copy(name = userName))
+    prov.copy(creators = prov.creators + personEntities.generateOne.copy(name = userName))
   }
 }
 

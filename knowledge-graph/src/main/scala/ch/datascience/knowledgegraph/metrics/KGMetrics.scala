@@ -21,9 +21,12 @@ package ch.datascience.knowledgegraph.metrics
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
+import ch.datascience.logging.ApplicationLogger
 import ch.datascience.metrics._
+import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
 import scala.language.postfixOps
 import scala.util.control.NonFatal
@@ -36,8 +39,8 @@ class KGMetricsImpl(
     statsFinder:    StatsFinder[IO],
     logger:         Logger[IO],
     countsGauge:    LabeledGauge[IO, EntityLabel],
-    initialDelay:   FiniteDuration = IOKGMetrics.initialDelay,
-    countsInterval: FiniteDuration = IOKGMetrics.countsInterval
+    initialDelay:   FiniteDuration = KGMetrics.initialDelay,
+    countsInterval: FiniteDuration = KGMetrics.countsInterval
 )(implicit ME:      MonadError[IO, Throwable], timer: Timer[IO], cs: ContextShift[IO])
     extends KGMetrics[IO] {
 
@@ -67,7 +70,7 @@ class KGMetricsImpl(
   }
 }
 
-object IOKGMetrics {
+object KGMetrics {
 
   import cats.effect.IO._
   import eu.timepit.refined.auto._
@@ -78,11 +81,12 @@ object IOKGMetrics {
   private[metrics] val countsInterval: FiniteDuration = 1 minute
 
   def apply(
-      statsFinder:         StatsFinder[IO],
       metricsRegistry:     MetricsRegistry[IO],
+      timeRecorder:        SparqlQueryTimeRecorder[IO],
       logger:              Logger[IO]
-  )(implicit contextShift: ContextShift[IO], timer: Timer[IO]): IO[KGMetrics[IO]] =
+  )(implicit contextShift: ContextShift[IO], timer: Timer[IO], executionContext: ExecutionContext): IO[KGMetrics[IO]] =
     for {
+      statsFinder <- StatsFinder(timeRecorder, ApplicationLogger)
       entitiesCountGauge <-
         Gauge[IO, EntityLabel](
           name = "entities_count",

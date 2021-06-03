@@ -108,10 +108,27 @@ object CommandParameterBase {
     def fromLocation(defaultValue: Location): Position => RunPlan => CommandInput =
       from(InputDefaultValue(defaultValue))
 
-    def from(defaultValue: InputDefaultValue): Position => RunPlan => CommandInput =
+    def streamedFromLocation(defaultValue: Location): Position => RunPlan => CommandInput =
+      streamedFrom(InputDefaultValue(defaultValue))
+
+    def from(defaultValue: InputDefaultValue): Position => RunPlan => LocationCommandInput =
       position =>
         runPlan =>
           LocationCommandInput(
+            position,
+            Name(s"input_$position"),
+            maybeDescription = None,
+            maybePrefix = None,
+            defaultValue,
+            Temporary.nonTemporary,
+            maybeEncodingFormat = None,
+            runPlan
+          )
+
+    def streamedFrom(defaultValue: InputDefaultValue): Position => RunPlan => MappedCommandInput =
+      position =>
+        runPlan =>
+          MappedCommandInput(
             position,
             Name(s"input_$position"),
             maybeDescription = None,
@@ -210,10 +227,10 @@ object CommandParameterBase {
 
   object CommandOutput {
 
-    def fromLocation(defaultValue: Location): Position => RunPlan => CommandOutput =
+    def fromLocation(defaultValue: Location): Position => RunPlan => LocationCommandOutput =
       from(OutputDefaultValue(defaultValue))
 
-    def from(defaultValue: OutputDefaultValue): Position => RunPlan => CommandOutput =
+    def from(defaultValue: OutputDefaultValue): Position => RunPlan => LocationCommandOutput =
       position =>
         runPlan =>
           LocationCommandOutput(
@@ -225,6 +242,27 @@ object CommandParameterBase {
             FolderCreation.no,
             Temporary.nonTemporary,
             maybeEncodingFormat = None,
+            runPlan
+          )
+
+    def streamedFromLocation(defaultValue: Location, stream: IOStream.Out): Position => RunPlan => MappedCommandOutput =
+      streamedFrom(OutputDefaultValue(defaultValue), stream)
+
+    def streamedFrom(defaultValue: OutputDefaultValue,
+                     stream:       IOStream.Out
+    ): Position => RunPlan => MappedCommandOutput =
+      position =>
+        runPlan =>
+          MappedCommandOutput(
+            position,
+            Name(s"output_$position"),
+            maybeDescription = None,
+            maybePrefix = None,
+            defaultValue = defaultValue,
+            FolderCreation.no,
+            Temporary.nonTemporary,
+            maybeEncodingFormat = None,
+            mappedTo = stream,
             runPlan
           )
 

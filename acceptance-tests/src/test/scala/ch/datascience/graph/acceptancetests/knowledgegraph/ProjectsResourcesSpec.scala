@@ -64,7 +64,7 @@ class ProjectsResourcesSpec
     val (parent, child) = projectEntities[entities.Project.ForksCount.Zero](visibilityPublic).generateOne.forkOnce()
     dataProjects(parent).generateOne -> dataProjects(
       child.copy(visibility = visibilityNonPublic.generateOne,
-                 members = child.members + persons.generateOne.copy(maybeGitLabId = user.id.some)
+                 members = child.members + personEntities.generateOne.copy(maybeGitLabId = user.id.some)
       )
     ).generateOne
   }

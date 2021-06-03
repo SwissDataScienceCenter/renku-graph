@@ -18,7 +18,7 @@
 
 package ch.datascience.tinytypes
 
-import cats.MonadError
+import cats.{MonadError, MonadThrow}
 import cats.syntax.all._
 import ch.datascience.tinytypes.constraints.PathSegment
 import io.circe.Json
@@ -101,9 +101,8 @@ abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT)
 
   implicit class TinyTypeConverters(tinyType: TT) {
 
-    def as[Interpretation[_]: MonadError[*[_], Throwable], OUT](implicit
-        converter: TinyTypeConverter[TT, OUT]
-    ): Interpretation[OUT] = implicitly[MonadError[Interpretation, Throwable]].fromEither(converter(tinyType))
+    def as[Interpretation[_]: MonadThrow, OUT](implicit converter: TinyTypeConverter[TT, OUT]): Interpretation[OUT] =
+      implicitly[MonadError[Interpretation, Throwable]].fromEither(converter(tinyType))
 
     def toUnsafe[OUT](implicit convert: TT => Either[Exception, OUT]): OUT =
       convert(tinyType).fold(throw _, identity)
@@ -112,7 +111,7 @@ abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT)
   }
 }
 
-trait TinyTypeConverter[TT <: TinyType, OUT] extends Function1[TT, Either[Exception, OUT]]
+trait TinyTypeConverter[TT <: TinyType, OUT] extends (TT => Either[Exception, OUT])
 
 trait Renderer[View, -T] {
   def render(value: T): String

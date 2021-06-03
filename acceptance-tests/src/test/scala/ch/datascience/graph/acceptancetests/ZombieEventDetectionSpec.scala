@@ -35,7 +35,7 @@ import ch.datascience.graph.model.events.{BatchDate, CommitId, EventBody, EventI
 import ch.datascience.graph.model.projects._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.microservices.MicroserviceIdentifier
-import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
+import ch.datascience.rdfstore.entities.EntitiesGenerators.personEntities
 import ch.datascience.rdfstore.entities.Project.ForksCount
 import ch.datascience.rdfstore.entities.{projectEntities, visibilityPublic}
 import io.circe.literal._
@@ -70,7 +70,7 @@ class ZombieEventDetectionSpec
     val project   = dataProjects(projectEntities[ForksCount.Zero](visibilityPublic)).generateOne
     val projectId = project.id
     val commitId  = commitIds.generateOne
-    val committer = persons.generateOne
+    val committer = personEntities.generateOne
     val eventDate = eventDates.generateOne
 
     Given("Triples generation is successful")

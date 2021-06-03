@@ -28,7 +28,6 @@ import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import ch.datascience.stubbing.ExternalServiceStubbing
-import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -131,11 +130,11 @@ class ProjectDatasetsFinderSpec
     }
 
     "not returned deleted dataset" in new TestCase {
-      fail("implementation not known yet")
+      assert(false, "implementation not known yet")
     }
 
     "not returned deleted dataset when its latest version was deleted" in new TestCase {
-      fail("implementation not known yet")
+      assert(false, "implementation not known yet")
     }
   }
 

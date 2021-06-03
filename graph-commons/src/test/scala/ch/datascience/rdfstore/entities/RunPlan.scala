@@ -67,10 +67,10 @@ object RunPlan {
   )
 
   object CommandParameters {
-    def of(
-        parameters: (Position => RunPlan => CommandParameterBase)*
-    ): List[Position => RunPlan => CommandParameterBase] =
-      parameters.toList
+
+    type CommandParameterFactory = Position => RunPlan => CommandParameterBase
+
+    def of(parameters: CommandParameterFactory*): List[CommandParameterFactory] = parameters.toList
   }
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[RunPlan] = JsonLDEncoder.instance { plan =>
