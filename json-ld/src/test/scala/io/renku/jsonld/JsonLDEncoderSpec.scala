@@ -18,12 +18,15 @@
 
 package io.renku.jsonld
 
+import cats.syntax.all._
 import io.renku.jsonld.generators.Generators.Implicits._
 import io.renku.jsonld.generators.JsonLDGenerators._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import syntax._
+
+import scala.util.Random
 
 class JsonLDEncoderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
@@ -53,5 +56,30 @@ class JsonLDEncoderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
     }
   }
 
+  "apply" should {
+
+    implicit val implicitEncoder: JsonLDEncoder[Object] =
+      JsonLDEncoder.entityId[Object](o => EntityId.of(o.field))
+
+    "be able to return an instance of encoder if available implicitly" in {
+      JsonLDEncoder[Object] shouldBe implicitEncoder
+    }
+  }
+
+  "contramap" should {
+
+    implicit val implicitEncoder: JsonLDEncoder[Object] =
+      JsonLDEncoder.entityId[Object](o => EntityId.of(o.field))
+
+    "provide contramap" in {
+      val otherEncoder: JsonLDEncoder[OtherObject] = JsonLDEncoder[Object].contramap(_.obj)
+
+      val obj = Object(Random.nextString(5))
+
+      otherEncoder(OtherObject(obj)) shouldBe JsonLD.fromEntityId(EntityId.of(obj.field))
+    }
+  }
+
   private case class Object(field: String)
+  private case class OtherObject(obj: Object)
 }
