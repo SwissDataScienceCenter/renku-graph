@@ -49,15 +49,15 @@ class CommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSer
     "fetch commit info from the configured url " +
       "and return CommitInfo if OK returned with valid body - case with Personal Access Token" in new TestCase {
 
-        val accessToken = personalAccessTokens.generateOne
+        val maybeAccessToken @ Some(token) = personalAccessTokens.generateSome
 
         stubFor {
           get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
-            .withHeader("PRIVATE-TOKEN", equalTo(accessToken.value))
+            .withHeader("PRIVATE-TOKEN", equalTo(token.value))
             .willReturn(okJson(responseJson.toString()))
         }
 
-        finder.findCommitInfo(projectId, commitId, Some(accessToken)).unsafeRunSync() shouldBe CommitInfo(
+        finder.findCommitInfo(projectId, commitId)(maybeAccessToken).unsafeRunSync() shouldBe CommitInfo(
           id = commitId,
           message = commitMessage,
           committedDate = committedDate,
@@ -70,15 +70,15 @@ class CommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSer
     "fetch commit info from the configured url " +
       "and return CommitInfo if OK returned with valid body - case with OAuth Access Token" in new TestCase {
 
-        val accessToken = oauthAccessTokens.generateOne
+        val maybeAccessToken @ Some(token) = oauthAccessTokens.generateSome
 
         stubFor {
           get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
-            .withHeader("Authorization", equalTo(s"Bearer ${accessToken.value}"))
+            .withHeader("Authorization", equalTo(s"Bearer ${token.value}"))
             .willReturn(okJson(responseJson.toString()))
         }
 
-        finder.findCommitInfo(projectId, commitId, Some(accessToken)).unsafeRunSync() shouldBe CommitInfo(
+        finder.findCommitInfo(projectId, commitId)(maybeAccessToken).unsafeRunSync() shouldBe CommitInfo(
           id = commitId,
           message = commitMessage,
           committedDate = committedDate,
@@ -96,7 +96,7 @@ class CommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSer
             .willReturn(okJson(responseJson.toString()))
         }
 
-        finder.findCommitInfo(projectId, commitId, maybeAccessToken = None).unsafeRunSync() shouldBe CommitInfo(
+        finder.findCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync() shouldBe CommitInfo(
           id = commitId,
           message = commitMessage,
           committedDate = committedDate,
@@ -114,7 +114,7 @@ class CommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSer
       }
 
       intercept[Exception] {
-        finder.findCommitInfo(projectId, commitId, maybeAccessToken = None).unsafeRunSync()
+        finder.findCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync()
       } shouldBe UnauthorizedException
     }
 
@@ -126,7 +126,7 @@ class CommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSer
       }
 
       intercept[Exception] {
-        finder.findCommitInfo(projectId, commitId, maybeAccessToken = None).unsafeRunSync()
+        finder.findCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync()
       }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId/repository/commits/$commitId returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
     }
 
@@ -138,7 +138,7 @@ class CommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSer
       }
 
       intercept[Exception] {
-        finder.findCommitInfo(projectId, commitId, maybeAccessToken = None).unsafeRunSync()
+        finder.findCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync()
       }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId/repository/commits/$commitId returned ${Status.NotFound}; body: some message"
     }
   }
@@ -148,15 +148,15 @@ class CommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSer
     "get commit info from the configured url " +
       "and return some CommitInfo if OK returned with valid body - case with Personal Access Token" in new TestCase {
 
-        val accessToken = personalAccessTokens.generateOne
+        val maybeAccessToken @ Some(token) = personalAccessTokens.generateSome
 
         stubFor {
           get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
-            .withHeader("PRIVATE-TOKEN", equalTo(accessToken.value))
+            .withHeader("PRIVATE-TOKEN", equalTo(token.value))
             .willReturn(okJson(responseJson.toString()))
         }
 
-        finder.getMaybeCommitInfo(projectId, commitId, Some(accessToken)).unsafeRunSync() shouldBe CommitInfo(
+        finder.getMaybeCommitInfo(projectId, commitId)(maybeAccessToken).unsafeRunSync() shouldBe CommitInfo(
           id = commitId,
           message = commitMessage,
           committedDate = committedDate,
@@ -169,15 +169,15 @@ class CommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSer
     "get commit info from the configured url " +
       "and return some CommitInfo if OK returned with valid body - case with OAuth Access Token" in new TestCase {
 
-        val accessToken = oauthAccessTokens.generateOne
+        val maybeAccessToken @ Some(token) = oauthAccessTokens.generateSome
 
         stubFor {
           get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
-            .withHeader("Authorization", equalTo(s"Bearer ${accessToken.value}"))
+            .withHeader("Authorization", equalTo(s"Bearer ${token.value}"))
             .willReturn(okJson(responseJson.toString()))
         }
 
-        finder.getMaybeCommitInfo(projectId, commitId, Some(accessToken)).unsafeRunSync() shouldBe CommitInfo(
+        finder.getMaybeCommitInfo(projectId, commitId)(maybeAccessToken).unsafeRunSync() shouldBe CommitInfo(
           id = commitId,
           message = commitMessage,
           committedDate = committedDate,
@@ -195,7 +195,7 @@ class CommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSer
             .willReturn(okJson(responseJson.toString()))
         }
 
-        finder.getMaybeCommitInfo(projectId, commitId, maybeAccessToken = None).unsafeRunSync() shouldBe CommitInfo(
+        finder.getMaybeCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync() shouldBe CommitInfo(
           id = commitId,
           message = commitMessage,
           committedDate = committedDate,
@@ -211,7 +211,7 @@ class CommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSer
         get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
           .willReturn(notFound())
       }
-      finder.getMaybeCommitInfo(projectId, commitId, maybeAccessToken = None).unsafeRunSync() shouldBe None
+      finder.getMaybeCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync() shouldBe None
 
     }
 
@@ -223,7 +223,7 @@ class CommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSer
       }
 
       intercept[Exception] {
-        finder.findCommitInfo(projectId, commitId, maybeAccessToken = None).unsafeRunSync()
+        finder.findCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync()
       } shouldBe UnauthorizedException
     }
 
@@ -235,7 +235,7 @@ class CommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSer
       }
 
       intercept[Exception] {
-        finder.findCommitInfo(projectId, commitId, maybeAccessToken = None).unsafeRunSync()
+        finder.findCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync()
       }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId/repository/commits/$commitId returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
     }
 
@@ -247,7 +247,7 @@ class CommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSer
       }
 
       intercept[Exception] {
-        finder.findCommitInfo(projectId, commitId, maybeAccessToken = None).unsafeRunSync()
+        finder.findCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync()
       }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId/repository/commits/$commitId returned ${Status.NotFound}; body: some message"
     }
   }

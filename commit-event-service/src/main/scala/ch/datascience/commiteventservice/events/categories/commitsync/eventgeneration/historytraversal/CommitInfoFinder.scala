@@ -36,14 +36,14 @@ import scala.concurrent.ExecutionContext
 
 private[eventgeneration] trait CommitInfoFinder[Interpretation[_]] {
   def findCommitInfo(
-      projectId:        Id,
-      commitId:         CommitId,
+      projectId: Id,
+      commitId:  CommitId
+  )(implicit
       maybeAccessToken: Option[AccessToken]
   ): Interpretation[CommitInfo]
 
-  def getMaybeCommitInfo(projectId:        Id,
-                         commitId:         CommitId,
-                         maybeAccessToken: Option[AccessToken]
+  def getMaybeCommitInfo(projectId: Id, commitId: CommitId)(implicit
+      maybeAccessToken:             Option[AccessToken]
   ): Interpretation[Option[CommitInfo]]
 }
 
@@ -61,23 +61,21 @@ private[eventgeneration] class CommitInfoFinderImpl[Interpretation[_]: Concurren
   import org.http4s.Status.{Ok, Unauthorized}
   import org.http4s.{Request, Response}
 
-  def findCommitInfo(projectId:        Id,
-                     commitId:         CommitId,
-                     maybeAccessToken: Option[AccessToken]
+  def findCommitInfo(projectId: Id, commitId: CommitId)(implicit
+      maybeAccessToken:         Option[AccessToken]
   ): Interpretation[CommitInfo] =
-    fetchCommitInfo(projectId, commitId, maybeAccessToken)(mapToCommitOrThrow)
+    fetchCommitInfo(projectId, commitId)(mapToCommitOrThrow)
 
-  def getMaybeCommitInfo(projectId:        Id,
-                         commitId:         CommitId,
-                         maybeAccessToken: Option[AccessToken]
+  def getMaybeCommitInfo(projectId: Id, commitId: CommitId)(implicit
+      maybeAccessToken:             Option[AccessToken]
   ): Interpretation[Option[CommitInfo]] =
-    fetchCommitInfo(projectId, commitId, maybeAccessToken)(mapToMaybeCommit)
+    fetchCommitInfo(projectId, commitId)(mapToMaybeCommit)
 
-  private def fetchCommitInfo[ResultType](projectId: Id, commitId: CommitId, maybeAccessToken: Option[AccessToken])(
+  private def fetchCommitInfo[ResultType](projectId: Id, commitId: CommitId)(
       mapResponse: PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[
         ResultType
       ]]
-  ) =
+  )(implicit maybeAccessToken: Option[AccessToken]) =
     for {
       uri    <- validateUri(s"$gitLabUrl/api/v4/projects/$projectId/repository/commits/$commitId")
       result <- send(request(GET, uri, maybeAccessToken))(mapResponse)
@@ -106,7 +104,7 @@ object CommitInfoFinder {
       executionContext:      ExecutionContext,
       concurrentEffect:      ConcurrentEffect[IO],
       timer:                 Timer[IO]
-  ) = for {
+  ): IO[CommitInfoFinderImpl[IO]] = for {
     gitLabUrl <- GitLabUrl[IO]()
   } yield new CommitInfoFinderImpl[IO](gitLabUrl, gitLabThrottler, logger)
 }

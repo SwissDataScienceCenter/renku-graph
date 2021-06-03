@@ -22,7 +22,7 @@ import cats.data.StateT
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import cats.{Applicative, MonadThrow}
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.SynchronizationSummary.{SummaryState, add}
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.SynchronizationSummary.{SummaryKey, SummaryState, add}
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.UpdateResult._
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.{SynchronizationSummary, UpdateResult}
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.{CommitInfoFinder, CommitToEventLog, EventDetailsFinder}
@@ -57,60 +57,64 @@ private[commitsync] class CommitEventSynchronizerImpl[Interpretation[_]: MonadTh
 ) extends CommitEventSynchronizer[Interpretation] {
 
   import executionTimeRecorder._
+  import accessTokenFinder._
+  import latestCommitFinder._
+  import commitToEventLog._
+  import commitEventsRemover._
+  import commitInfoFinder._
+  import eventDetailsFinder._
+
   override def synchronizeEvents(event: CommitSyncEvent): Interpretation[Unit] = (for {
-    maybeAccessToken  <- accessTokenFinder.findAccessToken(event.project.id)
-    maybeLatestCommit <- latestCommitFinder.findLatestCommit(event.project.id, maybeAccessToken).value
-    _                 <- checkForSkippedEvent(maybeLatestCommit, event, maybeAccessToken)
+    maybeAccessToken  <- findAccessToken(event.project.id)
+    maybeLatestCommit <- findLatestCommit(event.project.id, maybeAccessToken).value
+    _                 <- checkForSkippedEvent(maybeLatestCommit, event)(maybeAccessToken)
   } yield ()) recoverWith loggingError(event)
 
-  private def checkForSkippedEvent(maybeLatestCommit: Option[CommitInfo],
-                                   event:             CommitSyncEvent,
-                                   maybeAccessToken:  Option[AccessToken]
+  private def checkForSkippedEvent(maybeLatestCommit: Option[CommitInfo], event: CommitSyncEvent)(implicit
+      maybeAccessToken:                               Option[AccessToken]
   ) = (maybeLatestCommit, event) match {
     case (Some(commitInfo), FullCommitSyncEvent(id, _, _)) if commitInfo.id == id =>
       measureExecutionTime(Skipped.pure[Interpretation].widen[UpdateResult]) >>= logResult(event)
     case (Some(commitInfo), event) =>
-      processCommitsAndLogSummary(commitInfo.id, event.project, maybeAccessToken)
+      processCommitsAndLogSummary(commitInfo.id, event.project)
     case (None, FullCommitSyncEvent(id, _, _)) =>
-      processCommitsAndLogSummary(id, event.project, maybeAccessToken)
+      processCommitsAndLogSummary(id, event.project)
     case (None, MinimalCommitSyncEvent(_)) =>
       measureExecutionTime(Skipped.pure[Interpretation].widen[UpdateResult]) >>= logResult(event)
   }
 
-  private def processCommitsAndLogSummary(commitId: CommitId, project: Project, maybeAccessToken: Option[AccessToken]) =
+  private def processCommitsAndLogSummary(commitId: CommitId, project: Project)(implicit
+      maybeAccessToken:                             Option[AccessToken]
+  ) =
     measureExecutionTime(
-      processCommits(List(commitId), project, BatchDate(clock), maybeAccessToken).run(SynchronizationSummary())
+      processCommits(List(commitId), project, BatchDate(clock)).run(SynchronizationSummary())
     ) flatMap { case (elapsedTime: ElapsedTime, summary) =>
       logSummary(commitId, project)(elapsedTime, summary._2)
     }
 
   private val DontCareCommitId = CommitId("0000000000000000000000000000000000000000")
 
-  private def processCommits(commitList: List[CommitId],
-                             project:    Project,
-                             batchDate:  BatchDate,
-                             maybeToken: Option[AccessToken]
+  private def processCommits(commitList: List[CommitId], project: Project, batchDate: BatchDate)(implicit
+      maybeToken:                        Option[AccessToken]
   ): SummaryState[Interpretation, SynchronizationSummary] =
     commitList match {
       case commitId :: commitIds =>
         StateT
           .liftF(
             measureExecutionTime(
-              getInfoFromELandGL(commitId, project, maybeToken)
+              getInfoFromELandGL(commitId, project)
                 .flatMap {
                   case (_, Some(CommitInfo(DontCareCommitId, _, _, _, _, _))) =>
                     Skipped.pure[Interpretation].widen[UpdateResult].map(result => (result, commitId, commitIds))
                   case (Some(_), Some(_)) =>
                     Existed.pure[Interpretation].widen[UpdateResult].map(result => (result, commitId, commitIds))
                   case (None, Some(commitFromGL)) =>
-                    commitToEventLog
-                      .storeCommitsInEventLog(project, commitFromGL, batchDate, maybeToken)
+                    storeCommitsInEventLog(project, commitFromGL, batchDate)
                       .map(result =>
                         (result, commitId, commitIds ++: commitFromGL.parents.filterNot(_ == DontCareCommitId))
                       )
                   case (Some(commitFromEL), None) =>
-                    commitEventsRemover
-                      .removeDeletedEvent(project, commitFromEL.id)
+                    removeDeletedEvent(project, commitFromEL.id)
                       .map(result =>
                         (result, commitId, commitIds ++: commitFromEL.parents.filterNot(_ == DontCareCommitId))
                       )
@@ -129,19 +133,18 @@ private[commitsync] class CommitEventSynchronizerImpl[Interpretation[_]: MonadTh
             for {
               _               <- add[Interpretation](result)
               _               <- StateT.liftF(logResult(commitId, project)(elapsedTime -> result))
-              continueProcess <- processCommits(commits, project, batchDate, maybeToken)
+              continueProcess <- processCommits(commits, project, batchDate)
             } yield continueProcess
           }
       case Nil => StateT.get[Interpretation, SynchronizationSummary]
     }
 
-  private def getInfoFromELandGL(commitId:         CommitId,
-                                 project:          Project,
-                                 maybeAccessToken: Option[AccessToken]
+  private def getInfoFromELandGL(commitId: CommitId, project: Project)(implicit
+      maybeAccessToken:                    Option[AccessToken]
   ): Interpretation[(Option[CommitWithParents], Option[CommitInfo])] =
     for {
-      maybeEventDetailsFromEL <- eventDetailsFinder.getEventDetails(project.id, commitId)
-      maybeInfoFromGL         <- commitInfoFinder.getMaybeCommitInfo(project.id, commitId, maybeAccessToken)
+      maybeEventDetailsFromEL <- getEventDetails(project.id, commitId)
+      maybeInfoFromGL         <- getMaybeCommitInfo(project.id, commitId)
     } yield (maybeEventDetailsFromEL, maybeInfoFromGL)
 
   private def loggingError(event: CommitSyncEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
@@ -187,7 +190,7 @@ private[commitsync] class CommitEventSynchronizerImpl[Interpretation[_]: MonadTh
       logMessageFor(
         eventId,
         project,
-        s"events generation result: ${summary.created} created, ${summary.existed} existed, ${summary.skipped} skipped, ${summary.deleted} deleted, ${summary.failed} failed in ${elapsedTime}ms"
+        s"events generation result: ${summary.getSummary()} in ${elapsedTime}ms"
       )
     )
 
@@ -225,6 +228,7 @@ private[commitsync] object CommitEventSynchronizer {
   )
 
   sealed trait UpdateResult extends Product with Serializable
+
   object UpdateResult {
     final case object Skipped extends UpdateResult
     final case object Created extends UpdateResult
@@ -233,25 +237,35 @@ private[commitsync] object CommitEventSynchronizer {
     case class Failed(message: String, exception: Throwable) extends UpdateResult
   }
 
-  final case class SynchronizationSummary(skipped: Int = 0,
-                                          created: Int = 0,
-                                          existed: Int = 0,
-                                          deleted: Int = 0,
-                                          failed:  Int = 0
-  )
+  final class SynchronizationSummary(private val summary: Map[SummaryKey, Int]) {
+    import SynchronizationSummary._
+    def getSummary(): String =
+      s"${get("Created")} created, ${get("Existed")} existed, ${get("Skipped")} skipped, ${get("Deleted")} deleted, ${get("Failed")} failed"
+
+    def get(key: String) = summary.getOrElse(key, 0)
+
+    def updated(result: UpdateResult, newValue: Int): SynchronizationSummary = {
+      val newSummary = summary.updated(toSummaryKey(result), newValue)
+      new SynchronizationSummary(newSummary)
+    }
+  }
 
   object SynchronizationSummary {
+
+    def apply() = new SynchronizationSummary(Map.empty[SummaryKey, Int])
+
+    type SummaryKey = String
+
     type SummaryState[F[_], A] = StateT[F, SynchronizationSummary, A]
 
-    def add[F[_]: Applicative](result: UpdateResult): SummaryState[F, Unit] = StateT {
-      case SynchronizationSummary(s, c, e, d, f) =>
-        result match {
-          case Skipped      => (SynchronizationSummary(s + 1, c, e, d, f), ()).pure[F]
-          case Created      => (SynchronizationSummary(s, c + 1, e, d, f), ()).pure[F]
-          case Existed      => (SynchronizationSummary(s, c, e + 1, d, f), ()).pure[F]
-          case Deleted      => (SynchronizationSummary(s, c, e, d + 1, f), ()).pure[F]
-          case Failed(_, _) => (SynchronizationSummary(s, c, e, d, f + 1), ()).pure[F]
-        }
+    def add[F[_]: Applicative](result: UpdateResult): SummaryState[F, Unit] = StateT { summaryMap =>
+      val currentCount = summaryMap.get(toSummaryKey(result))
+      (summaryMap.updated(result, currentCount + 1), ()).pure[F]
+    }
+
+    def toSummaryKey(result: UpdateResult): SummaryKey = result match {
+      case Failed(_, _) => "Failed"
+      case s            => s.toString
     }
   }
 

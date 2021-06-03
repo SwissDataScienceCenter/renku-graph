@@ -38,7 +38,8 @@ class CommitEventsRemoverSpec extends AnyWordSpec with should.Matchers with Mock
       (eventPatcher.sendDeletionStatus _).expects(event.project.id, event.id).returning(Success(()))
       commitRemover.removeDeletedEvent(event.project, event.id) shouldBe Success(Deleted)
     }
-    "return Ignored if marking the event for deletion fails" in new TestCase {
+
+    "return Failed if marking the event for deletion fails" in new TestCase {
       val event     = fullCommitSyncEvents.generateOne
       val exception = exceptions.generateOne
 

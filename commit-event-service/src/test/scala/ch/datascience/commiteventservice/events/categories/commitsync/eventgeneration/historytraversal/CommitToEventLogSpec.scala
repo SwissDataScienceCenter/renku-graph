@@ -25,7 +25,6 @@ import ch.datascience.commiteventservice.events.categories.commitsync.eventgener
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.UpdateResult._
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.Generators._
 import ch.datascience.events.consumers.Project
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events._
@@ -51,7 +50,7 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
         .expects(commitEvent)
         .returning(().pure[Try])
 
-      commitToEventLog.storeCommitsInEventLog(project, startCommit, batchDate, maybeAccessToken) shouldBe Success(
+      commitToEventLog.storeCommitsInEventLog(project, startCommit, batchDate) shouldBe Success(
         Created
       )
     }
@@ -67,7 +66,7 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
         .expects(commitEvent)
         .returning(().pure[Try])
 
-      commitToEventLog.storeCommitsInEventLog(project, skippedCommit, batchDate, maybeAccessToken) shouldBe Success(
+      commitToEventLog.storeCommitsInEventLog(project, skippedCommit, batchDate) shouldBe Success(
         Created
       )
     }
@@ -82,14 +81,12 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
         .expects(commitEvent)
         .returning(exception.raiseError[Try, Unit])
 
-      commitToEventLog.storeCommitsInEventLog(project, startCommit, batchDate, maybeAccessToken) shouldBe
+      commitToEventLog.storeCommitsInEventLog(project, startCommit, batchDate) shouldBe
         Failed(failedStoring(startCommit, project), exception).pure[Try]
     }
   }
 
   private trait TestCase {
-
-    val maybeAccessToken = Gen.option(accessTokens).generateOne
 
     val startCommit = commitInfos.generateOne
     val batchDate   = BatchDate(Instant.now)

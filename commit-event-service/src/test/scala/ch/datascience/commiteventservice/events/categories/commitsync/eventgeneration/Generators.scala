@@ -30,10 +30,10 @@ import org.scalacheck.Gen.choose
 
 private object Generators {
 
-  implicit val startCommits: Gen[StartCommit] = for {
+  implicit val commits: Gen[Commit] = for {
     id      <- commitIds
     project <- projects
-  } yield StartCommit(id, project)
+  } yield Commit(id, project)
 
   implicit val projectInfos: Gen[ProjectInfo] = for {
     id         <- projectIds

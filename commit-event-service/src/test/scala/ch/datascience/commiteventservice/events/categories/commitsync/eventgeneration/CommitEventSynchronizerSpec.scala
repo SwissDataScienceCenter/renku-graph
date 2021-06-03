@@ -27,13 +27,14 @@ import ch.datascience.commiteventservice.events.categories.commitsync.eventgener
 import ch.datascience.commiteventservice.events.categories.commitsync.{categoryName, logMessageCommon}
 import ch.datascience.events.consumers.Project
 import ch.datascience.generators.CommonGraphGenerators.personalAccessTokens
-import ch.datascience.graph.model.EventsGenerators.batchDates
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.EventsGenerators.batchDates
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.graph.tokenrepository.AccessTokenFinder._
+import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level._
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
@@ -127,14 +128,14 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       givenCommitIsInGL(latestCommitInfo, event.project.id)
 
       (commitToEventLog.storeCommitsInEventLog _)
-        .expects(event.project, latestCommitInfo, batchDate, maybeAccessToken)
+        .expects(event.project, latestCommitInfo, batchDate)
         .returning(Success(Created))
 
       givenEventIsNotInEL(parentCommit, event.project.id)
       givenCommitIsInGL(parentCommit, event.project.id)
 
       (commitToEventLog.storeCommitsInEventLog _)
-        .expects(event.project, parentCommit, batchDate, maybeAccessToken)
+        .expects(event.project, parentCommit, batchDate)
         .returning(Success(Created))
 
       commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
@@ -197,7 +198,7 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       givenCommitIsInGL(latestCommitInfo, event.project.id)
 
       (commitToEventLog.storeCommitsInEventLog _)
-        .expects(event.project, latestCommitInfo, batchDate, maybeAccessToken)
+        .expects(event.project, latestCommitInfo, batchDate)
         .returning(Success(Created))
 
       givenEventIsInEL(parentCommit.id, event.project.id)(returning =
@@ -232,7 +233,7 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       givenCommitIsInGL(latestCommitInfo, event.project.id)
 
       (commitToEventLog.storeCommitsInEventLog _)
-        .expects(event.project, latestCommitInfo, batchDate, maybeAccessToken)
+        .expects(event.project, latestCommitInfo, batchDate)
         .returning(Success(Created))
 
       val exception = exceptions.generateOne
@@ -244,7 +245,7 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       givenCommitIsInGL(parent2Commit, event.project.id)
 
       (commitToEventLog.storeCommitsInEventLog _)
-        .expects(event.project, parent2Commit, batchDate, maybeAccessToken)
+        .expects(event.project, parent2Commit, batchDate)
         .returning(Success(Created))
 
       commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
@@ -271,13 +272,14 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       givenCommitIsInGL(latestCommitInfo, event.project.id)
 
       (commitToEventLog.storeCommitsInEventLog _)
-        .expects(event.project, latestCommitInfo, batchDate, maybeAccessToken)
+        .expects(event.project, latestCommitInfo, batchDate)
         .returning(Success(Created))
 
       givenEventIsNotInEL(parent1Commit, event.project.id)
 
       val exception = exceptions.generateOne
-      (commitInfoFinder.getMaybeCommitInfo _)
+      (commitInfoFinder
+        .getMaybeCommitInfo(_: Id, _: CommitId)(_: Option[AccessToken]))
         .expects(event.project.id, parent1Commit.id, maybeAccessToken)
         .returning(Failure(exception))
 
@@ -285,7 +287,7 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       givenCommitIsInGL(parent2Commit, event.project.id)
 
       (commitToEventLog.storeCommitsInEventLog _)
-        .expects(event.project, parent2Commit, batchDate, maybeAccessToken)
+        .expects(event.project, parent2Commit, batchDate)
         .returning(Success(Created))
 
       commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
@@ -313,14 +315,14 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       val exception = exceptions.generateOne
 
       (commitToEventLog.storeCommitsInEventLog _)
-        .expects(event.project, latestCommitInfo, batchDate, maybeAccessToken)
+        .expects(event.project, latestCommitInfo, batchDate)
         .returning(Success(Failed(exception.getMessage, exception)))
 
       givenEventIsNotInEL(parent1Commit, event.project.id)
       givenCommitIsInGL(parent1Commit, event.project.id)
 
       (commitToEventLog.storeCommitsInEventLog _)
-        .expects(event.project, parent1Commit, batchDate, maybeAccessToken)
+        .expects(event.project, parent1Commit, batchDate)
         .returning(Success(Created))
 
       commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
@@ -361,7 +363,7 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       givenCommitIsInGL(parent1Commit, event.project.id)
 
       (commitToEventLog.storeCommitsInEventLog _)
-        .expects(event.project, parent1Commit, batchDate, maybeAccessToken)
+        .expects(event.project, parent1Commit, batchDate)
         .returning(Success(Created))
 
       commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
@@ -433,7 +435,8 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       .expects(projectId, maybeAccessToken)
       .returning(OptionT.some[Try](commitInfo))
 
-    def givenCommitIsInGL(commitInfo: CommitInfo, projectId: Id) = (commitInfoFinder.getMaybeCommitInfo _)
+    def givenCommitIsInGL(commitInfo: CommitInfo, projectId: Id) = (commitInfoFinder
+      .getMaybeCommitInfo(_: Id, _: CommitId)(_: Option[AccessToken]))
       .expects(projectId, commitInfo.id, maybeAccessToken)
       .returning(Success(commitInfo.some))
 
@@ -446,7 +449,8 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       (eventDetailsFinder.getEventDetails _).expects(projectId, commitInfo.id).returning(Success(None))
 
     def givenCommitIsNotInGL(commitId: CommitId, projectId: Id) =
-      (commitInfoFinder.getMaybeCommitInfo _)
+      (commitInfoFinder
+        .getMaybeCommitInfo(_: Id, _: CommitId)(_: Option[AccessToken]))
         .expects(projectId, commitId, maybeAccessToken)
         .returning(Success(None))
   }

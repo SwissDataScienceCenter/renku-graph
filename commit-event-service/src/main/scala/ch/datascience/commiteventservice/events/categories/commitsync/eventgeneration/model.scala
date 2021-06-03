@@ -24,7 +24,7 @@ import ch.datascience.graph.model.events.{BatchDate, CommitId, CommitMessage, Co
 import ch.datascience.graph.model.users.Email
 import ch.datascience.graph.model.{projects, users}
 
-private final case class StartCommit(id: CommitId, project: Project)
+private final case class Commit(id: CommitId, project: Project)
 
 private final case class CommitWithParents(id: CommitId, projectId: projects.Id, parents: List[CommitId])
 

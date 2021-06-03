@@ -27,17 +27,15 @@ import ch.datascience.commiteventservice.events.categories.commitsync.eventgener
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.{CommitEvent, CommitInfo}
 import ch.datascience.events.consumers.Project
 import ch.datascience.graph.model.events.BatchDate
-import ch.datascience.http.client.AccessToken
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 private[eventgeneration] trait CommitToEventLog[Interpretation[_]] {
-  def storeCommitsInEventLog(project:          Project,
-                             startCommit:      CommitInfo,
-                             batchDate:        BatchDate,
-                             maybeAccessToken: Option[AccessToken]
+  def storeCommitsInEventLog(project:     Project,
+                             startCommit: CommitInfo,
+                             batchDate:   BatchDate
   ): Interpretation[UpdateResult]
 }
 
@@ -47,14 +45,13 @@ private class CommitToEventLogImpl[Interpretation[_]: MonadThrow](
 
   import commitEventSender._
 
-  def storeCommitsInEventLog(project:          Project,
-                             startCommit:      CommitInfo,
-                             batchDate:        BatchDate,
-                             maybeAccessToken: Option[AccessToken]
+  def storeCommitsInEventLog(project:     Project,
+                             startCommit: CommitInfo,
+                             batchDate:   BatchDate
   ): Interpretation[UpdateResult] = {
     val commitEvent = toCommitEvent(project, batchDate)(startCommit)
     send(commitEvent).map(_ => Created).widen[UpdateResult] recover { case NonFatal(exception) =>
-      Failed(failureMessageFor(commitEvent, "storing in the event log failed"), exception)
+      Failed(failureMessageFor(commitEvent), exception)
     }
   }
 
@@ -85,10 +82,9 @@ private class CommitToEventLogImpl[Interpretation[_]: MonadThrow](
     }
 
   private def failureMessageFor(
-      startCommit: CommitEvent,
-      message:     String
+      startCommit: CommitEvent
   ) =
-    s"$categoryName: id = ${startCommit.id}, projectId = ${startCommit.project.id}, projectPath = ${startCommit.project.path} -> $message"
+    s"$categoryName: id = ${startCommit.id}, projectId = ${startCommit.project.id}, projectPath = ${startCommit.project.path} -> storing in the event log failed"
 
 }
 
