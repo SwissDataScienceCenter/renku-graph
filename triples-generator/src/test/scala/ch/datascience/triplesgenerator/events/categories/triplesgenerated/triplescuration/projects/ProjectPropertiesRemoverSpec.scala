@@ -19,20 +19,20 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects
 
 import cats.syntax.all._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.Schemas._
 import ch.datascience.graph.model.projects.{DateCreated, Name, ResourceId}
 import ch.datascience.graph.model.{SchemaVersion, users}
 import ch.datascience.rdfstore.JsonLDTriples
-import ch.datascience.rdfstore.entities.Project
+import ch.datascience.rdfstore.entities.Project.ForksCount
+import ch.datascience.rdfstore.entities.{Project, _}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
 import io.circe.optics.JsonOptics._
 import io.circe.optics.JsonPath.root
 import io.circe.{Decoder, Encoder, Json}
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{EntityId, JsonLD, Property}
+import io.renku.jsonld.{JsonLD, Property}
 import monocle.function.Plated
+import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -44,43 +44,53 @@ class ProjectPropertiesRemoverSpec extends AnyWordSpec with ScalaCheckPropertyCh
   "ProjectPropertiesRemover" should {
 
     "remove schema:dateCreated, and schema:creator, and schema:name properties from all the Project entities in the given JSON" in {
-      forAll { project: Project =>
+      forAll(
+        Gen.oneOf(projectEntities[ForksCount.Zero](visibilityAny),
+                  projectEntities[ForksCount.Zero](visibilityAny).map(_.forkOnce()._2)
+        )
+      ) { project =>
         val triples = JsonLDTriples(JsonLD.arr(project.asJsonLD).toJson)
 
         // assume there are names, createdDates and creators initially
-        triples.collectAllProjects shouldBe Set(
-          TransformedProject(
-            project,
-            project.name.some,
-            project.dateCreated.some,
-            project.maybeCreator.asJsonLD.entityId
-          ).some,
-          project.maybeParent.map { parent =>
-            TransformedProject(
-              parent,
-              parent.name.some,
-              parent.dateCreated.some,
-              parent.maybeCreator.asJsonLD.entityId
-            )
-          }
-        ).flatten
 
-        removeProperties(triples).collectAllProjects shouldBe Set(
-          TransformedProject(
-            project,
-            maybeName = None,
-            maybeCreatedDate = None,
-            maybeCreatorId = None
-          ).some,
-          project.maybeParent.map { parent =>
-            TransformedProject(
-              parent,
-              maybeName = None,
-              maybeCreatedDate = None,
-              maybeCreatorId = None
+        triples.collectAllProjects shouldBe project match {
+          case project: Project[ForksCount] with HavingParent =>
+            Set(project.to[TransformedProject], project.parent.to[TransformedProject])
+          case _ => Set(project.to[TransformedProject])
+        }
+
+        removeProperties(triples).collectAllProjects shouldBe project match {
+          case project: Project[ForksCount] with HavingParent =>
+            Set(
+              TransformedProject(
+                project.resourceId,
+                maybeName = Nil,
+                maybeDateCreated = Nil,
+                maybeCreator = None,
+                maybeParentProject = project.parent.resourceId.some,
+                version = List(project.version)
+              ),
+              TransformedProject(
+                project.parent.resourceId,
+                maybeName = Nil,
+                maybeDateCreated = Nil,
+                maybeCreator = None,
+                maybeParentProject = None,
+                version = List(project.parent.version)
+              )
             )
-          }
-        ).flatten
+          case _ =>
+            Set(
+              TransformedProject(
+                project.resourceId,
+                maybeName = Nil,
+                maybeDateCreated = Nil,
+                maybeCreator = None,
+                maybeParentProject = None,
+                version = List(project.version)
+              )
+            )
+        }
       }
     }
   }
@@ -136,21 +146,27 @@ class ProjectPropertiesRemoverSpec extends AnyWordSpec with ScalaCheckPropertyCh
   )
 
   object TransformedProject {
-    def apply(project:          Project,
-              maybeName:        Option[Name],
-              maybeCreatedDate: Option[DateCreated],
-              maybeCreatorId:   Option[EntityId]
-    ): TransformedProject =
-      TransformedProject(
-        project.asJsonLD.entityId
-          .map(id => ResourceId(id))
-          .getOrElse(fail("Project's entityId finding problem")),
-        maybeName.map(List(_)).getOrElse(Nil),
-        maybeCreatedDate.map(List(_)).getOrElse(Nil),
-        maybeCreatorId.map(id => users.ResourceId(id)),
-        project.maybeParent.flatMap(_.asJsonLD.entityId).map(id => ResourceId(id)),
-        List(SchemaVersion(project.version.toString))
-      )
+
+    implicit lazy val converter: Project[ForksCount] => TransformedProject = {
+      case project: Project[ForksCount] with HavingParent =>
+        TransformedProject(
+          project.resourceId,
+          List(project.name),
+          List(project.dateCreated),
+          project.maybeCreator.map(creator => creator.resourceId),
+          project.parent.resourceId.some,
+          List(SchemaVersion(project.version.toString))
+        )
+      case project: Project[ForksCount] =>
+        TransformedProject(
+          project.resourceId,
+          List(project.name),
+          List(project.dateCreated),
+          project.maybeCreator.map(creator => creator.resourceId),
+          None,
+          List(SchemaVersion(project.version.toString))
+        )
+    }
   }
 
 }

@@ -25,7 +25,7 @@ import ch.datascience.generators.Generators.sentenceContaining
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators.datasetIdentifiers
 import ch.datascience.graph.model.datasets.{DateCreated, DatePublished, Description, InternalSameAs, Keyword, Name, SameAs, Title}
-import ch.datascience.graph.model.{datasets, users}
+import ch.datascience.graph.model.{datasets, projects, users}
 import ch.datascience.rdfstore.entities.Dataset.Provenance.{ImportedExternal, ImportedInternalAncestorExternal, Internal}
 import ch.datascience.rdfstore.entities.ModelOps.DatasetForkingResult
 import ch.datascience.rdfstore.entities.Project.ForksCount
@@ -33,8 +33,14 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.jsonld.EntityId
+import io.renku.jsonld.syntax._
 
 trait ModelOps {
+
+  implicit class PersonOps(person: Person) {
+    lazy val resourceId: users.ResourceId = users.ResourceId(person.asEntityId)
+
+  }
 
   implicit class ProjectOps[FC <: ForksCount](project: Project[FC])(implicit renkuBaseUrl: RenkuBaseUrl) {
 
@@ -55,6 +61,8 @@ trait ModelOps {
         childrenGens :+ newChildGen(parent).generateOne
       )
     }
+
+    lazy val resourceId: projects.ResourceId = projects.ResourceId(project.asEntityId)
 
     private def newChildGen(parentProject: Project[Project.ForksCount.NonZero]) =
       projectEntities[ForksCount.Zero](fixed(parentProject.visibility), parentProject.dateCreated).map(child =>

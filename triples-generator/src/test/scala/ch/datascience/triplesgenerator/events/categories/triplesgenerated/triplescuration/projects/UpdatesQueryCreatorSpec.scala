@@ -20,12 +20,14 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated.tripl
 
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.Schemas._
 import ch.datascience.graph.model.GraphModelGenerators.{projectCreatedDates, projectNames, projectVisibilities}
 import ch.datascience.graph.model.projects.{DateCreated, Name, ResourceId, Visibility}
-import ch.datascience.graph.model.{projects, users}
 import ch.datascience.graph.model.views.RdfResource
+import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore.entities.EntitiesGenerators._
-import ch.datascience.rdfstore.entities.{Person, Project}
+import ch.datascience.rdfstore.entities.Project
+import ch.datascience.rdfstore.entities.Project.ForksCount
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQuery}
 import eu.timepit.refined.auto._
 import io.renku.jsonld.syntax._
@@ -39,11 +41,11 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
   "updateWasDerivedFrom" should {
 
     "generate query deleting 'prov:wasDerivedFrom' triple from a given project when there is no fork" in new TestCase {
-      val (parent, children) = projectEntities[Project.ForksCount.Zero]().generateOne.fork(times = 2)
+      val (parent, children) = projectEntities[Project.ForksCount.Zero](visibilityAny).generateOne.fork(times = 2)
       val child1             = children.head
       val child2             = children.tail.head
 
-      loadToStore(child1.asJsonLD, child2.asJsonLD)
+      loadToStore(child1, child2)
 
       findDerivedFrom should contain theSameElementsAs Set(
         child1.resourceId.value -> Some(parent.resourceId.value),
@@ -61,11 +63,12 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
     }
 
     "generate query inserting 'prov:wasDerivedFrom' triple to a given project when there is no derivedFrom" in new TestCase {
-      val Some(parent) = entitiesProjects().generateSome
-      val child1       = entitiesProjects(maybeParentProject = None).generateOne
-      val child2       = entitiesProjects(maybeParentProject = None).generateOne
 
-      loadToStore(child1.asJsonLD, child2.asJsonLD, parent.asJsonLD)
+      val parent = projectEntities[Project.ForksCount.Zero](visibilityAny).generateOne
+      val child1 = projectEntities[Project.ForksCount.Zero](visibilityAny).generateOne
+      val child2 = projectEntities[Project.ForksCount.Zero](visibilityAny).generateOne
+
+      loadToStore(child1, child2, parent)
 
       findDerivedFrom should contain theSameElementsAs Set(
         child1.resourceId.value -> None,
@@ -83,12 +86,11 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
     }
 
     "generate a query updating 'prov:wasDerivedFrom' triple to a given project when there is already a derivedFrom" in new TestCase {
-      val maybeParent1 @ Some(parent1) = entitiesProjects().generateSome
-      val maybeParent2 @ Some(parent2) = entitiesProjects().generateSome
-      val child1                       = entitiesProjects(maybeParentProject = maybeParent1).generateOne
-      val child2                       = entitiesProjects(maybeParentProject = maybeParent2).generateOne
 
-      loadToStore(child1.asJsonLD, child2.asJsonLD)
+      val (parent1, child1) = projectEntities[Project.ForksCount.Zero](visibilityAny).generateOne.forkOnce()
+      val (parent2, child2) = projectEntities[Project.ForksCount.Zero](visibilityAny).generateOne.forkOnce()
+
+      loadToStore(child1, child2)
 
       findDerivedFrom should contain theSameElementsAs Set(
         child1.resourceId.value  -> Some(parent1.resourceId.value),
@@ -113,10 +115,10 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
     "replace the current Project's creator with the given one" in new TestCase {
       val creator1 = personEntities.generateOne
       val creator2 = personEntities.generateOne
-      val project1 = entitiesProjects(maybeCreator = creator1.some).generateOne
-      val project2 = entitiesProjects(maybeCreator = creator2.some).generateOne
+      val project1 = projectEntities[ForksCount.Zero](visibilityAny).generateOne.copy(maybeCreator = creator1.some)
+      val project2 = projectEntities[ForksCount.Zero](visibilityAny).generateOne.copy(maybeCreator = creator2.some)
 
-      loadToStore(project1.asJsonLD, project2.asJsonLD)
+      loadToStore(project1, project2)
 
       findCreators should contain theSameElementsAs Set(
         (project1.resourceId.value, creator1.name.value, creator1.maybeEmail.map(_.value), None),
@@ -133,10 +135,10 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
 
     "add a new creator to the Project when there is no creator linked to the project" in new TestCase {
       val creator1 = personEntities.generateOne
-      val project1 = entitiesProjects(maybeCreator = None).generateOne
-      val project2 = entitiesProjects(maybeCreator = creator1.some).generateOne
+      val project1 = projectEntities[ForksCount.Zero](visibilityAny).generateOne.copy(maybeCreator = None)
+      val project2 = projectEntities[ForksCount.Zero](visibilityAny).generateOne.copy(maybeCreator = creator1.some)
 
-      loadToStore(project1.asJsonLD, project2.asJsonLD)
+      loadToStore(project1, project2)
 
       findCreators should contain theSameElementsAs Set(
         (project2.resourceId.value, creator1.name.value, creator1.maybeEmail.map(_.value), None)
@@ -154,12 +156,13 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
   "unlinkCreator" should {
 
     "remove creator from the project" in new TestCase {
+
       val creator1 = personEntities.generateOne
       val creator2 = personEntities.generateOne
-      val project1 = entitiesProjects(maybeCreator = creator1.some).generateOne
-      val project2 = entitiesProjects(maybeCreator = creator2.some).generateOne
+      val project1 = projectEntities[ForksCount.Zero](visibilityAny).generateOne.copy(maybeCreator = creator1.some)
+      val project2 = projectEntities[ForksCount.Zero](visibilityAny).generateOne.copy(maybeCreator = creator2.some)
 
-      loadToStore(project1.asJsonLD, project2.asJsonLD)
+      loadToStore(project1, project2)
 
       findCreators should contain theSameElementsAs Set(
         (project1.resourceId.value, creator1.name.value, creator1.maybeEmail.map(_.value), None),
@@ -177,12 +180,13 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
   "addNewCreator" should {
 
     "create a new Person and link it to the given Project replacing the old creator on the project" in new TestCase {
+
       val creator1 = personEntities.generateOne
       val creator2 = personEntities.generateOne
-      val project1 = entitiesProjects(maybeCreator = creator1.some).generateOne
-      val project2 = entitiesProjects(maybeCreator = creator2.some).generateOne
+      val project1 = projectEntities[ForksCount.Zero](visibilityAny).generateOne.copy(maybeCreator = creator1.some)
+      val project2 = projectEntities[ForksCount.Zero](visibilityAny).generateOne.copy(maybeCreator = creator2.some)
 
-      loadToStore(project1.asJsonLD, project2.asJsonLD)
+      loadToStore(project1, project2)
 
       findCreators should contain theSameElementsAs Set(
         (project1.resourceId.value, creator1.name.value, creator1.maybeEmail.map(_.value), None),
@@ -206,17 +210,17 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
   "recreateDateCreated" should {
 
     "update the Project's createdDate - case when there is already a dateCreated" in new TestCase {
-      val project1 = entitiesProjects().generateOne
-      val project2 = entitiesProjects().generateOne
+      val project1 = projectEntities[ForksCount.Zero](visibilityAny).generateOne
+      val project2 = projectEntities[ForksCount.Zero](visibilityAny).generateOne
 
-      loadToStore(project1.asJsonLD, project2.asJsonLD)
+      loadToStore(project1, project2)
 
       findDateCreated should contain theSameElementsAs Set(
         (project1.resourceId.value, project1.dateCreated.some),
         (project2.resourceId.value, project2.dateCreated.some)
       )
 
-      val newDateCreated = projectCreatedDates.generateOne
+      val newDateCreated = projectCreatedDates().generateOne
 
       updatesQueryCreator.updateDateCreated(project1.path, newDateCreated).runAll.unsafeRunSync()
 
@@ -227,10 +231,10 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
     }
 
     "update the Project's createdDate - case when there is no dateCreated" in new TestCase {
-      val project1 = entitiesProjects().generateOne
-      val project2 = entitiesProjects().generateOne
+      val project1 = projectEntities[ForksCount.Zero](visibilityAny).generateOne
+      val project2 = projectEntities[ForksCount.Zero](visibilityAny).generateOne
 
-      loadToStore(project1.asJsonLD, project2.asJsonLD)
+      loadToStore(project1, project2)
 
       removeDateCreated(project1.resourceId)
 
@@ -239,7 +243,7 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
         (project2.resourceId.value, project2.dateCreated.some)
       )
 
-      val newDateCreated = projectCreatedDates.generateOne
+      val newDateCreated = projectCreatedDates().generateOne
 
       updatesQueryCreator.updateDateCreated(project1.path, newDateCreated).runAll.unsafeRunSync()
 
@@ -251,13 +255,13 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
   }
   "upsertVisibility" should {
     "update the Project's visibility - case when visibility exists on project already" in new TestCase {
-      val initialVisibility: projects.Visibility = projectVisibilities.generateOne
-      val project = entitiesProjects(maybeVisibility = Some(initialVisibility)).generateOne
-      loadToStore(project.asJsonLD)
+      val project = projectEntities[ForksCount.Zero](visibilityAny).generateOne
 
-      val newVisibility = projectVisibilities.generateDifferentThan(initialVisibility)
+      loadToStore(project)
 
-      findVisibility(project.resourceId) shouldBe Some(initialVisibility)
+      val newVisibility = projectVisibilities.generateDifferentThan(project.visibility)
+
+      findVisibility(project.resourceId) shouldBe Some(project.visibility)
 
       updatesQueryCreator.upsertVisibility(project.path, newVisibility).runAll.unsafeRunSync()
 
@@ -267,12 +271,15 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
 
     "insert the Project's visibility - case when it didn't previously exist" in new TestCase {
 
-      val project = entitiesProjects(maybeVisibility = None).generateOne
+      val project = projectEntities[ForksCount.Zero](visibilityAny).generateOne
+
       loadToStore(project.asJsonLD)
 
-      val newVisibility = projectVisibilities.generateOne
+      removeVisibility(project.resourceId)
 
       findVisibility(project.resourceId) shouldBe None
+
+      val newVisibility = projectVisibilities.generateOne
 
       updatesQueryCreator.upsertVisibility(project.path, newVisibility).runAll.unsafeRunSync()
 
@@ -284,13 +291,12 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
 
   "upsertName" should {
     "update the Project's name" in new TestCase {
-      val initialName: projects.Name = projectNames.generateOne
-      val project = entitiesProjects(name = initialName).generateOne
+      val project = projectEntities[ForksCount.Zero](visibilityAny).generateOne
       loadToStore(project.asJsonLD)
 
-      val newName = projectNames.generateDifferentThan(initialName)
+      findName(project.resourceId) shouldBe project.name
 
-      findName(project.resourceId) shouldBe initialName
+      val newName = projectNames.generateDifferentThan(project.name)
 
       updatesQueryCreator.upsertName(project.path, newName).runAll.unsafeRunSync()
 
@@ -301,18 +307,6 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
 
   private trait TestCase {
     val updatesQueryCreator = new UpdatesQueryCreator(renkuBaseUrl, gitLabApiUrl)
-  }
-
-  private implicit class ProjectOps(project: Project) {
-    lazy val resourceId: ResourceId = project.asJsonLD.entityId
-      .map(id => ResourceId(id))
-      .getOrElse(fail("projects.ResourceId cannot be obtained"))
-  }
-
-  private implicit class PersonOps(person: Person) {
-    lazy val resourceId: users.ResourceId = person.asJsonLD.entityId
-      .map(id => users.ResourceId(id))
-      .getOrElse(fail("users.ResourceId cannot be obtained"))
   }
 
   private def findDerivedFrom: Set[(String, Option[String])] =
@@ -377,6 +371,17 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
     ).unsafeRunSync()
       .flatMap(row => row.get("visibility").map(visibility => Visibility.apply(visibility)))
       .headOption
+
+  private def removeVisibility(projectId: ResourceId): Unit =
+    runUpdate(
+      SparqlQuery.of(
+        name = "delete visibility",
+        prefixes = Prefixes.of(renku -> "renku"),
+        s"""| DELETE { ${projectId.showAs[RdfResource]} renku:projectVisibility ?visibility }
+            | WHERE { ${projectId.showAs[RdfResource]} renku:projectVisibility ?visibility }
+            |""".stripMargin
+      )
+    ).unsafeRunSync()
 
   private def findName(projectId: ResourceId): Name =
     runQuery(

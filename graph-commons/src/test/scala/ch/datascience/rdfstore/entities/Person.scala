@@ -44,7 +44,7 @@ object Person {
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Person] =
     JsonLDEncoder.instance { entity =>
       JsonLD.entity(
-        entityId(entity),
+        entity.asEntityId,
         EntityTypes.of(prov / "Person", schema / "Person"),
         schema / "email"       -> entity.maybeEmail.asJsonLD,
         schema / "name"        -> entity.name.asJsonLD,
@@ -64,8 +64,10 @@ object Person {
       )
   }
 
-  private def entityId(person: Person)(implicit renkuBaseUrl: RenkuBaseUrl): EntityId = person.maybeEmail match {
-    case Some(email) => EntityId of s"mailto:$email"
-    case None        => EntityId of (renkuBaseUrl / "persons" / UUID.nameUUIDFromBytes(person.name.value.getBytes()).toString)
-  }
+  implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[Person] =
+    EntityIdEncoder.instance {
+      case Person(_, Some(email), _, _) => EntityId of s"mailto:$email"
+      case Person(name, _, _, _) =>
+        EntityId of (renkuBaseUrl / "persons" / UUID.nameUUIDFromBytes(name.value.getBytes()).toString)
+    }
 }
