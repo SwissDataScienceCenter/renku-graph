@@ -29,7 +29,7 @@ import ch.datascience.triplesgenerator.events.categories.triplesgenerated.Triple
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CurationGenerators._
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.DataSetInfoEnricher
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.DatasetInfoEnricher
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails.PersonDetailsUpdater
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects.ProjectInfoUpdater
 import org.scalamock.scalatest.MockFactory
@@ -59,7 +59,7 @@ class TriplesTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         .returning(triplesWithForkInfo.toRightT)
 
       val triplesWithEnrichedDataset = curatedTriplesObjects[Try].generateOne
-      (dataSetInfoEnricher.enrichDataSetInfo _)
+      (datasetInfoEnricher.enrichDatasetInfo _)
         .expects(triplesWithForkInfo)
         .returning(triplesWithEnrichedDataset.toRightT)
 
@@ -115,7 +115,7 @@ class TriplesTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         .returning(triplesWithForkInfo.toRightT)
 
       val exception = exceptions.generateOne
-      (dataSetInfoEnricher.enrichDataSetInfo _)
+      (datasetInfoEnricher.enrichDatasetInfo _)
         .expects(triplesWithForkInfo)
         .returning(exception.toEitherTError)
 
@@ -161,8 +161,8 @@ class TriplesTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
 
     val personDetailsUpdater = mock[PersonDetailsUpdater[Try]]
     val projectInfoUpdater   = mock[ProjectInfoUpdater[Try]]
-    val dataSetInfoEnricher  = mock[DataSetInfoEnricher[Try]]
-    val curator              = new TriplesTransformerImpl[Try](personDetailsUpdater, projectInfoUpdater, dataSetInfoEnricher)
+    val datasetInfoEnricher  = mock[DatasetInfoEnricher[Try]]
+    val curator              = new TriplesTransformerImpl[Try](personDetailsUpdater, projectInfoUpdater, datasetInfoEnricher)
   }
 
   private implicit class TriplesOps(out: CuratedTriples[Try]) {

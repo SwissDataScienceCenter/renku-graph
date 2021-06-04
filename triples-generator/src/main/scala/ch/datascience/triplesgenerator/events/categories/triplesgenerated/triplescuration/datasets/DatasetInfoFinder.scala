@@ -27,7 +27,7 @@ import ch.datascience.graph.model.datasets.{DerivedFrom, InternalSameAs, SameAs}
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.tinytypes.TinyType
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.DataSetInfoFinder.DatasetInfo
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.DatasetInfoFinder.DatasetInfo
 import io.circe.optics.JsonOptics._
 import io.circe.{Decoder, Json}
 import io.renku.jsonld.EntityId
@@ -35,11 +35,11 @@ import monocle.function.Plated
 
 import scala.collection.mutable
 
-private trait DataSetInfoFinder[Interpretation[_]] {
+private trait DatasetInfoFinder[Interpretation[_]] {
   def findDatasetsInfo(triples: JsonLDTriples): Interpretation[Set[DatasetInfo]]
 }
 
-private class DataSetInfoFinderImpl[Interpretation[_]: MonadThrow]() extends DataSetInfoFinder[Interpretation] {
+private class DatasetInfoFinderImpl[Interpretation[_]: MonadThrow]() extends DatasetInfoFinder[Interpretation] {
 
   import CollectedInfo._
 
@@ -168,6 +168,6 @@ private class DataSetInfoFinderImpl[Interpretation[_]: MonadThrow]() extends Dat
   }
 }
 
-private object DataSetInfoFinder {
+private object DatasetInfoFinder {
   type DatasetInfo = (EntityId, Option[SameAs], Option[DerivedFrom])
 }

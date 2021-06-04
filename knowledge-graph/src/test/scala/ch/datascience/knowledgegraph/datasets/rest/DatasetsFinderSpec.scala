@@ -672,7 +672,7 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
 
   "findDatasets with authorized user" should {
     s"return public datasets and private datasets from project the user is a member of" in new TestCase {
-      val userWithGitlabId = personsEntities(userGitLabIds.toGeneratorOfSomes).generateOne
+      val userWithGitlabId = personEntities(userGitLabIds.toGeneratorOfSomes).generateOne
       val publicDataset = datasetEntities(
         provenanceGen = datasetProvenanceInternal,
         projectsGen = projectEntities[Project.ForksCount.Zero](visibilityPublic)
@@ -711,7 +711,7 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
 
     s"return public datasets and private datasets from project the user is a member of " +
       s"but not count project the user is not a member of" in new TestCase {
-        val userWithGitlabId = personsEntities(userGitLabIds.toGeneratorOfSomes).generateOne
+        val userWithGitlabId = personEntities(userGitLabIds.toGeneratorOfSomes).generateOne
         val publicDataset = datasetEntities(
           provenanceGen = datasetProvenanceInternal,
           projectsGen = projectEntities[Project.ForksCount.Zero](visibilityPublic)

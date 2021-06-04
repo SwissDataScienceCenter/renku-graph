@@ -39,9 +39,8 @@ import ch.datascience.http.rest.Links.{Href, Rel, _links}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.rdfstore.entities
-import ch.datascience.rdfstore.entities.EntitiesGenerators._
 import ch.datascience.rdfstore.entities.ModelOps.DatasetForkingResult
-import ch.datascience.rdfstore.entities.Person
+import ch.datascience.rdfstore.entities._
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import eu.timepit.refined.auto._
 import io.circe.literal._

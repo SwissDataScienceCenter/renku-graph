@@ -23,8 +23,8 @@ import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{Identifier, TopmostDerivedFrom, TopmostSameAs}
-import ch.datascience.rdfstore.entities._
 import ch.datascience.rdfstore.entities.Dataset._
+import ch.datascience.rdfstore.entities._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQuery}
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CurationGenerators.curatedTriplesObjects
@@ -37,50 +37,39 @@ class DescendantsUpdaterSpec extends AnyWordSpec with InMemoryRdfStore with shou
 
   "prepareUpdates" should {
 
-    "add update queries for all datasets which topmostSameAs or topmostDerivedFrom points to the given datasetId" in new TestCase {
+    "add update queries for all datasets which topmostSameAs or topmostDerivedFrom points to the given dataset id" in new TestCase {
 
-      val dataset1                   = datasetEntities(datasetProvenanceImportedExternal()).generateOne
-      val dataset1Id                 = datasetIdentifiers.generateOne
-      val dataset1TopmostDerivedFrom = datasetTopmostDerivedFroms.generateOne
-
-      val dataset2Id                 = datasetIdentifiers.generateOne
-      val dataset2TopmostDerivedFrom = datasetTopmostDerivedFroms.generateOne
-      val dataset3Id                 = datasetIdentifiers.generateOne
-      val dataset3TopmostSameAs      = datasetTopmostSameAs.generateOne
-      val dataset4Id                 = datasetIdentifiers.generateOne
-      val dataset4TopmostSameAs      = datasetTopmostSameAs.generateOne
-      val dataset5Id                 = datasetIdentifiers.generateOne
-      val dataset5TopmostSameAs      = datasetTopmostSameAs.generateOne
-      val dataset5TopmostDerivedFrom = datasetTopmostDerivedFroms.generateOne
-
-      loadToStore(
-        nonModifiedDataSetCommit()()(datasetIdentifier = dataset1Id,
-                                     overrideTopmostSameAs = topmostData.topmostSameAs.some,
-                                     overrideTopmostDerivedFrom = dataset1TopmostDerivedFrom.some
-        ),
-        nonModifiedDataSetCommit()()(datasetIdentifier = dataset2Id,
-                                     overrideTopmostSameAs = topmostData.topmostSameAs.some,
-                                     overrideTopmostDerivedFrom = dataset2TopmostDerivedFrom.some
-        ),
-        modifiedDataSetCommit()()(
-          datasetIdentifier = dataset3Id,
-          overrideTopmostSameAs = dataset3TopmostSameAs.some,
-          overrideTopmostDerivedFrom = TopmostDerivedFrom(topmostData.datasetId).some
-        ),
-        modifiedDataSetCommit()()(
-          datasetIdentifier = dataset4Id,
-          overrideTopmostSameAs = dataset4TopmostSameAs.some,
-          overrideTopmostDerivedFrom = TopmostDerivedFrom(topmostData.datasetId).some
-        ),
-        modifiedDataSetCommit()()(datasetIdentifier = dataset5Id,
-                                  overrideTopmostSameAs = dataset5TopmostSameAs.some,
-                                  overrideTopmostDerivedFrom = dataset5TopmostDerivedFrom.some
+      val ds1 = {
+        val orig = datasetEntities(datasetProvenanceImportedInternalAncestorInternal).generateOne
+        orig.copy(
+          provenance = orig.provenance.copy(topmostSameAs = TopmostSameAs(topmostData.datasetId))
         )
-      )
+      }
+      val ds2 = {
+        val orig = datasetEntities(datasetProvenanceImportedInternalAncestorInternal).generateOne
+        orig.copy(
+          provenance = orig.provenance.copy(topmostSameAs = TopmostSameAs(topmostData.datasetId))
+        )
+      }
+      val ds3 = {
+        val orig = datasetEntities(datasetProvenanceModified).generateOne
+        orig.copy(
+          provenance = orig.provenance.copy(topmostDerivedFrom = TopmostDerivedFrom(topmostData.datasetId))
+        )
+      }
+      val ds4 = {
+        val orig = datasetEntities(datasetProvenanceModified).generateOne
+        orig.copy(
+          provenance = orig.provenance.copy(topmostDerivedFrom = TopmostDerivedFrom(topmostData.datasetId))
+        )
+      }
+      val ds5 = datasetEntities(datasetProvenanceImportedExternal).generateOne
+
+      loadToStore(ds1, ds2, ds3, ds4, ds5)
 
       val updatedTriples = updater.prepareUpdates[IO](curatedTriples, topmostData)
 
-      updatedTriples.triples shouldBe curatedTriples.triples
+      assume(updatedTriples.triples === curatedTriples.triples)
 
       updatedTriples.updatesGroups
         .map(updateGroup => updateGroup.generateUpdates().value)
@@ -92,17 +81,17 @@ class DescendantsUpdaterSpec extends AnyWordSpec with InMemoryRdfStore with shou
         .flatMap(_.runAll)
         .unsafeRunSync()
 
-      findTopmostData(dataset1Id) shouldBe topmostData.topmostSameAs -> dataset1TopmostDerivedFrom
-      findTopmostData(dataset2Id) shouldBe topmostData.topmostSameAs -> dataset2TopmostDerivedFrom
-      findTopmostData(dataset3Id) shouldBe dataset3TopmostSameAs     -> topmostData.topmostDerivedFrom
-      findTopmostData(dataset4Id) shouldBe dataset4TopmostSameAs     -> topmostData.topmostDerivedFrom
-      findTopmostData(dataset5Id) shouldBe dataset5TopmostSameAs     -> dataset5TopmostDerivedFrom
+      findTopmostData(ds1.identifier) shouldBe topmostData.topmostSameAs    -> ds1.provenance.topmostDerivedFrom
+      findTopmostData(ds2.identifier) shouldBe topmostData.topmostSameAs    -> ds2.provenance.topmostDerivedFrom
+      findTopmostData(ds3.identifier) shouldBe ds3.provenance.topmostSameAs -> topmostData.topmostDerivedFrom
+      findTopmostData(ds4.identifier) shouldBe ds4.provenance.topmostSameAs -> topmostData.topmostDerivedFrom
+      findTopmostData(ds5.identifier) shouldBe ds5.provenance.topmostSameAs -> ds5.provenance.topmostDerivedFrom
     }
   }
 
   private trait TestCase {
-    val curatedTriples = curatedTriplesObjects[IO].generateOne.copy(updatesGroups = Nil)
-    val topmostData    = topmostDatas.generateOne
+    val curatedTriples: CuratedTriples[IO] = curatedTriplesObjects[IO].generateOne.copy(updatesGroups = Nil)
+    val topmostData = topmostDatas.generateOne
 
     val updater = new DescendantsUpdater()
   }

@@ -23,7 +23,7 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedEvent
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.{DataSetInfoEnricher, IODataSetInfoEnricher}
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.DatasetInfoEnricher
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails.PersonDetailsUpdater
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects.{IOProjectInfoUpdater, ProjectInfoUpdater}
 import org.typelevel.log4cats.Logger
@@ -39,7 +39,7 @@ trait TriplesTransformer[Interpretation[_]] {
 private[events] class TriplesTransformerImpl[Interpretation[_]](
     personDetailsUpdater: PersonDetailsUpdater[Interpretation],
     projectInfoUpdater:   ProjectInfoUpdater[Interpretation],
-    dataSetInfoEnricher:  DataSetInfoEnricher[Interpretation]
+    datasetInfoEnricher:  DatasetInfoEnricher[Interpretation]
 )(implicit ME:            MonadError[Interpretation, Throwable])
     extends TriplesTransformer[Interpretation] {
 
@@ -56,7 +56,7 @@ private[events] class TriplesTransformerImpl[Interpretation[_]](
                                     triplesGeneratedEvent.eventId
                                   )
       triplesWithForkInfo         <- updateProjectInfo(triplesGeneratedEvent, triplesWithPersonDetails)
-      triplesWithEnrichedDatasets <- dataSetInfoEnricher.enrichDataSetInfo(triplesWithForkInfo)
+      triplesWithEnrichedDatasets <- datasetInfoEnricher.enrichDatasetInfo(triplesWithForkInfo)
     } yield triplesWithEnrichedDatasets
 }
 
@@ -82,6 +82,6 @@ private[triplesgenerated] object IOTriplesCurator {
     for {
       personDetailsUpdater <- PersonDetailsUpdater(gitLabThrottler, logger)
       forkInfoUpdater      <- IOProjectInfoUpdater(gitLabThrottler, logger, timeRecorder)
-      dataSetInfoEnricher  <- IODataSetInfoEnricher(logger, timeRecorder)
-    } yield new TriplesTransformerImpl[IO](personDetailsUpdater, forkInfoUpdater, dataSetInfoEnricher)
+      datasetInfoEnricher  <- DatasetInfoEnricher(logger, timeRecorder)
+    } yield new TriplesTransformerImpl[IO](personDetailsUpdater, forkInfoUpdater, datasetInfoEnricher)
 }

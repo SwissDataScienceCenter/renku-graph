@@ -19,13 +19,12 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets
 
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators.{fusekiBaseUrls, jsonLDTriples}
+import ch.datascience.generators.CommonGraphGenerators.jsonLDTriples
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{ExternalSameAs, InternalSameAs}
-import ch.datascience.rdfstore.entities.Dataset
-import ch.datascience.rdfstore.entities.bundles._
-import ch.datascience.rdfstore.{FusekiBaseUrl, JsonLDTriples}
+import ch.datascience.rdfstore.JsonLDTriples
+import ch.datascience.rdfstore.entities._
+import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -33,65 +32,46 @@ import scala.util.{Success, Try}
 
 class DataSetInfoFinderSpec extends AnyWordSpec with should.Matchers {
 
-  private implicit val fusekiBaseUrl: FusekiBaseUrl = fusekiBaseUrls.generateOne
-
   "findDatasetsInfo" should {
 
-    "return empty set if there's no Dataset entity in the Json" in new TestCase {
-      infoFinder.findDatasetsInfo(jsonLDTriples.generateOne) shouldBe Success(Set.empty)
+    "return empty set if there's no Dataset entity in the Json" in {
+      infoFinder.findDatasetsInfo(jsonLDTriples.generateOne) shouldBe Set.empty.pure[Try]
     }
 
-    "return the DataSetInfo without sameAs and derivedFrom when they are not present in the json" in new TestCase {
-      val identifier = datasetIdentifiers.generateOne
-      val entityId   = Dataset.entityId(identifier)
-      val triples = JsonLDTriples {
-        nonModifiedDataSetCommit()()(datasetIdentifier = identifier, maybeDatasetSameAs = None).toJson
-      }
+    "return the DatasetInfo without sameAs and derivedFrom when they are not present in the json" in {
+      val dataset = datasetEntities(datasetProvenanceInternal).generateOne
 
-      infoFinder.findDatasetsInfo(triples) shouldBe Success(Set((entityId, None, None)))
+      infoFinder.findDatasetsInfo(JsonLDTriples(dataset.asJsonLD.toJson)) shouldBe Set(
+        (dataset.asEntityId, None, None)
+      ).pure[Try]
     }
 
-    "return the DataSetInfo with UrlSameAs and no derivedFrom as reflected in json" in new TestCase {
-      val identifier = datasetIdentifiers.generateOne
-      val entityId   = Dataset.entityId(identifier)
-      val sameAs     = datasetExternalSameAs.generateSome
-      val triples = JsonLDTriples {
-        nonModifiedDataSetCommit()()(datasetIdentifier = identifier, maybeDatasetSameAs = sameAs).toJson
-      }
+    "return the DatasetInfo with UrlSameAs and no derivedFrom as reflected in json" in {
+      val dataset = datasetEntities(datasetProvenanceImportedExternal).generateOne
 
-      val Success(datasetInfos) = infoFinder.findDatasetsInfo(triples)
+      val Success(datasetInfos) = infoFinder.findDatasetsInfo(JsonLDTriples(dataset.asJsonLD.toJson))
 
-      datasetInfos             shouldBe Set((entityId, sameAs, None))
+      datasetInfos             shouldBe Set((dataset.asEntityId, dataset.provenance.sameAs, None))
       datasetInfos.head._2.get shouldBe an[ExternalSameAs]
     }
 
-    "return the DataSetInfo with IdSameAs and no derivedFrom as reflected in json" in new TestCase {
-      val identifier = datasetIdentifiers.generateOne
-      val entityId   = Dataset.entityId(identifier)
-      val sameAs     = datasetInternalSameAs.generateSome
-      val triples = JsonLDTriples {
-        nonModifiedDataSetCommit()()(datasetIdentifier = identifier, maybeDatasetSameAs = sameAs).toJson
-      }
+    "return the DatasetInfo with IdSameAs and no derivedFrom as reflected in json" in {
+      val dataset = datasetEntities(datasetProvenanceImportedInternalAncestorInternal).generateOne
 
-      val Success(datasetInfos) = infoFinder.findDatasetsInfo(triples)
+      val Success(datasetInfos) = infoFinder.findDatasetsInfo(JsonLDTriples(dataset.asJsonLD.toJson))
 
-      datasetInfos             shouldBe Set((entityId, sameAs, None))
+      datasetInfos             shouldBe Set((dataset.asEntityId, dataset.provenance.sameAs, None))
       datasetInfos.head._2.get shouldBe an[InternalSameAs]
     }
 
-    "return the DataSetInfo with derivedFrom and no sameAs as reflected in json" in new TestCase {
-      val identifier  = datasetIdentifiers.generateOne
-      val entityId    = Dataset.entityId(identifier)
-      val derivedFrom = datasetDerivedFroms.generateOne
-      val triples = JsonLDTriples {
-        modifiedDataSetCommit()()(datasetIdentifier = identifier, datasetDerivedFrom = derivedFrom).toJson
-      }
+    "return the DatasetInfo with derivedFrom and no sameAs as reflected in json" in {
+      val dataset = datasetEntities(datasetProvenanceModified).generateOne
 
-      infoFinder.findDatasetsInfo(triples) shouldBe Success(Set((entityId, None, derivedFrom.some)))
+      infoFinder.findDatasetsInfo(JsonLDTriples(dataset.asJsonLD.toJson)) shouldBe Set(
+        (dataset.asEntityId, None, dataset.provenance.derivedFrom.some)
+      ).pure[Try]
     }
   }
 
-  private trait TestCase {
-    val infoFinder = new DataSetInfoFinderImpl[Try]()
-  }
+  private lazy val infoFinder = new DatasetInfoFinderImpl[Try]()
 }

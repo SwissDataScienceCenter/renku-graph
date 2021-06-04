@@ -18,9 +18,11 @@
 
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets
 
-import cats.MonadError
+import cats.MonadThrow
+import ch.datascience.graph.Schemas._
 import ch.datascience.graph.model.datasets.{TopmostDerivedFrom, TopmostSameAs}
 import ch.datascience.rdfstore.SparqlQuery
+import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CuratedTriples.CurationUpdatesGroup
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.TopmostDataFinder.TopmostData
@@ -29,44 +31,36 @@ import io.renku.jsonld.EntityId
 
 private class DescendantsUpdater {
 
-  def prepareUpdates[Interpretation[_]](
+  def prepareUpdates[Interpretation[_]: MonadThrow](
       curatedTriples: CuratedTriples[Interpretation],
       topmostData:    TopmostData
-  )(implicit ME:      MonadError[Interpretation, Throwable]): CuratedTriples[Interpretation] = curatedTriples.copy(
-    updatesGroups = curatedTriples.updatesGroups :+ CurationUpdatesGroup(
+  ): CuratedTriples[Interpretation] = curatedTriples.copy(
+    updatesGroups = curatedTriples.updatesGroups ::: CurationUpdatesGroup(
       name = "Dataset descendants updates",
       prepareSameAsUpdate(topmostData.datasetId, topmostData.topmostSameAs),
       prepareDerivedFromUpdate(topmostData.datasetId, topmostData.topmostDerivedFrom)
-    )
+    ) :: Nil
   )
 
-  private def prepareSameAsUpdate(entityId: EntityId, topmostSameAs: TopmostSameAs) = SparqlQuery(
+  private def prepareSameAsUpdate(entityId: EntityId, topmostSameAs: TopmostSameAs) = SparqlQuery.of(
     name = "upload - topmostSameAs update",
-    Set(
-      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-      "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>",
-      "PREFIX schema: <http://schema.org/>"
-    ),
+    Prefixes.of(renku -> "renku", schema -> "schema"),
     s"""|DELETE { ?dsId renku:topmostSameAs <$entityId> }
         |INSERT { ?dsId renku:topmostSameAs <$topmostSameAs> }
         |WHERE {
-        |  ?dsId rdf:type schema:Dataset;
+        |  ?dsId a schema:Dataset;
         |        renku:topmostSameAs <$entityId>.
         |}
         |""".stripMargin
   )
 
-  private def prepareDerivedFromUpdate(entityId: EntityId, topmostDerivedFrom: TopmostDerivedFrom) = SparqlQuery(
+  private def prepareDerivedFromUpdate(entityId: EntityId, topmostDerivedFrom: TopmostDerivedFrom) = SparqlQuery.of(
     name = "upload - topmostDerivedFrom update",
-    Set(
-      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-      "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>",
-      "PREFIX schema: <http://schema.org/>"
-    ),
+    Prefixes.of(renku -> "renku", schema -> "schema"),
     s"""|DELETE { ?dsId renku:topmostDerivedFrom <$entityId> }
         |INSERT { ?dsId renku:topmostDerivedFrom <$topmostDerivedFrom> }
         |WHERE {
-        |  ?dsId rdf:type schema:Dataset;
+        |  ?dsId a schema:Dataset;
         |        renku:topmostDerivedFrom <$entityId>
         |}
         |""".stripMargin

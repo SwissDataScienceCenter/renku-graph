@@ -40,9 +40,13 @@ trait ModelOps {
   implicit class PersonOps(person: Person) {
     lazy val resourceId: users.ResourceId = users.ResourceId(person.asEntityId)
 
+    def to[T](implicit convert:      Person => T):         T         = convert(person)
+    def toMaybe[T](implicit convert: Person => Option[T]): Option[T] = convert(person)
   }
 
   implicit class ProjectOps[FC <: ForksCount](project: Project[FC])(implicit renkuBaseUrl: RenkuBaseUrl) {
+
+    lazy val resourceId: projects.ResourceId = projects.ResourceId(project.asEntityId)
 
     def to[T](implicit convert: Project[FC] => T): T = convert(project)
 
@@ -61,8 +65,6 @@ trait ModelOps {
         childrenGens :+ newChildGen(parent).generateOne
       )
     }
-
-    lazy val resourceId: projects.ResourceId = projects.ResourceId(project.asEntityId)
 
     private def newChildGen(parentProject: Project[Project.ForksCount.NonZero]) =
       projectEntities[ForksCount.Zero](fixed(parentProject.visibility), parentProject.dateCreated).map(child =>

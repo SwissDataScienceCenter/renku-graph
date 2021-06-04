@@ -16,12 +16,11 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events.categories.membersync
+package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration
 
 import ch.datascience.rdfstore.entities
 
-private object PersonOps {
-
-  implicit lazy val toKGProjectMember: entities.Person => Option[KGProjectMember] =
-    person => person.maybeGitLabId.map(gitLabId => KGProjectMember(person.resourceId, gitLabId))
+package object persondetails {
+  private[persondetails] implicit lazy val toPersonDetailsPerson: entities.Person => persondetails.Person =
+    person => persondetails.Person(person.resourceId, person.maybeGitLabId, person.name, person.maybeEmail)
 }

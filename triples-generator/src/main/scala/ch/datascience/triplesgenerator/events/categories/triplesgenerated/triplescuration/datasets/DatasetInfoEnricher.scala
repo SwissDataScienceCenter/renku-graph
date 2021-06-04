@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration
 package datasets
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.data.EitherT
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
@@ -32,23 +32,22 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private[triplescuration] trait DataSetInfoEnricher[Interpretation[_]] {
-  def enrichDataSetInfo(curatedTriples: CuratedTriples[Interpretation]): CurationResults[Interpretation]
+private[triplescuration] trait DatasetInfoEnricher[Interpretation[_]] {
+  def enrichDatasetInfo(curatedTriples: CuratedTriples[Interpretation]): CurationResults[Interpretation]
 }
 
-private[triplescuration] class DataSetInfoEnricherImpl[Interpretation[_]](
-    dataSetInfoFinder:  DataSetInfoFinder[Interpretation],
+private[triplescuration] class DatasetInfoEnricherImpl[Interpretation[_]: MonadThrow](
+    datasetInfoFinder:  DatasetInfoFinder[Interpretation],
     triplesUpdater:     TriplesUpdater,
     topmostDataFinder:  TopmostDataFinder[Interpretation],
     descendantsUpdater: DescendantsUpdater
-)(implicit ME:          MonadError[Interpretation, Throwable])
-    extends DataSetInfoEnricher[Interpretation] {
+) extends DatasetInfoEnricher[Interpretation] {
 
-  import dataSetInfoFinder._
+  import datasetInfoFinder._
   import topmostDataFinder._
   import triplesUpdater._
 
-  def enrichDataSetInfo(curatedTriples: CuratedTriples[Interpretation]): CurationResults[Interpretation] =
+  def enrichDatasetInfo(curatedTriples: CuratedTriples[Interpretation]): CurationResults[Interpretation] =
     for {
       datasetInfos <- findDatasetsInfo(curatedTriples.triples).asRightT
       topmostInfos <- EitherT(
@@ -77,18 +76,18 @@ private[triplescuration] class DataSetInfoEnricherImpl[Interpretation[_]](
 
 }
 
-private[triplescuration] object IODataSetInfoEnricher {
+private[triplescuration] object DatasetInfoEnricher {
 
   import cats.effect.Timer
 
   def apply(
       logger:                  Logger[IO],
       timeRecorder:            SparqlQueryTimeRecorder[IO]
-  )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[DataSetInfoEnricher[IO]] =
+  )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[DatasetInfoEnricher[IO]] =
     for {
       topmostDataFinder <- IOTopmostDataFinder(logger, timeRecorder)
-    } yield new DataSetInfoEnricherImpl[IO](
-      new DataSetInfoFinderImpl[IO](),
+    } yield new DatasetInfoEnricherImpl[IO](
+      new DatasetInfoFinderImpl[IO](),
       new TriplesUpdater(),
       topmostDataFinder,
       new DescendantsUpdater()

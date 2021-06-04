@@ -22,6 +22,7 @@ package persondetails
 import cats.MonadError
 import cats.data.EitherT
 import cats.syntax.all._
+import ch.datascience.events.consumers.ConsumersModelGenerators.projects
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits.GenOps
 import ch.datascience.generators.Generators._
@@ -31,12 +32,12 @@ import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.graph.tokenrepository.IOAccessTokenFinder.projectPathToPath
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.JsonLDTriples
-import ch.datascience.events.consumers.ConsumersModelGenerators.projects
+import ch.datascience.rdfstore.entities._
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CuratedTriples.CurationUpdatesGroup
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CurationGenerators._
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails.PersonDetailsGenerators.{persons, _}
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails.PersonDetailsGenerators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -66,7 +67,7 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
         .expects(project.path, maybeAccessToken)
         .returning(EitherT.rightT[Try, ProcessingRecoverableError](projectMembers))
 
-      val personsWithGitlabIds = persons.generateSet()
+      val personsWithGitlabIds = personEntities(withGitLabId).map(_.to[persondetails.Person]).generateSet()
       (personsAndProjectMembersMatcher.merge _)
         .expects(trimmedPersons, projectMembers)
         .returning(personsWithGitlabIds)
@@ -74,7 +75,7 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
       val newUpdatesGroups = personsWithGitlabIds.foldLeft(List.empty[CurationUpdatesGroup[Try]]) { (acc, person) =>
         val updatesGroup = curationUpdatesGroups[Try].generateOne
         (updatesCreator
-          .prepareUpdates[Try](_: Person)(_: MonadError[Try, Throwable]))
+          .prepareUpdates[Try](_: persondetails.Person)(_: MonadError[Try, Throwable]))
           .expects(person, *)
           .returning(updatesGroup)
 
@@ -99,10 +100,10 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
       val exception = exceptions.generateOne
       (personTrimmer.getTriplesAndTrimmedPersons _)
         .expects(curatedTriples.triples, project.id, eventId, maybeAccessToken)
-        .returning(EitherT.right(exception.raiseError[Try, (JsonLDTriples, Set[Person])]))
+        .returning(EitherT.right(exception.raiseError[Try, (JsonLDTriples, Set[persondetails.Person])]))
 
       updater.updatePersonDetails(curatedTriples, project, eventId).value shouldBe exception
-        .raiseError[Try, (JsonLDTriples, Set[Person])]
+        .raiseError[Try, (JsonLDTriples, Set[persondetails.Person])]
     }
 
     "fail if finding project access token fails" in new TestCase {
@@ -114,7 +115,7 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
         .returning(exception.raiseError[Try, Option[AccessToken]])
 
       updater.updatePersonDetails(curatedTriples, project, eventId).value shouldBe exception
-        .raiseError[Try, (JsonLDTriples, Set[Person])]
+        .raiseError[Try, (JsonLDTriples, Set[persondetails.Person])]
     }
 
     "fail if finding project members fails" in new TestCase {
@@ -138,7 +139,7 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
         )
 
       updater.updatePersonDetails(curatedTriples, project, eventId).value shouldBe exception
-        .raiseError[Try, (JsonLDTriples, Set[Person])]
+        .raiseError[Try, (JsonLDTriples, Set[persondetails.Person])]
     }
 
     "return ProcessingRecoverableError if finding project members returns one" in new TestCase {
@@ -167,15 +168,12 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
 
   private trait TestCase {
 
-    implicit lazy val renkuBaseUrl = renkuBaseUrls.generateOne
-    implicit lazy val gitLabApiUrl = gitLabUrls.generateOne.apiV4
+    val maybeAccessToken = accessTokens.generateOption
 
     val project        = projects.generateOne
     val curatedTriples = curatedTriplesObjects[Try].generateOne
-    val trimmedPersons = persons.generateSet()
+    val trimmedPersons = personEntities().map(_.to[persondetails.Person]).generateSet()
     val eventId        = eventIds.generateOne
-
-    val maybeAccessToken = accessTokens.generateOption
 
     val personTrimmer                   = mock[PersonTrimmer[Try]]
     val accessTokenFinder               = mock[AccessTokenFinder[Try]]

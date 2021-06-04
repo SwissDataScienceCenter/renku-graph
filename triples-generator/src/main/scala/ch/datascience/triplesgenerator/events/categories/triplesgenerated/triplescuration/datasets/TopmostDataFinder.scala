@@ -23,10 +23,10 @@ import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.graph.model.datasets.{ExternalSameAs, InternalSameAs, TopmostDerivedFrom, TopmostSameAs}
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.DataSetInfoFinder.DatasetInfo
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.DatasetInfoFinder.DatasetInfo
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.TopmostDataFinder.TopmostData
-import org.typelevel.log4cats.Logger
 import io.renku.jsonld.EntityId
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
@@ -66,10 +66,9 @@ private object IOTopmostDataFinder {
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[TopmostDataFinderImpl[IO]] =
-    for {
-      kgDatasetInfoFinder <- IOKGDatasetInfoFinder(logger, timeRecorder)
-    } yield new TopmostDataFinderImpl[IO](kgDatasetInfoFinder)
+  ): IO[TopmostDataFinderImpl[IO]] = for {
+    kgDatasetInfoFinder <- IOKGDatasetInfoFinder(logger, timeRecorder)
+  } yield new TopmostDataFinderImpl[IO](kgDatasetInfoFinder)
 }
 
 private object TopmostDataFinder {
@@ -78,5 +77,4 @@ private object TopmostDataFinder {
                                topmostSameAs:      TopmostSameAs,
                                topmostDerivedFrom: TopmostDerivedFrom
   )
-
 }

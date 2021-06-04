@@ -90,7 +90,7 @@ trait EntitiesGenerators {
     dateCreated  <- projectCreatedDates(minDateCreated.value)
     maybeCreator <- personEntities.toGeneratorOfOptions
     visibility   <- visibilityGen
-    members      <- personsEntities(userGitLabIds.toGeneratorOfSomes).toGeneratorOfSet(minElements = 0)
+    members      <- personEntities(userGitLabIds.toGeneratorOfSomes).toGeneratorOfSet(minElements = 0)
     version      <- projectSchemaVersions
     forksCount   <- forksCountGen
   } yield Project[FC](path, name, agent, dateCreated, maybeCreator, visibility, forksCount, members, version)
@@ -307,9 +307,13 @@ trait EntitiesGenerators {
 
   implicit val agentEntities: Gen[Agent] = cliVersions map Agent.apply
 
-  implicit lazy val personEntities: Gen[Person] = personsEntities()
+  lazy val withGitLabId:    Gen[Option[GitLabId]] = userGitLabIds.toGeneratorOfSomes
+  lazy val withoutGitLabId: Gen[Option[GitLabId]] = fixed(Option.empty[GitLabId])
+  lazy val withEmail:       Gen[Option[Email]]    = userEmails.toGeneratorOfSomes
 
-  def personsEntities(
+  implicit lazy val personEntities: Gen[Person] = personEntities()
+
+  def personEntities(
       maybeGitLabIds: Gen[Option[GitLabId]] = userGitLabIds.toGeneratorOfNones,
       maybeEmails:    Gen[Option[Email]] = userEmails.toGeneratorOfOptions
   ): Gen[Person] = for {

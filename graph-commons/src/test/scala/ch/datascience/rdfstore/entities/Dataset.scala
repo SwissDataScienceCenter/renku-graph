@@ -67,7 +67,7 @@ object Dataset {
     }
   }
 
-  sealed trait Provenance {
+  sealed trait Provenance extends Product with Serializable {
     type D <: Date
     val topmostSameAs:      TopmostSameAs
     val initialVersion:     InitialVersion

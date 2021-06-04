@@ -20,13 +20,12 @@ package ch.datascience.triplesgenerator.events.categories.membersync
 
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators.{projectPaths, userEmails, userGitLabIds}
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.users.{Email, GitLabId}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.graph.model.{projects, users}
 import ch.datascience.rdfstore.InMemoryRdfStore
-import ch.datascience.rdfstore.entities.EntitiesGenerators.{personEntities, projectEntities}
-import ch.datascience.rdfstore.entities.bundles.{gitLabApiUrl, renkuBaseUrl}
+import ch.datascience.rdfstore.entities._
 import ch.datascience.triplesgenerator.events.categories.membersync.Generators._
 import ch.datascience.triplesgenerator.events.categories.membersync.PersonOps._
 import io.renku.jsonld.syntax._
@@ -37,20 +36,20 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
 
   "removal" should {
 
-    "prepare query to delete the member links to project" in new TestCase {
-      val memberToRemove0 = persons(userGitLabIds.toGeneratorOfSomes).generateOne
-      val memberToRemove1 = persons(userGitLabIds.toGeneratorOfSomes).generateOne
-      val memberToStay    = persons(userGitLabIds.toGeneratorOfSomes).generateOne
+    "prepare query to delete the member links to project" in {
+      val memberToRemove0 = personEntities(withGitLabId).generateOne
+      val memberToRemove1 = personEntities(withGitLabId).generateOne
+      val memberToStay    = personEntities(withGitLabId).generateOne
       val allMembers      = Set(memberToRemove0, memberToRemove1, memberToStay)
-      val project         = projectEntities().generateOne.copy(members = allMembers)
+      val project         = projectEntities[Project.ForksCount.Zero](visibilityAny).generateOne.copy(members = allMembers)
 
-      loadToStore(project.asJsonLD)
+      loadToStore(project)
 
       findMembers(project.path) shouldBe allMembers.flatMap(_.maybeGitLabId)
 
       val query = updatesCreator.removal(
         project.path,
-        Set(memberToRemove0, memberToRemove1).toKGProjectMembers + kgProjectMembers.generateOne
+        Set(memberToRemove0, memberToRemove1).flatMap(_.toMaybe[KGProjectMember]) + kgProjectMembers.generateOne
       )
 
       runUpdate(query).unsafeRunSync()
@@ -61,40 +60,34 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
 
   "insertion" should {
 
-    "prepare queries to insert links for members existing in KG" in new TestCase {
-      val member = gitLabProjectMembers.generateOne
-      val personInKG = persons(maybeEmails = userEmails.toGeneratorOfSomes).generateOne.copy(
-        maybeGitLabId = Some(member.gitLabId)
-      )
-      val personJsonLD = personInKG.asJsonLD
+    "prepare queries to insert links for members existing in KG" in {
+      val member     = gitLabProjectMembers.generateOne
+      val personInKG = personEntities(fixed(member.gitLabId.some), withEmail).generateOne
+      val project    = projectEntities[Project.ForksCount.Zero](visibilityAny).generateOne.copy(members = Set.empty)
 
-      val project = projectEntities().generateOne.copy(members = Set.empty)
-
-      loadToStore(project.asJsonLD, personJsonLD)
+      loadToStore(project.asJsonLD, personInKG.asJsonLD)
 
       findMembers(project.path) shouldBe Set.empty
 
       val queries = updatesCreator.insertion(
         project.path,
-        Set(member -> personJsonLD.entityId.map(users.ResourceId.apply))
+        Set(member -> personInKG.resourceId.some)
       )
 
       queries.map(runUpdate).sequence.unsafeRunSync()
 
-      findMembersEmails(project.path) shouldBe Set(
-        member.gitLabId -> personInKG.maybeEmail
-      )
+      findMembersEmails(project.path) shouldBe Set(member.gitLabId -> personInKG.maybeEmail)
     }
 
-    "prepare queries to insert links and new person for members non-existing in KG" in new TestCase {
-      val member = gitLabProjectMembers.generateOne
+    "prepare queries to insert links and new person for members non-existing in KG" in {
 
-      val project = projectEntities().generateOne.copy(members = Set.empty)
+      val project = projectEntities[Project.ForksCount.Zero](visibilityAny).generateOne.copy(members = Set.empty)
 
-      loadToStore(project.asJsonLD)
+      loadToStore(project)
 
       findMembers(project.path) shouldBe Set.empty
 
+      val member = gitLabProjectMembers.generateOne
       val queries = updatesCreator.insertion(
         project.path,
         Set(member -> Option.empty[users.ResourceId])
@@ -102,18 +95,16 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
 
       queries.map(runUpdate).sequence.unsafeRunSync()
 
-      findMembersEmails(project.path) shouldBe Set(
-        member.gitLabId -> Option.empty[users.Email]
-      )
+      findMembersEmails(project.path) shouldBe Set(member.gitLabId -> Option.empty[users.Email])
     }
 
-    "prepare queries to insert the project and then the members when neither exists in KG" in new TestCase {
-      val member = gitLabProjectMembers.generateOne
+    "prepare queries to insert the project and then the members when neither exists in KG" in {
 
       val projectPath = projectPaths.generateOne
 
       findMembers(projectPath) shouldBe Set.empty
 
+      val member = gitLabProjectMembers.generateOne
       val queries = updatesCreator.insertion(
         projectPath,
         Set(member -> Option.empty[users.ResourceId])
@@ -126,21 +117,20 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
       )
     }
 
-    "prepare queries to insert a project and attach a member already in KG when the project didn't previously exist" in new TestCase {
-      val member = gitLabProjectMembers.generateOne
+    "prepare queries to insert a project and attach a member already in KG when the project didn't previously exist" in {
+
+      val member     = gitLabProjectMembers.generateOne
+      val personInKG = personEntities(fixed(member.gitLabId.some), withEmail).generateOne
+
+      loadToStore(personInKG)
 
       val projectPath = projectPaths.generateOne
-      val personInKG = persons(maybeEmails = userEmails.toGeneratorOfSomes).generateOne.copy(
-        maybeGitLabId = Some(member.gitLabId)
-      )
-      val personJsonLD = personInKG.asJsonLD
-      loadToStore(personJsonLD)
 
       findMembers(projectPath) shouldBe Set.empty
 
       val queries = updatesCreator.insertion(
         projectPath,
-        Set(member -> personJsonLD.entityId.map(users.ResourceId.apply))
+        Set(member -> personInKG.resourceId.some)
       )
 
       queries.map(runUpdate).sequence.unsafeRunSync()
@@ -179,9 +169,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
       - links are created regardless of the project exists in KG
    */
 
-  private trait TestCase {
-    val updatesCreator = new UpdatesCreator(renkuBaseUrl, gitLabApiUrl)
-  }
+  private lazy val updatesCreator = new UpdatesCreator(renkuBaseUrl, gitLabApiUrl)
 
   private def findMembers(path: projects.Path): Set[GitLabId] =
     runQuery(

@@ -30,7 +30,7 @@ import ch.datascience.http.client.RestClientError.UnexpectedResponseException
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CurationGenerators._
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.DataSetInfoFinder.DatasetInfo
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.DatasetInfoFinder.DatasetInfo
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.TopmostDataFinder.TopmostData
 import io.renku.jsonld.generators.JsonLDGenerators._
 import org.scalamock.scalatest.MockFactory
@@ -39,7 +39,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.{Failure, Success, Try}
 
-class DataSetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class DatasetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "enrichDataSetInfo" should {
 
@@ -47,7 +47,7 @@ class DataSetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.M
 
       (infoFinder.findDatasetsInfo _).expects(curatedTriples.triples).returning(Set.empty[DatasetInfo].pure[Try])
 
-      enricher.enrichDataSetInfo(curatedTriples) shouldBe EitherT.rightT[Try, ProcessingRecoverableError](
+      enricher.enrichDatasetInfo(curatedTriples) shouldBe EitherT.rightT[Try, ProcessingRecoverableError](
         curatedTriples
       )
     }
@@ -87,7 +87,7 @@ class DataSetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.M
         triplesWithUpdates
       }
 
-      enricher.enrichDataSetInfo(curatedTriples).value shouldBe Success(Right(curatedTriplesWithUpdates))
+      enricher.enrichDatasetInfo(curatedTriples).value shouldBe Success(Right(curatedTriplesWithUpdates))
     }
 
     connectivityExceptions.generateOne +: clientExceptions.generateOne +: Nil foreach { exception =>
@@ -102,7 +102,7 @@ class DataSetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.M
           (topmostDataFinder.findTopmostData _).expects(datasetInfo).returning(exception.raiseError[Try, TopmostData])
         }
 
-        enricher.enrichDataSetInfo(curatedTriples).value shouldBe Success(
+        enricher.enrichDatasetInfo(curatedTriples).value shouldBe Success(
           Left(CurationRecoverableError("Problem with finding top most data", exception))
         )
       }
@@ -120,7 +120,7 @@ class DataSetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.M
         (topmostDataFinder.findTopmostData _).expects(datasetInfo).returning(exception.raiseError[Try, TopmostData])
       }
 
-      enricher.enrichDataSetInfo(curatedTriples).value shouldBe Success(
+      enricher.enrichDatasetInfo(curatedTriples).value shouldBe Success(
         Left(CurationRecoverableError("Problem with finding top most data", exception))
       )
     }
@@ -138,7 +138,7 @@ class DataSetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.M
         (topmostDataFinder.findTopmostData _).expects(datasetInfo).returning(exception.raiseError[Try, TopmostData])
       }
 
-      enricher.enrichDataSetInfo(curatedTriples).value shouldBe Failure(exception)
+      enricher.enrichDatasetInfo(curatedTriples).value shouldBe Failure(exception)
     }
 
     "fail when preparing updates fails" in new TestCase {
@@ -174,18 +174,18 @@ class DataSetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.M
         .expects(updatedCuratedTriples, *, *)
         .throwing(exception)
 
-      enricher.enrichDataSetInfo(curatedTriples).value shouldBe Failure(exception)
+      enricher.enrichDatasetInfo(curatedTriples).value shouldBe Failure(exception)
     }
   }
 
   private trait TestCase {
     val curatedTriples = curatedTriplesObjects[Try].generateOne
 
-    val infoFinder         = mock[DataSetInfoFinder[Try]]
+    val infoFinder         = mock[DatasetInfoFinder[Try]]
     val triplesUpdater     = mock[TriplesUpdater]
     val topmostDataFinder  = mock[TopmostDataFinder[Try]]
     val descendantsUpdater = mock[DescendantsUpdater]
-    val enricher           = new DataSetInfoEnricherImpl[Try](infoFinder, triplesUpdater, topmostDataFinder, descendantsUpdater)
+    val enricher           = new DatasetInfoEnricherImpl[Try](infoFinder, triplesUpdater, topmostDataFinder, descendantsUpdater)
   }
 
   private lazy val datasetInfos = for {
