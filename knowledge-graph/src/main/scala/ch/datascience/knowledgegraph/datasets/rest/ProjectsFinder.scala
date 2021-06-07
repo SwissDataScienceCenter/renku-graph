@@ -18,7 +18,7 @@
 
 package ch.datascience.knowledgegraph.datasets.rest
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, Timer}
 import cats.syntax.all._
 import ch.datascience.graph.Schemas._
 import ch.datascience.graph.model.datasets.Identifier
@@ -35,53 +35,38 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.ExecutionContext
 import scala.util.Try
 
-private class ProjectsFinder(
+private class ProjectsFinder[Interpretation[_]: ConcurrentEffect: Timer](
     rdfStoreConfig:          RdfStoreConfig,
-    logger:                  Logger[IO],
-    timeRecorder:            SparqlQueryTimeRecorder[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+    logger:                  Logger[Interpretation],
+    timeRecorder:            SparqlQueryTimeRecorder[Interpretation]
+)(implicit executionContext: ExecutionContext)
     extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder) {
 
   import ProjectsFinder._
 
-  def findUsedIn(identifier: Identifier): IO[List[DatasetProject]] =
+  def findUsedIn(identifier: Identifier): Interpretation[List[DatasetProject]] =
     queryExpecting[List[DatasetProject]](using = query(identifier))
 
   private def query(identifier: Identifier) = SparqlQuery.of(
     name = "ds by id - projects",
-    Prefixes.of(rdf -> "rdf", schema -> "schema", prov -> "prov", renku -> "renku"),
+    Prefixes.of(schema -> "schema", prov -> "prov", renku -> "renku"),
     s"""|SELECT DISTINCT ?projectId ?projectName
         |WHERE {
-        |  {
-        |    SELECT ?allDsId ?projectId (MIN(?dateCreated) AS ?minDateCreated)
-        |    WHERE {
-        |      ?dsId a schema:Dataset;
-        |            schema:identifier '$identifier';
-        |            prov:atLocation ?location;
-        |            renku:topmostSameAs ?topmostSameAs.
-        |            
-        |      BIND(CONCAT(?location, "/metadata.yml") AS ?metaDataLocation) .
-        |      FILTER NOT EXISTS {
-        |      # Removing dataset that have an activity that invalidates them
-        |      ?deprecationEntity a prov:Entity;
-        |                         prov:atLocation ?metaDataLocation;
-        |                         prov:wasInvalidatedBy ?invalidationActivity;
-        |                         schema:isPartOf ?projectId.
-        |      }  
-        |            
-        |      ?allDsId a schema:Dataset;
-        |               renku:topmostSameAs ?topmostSameAs;
-        |               schema:isPartOf ?projectId.
-        |      ?projectId schema:dateCreated ?dateCreated.
-        |    }
-        |    GROUP BY ?allDsId ?projectId
-        |  }
-        |  
+        |  ?dsId a schema:Dataset;
+        |        schema:identifier '$identifier';
+        |        renku:topmostSameAs ?topmostSameAs.
+        |        
         |  ?allDsId a schema:Dataset;
+        |           renku:topmostSameAs ?topmostSameAs;
         |           schema:isPartOf ?projectId.
-        |  ?projectId a schema:Project;
-        |             schema:dateCreated ?minDateCreated;
-        |             schema:name ?projectName.
+        |  FILTER NOT EXISTS {
+        |   ?modifiedDsId prov:wasDerivedFrom / schema:url ?allDsId;
+        |    			        schema:isPartOf ?projectId.
+        |  }
+        |  FILTER NOT EXISTS {
+        |    ?allDsId prov:invalidatedAtTime ?invalidationTime .
+        |  }  
+        |  ?projectId schema:name ?projectName .
         |}
         |ORDER BY ASC(?projectName)
         |""".stripMargin

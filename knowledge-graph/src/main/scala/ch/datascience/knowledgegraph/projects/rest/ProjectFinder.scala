@@ -63,7 +63,7 @@ private class ProjectFinderImpl[Interpretation[_]: MonadThrow](
       path = path,
       name = kgProject.name,
       maybeDescription = gitLabProject.maybeDescription,
-      visibility = gitLabProject.visibility,
+      visibility = kgProject.visibility,
       created = Creation(
         date = kgProject.created.date,
         maybeCreator = kgProject.created.maybeCreator.map(creator => Creator(creator.maybeEmail, creator.name))

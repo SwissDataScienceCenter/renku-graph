@@ -21,7 +21,7 @@ package ch.datascience.rdfstore.entities
 import cats.syntax.all._
 import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.rdfstore.entities.Activity._
-import ch.datascience.rdfstore.entities.Entity.{Checksum, InputEntity, OutputEntity}
+import ch.datascience.rdfstore.entities.Entity.{Checksum, OutputEntity}
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints.{BoundedInstant, PositiveInt, UUID}
 
@@ -49,7 +49,7 @@ final case class Activity(id:                  Id,
   def findEntity(location: Location): Option[Entity] =
     findUsageEntity(location) orElse findGenerationEntity(location)
 
-  def findUsageEntity(location: Location): Option[InputEntity] =
+  def findUsageEntity(location: Location): Option[Entity] =
     usages.find(_.entity.location == location).map(_.entity)
 
   def findUsagesChecksum(location: Location): Option[Checksum] =

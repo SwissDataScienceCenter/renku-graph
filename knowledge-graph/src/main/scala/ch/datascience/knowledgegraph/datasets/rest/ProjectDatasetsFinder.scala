@@ -72,21 +72,12 @@ private class ProjectDatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Tim
         |               schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
         |               schema:identifier ?identifier;
         |               schema:name ?name;
-        |               prov:atLocation ?location;
         |               schema:alternateName  ?alternateName;
         |               renku:topmostSameAs ?topmostSameAs;
         |               renku:topmostDerivedFrom/schema:identifier ?initialVersion.
         |    OPTIONAL { ?datasetId prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }.
         |    FILTER NOT EXISTS { ?otherDsId prov:wasDerivedFrom/schema:url ?datasetId }
-        |    BIND(CONCAT(?location, "/metadata.yml") AS ?metaDataLocation).
-        |    
-        |    FILTER NOT EXISTS { 
-        |      # Removing dataset that have an activity that invalidates them
-        |      ?deprecationEntity a prov:Entity;
-        |                         prov:atLocation ?metaDataLocation ;
-        |                         schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
-        |                         prov:wasInvalidatedBy ?invalidationActivity .	
-        |    }
+        |    FILTER NOT EXISTS { ?datasetId prov:invalidatedAtTime ?invalidationTime. }
         |    OPTIONAL { 
         |      ?datasetId   schema:image ?imageId .
         |      ?imageId     schema:position ?imagePosition ;

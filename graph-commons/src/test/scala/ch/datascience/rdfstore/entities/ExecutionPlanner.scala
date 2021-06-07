@@ -34,13 +34,12 @@ import ch.datascience.rdfstore.entities.ParameterValue.{PathParameterValue, Vari
 
 final case class ExecutionPlanner(runPlan:                  RunPlan,
                                   activityData:             ActivityData,
-                                  project:                  Project[Project.ForksCount],
                                   parametersValueOverrides: List[(ParameterDefaultValue, ValueOverride)],
-                                  inputsValueOverrides:     List[(InputDefaultValue, Location, Checksum)],
+                                  inputsValueOverrides:     List[(InputDefaultValue, Entity)],
                                   outputsValueOverrides:    List[(OutputDefaultValue, Location)]
 ) {
 
-  def planParameterArgumentsValues(
+  def planParameterValues(
       valuesOverrides: (ParameterDefaultValue, ValueOverride)*
   ): ValidatedNel[String, ExecutionPlanner] = {
     val validatedValues = runPlan.parameters.traverse { argument =>
@@ -55,19 +54,26 @@ final case class ExecutionPlanner(runPlan:                  RunPlan,
     validatedValues.map(_ => this.copy(parametersValueOverrides = valuesOverrides.toList))
   }
 
-  def planParameterInputsValues(
+  def planInputParameterValuesFromChecksum(
       valuesOverrides: (Location, Checksum)*
-  ): ExecutionPlanner = planParameterInputsOverrides(
+  ): ExecutionPlanner = planInputParameterOverrides(
     valuesOverrides.map { case (location, checksum) =>
-      (InputDefaultValue(location), location, checksum)
+      (InputDefaultValue(location), InputEntity(location, checksum))
     }: _*
   )
 
-  def planParameterInputsOverrides(
-      valuesOverrides: (InputDefaultValue, Location, Checksum)*
-  ): ExecutionPlanner = this.copy(inputsValueOverrides = valuesOverrides.toList)
+  def planInputParameterValuesFromEntity(
+      valuesOverrides: (Location, OutputEntity)*
+  ): ExecutionPlanner =
+    this.copy(inputsValueOverrides = inputsValueOverrides ::: valuesOverrides.toList.map { case (location, entity) =>
+      (InputDefaultValue(location), entity)
+    })
 
-  def planParameterOutputsOverrides(
+  def planInputParameterOverrides(
+      valuesOverrides: (InputDefaultValue, Entity)*
+  ): ExecutionPlanner = this.copy(inputsValueOverrides = inputsValueOverrides ::: valuesOverrides.toList)
+
+  def planOutputParameterOverrides(
       valuesOverrides: (OutputDefaultValue, Location)*
   ): ExecutionPlanner = this.copy(outputsValueOverrides = valuesOverrides.toList)
 
@@ -83,7 +89,7 @@ final case class ExecutionPlanner(runPlan:                  RunPlan,
       Activity.EndTime(activityTime.value),
       author,
       Agent(cliVersion),
-      project,
+      runPlan.project,
       Activity.Order(1),
       Association.factory(Agent(cliVersion), runPlan),
       usageFactories,
@@ -96,8 +102,8 @@ final case class ExecutionPlanner(runPlan:                  RunPlan,
     case input: LocationCommandInput =>
       inputsValueOverrides
         .foldMapK {
-          case (defaultValue, _, _) => Option.when(defaultValue == input.defaultValue)(input)
-          case _                    => Option.empty[CommandInput]
+          case (defaultValue, _) => Option.when(defaultValue == input.defaultValue)(input)
+          case _                 => Option.empty[CommandInput]
         }
         .toValidNel(
           s"No execution location and checksum for input parameter with default value ${input.defaultValue}"
@@ -117,8 +123,8 @@ final case class ExecutionPlanner(runPlan:                  RunPlan,
         }.sequence
     }
 
-  private lazy val usageFactories = inputsValueOverrides.map { case (_, location, checksum) =>
-    Usage.factory(InputEntity(location, checksum))
+  private lazy val usageFactories = inputsValueOverrides.map { case (_, entity) =>
+    Usage.factory(entity)
   }
 
   private lazy val generationFactories = runPlan.outputs
@@ -152,9 +158,9 @@ final case class ExecutionPlanner(runPlan:                  RunPlan,
   private lazy val createPathParameterFactoriesForInputs = runPlan.inputs.traverse { planInput =>
     inputsValueOverrides
       .foldMapK {
-        case (defaultValue, locationOverride, _) =>
+        case (defaultValue, entity) =>
           Option.when(defaultValue == planInput.defaultValue)(
-            PathParameterValue.factory(locationOverride, planInput)
+            PathParameterValue.factory(entity.location, planInput)
           )
         case _ => Option.empty[Activity => ParameterValue]
       }
@@ -178,9 +184,9 @@ final case class ExecutionPlanner(runPlan:                  RunPlan,
   private lazy val validateStartTime: ValidatedNel[String, ActivityData] = {
     val (startTime, _, _) = activityData
     Validated.condNel(
-      (startTime.value compareTo project.dateCreated.value) >= 0,
+      (startTime.value compareTo runPlan.project.dateCreated.value) >= 0,
       activityData,
-      s"Activity start time $startTime cannot be older than project ${project.dateCreated}"
+      s"Activity start time $startTime cannot be older than project ${runPlan.project.dateCreated}"
     )
   }
 }
@@ -189,11 +195,6 @@ object ExecutionPlanner {
 
   private type ActivityData = (Activity.StartTime, Person, CliVersion)
 
-  def of(runPlan:      RunPlan,
-         activityTime: Activity.StartTime,
-         author:       Person,
-         cliVersion:   CliVersion,
-         project:      Project[Project.ForksCount]
-  ): ExecutionPlanner =
-    ExecutionPlanner(runPlan, (activityTime, author, cliVersion), project, List.empty, List.empty, List.empty)
+  def of(runPlan: RunPlan, activityTime: Activity.StartTime, author: Person, cliVersion: CliVersion): ExecutionPlanner =
+    ExecutionPlanner(runPlan, (activityTime, author, cliVersion), List.empty, List.empty, List.empty)
 }

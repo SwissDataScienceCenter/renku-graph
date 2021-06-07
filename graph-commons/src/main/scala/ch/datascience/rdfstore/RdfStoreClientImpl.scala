@@ -37,18 +37,17 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
 
 abstract class RdfStoreClientImpl[Interpretation[_]: ConcurrentEffect: Timer](
-    rdfStoreConfig: RdfStoreConfig,
-    logger:         Logger[Interpretation],
-    timeRecorder:   SparqlQueryTimeRecorder[Interpretation],
-    retryInterval:  FiniteDuration = SleepAfterConnectionIssue,
-    maxRetries:     Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
-)(implicit
-    executionContext: ExecutionContext
-) extends RestClient[Interpretation, RdfStoreClientImpl[Interpretation]](Throttler.noThrottling,
-                                                                         logger,
-                                                                         Some(timeRecorder.instance),
-                                                                         retryInterval,
-                                                                         maxRetries
+    rdfStoreConfig:          RdfStoreConfig,
+    logger:                  Logger[Interpretation],
+    timeRecorder:            SparqlQueryTimeRecorder[Interpretation],
+    retryInterval:           FiniteDuration = SleepAfterConnectionIssue,
+    maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
+)(implicit executionContext: ExecutionContext)
+    extends RestClient[Interpretation, RdfStoreClientImpl[Interpretation]](Throttler.noThrottling,
+                                                                           logger,
+                                                                           Some(timeRecorder.instance),
+                                                                           retryInterval,
+                                                                           maxRetries
     ) {
 
   import RdfStoreClientImpl._

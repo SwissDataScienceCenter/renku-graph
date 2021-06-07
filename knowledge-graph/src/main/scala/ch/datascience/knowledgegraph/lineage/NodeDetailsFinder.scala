@@ -124,13 +124,20 @@ private object NodeDetailsFinder {
   implicit val locationQuery: (Node.Location, ResourceId) => SparqlQuery = (location, path) =>
     SparqlQuery.of(
       name = "lineage - entity details",
-      Prefixes.of(prov -> "prov", rdf -> "rdf", schema -> "schema"),
+      Prefixes.of(prov -> "prov", schema -> "schema"),
       s"""|SELECT DISTINCT ?type ?location ?label
           |WHERE {
-          |  ?entity prov:atLocation '$location';
-          |          rdf:type prov:Entity;
-          |          rdf:type ?type;
-          |          schema:isPartOf ${path.showAs[RdfResource]}.
+          |  { 
+          |    ?entity prov:atLocation '$location';
+          |          a prov:Entity;
+          |          a ?type .
+          |  } {
+          |    ?activityId a prov:Activity ;
+          |                prov:qualifiedUsage / prov:entity ?entity ;
+          |                schema:isPartOf ${path.showAs[RdfResource]} .
+          |  } UNION {
+          |    ?entity prov:qualifiedGeneration / prov:activity / schema:isPartOf ${path.showAs[RdfResource]} .
+          |  }
           |  BIND ('$location' AS ?location)
           |  BIND ('$location' AS ?label)
           |}
@@ -140,7 +147,7 @@ private object NodeDetailsFinder {
   implicit val runIdQuery: (RunInfo, ResourceId) => SparqlQuery = { case (RunInfo(runId, _), _) =>
     SparqlQuery.of(
       name = "lineage - runPlan details",
-      Prefixes.of(prov -> "prov", rdf -> "rdf", renku -> "renku", schema -> "schema"),
+      Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema"),
       s"""|SELECT DISTINCT  ?type (CONCAT(STR(?command), STR(' '), (GROUP_CONCAT(?commandParameter; separator=' '))) AS ?label) ?location
           |WHERE {
           |  {
@@ -148,63 +155,45 @@ private object NodeDetailsFinder {
           |    WHERE {
           |      <$runId> renku:command ?command.
           |      ?activity prov:qualifiedAssociation/prov:hadPlan <$runId>;
-          |                rdf:type ?type.
+          |                a ?type.
           |      BIND (<$runId> AS ?location)
           |    }
           |  } {
           |    SELECT ?position ?commandParameter
-          |    WHERE {
-          |      { # inputs with position
+          |     WHERE {
+          |      { # inputs
           |        <$runId> renku:hasInputs ?input .
-          |        ?input renku:consumes/prov:atLocation ?location;
-          |               renku:position ?position.
+          |        ?paramValue a renku:PathParameterValue ;
+          |                    schema:valueReference ?input .
+          |        ?paramValue prov:atLocation ?location .
+          |        OPTIONAL { ?input renku:mappedTo/renku:streamType ?maybeStreamType. }
+          |        ?input renku:position ?position.
           |        OPTIONAL { ?input renku:prefix ?maybePrefix }
-          |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .
-          |        BIND (CONCAT(?prefix, STR(?location)) AS ?commandParameter) .
-          |      } UNION { # inputs with mappedTo
-          |        <$runId> renku:hasInputs ?input .
-          |        ?input renku:consumes/prov:atLocation ?location;
-          |               renku:mappedTo/renku:streamType ?streamType.
-          |        OPTIONAL { ?input renku:prefix ?maybePrefix }
-          |        FILTER NOT EXISTS { ?input renku:position ?maybePosition }.
+          |        BIND (IF(bound(?maybeStreamType), ?maybeStreamType, '') AS ?streamType).
           |        BIND (IF(?streamType = 'stdin', '< ', '') AS ?streamOperator).
-          |        BIND (1 AS ?position).
           |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix).
           |        BIND (CONCAT(?prefix, ?streamOperator, STR(?location)) AS ?commandParameter) .
-          |      } UNION { # inputs with no position and mappedTo
-          |        <$runId> renku:hasInputs ?input .
-          |        FILTER NOT EXISTS { ?input renku:position ?maybePosition }.
-          |        FILTER NOT EXISTS { ?input renku:mappedTo ?mappedTo }.
-          |        BIND (1 AS ?position).
-          |        BIND ('' AS ?commandParameter).
-          |      } UNION { # outputs with position
+          |      } UNION { # outputs
           |        <$runId> renku:hasOutputs ?output .
-          |        ?output renku:produces/prov:atLocation ?location;
-          |                renku:position ?position.
+          |        ?paramValue a renku:PathParameterValue ;
+          |                    schema:valueReference ?output .
+          |        ?paramValue prov:atLocation ?location .
+          |        ?output renku:position ?position.
+          |        OPTIONAL { ?output renku:mappedTo/renku:streamType ?maybeStreamType. }
           |        OPTIONAL { ?output renku:prefix ?maybePrefix }
-          |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .
-          |        BIND (CONCAT(?prefix, STR(?location)) AS ?commandParameter) .
-          |      } UNION { # outputs with mappedTo
-          |        <$runId> renku:hasOutputs ?output .
-          |        ?output renku:produces/prov:atLocation ?location;
-          |                renku:mappedTo/renku:streamType ?streamType.
-          |        OPTIONAL { ?output renku:prefix ?maybePrefix }
-          |        FILTER NOT EXISTS { ?output renku:position ?maybePosition }.
+          |        BIND (IF(bound(?maybeStreamType), ?maybeStreamType, '') AS ?streamType).
           |        BIND (IF(?streamType = 'stdout', '> ', IF(?streamType = 'stderr', '2> ', '')) AS ?streamOperator).
-          |        BIND (IF(?streamType = 'stdout', 2, IF(?streamType = 'stderr', 3, 3)) AS ?position).
           |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .
           |        BIND (CONCAT(?prefix, ?streamOperator, STR(?location)) AS ?commandParameter) .
-          |      } UNION { # outputs with no position and mappedTo
-          |        <$runId> renku:hasOutputs ?output .
-          |        FILTER NOT EXISTS { ?output renku:position ?maybePosition }.
-          |        FILTER NOT EXISTS { ?output renku:mappedTo ?mappedTo }.
-          |        BIND (1 AS ?position).
-          |        BIND ('' AS ?commandParameter).
-          |      } UNION { # arguments
-          |        <$runId> renku:hasArguments ?argument .
-          |        ?argument renku:position ?position .
-          |        OPTIONAL { ?argument renku:prefix ?maybePrefix }
-          |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?commandParameter) .
+          |      } UNION { # parameters
+          |        <$runId> renku:hasArguments ?parameter .
+          |        ?paramValue a renku:VariableParameterValue;
+          |                    schema:valueReference ?parameter .
+          |        ?paramValue schema:Value ?value .
+          |        ?parameter renku:position ?position .
+          |        OPTIONAL { ?parameter renku:prefix ?maybePrefix }
+          |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .
+          |        BIND (CONCAT(?prefix, STR(?value)) AS ?commandParameter) .
           |      }
           |    }
           |    GROUP BY ?position ?commandParameter

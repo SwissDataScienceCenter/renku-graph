@@ -18,8 +18,7 @@
 
 package ch.datascience.knowledgegraph.metrics
 
-import cats.MonadError
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
@@ -35,22 +34,18 @@ private trait StatsFinder[Interpretation[_]] {
   def entitiesCount(): Interpretation[Map[EntityLabel, Count]]
 }
 
-private class StatsFinderImpl(
-    rdfStoreConfig: RdfStoreConfig,
-    logger:         Logger[IO],
-    timeRecorder:   SparqlQueryTimeRecorder[IO]
-)(implicit
-    executionContext: ExecutionContext,
-    contextShift:     ContextShift[IO],
-    timer:            Timer[IO],
-    ME:               MonadError[IO, Throwable]
-) extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
-    with StatsFinder[IO] {
+private class StatsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer](
+    rdfStoreConfig:          RdfStoreConfig,
+    logger:                  Logger[Interpretation],
+    timeRecorder:            SparqlQueryTimeRecorder[Interpretation]
+)(implicit executionContext: ExecutionContext)
+    extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
+    with StatsFinder[Interpretation] {
 
   import EntityCount._
   import ch.datascience.graph.Schemas._
 
-  override def entitiesCount(): IO[Map[EntityLabel, Count]] =
+  override def entitiesCount(): Interpretation[Map[EntityLabel, Count]] =
     queryExpecting[List[(EntityLabel, Count)]](using = query) map (_.toMap)
 
   private lazy val query = SparqlQuery.of(
@@ -128,8 +123,7 @@ private object StatsFinder {
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
-      timer:            Timer[IO],
-      ME:               MonadError[IO, Throwable]
+      timer:            Timer[IO]
   ): IO[StatsFinder[IO]] = for {
     config <- rdfStoreConfig
   } yield new StatsFinderImpl(config, logger, timeRecorder)

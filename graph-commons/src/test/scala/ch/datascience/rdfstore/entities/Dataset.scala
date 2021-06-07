@@ -29,23 +29,18 @@ import io.renku.jsonld.{EntityId, JsonLD, Property}
 
 import scala.language.implicitConversions
 
-final case class Dataset[+P <: Provenance](identification: Identification,
-                                           provenance:     P,
-                                           additionalInfo: AdditionalInfo,
-                                           publishing:     Publishing,
-                                           parts:          List[DatasetPart],
-                                           project:        Project[Project.ForksCount]
+case class Dataset[+P <: Provenance](identification: Identification,
+                                     provenance:     P,
+                                     additionalInfo: AdditionalInfo,
+                                     publishing:     Publishing,
+                                     parts:          List[DatasetPart],
+                                     project:        Project[Project.ForksCount]
 ) {
 
   def entityId(implicit renkuBaseUrl: RenkuBaseUrl): EntityId = Dataset.entityId(identification.identifier)
 
-  validateState(identification.identifier,
-                provenance.date,
-                project,
-                provenance.creators,
-                parts,
-                publishing.publicationEvents
-  ).fold(errors => throw new IllegalStateException(errors.nonEmptyIntercalate("; ")), _ => ())
+  validateState(identification.identifier, provenance, project, parts, publishing.publicationEvents)
+    .fold(errors => throw new IllegalStateException(errors.nonEmptyIntercalate("; ")), _ => ())
 }
 
 object Dataset {
@@ -74,7 +69,6 @@ object Dataset {
     val topmostDerivedFrom: TopmostDerivedFrom
     val date:               D
     val creators:           Set[Person]
-
   }
 
   object Provenance {
@@ -137,6 +131,8 @@ object Dataset {
       override type D = DateCreated
       override lazy val topmostSameAs: TopmostSameAs = TopmostSameAs(entityId)
     }
+
+    import ch.datascience.graph.model.datasets.DerivedFrom._
 
     private[Dataset] implicit def encoder(implicit
         renkuBaseUrl: RenkuBaseUrl,
@@ -235,13 +231,7 @@ object Dataset {
                             parts:          List[DatasetPart],
                             project:        Project[Project.ForksCount]
   ): ValidatedNel[String, Dataset[P]] =
-    validateState(identification.identifier,
-                  provenance.date,
-                  project,
-                  provenance.creators,
-                  parts,
-                  publishing.publicationEvents
-    ).map(_ =>
+    validateState(identification.identifier, provenance, project, parts, publishing.publicationEvents).map(_ =>
       Dataset[P](
         identification,
         provenance,
@@ -252,69 +242,79 @@ object Dataset {
       )
     )
 
-  private[Dataset] def validateState(identifier:        Identifier,
-                                     date:              Date,
-                                     project:           Project[Project.ForksCount],
-                                     creators:          Set[Person],
-                                     parts:             List[DatasetPart],
-                                     publicationEvents: List[PublicationEvent]
+  private[Dataset] def validateState[P <: Provenance](identifier:        Identifier,
+                                                      provenance:        P,
+                                                      project:           Project[Project.ForksCount],
+                                                      parts:             List[DatasetPart],
+                                                      publicationEvents: List[PublicationEvent]
   ): ValidatedNel[String, Unit] = List(
-    validateDateCreated(identifier, project, date),
-    validateCreators(identifier, creators),
-    validateParts(identifier, date, parts),
-    validatePublicationEvents(identifier, date, publicationEvents)
+    validateDateCreated(identifier, project, provenance),
+    validateCreators(identifier, provenance.creators),
+    validateParts(identifier, provenance, parts),
+    validatePublicationEvents(identifier, provenance, publicationEvents, project)
   ).sequence.void
 
-  private[Dataset] def validateCreators(identifier: Identifier,
-                                        creators:   Set[Person]
-  ): ValidatedNel[String, Set[Person]] =
-    Validated.condNel(creators.nonEmpty, creators, s"No creators on dataset with id: $identifier")
+  private[Dataset] def validateCreators(identifier: Identifier, creators: Set[Person]): ValidatedNel[String, Unit] =
+    Validated.condNel(creators.nonEmpty, (), s"No creators on dataset with id: $identifier")
 
-  private[Dataset] def validateDateCreated(identifier: Identifier,
-                                           project:    Project[Project.ForksCount],
-                                           date:       Date
-  ): ValidatedNel[String, Date] = date match {
-    case created: DateCreated =>
+  private[Dataset] def validateDateCreated[P <: Provenance](identifier: Identifier,
+                                                            project:    Project[Project.ForksCount],
+                                                            provenance: P
+  ): ValidatedNel[String, Unit] = provenance match {
+    case prov: Provenance.Internal =>
       Validated.condNel(
-        test = (created.value compareTo project.dateCreated.value) >= 0,
-        date,
-        s"Dataset with id: $identifier is older than project ${project.name}"
+        test = (prov.date.value compareTo project.topAncestorDateCreated.value) >= 0,
+        (),
+        s"Internal Dataset with id: $identifier is older than project ${project.name}"
       )
-    case _ => Validated.validNel(date)
+    case prov: Provenance.Modified =>
+      Validated.condNel(
+        test = (prov.date.value compareTo project.topAncestorDateCreated.value) >= 0,
+        (),
+        s"Modified Dataset with id: $identifier is older than project ${project.name}"
+      )
+    case _ => Validated.validNel(())
   }
 
-  private[Dataset] def validateParts(
+  private[Dataset] def validateParts[P <: Provenance](
       identifier: Identifier,
-      date:       Date,
+      provenance: P,
       parts:      List[DatasetPart]
-  ): ValidatedNel[String, List[DatasetPart]] = parts.map { part =>
-    date match {
-      case created: DateCreated =>
-        Validated.condNel(
-          test = (part.dateCreated.value compareTo created.value) >= 0,
-          part,
-          s"Part ${part.entity.location} on dataset with id: $identifier is older than dataset date"
-        )
-      case _ => Validated.validNel(part)
-    }
-  }.sequence
-
-  private[Dataset] def validatePublicationEvents(
-      identifier:        Identifier,
-      date:              Date,
-      publicationEvents: List[PublicationEvent]
-  ): ValidatedNel[String, List[PublicationEvent]] =
-    publicationEvents.map { event =>
-      date match {
-        case created: DateCreated =>
+  ): ValidatedNel[String, Unit] = provenance match {
+    case _: Provenance.Modified => Validated.validNel(())
+    case prov =>
+      parts
+        .map { part =>
           Validated.condNel(
-            test = (event.startDate.value compareTo created.value) >= 0,
-            event,
-            s"Publication Event ${event.about} on dataset with id: $identifier is older than dataset date"
+            test = (part.dateCreated.value compareTo prov.date.instant) >= 0,
+            (),
+            s"Part ${part.entity.location} on dataset with id: $identifier is older than dataset date"
           )
-        case _ => Validated.validNel(event)
-      }
-    }.sequence
+        }
+        .sequence
+        .void
+  }
+
+  private[Dataset] def validatePublicationEvents[P <: Provenance](
+      identifier:        Identifier,
+      provenance:        P,
+      publicationEvents: List[PublicationEvent],
+      project:           Project[_]
+  ): ValidatedNel[String, Unit] = {
+    provenance match {
+      case prov: Provenance.Internal         => Some(prov.date.instant, "dataset date")
+      case _:    Provenance.ImportedExternal => Some(project.topAncestorDateCreated.value, "project date")
+      case _ => None
+    }
+  }.map { case (minDate, dateLabel) =>
+    publicationEvents.map { event =>
+      Validated.condNel(
+        test = (event.startDate.value compareTo minDate) >= 0,
+        (),
+        s"Publication Event ${event.about} on dataset with id: $identifier is older than $dateLabel"
+      )
+    }.combineAll
+  }.getOrElse(Validated.validNel(()))
 
   import ch.datascience.graph.config.RenkuBaseUrl
   import io.renku.jsonld.JsonLDEncoder._
@@ -325,6 +325,21 @@ object Dataset {
       renkuBaseUrl: RenkuBaseUrl,
       gitLabApiUrl: GitLabApiUrl
   ): JsonLDEncoder[Dataset[P]] = JsonLDEncoder.instance {
+    case dataset: Dataset[P] with HavingInvalidationTime =>
+      JsonLD
+        .entity(
+          dataset.entityId,
+          EntityTypes of (schema / "Dataset", prov / "Entity"),
+          List(
+            dataset.identification.asJsonLDProperties,
+            dataset.provenance.asJsonLDProperties,
+            dataset.additionalInfo.asJsonLDProperties(AdditionalInfo.encoder(dataset.entityId)),
+            dataset.publishing.asJsonLDProperties
+          ).flatten.toMap,
+          schema / "hasPart"         -> dataset.parts.asJsonLD,
+          schema / "isPartOf"        -> dataset.project.asJsonLD,
+          prov / "invalidatedAtTime" -> dataset.invalidationTime.asJsonLD
+        )
     case dataset @ Dataset(identification, provenance, additionalInfo, publishing, parts, project) =>
       JsonLD
         .entity(
@@ -337,7 +352,7 @@ object Dataset {
             publishing.asJsonLDProperties
           ).flatten.toMap,
           schema / "hasPart"  -> parts.asJsonLD,
-          schema / "isPartOf" -> project.asEntityId.asJsonLD
+          schema / "isPartOf" -> project.asJsonLD
         )
   }
 

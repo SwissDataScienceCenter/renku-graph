@@ -33,8 +33,11 @@ package object rest {
   val phrases:                      Gen[Phrase]                         = nonBlankStrings(minLength = 5) map (_.value) map Phrase.apply
   implicit val searchEndpointSorts: Gen[DatasetsSearchEndpoint.Sort.By] = sortBys(DatasetsSearchEndpoint.Sort)
 
-  lazy val toCreator: Person => DatasetCreator =
+  implicit lazy val personToCreator: Person => DatasetCreator =
     person => DatasetCreator(person.maybeEmail, person.name, person.maybeAffiliation)
+
+  implicit lazy val projectToDatasetProject: entities.Project[_] => DatasetProject =
+    project => DatasetProject(project.path, project.name)
 
   implicit def internalToNonModified(implicit
       renkuBaseUrl: RenkuBaseUrl
@@ -46,13 +49,13 @@ package object rest {
         dataset.identification.name,
         dataset.additionalInfo.url,
         SameAs(dataset.entityId),
-        DatasetVersions(InitialVersion(dataset.provenance.topmostSameAs.value)),
+        DatasetVersions(dataset.provenance.initialVersion),
         dataset.additionalInfo.maybeDescription,
         dataset.provenance.creators.map(person =>
           DatasetCreator(person.maybeEmail, person.name, person.maybeAffiliation)
         ),
         dataset.provenance.date,
-        dataset.parts.map(part => model.DatasetPart(PartLocation(part.entity.location.value))),
+        dataset.parts.map(part => model.DatasetPart(PartLocation(part.entity.location.value))).sortBy(_.location),
         DatasetProject(dataset.project.path, dataset.project.name),
         usedIn = List(DatasetProject(dataset.project.path, dataset.project.name)),
         dataset.additionalInfo.keywords.sorted,
@@ -69,13 +72,13 @@ package object rest {
         dataset.identification.name,
         dataset.additionalInfo.url,
         dataset.provenance.sameAs,
-        DatasetVersions(InitialVersion(dataset.provenance.topmostSameAs.value)),
+        DatasetVersions(dataset.provenance.initialVersion),
         dataset.additionalInfo.maybeDescription,
         dataset.provenance.creators.map(person =>
           DatasetCreator(person.maybeEmail, person.name, person.maybeAffiliation)
         ),
         dataset.provenance.date,
-        dataset.parts.map(part => model.DatasetPart(PartLocation(part.entity.location.value))),
+        dataset.parts.map(part => model.DatasetPart(PartLocation(part.entity.location.value))).sortBy(_.location),
         DatasetProject(dataset.project.path, dataset.project.name),
         usedIn = List(DatasetProject(dataset.project.path, dataset.project.name)),
         dataset.additionalInfo.keywords.sorted,
@@ -92,13 +95,13 @@ package object rest {
         dataset.identification.name,
         dataset.additionalInfo.url,
         dataset.provenance.sameAs,
-        DatasetVersions(InitialVersion(dataset.provenance.topmostSameAs.value)),
+        DatasetVersions(dataset.provenance.initialVersion),
         dataset.additionalInfo.maybeDescription,
         dataset.provenance.creators.map(person =>
           DatasetCreator(person.maybeEmail, person.name, person.maybeAffiliation)
         ),
         dataset.provenance.date,
-        dataset.parts.map(part => model.DatasetPart(PartLocation(part.entity.location.value))),
+        dataset.parts.map(part => model.DatasetPart(PartLocation(part.entity.location.value))).sortBy(_.location),
         DatasetProject(dataset.project.path, dataset.project.name),
         usedIn = List(DatasetProject(dataset.project.path, dataset.project.name)),
         dataset.additionalInfo.keywords.sorted,
@@ -115,13 +118,13 @@ package object rest {
         dataset.identification.name,
         dataset.additionalInfo.url,
         dataset.provenance.derivedFrom,
-        DatasetVersions(InitialVersion(dataset.provenance.topmostSameAs.value)),
+        DatasetVersions(dataset.provenance.initialVersion),
         dataset.additionalInfo.maybeDescription,
         dataset.provenance.creators.map(person =>
           DatasetCreator(person.maybeEmail, person.name, person.maybeAffiliation)
         ),
         dataset.provenance.date,
-        dataset.parts.map(part => model.DatasetPart(PartLocation(part.entity.location.value))),
+        dataset.parts.map(part => model.DatasetPart(PartLocation(part.entity.location.value))).sortBy(_.location),
         DatasetProject(dataset.project.path, dataset.project.name),
         usedIn = List(DatasetProject(dataset.project.path, dataset.project.name)),
         dataset.additionalInfo.keywords.sorted,

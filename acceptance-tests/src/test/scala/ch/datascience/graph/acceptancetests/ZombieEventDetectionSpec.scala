@@ -49,7 +49,10 @@ import skunk.data.Completion
 import skunk.implicits._
 import skunk.{Command, Session, ~}
 
+import java.lang.Thread.sleep
 import java.time.Instant
+import scala.concurrent.duration._
+import scala.language.postfixOps
 
 class ZombieEventDetectionSpec
     extends AnyFeatureSpec
@@ -65,7 +68,6 @@ class ZombieEventDetectionSpec
     s"An event which got stuck in either $GeneratingTriples or $TransformingTriples status " +
       s"should be detected and re-processes"
   ) {
-
     implicit val accessToken: AccessToken = accessTokens.generateOne
     val project   = dataProjects(projectEntities[ForksCount.Zero](visibilityPublic)).generateOne
     val projectId = project.id
@@ -93,6 +95,7 @@ class ZombieEventDetectionSpec
     EventLog.execute { implicit session =>
       insertEventToDB(commitId, project, eventDate) >> insertEventDeliveryToDB(commitId, project)
     }
+    sleep((5 seconds).toMillis)
 
     Then("the zombie chasing functionality should re-do the event")
     eventually {
@@ -101,7 +104,7 @@ class ZombieEventDetectionSpec
     }
   }
 
-  private def insertProjectToDB(project: data.Project[_], eventDate: EventDate) = EventLog.execute { session =>
+  private def insertProjectToDB(project: data.Project[_], eventDate: EventDate): Int = EventLog.execute { session =>
     val query: Command[Id ~ Path ~ EventDate] =
       sql"""INSERT INTO project (project_id, project_path, latest_event_date)
           VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
@@ -116,9 +119,11 @@ class ZombieEventDetectionSpec
     }
   }
 
-  private def insertEventToDB(commitId: CommitId, project: data.Project[_], eventDate: EventDate)(implicit
-      session:                          Session[IO]
-  ) = {
+  private def insertEventToDB(
+      commitId:       CommitId,
+      project:        data.Project[_],
+      eventDate:      EventDate
+  )(implicit session: Session[IO]) = {
     val query: Command[EventId ~ Id ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody] =
       sql"""
           INSERT INTO event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body)

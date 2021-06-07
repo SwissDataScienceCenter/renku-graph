@@ -18,7 +18,6 @@
 
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects
 
-import cats.MonadError
 import cats.data.EitherT
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
@@ -43,8 +42,7 @@ private trait PayloadTransformer[Interpretation[_]] {
 private class PayloadTransformerImpl(
     gitLab:                   GitLabInfoFinder[IO],
     projectPropertiesRemover: JsonLDTriples => JsonLDTriples
-)(implicit ME:                MonadError[IO, Throwable], cs: ContextShift[IO])
-    extends PayloadTransformer[IO] {
+) extends PayloadTransformer[IO] {
 
   override def transform(
       event:                   TriplesGeneratedEvent,

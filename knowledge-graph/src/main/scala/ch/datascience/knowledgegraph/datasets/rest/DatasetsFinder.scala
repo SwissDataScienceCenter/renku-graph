@@ -18,8 +18,10 @@
 
 package ch.datascience.knowledgegraph.datasets.rest
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.Parallel
+import cats.effect.{ConcurrentEffect, Timer}
 import cats.syntax.all._
+import ch.datascience.graph.Schemas._
 import ch.datascience.graph.model.datasets.{Date, DateCreated, DatePublished, Description, Identifier, ImageUri, Keyword, Name, Title}
 import ch.datascience.graph.model.projects.Visibility
 import ch.datascience.http.rest.paging.Paging.PagedResultsFinder
@@ -29,6 +31,7 @@ import ch.datascience.knowledgegraph.datasets.model.DatasetCreator
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.DatasetSearchResult
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
+import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
 import ch.datascience.tinytypes.constraints.NonNegativeInt
 import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
@@ -63,18 +66,17 @@ private object DatasetsFinder {
   final class ProjectsCount private (val value: Int) extends AnyVal with IntTinyType
 
   implicit object ProjectsCount extends TinyTypeFactory[ProjectsCount](new ProjectsCount(_)) with NonNegativeInt
-
 }
 
-private class DatasetsFinderImpl(
+private class DatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer: Parallel](
     rdfStoreConfig:          RdfStoreConfig,
-    creatorsFinder:          CreatorsFinder,
-    logger:                  Logger[IO],
-    timeRecorder:            SparqlQueryTimeRecorder[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+    creatorsFinder:          CreatorsFinder[Interpretation],
+    logger:                  Logger[Interpretation],
+    timeRecorder:            SparqlQueryTimeRecorder[Interpretation]
+)(implicit executionContext: ExecutionContext)
     extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
-    with DatasetsFinder[IO]
-    with Paging[IO, DatasetSearchResult] {
+    with DatasetsFinder[Interpretation]
+    with Paging[Interpretation, DatasetSearchResult] {
 
   import DatasetsFinderImpl._
   import cats.syntax.all._
@@ -84,55 +86,39 @@ private class DatasetsFinderImpl(
                             sort:          Sort.By,
                             pagingRequest: PagingRequest,
                             maybeUser:     Option[AuthUser]
-  ): IO[PagingResponse[DatasetSearchResult]] = {
+  ): Interpretation[PagingResponse[DatasetSearchResult]] = {
     val phrase = maybePhrase getOrElse Phrase("*")
-    implicit val resultsFinder: PagedResultsFinder[IO, DatasetSearchResult] = pagedResultsFinder(
+    implicit val resultsFinder: PagedResultsFinder[Interpretation, DatasetSearchResult] = pagedResultsFinder(
       sparqlQuery(phrase, sort, maybeUser)
     )
     for {
       page                 <- findPage(pagingRequest)
       datasetsWithCreators <- (page.results map addCreators).parSequence
-      updatedPage          <- page.updateResults[IO](datasetsWithCreators)
+      updatedPage          <- page.updateResults[Interpretation](datasetsWithCreators)
     } yield updatedPage
   }
 
   private lazy val projectMemberFilterQuery: Option[AuthUser] => String = {
     case Some(user) =>
-      s"""
-         |OPTIONAL { 
-         |    ?projectId renku:projectVisibility ?visibility .
-         |}
-         |OPTIONAL { 
-         |    ?projectId schema:member/schema:sameAs ?memberId.
-         |    ?memberId  schema:additionalType 'GitLab';
-         |               schema:identifier ?userGitlabId .
-         |}
-         |BIND (IF (BOUND (?visibility), ?visibility,  '${Visibility.Public.value}') as ?projectVisibility)
-         |FILTER (
-         |  lcase(str(?projectVisibility)) = '${Visibility.Public.value}' || 
-         |  (lcase(str(?projectVisibility)) != '${Visibility.Public.value}' && ?userGitlabId = ${user.id.value})
-         |)
-         |""".stripMargin
+      s"""|?projectId renku:projectVisibility ?visibility .
+          |OPTIONAL { 
+          |    ?projectId schema:member/schema:sameAs ?memberId.
+          |    ?memberId  schema:additionalType 'GitLab';
+          |               schema:identifier ?userGitlabId .
+          |}
+          |FILTER (
+          |  ?visibility = '${Visibility.Public.value}' || ?userGitlabId = ${user.id.value}
+          |)
+          |""".stripMargin
     case _ =>
-      s"""
-         |OPTIONAL {
-         |  ?projectId renku:projectVisibility ?visibility .
-         |}
-         |BIND(IF (BOUND (?visibility), ?visibility, '${Visibility.Public.value}' ) as ?projectVisibility)
-         |FILTER(lcase(str(?projectVisibility)) = '${Visibility.Public.value}')
-         |""".stripMargin
+      s"""|?projectId renku:projectVisibility ?visibility .
+          |FILTER(?visibility = '${Visibility.Public.value}')
+          |""".stripMargin
   }
 
-  private def sparqlQuery(phrase: Phrase, sort: Sort.By, maybeUser: Option[AuthUser]): SparqlQuery = SparqlQuery(
+  private def sparqlQuery(phrase: Phrase, sort: Sort.By, maybeUser: Option[AuthUser]): SparqlQuery = SparqlQuery.of(
     name = "ds free-text search",
-    Set(
-      "PREFIX prov: <http://www.w3.org/ns/prov#>",
-      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-      "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
-      "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>",
-      "PREFIX schema: <http://schema.org/>",
-      "PREFIX text: <http://jena.apache.org/text#>"
-    ),
+    Prefixes.of(prov -> "prov", rdfs -> "rdfs", renku -> "renku", schema -> "schema", text -> "text"),
     s"""|SELECT ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?projectsCount (GROUP_CONCAT(?keyword; separator='|') AS ?keywords) ?images
         |WHERE {        
         |  SELECT ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?projectsCount ?keyword (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
@@ -147,27 +133,21 @@ private class DatasetsFinderImpl(
         |              SELECT DISTINCT ?id
         |              WHERE { ?id text:query (schema:name schema:description schema:alternateName schema:keywords '$phrase') }
         |            } {
-        |              ?id rdf:type <http://schema.org/Dataset>;
+        |              ?id a schema:Dataset;
         |              	renku:topmostSameAs ?sameAs.
         |            } UNION {
-        |              ?id rdf:type <http://schema.org/Person>.
+        |              ?id a schema:Person.
         |              ?luceneDsId schema:creator ?id;
-        |                          rdf:type <http://schema.org/Dataset>;
+        |                          a schema:Dataset;
         |                          renku:topmostSameAs ?sameAs.
         |            }
         |          }
         |        } {
-        |          ?dsId rdf:type <http://schema.org/Dataset>;
+        |          ?dsId a schema:Dataset;
         |                renku:topmostSameAs ?sameAs;
-        |                schema:isPartOf ?projectId ;
-        |                prov:atLocation ?location .
-        |          BIND(CONCAT(?location, "/metadata.yml") AS ?metaDataLocation).
+        |                schema:isPartOf ?projectId .
         |          FILTER NOT EXISTS {
-        |              # Removing dataset that have an activity that invalidates them
-        |              ?deprecationEntity rdf:type <http://www.w3.org/ns/prov#Entity>;
-        |                                 prov:atLocation ?metaDataLocation ;
-        |                                 prov:wasInvalidatedBy ?invalidationActivity ;
-        |                                 schema:isPartOf ?projectId .
+        |            ?dsId prov:invalidatedAtTime ?invalidationTime.
         |          }
         |          FILTER NOT EXISTS {
         |              ?someId prov:wasDerivedFrom/schema:url ?dsId.
@@ -179,7 +159,7 @@ private class DatasetsFinderImpl(
         |      GROUP BY ?sameAs
         |      HAVING (COUNT(*) > 0)
         |    } {
-        |      ?dsIdExample rdf:type <http://schema.org/Dataset>;
+        |      ?dsIdExample a schema:Dataset;
         |            renku:topmostSameAs ?sameAs;
         |            schema:identifier ?identifier;
         |            schema:name ?name ;
@@ -218,7 +198,7 @@ private class DatasetsFinderImpl(
     case Sort.ProjectsCountProperty => s"ORDER BY ${sort.direction}(?projectsCount)"
   }
 
-  private lazy val addCreators: DatasetSearchResult => IO[DatasetSearchResult] =
+  private lazy val addCreators: DatasetSearchResult => Interpretation[DatasetSearchResult] =
     dataset =>
       findCreators(dataset.id)
         .map(creators => dataset.copy(creators = creators))

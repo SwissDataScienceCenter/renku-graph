@@ -19,6 +19,7 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration
 package datasets
 
+import cats.syntax.all._
 import ch.datascience.graph.Schemas._
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.TopmostDataFinder.TopmostData
@@ -34,14 +35,13 @@ private class TriplesUpdater {
   def mergeTopmostDataIntoTriples[Interpretation[_]](
       curatedTriples: CuratedTriples[Interpretation],
       topmostData:    TopmostData
-  ): CuratedTriples[Interpretation] =
-    curatedTriples.copy(
-      triples = JsonLDTriples(Plated.transform(updateDataset(topmostData))(curatedTriples.triples.value))
-    )
+  ): CuratedTriples[Interpretation] = curatedTriples.copy(
+    triples = JsonLDTriples(Plated.transform(updateDataset(topmostData))(curatedTriples.triples.value))
+  )
 
   private def updateDataset(topmostData: TopmostData): Json => Json = { json =>
     root.`@type`.each.string.getAll(json) match {
-      case types if types.contains("http://schema.org/Dataset") =>
+      case types if types contains (schema / "Dataset").show =>
         json.get[EntityId]("@id") match {
           case Some(topmostData.datasetId) =>
             val noSameAsJson  = json.remove(renku / "topmostSameAs")

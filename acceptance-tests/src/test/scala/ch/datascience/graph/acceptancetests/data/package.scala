@@ -32,11 +32,14 @@ import ch.datascience.rdfstore.entities
 import ch.datascience.rdfstore.entities.fixed
 import org.scalacheck.Gen
 
+import java.time.Instant.now
+import scala.util.Try
+
 package object data {
   val currentVersionPair:    RenkuVersionPair   = RenkuVersionPair(CliVersion("0.12.2"), SchemaVersion("8"))
   implicit val cliVersion:   CliVersion         = currentVersionPair.cliVersion
   val renkuResourcesUrl:     renku.ResourcesUrl = renku.ResourcesUrl("http://localhost:9004/knowledge-graph")
-  implicit val renkuBaseUrl: RenkuBaseUrl       = RenkuBaseUrl("http://localhost")
+  implicit val renkuBaseUrl: RenkuBaseUrl       = RenkuBaseUrl[Try]().fold(throw _, identity)
 
   def dataProjects[FC <: entities.Project.ForksCount](
       projectGen: Gen[entities.Project[FC]]
@@ -44,7 +47,7 @@ package object data {
     project          <- projectGen
     id               <- projectIds
     maybeDescription <- projectDescriptions.toGeneratorOfOptions
-    updatedAt        <- timestamps(min = project.dateCreated.value).toGeneratorOf[DateUpdated]
+    updatedAt        <- timestamps(min = project.dateCreated.value, max = now).toGeneratorOf[DateUpdated]
     urls             <- urlsObjects
     tags             <- tagsObjects.toGeneratorOfSet()
     starsCount       <- starsCounts

@@ -23,14 +23,13 @@ import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.entities._
-import ch.datascience.rdfstore.{InMemoryRdfStore, JsonLDTriples}
 import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks with should.Matchers {
+class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers {
 
   "prepareUpdates" should {
 
@@ -70,10 +69,10 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
         val gitLabId = userGitLabIds.generateOne
         val person   = personEntities(fixed(gitLabId.some)).generateOne
 
+        loadToStore(person)
+
         val newName  = userNames.generateOne
         val newEmail = userEmails.generateOption
-
-        loadToStore(person)
 
         val updatesGroup = updatesCreator.prepareUpdates[IO](
           person.to[persondetails.Person].copy(name = newName, maybeEmail = newEmail)
@@ -96,9 +95,9 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
         val existingGitLabId = userGitLabIds.generateOne
         val person           = personEntities(fixed(existingGitLabId.some)).generateOne
 
-        val newGitLabId = userGitLabIds.generateOne
-
         loadToStore(person)
+
+        val newGitLabId = userGitLabIds.generateOne
 
         val updatesGroup = updatesCreator.prepareUpdates[IO](
           person.to[persondetails.Person].copy(maybeGitLabId = newGitLabId.some)
@@ -116,7 +115,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
         )
       }
 
-    "generate query which upserts everything when the GitLabId is matched " +
+    "generate query which inserts everything when the GitLabId is matched " +
       "and nothing in JENA " in {
         val gitLabId = userGitLabIds.generateOne
         val person   = personEntities(fixed(gitLabId.some)).generateOne
@@ -139,12 +138,12 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
       // This could happen if a user changes their email
       val gitLabId = userGitLabIds.generateOne
       val person   = personEntities(fixed(gitLabId.some)).generateOne
-      val project1 = projectEntities[Project.ForksCount.NonZero](visibilityAny).generateOne
+      val project1 = projectEntities[Project.ForksCount.Zero](visibilityAny).generateOne
         .copy(maybeCreator = Some(person), members = Set(person))
-      val project2 = projectEntities[Project.ForksCount.NonZero](visibilityAny).generateOne
+      val project2 = projectEntities[Project.ForksCount.Zero](visibilityAny).generateOne
         .copy(maybeCreator = Some(person), members = Set.empty)
       val dataset = {
-        val orig = datasetEntities(datasetProvenanceInternal).generateOne
+        val orig = datasetEntities(datasetProvenanceInternal, fixed(project1)).generateOne
         orig.copy(provenance = orig.provenance.copy(creators = Set(person)))
       }
 
@@ -155,7 +154,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
 
       val updatedPerson = personEntities(fixed(gitLabId.some)).generateOne
 
-      val updatesGroup = updatesCreator.prepareUpdates[IO](updatedPerson)
+      val updatesGroup = updatesCreator.prepareUpdates[IO](updatedPerson.to[persondetails.Person])
 
       updatesGroup.generateUpdates().foldF(throw _, _.runAll).unsafeRunSync()
 
@@ -195,12 +194,12 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
 
         val updatedPerson = person.copy(name = userNames.generateOne, maybeGitLabId = None)
 
-        val updatesGroup = updatesCreator.prepareUpdates[IO](updatedPerson)
+        val updatesGroup = updatesCreator.prepareUpdates[IO](updatedPerson.to[persondetails.Person])
 
         updatesGroup.generateUpdates().foldF(throw _, _.runAll).unsafeRunSync()
 
         findPersons should contain theSameElementsAs Set(
-          (updatedPerson.id.value, Some(updatedPerson.name.value), Some(email.value), None, None)
+          (updatedPerson.resourceId.value, Some(updatedPerson.name.value), Some(email.value), None, None)
         )
       }
 
@@ -218,35 +217,12 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
 
         val updatedPerson = person.copy(name = userNames.generateOne)
 
-        val updatesGroup = updatesCreator.prepareUpdates[IO](updatedPerson)
+        val updatesGroup = updatesCreator.prepareUpdates[IO](updatedPerson.to[persondetails.Person])
 
         updatesGroup.generateUpdates().foldF(throw _, _.runAll).unsafeRunSync()
 
         findPersons should contain theSameElementsAs Set(
-          (updatedPerson.id.value, Some(updatedPerson.name.value), Some(email.value), None, None)
-        )
-      }
-
-    "generate query which upserts both email and name " +
-      "when the GitLab Id matching was not successful and this person exists in JENA but without name and email" in {
-
-        val person = personEntities(withoutGitLabId).generateOne
-        loadToStore(
-          JsonLDTriples(person.asJsonLD.toJson.remove(schema / "name").remove(schema / "email"))
-        )
-
-        findPersons shouldBe Set(
-          (person.resourceId.value, None, None, None, None)
-        )
-
-        val updatedPerson = person.copy(name = userNames.generateOne, maybeEmail = userEmails.generateOption)
-
-        val updatesGroup = updatesCreator.prepareUpdates[IO](updatedPerson)
-
-        updatesGroup.generateUpdates().foldF(throw _, _.runAll).unsafeRunSync()
-
-        findPersons should contain theSameElementsAs Set(
-          (updatedPerson.id.value, Some(updatedPerson.name.value), updatedPerson.maybeEmail.map(_.value), None, None)
+          (updatedPerson.resourceId.value, Some(updatedPerson.name.value), Some(email.value), None, None)
         )
       }
   }

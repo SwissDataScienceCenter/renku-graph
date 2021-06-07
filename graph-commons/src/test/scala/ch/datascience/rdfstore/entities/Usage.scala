@@ -19,16 +19,15 @@
 package ch.datascience.rdfstore.entities
 
 import ch.datascience.graph.config.GitLabApiUrl
-import ch.datascience.rdfstore.entities.Entity.InputEntity
 import ch.datascience.rdfstore.entities.Usage.Id
 import ch.datascience.tinytypes.constraints.UUID
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
-final case class Usage(id: Id, activity: Activity, entity: InputEntity)
+final case class Usage(id: Id, activity: Activity, entity: Entity)
 
 object Usage {
 
-  def factory(entity: InputEntity): Activity => Usage =
+  def factory(entity: Entity): Activity => Usage =
     Usage(Id.generate, _, entity)
 
   final class Id private (val value: String) extends AnyVal with StringTinyType

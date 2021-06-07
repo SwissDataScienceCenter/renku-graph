@@ -235,11 +235,6 @@ object GitLab {
       }"""
     }
 
-    implicit val parentProjectEncoder: Encoder[entities.Project[FC] with entities.HavingParent] =
-      Encoder.instance(project => json"""{
-        "forked_from_project": ${project.parent.path.value}
-      }""")
-
     val queryParams = if (withStatistics) "?statistics=true" else ""
     stubFor {
       get(s"/api/v4/projects/${urlEncode(project.path.value)}$queryParams").withAccessTokenInHeader
@@ -259,6 +254,7 @@ object GitLab {
               "tag_list":             ${project.tags.map(_.value).toList},
               "star_count":           ${project.starsCount.value},
               "created_at":           ${project.entitiesProject.dateCreated.value},
+              "creator_id":           ${project.entitiesProject.maybeCreator.flatMap(_.maybeGitLabId.map(_.value))},
               "last_activity_at":     ${project.updatedAt.value},
               "permissions":          ${project.permissions.toJson},
               "statistics": {
@@ -271,15 +267,10 @@ object GitLab {
             }"""
               .deepMerge(
                 project.entitiesProject match {
-                  case hasParent: entities.Project[FC] with entities.HavingParent => hasParent.asJson
+                  case withParent: entities.ProjectWithParent[FC] =>
+                    json"""{"forked_from_project":  {"path_with_namespace": ${withParent.parent.path.value}} }"""
                   case _ => Json.obj()
                 }
-              )
-              .deepMerge(
-                project.entitiesProject.maybeCreator
-                  .flatMap(_.maybeGitLabId)
-                  .map(creatorId => json"""{"creator_id": ${creatorId.value}}""")
-                  .getOrElse(Json.obj())
               )
               .noSpaces
           )

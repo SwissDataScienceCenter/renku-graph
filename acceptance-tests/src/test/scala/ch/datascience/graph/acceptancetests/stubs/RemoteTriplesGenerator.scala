@@ -58,9 +58,12 @@ object RemoteTriplesGenerator {
       project,
       commitId,
       ExecutionPlanner(
-        RunPlan(runPlanNames.generateOne, runPlanCommands.generateOne, commandParameterFactories = Nil),
+        RunPlan(runPlanNames.generateOne,
+                runPlanCommands.generateOne,
+                commandParameterFactories = Nil,
+                project.entitiesProject
+        ),
         (Activity.StartTime(project.entitiesProject.dateCreated.value), author, cliVersion),
-        project.entitiesProject,
         parametersValueOverrides = Nil,
         inputsValueOverrides = Nil,
         outputsValueOverrides = Nil
@@ -75,7 +78,7 @@ object RemoteTriplesGenerator {
     stubFor {
       get(s"/projects/${project.id}/commits/$commitId")
         .willReturn(
-          ok(triples.toJson.spaces2)
+          ok(triples.flatten.fold(throw _, _.toJson.spaces2))
         )
     }
     ()

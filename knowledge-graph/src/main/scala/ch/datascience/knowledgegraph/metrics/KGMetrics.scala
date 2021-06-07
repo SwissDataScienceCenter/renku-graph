@@ -18,8 +18,7 @@
 
 package ch.datascience.knowledgegraph.metrics
 
-import cats.MonadError
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.metrics._
@@ -35,37 +34,36 @@ trait KGMetrics[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
-class KGMetricsImpl(
-    statsFinder:    StatsFinder[IO],
-    logger:         Logger[IO],
-    countsGauge:    LabeledGauge[IO, EntityLabel],
+class KGMetricsImpl[Interpretation[_]: ConcurrentEffect: Timer](
+    statsFinder:    StatsFinder[Interpretation],
+    logger:         Logger[Interpretation],
+    countsGauge:    LabeledGauge[Interpretation, EntityLabel],
     initialDelay:   FiniteDuration = KGMetrics.initialDelay,
     countsInterval: FiniteDuration = KGMetrics.countsInterval
-)(implicit ME:      MonadError[IO, Throwable], timer: Timer[IO], cs: ContextShift[IO])
-    extends KGMetrics[IO] {
+) extends KGMetrics[Interpretation] {
 
-  def run(): IO[Unit] =
-    for {
-      _ <- timer sleep initialDelay
-      _ <- updateCounts().foreverM[Unit]
-    } yield ()
+  def run(): Interpretation[Unit] = for {
+    _ <- Timer[Interpretation] sleep initialDelay
+    _ <- updateCounts().foreverM[Unit]
+  } yield ()
 
-  private def updateCounts(): IO[Unit] = {
+  private def updateCounts(): Interpretation[Unit] = {
     for {
+      _      <- ().pure[Interpretation]
       counts <- statsFinder.entitiesCount()
       _      <- (counts map toCountsGauge).toList.sequence
-      _      <- timer sleep countsInterval
+      _      <- Timer[Interpretation] sleep countsInterval
     } yield ()
   } recoverWith logAndRetry
 
-  private lazy val toCountsGauge: ((EntityLabel, Count)) => IO[Unit] = { case (status, count) =>
+  private lazy val toCountsGauge: ((EntityLabel, Count)) => Interpretation[Unit] = { case (status, count) =>
     countsGauge set status -> count.value.toDouble
   }
 
-  private lazy val logAndRetry: PartialFunction[Throwable, IO[Unit]] = { case NonFatal(exception) =>
+  private lazy val logAndRetry: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
     for {
       _ <- logger.error(exception)("Problem with gathering metrics")
-      _ <- timer sleep initialDelay
+      _ <- Timer[Interpretation] sleep initialDelay
     } yield ()
   }
 }

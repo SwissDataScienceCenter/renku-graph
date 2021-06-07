@@ -76,22 +76,24 @@ private class EdgesFinderImpl(
         |WHERE {
         |  {
         |    ${projectMemberFilterQuery(ResourceId(renkuBaseUrl, path).showAs[RdfResource])(maybeUser)}
-        |    ?sourceEntity schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
-        |                  prov:atLocation ?sourceEntityLocation.
-        |    ?runPlan schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
-        |             renku:hasInputs/renku:consumes ?sourceEntity.
         |    ?activity schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
+        |              a prov:Activity;
         |              prov:qualifiedAssociation/prov:hadPlan ?runPlan;
         |              prov:startedAtTime ?date.
+        |    ?runPlan renku:hasInputs ?input.
+        |    ?paramValue a renku:PathParameterValue;
+        |                schema:valueReference ?input.
+        |    ?paramValue prov:atLocation ?sourceEntityLocation.
         |  } UNION {
         |    ${projectMemberFilterQuery(ResourceId(renkuBaseUrl, path).showAs[RdfResource])(maybeUser)}
-        |    ?targetEntity schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
-        |                  prov:atLocation ?targetEntityLocation.
-        |    ?runPlan schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
-        |             renku:hasOutputs/renku:produces ?targetEntity.
         |    ?activity schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
+        |              a prov:Activity;
         |              prov:qualifiedAssociation/prov:hadPlan ?runPlan;
         |              prov:startedAtTime ?date.
+        |    ?runPlan renku:hasOutputs ?output.
+        |    ?paramValue a renku:PathParameterValue;
+        |                schema:valueReference ?output.
+        |    ?paramValue prov:atLocation ?targetEntityLocation.
         |  }
         |}
         |ORDER BY ASC(?date)
@@ -149,30 +151,18 @@ private class EdgesFinderImpl(
 
   private def projectMemberFilterQuery(projectResourceId: String): Option[AuthUser] => String = {
     case Some(user) =>
-      s"""
-         |OPTIONAL { 
-         |    $projectResourceId renku:projectVisibility ?visibility .
-         |}
-         |OPTIONAL {
-         |    $projectResourceId schema:member/schema:sameAs ?memberId.
-         |    ?memberId  schema:additionalType 'GitLab';
-         |               schema:identifier ?userGitlabId .
-         |}
-         |
-         |BIND (IF (BOUND (?visibility), ?visibility,  '${Visibility.Public.value}') as ?projectVisibility)
-         |FILTER (
-         |  lcase(str(?projectVisibility)) = '${Visibility.Public.value}' || 
-         |  (lcase(str(?projectVisibility)) != '${Visibility.Public.value}'  && ?userGitlabId = ${user.id.value})
-         |)
-         |""".stripMargin
+      s"""|$projectResourceId renku:projectVisibility ?visibility .
+          |OPTIONAL {
+          |  $projectResourceId schema:member/schema:sameAs ?memberId.
+          |  ?memberId  schema:additionalType 'GitLab';
+          |             schema:identifier ?userGitlabId .
+          |}
+          |FILTER ( ?visibility = '${Visibility.Public.value}' || ?userGitlabId = ${user.id.value} )
+          |""".stripMargin
     case _ =>
-      s"""
-         |OPTIONAL {
-         |  $projectResourceId renku:projectVisibility ?visibility .
-         |}
-         |BIND(IF (BOUND (?visibility), ?visibility, '${Visibility.Public.value}' ) as ?projectVisibility)
-         |FILTER(lcase(str(?projectVisibility)) = '${Visibility.Public.value}')
-         |""".stripMargin
+      s"""|$projectResourceId renku:projectVisibility ?visibility .
+          |FILTER(?visibility = '${Visibility.Public.value}')
+          |""".stripMargin
   }
 }
 

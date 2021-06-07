@@ -18,13 +18,12 @@
 
 package ch.datascience.knowledgegraph.datasets.rest
 
-import cats.MonadError
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, Timer}
 import cats.syntax.all._
 import ch.datascience.graph.model.datasets.{Identifier, ImageUri, Keyword}
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{Path, ResourceId}
-import ch.datascience.knowledgegraph.datasets.model.{Dataset, DatasetProject}
+import ch.datascience.knowledgegraph.datasets.model.Dataset
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
@@ -34,84 +33,78 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.ExecutionContext
 import scala.util.Try
 
-private class BaseDetailsFinder(
-    rdfStoreConfig: RdfStoreConfig,
-    logger:         Logger[IO],
-    timeRecorder:   SparqlQueryTimeRecorder[IO]
-)(implicit
-    executionContext: ExecutionContext,
-    contextShift:     ContextShift[IO],
-    timer:            Timer[IO],
-    ME:               MonadError[IO, Throwable]
-) extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder) {
+private class BaseDetailsFinder[Interpretation[_]: ConcurrentEffect: Timer](
+    rdfStoreConfig:          RdfStoreConfig,
+    logger:                  Logger[Interpretation],
+    timeRecorder:            SparqlQueryTimeRecorder[Interpretation]
+)(implicit executionContext: ExecutionContext)
+    extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder) {
 
   import BaseDetailsFinder._
   import ch.datascience.graph.Schemas._
 
-  def findBaseDetails(identifier: Identifier, usedIn: List[DatasetProject]): IO[Option[Dataset]] =
-    queryExpecting[List[Dataset]](using = queryForDatasetDetails(identifier))(datasetsDecoder(usedIn)) >>= { dataset =>
-      toSingleDataset(dataset)
-    }
+  def findBaseDetails(identifier: Identifier): Interpretation[Option[Dataset]] =
+    queryExpecting[List[Dataset]](using = queryForDatasetDetails(identifier)) >>= toSingleDataset
 
   private def queryForDatasetDetails(identifier: Identifier) = SparqlQuery.of(
     name = "ds by id - details",
     Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema"),
-    s"""|SELECT DISTINCT ?identifier ?name ?maybeDateCreated ?alternateName ?url ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?maybePublishedDate ?projectId
+    s"""|SELECT DISTINCT ?identifier ?name ?maybeDateCreated ?alternateName ?url ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?maybeDatePublished ?projectId ?projectName
         |WHERE {        
-        |    {
-        |         SELECT  ?projectId  ?dateCreated
-        |         WHERE {
-        |             ?datasetId a schema:Dataset;
-        |                        schema:identifier '$identifier';
-        |                        prov:atLocation ?location ;
-        |                        schema:isPartOf ?projectId .
-        |             ?projectId schema:dateCreated ?dateCreated ;
-        |                        schema:name ?projectName .
-        |             BIND(CONCAT(?location, "/metadata.yml") AS ?metaDataLocation) .
-        |             FILTER NOT EXISTS {
-        |             # Removing dataset that have an activity that invalidates them
-        |             ?deprecationEntity a prov:Entity;
-        |                                prov:atLocation ?metaDataLocation ;
-        |                                prov:wasInvalidatedBy ?invalidationActivity ;
-        |                                schema:isPartOf ?projectId .
-        |             }  
-        |         }
-        |         ORDER BY ?dateCreated ?projectName
-        |         LIMIT 1
+        |  {
+        |    SELECT ?projectId ?projectName
+        |    WHERE {
+        |      ?datasetId a schema:Dataset;
+        |                 schema:identifier '$identifier';
+        |                 schema:isPartOf ?projectId .
+        |      ?projectId schema:dateCreated ?dateCreated ;
+        |                 schema:name ?projectName .
+        |      FILTER NOT EXISTS {
+        |        ?datasetId prov:invalidatedAtTime ?invalidationTime.
+        |      }
+        |      FILTER NOT EXISTS {
+        |        ?parentDsId prov:wasDerivedFrom / schema:url ?datasetId.
+        |        ?parentDsId prov:invalidatedAtTime ?invalidationTimeOnChild;
+        |                    schema:isPartOf ?projectId.
+        |      }
         |    }
+        |    ORDER BY ?dateCreated ?projectName
+        |    LIMIT 1
+        |  }
         |  
-        |    ?datasetId schema:identifier '$identifier';
-        |               schema:identifier ?identifier;
-        |               a schema:Dataset;
-        |               schema:isPartOf ?projectId;   
-        |               schema:url ?url;
-        |               schema:name ?name;
-        |               schema:alternateName ?alternateName;
-        |               renku:topmostSameAs ?topmostSameAs;
-        |               renku:topmostDerivedFrom/schema:identifier ?initialVersion .
-        |    OPTIONAL { ?datasetId prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }.
-        |    OPTIONAL { ?datasetId schema:description ?description }.
-        |    OPTIONAL { ?datasetId schema:dateCreated ?maybeDateCreated }.
-        |    OPTIONAL { ?datasetId schema:datePublished ?maybePublishedDate }.
+        |  ?datasetId schema:identifier '$identifier';
+        |             schema:identifier ?identifier;
+        |             a schema:Dataset;
+        |             schema:isPartOf ?projectId;   
+        |             schema:url ?url;
+        |             schema:name ?name;
+        |             schema:alternateName ?alternateName;
+        |             renku:topmostSameAs ?topmostSameAs;
+        |             renku:topmostDerivedFrom/schema:identifier ?initialVersion .
+        |  OPTIONAL { ?datasetId prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }.
+        |  OPTIONAL { ?datasetId schema:description ?description }.
+        |  OPTIONAL { ?datasetId schema:dateCreated ?maybeDateCreated }.
+        |  OPTIONAL { ?datasetId schema:datePublished ?maybeDatePublished }.
         |}
         |""".stripMargin
   )
 
-  def findKeywords(identifier: Identifier): IO[List[Keyword]] =
-    queryExpecting[List[Keyword]](using = queryKeywords(identifier)).flatMap(s => ME.pure(s))
+  def findKeywords(identifier: Identifier): Interpretation[List[Keyword]] =
+    queryExpecting[List[Keyword]](using = queryKeywords(identifier))
 
   private def queryKeywords(identifier: Identifier) = SparqlQuery.of(
     name = "ds by id - keyword details",
     Prefixes.of(schema -> "schema"),
     s"""|SELECT DISTINCT ?keyword
         |WHERE {
-        |    ?datasetId schema:identifier "$identifier" ;
-        |               schema:keywords ?keyword .
-        |}ORDER BY ASC(?keyword)
+        |  ?datasetId schema:identifier "$identifier" ;
+        |             schema:keywords ?keyword .
+        |}
+        |ORDER BY ASC(?keyword)
         |""".stripMargin
   )
 
-  def findImages(identifier: Identifier): IO[List[ImageUri]] =
+  def findImages(identifier: Identifier): Interpretation[List[ImageUri]] =
     queryExpecting[List[ImageUri]](using = queryImages(identifier))
 
   private def queryImages(identifier: Identifier) = SparqlQuery.of(
@@ -128,10 +121,13 @@ private class BaseDetailsFinder(
         |""".stripMargin
   )
 
-  private lazy val toSingleDataset: List[Dataset] => IO[Option[Dataset]] = {
-    case Nil            => Option.empty[Dataset].pure[IO]
-    case dataset :: Nil => Option(dataset).pure[IO]
-    case dataset :: _   => new Exception(s"More than one dataset with ${dataset.id} id").raiseError[IO, Option[Dataset]]
+  private lazy val toSingleDataset: List[Dataset] => Interpretation[Option[Dataset]] = {
+    case Nil            => Option.empty[Dataset].pure[Interpretation]
+    case dataset :: Nil => Option(dataset).pure[Interpretation]
+    case dataset :: _ =>
+      new Exception(
+        s"More than one dataset with ${dataset.id} id"
+      ).raiseError[Interpretation, Option[Dataset]]
   }
 }
 
@@ -195,7 +191,7 @@ private object BaseDetailsFinder {
       ).asLeft[Dataset]
   }
 
-  private[rest] def datasetsDecoder(usedIns: List[DatasetProject]): Decoder[List[Dataset]] = {
+  private[rest] implicit lazy val datasetsDecoder: Decoder[List[Dataset]] = {
     val dataset: Decoder[Dataset] = { implicit cursor =>
       for {
         identifier       <- extract[Identifier]("identifier")
@@ -208,7 +204,7 @@ private object BaseDetailsFinder {
         date <- maybeDerivedFrom match {
                   case Some(_) => extract[DateCreated]("maybeDateCreated").widen[Date]
                   case _ =>
-                    extract[Option[DatePublished]]("maybePublishedDate")
+                    extract[Option[DatePublished]]("maybeDatePublished")
                       .flatMap {
                         case Some(published) => published.asRight
                         case None            => extract[DateCreated]("maybeDateCreated")
@@ -218,10 +214,8 @@ private object BaseDetailsFinder {
         maybeDescription <- extract[Option[String]]("description")
                               .map(blankToNone)
                               .flatMap(toOption[Description])
-        path <- extract[projects.ResourceId]("projectId").flatMap(toProjectPath)
-        project <- Either.fromOption(usedIns.find(_.path == path),
-                                     ifNone = DecodingFailure("Could not find project in UsedIns", Nil)
-                   )
+        projectPath <- extract[projects.ResourceId]("projectId").flatMap(toProjectPath)
+        projectName <- extract[projects.Name]("projectName")
         dataset <- createDataset(identifier,
                                  title,
                                  name,
@@ -231,7 +225,7 @@ private object BaseDetailsFinder {
                                  initialVersion,
                                  date,
                                  maybeDescription,
-                                 project
+                                 DatasetProject(projectPath, projectName)
                    )
       } yield dataset
     }

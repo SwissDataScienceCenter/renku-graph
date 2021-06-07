@@ -27,20 +27,40 @@ import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
 
-case class Project[+FC <: ForksCount](path:         Path,
-                                      name:         Name,
-                                      agent:        CliVersion,
-                                      dateCreated:  DateCreated,
-                                      maybeCreator: Option[Person],
-                                      visibility:   Visibility,
-                                      forksCount:   FC,
-                                      members:      Set[Person],
-                                      version:      SchemaVersion
-)
-
-trait HavingParent {
-  val parent: Project[ForksCount.NonZero]
+sealed trait Project[+FC <: ForksCount] extends Project.ProjectOps[FC] {
+  val path:         Path
+  val name:         Name
+  val agent:        CliVersion
+  val dateCreated:  DateCreated
+  val maybeCreator: Option[Person]
+  val visibility:   Visibility
+  val forksCount:   FC
+  val members:      Set[Person]
+  val version:      SchemaVersion
 }
+
+final case class ProjectWithoutParent[+FC <: ForksCount](path:         Path,
+                                                         name:         Name,
+                                                         agent:        CliVersion,
+                                                         dateCreated:  DateCreated,
+                                                         maybeCreator: Option[Person],
+                                                         visibility:   Visibility,
+                                                         forksCount:   FC,
+                                                         members:      Set[Person],
+                                                         version:      SchemaVersion
+) extends Project[FC]
+
+final case class ProjectWithParent[+FC <: ForksCount](path:         Path,
+                                                      name:         Name,
+                                                      agent:        CliVersion,
+                                                      dateCreated:  DateCreated,
+                                                      maybeCreator: Option[Person],
+                                                      visibility:   Visibility,
+                                                      forksCount:   FC,
+                                                      members:      Set[Person],
+                                                      version:      SchemaVersion,
+                                                      parent:       Project[ForksCount.NonZero]
+) extends Project[FC]
 
 object Project {
 
@@ -58,7 +78,8 @@ object Project {
                                       forksCount:   FC,
                                       members:      Set[Person],
                                       version:      SchemaVersion
-  ): Project[FC] = Project[FC](path, name, agent, dateCreated, maybeCreator, visibility, forksCount, members, version)
+  ): ProjectWithoutParent[FC] =
+    ProjectWithoutParent[FC](path, name, agent, dateCreated, maybeCreator, visibility, forksCount, members, version)
 
   def withParent[FC <: ForksCount](path:          Path,
                                    name:          Name,
@@ -70,9 +91,26 @@ object Project {
                                    members:       Set[Person],
                                    version:       SchemaVersion,
                                    parentProject: Project[ForksCount.NonZero]
-  ): Project[FC] with HavingParent =
-    new Project[FC](path, name, agent, dateCreated, maybeCreator, visibility, forksCount, members, version)
-      with HavingParent { override val parent = parentProject }
+  ): ProjectWithParent[FC] = new ProjectWithParent[FC](path,
+                                                       name,
+                                                       agent,
+                                                       dateCreated,
+                                                       maybeCreator,
+                                                       visibility,
+                                                       forksCount,
+                                                       members,
+                                                       version,
+                                                       parentProject
+  )
+
+  trait ProjectOps[+FC <: ForksCount] {
+    self: Project[FC] =>
+
+    lazy val topAncestorDateCreated: DateCreated = this match {
+      case project: ProjectWithParent[_] => project.parent.topAncestorDateCreated
+      case project => project.dateCreated
+    }
+  }
 
   sealed trait ForksCount extends Any with IntTinyType
 
@@ -91,7 +129,7 @@ object Project {
       renkuBaseUrl: RenkuBaseUrl,
       gitLabApiUrl: GitLabApiUrl
   ): JsonLDEncoder[P] = JsonLDEncoder.instance {
-    case project: Project[_] with HavingParent =>
+    case project: ProjectWithParent[_] =>
       JsonLD.entity(
         project.asEntityId,
         EntityTypes.of(prov / "Location", schema / "Project"),

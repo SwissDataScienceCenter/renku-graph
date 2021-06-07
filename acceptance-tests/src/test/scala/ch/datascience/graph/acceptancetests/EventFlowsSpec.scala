@@ -89,10 +89,6 @@ class EventFlowsSpec
 
       Then(s"all the events should get the $TriplesStore status in the Event Log")
       EventLog.findEvents(projectId).map(_._2).toSet shouldBe Set(TriplesStore)
-
-      And("triples in the RDF Store")
-      RDFStore.commitTriplesCount(commitId) should be > 0
-
     }
 
     Scenario("A non recoverable generation error arises and the events are reported as failed") {
@@ -128,9 +124,6 @@ class EventFlowsSpec
 
       And(s"all the events should get the $GenerationNonRecoverableFailure status in the Event Log")
       EventLog.findEvents(projectId).map(_._2).toSet shouldBe Set(GenerationNonRecoverableFailure)
-
-      And("no triples in the RDF Store")
-      RDFStore.commitTriplesCount(commitId) should be(0)
     }
 
     Scenario(
@@ -167,9 +160,6 @@ class EventFlowsSpec
       eventually {
         EventLog.findEvents(projectId).map(_._2).toSet shouldBe Set(GenerationRecoverableFailure)
       }
-
-      And("triples in the RDF Store")
-      RDFStore.commitTriplesCount(commitId) shouldBe 0
     }
 
     Scenario("A non recoverable transformation error arises and the events are reported as a non recoverable failure") {
@@ -206,9 +196,6 @@ class EventFlowsSpec
 
       Then(s"all the events should get the $TransformationNonRecoverableFailure status in the Event Log")
       EventLog.findEvents(projectId).map(_._2).toSet shouldBe Set(TransformationNonRecoverableFailure)
-
-      And("no triples in the RDF Store")
-      RDFStore.commitTriplesCount(commitId) shouldBe 0
     }
 
     Scenario("A recoverable transformation error arises and the events are reported as a recoverable failure") {
@@ -244,9 +231,6 @@ class EventFlowsSpec
       eventually {
         EventLog.findEvents(projectId).map(_._2).toSet shouldBe Set(TransformationRecoverableFailure)
       }
-
-      And("no triples in the RDF Store")
-      RDFStore.commitTriplesCount(commitId) shouldBe 0
     }
   }
 }

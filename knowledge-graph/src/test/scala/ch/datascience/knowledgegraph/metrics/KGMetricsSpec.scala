@@ -93,15 +93,15 @@ class KGMetricsSpec extends AnyWordSpec with MockFactory with Eventually with In
   }
 
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
-  private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
+  private implicit val timer:        Timer[IO]        = IO.timer(ExecutionContext.global)
 
   private trait TestGauges {
     lazy val countsGauge = mock[LabeledGauge[IO, EntityLabel]]
   }
 
   private trait TestCase extends TestGauges {
-    lazy val statsFinder: StatsFinder[IO] = mock[StatsFinder[IO]]
-    lazy val logger = TestLogger[IO]()
+    lazy val statsFinder = mock[StatsFinder[IO]]
+    lazy val logger      = TestLogger[IO]()
     lazy val metrics = new KGMetricsImpl(
       statsFinder,
       logger,
@@ -114,7 +114,7 @@ class KGMetricsSpec extends AnyWordSpec with MockFactory with Eventually with In
   private lazy val groupingCountGen: Gen[Map[EntityLabel, Count]] = nonEmptySet {
     for {
       entityType <- groupings
-      count <- nonNegativeLongs() map (long => Count(long.value))
+      count      <- nonNegativeLongs() map (long => Count(long.value))
     } yield entityType -> count
   }.map(_.toMap)
 

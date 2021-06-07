@@ -30,7 +30,7 @@ import io.circe.Json
 import io.circe.optics.JsonPath.root
 import io.circe.optics.{JsonPath, JsonTraversalPath}
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{EntityId, Property}
+import io.renku.jsonld.{EntityId, JsonLD, Property}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -42,19 +42,18 @@ class TriplesUpdaterSpec extends AnyWordSpec with should.Matchers {
 
     "add given topmost SameAs and DerivedFrom to Dataset entity in the given triples" in new TestCase {
       val dataset         = datasetEntities(datasetProvenanceInternal).generateOne
-      val identifier      = dataset.identifier
       val datasetEntityId = dataset.asEntityId
 
       val topmostData = topmostDatas(datasetEntityId).generateOne
 
       val updatedTriples = updater.mergeTopmostDataIntoTriples[Try](
-        curatedTriples.copy(triples = JsonLDTriples(dataset.asJsonLD.toJson)),
+        curatedTriples.copy(triples = JsonLDTriples(JsonLD.arr(dataset.asJsonLD).toJson)),
         topmostData
       )
 
       val Some(updatedDataset) = updatedTriples.triples.findDataset(datasetEntityId)
 
-      findIdentifier(updatedDataset)         shouldBe Some(identifier.toString)
+      findIdentifier(updatedDataset)         shouldBe Some(dataset.identifier.toString)
       findTopmostSameAs(updatedDataset)      shouldBe Some(topmostData.topmostSameAs.toString)
       findTopmostDerivedFrom(updatedDataset) shouldBe Some(topmostData.topmostDerivedFrom.toString)
 
@@ -78,21 +77,18 @@ class TriplesUpdaterSpec extends AnyWordSpec with should.Matchers {
   private def findTopmostDerivedFrom(json: Json) =
     (root / (renku / "topmostDerivedFrom")).`@id`.string.getOption(json)
 
-  private def topmostDatas(datasetId: EntityId) =
-    for {
-      topmostSameAs      <- datasetTopmostSameAs
-      topmostDerivedFrom <- datasetTopmostDerivedFroms
-    } yield TopmostData(datasetId, topmostSameAs, topmostDerivedFrom)
+  private def topmostDatas(datasetId: EntityId) = for {
+    topmostSameAs      <- datasetTopmostSameAs
+    topmostDerivedFrom <- datasetTopmostDerivedFroms
+  } yield TopmostData(datasetId, topmostSameAs, topmostDerivedFrom)
 
   private implicit class JsonLdOps(jsonLd: JsonLDTriples) {
     private val json = jsonLd.value
 
     private val id = root.`@id`.string
-    private val datasetObject =
-      ((root.`@reverse` / (prov / "activity")).each.`@reverse` / (prov / "qualifiedGeneration")).json
 
     def findDataset(datasetId: EntityId): Option[Json] =
-      datasetObject
+      root.each.json
         .getAll(json)
         .find(datasetObj => id.getOption(datasetObj).contains(datasetId.toString))
   }

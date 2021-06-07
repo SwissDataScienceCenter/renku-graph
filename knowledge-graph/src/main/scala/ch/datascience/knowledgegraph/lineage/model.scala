@@ -113,7 +113,6 @@ object model {
         "http://www.w3.org/ns/prov#Collection"
       )
       private lazy val ProcessRunTypes = Set(
-        "http://purl.org/wf4ever/wfprov#ProcessRun",
         "http://www.w3.org/ns/prov#Activity"
       )
 

@@ -24,13 +24,14 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.datasets.{ExternalSameAs, InternalSameAs}
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.rdfstore.entities._
+import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.{Success, Try}
 
-class DataSetInfoFinderSpec extends AnyWordSpec with should.Matchers {
+class DatasetInfoFinderSpec extends AnyWordSpec with should.Matchers {
 
   "findDatasetsInfo" should {
 
@@ -41,7 +42,7 @@ class DataSetInfoFinderSpec extends AnyWordSpec with should.Matchers {
     "return the DatasetInfo without sameAs and derivedFrom when they are not present in the json" in {
       val dataset = datasetEntities(datasetProvenanceInternal).generateOne
 
-      infoFinder.findDatasetsInfo(JsonLDTriples(dataset.asJsonLD.toJson)) shouldBe Set(
+      infoFinder.findDatasetsInfo(JsonLDTriples(JsonLD.arr(dataset.asJsonLD).toJson)) shouldBe Set(
         (dataset.asEntityId, None, None)
       ).pure[Try]
     }
@@ -49,25 +50,25 @@ class DataSetInfoFinderSpec extends AnyWordSpec with should.Matchers {
     "return the DatasetInfo with UrlSameAs and no derivedFrom as reflected in json" in {
       val dataset = datasetEntities(datasetProvenanceImportedExternal).generateOne
 
-      val Success(datasetInfos) = infoFinder.findDatasetsInfo(JsonLDTriples(dataset.asJsonLD.toJson))
+      val Success(datasetInfos) = infoFinder.findDatasetsInfo(JsonLDTriples(JsonLD.arr(dataset.asJsonLD).toJson))
 
-      datasetInfos             shouldBe Set((dataset.asEntityId, dataset.provenance.sameAs, None))
+      datasetInfos             shouldBe Set((dataset.asEntityId, dataset.provenance.sameAs.some, None))
       datasetInfos.head._2.get shouldBe an[ExternalSameAs]
     }
 
     "return the DatasetInfo with IdSameAs and no derivedFrom as reflected in json" in {
       val dataset = datasetEntities(datasetProvenanceImportedInternalAncestorInternal).generateOne
 
-      val Success(datasetInfos) = infoFinder.findDatasetsInfo(JsonLDTriples(dataset.asJsonLD.toJson))
+      val Success(datasetInfos) = infoFinder.findDatasetsInfo(JsonLDTriples(JsonLD.arr(dataset.asJsonLD).toJson))
 
-      datasetInfos             shouldBe Set((dataset.asEntityId, dataset.provenance.sameAs, None))
+      datasetInfos             shouldBe Set((dataset.asEntityId, dataset.provenance.sameAs.some, None))
       datasetInfos.head._2.get shouldBe an[InternalSameAs]
     }
 
     "return the DatasetInfo with derivedFrom and no sameAs as reflected in json" in {
       val dataset = datasetEntities(datasetProvenanceModified).generateOne
 
-      infoFinder.findDatasetsInfo(JsonLDTriples(dataset.asJsonLD.toJson)) shouldBe Set(
+      infoFinder.findDatasetsInfo(JsonLDTriples(JsonLD.arr(dataset.asJsonLD).toJson)) shouldBe Set(
         (dataset.asEntityId, None, dataset.provenance.derivedFrom.some)
       ).pure[Try]
     }

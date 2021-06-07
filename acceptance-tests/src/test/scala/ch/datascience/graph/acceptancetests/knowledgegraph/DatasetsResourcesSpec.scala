@@ -38,7 +38,7 @@ import ch.datascience.http.rest.Links.{Href, Rel, _links}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.rdfstore.entities
 import ch.datascience.rdfstore.entities.ModelOps.DatasetForkingResult
-import ch.datascience.rdfstore.entities.{renkuBaseUrl => _, gitLabApiUrl => _, _}
+import ch.datascience.rdfstore.entities.{gitLabApiUrl => _, renkuBaseUrl => _, _}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import eu.timepit.refined.auto._
 import io.circe.literal._
@@ -70,22 +70,14 @@ class DatasetsResourcesSpec
     val project = dataProjects(
       projectEntities[entities.Project.ForksCount.Zero](visibilityPublic).generateOne
     ).generateOne
-    val dataset1         = datasetEntities(datasetProvenanceInternal, projectsGen = fixed(project.entitiesProject)).generateOne
-    val dataset2         = datasetEntities(datasetProvenanceInternal, projectsGen = fixed(project.entitiesProject)).generateOne
+    val dataset1         = datasetEntities(datasetProvenanceInternal, fixed(project.entitiesProject)).generateOne
+    val dataset2         = datasetEntities(datasetProvenanceInternal, fixed(project.entitiesProject)).generateOne
     val dataset2Modified = modifiedDatasetEntities(dataset2).generateOne
 
     Scenario("As a user I would like to find project's datasets by calling a REST endpoint") {
 
       Given("some data in the RDF Store")
-      val jsonLDTriples = JsonLD.arr(
-        project.entitiesProject.asJsonLD,
-        dataset1.asJsonLD,
-        dataset2.asJsonLD,
-        dataset2Modified.asJsonLD
-      )
-
-      `data in the RDF store`(project, jsonLDTriples)
-
+      `data in the RDF store`(project, JsonLD.arr(dataset1.asJsonLD, dataset2.asJsonLD, dataset2Modified.asJsonLD))
       `wait for events to be processed`(project.id)
 
       And("the project exists in GitLab")
@@ -100,12 +92,11 @@ class DatasetsResourcesSpec
       foundDatasets should contain theSameElementsAs List(briefJson(dataset1), briefJson(dataset2Modified))
 
       When("user then fetches details of the chosen dataset with the link from the response")
-      val someDatasetDetailsLink =
-        Random
-          .shuffle(foundDatasets)
-          .headOption
-          .flatMap(_._links.get(Rel("details")))
-          .getOrFail(message = "No link with rel 'details'")
+      val someDatasetDetailsLink = Random
+        .shuffle(foundDatasets)
+        .headOption
+        .flatMap(_._links.get(Rel("details")))
+        .getOrFail(message = "No link with rel 'details'")
       val datasetDetailsResponse = restClient GET someDatasetDetailsLink.toString
 
       Then("he should get OK response with dataset details")
@@ -153,7 +144,7 @@ class DatasetsResourcesSpec
         .find(json => findIdentifier(json) == dataset2Modified.identifier)
         .getOrFail(s"No modified dataset with ${dataset2Modified.identifier} id")
 
-      val modifiedDatasetInitialVersionLink = modifiedDataset2Json.hcursor._links
+      val modifiedDatasetInitialVersionLink = modifiedDataset2Json._links
         .get(Rel("initial-version"))
         .getOrFail("No link with rel 'initial-version'")
       val getInitialVersionResponse = restClient GET modifiedDatasetInitialVersionLink.toString
@@ -309,7 +300,6 @@ class DatasetsResourcesSpec
         searchResultJson(dataset1, 1, foundDatasets),
         searchResultJson(dataset3PrivateWithAccess, 1, foundDatasets)
       ).flatMap(sortCreators)
-
     }
 
     def pushToStore(dataset: entities.Dataset[entities.Dataset.Provenance])(implicit
@@ -320,7 +310,6 @@ class DatasetsResourcesSpec
       `wait for events to be processed`(project.id)
       ()
     }
-
   }
 }
 
@@ -393,13 +382,11 @@ object DatasetsResources {
 
   private implicit def publishedEncoder[P <: entities.Dataset.Provenance]: Encoder[(Set[entities.Person], P#D)] =
     Encoder.instance {
-      case (creators, DatePublished(date)) =>
-        json"""{
+      case (creators, DatePublished(date)) => json"""{
           "creator": ${creators.toList},
           "datePublished": $date
         }"""
-      case (creators, _) =>
-        json"""{
+      case (creators, _)                   => json"""{
           "creator": ${creators.toList}
         }"""
     }

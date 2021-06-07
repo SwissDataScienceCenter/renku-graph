@@ -35,6 +35,8 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
+  import SameAs._
+
   "Identifier" should {
     "be a NonBlank" in {
       Identifier shouldBe a[NonBlank]
@@ -47,7 +49,7 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
       datasetSameAs.generateOne shouldBe a[UrlTinyType]
     }
 
-    "allow to construct ImportedSameAs using the from factory" in {
+    "allow to construct ExternalSameAs using the from factory" in {
       forAll(httpUrls()) { url =>
         val Right(sameAs) = SameAs.from(url)
         sameAs         should (be(a[SameAs]) and be(a[ExternalSameAs]))
@@ -130,10 +132,12 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
 
   "SameAs jsonLdEncoder" should {
 
+    import io.renku.jsonld.syntax._
+
     "serialise IdSameAs to an object having url property linked to the SameAs's value" in {
       val sameAs = datasetInternalSameAs.generateOne
 
-      val json = SameAs.sameAsJsonLdEncoder(sameAs).toJson
+      val json = sameAs.asJsonLD.toJson
 
       json.hcursor.downField("@type").as[String]                                    shouldBe Right((schema / "URL").toString)
       json.hcursor.downField((schema / "url").toString).downField("@id").as[String] shouldBe Right(sameAs.toString)
@@ -142,7 +146,7 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
     "serialise UrlSameAs to an object having url property as the SameAs's value" in {
       val sameAs = datasetExternalSameAs.generateOne
 
-      val json = SameAs.sameAsJsonLdEncoder(sameAs).toJson
+      val json = sameAs.asJsonLD.toJson
 
       json.hcursor.downField("@type").as[String]                                       shouldBe Right((schema / "URL").toString)
       json.hcursor.downField((schema / "url").toString).downField("@value").as[String] shouldBe Right(sameAs.toString)

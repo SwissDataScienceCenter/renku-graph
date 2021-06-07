@@ -21,21 +21,16 @@ package ch.datascience.rdfstore
 import cats.kernel.Semigroup
 import ch.datascience.graph.Schemas
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.datasets.{ExternalSameAs, InternalSameAs, SameAs}
+import ch.datascience.graph.model.datasets.SameAs
 import ch.datascience.graph.model.projects.Visibility
 import ch.datascience.graph.model.projects.Visibility.{Internal, Private, Public}
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
 import io.renku.jsonld._
-import io.renku.jsonld.syntax._
 
 import java.time.{Instant, LocalDate}
 
 package object entities extends Schemas with EntitiesGenerators with ModelOps {
-
-  def importedSameAsTo[T](mapping: => T): PartialFunction[SameAs, T] = { case _: ExternalSameAs =>
-    mapping
-  }
 
   implicit val fusekiBaseUrlToEntityId: FusekiBaseUrl => EntityId = url => EntityId of url.value
   implicit val renkuBaseUrlToEntityId:  RenkuBaseUrl => EntityId  = url => EntityId of url.value
@@ -46,36 +41,11 @@ package object entities extends Schemas with EntitiesGenerators with ModelOps {
     case Internal => JsonLDEncoder.encodeString(Internal.value)
   }
 
-  implicit def sameAsEncoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[SameAs] = JsonLDEncoder.instance {
-    case v: InternalSameAs => idSameAsEncoder(renkuBaseUrl)(v)
-    case v: ExternalSameAs => urlSameAsEncoder(renkuBaseUrl)(v)
-  }
-
-  private def idSameAsEncoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[InternalSameAs] =
-    JsonLDEncoder.instance { sameAs =>
-      JsonLD.entity(
-        EntityId of (renkuBaseUrl / "urls" / sameAs),
-        EntityTypes of (schema / "URL"),
-        schema / "url" -> EntityId.of(sameAs.value).asJsonLD
-      )
-    }
-
-  private def urlSameAsEncoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[ExternalSameAs] =
-    JsonLDEncoder.instance { sameAs =>
-      JsonLD.entity(
-        EntityId of (renkuBaseUrl / "urls" / sameAs),
-        EntityTypes of (schema / "URL"),
-        schema / "url" -> sameAs.value.asJsonLD
-      )
-    }
-
   private implicit lazy val sameAsToPathSegment: SameAs => List[PathSegment] = sameAs => List(PathSegment(sameAs.value))
 
   implicit def stringTTEncoder[TT <: StringTinyType]: JsonLDEncoder[TT] =
     JsonLDEncoder.instance(v => JsonLD.fromString(v.value))
   implicit def relativePathTTEncoder[TT <: RelativePathTinyType]: JsonLDEncoder[TT] =
-    JsonLDEncoder.instance(v => JsonLD.fromString(v.value))
-  implicit def urlTTEncoder[TT <: UrlTinyType]: JsonLDEncoder[TT] =
     JsonLDEncoder.instance(v => JsonLD.fromString(v.value))
   implicit def instantTTEncoder[TT <: TinyType { type V = Instant }]: JsonLDEncoder[TT] =
     JsonLDEncoder.instance(v => JsonLD.fromInstant(v.value))

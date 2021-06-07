@@ -31,7 +31,6 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.ExecutionContext
 
 private trait GitLabInfoFinder[Interpretation[_]] {
-
   def findProject(path: Path)(implicit maybeAccessToken: Option[AccessToken]): Interpretation[Option[GitLabProject]]
 }
 

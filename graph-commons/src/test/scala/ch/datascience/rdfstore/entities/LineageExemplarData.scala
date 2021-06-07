@@ -98,17 +98,17 @@ object LineageExemplarData {
       CommandParameters.of(CommandInput.fromLocation(cleanData),
                            CommandInput.fromLocation(zhbikesFolder),
                            CommandOutput.fromLocation(bikesParquet)
-      )
+      ),
+      project
     )
 
     val activity1RunPlan1 = ExecutionPlanner
       .of(runPlan1,
           activityStartTimes(after = project.dateCreated).generateOne,
           personEntities.generateOne,
-          project.agent,
-          project
+          project.agent
       )
-      .planParameterInputsValues(
+      .planInputParameterValuesFromChecksum(
         cleanData     -> entityChecksums.generateOne,
         zhbikesFolder -> entityChecksums.generateOne
       )
@@ -123,20 +123,22 @@ object LineageExemplarData {
         CommandInput.fromLocation(bikesParquet),
         CommandOutput.fromLocation(cumulative),
         CommandOutput.fromLocation(gridPlot)
-      )
+      ),
+      project
     )
 
     val activity2RunPlan2 = ExecutionPlanner
       .of(runPlan2,
           activityStartTimes(after = activity1RunPlan1.startTime).generateOne,
           personEntities.generateOne,
-          project.agent,
-          project
+          project.agent
       )
-      .planParameterInputsValues(
-        plotData -> entityChecksums.generateOne,
+      .planInputParameterValuesFromChecksum(
+        plotData -> entityChecksums.generateOne
+      )
+      .planInputParameterValuesFromEntity(
         bikesParquet -> activity1RunPlan1
-          .findGenerationChecksum(bikesParquet)
+          .findGenerationEntity(bikesParquet)
           .getOrElse(throw new Exception(s"No generation for $bikesParquet"))
       )
       .buildProvenanceGraph
@@ -146,10 +148,9 @@ object LineageExemplarData {
       .of(runPlan1,
           activityStartTimes(after = activity2RunPlan2.startTime).generateOne,
           personEntities.generateOne,
-          project.agent,
-          project
+          project.agent
       )
-      .planParameterInputsValues(
+      .planInputParameterValuesFromChecksum(
         cleanData -> activity1RunPlan1
           .findUsagesChecksum(cleanData)
           .getOrElse(throw new Exception(s"No usage for $cleanData")),
@@ -162,15 +163,16 @@ object LineageExemplarData {
       .of(runPlan2,
           activityStartTimes(after = activity3RunPlan1.startTime).generateOne,
           personEntities.generateOne,
-          project.agent,
-          project
+          project.agent
       )
-      .planParameterInputsValues(
+      .planInputParameterValuesFromChecksum(
         plotData -> activity2RunPlan2
           .findUsagesChecksum(plotData)
-          .getOrElse(throw new Exception(s"No usage found for $plotData")),
+          .getOrElse(throw new Exception(s"No usage found for $plotData"))
+      )
+      .planInputParameterValuesFromEntity(
         bikesParquet -> activity3RunPlan1
-          .findGenerationChecksum(bikesParquet)
+          .findGenerationEntity(bikesParquet)
           .getOrElse(throw new Exception(s"No generation for $bikesParquet"))
       )
       .buildProvenanceGraph
@@ -235,8 +237,11 @@ object NodeDef {
         .toSet
     )
 
-  private implicit lazy val activityShow: Show[Activity] = Show.show {
-    _.parameters.sortBy(_.valueReference.position).map(_.show).mkString(" ")
+  private implicit lazy val activityShow: Show[Activity] = Show.show { activity =>
+    activity.parameters
+      .sortBy(_.valueReference.position)
+      .map(_.show)
+      .mkString(s"${activity.association.runPlan.command} ", " ", "")
   }
 
   private implicit lazy val parameterValueShow: Show[ParameterValue] = Show.show {

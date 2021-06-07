@@ -138,12 +138,10 @@ object datasets {
 
     def apply(datasetEntityId: EntityId): InternalSameAs = new InternalSameAs(datasetEntityId.toString)
 
-    implicit val sameAsJsonLdEncoder: JsonLDEncoder[SameAs] = JsonLDEncoder.instance {
-      case v: InternalSameAs => internalSameAsEncoder(v)
-      case v: ExternalSameAs => externalSameAsEncoder(v)
-    }
+    implicit def jsonLdEncoder[S <: SameAs](implicit sameAsEncoder: JsonLDEncoder[S]): JsonLDEncoder[S] =
+      sameAsEncoder
 
-    private lazy val internalSameAsEncoder: JsonLDEncoder[InternalSameAs] = JsonLDEncoder.instance { sameAs =>
+    implicit lazy val internalSameAsEncoder: JsonLDEncoder[InternalSameAs] = JsonLDEncoder.instance { sameAs =>
       JsonLD.entity(
         EntityId of s"_:${java.util.UUID.randomUUID()}",
         EntityTypes of (schema / "URL"),
@@ -151,7 +149,7 @@ object datasets {
       )
     }
 
-    private lazy val externalSameAsEncoder: JsonLDEncoder[ExternalSameAs] = JsonLDEncoder.instance { sameAs =>
+    implicit lazy val externalSameAsEncoder: JsonLDEncoder[ExternalSameAs] = JsonLDEncoder.instance { sameAs =>
       JsonLD.entity(
         EntityId of s"_:${java.util.UUID.randomUUID()}",
         EntityTypes of (schema / "URL"),

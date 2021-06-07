@@ -19,19 +19,20 @@
 package ch.datascience.rdfstore.entities
 
 import ch.datascience.rdfstore.entities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter, Position}
+import ch.datascience.rdfstore.entities.Project.ForksCount
 import ch.datascience.rdfstore.entities.RunPlan._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
 
-final case class RunPlan(id:                        Id,
-                         name:                      Name,
-                         maybeDescription:          Option[Description],
-                         command:                   Command,
-                         maybeProgrammingLanguage:  Option[ProgrammingLanguage],
-                         keywords:                  List[Keyword],
-                         commandParameterFactories: List[RunPlan => CommandParameterBase],
-                         successCodes:              List[SuccessCode],
-                         maybeInvalidationTime:     Option[InvalidationTime]
+case class RunPlan(id:                        Id,
+                   name:                      Name,
+                   maybeDescription:          Option[Description],
+                   command:                   Command,
+                   maybeProgrammingLanguage:  Option[ProgrammingLanguage],
+                   keywords:                  List[Keyword],
+                   commandParameterFactories: List[RunPlan => CommandParameterBase],
+                   successCodes:              List[SuccessCode],
+                   project:                   Project[ForksCount]
 ) {
   private lazy val commandParameters: List[CommandParameterBase] = commandParameterFactories.map(_.apply(this))
   lazy val parameters:                List[CommandParameter]     = commandParameters.collect { case param: CommandParameter => param }
@@ -51,7 +52,8 @@ object RunPlan {
   def apply(
       name:                      Name,
       command:                   Command,
-      commandParameterFactories: List[Position => RunPlan => CommandParameterBase]
+      commandParameterFactories: List[Position => RunPlan => CommandParameterBase],
+      project:                   Project[ForksCount]
   ): RunPlan = RunPlan(
     Id.generate,
     name,
@@ -63,7 +65,7 @@ object RunPlan {
       factory(Position(idx + 1))
     },
     successCodes = Nil,
-    maybeInvalidationTime = None
+    project
   )
 
   object CommandParameters {
@@ -73,24 +75,41 @@ object RunPlan {
     def of(parameters: CommandParameterFactory*): List[CommandParameterFactory] = parameters.toList
   }
 
-  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[RunPlan] = JsonLDEncoder.instance { plan =>
-    JsonLD.entity(
-      plan.asEntityId,
-      EntityTypes.of(prov / "Plan", renku / "Run"),
-      schema / "name"                -> plan.name.asJsonLD,
-      schema / "description"         -> plan.maybeDescription.asJsonLD,
-      renku / "command"              -> plan.command.asJsonLD,
-      schema / "programmingLanguage" -> plan.maybeProgrammingLanguage.asJsonLD,
-      schema / "keywords"            -> plan.keywords.asJsonLD,
-      renku / "hasArguments"         -> plan.parameters.asJsonLD,
-      renku / "hasInputs"            -> plan.inputs.asJsonLD,
-      renku / "hasOutputs"           -> plan.outputs.asJsonLD,
-      renku / "successCodes"         -> plan.successCodes.asJsonLD,
-      prov / "invalidatedAtTime"     -> plan.maybeInvalidationTime.asJsonLD
-    )
+  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[RunPlan] = JsonLDEncoder.instance {
+    case plan: RunPlan with HavingInvalidationTime =>
+      JsonLD.entity(
+        plan.asEntityId,
+        EntityTypes.of(prov / "Plan", renku / "Run"),
+        schema / "name"                -> plan.name.asJsonLD,
+        schema / "description"         -> plan.maybeDescription.asJsonLD,
+        renku / "command"              -> plan.command.asJsonLD,
+        schema / "programmingLanguage" -> plan.maybeProgrammingLanguage.asJsonLD,
+        schema / "keywords"            -> plan.keywords.asJsonLD,
+        renku / "hasArguments"         -> plan.parameters.asJsonLD,
+        renku / "hasInputs"            -> plan.inputs.asJsonLD,
+        renku / "hasOutputs"           -> plan.outputs.asJsonLD,
+        renku / "successCodes"         -> plan.successCodes.asJsonLD,
+        schema / "isPartOf"            -> plan.project.asEntityId.asJsonLD,
+        prov / "invalidatedAtTime"     -> plan.invalidationTime.asJsonLD
+      )
+    case plan: RunPlan =>
+      JsonLD.entity(
+        plan.asEntityId,
+        EntityTypes.of(prov / "Plan", renku / "Run"),
+        schema / "name"                -> plan.name.asJsonLD,
+        schema / "description"         -> plan.maybeDescription.asJsonLD,
+        renku / "command"              -> plan.command.asJsonLD,
+        schema / "programmingLanguage" -> plan.maybeProgrammingLanguage.asJsonLD,
+        schema / "keywords"            -> plan.keywords.asJsonLD,
+        renku / "hasArguments"         -> plan.parameters.asJsonLD,
+        renku / "hasInputs"            -> plan.inputs.asJsonLD,
+        renku / "hasOutputs"           -> plan.outputs.asJsonLD,
+        renku / "successCodes"         -> plan.successCodes.asJsonLD,
+        schema / "isPartOf"            -> plan.project.asEntityId.asJsonLD
+      )
   }
 
-  implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[RunPlan] =
+  implicit def entityIdEncoder[R <: RunPlan](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[R] =
     EntityIdEncoder.instance(plan => EntityId of renkuBaseUrl / "plans" / plan.id)
 
   final class Id private (val value: String) extends AnyVal with StringTinyType

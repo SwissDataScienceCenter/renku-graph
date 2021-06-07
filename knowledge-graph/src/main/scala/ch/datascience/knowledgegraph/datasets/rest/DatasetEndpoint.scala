@@ -163,15 +163,14 @@ object IODatasetEndpoint {
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[DatasetEndpoint[IO]] =
-    for {
-      datasetFinder         <- IODatasetFinder(timeRecorder, logger = ApplicationLogger)
-      renkuResourceUrl      <- renku.ResourcesUrl[IO]()
-      executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
-    } yield new DatasetEndpoint[IO](
-      datasetFinder,
-      renkuResourceUrl,
-      executionTimeRecorder,
-      ApplicationLogger
-    )
+  ): IO[DatasetEndpoint[IO]] = for {
+    datasetFinder         <- DatasetFinder(timeRecorder, logger = ApplicationLogger)
+    renkuResourceUrl      <- renku.ResourcesUrl[IO]()
+    executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
+  } yield new DatasetEndpoint[IO](
+    datasetFinder,
+    renkuResourceUrl,
+    executionTimeRecorder,
+    ApplicationLogger
+  )
 }

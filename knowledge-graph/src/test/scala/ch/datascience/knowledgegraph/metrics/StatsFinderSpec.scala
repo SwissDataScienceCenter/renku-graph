@@ -19,6 +19,7 @@
 package ch.datascience.knowledgegraph.metrics
 
 import cats.effect.IO
+import cats.syntax.all._
 import cats.implicits.toShow
 import ch.datascience.generators.CommonGraphGenerators.cliVersions
 import ch.datascience.generators.Generators.Implicits._
@@ -53,17 +54,24 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
 
     "return info about number of objects by types" in new TestCase {
 
+      val datasets   = datasetEntities(ofAnyProvenance).generateNonEmptyList()
       val activities = activityEntities.generateNonEmptyList(minElements = 10, maxElements = 50)
       val persons    = activities.map(_.author)
+
       val entitiesWithActivities = Map
         .empty[EntityLabel, Count]
-        .update(schema / "Project", activities.size)
+        .update(schema / "Dataset", datasets.size)
+        .update(schema / "Project", activities.size + datasets.size)
         .update(prov / "Activity", activities.size)
         .update(renku / "Run", activities.map(_.association.runPlan).size)
         .update(schema / "Person", persons.size)
         .update(schema / "Person with GitLabId", persons.toList.count(_.maybeGitLabId.isDefined))
 
-      loadToStore(activities.toList.map(_.asJsonLD) :++ activities.toList.map(_.association.runPlan.asJsonLD): _*)
+      loadToStore(
+        datasets.toList.map(_.asJsonLD) :::
+          activities.toList.map(_.asJsonLD) :::
+          activities.toList.map(_.association.runPlan.asJsonLD): _*
+      )
 
       stats.entitiesCount().unsafeRunSync() shouldBe entitiesWithActivities
     }
@@ -81,14 +89,14 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
   private lazy val activityEntities: Gen[Activity] = for {
     name       <- runPlanNames
     command    <- runPlanCommands
-    startTime  <- activityStartTimes
     author     <- personEntities
     cliVersion <- cliVersions
     project    <- projectEntities[ForksCount.Zero](visibilityPublic)
+    startTime  <- activityStartTimes(project.dateCreated)
   } yield ExecutionPlanner
-    .of(RunPlan(name, command, commandParameterFactories = Nil), startTime, author, cliVersion, project)
+    .of(RunPlan(name, command, commandParameterFactories = Nil, project), startTime, author, cliVersion)
     .buildProvenanceGraph
-    .getOrElse(throw new Exception("Invalid Activity"))
+    .fold(errors => fail(errors.intercalate("\n")), identity)
 
   private implicit class MapOps(entitiesByType: Map[EntityLabel, Count]) {
     def update(entityType: Property, count: Long): Map[EntityLabel, Count] = {

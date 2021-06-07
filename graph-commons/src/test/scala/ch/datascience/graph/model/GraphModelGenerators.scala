@@ -110,16 +110,10 @@ object GraphModelGenerators {
 
   implicit val filePaths: Gen[FilePath] = relativePaths() map FilePath.apply
 
-  implicit val datasetIdentifiers: Gen[Identifier] = Gen
-    .oneOf(
-      uuid.map(_.toString),
-      for {
-        first  <- Gen.choose(10, 99)
-        second <- Gen.choose(1000, 9999)
-        third  <- Gen.choose(1000000, 9999999)
-      } yield s"$first.$second/zenodo.$third"
-    )
+  implicit val datasetIdentifiers: Gen[Identifier] = uuid
+    .map(_.toString)
     .map(Identifier.apply)
+
   implicit val datasetInitialVersions: Gen[InitialVersion] = datasetIdentifiers map (id => InitialVersion(id.toString))
   implicit val datasetTitles:          Gen[datasets.Title] = nonEmptyStrings() map datasets.Title.apply
   implicit val datasetNames:           Gen[datasets.Name]  = nonEmptyStrings() map datasets.Name.apply

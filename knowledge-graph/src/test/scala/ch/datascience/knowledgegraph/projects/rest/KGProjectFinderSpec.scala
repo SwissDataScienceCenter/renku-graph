@@ -47,7 +47,7 @@ class KGProjectFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
       forAll(projectWitParentEntities(visibilityAny)) { project =>
         loadToStore(project)
 
-        metadataFinder.findProject(project.path).unsafeRunSync() shouldBe Some(project)
+        metadataFinder.findProject(project.path).unsafeRunSync() shouldBe Some(project.to[KGProject])
       }
     }
 

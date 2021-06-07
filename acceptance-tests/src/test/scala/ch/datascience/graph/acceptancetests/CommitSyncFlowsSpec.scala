@@ -21,19 +21,21 @@ package ch.datascience.graph.acceptancetests
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.data.dataProjects
+import ch.datascience.graph.acceptancetests.db.EventLog
 import ch.datascience.graph.acceptancetests.flows.AccessTokenPresence.givenAccessTokenPresentFor
 import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning.`wait for events to be processed`
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
-import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplicits, RDFStore}
+import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import ch.datascience.graph.model.EventsGenerators.commitIds
+import ch.datascience.graph.model.events.EventId
+import ch.datascience.graph.model.events.EventStatus.TriplesStore
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.AccessToken
-import ch.datascience.rdfstore.entities._
 import ch.datascience.rdfstore.entities.EntitiesGenerators.personEntities
 import ch.datascience.rdfstore.entities.Project.ForksCount
-import ch.datascience.rdfstore.entities.{projectEntities, visibilityPublic}
+import ch.datascience.rdfstore.entities._
 import ch.datascience.webhookservice.model.HookToken
 import io.renku.eventlog.TypeSerializers
 import org.http4s.Status._
@@ -106,8 +108,8 @@ class CommitSyncFlowsSpec
       And("relevant commit events are processed")
       `wait for events to be processed`(project.id)
 
-      Then("triples for the non missed events should be in the RDF Store")
-      RDFStore.commitTriplesCount(nonMissedCommitId) should be > 0
+      Then("the non missed events should be in the RDF Store")
+      EventLog.findEvents(project.id) shouldBe List(EventId(nonMissedCommitId.value) -> TriplesStore)
 
       When("commit synchronisation process kicks-off")
       db.EventLog.execute { session =>
@@ -123,7 +125,7 @@ class CommitSyncFlowsSpec
       `wait for events to be processed`(project.id)
 
       Then("triples for the missed commit should be in the RDF Store")
-      RDFStore.commitTriplesCount(missedCommitId) should be > 0
+      EventLog.findEvents(project.id) should contain(EventId(missedCommitId.value) -> TriplesStore)
     }
   }
 }

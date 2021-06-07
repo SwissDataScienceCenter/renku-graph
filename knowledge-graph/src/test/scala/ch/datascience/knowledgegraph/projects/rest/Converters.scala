@@ -30,7 +30,7 @@ private object Converters extends Converters
 private trait Converters {
 
   implicit lazy val entitiesToKGProject: Project[entities.Project.ForksCount] => KGProject = {
-    case project: entities.Project[entities.Project.ForksCount] with HavingParent =>
+    case project: entities.ProjectWithParent[_] =>
       KGProject(
         project.path,
         project.name,
@@ -41,7 +41,7 @@ private trait Converters {
         project.parent.to[Parent].some,
         project.version
       )
-    case project: entities.Project[entities.Project.ForksCount] =>
+    case project: entities.Project[_] =>
       KGProject(
         project.path,
         project.name,

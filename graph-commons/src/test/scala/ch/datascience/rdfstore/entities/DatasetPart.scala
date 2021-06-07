@@ -20,7 +20,7 @@ package ch.datascience.rdfstore.entities
 
 import ch.datascience.graph.model.datasets.{DateCreated, PartExternal, PartId, PartSource, Url}
 
-final case class DatasetPart(
+case class DatasetPart(
     id:          PartId,
     external:    PartExternal,
     entity:      Entity,
@@ -31,35 +31,38 @@ final case class DatasetPart(
 
 object DatasetPart {
 
-  def external(entity:      Entity,
-               dateCreated: DateCreated,
-               maybeUrl:    Option[Url] = None,
-               maybeSource: Option[PartSource] = None
-  ): DatasetPart = new DatasetPart(PartId.generate, PartExternal(true), entity, dateCreated, maybeUrl, maybeSource)
-
-  def internal(entity:      Entity,
-               dateCreated: DateCreated,
-               maybeUrl:    Option[Url] = None,
-               maybeSource: Option[PartSource] = None
-  ): DatasetPart = new DatasetPart(PartId.generate, PartExternal(true), entity, dateCreated, maybeUrl, maybeSource)
-
   import ch.datascience.graph.config.RenkuBaseUrl
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[DatasetPart] =
-    JsonLDEncoder.instance { case part @ DatasetPart(_, external, entity, dateCreated, maybeUrl, maybeSource) =>
-      JsonLD.entity(
-        part.asEntityId,
-        EntityTypes of (prov / "Entity", schema / "DigitalDocument"),
-        renku / "external"     -> external.asJsonLD,
-        prov / "entity"        -> entity.asEntityId.asJsonLD,
-        schema / "dateCreated" -> dateCreated.asJsonLD,
-        schema / "url"         -> maybeUrl.asJsonLD,
-        renku / "source"       -> maybeSource.asJsonLD
-      )
+    JsonLDEncoder.instance {
+      case part: DatasetPart with HavingInvalidationTime =>
+        JsonLD.entity(
+          part.asEntityId,
+          EntityTypes of (prov / "Entity", schema / "DigitalDocument"),
+          renku / "external"         -> part.external.asJsonLD,
+          prov / "entity"            -> part.entity.asJsonLD,
+          schema / "dateCreated"     -> part.dateCreated.asJsonLD,
+          schema / "url"             -> part.maybeUrl.asJsonLD,
+          renku / "source"           -> part.maybeSource.asJsonLD,
+          prov / "invalidatedAtTime" -> part.invalidationTime.asJsonLD
+        )
+      case part @ DatasetPart(_, external, entity, dateCreated, maybeUrl, maybeSource) =>
+        JsonLD.entity(
+          part.asEntityId,
+          EntityTypes of (prov / "Entity", schema / "DigitalDocument"),
+          renku / "external"     -> external.asJsonLD,
+          prov / "entity"        -> entity.asJsonLD,
+          schema / "dateCreated" -> dateCreated.asJsonLD,
+          schema / "url"         -> maybeUrl.asJsonLD,
+          renku / "source"       -> maybeSource.asJsonLD
+        )
     }
 
-  implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[DatasetPart] =
+  private implicit lazy val sourceUrlEncoder: JsonLDEncoder[PartSource] =
+    JsonLDEncoder.instance(v => JsonLD.fromString(v.value))
+
+  implicit def entityIdEncoder[D <: DatasetPart](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[D] =
     EntityIdEncoder.instance(part => renkuBaseUrl / "dataset-files" / part.id / part.entity.location)
 }

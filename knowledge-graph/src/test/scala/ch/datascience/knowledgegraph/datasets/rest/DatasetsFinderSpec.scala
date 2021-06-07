@@ -24,13 +24,13 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{DateCreated, DatePublished}
 import ch.datascience.graph.model.projects.Visibility
 import ch.datascience.http.rest.SortBy.Direction
 import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.http.rest.paging.model.{Page, PerPage, Total}
 import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.interpreters.TestLogger
+import ch.datascience.knowledgegraph.datasets.model.DatasetCreator
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.{DatasetSearchResult, ProjectsCount}
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
@@ -43,9 +43,6 @@ import eu.timepit.refined.api.Refined
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-
-import java.time.temporal.ChronoUnit
-import java.time.{Instant, LocalDate}
 
 class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks with should.Matchers {
 
@@ -107,7 +104,7 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
             .unsafeRunSync()
 
-          result.results shouldBe datasets.toDatasetSearchResult(matchIdFrom = result.results)
+          result.results shouldBe datasets.toDatasetSearchResult(matchIdFrom = result.results).toList
 
           result.pagingInfo.total shouldBe Total(1)
         }
@@ -292,25 +289,78 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
 
       s"not return deleted datasets when the given phrase is $maybePhrase" +
         "- case with unrelated datasets" in new TestCase {
-          assert(false, "implementation not known yet")
+          val dataset1 = datasetEntities(datasetProvenanceImportedExternal).generateOne
+          val dataset2 = datasetEntities(datasetProvenanceImportedExternal).generateOne
+          val dataset2Deleted = dataset2
+            .invalidate(
+              invalidationTimes(dataset2.provenance.date.instant, dataset2.project.dateCreated.value).generateOne
+            )
+            .fold(errors => fail(errors.intercalate("; ")), identity)
 
+          loadToStore(dataset1, dataset2, dataset2Deleted)
+
+          val result = datasetsFinder
+            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+            .unsafeRunSync()
+
+          result.results should contain theSameElementsAs List(dataset1.toDatasetSearchResult(projectsCount = 1))
         }
 
       s"not return deleted datasets when the given phrase is $maybePhrase" +
         "- case with forks on renku created datasets and the fork dataset is deleted" in new TestCase {
-          assert(false, "implementation not known yet")
+
+          val dataset     = datasetEntities(datasetProvenanceInternal).generateOne
+          val datasetFork = dataset.forkProject().fork
+          val datasetForkDeleted = datasetFork
+            .invalidate(invalidationTimes(datasetFork.provenance.date).generateOne)
+            .fold(errors => fail(errors.intercalate("; ")), identity)
+
+          loadToStore(dataset, datasetFork, datasetForkDeleted)
+
+          val result = datasetsFinder
+            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+            .unsafeRunSync()
+
+          result.results should contain theSameElementsAs List(dataset.toDatasetSearchResult(projectsCount = 1))
 
         }
 
       s"not return deleted datasets when the given phrase is $maybePhrase" +
         "- case with forks on renku created datasets and original dataset is deleted" in new TestCase {
-          assert(false, "implementation not known yet")
+
+          val dataset = datasetEntities(datasetProvenanceInternal).generateOne
+
+          val datasetFork = dataset.forkProject().fork
+          val datasetDeleted = dataset
+            .invalidate(invalidationTimes(dataset.provenance.date).generateOne)
+            .fold(errors => fail(errors.intercalate("; ")), identity)
+
+          loadToStore(dataset, datasetFork, datasetDeleted)
+
+          val result = datasetsFinder
+            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+            .unsafeRunSync()
+
+          result.results should contain theSameElementsAs List(datasetFork.toDatasetSearchResult(projectsCount = 1))
 
         }
 
       s"not return deleted datasets when the given phrase is $maybePhrase" +
         "- case with modification on renku created datasets" in new TestCase {
-          assert(false, "implementation not known yet")
+
+          val dataset         = datasetEntities(datasetProvenanceInternal).generateOne
+          val datasetModified = modifiedDatasetEntities(dataset).generateOne
+          val datasetModifiedDeleted = datasetModified
+            .invalidate(invalidationTimes(datasetModified.provenance.date).generateOne)
+            .fold(errors => fail(errors.intercalate("; ")), identity)
+
+          loadToStore(dataset, datasetModified, datasetModifiedDeleted)
+
+          val result = datasetsFinder
+            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+            .unsafeRunSync()
+
+          result.results should contain theSameElementsAs Nil
 
         }
     }
@@ -451,7 +501,20 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
 
     s"not return deleted datasets even if the phrase match" +
       "- case with unrelated datasets" in new TestCase {
-        assert(false, "implementation not known yet")
+        val phrase = phrases.generateOne
+
+        val dataset = datasetEntities(datasetProvenanceInternal).generateOne.makeDescContaining(phrase.value)
+        val datasetDeleted = dataset
+          .invalidate(invalidationTimes(dataset.provenance.date).generateOne)
+          .fold(errors => fail(errors.intercalate("; ")), identity)
+
+        loadToStore(dataset, datasetDeleted)
+
+        datasetsFinder
+          .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+          .unsafeRunSync()
+          .results shouldBe Nil
+
       }
   }
 
@@ -467,16 +530,14 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
         val phrase                         = phrases.generateOne
         val (dataset1, dataset2, dataset3) = addPhraseToVariousFields(phrase, dataset1Orig, dataset2Orig, dataset3Orig)
 
-        val datasets = List(dataset1, dataset2, dataset3, nonPhrased)
-
-        loadToStore(datasets: _*)
+        loadToStore(dataset1, dataset2, dataset3, nonPhrased)
 
         val results = datasetsFinder
           .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
           .unsafeRunSync()
           .results
 
-        results shouldBe datasets
+        results shouldBe List(dataset1, dataset2, dataset3)
           .map(_.toDatasetSearchResult(1))
           .sortBy(_.title)
       }
@@ -486,27 +547,19 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
       val phrase = phrases.generateOne
       val (dataset1, dataset2, dataset3) = addPhraseToVariousFields(
         phrase,
-        datasetEntities(datasetProvenanceImportedExternal).generateOne changePublishedDateTo DatePublished(
-          LocalDate.now() minusDays 1
-        ),
-        datasetEntities(datasetProvenanceImportedExternal).generateOne changePublishedDateTo DatePublished(
-          LocalDate.now()
-        ),
-        datasetEntities(datasetProvenanceImportedExternal).generateOne changePublishedDateTo DatePublished(
-          LocalDate.now() plusDays 1
-        )
+        datasetEntities(datasetProvenanceImportedExternal).generateOne,
+        datasetEntities(datasetProvenanceImportedExternal).generateOne,
+        datasetEntities(datasetProvenanceImportedExternal).generateOne
       )
 
-      val datasets = List(dataset1, dataset2, dataset3, datasetEntities(datasetProvenanceInternal).generateOne)
-
-      loadToStore(datasets: _*)
+      loadToStore(dataset1, dataset2, dataset3, datasetEntities(datasetProvenanceInternal).generateOne)
 
       val results = datasetsFinder
         .findDatasets(Some(phrase), Sort.By(DatePublishedProperty, Direction.Desc), PagingRequest.default, None)
         .unsafeRunSync()
         .results
 
-      results shouldBe datasets
+      results shouldBe List(dataset1, dataset2, dataset3)
         .map(_.toDatasetSearchResult(projectsCount = 1))
         .sortBy(_.date.instant)
         .reverse
@@ -516,24 +569,19 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
       val phrase = phrases.generateOne
       val (dataset1, dataset2, dataset3) = addPhraseToVariousFields(
         phrase,
-        datasetEntities(datasetProvenanceInternal).generateOne changeCreatedDateTo DateCreated(
-          Instant.now() minus (1, ChronoUnit.DAYS)
-        ),
-        datasetEntities(datasetProvenanceInternal).generateOne changeCreatedDateTo
-          DateCreated(Instant.now() minus (5, ChronoUnit.DAYS)),
-        datasetEntities(datasetProvenanceInternal).generateOne changeCreatedDateTo DateCreated(Instant.now())
+        datasetEntities(datasetProvenanceInternal).generateOne,
+        datasetEntities(datasetProvenanceInternal).generateOne,
+        datasetEntities(datasetProvenanceInternal).generateOne
       )
 
-      val datasets = List(dataset1, dataset2, dataset3, datasetEntities(datasetProvenanceInternal).generateOne)
-
-      loadToStore(datasets: _*)
+      loadToStore(dataset1, dataset2, dataset3, datasetEntities(datasetProvenanceInternal).generateOne)
 
       val results = datasetsFinder
         .findDatasets(Some(phrase), Sort.By(DateProperty, Direction.Desc), PagingRequest.default, None)
         .unsafeRunSync()
         .results
 
-      results shouldBe datasets
+      results shouldBe List(dataset1, dataset2, dataset3)
         .map(_.toDatasetSearchResult(projectsCount = 1))
         .sortBy(_.date.instant)
         .reverse
@@ -573,17 +621,14 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
 
     "return the requested page of datasets matching the given phrase" in new TestCase {
       val phrase = phrases.generateOne
-      val (dataset1, dataset2, dataset3) =
-        addPhraseToVariousFields(
-          phrase,
-          datasetEntities(datasetProvenanceInternal).generateOne,
-          datasetEntities(datasetProvenanceInternal).generateOne,
-          datasetEntities(datasetProvenanceInternal).generateOne
-        )
+      val (dataset1, dataset2, dataset3) = addPhraseToVariousFields(
+        phrase,
+        datasetEntities(datasetProvenanceInternal).generateOne,
+        datasetEntities(datasetProvenanceInternal).generateOne,
+        datasetEntities(datasetProvenanceInternal).generateOne
+      )
 
-      val datasets = List(dataset1, dataset2, dataset3, datasetEntities(datasetProvenanceInternal).generateOne)
-
-      loadToStore(datasets: _*)
+      loadToStore(dataset1, dataset2, dataset3, datasetEntities(datasetProvenanceInternal).generateOne)
 
       val pagingRequest = PagingRequest(Page(2), PerPage(1))
 
@@ -591,7 +636,7 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
         .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), pagingRequest, None)
         .unsafeRunSync()
 
-      result.results shouldBe datasets
+      result.results shouldBe List(dataset1, dataset2, dataset3)
         .map(_.toDatasetSearchResult(projectsCount = 1))
         .sortBy(_.title)
         .get(1)
@@ -603,13 +648,12 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
 
     "return no results if the requested page does not exist" in new TestCase {
       val phrase = phrases.generateOne
-      val (dataset1, dataset2, dataset3) =
-        addPhraseToVariousFields(
-          phrase,
-          datasetEntities(datasetProvenanceInternal).generateOne,
-          datasetEntities(datasetProvenanceInternal).generateOne,
-          datasetEntities(datasetProvenanceInternal).generateOne
-        )
+      val (dataset1, dataset2, dataset3) = addPhraseToVariousFields(
+        phrase,
+        datasetEntities(datasetProvenanceInternal).generateOne,
+        datasetEntities(datasetProvenanceInternal).generateOne,
+        datasetEntities(datasetProvenanceInternal).generateOne
+      )
 
       loadToStore(dataset1, dataset2, dataset3)
 
@@ -782,7 +826,7 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
       dataset.identification.title,
       dataset.identification.name,
       dataset.additionalInfo.maybeDescription,
-      dataset.provenance.creators.map(toCreator),
+      dataset.provenance.creators.map(_.to[DatasetCreator]),
       dataset.provenance.date,
       ProjectsCount(projectsCount),
       dataset.additionalInfo.keywords.sorted,

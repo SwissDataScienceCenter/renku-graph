@@ -48,19 +48,21 @@ class ProjectPropertiesRemoverSpec extends AnyWordSpec with ScalaCheckPropertyCh
         Gen.oneOf(projectEntities[ForksCount.Zero](visibilityAny),
                   projectEntities[ForksCount.Zero](visibilityAny).map(_.forkOnce()._2)
         )
-      ) { project =>
+      ) { project: Project[ForksCount.Zero] =>
         val triples = JsonLDTriples(JsonLD.arr(project.asJsonLD).toJson)
 
         // assume there are names, createdDates and creators initially
 
-        triples.collectAllProjects shouldBe project match {
-          case project: Project[ForksCount] with HavingParent =>
-            Set(project.to[TransformedProject], project.parent.to[TransformedProject])
-          case _ => Set(project.to[TransformedProject])
+        triples.collectAllProjects shouldBe {
+          project match {
+            case project: ProjectWithParent[_] =>
+              Set(project.to[TransformedProject], project.parent.to[TransformedProject])
+            case _ => Set(project.to[TransformedProject])
+          }
         }
 
-        removeProperties(triples).collectAllProjects shouldBe project match {
-          case project: Project[ForksCount] with HavingParent =>
+        removeProperties(triples).collectAllProjects shouldBe (project match {
+          case project: ProjectWithParent[_] =>
             Set(
               TransformedProject(
                 project.resourceId,
@@ -90,7 +92,7 @@ class ProjectPropertiesRemoverSpec extends AnyWordSpec with ScalaCheckPropertyCh
                 version = List(project.version)
               )
             )
-        }
+        })
       }
     }
   }
@@ -148,7 +150,7 @@ class ProjectPropertiesRemoverSpec extends AnyWordSpec with ScalaCheckPropertyCh
   object TransformedProject {
 
     implicit lazy val converter: Project[ForksCount] => TransformedProject = {
-      case project: Project[ForksCount] with HavingParent =>
+      case project: ProjectWithParent[ForksCount] =>
         TransformedProject(
           project.resourceId,
           List(project.name),
@@ -168,5 +170,4 @@ class ProjectPropertiesRemoverSpec extends AnyWordSpec with ScalaCheckPropertyCh
         )
     }
   }
-
 }

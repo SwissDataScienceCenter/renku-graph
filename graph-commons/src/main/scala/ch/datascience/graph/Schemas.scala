@@ -28,6 +28,7 @@ trait Schemas {
   val rdfs:      Schema = Schema.from("http://www.w3.org/2000/01/rdf-schema", separator = "#")
   val xmlSchema: Schema = Schema.from("http://www.w3.org/2001/XMLSchema", separator = "#")
   val schema:    Schema = Schema.from("http://schema.org")
+  val text:      Schema = Schema.from("http://jena.apache.org/text", separator = "#")
   val renku:     Schema = Schema.from("https://swissdatasciencecenter.github.io/renku-ontology", separator = "#")
 
   val all: Set[Schema] = Set(prov, wfprov, wfdesc, rdf, rdfs, xmlSchema, schema, renku)

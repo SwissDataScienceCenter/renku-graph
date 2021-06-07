@@ -56,7 +56,7 @@ class NodeDetailsFinderSpec
           CommandOutput.fromLocation(output)
         )
       ).generateOne
-        .planParameterInputsValues(input -> entityChecksums.generateOne)
+        .planInputParameterValuesFromChecksum(input -> entityChecksums.generateOne)
         .buildProvenanceGraph
         .fold(errors => throw new Exception(errors.toList.mkString), identity)
 
@@ -86,7 +86,7 @@ class NodeDetailsFinderSpec
           CommandOutput.fromLocation(output)
         )
       ).generateOne
-        .planParameterInputsValues(input -> entityChecksums.generateOne)
+        .planInputParameterValuesFromChecksum(input -> entityChecksums.generateOne)
         .buildProvenanceGraph
         .fold(errors => throw new Exception(errors.toList.mkString), identity)
 
@@ -119,14 +119,14 @@ class NodeDetailsFinderSpec
           CommandOutput.fromLocation(output)
         )
       ).generateOne
-        .planParameterInputsValues(input -> entityChecksums.generateOne)
+        .planInputParameterValuesFromChecksum(input -> entityChecksums.generateOne)
         .buildProvenanceGraph
         .fold(errors => throw new Exception(errors.toList.mkString), identity)
       val activity2 = executionPlanners(
-        runPlanEntities(CommandInput.fromLocation(input)),
+        runPlanEntities(CommandInput.fromLocation(output)),
         fixed(activity1.project)
       ).generateOne
-        .planParameterInputsValues(
+        .planInputParameterValuesFromChecksum(
           output -> activity1
             .findGenerationChecksum(output)
             .getOrElse(throw new Exception(s"No generation for $output"))
@@ -160,7 +160,7 @@ class NodeDetailsFinderSpec
           CommandOutput.streamedFromLocation(errOutput, IOStream.StdErr)
         )
       ).generateOne
-        .planParameterInputsValues(input -> entityChecksums.generateOne)
+        .planInputParameterValuesFromChecksum(input -> entityChecksums.generateOne)
         .buildProvenanceGraph
         .fold(errors => throw new Exception(errors.toList.mkString), identity)
 

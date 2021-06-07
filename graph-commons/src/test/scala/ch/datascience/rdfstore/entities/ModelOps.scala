@@ -18,15 +18,15 @@
 
 package ch.datascience.rdfstore.entities
 
-import cats.data.NonEmptyList
+import cats.data.{NonEmptyList, Validated, ValidatedNel}
+import cats.syntax.all._
 import ch.datascience.generators.Generators
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.sentenceContaining
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators.datasetIdentifiers
-import ch.datascience.graph.model.datasets.{DateCreated, DatePublished, Description, InternalSameAs, Keyword, Name, SameAs, Title}
+import ch.datascience.graph.model.datasets.{DateCreated, DerivedFrom, Description, InitialVersion, InternalSameAs, Keyword, Name, SameAs, Title}
 import ch.datascience.graph.model.{datasets, projects, users}
-import ch.datascience.rdfstore.entities.Dataset.Provenance.{ImportedExternal, ImportedInternalAncestorExternal, Internal}
 import ch.datascience.rdfstore.entities.ModelOps.DatasetForkingResult
 import ch.datascience.rdfstore.entities.Project.ForksCount
 import eu.timepit.refined.api.Refined
@@ -50,25 +50,28 @@ trait ModelOps {
 
     def to[T](implicit convert: Project[FC] => T): T = convert(project)
 
-    def forkOnce(): (Project[ForksCount.NonZero], Project[ForksCount.Zero] with HavingParent) = {
+    def forkOnce(): (Project[ForksCount.NonZero], ProjectWithParent[ForksCount.Zero]) = {
       val (parent, childGen) = fork(times = 1)
       parent -> childGen.head
     }
 
     def fork(
         times: Int Refined Positive
-    ): (Project[ForksCount.NonZero], NonEmptyList[Project[ForksCount.Zero] with HavingParent]) = {
-      val parent = project.copy(
-        forksCount = Project.ForksCount(Refined.unsafeApply(project.forksCount.value + times.value))
-      )
+    ): (Project[ForksCount.NonZero], NonEmptyList[ProjectWithParent[ForksCount.Zero]]) = {
+      val parent = project match {
+        case proj: ProjectWithParent[FC] =>
+          proj.copy(forksCount = ForksCount(Refined.unsafeApply(proj.forksCount.value + times.value)))
+        case proj: ProjectWithoutParent[FC] =>
+          proj.copy(forksCount = Project.ForksCount(Refined.unsafeApply(project.forksCount.value + times.value)))
+      }
       parent -> (1 to times.value).foldLeft(NonEmptyList.one(newChildGen(parent).generateOne))((childrenGens, _) =>
-        childrenGens :+ newChildGen(parent).generateOne
+        newChildGen(parent).generateOne :: childrenGens
       )
     }
 
     private def newChildGen(parentProject: Project[Project.ForksCount.NonZero]) =
       projectEntities[ForksCount.Zero](fixed(parentProject.visibility), parentProject.dateCreated).map(child =>
-        new Project(
+        ProjectWithParent(
           child.path,
           child.name,
           child.agent,
@@ -77,10 +80,9 @@ trait ModelOps {
           child.visibility,
           child.forksCount,
           child.members,
-          child.version
-        ) with HavingParent {
-          override val parent: Project[ForksCount.NonZero] = parentProject
-        }
+          child.version,
+          parentProject
+        )
       )
   }
 
@@ -88,27 +90,104 @@ trait ModelOps {
 
     lazy val identifier: datasets.Identifier = dataset.identification.identifier
 
+    def to[T](implicit convert: Dataset[P] => T): T = convert(dataset)
+
     def forkProject(): DatasetForkingResult[P] = {
       val (updatedOriginalProject, forkProject) = dataset.project.forkOnce()
       DatasetForkingResult(
-        dataset.copy(project = updatedOriginalProject),
-        dataset.copy(project = forkProject)
+        original = dataset.copy(project = updatedOriginalProject),
+        fork = dataset.copy(project = forkProject)
       )
     }
 
     def importTo[POUT <: Dataset.Provenance](
         project:              Project[Project.ForksCount]
-    )(implicit newProvenance: (EntityId, InternalSameAs, P) => POUT): Dataset[POUT] = {
-      val intermediate = dataset.copy(
-        project = project,
-        identification = dataset.identification.copy(identifier = datasetIdentifiers.generateOne)
-      )
-      intermediate.copy(
-        provenance = newProvenance(intermediate.entityId, SameAs(dataset.entityId), dataset.provenance)
+    )(implicit newProvenance: ProvenanceImportFactory[P, POUT]): Dataset[POUT] = {
+      val newIdentifier = datasetIdentifiers.generateOne
+      dataset.copy(
+        identification = dataset.identification.copy(identifier = newIdentifier),
+        provenance = newProvenance(
+          Dataset.entityId(newIdentifier),
+          SameAs(dataset.entityId),
+          dataset.provenance,
+          InitialVersion(newIdentifier)
+        ),
+        project = project
       )
     }
 
-    def to[T](implicit convert: Dataset[P] => T): T = convert(dataset)
+    def invalidate(
+        time: InvalidationTime
+    ): ValidatedNel[String, Dataset[Dataset.Provenance.Modified] with HavingInvalidationTime] = {
+      val newIdentifier = datasetIdentifiers.generateOne
+      dataset.provenance.date match {
+        case dateCreated: DateCreated =>
+          Validated.condNel(
+            test = (time.value compareTo dateCreated.instant) >= 0,
+            new Dataset(dataset.identification.copy(identifier = newIdentifier),
+                        Dataset.Provenance.Modified(
+                          Dataset.entityId(newIdentifier),
+                          DerivedFrom(dataset.entityId),
+                          dataset.provenance.topmostDerivedFrom,
+                          dataset.provenance.initialVersion,
+                          datasets.DateCreated(time.value),
+                          dataset.provenance.creators + personEntities.generateOne
+                        ),
+                        dataset.additionalInfo,
+                        dataset.publishing,
+                        dataset.parts,
+                        dataset.project
+            ) with HavingInvalidationTime {
+              override val invalidationTime: InvalidationTime = time
+            },
+            s"Invalidation time $time on dataset with id: ${dataset.identification.identifier} is older than dataset date"
+          )
+        case _ =>
+          Validated.condNel(
+            test = (time.value compareTo dataset.project.dateCreated.value) >= 0,
+            new Dataset(dataset.identification.copy(identifier = newIdentifier),
+                        Dataset.Provenance.Modified(
+                          Dataset.entityId(newIdentifier),
+                          DerivedFrom(dataset.entityId),
+                          dataset.provenance.topmostDerivedFrom,
+                          dataset.provenance.initialVersion,
+                          datasets.DateCreated(time.value),
+                          dataset.provenance.creators + personEntities.generateOne
+                        ),
+                        dataset.additionalInfo,
+                        dataset.publishing,
+                        dataset.parts,
+                        dataset.project
+            ) with HavingInvalidationTime {
+              override val invalidationTime: InvalidationTime = time
+            },
+            s"Invalidation time $time on dataset with id: ${dataset.identification.identifier} is older than the project date"
+          )
+      }
+    }
+
+    def invalidatePart(part: DatasetPart,
+                       time: InvalidationTime
+    ): ValidatedNel[String, Dataset[Dataset.Provenance.Modified]] =
+      dataset.parts
+        .find(_ == part)
+        .toValidNel(s"There's no part ${part.entity.location} on dataset with id ${dataset.identifier}")
+        .andThen(_.invalidate(time))
+        .map { invalidatedPart =>
+          val newIdentifier = datasetIdentifiers.generateOne
+          dataset.copy(
+            dataset.identification.copy(identifier = newIdentifier),
+            provenance = Dataset.Provenance.Modified(
+              Dataset.entityId(newIdentifier),
+              DerivedFrom(dataset.entityId),
+              dataset.provenance.topmostDerivedFrom,
+              dataset.provenance.initialVersion,
+              datasets.DateCreated(time.value),
+              dataset.provenance.creators + personEntities.generateOne
+            ),
+            parts = dataset.parts.filterNot(_ == part) ::: invalidatedPart :: Nil
+          )
+        }
 
     def makeNameContaining(phrase: String): Dataset[P] = {
       val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(phrase)
@@ -149,92 +228,68 @@ trait ModelOps {
           sentenceContaining(Refined.unsafeApply(phrase)).map(_.value).map(Description.apply).generateSome
         )
       )
-
   }
 
-  implicit class DatasetOpsImportedExternal(dataset: Dataset[ImportedExternal])(implicit renkuBaseUrl: RenkuBaseUrl) {
-    def changePublishedDateTo(date: DatePublished): Dataset[ImportedExternal] =
-      dataset.copy(provenance = dataset.provenance.copy(date = date))
-  }
+  type ProvenanceImportFactory[OldProvenance <: Dataset.Provenance, NewProvenance <: Dataset.Provenance] =
+    (EntityId, InternalSameAs, OldProvenance, InitialVersion) => NewProvenance
 
-  implicit class DatasetOpsImportedInternalAncestorExternal(dataset: Dataset[ImportedInternalAncestorExternal])(implicit
-      renkuBaseUrl:                                                  RenkuBaseUrl
-  ) {
-    def changePublishedDateTo(date: DatePublished): Dataset[ImportedInternalAncestorExternal] =
-      dataset.copy(provenance = dataset.provenance.copy(date = date))
+  implicit lazy val fromInternalToImportedInternalAncestorInternal
+      : ProvenanceImportFactory[Dataset.Provenance.Internal, Dataset.Provenance.ImportedInternalAncestorInternal] =
+    (newEntityId, sameAs, oldProvenance, initialVersion) =>
+      Dataset.Provenance.ImportedInternalAncestorInternal(newEntityId,
+                                                          sameAs,
+                                                          oldProvenance.topmostSameAs,
+                                                          initialVersion,
+                                                          oldProvenance.date,
+                                                          oldProvenance.creators
+      )
 
-  }
-
-  implicit class DatasetOpsInternal(dataset: Dataset[Internal])(implicit renkuBaseUrl: RenkuBaseUrl) {
-    def changeCreatedDateTo(date: DateCreated): Dataset[Internal] =
-      dataset.copy(provenance = dataset.provenance.copy(date = date))
-  }
-
-  implicit def importFromInternal(
-      newEntityId:    EntityId,
-      sameAsToParent: InternalSameAs,
-      provenance:     Dataset.Provenance.Internal
-  ): Dataset.Provenance.ImportedInternalAncestorInternal =
-    Dataset.Provenance.ImportedInternalAncestorInternal(newEntityId,
-                                                        sameAsToParent,
-                                                        provenance.topmostSameAs,
-                                                        provenance.initialVersion,
-                                                        provenance.date,
-                                                        provenance.creators
-    )
-
-  implicit def importFromImportedExternal(
-      newEntityId:    EntityId,
-      sameAsToParent: InternalSameAs,
-      provenance:     Dataset.Provenance.ImportedExternal
-  ): Dataset.Provenance.ImportedInternalAncestorExternal =
+  implicit lazy val fromImportedExternalToImportedInternalAncestorExternal
+      : ProvenanceImportFactory[Dataset.Provenance.ImportedExternal,
+                                Dataset.Provenance.ImportedInternalAncestorExternal
+      ] = (newEntityId, sameAs, oldProvenance, initialVersion) =>
     Dataset.Provenance.ImportedInternalAncestorExternal(newEntityId,
-                                                        sameAsToParent,
-                                                        provenance.topmostSameAs,
-                                                        provenance.initialVersion,
-                                                        provenance.date,
-                                                        provenance.creators
+                                                        sameAs,
+                                                        oldProvenance.topmostSameAs,
+                                                        initialVersion,
+                                                        oldProvenance.date,
+                                                        oldProvenance.creators
     )
 
-  implicit def importFromImportedInternalAncestorExternal(
-      newEntityId:    EntityId,
-      sameAsToParent: InternalSameAs,
-      provenance:     Dataset.Provenance.ImportedInternalAncestorExternal
-  ): Dataset.Provenance.ImportedInternalAncestorExternal =
+  implicit lazy val fromImportedInternalAncestorExternalToImportedInternalAncestorExternal
+      : ProvenanceImportFactory[Dataset.Provenance.ImportedInternalAncestorExternal,
+                                Dataset.Provenance.ImportedInternalAncestorExternal
+      ] = (newEntityId, sameAs, oldProvenance, initialVersion) =>
     Dataset.Provenance.ImportedInternalAncestorExternal(newEntityId,
-                                                        sameAsToParent,
-                                                        provenance.topmostSameAs,
-                                                        provenance.initialVersion,
-                                                        provenance.date,
-                                                        provenance.creators
+                                                        sameAs,
+                                                        oldProvenance.topmostSameAs,
+                                                        initialVersion,
+                                                        oldProvenance.date,
+                                                        oldProvenance.creators
     )
 
-  implicit def importFromImportedInternalAncestorInternal(
-      newEntityId:    EntityId,
-      sameAsToParent: InternalSameAs,
-      provenance:     Dataset.Provenance.ImportedInternalAncestorInternal
-  ): Dataset.Provenance.ImportedInternalAncestorInternal =
+  implicit lazy val fromImportedInternalAncestorInternalToImportedInternalAncestorInternal
+      : ProvenanceImportFactory[Dataset.Provenance.ImportedInternalAncestorInternal,
+                                Dataset.Provenance.ImportedInternalAncestorInternal
+      ] = (newEntityId, sameAs, oldProvenance, initialVersion) =>
     Dataset.Provenance.ImportedInternalAncestorInternal(newEntityId,
-                                                        sameAsToParent,
-                                                        provenance.topmostSameAs,
-                                                        provenance.initialVersion,
-                                                        provenance.date,
-                                                        provenance.creators
+                                                        sameAs,
+                                                        oldProvenance.topmostSameAs,
+                                                        initialVersion,
+                                                        oldProvenance.date,
+                                                        oldProvenance.creators
     )
 
-  implicit def importFromModified(
-      newEntityId:    EntityId,
-      sameAsToParent: InternalSameAs,
-      provenance:     Dataset.Provenance.Modified
-  ): Dataset.Provenance.ImportedInternalAncestorInternal =
-    Dataset.Provenance.ImportedInternalAncestorInternal(
-      newEntityId,
-      sameAsToParent,
-      provenance.topmostSameAs,
-      provenance.initialVersion,
-      provenance.date,
-      provenance.creators
-    )
+  implicit lazy val importFromModifiedToImportedInternalAncestorInternal
+      : ProvenanceImportFactory[Dataset.Provenance.Modified, Dataset.Provenance.ImportedInternalAncestorInternal] =
+    (newEntityId, sameAs, oldProvenance, initialVersion) =>
+      Dataset.Provenance.ImportedInternalAncestorInternal(newEntityId,
+                                                          sameAs,
+                                                          oldProvenance.topmostSameAs,
+                                                          initialVersion,
+                                                          oldProvenance.date,
+                                                          oldProvenance.creators
+      )
 
   implicit val creatorUsernameUpdaterInternal
       : (users.Name, Dataset.Provenance.Internal) => Dataset.Provenance.Internal = { case (userName, prov) =>
@@ -264,6 +319,47 @@ trait ModelOps {
   implicit val creatorUsernameUpdaterModified
       : (users.Name, Dataset.Provenance.Modified) => Dataset.Provenance.Modified = { case (userName, prov) =>
     prov.copy(creators = prov.creators + personEntities.generateOne.copy(name = userName))
+  }
+
+  implicit class DatasetPartOps(part: DatasetPart) {
+
+    private[ModelOps] def invalidate(
+        time: InvalidationTime
+    ): ValidatedNel[String, DatasetPart with HavingInvalidationTime] =
+      Validated.condNel(
+        test = (time.value compareTo part.dateCreated.value) >= 0,
+        new DatasetPart(datasets.PartId.generate,
+                        part.external,
+                        part.entity,
+                        part.dateCreated,
+                        part.maybeUrl,
+                        part.maybeSource
+        ) with HavingInvalidationTime {
+          override val invalidationTime: InvalidationTime = time
+        },
+        s"Invalidation time $time is older than dataset part ${part.entity.location}"
+      )
+  }
+
+  implicit class RunPlanOps(runPlan: RunPlan) {
+
+    def invalidate(time: InvalidationTime): ValidatedNel[String, RunPlan with HavingInvalidationTime] =
+      Validated.condNel(
+        test = (time.value compareTo runPlan.project.dateCreated.value) >= 0,
+        new RunPlan(runPlan.id,
+                    runPlan.name,
+                    runPlan.maybeDescription,
+                    runPlan.command,
+                    runPlan.maybeProgrammingLanguage,
+                    runPlan.keywords,
+                    runPlan.commandParameterFactories,
+                    runPlan.successCodes,
+                    runPlan.project
+        ) with HavingInvalidationTime {
+          override val invalidationTime: InvalidationTime = time
+        },
+        s"Invalidation time $time on RunPlan with name: ${runPlan.name} is older than project date"
+      )
   }
 }
 

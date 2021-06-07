@@ -24,14 +24,18 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.datasets.SameAs
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.logging.TestExecutionTimeRecorder
+import ch.datascience.rdfstore.entities.Project.ForksCount
 import ch.datascience.rdfstore.entities._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+
+import scala.util.Random
 
 class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks with should.Matchers {
 
@@ -60,9 +64,9 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
             .to[NonModifiedDataset]
             .copy(
               usedIn = List(
-                DatasetProject(dataset1.project.path, dataset1.project.name),
-                DatasetProject(dataset2.project.path, dataset2.project.name)
-              )
+                dataset1.project.to[DatasetProject],
+                dataset2.project.to[DatasetProject]
+              ).sorted
             )
         )
 
@@ -71,9 +75,9 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
             .to[NonModifiedDataset]
             .copy(
               usedIn = List(
-                DatasetProject(dataset1.project.path, dataset1.project.name),
-                DatasetProject(dataset2.project.path, dataset2.project.name)
-              )
+                dataset1.project.to[DatasetProject],
+                dataset2.project.to[DatasetProject]
+              ).sorted
             )
         )
       }
@@ -99,9 +103,9 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
       "- a case when unrelated projects are using the same dataset created in a Renku project" in new TestCase {
         forAll(datasetEntities(datasetProvenanceInternal)) { sourceDataset =>
           val datasetOnProject1 =
-            sourceDataset.importTo(projectEntities[Project.ForksCount.Zero](visibilityPublic).generateOne)
+            sourceDataset importTo projectEntities[Project.ForksCount.Zero](visibilityPublic).generateOne
           val datasetOnProject2 =
-            sourceDataset.importTo(projectEntities[Project.ForksCount.Zero](visibilityPublic).generateOne)
+            sourceDataset importTo projectEntities[Project.ForksCount.Zero](visibilityPublic).generateOne
 
           loadToStore(
             sourceDataset,
@@ -115,10 +119,10 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
               .to[NonModifiedDataset]
               .copy(
                 usedIn = List(
-                  DatasetProject(sourceDataset.project.path, sourceDataset.project.name),
-                  DatasetProject(datasetOnProject1.project.path, datasetOnProject1.project.name),
-                  DatasetProject(datasetOnProject2.project.path, datasetOnProject2.project.name)
-                )
+                  sourceDataset.project.to[DatasetProject],
+                  datasetOnProject1.project.to[DatasetProject],
+                  datasetOnProject2.project.to[DatasetProject]
+                ).sorted
               )
               .some
 
@@ -127,10 +131,10 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
               .to[NonModifiedDataset]
               .copy(
                 usedIn = List(
-                  DatasetProject(sourceDataset.project.path, sourceDataset.project.name),
-                  DatasetProject(datasetOnProject1.project.path, datasetOnProject1.project.name),
-                  DatasetProject(datasetOnProject2.project.path, datasetOnProject2.project.name)
-                )
+                  sourceDataset.project.to[DatasetProject],
+                  datasetOnProject1.project.to[DatasetProject],
+                  datasetOnProject2.project.to[DatasetProject]
+                ).sorted
               )
               .some
         }
@@ -138,6 +142,41 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
 
     "return None if there are no datasets with the given id" in new TestCase {
       datasetFinder.findDataset(datasetIdentifiers.generateOne).unsafeRunSync() shouldBe None
+    }
+
+    "return None if dataset was invalidated" in new TestCase {
+
+      val original = datasetEntities(datasetProvenanceInternal).generateOne
+      val invalidated = original
+        .invalidate(invalidationTimes(original.provenance.date).generateOne)
+        .fold(errors => fail(errors.intercalate("; ")), identity)
+
+      loadToStore(original, invalidated)
+
+      datasetFinder.findDataset(original.identifier).unsafeRunSync()    shouldBe None
+      datasetFinder.findDataset(invalidated.identifier).unsafeRunSync() shouldBe None
+    }
+
+    "return a dataset without invalidated part" in new TestCase {
+      val original = datasetEntities(datasetProvenanceInternal)
+        .map(ds => ds.copy(parts = datasetPartEntities(ds.provenance.date.instant).generateNonEmptyList().toList))
+        .generateOne
+      val partToInvalidate = Random.shuffle(original.parts).head
+      val originalWithInvalidatedPart = original
+        .invalidatePart(partToInvalidate, invalidationTimes(partToInvalidate.dateCreated).generateOne)
+        .fold(errors => fail(errors.intercalate("; ")), identity)
+
+      loadToStore(original, originalWithInvalidatedPart)
+
+      datasetFinder.findDataset(original.identifier).unsafeRunSync() shouldBe Some(
+        original.to[NonModifiedDataset].copy(usedIn = Nil)
+      )
+
+      datasetFinder.findDataset(originalWithInvalidatedPart.identifier).unsafeRunSync() shouldBe Some(
+        originalWithInvalidatedPart
+          .copy(parts = original.parts.filterNot(_ == partToInvalidate))
+          .to[ModifiedDataset]
+      )
     }
   }
 
@@ -151,25 +190,18 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
 
           loadToStore(originalDataset, datasetOnForkedProject)
 
+          assume(originalDataset.identifier === datasetOnForkedProject.identifier,
+                 "Datasets on original project and fork have different identifiers"
+          )
+
           datasetFinder.findDataset(originalDataset.identifier).unsafeRunSync() shouldBe
             originalDataset
               .to[NonModifiedDataset]
               .copy(
                 usedIn = List(
-                  DatasetProject(originalDataset.project.path, originalDataset.project.name),
-                  DatasetProject(datasetOnForkedProject.project.path, datasetOnForkedProject.project.name)
-                )
-              )
-              .some
-
-          datasetFinder.findDataset(datasetOnForkedProject.identifier).unsafeRunSync() shouldBe
-            datasetOnForkedProject
-              .to[NonModifiedDataset]
-              .copy(
-                usedIn = List(
-                  DatasetProject(originalDataset.project.path, originalDataset.project.name),
-                  DatasetProject(datasetOnForkedProject.project.path, datasetOnForkedProject.project.name)
-                )
+                  originalDataset.project.to[DatasetProject],
+                  datasetOnForkedProject.project.to[DatasetProject]
+                ).sorted
               )
               .some
         }
@@ -187,22 +219,26 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
             .to[NonModifiedDataset]
             .copy(
               usedIn = List(
-                DatasetProject(dataset1.project.path, dataset1.project.name),
-                DatasetProject(dataset2.project.path, dataset2.project.name),
-                DatasetProject(dataset2Fork.project.path, dataset2Fork.project.name)
-              )
+                dataset1.project.to[DatasetProject],
+                dataset2.project.to[DatasetProject],
+                dataset2Fork.project.to[DatasetProject]
+              ).sorted
             )
             .some
+
+        assume(dataset2.identifier === dataset2Fork.identifier,
+               "Datasets on original project and fork have different identifiers"
+        )
 
         datasetFinder.findDataset(dataset2.identifier).unsafeRunSync() shouldBe
           dataset2
             .to[NonModifiedDataset]
             .copy(
               usedIn = List(
-                DatasetProject(dataset1.project.path, dataset1.project.name),
-                DatasetProject(dataset2.project.path, dataset2.project.name),
-                DatasetProject(dataset2Fork.project.path, dataset2Fork.project.name)
-              )
+                dataset1.project.to[DatasetProject],
+                dataset2.project.to[DatasetProject],
+                dataset2Fork.project.to[DatasetProject]
+              ).sorted
             )
             .some
       }
@@ -215,15 +251,20 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
 
           loadToStore(grandparentDataset, parentDataset, childDataset)
 
+          assume(
+            (grandparentDataset.identifier === parentDataset.identifier) && (parentDataset.identifier === childDataset.identifier),
+            "Datasets on original project and fork have different identifiers"
+          )
+
           datasetFinder.findDataset(grandparentDataset.identifier).unsafeRunSync() shouldBe
             grandparentDataset
               .to[NonModifiedDataset]
               .copy(
                 usedIn = List(
-                  DatasetProject(grandparentDataset.project.path, grandparentDataset.project.name),
-                  DatasetProject(parentDataset.project.path, parentDataset.project.name),
-                  DatasetProject(childDataset.project.path, childDataset.project.name)
-                )
+                  grandparentDataset.project.to[DatasetProject],
+                  parentDataset.project.to[DatasetProject],
+                  childDataset.project.to[DatasetProject]
+                ).sorted
               )
               .some
         }
@@ -231,55 +272,117 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
 
     "return details of the modified dataset with the given id " +
       "- case when modification is followed by forking" in new TestCase {
-        forAll(datasetEntities(datasetProvenanceInternal)) { originalDataset =>
-          val modifiedDataset     = modifiedDatasetEntities(originalDataset).generateOne
-          val modifiedDatasetFork = modifiedDataset.forkProject().fork
+        forAll(datasetEntities(datasetProvenanceInternal)) { original =>
+          val modified     = modifiedDatasetEntities(original).generateOne
+          val modifiedFork = modified.forkProject().fork
 
-          loadToStore(originalDataset, modifiedDataset, modifiedDatasetFork)
+          loadToStore(original, modified, modifiedFork)
 
-          datasetFinder.findDataset(originalDataset.identifier).unsafeRunSync() shouldBe Some(
-            originalDataset.to[NonModifiedDataset].copy(usedIn = Nil)
+          datasetFinder.findDataset(original.identifier).unsafeRunSync() shouldBe Some(
+            original
+              .to[NonModifiedDataset]
+              .copy(usedIn = Nil)
           )
 
-          datasetFinder.findDataset(modifiedDataset.identifier).unsafeRunSync() shouldBe Some(
-            modifiedDataset
+          datasetFinder.findDataset(modified.identifier).unsafeRunSync() shouldBe Some(
+            modified
               .to[ModifiedDataset]
               .copy(
                 usedIn = List(
-                  DatasetProject(modifiedDataset.project.path, modifiedDataset.project.name),
-                  DatasetProject(modifiedDatasetFork.project.path, modifiedDatasetFork.project.name)
-                )
+                  modified.project.to[DatasetProject],
+                  modifiedFork.project.to[DatasetProject]
+                ).sorted
               )
+          )
+        }
+      }
+
+    "return details of the modified dataset with the given id " +
+      "- case when modification is followed by forking and some other modification" in new TestCase {
+        forAll(datasetEntities(datasetProvenanceInternal)) { original =>
+          val modified      = modifiedDatasetEntities(original).generateOne
+          val modifiedFork  = modified.forkProject().fork
+          val modifiedAgain = modifiedDatasetEntities(modified).generateOne
+
+          loadToStore(original, modified, modifiedFork, modifiedAgain)
+
+          datasetFinder.findDataset(original.identifier).unsafeRunSync() shouldBe Some(
+            original
+              .to[NonModifiedDataset]
+              .copy(usedIn = Nil)
+          )
+
+          assume(modified.identifier === modifiedFork.identifier, "Dataset after forking must have the same identifier")
+
+          datasetFinder.findDataset(modified.identifier).unsafeRunSync() shouldBe Some(
+            modified
+              .to[ModifiedDataset]
+              .copy(usedIn = List(modifiedFork.project.to[DatasetProject]))
+          )
+
+          datasetFinder.findDataset(modifiedAgain.identifier).unsafeRunSync() shouldBe Some(
+            modifiedAgain.to[ModifiedDataset]
           )
         }
       }
 
     "return details of the dataset with the given id " +
       "- case when forking is followed by modification" in new TestCase {
-        forAll(datasetEntities(datasetProvenanceInternal)) { originalDataset =>
-          val datasetForked   = originalDataset.forkProject().fork
-          val modifiedDataset = modifiedDatasetEntities(datasetForked).generateOne
+        forAll(datasetEntities(datasetProvenanceInternal)) { original =>
+          val originalForked = original.forkProject().fork
+          val modifiedForked = modifiedDatasetEntities(originalForked).generateOne
 
-          loadToStore(originalDataset, datasetForked, modifiedDataset)
+          loadToStore(original, originalForked, modifiedForked)
 
-          datasetFinder.findDataset(originalDataset.identifier).unsafeRunSync() shouldBe Some(
-            originalDataset.to[NonModifiedDataset]
+          assume(original.identifier === originalForked.identifier,
+                 "Dataset after forking must have the same identifier"
           )
 
-          datasetFinder.findDataset(modifiedDataset.identifier).unsafeRunSync() shouldBe Some(
-            modifiedDataset.to[ModifiedDataset]
+          datasetFinder.findDataset(original.identifier).unsafeRunSync() shouldBe Some(
+            original.to[NonModifiedDataset]
+          )
+
+          datasetFinder.findDataset(modifiedForked.identifier).unsafeRunSync() shouldBe Some(
+            modifiedForked.to[ModifiedDataset]
           )
         }
       }
 
     "return details of the dataset with the given id " +
       "- case when a dataset on a fork is deleted" in new TestCase {
-        assert(false, "implementation not known yet")
+        forAll(datasetEntities(datasetProvenanceInternal)) { original =>
+          val forked = original.forkProject().fork
+          val invalidatedForked = forked
+            .invalidate(invalidationTimes(forked.provenance.date).generateOne)
+            .fold(errors => fail(errors.intercalate("; ")), identity)
+
+          loadToStore(original, forked, invalidatedForked)
+
+          datasetFinder.findDataset(original.identifier).unsafeRunSync() shouldBe Some(
+            original.to[NonModifiedDataset]
+          )
+
+          datasetFinder.findDataset(invalidatedForked.identifier).unsafeRunSync() shouldBe None
+        }
       }
 
     "return details of a fork dataset with the given id " +
       "- case when the parent of a fork dataset is deleted" in new TestCase {
-        assert(false, "implementation not known yet")
+        val originalDataset = datasetEntities(datasetProvenanceInternal).generateOne
+        val datasetForked   = originalDataset.forkProject().fork
+        val invalidatedOriginalDataset = originalDataset
+          .invalidate(
+            invalidationTimes(originalDataset.provenance.date).generateOne
+          )
+          .fold(errors => fail(errors.intercalate("; ")), identity)
+
+        loadToStore(originalDataset, datasetForked, invalidatedOriginalDataset)
+
+        datasetFinder.findDataset(datasetForked.identifier).unsafeRunSync() shouldBe Some(
+          datasetForked.to[NonModifiedDataset]
+        )
+
+        datasetFinder.findDataset(invalidatedOriginalDataset.identifier).unsafeRunSync() shouldBe None
       }
   }
 
@@ -297,10 +400,10 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
             .to[NonModifiedDataset]
             .copy(
               usedIn = List(
-                DatasetProject(dataset1.project.path, dataset1.project.name),
-                DatasetProject(dataset2.project.path, dataset2.project.name),
-                DatasetProject(dataset3.project.path, dataset3.project.name)
-              )
+                dataset1.project.to[DatasetProject],
+                dataset2.project.to[DatasetProject],
+                dataset3.project.to[DatasetProject]
+              ).sorted
             )
         )
 
@@ -308,11 +411,12 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
           dataset3
             .to[NonModifiedDataset]
             .copy(
+              sameAs = dataset2.provenance.sameAs,
               usedIn = List(
-                DatasetProject(dataset1.project.path, dataset1.project.name),
-                DatasetProject(dataset2.project.path, dataset2.project.name),
-                DatasetProject(dataset3.project.path, dataset3.project.name)
-              )
+                dataset1.project.to[DatasetProject],
+                dataset2.project.to[DatasetProject],
+                dataset3.project.to[DatasetProject]
+              ).sorted
             )
         )
       }
@@ -333,10 +437,10 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
             .to[NonModifiedDataset]
             .copy(
               usedIn = List(
-                DatasetProject(dataset1.project.path, dataset1.project.name),
-                DatasetProject(dataset2.project.path, dataset2.project.name),
-                DatasetProject(dataset3.project.path, dataset3.project.name)
-              )
+                dataset1.project.to[DatasetProject],
+                dataset2.project.to[DatasetProject],
+                dataset3.project.to[DatasetProject]
+              ).sorted
             )
         )
 
@@ -346,11 +450,12 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
           dataset3
             .to[NonModifiedDataset]
             .copy(
+              sameAs = SameAs(dataset1.provenance.entityId),
               usedIn = List(
-                DatasetProject(dataset1.project.path, dataset1.project.name),
-                DatasetProject(dataset2.project.path, dataset2.project.name),
-                DatasetProject(dataset3.project.path, dataset3.project.name)
-              )
+                dataset1.project.to[DatasetProject],
+                dataset2.project.to[DatasetProject],
+                dataset3.project.to[DatasetProject]
+              ).sorted
             )
         )
       }
@@ -370,21 +475,63 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
             .to[ModifiedDataset]
             .copy(
               usedIn = List(
-                DatasetProject(dataset2Modified.project.path, dataset2Modified.project.name),
-                DatasetProject(dataset3.project.path, dataset3.project.name)
-              )
+                dataset2Modified.project.to[DatasetProject],
+                dataset3.project.to[DatasetProject]
+              ).sorted
             )
         )
       }
 
     "not return the details of a dataset" +
-      "- case when the dataset has been invalidated" in new TestCase {
-        assert(false, "implementation not known yet")
+      "- case when the latest import of the dataset has been invalidated" in new TestCase {
+
+        val dataset1 = datasetEntities(datasetProvenanceInternal).generateOne
+        val dataset2 = dataset1.importTo(projectEntities[ForksCount.Zero](visibilityPublic).generateOne)
+        val invalidated = dataset2
+          .invalidate(
+            invalidationTimes(dataset2.provenance.date.instant, dataset2.project.dateCreated.value).generateOne
+          )
+          .fold(errors => fail(errors.intercalate("; ")), identity)
+
+        loadToStore(dataset1, dataset2, invalidated)
+
+        datasetFinder.findDataset(dataset1.identifier).unsafeRunSync()    shouldBe Some(dataset1.to[NonModifiedDataset])
+        datasetFinder.findDataset(dataset2.identifier).unsafeRunSync()    shouldBe None
+        datasetFinder.findDataset(invalidated.identifier).unsafeRunSync() shouldBe None
       }
 
     "not return the details of a dataset" +
-      "- case when the latest version of the dataset has been invalidated" in new TestCase {
-        assert(false, "implementation not known yet")
+      "- case when the original dataset has been invalidated" in new TestCase {
+
+        val dataset1 = datasetEntities(datasetProvenanceInternal).generateOne
+        val dataset2 = dataset1.importTo(projectEntities[ForksCount.Zero](visibilityPublic).generateOne)
+        val invalidated = dataset1
+          .invalidate(invalidationTimes(dataset1.provenance.date).generateOne)
+          .fold(errors => fail(errors.intercalate("; ")), identity)
+
+        loadToStore(dataset1, invalidated, dataset2)
+
+        datasetFinder.findDataset(dataset1.identifier).unsafeRunSync()    shouldBe None
+        datasetFinder.findDataset(invalidated.identifier).unsafeRunSync() shouldBe None
+        datasetFinder.findDataset(dataset2.identifier).unsafeRunSync()    shouldBe Some(dataset2.to[NonModifiedDataset])
+      }
+
+    "not return the details of a dataset" +
+      "- case when the latest modification of the dataset has been invalidated" in new TestCase {
+
+        val dataset         = datasetEntities(datasetProvenanceInternal).generateOne
+        val datasetModified = modifiedDatasetEntities(dataset).generateOne
+        val datasetModifiedInvalidated = datasetModified
+          .invalidate(invalidationTimes(datasetModified.provenance.date).generateOne)
+          .fold(errors => fail(errors.intercalate("; ")), identity)
+
+        loadToStore(dataset, datasetModified, datasetModifiedInvalidated)
+
+        datasetFinder.findDataset(dataset.identifier).unsafeRunSync() shouldBe Some(
+          dataset.to[NonModifiedDataset].copy(usedIn = Nil)
+        )
+        datasetFinder.findDataset(datasetModified.identifier).unsafeRunSync()            shouldBe None
+        datasetFinder.findDataset(datasetModifiedInvalidated.identifier).unsafeRunSync() shouldBe None
       }
   }
 
@@ -392,11 +539,13 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
     implicit val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
     private val logger       = TestLogger[IO]()
     private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
-    val datasetFinder = new IODatasetFinder(
+    val datasetFinder = new DatasetFinderImpl(
       new BaseDetailsFinder(rdfStoreConfig, logger, timeRecorder),
       new CreatorsFinder(rdfStoreConfig, logger, timeRecorder),
       new PartsFinder(rdfStoreConfig, logger, timeRecorder),
       new ProjectsFinder(rdfStoreConfig, logger, timeRecorder)
     )
   }
+
+  private implicit lazy val usedInOrdering: Ordering[DatasetProject] = Ordering.by(_.name)
 }
