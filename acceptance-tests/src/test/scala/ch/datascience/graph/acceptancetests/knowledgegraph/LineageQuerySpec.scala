@@ -34,7 +34,7 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.entities
 import ch.datascience.rdfstore.entities.LineageExemplarData.ExemplarData
 import ch.datascience.rdfstore.entities.Project.ForksCount
-import ch.datascience.rdfstore.entities.{LineageExemplarData, prov, wfprov, _}
+import ch.datascience.rdfstore.entities.{renkuBaseUrl => _, gitLabApiUrl => _, _}
 import io.circe.Json
 import io.circe.literal._
 import io.renku.jsonld.JsonLD
@@ -44,8 +44,6 @@ import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 import sangria.ast.Document
 import sangria.macros._
-
-import scala.collection.Set
 
 class LineageQuerySpec
     extends AnyFeatureSpec
@@ -118,6 +116,7 @@ class LineageQuerySpec
       lineageJson.downField("nodes").as[List[Json]].map(_.toSet) shouldBe theExpectedNodes(exemplarData)
     }
   }
+
   Feature("GraphQL query to find lineage with authentication") {
     val user = authUsers.generateOne
     implicit val accessToken: AccessToken = user.accessToken

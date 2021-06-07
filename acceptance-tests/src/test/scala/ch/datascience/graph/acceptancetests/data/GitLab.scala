@@ -22,10 +22,6 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{nonEmptyStrings, positiveInts}
 import ch.datascience.graph.model.GraphModelGenerators.userEmails
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.{Description, Id, Name, Path}
-import ch.datascience.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount, Tag}
-import ch.datascience.knowledgegraph.projects.model.{Permissions, Statistics, Urls}
-import ch.datascience.rdfstore.entities
 import io.circe.Json
 import io.circe.literal._
 

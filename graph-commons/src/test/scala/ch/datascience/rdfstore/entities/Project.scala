@@ -26,7 +26,6 @@ import ch.datascience.tinytypes.constraints.PositiveInt
 import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
-import scala.collection.Set
 
 case class Project[+FC <: ForksCount](path:         Path,
                                       name:         Name,

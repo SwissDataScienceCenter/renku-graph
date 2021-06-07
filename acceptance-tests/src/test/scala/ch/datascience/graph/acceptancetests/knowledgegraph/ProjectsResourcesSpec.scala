@@ -22,6 +22,8 @@ import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.data
+import ch.datascience.graph.acceptancetests.data.Project.Permissions._
+import ch.datascience.graph.acceptancetests.data.Project._
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning._
 import ch.datascience.graph.acceptancetests.knowledgegraph.DatasetsResources._
@@ -34,11 +36,9 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.server.EndpointTester._
-import ch.datascience.knowledgegraph.projects.model.Permissions._
-import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.rdfstore.entities
 import ch.datascience.rdfstore.entities.Project.ForksCount
-import ch.datascience.rdfstore.entities._
+import ch.datascience.rdfstore.entities.{renkuBaseUrl => _, gitLabApiUrl => _, _}
 import io.circe.literal._
 import io.circe.{Encoder, Json}
 import io.renku.jsonld.JsonLD
@@ -131,7 +131,7 @@ class ProjectsResourcesSpec
 
 object ProjectsResources {
 
-  def fullJson(project: data.Project[_]): Json = json"""{
+  def fullJson(project: data.Project[entities.Project.ForksCount]): Json = json"""{
     "identifier":  ${project.id.value}, 
     "path":        ${project.path.value}, 
     "name":        ${project.name.value},
@@ -169,14 +169,6 @@ object ProjectsResources {
     }""" addIfDefined ("readme" -> urls.maybeReadme.map(_.value))
   }
 
-  private implicit class CreationOps(created: Creation) {
-    import ch.datascience.json.JsonOps._
-
-    lazy val toJson: Json = json"""{
-      "dateCreated": ${created.date.value}
-    }""" addIfDefined ("creator" -> created.maybeCreator.map(_.toJson))
-  }
-
   private implicit lazy val forkingEncoder: Encoder[(ForksCount, entities.Project[ForksCount])] = Encoder.instance {
     case (forksCount, project: entities.Project[ForksCount] with entities.HavingParent) => json"""{
       "forksCount": ${forksCount.value},
@@ -189,14 +181,6 @@ object ProjectsResources {
     case (forksCount, _) => json"""{
       "forksCount": ${forksCount.value}
     }"""
-  }
-
-  private implicit class CreatorOps(creator: Creator) {
-    import ch.datascience.json.JsonOps._
-
-    lazy val toJson: Json = json"""{
-      "name":  ${creator.name.value}
-    }""" addIfDefined ("email" -> creator.maybeEmail.map(_.value))
   }
 
   private lazy val toJson: Permissions => Json = {

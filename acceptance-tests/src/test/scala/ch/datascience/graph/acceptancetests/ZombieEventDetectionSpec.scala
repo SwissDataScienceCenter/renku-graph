@@ -22,7 +22,8 @@ import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.acceptancetests.data.{Project, dataProjects}
+import ch.datascience.generators.Generators.timestampsNotInTheFuture
+import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.db.EventLog
 import ch.datascience.graph.acceptancetests.flows.AccessTokenPresence.givenAccessTokenPresentFor
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
@@ -35,19 +36,18 @@ import ch.datascience.graph.model.events.{BatchDate, CommitId, EventBody, EventI
 import ch.datascience.graph.model.projects._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.microservices.MicroserviceIdentifier
-import ch.datascience.rdfstore.entities.EntitiesGenerators.personEntities
 import ch.datascience.rdfstore.entities.Project.ForksCount
-import ch.datascience.rdfstore.entities.{projectEntities, visibilityPublic}
+import ch.datascience.rdfstore.entities.{gitLabApiUrl => _, renkuBaseUrl => _, _}
 import io.circe.literal._
-import io.renku.eventlog.EventContentGenerators.eventDates
-import io.renku.eventlog.{CreatedDate, EventDate, ExecutionDate, TypeSerializers}
+import io.renku.eventlog._
+import org.scalacheck.Gen
 import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.Eventually
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
-import skunk._
 import skunk.data.Completion
 import skunk.implicits._
+import skunk.{Command, Session, ~}
 
 import java.time.Instant
 
@@ -101,7 +101,7 @@ class ZombieEventDetectionSpec
     }
   }
 
-  private def insertProjectToDB(project: Project[_], eventDate: EventDate) = EventLog.execute { session =>
+  private def insertProjectToDB(project: data.Project[_], eventDate: EventDate) = EventLog.execute { session =>
     val query: Command[Id ~ Path ~ EventDate] =
       sql"""INSERT INTO project (project_id, project_path, latest_event_date)
           VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
@@ -116,7 +116,7 @@ class ZombieEventDetectionSpec
     }
   }
 
-  private def insertEventToDB(commitId: CommitId, project: Project[_], eventDate: EventDate)(implicit
+  private def insertEventToDB(commitId: CommitId, project: data.Project[_], eventDate: EventDate)(implicit
       session:                          Session[IO]
   ) = {
     val query: Command[EventId ~ Id ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody] =
@@ -146,11 +146,13 @@ class ZombieEventDetectionSpec
       )
   }
 
-  private def insertEventDeliveryToDB(commitId: CommitId, project: Project[_])(implicit session: Session[IO]) = {
+  private def insertEventDeliveryToDB(commitId: CommitId, project: data.Project[_])(implicit session: Session[IO]) = {
     val query: Command[EventId ~ Id ~ MicroserviceIdentifier] = sql"""
           INSERT INTO event_delivery (event_id, project_id, delivery_id)
           VALUES ($eventIdEncoder, $projectIdEncoder, $microserviceIdentifierEncoder)
           """.command
     session.prepare(query).use(_.execute(EventId(commitId.value) ~ project.id ~ MicroserviceIdentifier.generate))
   }
+
+  private implicit lazy val eventDates: Gen[EventDate] = timestampsNotInTheFuture map EventDate.apply
 }

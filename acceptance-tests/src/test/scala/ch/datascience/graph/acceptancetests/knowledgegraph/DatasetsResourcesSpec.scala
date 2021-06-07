@@ -30,17 +30,15 @@ import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TestReadabilityTools._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets
 import ch.datascience.graph.model.datasets.{DatePublished, Identifier, Title}
 import ch.datascience.graph.model.projects.Visibility
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.http.rest.Links.{Href, Rel, _links}
 import ch.datascience.http.server.EndpointTester._
-import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.rdfstore.entities
 import ch.datascience.rdfstore.entities.ModelOps.DatasetForkingResult
-import ch.datascience.rdfstore.entities._
+import ch.datascience.rdfstore.entities.{renkuBaseUrl => _, gitLabApiUrl => _, _}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import eu.timepit.refined.auto._
 import io.circe.literal._
@@ -335,45 +333,39 @@ object DatasetsResources {
       encoder:           Encoder[entities.Dataset[entities.Dataset.Provenance]]
   ): Json = encoder(dataset)
 
-  implicit val datasetEncoder: Encoder[entities.Dataset[_ <: entities.Dataset.Provenance]] = Encoder.instance {
-    case dataset: entities.Dataset[entities.Dataset.Provenance.Modified] =>
-      json"""{
-        "identifier": ${dataset.identification.identifier.value},
-        "versions": {
-          "initial": ${dataset.provenance.initialVersion.value}
-        },
-        "title": ${dataset.identification.title.value},
-        "name": ${dataset.identification.name.value},
-        "derivedFrom": ${dataset.provenance.derivedFrom.value},
-        "images": ${dataset.additionalInfo.images.map(_.value)}
-      }""" deepMerge {
+  implicit def datasetEncoder[P <: entities.Dataset.Provenance](implicit
+      provenanceEncoder: Encoder[P]
+  ): Encoder[entities.Dataset[P]] = Encoder.instance { dataset =>
+    json"""{
+      "identifier": ${dataset.identification.identifier.value},
+      "versions": {
+        "initial": ${dataset.provenance.initialVersion.value}
+      },
+      "title": ${dataset.identification.title.value},
+      "name": ${dataset.identification.name.value},
+      "images": ${dataset.additionalInfo.images.map(_.value)}
+    }"""
+      .deepMerge(
         _links(
           Rel("details")         -> Href(renkuResourcesUrl / "datasets" / dataset.identification.identifier),
           Rel("initial-version") -> Href(renkuResourcesUrl / "datasets" / dataset.provenance.initialVersion)
         )
-      }
-
-    case dataset =>
-      json"""{
-        "identifier": ${dataset.identification.identifier.value},
-        "versions": {
-          "initial": ${dataset.provenance.initialVersion.value}
-        },
-        "title": ${dataset.identification.title.value},
-        "name": ${dataset.identification.name.value},
-        "sameAs": ${dataset.provenance.topmostSameAs.value},
-        "images": ${dataset.additionalInfo.images.map(_.value)}
-      }""" deepMerge {
-        _links(
-          Rel("details")         -> Href(renkuResourcesUrl / "datasets" / dataset.identification.identifier),
-          Rel("initial-version") -> Href(renkuResourcesUrl / "datasets" / dataset.provenance.initialVersion)
-        )
-      }
+      )
+      .deepMerge(provenanceEncoder(dataset.provenance))
   }
 
-  def searchResultJson(dataset:       entities.Dataset[entities.Dataset.Provenance],
-                       projectsCount: Int,
-                       actualResults: List[Json]
+  implicit def provenanceEncoder: Encoder[entities.Dataset.Provenance] = Encoder.instance {
+    case provenance: entities.Dataset.Provenance.Modified => json"""{
+        "derivedFrom": ${provenance.derivedFrom.value}
+      }"""
+    case provenance => json"""{
+        "sameAs": ${provenance.topmostSameAs.value}
+      }"""
+  }
+
+  def searchResultJson[P <: entities.Dataset.Provenance](dataset:       entities.Dataset[P],
+                                                         projectsCount: Int,
+                                                         actualResults: List[Json]
   ): Json = {
     val actualIdentifier = actualResults
       .findId(dataset.identification.title)
@@ -386,7 +378,7 @@ object DatasetsResources {
       "title": ${dataset.identification.title.value},
       "name": ${dataset.identification.name.value},
       "published": ${dataset.provenance.creators -> dataset.provenance.date},
-      "date": ${dataset.provenance.date},
+      "date": ${dataset.provenance.date.instant},
       "projectsCount": $projectsCount,
       "images": ${dataset.additionalInfo.images.map(_.value)},
       "keywords": ${dataset.additionalInfo.keywords.sorted.map(_.value)}
@@ -399,9 +391,8 @@ object DatasetsResources {
       }
   }
 
-  private implicit lazy val publishingEncoder: Encoder[(Set[DatasetCreator], datasets.Date)] =
+  private implicit def publishedEncoder[P <: entities.Dataset.Provenance]: Encoder[(Set[entities.Person], P#D)] =
     Encoder.instance {
-
       case (creators, DatePublished(date)) =>
         json"""{
           "creator": ${creators.toList},
@@ -413,11 +404,10 @@ object DatasetsResources {
         }"""
     }
 
-  private implicit lazy val creatorEncoder: Encoder[DatasetCreator] = Encoder.instance[DatasetCreator] {
-    case DatasetCreator(maybeEmail, name, _) =>
-      json"""{
-        "name": $name
-      }""" addIfDefined ("email" -> maybeEmail)
+  private implicit lazy val personEncoder: Encoder[entities.Person] = Encoder.instance[entities.Person] {
+    case entities.Person(name, maybeEmail, _, _) => json"""{
+      "name": $name
+    }""" addIfDefined ("email" -> maybeEmail)
   }
 
   def sortCreators(json: Json): Option[Json] = {
@@ -430,8 +420,6 @@ object DatasetsResources {
 
     json.hcursor.downField("published").downField("creator").withFocus(_.mapArray(orderByName)).top
   }
-
-  lazy val toPerson: DatasetCreator => Person = creator => Person(creator.name, creator.maybeEmail, None)
 
   implicit class JsonsOps(jsons: List[Json]) {
 

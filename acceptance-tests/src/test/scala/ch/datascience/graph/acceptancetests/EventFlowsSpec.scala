@@ -101,7 +101,6 @@ class EventFlowsSpec
       val project   = dataProjects(projectEntities[ForksCount.Zero](visibilityPublic)).generateOne
       val projectId = project.id
       val commitId  = commitIds.generateOne
-      val committer = personEntities.generateOne
 
       Given("commit with the commit id matching Push Event's 'after' exists on the project in GitLab")
       `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
@@ -142,7 +141,6 @@ class EventFlowsSpec
       val project   = dataProjects(projectEntities[ForksCount.Zero](visibilityPublic)).generateOne
       val projectId = project.id
       val commitId  = commitIds.generateOne
-      val committer = personEntities.generateOne
 
       Given("commit with the commit id matching Push Event's 'after' exists on the project in GitLab")
       `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)

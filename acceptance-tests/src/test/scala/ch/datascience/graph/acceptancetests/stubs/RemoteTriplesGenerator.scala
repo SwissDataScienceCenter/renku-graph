@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.acceptancetests.stubs
 
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.data
 import ch.datascience.graph.acceptancetests.data._
@@ -63,7 +64,7 @@ object RemoteTriplesGenerator {
         parametersValueOverrides = Nil,
         inputsValueOverrides = Nil,
         outputsValueOverrides = Nil
-      ).buildProvenanceGraph.fold(fail, identity).asJsonLD
+      ).buildProvenanceGraph.fold(errors => fail(errors.intercalate("\n")), identity).asJsonLD
     )
 
   def `GET <triples-generator>/projects/:id/commits/:id returning OK`(

@@ -22,8 +22,11 @@ import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.data
+import ch.datascience.graph.acceptancetests.data.Project.Permissions
+import ch.datascience.graph.acceptancetests.data.Project.Permissions._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices.webhookServiceClient
 import ch.datascience.graph.acceptancetests.tooling.TestLogger
+import ch.datascience.graph.config.{GitLabApiUrl, GitLabUrl}
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.CommitId
@@ -33,8 +36,6 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.http.server.security.model.AuthUser
-import ch.datascience.knowledgegraph.projects.model.Permissions
-import ch.datascience.knowledgegraph.projects.model.Permissions._
 import ch.datascience.rdfstore.entities
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
@@ -52,7 +53,8 @@ import io.circe.{Encoder, Json}
 object GitLab {
 
   private val logger = TestLogger()
-  private val port: Int Refined Positive = 2048
+  private val port:      Int Refined Positive = 2048
+  lazy val gitLabApiUrl: GitLabApiUrl         = GitLabUrl(s"http://localhost:$port").apiV4
 
   def `GET <gitlabApi>/user returning OK`(user: AuthUser): Unit =
     `GET <gitlabApi>/user returning OK`(user.id)(user.accessToken)
@@ -235,7 +237,7 @@ object GitLab {
 
     implicit val parentProjectEncoder: Encoder[entities.Project[FC] with entities.HavingParent] =
       Encoder.instance(project => json"""{
-        "forked_from_project": ${project.parent.path}
+        "forked_from_project": ${project.parent.path.value}
       }""")
 
     val queryParams = if (withStatistics) "?statistics=true" else ""

@@ -20,23 +20,23 @@ package ch.datascience.graph.acceptancetests
 
 import ch.datascience.config.renku
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.acceptancetests.tooling.RDFStore
+import ch.datascience.generators.Generators.{httpUrls => urls, _}
+import ch.datascience.graph.acceptancetests.data.Project.Permissions._
+import ch.datascience.graph.acceptancetests.data.Project.Statistics._
+import ch.datascience.graph.acceptancetests.data.Project.Urls._
+import ch.datascience.graph.acceptancetests.data.Project._
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.{CliVersion, RenkuVersionPair, SchemaVersion}
-import ch.datascience.knowledgegraph.projects.rest.ProjectsGenerators._
-import ch.datascience.knowledgegraph.projects.model.Project.DateUpdated
+import ch.datascience.rdfstore.entities
 import ch.datascience.rdfstore.entities.fixed
-import ch.datascience.rdfstore.{FusekiBaseUrl, entities}
 import org.scalacheck.Gen
 
-import scala.language.implicitConversions
-
 package object data {
-  val renkuResourcesUrl:      renku.ResourcesUrl = renku.ResourcesUrl("http://localhost:9004/knowledge-graph")
-  val currentVersionPair:     RenkuVersionPair   = RenkuVersionPair(CliVersion("0.12.2"), SchemaVersion("8"))
-  implicit val cliVersion:    CliVersion         = currentVersionPair.cliVersion
-  implicit val fusekiBaseUrl: FusekiBaseUrl      = RDFStore.fusekiBaseUrl
+  val currentVersionPair:    RenkuVersionPair   = RenkuVersionPair(CliVersion("0.12.2"), SchemaVersion("8"))
+  implicit val cliVersion:   CliVersion         = currentVersionPair.cliVersion
+  val renkuResourcesUrl:     renku.ResourcesUrl = renku.ResourcesUrl("http://localhost:9004/knowledge-graph")
+  implicit val renkuBaseUrl: RenkuBaseUrl       = RenkuBaseUrl("http://localhost")
 
   def dataProjects[FC <: entities.Project.ForksCount](
       projectGen: Gen[entities.Project[FC]]
@@ -55,4 +55,50 @@ package object data {
   def dataProjects[FC <: entities.Project.ForksCount](
       project: entities.Project[FC]
   ): Gen[Project[FC]] = dataProjects(fixed(project))
+
+  implicit lazy val urlsObjects: Gen[Urls] = for {
+    sshUrl         <- sshUrls
+    httpUrl        <- httpUrls
+    webUrl         <- webUrls
+    maybeReadmeUrl <- readmeUrls.toGeneratorOfOptions
+  } yield Urls(sshUrl, httpUrl, webUrl, maybeReadmeUrl)
+
+  private lazy val starsCounts: Gen[StarsCount] = nonNegativeInts() map (v => StarsCount(v.value))
+  private lazy val tagsObjects: Gen[Tag]        = nonBlankStrings() map (v => Tag(v.value))
+  private lazy val sshUrls: Gen[SshUrl] = for {
+    hostParts   <- nonEmptyList(nonBlankStrings())
+    projectPath <- projectPaths
+  } yield SshUrl(s"git@${hostParts.toList.mkString(".")}:$projectPath.git")
+
+  private lazy val httpUrls: Gen[HttpUrl] = for {
+    url         <- urls()
+    projectPath <- projectPaths
+  } yield HttpUrl(s"$url/$projectPath.git")
+
+  private lazy val readmeUrls: Gen[ReadmeUrl] = for {
+    url         <- urls()
+    projectPath <- projectPaths
+  } yield ReadmeUrl(s"$url/$projectPath/blob/master/README.md")
+
+  private lazy val webUrls: Gen[WebUrl] = urls() map WebUrl.apply
+
+  implicit lazy val permissionsObjects: Gen[Permissions] =
+    Gen.oneOf(
+      accessLevels map ProjectAccessLevel.apply map ProjectPermissions.apply,
+      accessLevels map GroupAccessLevel.apply map GroupPermissions.apply,
+      for {
+        project <- accessLevels map ProjectAccessLevel.apply
+        group   <- accessLevels map GroupAccessLevel.apply
+      } yield ProjectAndGroupPermissions(project, group)
+    )
+
+  implicit lazy val accessLevels: Gen[AccessLevel] = Gen.oneOf(AccessLevel.all.toList)
+
+  implicit lazy val statisticsObjects: Gen[Statistics] = for {
+    commitsCount     <- nonNegativeInts() map (v => CommitsCount(v.value))
+    storageSize      <- nonNegativeInts() map (v => StorageSize(v.value))
+    repositorySize   <- nonNegativeInts() map (v => RepositorySize(v.value))
+    lfsSize          <- nonNegativeInts() map (v => LsfObjectsSize(v.value))
+    jobArtifactsSize <- nonNegativeInts() map (v => JobArtifactsSize(v.value))
+  } yield Statistics(commitsCount, storageSize, repositorySize, lfsSize, jobArtifactsSize)
 }

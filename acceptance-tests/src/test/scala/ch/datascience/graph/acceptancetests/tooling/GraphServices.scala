@@ -24,6 +24,8 @@ import ch.datascience.graph.acceptancetests.db.{EventLog, TokenRepository}
 import ch.datascience.graph.acceptancetests.stubs.{GitLab, RemoteTriplesGenerator}
 import ch.datascience.graph.acceptancetests.tooling.KnowledgeGraphClient.KnowledgeGraphClient
 import ch.datascience.graph.acceptancetests.tooling.WebhookServiceClient.WebhookServiceClient
+import ch.datascience.graph.config.GitLabApiUrl
+import ch.datascience.rdfstore.FusekiBaseUrl
 import io.renku.eventlog
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
@@ -31,6 +33,9 @@ import scala.concurrent.ExecutionContext
 
 trait GraphServices extends BeforeAndAfterAll {
   this: Suite =>
+
+  protected implicit val fusekiBaseUrl: FusekiBaseUrl = RDFStore.fusekiBaseUrl
+  protected implicit val gitLabApiUrl:  GitLabApiUrl  = GitLab.gitLabApiUrl
 
   protected implicit lazy val executionContext: ExecutionContext     = GraphServices.executionContext
   protected implicit lazy val contextShift:     ContextShift[IO]     = GraphServices.contextShift

@@ -133,13 +133,13 @@ lazy val acceptanceTests = Project(
 ).settings(
   commonSettings
 ).dependsOn(
+  graphCommons % "test->test",
   webhookService,
   commitEventService,
   triplesGenerator,
   tokenRepository,
-  knowledgeGraph % "test->test",
-  graphCommons   % "test->test",
-  eventLog       % "test->test"
+  knowledgeGraph,
+  eventLog
 ).enablePlugins(
   AutomateHeaderPlugin
 )
