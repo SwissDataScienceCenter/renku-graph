@@ -27,7 +27,7 @@ import ch.datascience.graph.config.GitLabApiUrl
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects
 import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException}
-import ch.datascience.http.client.{AccessToken, IORestClient}
+import ch.datascience.http.client.{AccessToken, RestClient}
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
 import eu.timepit.refined.api.Refined
@@ -54,18 +54,18 @@ private class CommitCommitterFinderImpl(
     gitLabApiUrl:           GitLabApiUrl,
     gitLabThrottler:        Throttler[IO, GitLab],
     logger:                 Logger[IO],
-    retryInterval:          FiniteDuration = IORestClient.SleepAfterConnectionIssue,
-    maxRetries:             Int Refined NonNegative = IORestClient.MaxRetriesAfterConnectionTimeout,
+    retryInterval:          FiniteDuration = RestClient.SleepAfterConnectionIssue,
+    maxRetries:             Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
     requestTimeoutOverride: Option[Duration] = None
 )(implicit
     executionContext: ExecutionContext,
     contextShift:     ContextShift[IO],
     timer:            Timer[IO]
-) extends IORestClient(gitLabThrottler,
-                       logger,
-                       retryInterval = retryInterval,
-                       maxRetries = maxRetries,
-                       requestTimeoutOverride = requestTimeoutOverride
+) extends RestClient(gitLabThrottler,
+                     logger,
+                     retryInterval = retryInterval,
+                     maxRetries = maxRetries,
+                     requestTimeoutOverride = requestTimeoutOverride
     )
     with CommitCommitterFinder[IO] {
 

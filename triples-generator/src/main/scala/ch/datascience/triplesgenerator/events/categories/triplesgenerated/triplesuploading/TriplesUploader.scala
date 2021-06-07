@@ -18,11 +18,11 @@
 
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplesuploading
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.control.Throttler
-import ch.datascience.http.client.IORestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
-import ch.datascience.http.client.{HttpRequest, IORestClient}
+import ch.datascience.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
+import ch.datascience.http.client.{HttpRequest, RestClient}
 import ch.datascience.rdfstore.{JsonLDTriples, RdfStoreConfig, SparqlQueryTimeRecorder}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -32,30 +32,31 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
+import scala.language.postfixOps
 import scala.util.control.NonFatal
 
 private trait TriplesUploader[Interpretation[_]] {
   def upload(triples: JsonLDTriples): Interpretation[TriplesUploadResult]
 }
 
-private class IOTriplesUploader(
+private class TriplesUploaderImpl[Interpretation[_]: ConcurrentEffect: Timer](
     rdfStoreConfig:          RdfStoreConfig,
-    logger:                  Logger[IO],
-    timeRecorder:            SparqlQueryTimeRecorder[IO],
+    logger:                  Logger[Interpretation],
+    timeRecorder:            SparqlQueryTimeRecorder[Interpretation],
     retryInterval:           FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     idleTimeout:             Duration = 6 minutes,
     requestTimeout:          Duration = 5 minutes
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORestClient[Any](Throttler.noThrottling,
-                              logger,
-                              maybeTimeRecorder = timeRecorder.instance.some,
-                              retryInterval = retryInterval,
-                              maxRetries = maxRetries,
-                              idleTimeoutOverride = idleTimeout.some,
-                              requestTimeoutOverride = requestTimeout.some
+)(implicit executionContext: ExecutionContext)
+    extends RestClient[Interpretation, Any](Throttler.noThrottling,
+                                            logger,
+                                            maybeTimeRecorder = timeRecorder.instance.some,
+                                            retryInterval = retryInterval,
+                                            maxRetries = maxRetries,
+                                            idleTimeoutOverride = idleTimeout.some,
+                                            requestTimeoutOverride = requestTimeout.some
     )
-    with TriplesUploader[IO] {
+    with TriplesUploader[Interpretation] {
 
   import TriplesUploadResult._
   import org.http4s.MediaType.application._
@@ -67,7 +68,7 @@ private class IOTriplesUploader(
 
   private lazy val dataUploadUrl = rdfStoreConfig.fusekiBaseUrl / rdfStoreConfig.datasetName / "data"
 
-  def upload(triples: JsonLDTriples): IO[TriplesUploadResult] = {
+  def upload(triples: JsonLDTriples): Interpretation[TriplesUploadResult] = {
     for {
       uri          <- validateUri(dataUploadUrl.value)
       uploadResult <- send(uploadRequest(uri, triples))(mapResponse)
@@ -82,18 +83,40 @@ private class IOTriplesUploader(
       name = "json-ld upload"
     )
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[TriplesUploadResult]] = {
-    case (Ok, _, _)                         => IO.pure(DeliverySuccess)
+  private lazy val mapResponse: PartialFunction[(Status, Request[Interpretation], Response[Interpretation]),
+                                                Interpretation[TriplesUploadResult]
+  ] = {
+    case (Ok, _, _)                         => DeliverySuccess.pure[Interpretation].widen[TriplesUploadResult]
     case (BadRequest, _, response)          => singleLineBody(response).map(InvalidTriplesFailure.apply)
     case (InternalServerError, _, response) => singleLineBody(response).map(InvalidTriplesFailure.apply)
     case (other, _, response) =>
       singleLineBody(response).map(message => s"$other: $message").map(RecoverableFailure.apply)
   }
 
-  private def singleLineBody(response: Response[IO]): IO[String] =
+  private def singleLineBody(response: Response[Interpretation]): Interpretation[String] =
     response.as[String].map(LogMessage.toSingleLine)
 
   private lazy val withUploadingError: PartialFunction[Throwable, TriplesUploadResult] = { case NonFatal(exception) =>
     RecoverableFailure(exception.getMessage)
   }
+}
+
+private object TriplesUploader {
+  def apply(rdfStoreConfig:    RdfStoreConfig,
+            logger:            Logger[IO],
+            timeRecorder:      SparqlQueryTimeRecorder[IO],
+            retryInterval:     FiniteDuration = SleepAfterConnectionIssue,
+            maxRetries:        Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
+            idleTimeout:       Duration = 6 minutes,
+            requestTimeout:    Duration = 5 minutes
+  )(implicit executionContext: ExecutionContext, concurrentEffect: ConcurrentEffect[IO], timer: Timer[IO]) = IO(
+    new TriplesUploaderImpl[IO](rdfStoreConfig,
+                                logger,
+                                timeRecorder,
+                                retryInterval,
+                                maxRetries,
+                                idleTimeout,
+                                requestTimeout
+    )
+  )
 }

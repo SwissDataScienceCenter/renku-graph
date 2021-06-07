@@ -18,15 +18,14 @@
 
 package ch.datascience.knowledgegraph.projects.rest
 
-import cats.MonadError
 import cats.data.OptionT
-import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
+import cats.{MonadThrow, Parallel}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.projects.Path
-import ch.datascience.graph.tokenrepository.IOAccessTokenFinder._
-import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
+import ch.datascience.graph.tokenrepository.AccessTokenFinder
+import ch.datascience.graph.tokenrepository.AccessTokenFinder._
 import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
@@ -35,26 +34,26 @@ import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder.{KGProject, P
 import scala.concurrent.ExecutionContext
 import scala.util.Try
 
-trait ProjectFinder[Interpretation[_]] {
+private trait ProjectFinder[Interpretation[_]] {
   def findProject(path: Path, maybeAuthUser: Option[AuthUser]): Interpretation[Option[Project]]
 }
 
-class IOProjectFinder(
-    kgProjectFinder:     KGProjectFinder[IO],
-    gitLabProjectFinder: GitLabProjectFinder[IO],
-    accessTokenFinder:   AccessTokenFinder[IO]
-)(implicit ME:           MonadError[IO, Throwable], cs: ContextShift[IO])
-    extends ProjectFinder[IO] {
+private class ProjectFinderImpl[Interpretation[_]: MonadThrow](
+    kgProjectFinder:     KGProjectFinder[Interpretation],
+    gitLabProjectFinder: GitLabProjectFinder[Interpretation],
+    accessTokenFinder:   AccessTokenFinder[Interpretation]
+)(implicit parallel:     Parallel[Interpretation])
+    extends ProjectFinder[Interpretation] {
 
   import accessTokenFinder._
   import gitLabProjectFinder.{findProject => findProjectInGitLab}
   import kgProjectFinder.{findProject => findInKG}
 
-  def findProject(path: Path, maybeAuthUser: Option[AuthUser]): IO[Option[Project]] =
+  def findProject(path: Path, maybeAuthUser: Option[AuthUser]): Interpretation[Option[Project]] =
     ((OptionT(findInKG(path)), findInGitLab(path, maybeAuthUser)) parMapN (merge(path, _, _))).value
 
   private def findInGitLab(path: Path, maybeAuthUser: Option[AuthUser]) = for {
-    accessToken   <- OptionT.fromOption[IO](maybeAuthUser.map(_.accessToken)) orElseF findAccessToken(path)
+    accessToken   <- OptionT.fromOption[Interpretation](maybeAuthUser.map(_.accessToken)) orElseF findAccessToken(path)
     gitLabProject <- findProjectInGitLab(path, Some(accessToken))
   } yield gitLabProject
 
@@ -93,7 +92,7 @@ class IOProjectFinder(
   }
 }
 
-private object IOProjectFinder {
+private object ProjectFinder {
   import cats.effect.{ContextShift, IO, Timer}
   import ch.datascience.rdfstore.SparqlQueryTimeRecorder
   import org.typelevel.log4cats.Logger
@@ -103,14 +102,12 @@ private object IOProjectFinder {
       logger:          Logger[IO],
       timeRecorder:    SparqlQueryTimeRecorder[IO]
   )(implicit
-      ME:               MonadError[IO, Throwable],
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[ProjectFinder[IO]] =
-    for {
-      kgProjectFinder     <- IOKGProjectFinder(timeRecorder, logger = logger)
-      gitLabProjectFinder <- IOGitLabProjectFinder(gitLabThrottler, logger)
-      accessTokenFinder   <- IOAccessTokenFinder(logger)
-    } yield new IOProjectFinder(kgProjectFinder, gitLabProjectFinder, accessTokenFinder)
+  ): IO[ProjectFinder[IO]] = for {
+    kgProjectFinder     <- KGProjectFinder(timeRecorder, logger = logger)
+    gitLabProjectFinder <- GitLabProjectFinder(gitLabThrottler, logger)
+    accessTokenFinder   <- AccessTokenFinder(logger)
+  } yield new ProjectFinderImpl(kgProjectFinder, gitLabProjectFinder, accessTokenFinder)
 }

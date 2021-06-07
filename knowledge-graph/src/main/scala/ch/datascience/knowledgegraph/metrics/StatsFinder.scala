@@ -44,7 +44,7 @@ private class StatsFinderImpl(
     contextShift:     ContextShift[IO],
     timer:            Timer[IO],
     ME:               MonadError[IO, Throwable]
-) extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
+) extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
     with StatsFinder[IO] {
 
   import EntityCount._

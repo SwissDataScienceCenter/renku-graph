@@ -25,12 +25,9 @@ import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.ErrorMessage
 import ch.datascience.http.ErrorMessage._
-import ch.datascience.http.client.AccessToken
-import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
-import io.circe.literal._
 import io.circe.syntax._
 import org.http4s.Status
 import org.scalamock.scalatest.MockFactory
@@ -39,41 +36,36 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class IOAccessTokenAssociatorSpec
+class AccessTokenRemoverImplSpec
     extends AnyWordSpec
     with MockFactory
     with ExternalServiceStubbing
     with should.Matchers {
 
-  "associate" should {
+  "removeAccessToken" should {
 
-    personalAccessTokens.generateOne +: oauthAccessTokens.generateOne +: Nil foreach { accessToken =>
-      s"succeed if association projectId with a ${accessToken.getClass.getSimpleName} on a remote is successful" in new TestCase {
+    "succeed if removing token for the given projectId on a remote is successful" in new TestCase {
 
-        stubFor {
-          put(s"/projects/$projectId/tokens")
-            .withRequestBody(equalToJson(toJson(accessToken)))
-            .willReturn(noContent())
-        }
-
-        associator.associate(projectId, accessToken).unsafeRunSync() shouldBe ((): Unit)
+      stubFor {
+        delete(s"/projects/$projectId/tokens")
+          .willReturn(noContent())
       }
+
+      tokenRemover.removeAccessToken(projectId).unsafeRunSync() shouldBe ((): Unit)
     }
 
     "return an Exception if remote client responds with a status other than NO_CONTENT" in new TestCase {
-
       val accessToken = accessTokens.generateOne
 
       val responseBody = ErrorMessage("some error").asJson.noSpaces
       stubFor {
-        put(s"/projects/$projectId/tokens")
-          .withRequestBody(equalToJson(toJson(accessToken)))
-          .willReturn(badRequest.withBody(responseBody))
+        delete(s"/projects/$projectId/tokens")
+          .willReturn(status(Status.BadGateway.code).withBody(responseBody))
       }
 
       intercept[Exception] {
-        associator.associate(projectId, accessToken).unsafeRunSync()
-      }.getMessage shouldBe s"PUT $tokenRepositoryUrl/projects/$projectId/tokens returned ${Status.BadRequest}; body: $responseBody"
+        tokenRemover.removeAccessToken(projectId).unsafeRunSync()
+      }.getMessage shouldBe s"DELETE $tokenRepositoryUrl/projects/$projectId/tokens returned ${Status.BadGateway}; body: $responseBody"
     }
   }
 
@@ -85,11 +77,6 @@ class IOAccessTokenAssociatorSpec
     val tokenRepositoryUrl = TokenRepositoryUrl(externalServiceBaseUrl)
     val projectId          = projectIds.generateOne
 
-    val associator = new IOAccessTokenAssociator(tokenRepositoryUrl, TestLogger())
-  }
-
-  private lazy val toJson: AccessToken => String = {
-    case PersonalAccessToken(token) => json"""{"personalAccessToken": $token}""".noSpaces
-    case OAuthAccessToken(token)    => json"""{"oauthAccessToken": $token}""".noSpaces
+    val tokenRemover = new AccessTokenRemoverImpl[IO](tokenRepositoryUrl, TestLogger())
   }
 }

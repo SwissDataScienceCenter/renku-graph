@@ -29,7 +29,7 @@ import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.GraphModelGenerators.{authUsers, projectPaths}
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
-import ch.datascience.graph.tokenrepository.IOAccessTokenFinder.projectPathToPath
+import ch.datascience.graph.tokenrepository.AccessTokenFinder.projectPathToPath
 import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.projects.model
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
@@ -208,7 +208,7 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
     val kgProjectFinder     = mock[KGProjectFinder[IO]]
     val accessTokenFinder   = mock[AccessTokenFinder[IO]]
     val gitLabProjectFinder = mock[GitLabProjectFinder[IO]]
-    val projectFinder       = new IOProjectFinder(kgProjectFinder, gitLabProjectFinder, accessTokenFinder)
+    val projectFinder       = new ProjectFinderImpl(kgProjectFinder, gitLabProjectFinder, accessTokenFinder)
   }
 
   private def projectFrom(kgProject: KGProject, gitLabProject: GitLabProject) =

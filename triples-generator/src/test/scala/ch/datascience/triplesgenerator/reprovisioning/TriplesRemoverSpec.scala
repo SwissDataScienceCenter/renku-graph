@@ -74,6 +74,6 @@ class TriplesRemoverSpec extends AnyWordSpec with InMemoryRdfStore with should.M
     private val logger                = TestLogger[IO]()
     private val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
     private val sparqlTimeRecorder    = new SparqlQueryTimeRecorder(executionTimeRecorder)
-    val triplesRemover                = new IOTriplesRemover(removalBatchSize, rdfStoreConfig, logger, sparqlTimeRecorder)
+    val triplesRemover                = new TriplesRemoverImpl(removalBatchSize, rdfStoreConfig, logger, sparqlTimeRecorder)
   }
 }

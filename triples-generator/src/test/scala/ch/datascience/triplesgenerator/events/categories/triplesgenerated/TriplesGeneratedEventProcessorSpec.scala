@@ -30,7 +30,7 @@ import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.EventStatus.TriplesGenerated
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects.Path
-import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
+import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
@@ -68,7 +68,7 @@ class TriplesGeneratedEventProcessorSpec
     with IntegrationPatience
     with should.Matchers {
 
-  import IOAccessTokenFinder._
+  import AccessTokenFinder._
 
   "process" should {
 

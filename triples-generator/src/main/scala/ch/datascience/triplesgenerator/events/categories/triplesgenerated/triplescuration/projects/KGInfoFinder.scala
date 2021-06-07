@@ -40,7 +40,7 @@ private class IOKGInfoFinder(
     contextShift:     ContextShift[IO],
     timer:            Timer[IO],
     ME:               MonadError[IO, Throwable]
-) extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
+) extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
     with KGInfoFinder[IO] {
 
   import eu.timepit.refined.auto._

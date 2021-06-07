@@ -24,20 +24,20 @@ import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.graph.model.events.EventStatus.TriplesGenerated
 import ch.datascience.graph.model.events.{EventProcessingTime, EventStatus}
-import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
+import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
+import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater
+import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater._
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.{IOTriplesCurator, TriplesTransformer}
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult._
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplesuploading.{IOUploader, TriplesUploadResult, Uploader}
-import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater
-import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater._
-import org.typelevel.log4cats.Logger
 import io.prometheus.client.Histogram
+import org.typelevel.log4cats.Logger
 
 import java.time.Duration
 import scala.concurrent.ExecutionContext
@@ -58,7 +58,7 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]: MonadError[*[_],
     executionTimeRecorder: ExecutionTimeRecorder[Interpretation]
 ) extends EventProcessor[Interpretation] {
 
-  import IOAccessTokenFinder._
+  import AccessTokenFinder._
   import UploadingResult._
   import accessTokenFinder._
   import executionTimeRecorder._
@@ -222,7 +222,7 @@ private object IOTriplesGeneratedEventProcessor {
   ): IO[TriplesGeneratedEventProcessor[IO]] =
     for {
       uploader              <- IOUploader(logger, timeRecorder)
-      accessTokenFinder     <- IOAccessTokenFinder(logger)
+      accessTokenFinder     <- AccessTokenFinder(logger)
       triplesCurator        <- IOTriplesCurator(gitLabThrottler, logger, timeRecorder)
       eventStatusUpdater    <- EventStatusUpdater(categoryName, logger)
       eventsProcessingTimes <- metricsRegistry.register[Histogram, Histogram.Builder](eventsProcessingTimesBuilder)

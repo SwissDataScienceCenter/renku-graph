@@ -188,7 +188,7 @@ class IOProcessingStatusFetcherSpec
   private trait TestCase {
     val projectId   = projectIds.generateOne
     val eventLogUrl = EventLogUrl(externalServiceBaseUrl)
-    val fetcher     = new IOProcessingStatusFetcher(eventLogUrl, TestLogger())
+    val fetcher     = new ProcessingStatusFetcherImpl[IO](eventLogUrl, TestLogger())
   }
 
   private implicit val processingStatusEncoder: Encoder[ProcessingStatus] = Encoder.instance[ProcessingStatus] {

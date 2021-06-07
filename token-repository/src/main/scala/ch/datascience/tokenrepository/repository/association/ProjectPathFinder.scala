@@ -23,7 +23,7 @@ import ch.datascience.config.GitLab
 import ch.datascience.control.{RateLimit, Throttler}
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.projects
-import ch.datascience.http.client.{AccessToken, IORestClient}
+import ch.datascience.http.client.{AccessToken, RestClient}
 import org.typelevel.log4cats.Logger
 import org.http4s.circe.jsonOf
 
@@ -41,7 +41,7 @@ private class IOProjectPathFinder(
     gitLabThrottler:         Throttler[IO, GitLab],
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORestClient(gitLabThrottler, logger)
+    extends RestClient(gitLabThrottler, logger)
     with ProjectPathFinder[IO] {
 
   import cats.effect._

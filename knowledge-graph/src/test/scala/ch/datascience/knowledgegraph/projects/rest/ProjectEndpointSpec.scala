@@ -128,11 +128,11 @@ class ProjectEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
   }
 
   private trait TestCase {
-    val projectFinder         = mock[IOProjectFinder]
+    val projectFinder         = mock[ProjectFinder[IO]]
     val renkuResourcesUrl     = renkuResourcesUrls.generateOne
     val logger                = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
-    val getProject = new ProjectEndpoint[IO](
+    val getProject = new ProjectEndpointImpl[IO](
       projectFinder,
       renkuResourcesUrl,
       executionTimeRecorder,

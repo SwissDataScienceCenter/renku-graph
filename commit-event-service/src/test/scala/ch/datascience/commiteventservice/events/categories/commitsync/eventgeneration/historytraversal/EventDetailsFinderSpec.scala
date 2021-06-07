@@ -44,7 +44,7 @@ class EventDetailsFinderSpec extends AnyWordSpec with MockFactory with ExternalS
           .willReturn(aResponse().withStatus(Ok.code))
       }
 
-      eventDetailsFinder.checkIfExists(event.id, event.project.id).unsafeRunSync() shouldBe true
+      eventDetailsFinder.checkIfExists(event.project.id, event.id).unsafeRunSync() shouldBe true
     }
 
     s"return false when event log responds with NotFound" in new TestCase {
@@ -54,7 +54,7 @@ class EventDetailsFinderSpec extends AnyWordSpec with MockFactory with ExternalS
           .willReturn(aResponse().withStatus(NotFound.code))
       }
 
-      eventDetailsFinder.checkIfExists(event.id, event.project.id).unsafeRunSync() shouldBe false
+      eventDetailsFinder.checkIfExists(event.project.id, event.id).unsafeRunSync() shouldBe false
     }
 
     s"fail when event log responds with other statuses" in new TestCase {
@@ -64,7 +64,7 @@ class EventDetailsFinderSpec extends AnyWordSpec with MockFactory with ExternalS
           .willReturn(aResponse().withStatus(Created.code))
       }
       intercept[Exception] {
-        eventDetailsFinder.checkIfExists(event.id, event.project.id).unsafeRunSync()
+        eventDetailsFinder.checkIfExists(event.project.id, event.id).unsafeRunSync()
       }
     }
   }
@@ -75,6 +75,6 @@ class EventDetailsFinderSpec extends AnyWordSpec with MockFactory with ExternalS
   private trait TestCase {
     val event              = newCommitEvents.generateOne
     val eventLogUrl        = EventLogUrl(externalServiceBaseUrl)
-    val eventDetailsFinder = new EventDetailsFinderImpl(eventLogUrl, TestLogger())
+    val eventDetailsFinder = new EventDetailsFinderImpl[IO](eventLogUrl, TestLogger())
   }
 }

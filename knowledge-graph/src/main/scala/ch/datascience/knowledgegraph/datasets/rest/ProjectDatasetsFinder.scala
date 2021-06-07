@@ -18,12 +18,12 @@
 
 package ch.datascience.knowledgegraph.datasets.rest
 
-import ProjectDatasetsFinder._
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.{DerivedFrom, Identifier, ImageUri, InitialVersion, Name, SameAs, Title}
 import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.graph.model.views.RdfResource
+import ch.datascience.knowledgegraph.datasets.rest.ProjectDatasetsFinder.{ProjectDataset, SameAsOrDerived}
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
 import org.typelevel.log4cats.Logger
@@ -37,22 +37,30 @@ private trait ProjectDatasetsFinder[Interpretation[_]] {
 private object ProjectDatasetsFinder {
   type SameAsOrDerived = Either[SameAs, DerivedFrom]
   type ProjectDataset  = (Identifier, InitialVersion, Title, Name, SameAsOrDerived, List[ImageUri])
+
+  def apply(rdfStoreConfig:    RdfStoreConfig,
+            renkuBaseUrl:      RenkuBaseUrl,
+            logger:            Logger[IO],
+            timeRecorder:      SparqlQueryTimeRecorder[IO]
+  )(implicit executionContext: ExecutionContext, concurrentEffect: ConcurrentEffect[IO], timer: Timer[IO]) = IO(
+    new ProjectDatasetsFinderImpl[IO](rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
+  )
 }
 
-private class IOProjectDatasetsFinder(
+private class ProjectDatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer](
     rdfStoreConfig:          RdfStoreConfig,
     renkuBaseUrl:            RenkuBaseUrl,
-    logger:                  Logger[IO],
-    timeRecorder:            SparqlQueryTimeRecorder[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
-    with ProjectDatasetsFinder[IO] {
+    logger:                  Logger[Interpretation],
+    timeRecorder:            SparqlQueryTimeRecorder[Interpretation]
+)(implicit executionContext: ExecutionContext)
+    extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
+    with ProjectDatasetsFinder[Interpretation] {
 
-  import IOProjectDatasetsFinder._
+  import ProjectDatasetsFinderImpl._
   import ch.datascience.graph.Schemas._
   import eu.timepit.refined.auto._
 
-  def findProjectDatasets(projectPath: Path): IO[List[ProjectDataset]] =
+  def findProjectDatasets(projectPath: Path): Interpretation[List[ProjectDataset]] =
     queryExpecting[List[ProjectDataset]](using = query(projectPath))
 
   private def query(path: Path) = SparqlQuery.of(
@@ -93,7 +101,7 @@ private class IOProjectDatasetsFinder(
   )
 }
 
-private object IOProjectDatasetsFinder {
+private object ProjectDatasetsFinderImpl {
 
   import io.circe.Decoder
   import io.circe.Decoder.decodeList

@@ -20,15 +20,8 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.IO
 import ch.datascience.config.renku
-import ch.datascience.knowledgegraph.projects.rest.{ProjectEndpoint, ProjectFinder}
 import ch.datascience.logging.ExecutionTimeRecorder
 import org.typelevel.log4cats.Logger
-
-class IOProjectEndpointStub(projectFinder:         ProjectFinder[IO],
-                            renkuResourcesUrl:     renku.ResourcesUrl,
-                            executionTimeRecorder: ExecutionTimeRecorder[IO],
-                            logger:                Logger[IO]
-) extends ProjectEndpoint[IO](projectFinder, renkuResourcesUrl, executionTimeRecorder, logger)
 
 class IOProjectDatasetsEndpointStub(projectDatasetsFinder: ProjectDatasetsFinder[IO],
                                     renkuResourcesUrl:     renku.ResourcesUrl,

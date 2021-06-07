@@ -18,8 +18,8 @@
 
 package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration
 
-import Generators._
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, IO, Timer}
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.Generators._
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators.{oauthAccessTokens, personalAccessTokens}
 import ch.datascience.generators.Generators.Implicits._
@@ -139,8 +139,8 @@ class LatestCommitFinderSpec extends AnyWordSpec with MockFactory with ExternalS
     }
   }
 
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO]        = IO.timer(global)
+  private implicit val ce:    ConcurrentEffect[IO] = IO.ioConcurrentEffect(IO.contextShift(global))
+  private implicit val timer: Timer[IO]            = IO.timer(global)
 
   private trait TestCase {
     val gitLabUrl  = GitLabUrl(externalServiceBaseUrl)

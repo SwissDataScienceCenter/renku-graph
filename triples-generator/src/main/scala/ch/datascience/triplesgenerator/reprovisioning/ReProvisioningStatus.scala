@@ -58,7 +58,7 @@ private class ReProvisioningStatusImpl(
     cacheRefreshInterval:    FiniteDuration,
     lastCacheCheckTimeRef:   Ref[IO, Long]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
+    extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
     with ReProvisioningStatus[IO] {
 
   private val applicative = Applicative[IO]

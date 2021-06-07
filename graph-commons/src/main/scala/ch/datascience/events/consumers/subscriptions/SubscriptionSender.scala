@@ -21,9 +21,9 @@ package ch.datascience.events.consumers.subscriptions
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.EventLogUrl
-import ch.datascience.http.client.IORestClient
-import org.typelevel.log4cats.Logger
+import ch.datascience.http.client.RestClient
 import io.circe.Json
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
@@ -35,7 +35,7 @@ private class IOSubscriptionSender(
     eventLogUrl:             EventLogUrl,
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORestClient(Throttler.noThrottling, logger)
+    extends RestClient[IO, IOSubscriptionSender](Throttler.noThrottling, logger)
     with SubscriptionSender[IO] {
 
   import cats.effect._

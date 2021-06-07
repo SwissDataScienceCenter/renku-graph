@@ -19,13 +19,13 @@
 package ch.datascience.knowledgegraph.projects.rest
 
 import cats.data.OptionT
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{Description, Id, Visibility}
-import ch.datascience.http.client.{AccessToken, IORestClient}
+import ch.datascience.http.client.{AccessToken, RestClient}
 import ch.datascience.knowledgegraph.projects.model.Forking.ForksCount
 import ch.datascience.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount, Tag}
 import ch.datascience.knowledgegraph.projects.model._
@@ -34,37 +34,21 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-trait GitLabProjectFinder[Interpretation[_]] {
+private trait GitLabProjectFinder[Interpretation[_]] {
   def findProject(
       projectPath:      projects.Path,
       maybeAccessToken: Option[AccessToken]
   ): OptionT[Interpretation, GitLabProject]
 }
 
-object GitLabProjectFinder {
-
-  final case class GitLabProject(id:               Id,
-                                 maybeDescription: Option[Description],
-                                 visibility:       Visibility,
-                                 urls:             Urls,
-                                 forksCount:       ForksCount,
-                                 tags:             Set[Tag],
-                                 starsCount:       StarsCount,
-                                 updatedAt:        DateUpdated,
-                                 permissions:      Permissions,
-                                 statistics:       Statistics
-  )
-}
-
-private class IOGitLabProjectFinder(
+private class GitLabProjectFinderImpl[Interpretation[_]: ConcurrentEffect: Timer](
     gitLabUrl:               GitLabUrl,
-    gitLabThrottler:         Throttler[IO, GitLab],
-    logger:                  Logger[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORestClient(gitLabThrottler, logger)
-    with GitLabProjectFinder[IO] {
+    gitLabThrottler:         Throttler[Interpretation, GitLab],
+    logger:                  Logger[Interpretation]
+)(implicit executionContext: ExecutionContext)
+    extends RestClient(gitLabThrottler, logger)
+    with GitLabProjectFinder[Interpretation] {
 
-  import cats.effect._
   import cats.syntax.all._
   import ch.datascience.http.client.UrlEncoder.urlEncode
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
@@ -74,7 +58,9 @@ private class IOGitLabProjectFinder(
   import org.http4s.circe.jsonOf
   import org.http4s.dsl.io._
 
-  def findProject(projectPath: projects.Path, maybeAccessToken: Option[AccessToken]): OptionT[IO, GitLabProject] =
+  def findProject(projectPath:      projects.Path,
+                  maybeAccessToken: Option[AccessToken]
+  ): OptionT[Interpretation, GitLabProject] =
     OptionT {
       for {
         uri     <- validateUri(s"$gitLabUrl/api/v4/projects/${urlEncode(projectPath.value)}?statistics=true")
@@ -82,12 +68,14 @@ private class IOGitLabProjectFinder(
       } yield project
     }
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[GitLabProject]]] = {
+  private lazy val mapResponse: PartialFunction[(Status, Request[Interpretation], Response[Interpretation]),
+                                                Interpretation[Option[GitLabProject]]
+  ] = {
     case (Ok, _, response) => response.as[GitLabProject].map(Option.apply)
-    case (NotFound, _, _)  => None.pure[IO]
+    case (NotFound, _, _)  => Option.empty[GitLabProject].pure[Interpretation]
   }
 
-  private implicit lazy val projectDecoder: EntityDecoder[IO, GitLabProject] = {
+  private implicit lazy val projectDecoder: EntityDecoder[Interpretation, GitLabProject] = {
     import ch.datascience.knowledgegraph.projects.model.Forking.ForksCount
     import ch.datascience.knowledgegraph.projects.model.Permissions._
     import ch.datascience.knowledgegraph.projects.model.Project.StarsCount
@@ -166,11 +154,23 @@ private class IOGitLabProjectFinder(
         statistics
       )
 
-    jsonOf[IO, GitLabProject]
+    jsonOf[Interpretation, GitLabProject]
   }
 }
 
-object IOGitLabProjectFinder {
+private object GitLabProjectFinder {
+
+  final case class GitLabProject(id:               Id,
+                                 maybeDescription: Option[Description],
+                                 visibility:       Visibility,
+                                 urls:             Urls,
+                                 forksCount:       ForksCount,
+                                 tags:             Set[Tag],
+                                 starsCount:       StarsCount,
+                                 updatedAt:        DateUpdated,
+                                 permissions:      Permissions,
+                                 statistics:       Statistics
+  )
 
   def apply(
       gitLabThrottler: Throttler[IO, GitLab],
@@ -179,8 +179,7 @@ object IOGitLabProjectFinder {
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[GitLabProjectFinder[IO]] =
-    for {
-      gitLabUrl <- GitLabUrl[IO]()
-    } yield new IOGitLabProjectFinder(gitLabUrl, gitLabThrottler, logger)
+  ): IO[GitLabProjectFinder[IO]] = for {
+    gitLabUrl <- GitLabUrl[IO]()
+  } yield new GitLabProjectFinderImpl(gitLabUrl, gitLabThrottler, logger)
 }

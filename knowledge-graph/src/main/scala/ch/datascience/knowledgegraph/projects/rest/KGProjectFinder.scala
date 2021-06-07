@@ -18,8 +18,7 @@
 
 package ch.datascience.knowledgegraph.projects.rest
 
-import cats.MonadError
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.projects._
 import ch.datascience.graph.model.views.RdfResource
@@ -32,47 +31,25 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-trait KGProjectFinder[Interpretation[_]] {
+private trait KGProjectFinder[Interpretation[_]] {
   def findProject(path: Path): Interpretation[Option[KGProject]]
 }
 
-object KGProjectFinder {
-
-  final case class KGProject(path:        Path,
-                             name:        Name,
-                             created:     ProjectCreation,
-                             visibility:  Visibility,
-                             maybeParent: Option[Parent],
-                             version:     SchemaVersion
-  )
-
-  final case class ProjectCreation(date: DateCreated, maybeCreator: Option[ProjectCreator])
-
-  final case class Parent(resourceId: ResourceId, name: Name, created: ProjectCreation)
-
-  final case class ProjectCreator(maybeEmail: Option[users.Email], name: users.Name)
-
-}
-
-private class IOKGProjectFinder(
-    rdfStoreConfig: RdfStoreConfig,
-    renkuBaseUrl:   RenkuBaseUrl,
-    logger:         Logger[IO],
-    timeRecorder:   SparqlQueryTimeRecorder[IO]
-)(implicit
-    executionContext: ExecutionContext,
-    contextShift:     ContextShift[IO],
-    timer:            Timer[IO],
-    ME:               MonadError[IO, Throwable]
-) extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
-    with KGProjectFinder[IO] {
+private class KGProjectFinderImpl[Interpretation[_]: ConcurrentEffect: Timer](
+    rdfStoreConfig:          RdfStoreConfig,
+    renkuBaseUrl:            RenkuBaseUrl,
+    logger:                  Logger[Interpretation],
+    timeRecorder:            SparqlQueryTimeRecorder[Interpretation]
+)(implicit executionContext: ExecutionContext)
+    extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
+    with KGProjectFinder[Interpretation] {
 
   import cats.syntax.all._
   import ch.datascience.graph.Schemas._
   import eu.timepit.refined.auto._
   import io.circe.Decoder
 
-  override def findProject(path: Path): IO[Option[KGProject]] = {
+  override def findProject(path: Path): Interpretation[Option[KGProject]] = {
     implicit val decoder: Decoder[List[KGProject]] = recordsDecoder(path)
     queryExpecting[List[KGProject]](using = query(path)) flatMap toSingleProject
   }
@@ -153,14 +130,30 @@ private class IOKGProjectFinder(
     _.downField("results").downField("bindings").as(decodeList(project))
   }
 
-  private lazy val toSingleProject: List[KGProject] => IO[Option[KGProject]] = {
-    case Nil            => ME.pure(None)
-    case project +: Nil => ME.pure(Some(project))
-    case projects       => ME.raiseError(new RuntimeException(s"More than one project with ${projects.head.path} path"))
+  private lazy val toSingleProject: List[KGProject] => Interpretation[Option[KGProject]] = {
+    case Nil            => Option.empty[KGProject].pure[Interpretation]
+    case project +: Nil => project.some.pure[Interpretation]
+    case projects =>
+      new RuntimeException(s"More than one project with ${projects.head.path} path")
+        .raiseError[Interpretation, Option[KGProject]]
   }
 }
 
-private object IOKGProjectFinder {
+private object KGProjectFinder {
+
+  final case class KGProject(path:        Path,
+                             name:        Name,
+                             created:     ProjectCreation,
+                             visibility:  Visibility,
+                             maybeParent: Option[Parent],
+                             version:     SchemaVersion
+  )
+
+  final case class ProjectCreation(date: DateCreated, maybeCreator: Option[ProjectCreator])
+
+  final case class Parent(resourceId: ResourceId, name: Name, created: ProjectCreation)
+
+  final case class ProjectCreator(maybeEmail: Option[users.Email], name: users.Name)
 
   def apply(
       timeRecorder:   SparqlQueryTimeRecorder[IO],
@@ -174,5 +167,5 @@ private object IOKGProjectFinder {
   ): IO[KGProjectFinder[IO]] = for {
     config       <- rdfStoreConfig
     renkuBaseUrl <- renkuBaseUrl
-  } yield new IOKGProjectFinder(config, renkuBaseUrl, logger, timeRecorder)
+  } yield new KGProjectFinderImpl(config, renkuBaseUrl, logger, timeRecorder)
 }

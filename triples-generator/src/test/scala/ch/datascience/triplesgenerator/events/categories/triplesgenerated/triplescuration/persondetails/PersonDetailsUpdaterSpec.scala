@@ -29,7 +29,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
-import ch.datascience.graph.tokenrepository.IOAccessTokenFinder.projectPathToPath
+import ch.datascience.graph.tokenrepository.AccessTokenFinder.projectPathToPath
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.rdfstore.entities._

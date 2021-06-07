@@ -26,7 +26,7 @@ import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.graph.model.users.GitLabId
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
-import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
+import ch.datascience.rdfstore.{RdfStoreClientImpl, RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -42,7 +42,7 @@ private class KGProjectMembersFinderImpl(
     logger:                  Logger[IO],
     timeRecorder:            SparqlQueryTimeRecorder[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
+    extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
     with KGProjectMembersFinder[IO] {
 
   import eu.timepit.refined.auto._

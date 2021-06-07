@@ -64,6 +64,6 @@ class EventsReSchedulerSpec extends AnyWordSpec with ExternalServiceStubbing wit
 
   private trait TestCase {
     val eventLogUrl = EventLogUrl(externalServiceBaseUrl)
-    val sender      = new IOEventsReScheduler(eventLogUrl, TestLogger())
+    val sender      = new EventsReSchedulerImpl[IO](eventLogUrl, TestLogger())
   }
 }

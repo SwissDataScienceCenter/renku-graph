@@ -20,6 +20,7 @@ package ch.datascience.commiteventservice.events.categories.commitsync.eventgene
 
 import ch.datascience.commiteventservice.events.categories.commitsync.ProjectInfo
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
+import ch.datascience.events.consumers.Project
 import ch.datascience.generators.Generators.listOf
 import ch.datascience.graph.model.EventsGenerators.{batchDates, commitIds, commitMessages, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths, projectVisibilities, userEmails, userNames}
@@ -29,10 +30,10 @@ import org.scalacheck.Gen.choose
 
 private object Generators {
 
-  implicit val startCommits: Gen[StartCommit] = for {
+  implicit val commits: Gen[Commit] = for {
     id      <- commitIds
     project <- projects
-  } yield StartCommit(id, project)
+  } yield Commit(id, project)
 
   implicit val projectInfos: Gen[ProjectInfo] = for {
     id         <- projectIds

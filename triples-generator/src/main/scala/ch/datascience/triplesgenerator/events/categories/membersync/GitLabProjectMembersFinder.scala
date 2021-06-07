@@ -26,7 +26,7 @@ import ch.datascience.graph.config.{GitLabApiUrl, GitLabUrl}
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.model.users.{GitLabId, Name}
 import ch.datascience.http.client.UrlEncoder.urlEncode
-import ch.datascience.http.client.{AccessToken, IORestClient}
+import ch.datascience.http.client.{AccessToken, RestClient}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import io.circe.Decoder
 import org.http4s.Method.GET
@@ -49,12 +49,12 @@ private class IOGitLabProjectMembersFinder(
     gitLabApiUrl:    GitLabApiUrl,
     gitLabThrottler: Throttler[IO, GitLab],
     logger:          Logger[IO],
-    retryInterval:   FiniteDuration = IORestClient.SleepAfterConnectionIssue
+    retryInterval:   FiniteDuration = RestClient.SleepAfterConnectionIssue
 )(implicit
     executionContext: ExecutionContext,
     contextShift:     ContextShift[IO],
     timer:            Timer[IO]
-) extends IORestClient(gitLabThrottler, logger, retryInterval = retryInterval)
+) extends RestClient(gitLabThrottler, logger, retryInterval = retryInterval)
     with GitLabProjectMembersFinder[IO] {
 
   override def findProjectMembers(

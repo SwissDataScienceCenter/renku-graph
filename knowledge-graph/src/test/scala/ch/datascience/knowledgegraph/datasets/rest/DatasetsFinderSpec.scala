@@ -750,7 +750,7 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
   private trait TestCase {
     private val logger       = TestLogger[IO]()
     private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
-    val datasetsFinder = new IODatasetsFinder(
+    val datasetsFinder = new DatasetsFinderImpl(
       rdfStoreConfig,
       new CreatorsFinder(rdfStoreConfig, logger, timeRecorder),
       logger,

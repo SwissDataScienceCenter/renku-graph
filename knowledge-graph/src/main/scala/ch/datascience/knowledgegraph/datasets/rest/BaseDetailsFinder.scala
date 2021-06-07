@@ -43,7 +43,7 @@ private class BaseDetailsFinder(
     contextShift:     ContextShift[IO],
     timer:            Timer[IO],
     ME:               MonadError[IO, Throwable]
-) extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder) {
+) extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder) {
 
   import BaseDetailsFinder._
   import ch.datascience.graph.Schemas._

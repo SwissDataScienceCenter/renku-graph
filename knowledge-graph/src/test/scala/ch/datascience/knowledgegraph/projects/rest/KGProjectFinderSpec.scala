@@ -59,6 +59,6 @@ class KGProjectFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
   private trait TestCase {
     private val logger       = TestLogger[IO]()
     private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
-    val metadataFinder       = new IOKGProjectFinder(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
+    val metadataFinder       = new KGProjectFinderImpl(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
   }
 }

@@ -20,7 +20,7 @@ package io.renku.eventlog.eventdetails
 
 import cats.effect.{BracketThrow, IO}
 import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
-import ch.datascience.graph.model.events.{CompoundEventId, EventId}
+import ch.datascience.graph.model.events.{CompoundEventId, EventBody, EventDetails, EventId}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
 import io.renku.eventlog.{EventLogDB, TypeSerializers}
@@ -28,7 +28,7 @@ import skunk._
 import skunk.implicits._
 
 private trait EventDetailsFinder[Interpretation[_]] {
-  def findDetails(eventId: CompoundEventId): Interpretation[Option[CompoundEventId]]
+  def findDetails(eventId: CompoundEventId): Interpretation[Option[EventDetails]]
 }
 
 private class EventDetailsFinderImpl[Interpretation[_]: BracketThrow](
@@ -40,18 +40,21 @@ private class EventDetailsFinderImpl[Interpretation[_]: BracketThrow](
 
   import eu.timepit.refined.auto._
 
-  override def findDetails(eventId: CompoundEventId): Interpretation[Option[CompoundEventId]] =
+  override def findDetails(eventId: CompoundEventId): Interpretation[Option[EventDetails]] =
     sessionResource.useK(measureExecutionTime(find(eventId)))
 
   private def find(eventId: CompoundEventId) =
     SqlStatement[Interpretation](name = "find event details")
-      .select[EventId ~ projects.Id, CompoundEventId](
-        sql"""SELECT evt.event_id, evt.project_id
+      .select[EventId ~ projects.Id, EventDetails](
+        sql"""SELECT evt.event_id, evt.project_id, evt.event_body
                 FROM event evt WHERE evt.event_id = $eventIdEncoder and evt.project_id = $projectIdEncoder
-          """.query(compoundEventIdDecoder)
+          """.query(compoundEventIdDecoder ~ eventBodyDecoder).map {
+          case (eventId: CompoundEventId, eventBody: EventBody) => EventDetails(eventId, eventBody)
+        }
       )
       .arguments(eventId.id ~ eventId.projectId)
       .build(_.option)
+
 }
 
 private object EventDetailsFinder {

@@ -39,6 +39,16 @@ object events {
     override lazy val toString: String = s"id = $id, projectId = $projectId"
   }
 
+  final case class EventDetails(id: EventId, projectId: projects.Id, eventBody: EventBody) {
+    override lazy val toString: String          = s"id = $id, projectId = $projectId"
+    lazy val compoundEventId:   CompoundEventId = CompoundEventId(id, projectId)
+  }
+
+  object EventDetails {
+    def apply(compoundEventId: CompoundEventId, eventBody: EventBody): EventDetails =
+      EventDetails(compoundEventId.id, compoundEventId.projectId, eventBody)
+  }
+
   final class CommitId private (val value: String) extends AnyVal with StringTinyType
   implicit object CommitId extends TinyTypeFactory[CommitId](new CommitId(_)) with GitSha
 
@@ -89,7 +99,8 @@ object events {
         GenerationRecoverableFailure,
         GenerationNonRecoverableFailure,
         TransformationRecoverableFailure,
-        TransformationNonRecoverableFailure
+        TransformationNonRecoverableFailure,
+        AwaitingDeletion
       )
 
     type New = New.type
@@ -119,6 +130,10 @@ object events {
     }
     final case object Skipped extends EventStatus with FinalStatus {
       override val value: String = "SKIPPED"
+    }
+
+    final case object AwaitingDeletion extends EventStatus with FinalStatus {
+      override val value: String = "AWAITING_DELETION"
     }
 
     sealed trait FailureStatus extends EventStatus

@@ -21,8 +21,8 @@ package io.renku.eventlog.subscriptions.zombieevents
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.control.Throttler
-import ch.datascience.http.client.IORestClient
-import ch.datascience.http.client.IORestClient.MaxRetriesAfterConnectionTimeout
+import ch.datascience.http.client.RestClient
+import ch.datascience.http.client.RestClient.MaxRetriesAfterConnectionTimeout
 import ch.datascience.microservices.MicroserviceBaseUrl
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
@@ -50,23 +50,28 @@ private object ServiceHealthChecker {
   }
 }
 
-private class ServiceHealthCheckerImpl(
-    logger:                  Logger[IO],
+private class ServiceHealthCheckerImpl[Interpretation[_]: ConcurrentEffect: Timer](
+    logger:                  Logger[Interpretation],
     retryInterval:           FiniteDuration = 1 second,
     maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
-)(implicit executionContext: ExecutionContext, concurrentEffect: ConcurrentEffect[IO], timer: Timer[IO])
-    extends IORestClient(Throttler.noThrottling, logger, retryInterval = retryInterval, maxRetries = maxRetries)
-    with ServiceHealthChecker[IO] {
+)(implicit executionContext: ExecutionContext)
+    extends RestClient[Interpretation, ServiceHealthChecker[Interpretation]](Throttler.noThrottling,
+                                                                             logger,
+                                                                             retryInterval = retryInterval,
+                                                                             maxRetries = maxRetries
+    )
+    with ServiceHealthChecker[Interpretation] {
 
-  override def ping(microserviceBaseUrl: MicroserviceBaseUrl): IO[Boolean] = {
+  override def ping(microserviceBaseUrl: MicroserviceBaseUrl): Interpretation[Boolean] = {
     for {
       uri    <- validateUri((microserviceBaseUrl / "ping").toString)
       result <- send(request(Method.GET, uri))(mapResponse)
     } yield result
   } recover { case NonFatal(_) => false }
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Boolean]] = {
-    case (Ok, _, _) => true.pure[IO]
-    case (_, _, _)  => false.pure[IO]
+  private lazy val mapResponse
+      : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[Boolean]] = {
+    case (Ok, _, _) => true.pure[Interpretation]
+    case (_, _, _)  => false.pure[Interpretation]
   }
 }

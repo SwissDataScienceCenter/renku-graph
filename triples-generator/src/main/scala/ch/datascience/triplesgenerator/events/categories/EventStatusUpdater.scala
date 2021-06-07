@@ -18,9 +18,9 @@
 
 package ch.datascience.triplesgenerator.events.categories
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.Eval
+import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.all._
-import cats.{Eval, MonadError}
 import ch.datascience.control.Throttler
 import ch.datascience.data.ErrorMessage
 import ch.datascience.events.consumers.EventRequestContent
@@ -28,15 +28,15 @@ import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.EventStatus.FailureStatus
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventProcessingTime, EventStatus}
-import ch.datascience.http.client.IORestClient
-import ch.datascience.http.client.IORestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
+import ch.datascience.http.client.RestClient
+import ch.datascience.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
 import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
 import ch.datascience.rdfstore.JsonLDTriples
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
-import org.typelevel.log4cats.Logger
 import org.http4s.Status.{BadGateway, GatewayTimeout, ServiceUnavailable}
 import org.http4s.{Status, Uri}
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -56,26 +56,23 @@ private trait EventStatusUpdater[Interpretation[_]] {
   def toFailure(eventId: CompoundEventId, eventStatus: FailureStatus, exception: Throwable): Interpretation[Unit]
 }
 
-private class EventStatusUpdaterImpl(
-    eventLogUrl:            EventLogUrl,
-    categoryName:           CategoryName,
-    retryDelay:             FiniteDuration,
-    logger:                 Logger[IO],
-    retryInterval:          FiniteDuration = SleepAfterConnectionIssue,
-    maxRetries:             Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-    requestTimeoutOverride: Option[Duration] = None
-)(implicit
-    ME:               MonadError[IO, Throwable],
-    executionContext: ExecutionContext,
-    contextShift:     ContextShift[IO],
-    timer:            Timer[IO]
-) extends IORestClient(Throttler.noThrottling,
-                       logger,
-                       retryInterval = retryInterval,
-                       maxRetries = maxRetries,
-                       requestTimeoutOverride = requestTimeoutOverride
+private class EventStatusUpdaterImpl[Interpretation[_]: ConcurrentEffect: Timer](
+    eventLogUrl:             EventLogUrl,
+    categoryName:            CategoryName,
+    retryDelay:              FiniteDuration,
+    logger:                  Logger[Interpretation],
+    retryInterval:           FiniteDuration = SleepAfterConnectionIssue,
+    maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
+    requestTimeoutOverride:  Option[Duration] = None
+)(implicit executionContext: ExecutionContext)
+    extends RestClient[Interpretation, EventStatusUpdater[Interpretation]](Throttler.noThrottling,
+                                                                           logger,
+                                                                           retryInterval = retryInterval,
+                                                                           maxRetries = maxRetries,
+                                                                           requestTimeoutOverride =
+                                                                             requestTimeoutOverride
     )
-    with EventStatusUpdater[IO] {
+    with EventStatusUpdater[Interpretation] {
 
   import cats.effect._
   import io.circe.literal._
@@ -87,7 +84,7 @@ private class EventStatusUpdaterImpl(
                                   payload:        JsonLDTriples,
                                   schemaVersion:  SchemaVersion,
                                   processingTime: EventProcessingTime
-  ): IO[Unit] = sendStatusChange(
+  ): Interpretation[Unit] = sendStatusChange(
     eventId,
     eventContent = EventRequestContent(
       event = json"""{
@@ -102,7 +99,7 @@ private class EventStatusUpdaterImpl(
     responseMapping
   )
 
-  override def toTriplesStore(eventId: CompoundEventId, processingTime: EventProcessingTime): IO[Unit] =
+  override def toTriplesStore(eventId: CompoundEventId, processingTime: EventProcessingTime): Interpretation[Unit] =
     sendStatusChange(
       eventId,
       eventContent = EventRequestContent(
@@ -114,14 +111,19 @@ private class EventStatusUpdaterImpl(
       responseMapping
     )
 
-  override def rollback[S <: EventStatus](eventId: CompoundEventId)(implicit rollbackStatus: () => S): IO[Unit] =
+  override def rollback[S <: EventStatus](
+      eventId:               CompoundEventId
+  )(implicit rollbackStatus: () => S): Interpretation[Unit] =
     sendStatusChange(
       eventId,
       eventContent = EventRequestContent(json"""{"status": ${rollbackStatus().value}}"""),
       responseMapping
     )
 
-  override def toFailure(eventId: CompoundEventId, eventStatus: FailureStatus, exception: Throwable): IO[Unit] =
+  override def toFailure(eventId:     CompoundEventId,
+                         eventStatus: FailureStatus,
+                         exception:   Throwable
+  ): Interpretation[Unit] =
     sendStatusChange(
       eventId,
       eventContent = EventRequestContent(
@@ -134,10 +136,12 @@ private class EventStatusUpdaterImpl(
     )
 
   private def sendStatusChange(
-      eventId:         CompoundEventId,
-      eventContent:    EventRequestContent,
-      responseMapping: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]]
-  ): IO[Unit] = for {
+      eventId:      CompoundEventId,
+      eventContent: EventRequestContent,
+      responseMapping: PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[
+        Unit
+      ]]
+  ): Interpretation[Unit] = for {
     uri <- validateUri(s"$eventLogUrl/events/${eventId.id}/${eventId.projectId}")
     request = createRequest(uri, eventContent)
     sendingResult <- send(request)(responseMapping) recoverWith retryOnServerError(
@@ -145,16 +149,18 @@ private class EventStatusUpdaterImpl(
                      )
   } yield sendingResult
 
-  private def retryOnServerError(retry: Eval[IO[Unit]]): PartialFunction[Throwable, IO[Unit]] = {
+  private def retryOnServerError(
+      retry: Eval[Interpretation[Unit]]
+  ): PartialFunction[Throwable, Interpretation[Unit]] = {
     case UnexpectedResponseException(ServiceUnavailable | GatewayTimeout | BadGateway, message) =>
       waitAndRetry(retry, message)
     case exception @ (_: ConnectivityException | _: ClientException) =>
       waitAndRetry(retry, exception.getMessage)
   }
 
-  private def waitAndRetry(retry: Eval[IO[Unit]], errorMessage: String) = for {
+  private def waitAndRetry(retry: Eval[Interpretation[Unit]], errorMessage: String) = for {
     _      <- logger.error(s"$categoryName: sending status change failed - retrying in $retryDelay - $errorMessage")
-    _      <- timer sleep retryDelay
+    _      <- Timer[Interpretation] sleep retryDelay
     result <- retry.value
   } yield result
 
@@ -164,9 +170,10 @@ private class EventStatusUpdaterImpl(
       .maybeAddPart("payload", eventRequestContent.maybePayload)
       .build()
 
-  private lazy val responseMapping: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
-    case (Ok, _, _)       => IO.unit
-    case (NotFound, _, _) => IO.unit
+  private lazy val responseMapping
+      : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[Unit]] = {
+    case (Ok, _, _)       => ().pure[Interpretation]
+    case (NotFound, _, _) => ().pure[Interpretation]
   }
 }
 

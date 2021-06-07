@@ -153,7 +153,7 @@ class GitLabProjectFinderSpec
 
   private trait TestCase {
     val gitLabUrl     = GitLabUrl(externalServiceBaseUrl)
-    val projectFinder = new IOGitLabProjectFinder(gitLabUrl, Throttler.noThrottling, TestLogger())
+    val projectFinder = new GitLabProjectFinderImpl[IO](gitLabUrl, Throttler.noThrottling, TestLogger())
   }
 
   private def projectJson(project: GitLabProject): Json = json"""{
