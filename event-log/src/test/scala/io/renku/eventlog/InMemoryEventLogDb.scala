@@ -40,7 +40,7 @@ trait InMemoryEventLogDb extends ForAllTestContainer with TypeSerializers {
   private val dbConfig = new EventLogDbConfigProvider[IO].get().unsafeRunSync()
 
   override val container: PostgreSQLContainer = PostgreSQLContainer(
-    dockerImageNameOverride = DockerImageName.parse("postgres:9.6.19-alpine"),
+    dockerImageNameOverride = DockerImageName.parse("postgres:11.11-alpine"),
     databaseName = dbConfig.name.value,
     username = dbConfig.user.value,
     password = dbConfig.pass.value

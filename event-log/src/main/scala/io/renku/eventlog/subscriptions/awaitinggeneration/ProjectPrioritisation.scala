@@ -32,7 +32,7 @@ import io.renku.eventlog.subscriptions.{Capacity, ProjectIds, Subscribers}
 import java.time.Duration
 
 private trait ProjectPrioritisation[Interpretation[_]] {
-  def prioritise(projects: List[ProjectInfo]): List[(ProjectIds, Priority)]
+  def prioritise(projects: List[ProjectInfo], totalOccupancy: Long): List[(ProjectIds, Priority)]
 }
 
 private class ProjectPrioritisationImpl[Interpretation[_]](subscribers: Subscribers[Interpretation])
@@ -41,12 +41,14 @@ private class ProjectPrioritisationImpl[Interpretation[_]](subscribers: Subscrib
 
   private val FreeSpotsRatio = .15
 
-  override def prioritise(projects: List[ProjectInfo]): List[(ProjectIds, Priority)] =
-    (rejectProjectsAboveOccupancyThreshold _ >>>
+  override def prioritise(projects: List[ProjectInfo], totalOccupancy: Long): List[(ProjectIds, Priority)] =
+    ((rejectProjectsAboveOccupancyThreshold _).tupled >>>
       findPrioritiesBasedOnLatestEventDate >>>
-      correctPrioritiesUsingOccupancyPerProject)(projects)
+      correctPrioritiesUsingOccupancyPerProject)(projects, totalOccupancy)
 
-  private def rejectProjectsAboveOccupancyThreshold(projects: List[ProjectInfo]): List[ProjectInfo] =
+  private def rejectProjectsAboveOccupancyThreshold(projects:       List[ProjectInfo],
+                                                    totalOccupancy: Long
+  ): List[ProjectInfo] =
     subscribers.getTotalCapacity
       .map(_.value)
       .map { totalCapacity =>
@@ -56,7 +58,6 @@ private class ProjectPrioritisationImpl[Interpretation[_]](subscribers: Subscrib
         projects match {
           case Nil => Nil
           case projects =>
-            val totalOccupancy = projects.map(_.currentOccupancy.value).sum
             projects.foldLeft(List.empty[ProjectInfo]) { (acc, project) =>
               if (project.currentOccupancy.value == 0) acc :+ project
               else if (totalOccupancy < totalCapacity - freeSpots) acc :+ project

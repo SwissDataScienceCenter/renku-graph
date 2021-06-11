@@ -57,7 +57,7 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
           projectInfos.generateOne
         ).map(_.copy(currentOccupancy = 0, latestEventDate = EventDate(now)))
 
-        projectPrioritisation.prioritise(projects).noPriority shouldBe projects.map(_.toIdsAndPath)
+        projectPrioritisation.prioritise(projects, totalOccupancy = 0).noPriority shouldBe projects.map(_.toIdsAndPath)
       }
 
     "do not discard projects events if " +
@@ -72,7 +72,9 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
           projectInfos.generateOne
         ).map(_.copy(currentOccupancy = positiveInts(max = 3).generateOne, latestEventDate = EventDate(now)))
 
-        projectPrioritisation.prioritise(projects).noPriority shouldBe projects.map(_.toIdsAndPath)
+        projectPrioritisation
+          .prioritise(projects, totalOccupancy = projects.map(_.currentOccupancy.value).sum)
+          .noPriority shouldBe projects.map(_.toIdsAndPath)
       }
 
     "discard all project events with " +
@@ -88,7 +90,27 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
           projectInfos.generateOne.copy(currentOccupancy = 0)
         ).map(_.copy(latestEventDate = EventDate(now)))
 
-        projectPrioritisation.prioritise(projects).noPriority shouldBe List(projects.last.toIdsAndPath)
+        projectPrioritisation
+          .prioritise(projects, totalOccupancy = projects.map(_.currentOccupancy.value).sum)
+          .noPriority shouldBe List(projects.last.toIdsAndPath)
+      }
+
+    "discard all project events with " +
+      "current occupancy > 0," +
+      "total occupancy >= max free spots, " +
+      "total capacity = 10, and there are projects under processing not listed" in new TestCase {
+
+        `given totalCapacity`(10)
+
+        val projects = List(
+          projectInfos.generateOne.copy(currentOccupancy = 1),
+          projectInfos.generateOne.copy(currentOccupancy = 1),
+          projectInfos.generateOne.copy(currentOccupancy = 0)
+        ).map(_.copy(latestEventDate = EventDate(now)))
+
+        projectPrioritisation
+          .prioritise(projects, totalOccupancy = 8)
+          .noPriority shouldBe List(projects.last.toIdsAndPath)
       }
 
     "discard all project events with " +
@@ -107,13 +129,15 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
 
         val projects = List(project0, project1, project2, project3) ++ projectsAwaitingGeneration
 
-        projectPrioritisation.prioritise(projects).noPriority shouldBe projectsAwaitingGeneration.map(_.toIdsAndPath)
+        projectPrioritisation
+          .prioritise(projects, totalOccupancy = projects.map(_.currentOccupancy.value).sum)
+          .noPriority shouldBe projectsAwaitingGeneration.map(_.toIdsAndPath)
       }
 
     "return an empty list if there are no projects" in new TestCase {
       `given no totalCapacity`
 
-      projectPrioritisation.prioritise(Nil) shouldBe Nil
+      projectPrioritisation.prioritise(Nil, totalOccupancy = positiveLongs().generateOne) shouldBe Nil
     }
 
     "put MaxPriority if the list contains only one project" in new TestCase {
@@ -121,7 +145,9 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
 
       val project = projectInfos.generateOne
 
-      projectPrioritisation.prioritise(List(project)) shouldBe List((project.toIdsAndPath, MaxPriority))
+      projectPrioritisation.prioritise(List(project), totalOccupancy = positiveLongs().generateOne) shouldBe List(
+        (project.toIdsAndPath, MaxPriority)
+      )
     }
 
     "put priority MaxPriority if projects' event dates are within and hour and currentOccupancy is 0" in new TestCase {
@@ -133,7 +159,7 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
         currentOccupancy = 0
       )
 
-      projectPrioritisation.prioritise(List(project1, project2)) shouldBe List(
+      projectPrioritisation.prioritise(List(project1, project2), totalOccupancy = 0) shouldBe List(
         (project1.toIdsAndPath, MaxPriority),
         (project2.toIdsAndPath, MaxPriority)
       )
@@ -149,7 +175,7 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
           currentOccupancy = 0
         )
 
-        projectPrioritisation.prioritise(List(project1, project2)) shouldBe List(
+        projectPrioritisation.prioritise(List(project1, project2), totalOccupancy = 0) shouldBe List(
           (project1.toIdsAndPath, MaxPriority),
           (project2.toIdsAndPath, MinPriority)
         )
@@ -170,7 +196,7 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
         )
 
         val (projectIdAndPath1, priority1) :: (projectIdAndPath2, priority2) :: (projectIdAndPath3, priority3) :: Nil =
-          projectPrioritisation.prioritise(List(project1, project2, project3))
+          projectPrioritisation.prioritise(List(project1, project2, project3), totalOccupancy = 0)
 
         projectIdAndPath1.id shouldBe project1.id
         projectIdAndPath2.id shouldBe project2.id
@@ -196,7 +222,9 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
           currentOccupancy = currentOccupancy
         )
 
-        val (projectIdAndPath, priority) :: Nil = projectPrioritisation.prioritise(List(project1, project2, project3))
+        val projects = List(project1, project2, project3)
+        val (projectIdAndPath, priority) :: Nil =
+          projectPrioritisation.prioritise(projects, totalOccupancy = projects.map(_.currentOccupancy.value).sum)
 
         List(projectIdAndPath.id) should contain atLeastOneElementOf List(project1.id, project2.id, project3.id)
         priority                shouldBe MinPriority
@@ -216,7 +244,9 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
         currentOccupancy = currentOccupancy
       )
 
-      val (projectIdAndPath, priority) :: Nil = projectPrioritisation.prioritise(List(project1, project2, project3))
+      val projects = List(project1, project2, project3)
+      val (projectIdAndPath, priority) :: Nil =
+        projectPrioritisation.prioritise(projects, totalOccupancy = projects.map(_.currentOccupancy.value).sum)
 
       projectIdAndPath.id shouldBe project2.id
       priority            shouldBe MaxPriority
@@ -238,8 +268,9 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
           currentOccupancy = 1
         )
 
+        val projects = List(project1, project2, project3)
         val (projectIdAndPath2, priority2) :: (projectIdAndPath3, priority3) :: Nil =
-          projectPrioritisation.prioritise(List(project1, project2, project3))
+          projectPrioritisation.prioritise(projects, totalOccupancy = projects.map(_.currentOccupancy.value).sum)
 
         projectIdAndPath2.id shouldBe project2.id
         projectIdAndPath3.id shouldBe project3.id
@@ -264,8 +295,9 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
           currentOccupancy = 0
         )
 
+        val projects = List(project1, project2, project3)
         val (projectIdAndPath1, priority1) :: (projectIdAndPath3, priority3) :: Nil =
-          projectPrioritisation.prioritise(List(project1, project2, project3))
+          projectPrioritisation.prioritise(projects, totalOccupancy = projects.map(_.currentOccupancy.value).sum)
 
         projectIdAndPath1.id shouldBe project1.id
         projectIdAndPath3.id shouldBe project3.id

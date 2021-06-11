@@ -78,6 +78,7 @@ private class AwaitingGenerationEventFinderSpec
 
         givenPrioritisation(
           takes = List(ProjectInfo(projectId, projectPath, latestEventDate, 0)),
+          totalOccupancy = 0,
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
@@ -92,6 +93,7 @@ private class AwaitingGenerationEventFinderSpec
 
         givenPrioritisation(
           takes = List(ProjectInfo(projectId, projectPath, latestEventDate, 1)),
+          totalOccupancy = 1,
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
@@ -103,7 +105,7 @@ private class AwaitingGenerationEventFinderSpec
                                                                             (event2Id, executionDate)
         )
 
-        givenPrioritisation(takes = Nil, returns = Nil)
+        givenPrioritisation(takes = Nil, totalOccupancy = 2, returns = Nil)
 
         finder.popEvent().unsafeRunSync() shouldBe None
 
@@ -147,6 +149,7 @@ private class AwaitingGenerationEventFinderSpec
         val latestEventDate = List(event1Date, event2Date, event3Date).max
         givenPrioritisation(
           takes = List(ProjectInfo(projectId, projectPath, latestEventDate, 0)),
+          totalOccupancy = 0,
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
@@ -156,7 +159,7 @@ private class AwaitingGenerationEventFinderSpec
 
         findEvents(EventStatus.GeneratingTriples).noBatchDate shouldBe List((event1Id, executionDate))
 
-        givenPrioritisation(takes = Nil, returns = Nil)
+        givenPrioritisation(takes = Nil, totalOccupancy = 1, returns = Nil)
 
         finder.popEvent().unsafeRunSync() shouldBe None
 
@@ -180,6 +183,7 @@ private class AwaitingGenerationEventFinderSpec
       events foreach { case (eventId, _, eventDate, projectPath) =>
         givenPrioritisation(
           takes = List(ProjectInfo(eventId.projectId, projectPath, eventDate, 0)),
+          totalOccupancy = 0,
           returns = List(ProjectIds(eventId.projectId, projectPath) -> MaxPriority)
         )
       }
@@ -219,7 +223,7 @@ private class AwaitingGenerationEventFinderSpec
 
       events foreach { case (eventId, _, _, projectPath) =>
         (projectPrioritisation.prioritise _)
-          .expects(*)
+          .expects(*, 0)
           .returning(List(ProjectIds(eventId.projectId, projectPath) -> MaxPriority))
       }
 
@@ -229,7 +233,7 @@ private class AwaitingGenerationEventFinderSpec
 
       findEvents(status = GeneratingTriples).eventIdsOnly should contain theSameElementsAs events.map(_._1)
 
-      givenPrioritisation(takes = Nil, returns = Nil)
+      givenPrioritisation(takes = Nil, totalOccupancy = events.size, returns = Nil)
 
       eventLogFind.popEvent().unsafeRunSync() shouldBe None
     }
@@ -261,9 +265,9 @@ private class AwaitingGenerationEventFinderSpec
       (underProcessingGauge.increment _).expects(*).returning(IO.unit).repeat(times)
     }
 
-    def givenPrioritisation(takes: List[ProjectInfo], returns: List[(ProjectIds, Priority)]) =
+    def givenPrioritisation(takes: List[ProjectInfo], totalOccupancy: Long, returns: List[(ProjectIds, Priority)]) =
       (projectPrioritisation.prioritise _)
-        .expects(takes)
+        .expects(takes, totalOccupancy)
         .returning(returns)
   }
 
