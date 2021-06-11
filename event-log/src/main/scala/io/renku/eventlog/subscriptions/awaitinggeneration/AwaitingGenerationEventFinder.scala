@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
+import cats.{Id, Parallel}
 import cats.data.{Kleisli, NonEmptyList}
 import cats.effect.{BracketThrow, IO, Sync}
 import cats.syntax.all._
@@ -42,7 +43,7 @@ import java.time.Instant
 import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
 
-private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Sync: BracketThrow](
+private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Sync: Parallel: BracketThrow](
     sessionResource:       SessionResource[Interpretation, EventLogDB],
     waitingEventsGauge:    LabeledGauge[Interpretation, projects.Path],
     underProcessingGauge:  LabeledGauge[Interpretation, projects.Path],
@@ -65,14 +66,18 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Sync: Bracket
   }
 
   private def findEventAndUpdateForProcessing = for {
-    maybeProject <- measureExecutionTime(findProjectsWithEventsInQueue)
-                      .map(projectPrioritisation.prioritise)
-                      .map(selectProject)
+    maybeProject <- selectCandidateProject()
     maybeIdAndProjectAndBody <- maybeProject
                                   .map(idAndPath => measureExecutionTime(findOldestEvent(idAndPath)))
                                   .getOrElse(Kleisli.pure(Option.empty[AwaitingGenerationEvent]))
     maybeBody <- markAsProcessing(maybeIdAndProjectAndBody)
   } yield maybeProject -> maybeBody
+
+  private def selectCandidateProject() =
+    (measureExecutionTime(findProjectsWithEventsInQueue), measureExecutionTime(findTotalOccupancy)).parMapN {
+      case (potentialProjects, totalOccupancy) =>
+        ((projectPrioritisation.prioritise _).tupled >>> selectProject)(potentialProjects, totalOccupancy)
+    }
 
   private def findProjectsWithEventsInQueue =
     SqlStatement(
@@ -102,6 +107,16 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Sync: Bracket
         }
     ).arguments(GeneratingTriples ~ ExecutionDate(now()) ~ projectsFetchingLimit.value)
       .build(_.toList)
+
+  private def findTotalOccupancy: SqlStatement[Interpretation, Long] =
+    SqlStatement(
+      name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find total occupancy")
+    ).select[EventStatus, Long](
+      sql"""
+      SELECT count(event_id) from event where status = $eventStatusEncoder
+      """.query(int8)
+    ).arguments(GeneratingTriples)
+      .build[Id](_.unique)
 
   private def findOldestEvent(idAndPath: ProjectIds) = {
     val executionDate = ExecutionDate(now())
@@ -197,7 +212,7 @@ private object IOAwaitingGenerationEventFinder {
       waitingEventsGauge:   LabeledGauge[IO, projects.Path],
       underProcessingGauge: LabeledGauge[IO, projects.Path],
       queriesExecTimes:     LabeledHistogram[IO, SqlStatement.Name]
-  ): IO[EventFinder[IO, AwaitingGenerationEvent]] = for {
+  )(implicit parallel:      Parallel[IO]): IO[EventFinder[IO, AwaitingGenerationEvent]] = for {
     projectPrioritisation <- ProjectPrioritisation(subscribers)
   } yield new AwaitingGenerationEventFinderImpl(sessionResource,
                                                 waitingEventsGauge,
