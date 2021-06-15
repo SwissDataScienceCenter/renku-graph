@@ -14,7 +14,7 @@ private[globalcommitsync] trait GlobalCommitEventSynchronizer[Interpretation[_]]
 }
 private[globalcommitsync] class GlobalCommitEventSynchronizerImpl {}
 
-private[globalcommitsync] object CommitEventSynchronizer {
+private[globalcommitsync] object GlobalCommitEventSynchronizer {
   def apply(gitLabThrottler:       Throttler[IO, GitLab],
             executionTimeRecorder: ExecutionTimeRecorder[IO],
             logger:                Logger[IO]
