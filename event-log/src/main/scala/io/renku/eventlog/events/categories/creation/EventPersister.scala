@@ -28,10 +28,10 @@ import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import eu.timepit.refined.auto._
-import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
+import io.renku.eventlog._
+import io.renku.eventlog.events.categories.creation.Event.{NewEvent, SkippedEvent}
 import io.renku.eventlog.events.categories.creation.EventPersister.Result
 import io.renku.eventlog.events.categories.creation.EventPersister.Result._
-import io.renku.eventlog._
 import skunk._
 import skunk.implicits._
 

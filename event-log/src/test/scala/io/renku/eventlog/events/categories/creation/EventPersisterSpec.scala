@@ -29,9 +29,9 @@ import ch.datascience.graph.model.events.{CompoundEventId, EventBody, EventId, E
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
-import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog._
 import io.renku.eventlog.events.categories.creation.EventPersister.Result._
+import io.renku.eventlog.events.categories.creation.Generators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

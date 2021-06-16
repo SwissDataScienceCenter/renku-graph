@@ -23,13 +23,15 @@ import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.events.{BatchDate, EventId}
-import ch.datascience.graph.model.{events, projects}
+import ch.datascience.graph.model.events.{BatchDate, EventId, EventStatus}
+import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
 import io.circe.literal._
 import io.renku.eventlog.EventContentGenerators._
-import io.renku.eventlog.{CreatedDate, Event, EventDate, ExecutionDate}
+import io.renku.eventlog.init.Generators._
+import io.renku.eventlog.init.model.Event
+import io.renku.eventlog.{CreatedDate, EventDate, ExecutionDate}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk._
@@ -77,10 +79,10 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
 
       checkColumnExists shouldBe false
 
-      val event1            = newOrSkippedEvents.generateOne
+      val event1            = events.generateOne
       val event1CreatedDate = createdDates.generateOne
       storeEvent(event1, event1CreatedDate)
-      val event2            = newOrSkippedEvents.generateOne
+      val event2            = events.generateOne
       val event2CreatedDate = createdDates.generateOne
       storeEvent(event2, event2CreatedDate)
 
@@ -117,7 +119,7 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
   private def storeEvent(event: Event, createdDate: CreatedDate): Unit = execute[Unit] {
     Kleisli { session =>
       val query: Command[
-        EventId ~ projects.Id ~ projects.Path ~ events.EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ String
+        EventId ~ projects.Id ~ projects.Path ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ String
       ] =
         sql"""insert into
               event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, event_body) 

@@ -19,8 +19,7 @@
 package io.renku.eventlog
 
 import ch.datascience.data.ErrorMessage
-import ch.datascience.events.consumers.Project
-import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventStatus}
+import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints.{BoundedInstant, InstantNotInTheFuture, NonBlank}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
@@ -28,51 +27,8 @@ import io.circe.Decoder
 
 import java.time.Instant
 
-sealed trait Event extends CompoundId {
-  def id:        EventId
-  def project:   Project
-  def date:      EventDate
-  def batchDate: BatchDate
-  def body:      EventBody
-  def status:    EventStatus
-
-  def withBatchDate(batchDate: BatchDate): Event
-  lazy val compoundEventId: CompoundEventId = CompoundEventId(id, project.id)
-
-}
-
 trait CompoundId {
   def compoundEventId: CompoundEventId
-}
-
-object Event {
-
-  final case class NewEvent(
-      id:        EventId,
-      project:   Project,
-      date:      EventDate,
-      batchDate: BatchDate,
-      body:      EventBody
-  ) extends Event {
-    val status: EventStatus = EventStatus.New
-
-    override def withBatchDate(batchDate: BatchDate): Event = this.copy(batchDate = batchDate)
-
-  }
-
-  final case class SkippedEvent(
-      id:        EventId,
-      project:   Project,
-      date:      EventDate,
-      batchDate: BatchDate,
-      body:      EventBody,
-      message:   EventMessage
-  ) extends Event {
-    val status: EventStatus = EventStatus.Skipped
-
-    override def withBatchDate(batchDate: BatchDate): Event = this.copy(batchDate = batchDate)
-
-  }
 }
 
 final class EventDate private (val value: Instant) extends AnyVal with InstantTinyType

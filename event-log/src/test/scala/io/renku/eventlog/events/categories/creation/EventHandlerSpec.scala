@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.events.categories.creation
+package io.renku.eventlog.events.categories
+package creation
 
 import cats.MonadError
 import cats.effect.IO
@@ -30,15 +31,14 @@ import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level._
 import io.circe.literal.JsonStringContext
-import io.circe.syntax._
 import io.circe.{Encoder, Json}
-import io.renku.eventlog.Event
-import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
-import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.events.categories.creation.EventPersister.Result.{Created, Existed}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import Generators._
+import io.circe.syntax._
+import io.renku.eventlog.events.categories.creation.Event.{NewEvent, SkippedEvent}
 
 class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
@@ -123,8 +123,8 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     val eventPersister = mock[EventPersister[IO]]
 
     val handler = new EventHandler[IO](categoryName, eventPersister, logger)
-
   }
+
   private def toJson(event: Event): Json =
     json"""{
       "categoryName": ${categoryName.value},
@@ -149,7 +149,4 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     case event: NewEvent     => toJson(event)
     case event: SkippedEvent => toJson(event) deepMerge json"""{ "message":    ${event.message.value} }"""
   }
-
-//}
-
 }
