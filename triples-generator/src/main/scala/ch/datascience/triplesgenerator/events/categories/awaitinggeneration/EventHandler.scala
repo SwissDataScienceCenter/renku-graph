@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator
 package events.categories.awaitinggeneration
 
-import cats.MonadError
+import cats.{MonadError, Show}
 import cats.data.EitherT.{fromEither, fromOption}
 import cats.data.NonEmptyList
 import cats.effect.{ContextShift, Effect, IO, Timer}
@@ -60,7 +60,7 @@ private[events] class EventHandler[Interpretation[_]: Effect](
     } yield result
   }.merge
 
-  private implicit lazy val eventInfoToString: ((CompoundEventId, NonEmptyList[CommitEvent])) => String = {
+  private implicit lazy val eventInfoToString: Show[(CompoundEventId, NonEmptyList[CommitEvent])] = Show.show {
     case (eventId, events) => s"$eventId, projectPath = ${events.head.project.path}"
   }
 }

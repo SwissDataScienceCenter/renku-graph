@@ -111,6 +111,28 @@ In the case of a *SKIPPED* event. Note that a non-blank `message` is required.
 }
 ```
 
+- **EVENTS_STATUS_CHANGE**
+
+Changes the status of events. The events for which the status will be changed are defined within the event as well as the new status.
+
+####Changing status of all project events older than the given one to `TRIPLES_GENERATED`
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "EVENTS_STATUS_CHANGE",
+  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "project": {
+    "id": 12,
+    "path": "namespace/project-name"
+  },
+  "newStatus": "TRIPLES_GENERATED"
+}
+```
+
 - **ZOMBIE_CHASING**
 
 Changes the status of a zombie event

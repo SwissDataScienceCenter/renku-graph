@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.events.categories.commitsyncrequest
 
-import cats.MonadError
+import cats.{MonadError, Show}
 import cats.data.EitherT.fromEither
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
@@ -61,7 +61,7 @@ private class EventHandler[Interpretation[_]: MonadError[*[_], Throwable]](
     } yield result
   }.merge
 
-  private implicit lazy val eventInfoToString: ((projects.Id, projects.Path)) => String = {
+  private implicit lazy val eventInfoToString: Show[(projects.Id, projects.Path)] = Show.show {
     case (projectId, projectPath) => s"projectId = $projectId, projectPath = $projectPath"
   }
 

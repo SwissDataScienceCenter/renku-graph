@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.events.categories.creation
 
-import cats.MonadError
+import cats.{MonadError, Show}
 import cats.data.EitherT.fromEither
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
@@ -58,7 +58,7 @@ private class EventHandler[Interpretation[_]: MonadError[*[_], Throwable]](
     } yield result
   }.merge
 
-  private implicit lazy val eventInfoToString: Event => String = { event =>
+  private implicit lazy val eventInfoToString: Show[Event] = Show.show { event =>
     s"${event.compoundEventId}, projectPath = ${event.project.path}, status = ${event.status}"
   }
 

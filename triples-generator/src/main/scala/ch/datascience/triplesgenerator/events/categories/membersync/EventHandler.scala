@@ -18,7 +18,7 @@
 
 package ch.datascience.triplesgenerator.events.categories.membersync
 
-import cats.MonadError
+import cats.{MonadError, Show}
 import cats.data.EitherT.fromEither
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
@@ -58,9 +58,7 @@ private[events] class EventHandler[Interpretation[_]](
     } yield result
   }.merge
 
-  private implicit lazy val eventInfoToString: projects.Path => String = { path =>
-    s"projectPath = $path"
-  }
+  private implicit lazy val eventInfoToString: Show[projects.Path] = Show.show(path => s"projectPath = $path")
 }
 
 private[events] object EventHandler {

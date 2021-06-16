@@ -16,11 +16,11 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.events.categories.commitsyncrequest
+package io.renku.eventlog.events.categories
+package commitsyncrequest
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.events.consumers.EventRequestContent
 import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{exceptions, jsons}
@@ -29,9 +29,9 @@ import ch.datascience.graph.model.projects
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
+import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
-import io.circe.{Encoder, Json}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
@@ -121,7 +121,6 @@ class EventHandlerSpec
     val logger           = TestLogger[IO]()
     val handler          = new EventHandler[IO](categoryName, commitSyncForcer, logger)
 
-    def requestContent(event: Json): EventRequestContent = EventRequestContent(event, maybePayload = None)
   }
 
   private implicit lazy val eventEncoder: Encoder[(projects.Id, projects.Path)] =

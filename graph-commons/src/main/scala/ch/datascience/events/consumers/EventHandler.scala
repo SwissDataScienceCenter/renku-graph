@@ -18,7 +18,7 @@
 
 package ch.datascience.events.consumers
 
-import cats.MonadError
+import cats.{MonadError, Show}
 import cats.data.EitherT
 import cats.syntax.all._
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, SchedulingError, UnsupportedEventType}
@@ -78,21 +78,21 @@ trait EventHandler[Interpretation[_]] {
 
     def log[EventInfo](
         eventInfo: EventInfo
-    )(result:      EventSchedulingResult)(implicit toString: EventInfo => String): Interpretation[Unit] =
+    )(result:      EventSchedulingResult)(implicit show: Show[EventInfo]): Interpretation[Unit] =
       result match {
-        case Accepted => logger.info(s"$categoryName: ${toString(eventInfo)} -> $result")
+        case Accepted => logger.info(s"$categoryName: ${eventInfo.show} -> $result")
         case SchedulingError(exception) =>
-          logger.error(exception)(s"$categoryName: ${toString(eventInfo)} -> $SchedulingError")
+          logger.error(exception)(s"$categoryName: ${eventInfo.show} -> $SchedulingError")
         case _ => ME.unit
       }
 
     def logInfo[EventInfo](eventInfo: EventInfo, message: String)(implicit
-        toString:                     EventInfo => String
-    ): Interpretation[Unit] = logger.info(s"$categoryName: ${toString(eventInfo)} -> $message")
+        show:                         Show[EventInfo]
+    ): Interpretation[Unit] = logger.info(s"$categoryName: ${eventInfo.show} -> $message")
 
     def logError[EventInfo](eventInfo: EventInfo, exception: Throwable)(implicit
-        toString:                      EventInfo => String
-    ): Interpretation[Unit] = logger.error(exception)(s"$categoryName: ${toString(eventInfo)} -> Failure")
+        show:                          Show[EventInfo]
+    ): Interpretation[Unit] = logger.error(exception)(s"$categoryName: ${eventInfo.show} -> Failure")
   }
 
   protected implicit class EitherTOps[T](

@@ -16,23 +16,12 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.events.categories.creation
+package io.renku.eventlog.events
 
-import ch.datascience.graph.model.events.CompoundEventId
-import org.scalatest.wordspec.AnyWordSpec
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-import ch.datascience.generators.Generators.Implicits._
-import org.scalatest.matchers.should
-import Generators._
+import ch.datascience.events.consumers.EventRequestContent
+import io.circe.Json
 
-class EventSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+package object categories {
 
-  "compoundEventId" should {
-
-    "create a CompoundEventId from the event's id and project id" in {
-      forAll { event: Event =>
-        event.compoundEventId shouldBe CompoundEventId(event.id, event.project.id)
-      }
-    }
-  }
+  def requestContent(event: Json): EventRequestContent = EventRequestContent(event, None)
 }

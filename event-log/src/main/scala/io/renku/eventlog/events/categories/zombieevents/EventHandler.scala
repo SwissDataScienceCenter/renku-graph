@@ -21,7 +21,7 @@ package io.renku.eventlog.events.categories.zombieevents
 import cats.data.EitherT.fromEither
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
-import cats.{Applicative, MonadError}
+import cats.{Applicative, MonadError, Show}
 import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
@@ -90,7 +90,7 @@ private class EventHandler[Interpretation[_]](
       } yield ()
   }
 
-  private implicit lazy val eventInfoToString: ZombieEvent => String = { event =>
+  private implicit lazy val eventInfoToString: Show[ZombieEvent] = Show.show { event =>
     s"${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status}"
   }
 

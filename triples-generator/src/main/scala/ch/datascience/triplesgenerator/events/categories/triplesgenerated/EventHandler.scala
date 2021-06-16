@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator
 package events.categories.triplesgenerated
 
-import cats.MonadError
+import cats.{MonadError, Show}
 import cats.data.EitherT.{fromEither, fromOption}
 import cats.effect.{ContextShift, Effect, IO, Timer}
 import ch.datascience.config.GitLab
@@ -72,7 +72,7 @@ private[events] class EventHandler[Interpretation[_]: Effect](
     } yield result
   }.merge
 
-  private implicit lazy val eventInfoToString: ((CompoundEventId, Project)) => String = { case (eventId, project) =>
+  private implicit lazy val eventInfoToString: Show[(CompoundEventId, Project)] = Show.show { case (eventId, project) =>
     s"$eventId, projectPath = ${project.path}"
   }
 

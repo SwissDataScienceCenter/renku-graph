@@ -24,21 +24,21 @@ import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.events.consumers.ConsumersModelGenerators._
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, SchedulingError}
-import ch.datascience.events.consumers.{EventRequestContent, Project}
+import ch.datascience.events.consumers.Project
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level._
 import io.circe.literal.JsonStringContext
+import io.circe.syntax._
 import io.circe.{Encoder, Json}
+import io.renku.eventlog.events.categories.creation.Event.{NewEvent, SkippedEvent}
 import io.renku.eventlog.events.categories.creation.EventPersister.Result.{Created, Existed}
+import io.renku.eventlog.events.categories.creation.Generators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import Generators._
-import io.circe.syntax._
-import io.renku.eventlog.events.categories.creation.Event.{NewEvent, SkippedEvent}
 
 class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
@@ -48,11 +48,9 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
       s"return $Accepted if the creation of the event returns $successfulResponse" in new TestCase {
         val event = newOrSkippedEvents.generateOne
 
-        val requestContent = EventRequestContent(event = event.asJson, None)
-
         (eventPersister.storeNewEvent _).expects(event).returning(successfulResponse.pure[IO])
 
-        handler.handle(requestContent).unsafeRunSync() shouldBe Accepted
+        handler.handle(requestContent(event.asJson)).unsafeRunSync() shouldBe Accepted
 
         logger.loggedOnly(
           Info(
@@ -99,12 +97,10 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
       val event     = newOrSkippedEvents.generateOne
       val exception = exceptions.generateOne
 
-      val requestContent = EventRequestContent(event = event.asJson, None)
-
       (eventPersister.storeNewEvent _).expects(event).returning(context.raiseError(exception))
       val expectedError = SchedulingError(exception)
 
-      handler.handle(requestContent).unsafeRunSync() shouldBe expectedError
+      handler.handle(requestContent(event.asJson)).unsafeRunSync() shouldBe expectedError
 
       logger.loggedOnly(
         Error(
