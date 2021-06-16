@@ -30,23 +30,23 @@ import ch.datascience.interpreters.TestLogger.Level.Warn
 import ch.datascience.logging.{ExecutionTimeRecorder, TestExecutionTimeRecorder}
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
+import com.github.tomakehurst.wiremock.http.Fault
+import com.github.tomakehurst.wiremock.http.Fault._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import io.circe.Json
 import io.prometheus.client.Histogram
+import org.http4s.MediaType._
 import org.http4s.Method.{GET, POST}
+import org.http4s.blaze.pipeline.{Command => Http4sCommand}
 import org.http4s.client.ConnectionFailure
 import org.http4s.{multipart => _, _}
-import MediaType._
-import com.github.tomakehurst.wiremock.http.Fault
-import com.github.tomakehurst.wiremock.http.Fault._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.typelevel.log4cats.Logger
 
-import java.net.ConnectException
 import java.util.concurrent.TimeoutException
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -235,13 +235,13 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
 
         verifyThrottling()
 
-        val exceptionMessage = s"Failed to connect to endpoint: $hostUrl"
+        val exceptionMessage = Http4sCommand.EOF.toString
 
         val exception = intercept[ConnectivityException] {
           client.callRemote.unsafeRunSync()
         }
         exception.getMessage shouldBe s"GET $hostUrl/resource error: $exceptionMessage"
-        exception.getCause   shouldBe a[ConnectException]
+        exception.getCause   shouldBe a[Http4sCommand.EOF.type]
 
         logger.loggedOnly(
           Warn(s"GET $hostUrl/resource timed out -> retrying attempt 1 error: $exceptionMessage"),
@@ -388,7 +388,9 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
     } yield response
 
     private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Int]] = {
-      case (Status.Ok, _, response) => response.as[String].map(_.toInt)
+      case (Status.Ok, _, response) =>
+        response.as[String].map(_.toInt)
+
     }
   }
 }
