@@ -133,6 +133,24 @@ Changes the status of events. The events for which the status will be changed ar
 }
 ```
 
+####Changing status of all project events older than the given one from `TRIPLES_GENERATED` to `TRIPLES_STORE`
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "EVENTS_STATUS_CHANGE",
+  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "project": {
+    "id": 12,
+    "path": "namespace/project-name"
+  },
+  "newStatus": "TRIPLES_STORE"
+}
+```
+
 - **ZOMBIE_CHASING**
 
 Changes the status of a zombie event

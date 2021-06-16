@@ -19,23 +19,25 @@
 package io.renku.eventlog.events.categories
 package statuschange
 
+import cats.Show
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
+import ch.datascience.db.SqlStatement
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
+import ch.datascience.metrics.TestLabeledHistogram
+import eu.timepit.refined.auto._
 import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
 import io.renku.eventlog.events.categories.statuschange.Generators._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent._
-import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.concurrent.Eventually
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
-import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -44,39 +46,41 @@ class EventHandlerSpec
     extends AnyWordSpec
     with MockFactory
     with should.Matchers
-    with TableDrivenPropertyChecks
-    with Eventually {
+    with Eventually
+    with IntegrationPatience {
 
   "handle" should {
-    Seq(triplesGeneratedEvents.generateOne, tripleStoreEvents.generateOne).foreach { event =>
-      s"decode event changing project events to ${event.getClass.getSimpleName} and pass it to the events updater" in new TestCase {
 
-        (statusChanger.updateStatuses _).expects(event).returning(().pure[IO])
-
+    "decode a valid event and pass it to the events updater" in new TestCase {
+      Seq(
+        ancestorsToTriplesGeneratedEvents.map(stubUpdateStatuses(updateResult = ().pure[IO])).generateOne,
+        ancestorsToTripleStoreEvents.map(stubUpdateStatuses(updateResult = ().pure[IO])).generateOne
+      ) foreach { case (event, eventAsString) =>
         handler.handle(requestContent(event.asJson)).unsafeRunSync() shouldBe Accepted
 
         eventually {
-          logger.loggedOnly(Info(s"$categoryName: ${event.show} -> Processed"),
-                            Info(s"$categoryName: ${event.show} -> $Accepted")
+          logger.loggedOnly(Info(s"$categoryName: $eventAsString -> Processed"),
+                            Info(s"$categoryName: $eventAsString -> $Accepted")
           )
         }
-
+        logger.reset()
       }
     }
 
     s"log an error if the events updater fails" in new TestCase {
-      val event     = Gen.oneOf(tripleStoreEvents, triplesGeneratedEvents).generateOne
       val exception = exceptions.generateOne
-      (statusChanger.updateStatuses _).expects(event).returning(exception.raiseError[IO, Unit])
+      val (event, eventAsString) =
+        ancestorsToTriplesGeneratedEvents
+          .map(stubUpdateStatuses(updateResult = exception.raiseError[IO, Unit]))
+          .generateOne
 
       handler.handle(requestContent(event.asJson)).unsafeRunSync() shouldBe Accepted
 
       eventually {
-        logger.loggedOnly(Error(s"$categoryName: ${event.show} -> Failure", exception),
-                          Info(s"$categoryName: ${event.show} -> $Accepted")
+        logger.loggedOnly(Error(s"$categoryName: $eventAsString -> Failure", exception),
+                          Info(s"$categoryName: $eventAsString -> $Accepted")
         )
       }
-
     }
 
     s"return $UnsupportedEventType if event is of wrong category" in new TestCase {
@@ -98,18 +102,25 @@ class EventHandlerSpec
 
       logger.expectNoLogs()
     }
-
   }
 
   private implicit val cs: ContextShift[IO] = IO.contextShift(global)
   private trait TestCase {
+
     val logger        = TestLogger[IO]()
     val statusChanger = mock[StatusChanger[IO]]
-    val handler       = new EventHandler[IO](categoryName, statusChanger, logger)
+    val queryExec     = TestLabeledHistogram[SqlStatement.Name]("query_id")
+    val handler       = new EventHandler[IO](categoryName, statusChanger, queryExec, logger)
+
+    def stubUpdateStatuses[E <: StatusChangeEvent](updateResult: IO[Unit])(implicit show: Show[E]): E => (E, String) =
+      event => {
+        (statusChanger.updateStatuses[E](_: E)(_: DBUpdater[IO, E])).expects(event, *).returning(updateResult)
+        (event, event.show)
+      }
   }
 
   private implicit def eventEncoder[E <: StatusChangeEvent]: Encoder[E] = Encoder.instance[E] {
-    case StatusChangeEvent.TriplesGenerated(eventId, path) =>
+    case StatusChangeEvent.AncestorsToTriplesGenerated(eventId, path) =>
       json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",
       "id":           ${eventId.id.value},
@@ -119,7 +130,7 @@ class EventHandlerSpec
       },
       "newStatus":    "TRIPLES_GENERATED"
     }"""
-    case StatusChangeEvent.TriplesStore(eventId, path) =>
+    case StatusChangeEvent.AncestorsToTriplesStore(eventId, path) =>
       json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",
       "id":           ${eventId.id.value},
@@ -129,6 +140,5 @@ class EventHandlerSpec
       },
       "newStatus":    "TRIPLES_STORE"
     }"""
-
   }
 }

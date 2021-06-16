@@ -18,6 +18,49 @@
 
 package io.renku.eventlog.events.categories.statuschange
 
+import cats.data.Kleisli
+import cats.effect.BracketThrow
+import cats.syntax.all._
+import ch.datascience.db.SessionResource
+import ch.datascience.graph.model.events.EventStatus
+import ch.datascience.graph.model.projects
+import io.renku.eventlog.EventLogDB
+import skunk.Transaction
+
+import scala.util.control.NonFatal
+
 private trait StatusChanger[Interpretation[_]] {
-  def updateStatuses(event: StatusChangeEvent): Interpretation[Unit]
+  def updateStatuses[E <: StatusChangeEvent](event: E)(implicit
+      dbUpdater:                                    DBUpdater[Interpretation, E]
+  ): Interpretation[Unit]
+}
+
+private final case class DBUpdateResults(projectPath: projects.Path, changedStatusCounts: Map[EventStatus, Int])
+
+private class StatusChangerImpl[Interpretation[_]: BracketThrow](
+    sessionResource: SessionResource[Interpretation, EventLogDB],
+    gaugesUpdater:   GaugesUpdater[Interpretation]
+) extends StatusChanger[Interpretation] {
+
+  import gaugesUpdater._
+
+  override def updateStatuses[E <: StatusChangeEvent](
+      event:            E
+  )(implicit dbUpdater: DBUpdater[Interpretation, E]): Interpretation[Unit] = sessionResource.useWithTransactionK {
+    Kleisli { case (transaction, session) =>
+      {
+        for {
+          savepoint     <- Kleisli.liftF(transaction.savepoint)
+          updateResults <- dbUpdater.updateDB(event) recoverWith rollback(transaction)(savepoint)
+          _             <- Kleisli.liftF(updateGauges(updateResults)) recoverWith { case NonFatal(_) => Kleisli.pure(()) }
+        } yield ()
+      } run session
+    }
+  }
+
+  private def rollback(transaction: Transaction[Interpretation])(
+      savepoint:                    transaction.Savepoint
+  ): PartialFunction[Throwable, UpdateResult[Interpretation]] = { case NonFatal(e) =>
+    Kleisli.liftF(transaction.rollback(savepoint) >> e.raiseError[Interpretation, DBUpdateResults])
+  }
 }

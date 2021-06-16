@@ -88,20 +88,19 @@ object events {
   sealed trait EventStatus extends StringTinyType with Product with Serializable
   object EventStatus extends TinyTypeFactory[EventStatus](EventStatusInstantiator) {
 
-    val all: Set[EventStatus] =
-      Set(
-        New,
-        GeneratingTriples,
-        TriplesGenerated,
-        TransformingTriples,
-        TriplesStore,
-        Skipped,
-        GenerationRecoverableFailure,
-        GenerationNonRecoverableFailure,
-        TransformationRecoverableFailure,
-        TransformationNonRecoverableFailure,
-        AwaitingDeletion
-      )
+    val all: Set[EventStatus] = Set(
+      New,
+      GeneratingTriples,
+      TriplesGenerated,
+      TransformingTriples,
+      TriplesStore,
+      Skipped,
+      GenerationRecoverableFailure,
+      GenerationNonRecoverableFailure,
+      TransformationRecoverableFailure,
+      TransformationNonRecoverableFailure,
+      AwaitingDeletion
+    )
 
     type New = New.type
     final case object New extends EventStatus {
@@ -125,6 +124,7 @@ object events {
 
     sealed trait FinalStatus extends EventStatus
 
+    type TriplesStore = TriplesStore.type
     final case object TriplesStore extends EventStatus with FinalStatus {
       override val value: String = "TRIPLES_STORE"
     }
@@ -132,6 +132,7 @@ object events {
       override val value: String = "SKIPPED"
     }
 
+    type AwaitingDeletion = AwaitingDeletion.type
     final case object AwaitingDeletion extends EventStatus with FinalStatus {
       override val value: String = "AWAITING_DELETION"
     }

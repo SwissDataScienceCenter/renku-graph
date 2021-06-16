@@ -18,14 +18,14 @@
 
 package ch.datascience.events.consumers
 
-import cats.{MonadError, Show}
 import cats.data.EitherT
 import cats.syntax.all._
-import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, SchedulingError, UnsupportedEventType}
+import cats.{MonadError, Show}
+import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventId}
 import ch.datascience.graph.model.projects
-import org.typelevel.log4cats.Logger
 import io.circe.{Decoder, DecodingFailure, Json}
+import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 

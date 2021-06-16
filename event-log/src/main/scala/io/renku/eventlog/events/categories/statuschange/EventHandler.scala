@@ -18,56 +18,107 @@
 
 package io.renku.eventlog.events.categories.statuschange
 
-import cats.MonadThrow
+import cats.data.EitherT
 import cats.data.EitherT.fromEither
-import cats.effect.{Concurrent, ContextShift}
+import cats.effect.{Concurrent, ContextShift, IO}
 import cats.syntax.all._
+import cats.{MonadThrow, Show}
+import ch.datascience.db.SqlStatement.Name
+import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.events.consumers
-import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
+import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
 import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult}
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventId, EventStatus}
 import ch.datascience.graph.model.projects
+import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.circe.{Decoder, DecodingFailure}
+import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent._
 import org.typelevel.log4cats.Logger
-import StatusChangeEvent._
 
 import scala.util.control.NonFatal
 
 private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurrent](
     override val categoryName: CategoryName,
     statusChanger:             StatusChanger[Interpretation],
+    queriesExecTimes:          LabeledHistogram[Interpretation, SqlStatement.Name],
     logger:                    Logger[Interpretation]
 ) extends consumers.EventHandler[Interpretation] {
 
   import EventHandler._
 
+  private implicit lazy val execTimes: LabeledHistogram[Interpretation, SqlStatement.Name] = queriesExecTimes
+
   override def handle(request: EventRequestContent): Interpretation[EventSchedulingResult] = {
-    for {
-      _ <- fromEither[Interpretation](request.event.validateCategoryName)
-      event <- fromEither[Interpretation](
-                 request.event
-                   .as[StatusChangeEvent.TriplesGenerated]
-                   .orElse(request.event.as[StatusChangeEvent.TriplesStore])
-                   .leftMap(_ => BadRequest)
-                   .leftWiden[EventSchedulingResult]
-               )
-
-      result <- (ContextShift[Interpretation].shift *> Concurrent[Interpretation].start(
-                  statusChanger.updateStatuses(event) >> logger.logInfo(event, "Processed") recoverWith {
-                    case NonFatal(e) => logger.logError(event, e)
-                  }
-                )).toRightT
-                  .map(_ => Accepted)
-                  .semiflatTap(logger.log(event.show))
-
-    } yield result
+    fromEither[Interpretation](request.event.validateCategoryName) >> tryHandle(
+      requestAs[AncestorsToTriplesGenerated],
+      requestAs[AncestorsToTriplesStore]
+    )(request)
   }.merge
 
+  private def tryHandle(
+      options: EventRequestContent => EitherT[Interpretation, EventSchedulingResult, EventSchedulingResult]*
+  ): EventRequestContent => EitherT[Interpretation, EventSchedulingResult, EventSchedulingResult] = request =>
+    options.foldLeft(
+      EitherT.left[EventSchedulingResult](UnsupportedEventType.pure[Interpretation].widen[EventSchedulingResult])
+    ) { case (acc, option) => acc orElse option(request) }
+
+  private def requestAs[E <: StatusChangeEvent](request: EventRequestContent)(implicit
+      updaterFactory:                                    LabeledHistogram[Interpretation, SqlStatement.Name] => DBUpdater[Interpretation, E],
+      show:                                              Show[E],
+      decoder:                                           Decoder[E]
+  ): EitherT[Interpretation, EventSchedulingResult, EventSchedulingResult] = EitherT(
+    request.event
+      .as[E]
+      .map(startUpdate)
+      .leftMap(_ => BadRequest)
+      .leftWiden[EventSchedulingResult]
+      .sequence
+  )
+
+  private def startUpdate[E <: StatusChangeEvent](implicit
+      updaterFactory: LabeledHistogram[Interpretation, Name] => DBUpdater[Interpretation, E],
+      show:           Show[E]
+  ): E => Interpretation[EventSchedulingResult] = event =>
+    (ContextShift[Interpretation].shift *> Concurrent[Interpretation]
+      .start(executeUpdate(event)))
+      .map(_ => Accepted)
+      .widen[EventSchedulingResult]
+      .flatTap(logger.log(event.show))
+
+  private def executeUpdate[E <: StatusChangeEvent](
+      event:                 E
+  )(implicit updaterFactory: LabeledHistogram[Interpretation, Name] => DBUpdater[Interpretation, E], show: Show[E]) =
+    statusChanger
+      .updateStatuses(event)(updaterFactory(execTimes))
+      .recoverWith { case NonFatal(e) =>
+        logger.logError(event, e) >> e.raiseError[Interpretation, Unit]
+      } >> logger.logInfo(event, "Processed")
 }
 
 private object EventHandler {
+
+  def apply(sessionResource:                    SessionResource[IO, EventLogDB],
+            queriesExecTimes:                   LabeledHistogram[IO, SqlStatement.Name],
+            awaitingTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],
+            underTriplesGenerationGauge:        LabeledGauge[IO, projects.Path],
+            awaitingTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
+            underTriplesTransformationGauge:    LabeledGauge[IO, projects.Path],
+            logger:                             Logger[IO]
+  )(implicit cs:                                ContextShift[IO]): IO[EventHandler[IO]] = for {
+    gaugesUpdater <- IO(
+                       new GaugesUpdaterImpl[IO](awaitingTriplesGenerationGauge,
+                                                 awaitingTriplesTransformationGauge,
+                                                 underTriplesTransformationGauge,
+                                                 underTriplesGenerationGauge
+                       )
+                     )
+    statusChanger <- IO(new StatusChangerImpl[IO](sessionResource, gaugesUpdater))
+  } yield new EventHandler[IO](categoryName, statusChanger, queriesExecTimes, logger)
+
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
-  private implicit val eventTriplesGeneratedDecoder: Decoder[StatusChangeEvent.TriplesGenerated] = { cursor =>
+
+  private implicit val eventTriplesGeneratedDecoder: Decoder[AncestorsToTriplesGenerated] = { cursor =>
     for {
       id          <- cursor.downField("id").as[EventId]
       projectId   <- cursor.downField("project").downField("id").as[projects.Id]
@@ -76,9 +127,10 @@ private object EventHandler {
              case EventStatus.TriplesGenerated => Right(())
              case status                       => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
            }
-    } yield StatusChangeEvent.TriplesGenerated(CompoundEventId(id, projectId), projectPath)
+    } yield AncestorsToTriplesGenerated(CompoundEventId(id, projectId), projectPath)
   }
-  private implicit val eventTripleStoreDecoder: Decoder[StatusChangeEvent.TriplesStore] = { cursor =>
+
+  private implicit val eventTripleStoreDecoder: Decoder[AncestorsToTriplesStore] = { cursor =>
     for {
       id          <- cursor.downField("id").as[EventId]
       projectId   <- cursor.downField("project").downField("id").as[projects.Id]
@@ -87,6 +139,6 @@ private object EventHandler {
              case EventStatus.TriplesStore => Right(())
              case status                   => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
            }
-    } yield StatusChangeEvent.TriplesStore(CompoundEventId(id, projectId), projectPath)
+    } yield AncestorsToTriplesStore(CompoundEventId(id, projectId), projectPath)
   }
 }

@@ -121,6 +121,9 @@ class GaugeResetSchedulerSpec
       override def set(labelValue: (Double, Double)): IO[Unit] =
         fail("Spec shouldn't be calling that")
 
+      override def update(labelValue: (Double, Double)): IO[Unit] =
+        fail("Spec shouldn't be calling that")
+
       override def increment(labelValue: Double): IO[Unit] =
         fail("Spec shouldn't be calling that")
 

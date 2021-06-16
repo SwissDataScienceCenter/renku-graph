@@ -25,7 +25,7 @@ import ch.datascience.tinytypes._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
-import eu.timepit.refined.numeric.{NonNegative, NonPositive, Positive}
+import eu.timepit.refined.numeric.{Negative, NonNegative, NonPositive, Positive}
 import eu.timepit.refined.string.Url
 import io.circe.{Encoder, Json}
 import org.http4s.Status
@@ -145,6 +145,8 @@ object Generators {
     choose(1L, max) map Refined.unsafeApply
 
   def nonNegativeDoubles(max: Double = 1000d): Gen[Double Refined NonNegative] = choose(0d, max) map Refined.unsafeApply
+
+  def negativeDoubles(min: Double = -1000d): Gen[Double Refined Negative] = choose(min, 0d) map Refined.unsafeApply
 
   def nonNegativeInts(max: Int = 1000): Gen[Int Refined NonNegative] = choose(0, max) map Refined.unsafeApply
 

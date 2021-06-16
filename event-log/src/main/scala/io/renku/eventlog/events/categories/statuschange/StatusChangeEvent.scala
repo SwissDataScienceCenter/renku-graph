@@ -22,16 +22,30 @@ import cats.Show
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.projects
 
-private sealed trait StatusChangeEvent extends Product with Serializable
+private sealed trait StatusChangeEvent extends Product with Serializable {
+  val projectPath: projects.Path
+}
 
 private object StatusChangeEvent {
-  final case class TriplesGenerated(eventId: CompoundEventId, projectPath: projects.Path) extends StatusChangeEvent
-  final case class TriplesStore(eventId: CompoundEventId, projectPath: projects.Path) extends StatusChangeEvent
+  final case class AncestorsToTriplesGenerated(eventId: CompoundEventId, projectPath: projects.Path)
+      extends StatusChangeEvent
 
-  implicit val show: Show[StatusChangeEvent] = Show.show {
-    case TriplesGenerated(eventId, projectPath) =>
-      s"$eventId, projectPath = $projectPath, status = TRIPLES_GENERATED"
-    case TriplesStore(eventId, projectPath) =>
-      s"$eventId, projectPath = $projectPath, status = TRIPLE_STORE"
+  object AncestorsToTriplesGenerated {
+    implicit lazy val show: Show[AncestorsToTriplesGenerated] = Show.show {
+      case AncestorsToTriplesGenerated(eventId, projectPath) =>
+        s"$eventId, projectPath = $projectPath, status = TRIPLES_GENERATED"
+    }
   }
+
+  final case class AncestorsToTriplesStore(eventId: CompoundEventId, projectPath: projects.Path)
+      extends StatusChangeEvent
+
+  object AncestorsToTriplesStore {
+    implicit lazy val show: Show[AncestorsToTriplesStore] = Show.show {
+      case AncestorsToTriplesStore(eventId, projectPath) =>
+        s"$eventId, projectPath = $projectPath, status = TRIPLE_STORE"
+    }
+  }
+
+  implicit def show[E <: StatusChangeEvent](implicit concreteShow: Show[E]): Show[E] = concreteShow
 }

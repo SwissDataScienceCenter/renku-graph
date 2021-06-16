@@ -110,8 +110,9 @@ class EventLogMetricsSpec
         case (categoryName, value) => categoryNameValues.put(categoryName, value).pure[IO].void
       }
 
-      override def increment(labelValue: CategoryName) = fail("Spec shouldn't be calling that")
-      override def decrement(labelValue: CategoryName) = fail("Spec shouldn't be calling that")
+      override def update(labelValue:    (CategoryName, Double)) = fail("Spec shouldn't be calling that")
+      override def increment(labelValue: CategoryName)           = fail("Spec shouldn't be calling that")
+      override def decrement(labelValue: CategoryName)           = fail("Spec shouldn't be calling that")
       override def reset()         = fail("Spec shouldn't be calling that")
       protected override def gauge = fail("Spec shouldn't be calling that")
     }
@@ -125,8 +126,9 @@ class EventLogMetricsSpec
         case (status, value) => statusValues.put(status, value).pure[IO].void
       }
 
-      override def increment(labelValue: EventStatus) = fail("Spec shouldn't be calling that")
-      override def decrement(labelValue: EventStatus) = fail("Spec shouldn't be calling that")
+      override def update(labelValue:    (EventStatus, Double)) = fail("Spec shouldn't be calling that")
+      override def increment(labelValue: EventStatus)           = fail("Spec shouldn't be calling that")
+      override def decrement(labelValue: EventStatus)           = fail("Spec shouldn't be calling that")
       override def reset()         = fail("Spec shouldn't be calling that")
       protected override def gauge = fail("Spec shouldn't be calling that")
     }

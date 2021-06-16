@@ -350,6 +350,8 @@ class StatusChangeEndpointSpec
   private class GaugeStub extends LabeledGauge[IO, projects.Path] {
     override def set(labelValue: (projects.Path, Double)) = IO.unit
 
+    override def update(labelValue: (projects.Path, Double)) = IO.unit
+
     override def increment(labelValue: projects.Path) = IO.unit
 
     override def decrement(labelValue: projects.Path) = IO.unit

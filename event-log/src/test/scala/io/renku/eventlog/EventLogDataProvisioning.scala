@@ -23,7 +23,7 @@ import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUr
 import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.{projectPaths, projectSchemaVersions}
-import ch.datascience.graph.model.events.EventStatus.{TransformationRecoverableFailure, TransformingTriples, TriplesGenerated}
+import ch.datascience.graph.model.events.EventStatus.{TransformationRecoverableFailure, TransformingTriples, TriplesGenerated, TriplesStore}
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.model.{SchemaVersion, projects}
@@ -122,7 +122,7 @@ trait EventLogDataProvisioning {
                                    schemaVersion:   SchemaVersion,
                                    maybePayload:    Option[EventPayload]
   ): Unit = (eventStatus, maybePayload) match {
-    case (TriplesGenerated | TransformationRecoverableFailure | TransformingTriples, Some(payload)) =>
+    case (TriplesGenerated | TransformationRecoverableFailure | TransformingTriples | TriplesStore, Some(payload)) =>
       execute[Unit] {
         Kleisli { session =>
           val query: Command[EventId ~ projects.Id ~ EventPayload ~ SchemaVersion] =
