@@ -45,6 +45,7 @@ import java.net.ConnectException
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.control.NonFatal
+import org.http4s.blaze.pipeline.Command
 
 abstract class RestClient[Interpretation[_]: ConcurrentEffect: Timer, ThrottlingTarget](
     throttler:               Throttler[Interpretation, ThrottlingTarget],
@@ -181,13 +182,15 @@ abstract class RestClient[Interpretation[_]: ConcurrentEffect: Timer, Throttling
     case error: RestClientError => throttler.release() >> error.raiseError[Interpretation, T]
     case NonFatal(cause) =>
       cause match {
-        case exception @ (_: ConnectionFailure | _: ConnectException) if attempt <= maxRetries.value =>
+        case exception @ (_: ConnectionFailure | _: ConnectException | _: Command.EOF.type)
+            if attempt <= maxRetries.value =>
           for {
             _      <- logger.warn(LogMessage(request.request, s"timed out -> retrying attempt $attempt", exception))
             _      <- Timer[Interpretation] sleep retryInterval
             result <- callRemote(httpClient, request, mapResponse, attempt + 1)
           } yield result
-        case exception @ (_: ConnectionFailure | _: ConnectException) if attempt > maxRetries.value =>
+        case exception @ (_: ConnectionFailure | _: ConnectException | _: Command.EOF.type)
+            if attempt > maxRetries.value =>
           throttler.release() >> ConnectivityException(LogMessage(request.request, exception), exception)
             .raiseError[Interpretation, T]
         case other =>

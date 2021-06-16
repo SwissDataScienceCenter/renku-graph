@@ -32,7 +32,7 @@ object TokenRepository {
     new ProjectsTokensDbConfigProvider[IO].get().unsafeRunSync()
 
   private val postgresContainer = FixedHostPortGenericContainer(
-    imageName = "postgres:9.6.19-alpine",
+    imageName = "postgres:11.11-alpine",
     env = Map("POSTGRES_USER"     -> dbConfig.user.value,
               "POSTGRES_PASSWORD" -> dbConfig.pass.value,
               "POSTGRES_DB"       -> dbConfig.name.value

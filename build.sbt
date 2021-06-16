@@ -1,6 +1,6 @@
 organization := "ch.datascience"
 name := "renku-graph"
-scalaVersion := "2.13.5"
+scalaVersion := "2.13.6"
 
 // This project contains nothing to package, like pure POM maven project
 packagedArtifacts := Map.empty
@@ -146,12 +146,12 @@ lazy val acceptanceTests = Project(
 
 lazy val commonSettings = Seq(
   organization := "ch.datascience",
-  scalaVersion := "2.13.5",
+  scalaVersion := "2.13.6",
   publish / skip := true,
   publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo"))),
   Compile / packageDoc / publishArtifact := false,
   Compile / packageSrc / publishArtifact := false,
-  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.3" cross CrossVersion.full),
+  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.13.0" cross CrossVersion.full),
   // format: off
   scalacOptions ++= Seq(
     "-deprecation", // Emit warning and location for usages of deprecated APIs.
