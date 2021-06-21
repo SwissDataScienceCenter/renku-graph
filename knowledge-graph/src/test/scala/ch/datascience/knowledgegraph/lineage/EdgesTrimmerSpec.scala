@@ -40,7 +40,8 @@ class EdgesTrimmerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
     *    \_ F -- g
     *  k __ L __/
     *
-    *  x -- Z -- y
+    *  m -- N -- o -- Q -- r
+    *         \_ p _/
     *
     *   trim on a should return B c d H j
     *   trim on c should return a B c e H j
@@ -50,6 +51,7 @@ class EdgesTrimmerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
     *   trim on i should return H j
     *   trim on j should return a B c e H i
     *   trim on k should return nothing (with assumption that F is more recent than L)
+    *   trim on m should return m N o p Q r
     */
 
   "trim" should {
@@ -61,20 +63,24 @@ class EdgesTrimmerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
     val i = Location("i")
     val j = Location("j")
     val k = Location("k")
-    val x = Location("x")
-    val y = Location("y")
+    val m = Location("m")
+    val o = Location("o")
+    val p = Location("p")
+    val r = Location("r")
     val B = RunInfo(EntityId.of("B"), Instant.now())
     val F = RunInfo(EntityId.of("F"), B.date.value plusSeconds 60)
     val H = RunInfo(EntityId.of("H"), F.date.value plusSeconds 60)
     val L = RunInfo(EntityId.of("L"), F.date.value minusSeconds 60)
-    val Z = RunInfo(EntityId.of("Z"), Instant.now())
+    val N = RunInfo(EntityId.of("N"), Instant.now())
+    val Q = RunInfo(EntityId.of("Q"), Instant.now())
 
     val graph: EdgeMap = Map(
       B -> (Set(a, e), Set(c, d)),
       F -> (Set(e), Set(g)),
       H -> (Set(c, i), Set(j)),
       L -> (Set(k), Set(g)),
-      Z -> (Set(x), Set(y))
+      N -> (Set(m), Set(o, p)),
+      Q -> (Set(o, p), Set(r))
     )
 
     "return a B c d H j when looking for a" in {
@@ -121,6 +127,20 @@ class EdgesTrimmerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
       edgesTrimmer.trim(graph, j) shouldBe Map(
         B -> (Set(a, e), Set(c)),
         H -> (Set(c, i), Set(j))
+      ).pure[Try]
+    }
+
+    "return m N o p Q r when looking for m - diamond case" in {
+      edgesTrimmer.trim(graph, m) shouldBe Map(
+        N -> (Set(m), Set(o, p)),
+        Q -> (Set(o, p), Set(r))
+      ).pure[Try]
+    }
+
+    "return m N o p Q r when looking for r - diamond case" in {
+      edgesTrimmer.trim(graph, r) shouldBe Map(
+        N -> (Set(m), Set(o, p)),
+        Q -> (Set(o, p), Set(r))
       ).pure[Try]
     }
 
