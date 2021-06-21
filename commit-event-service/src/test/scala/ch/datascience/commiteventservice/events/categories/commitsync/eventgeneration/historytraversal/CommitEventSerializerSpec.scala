@@ -21,6 +21,7 @@ package historytraversal
 
 import Generators._
 import cats.MonadError
+import ch.datascience.commiteventservice.events.categories.common.eventgeneration.{CommitEvent, Person}
 import ch.datascience.generators.Generators.Implicits._
 import io.circe.Json
 import io.circe.parser._

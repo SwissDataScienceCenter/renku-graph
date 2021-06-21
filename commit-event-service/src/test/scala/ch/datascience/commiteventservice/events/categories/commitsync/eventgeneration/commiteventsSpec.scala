@@ -18,6 +18,7 @@
 
 package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration
 
+import ch.datascience.commiteventservice.events.categories.common.eventgeneration.{Author, Committer}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.users.Email

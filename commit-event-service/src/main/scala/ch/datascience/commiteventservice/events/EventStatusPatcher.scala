@@ -36,6 +36,7 @@ import scala.concurrent.ExecutionContext
 
 private trait EventStatusPatcher[Interpretation[_]] {
   def sendDeletionStatus(projectId: projects.Id, eventId: CommitId): Interpretation[Unit]
+
 }
 
 private class EventStatusPatcherImpl[Interpretation[_]: MonadThrow: ConcurrentEffect: Timer](

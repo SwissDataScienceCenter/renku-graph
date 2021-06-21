@@ -20,7 +20,7 @@ package ch.datascience.commiteventservice.events.categories.commitsync.eventgene
 
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitWithParents
+import ch.datascience.commiteventservice.events.categories.common.eventgeneration.CommitWithParents
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.events.CommitId

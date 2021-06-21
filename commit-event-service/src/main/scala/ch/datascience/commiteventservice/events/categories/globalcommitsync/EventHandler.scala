@@ -4,17 +4,15 @@ import cats.MonadThrow
 import cats.data.EitherT.fromEither
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.commiteventservice.events.categories.commitsync.CommitSyncEvent
 import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.GlobalCommitEventSynchronizer
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.events.consumers
-import ch.datascience.events.consumers.EventSchedulingResult.Accepted
+import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult, Project}
 import ch.datascience.graph.model.events.{CategoryName, LastSyncedDate}
 import ch.datascience.logging.ExecutionTimeRecorder
 import io.circe.Decoder
-import org.http4s.Status.BadRequest
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -44,7 +42,7 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow](
                   .map(_ => Accepted)
                   .semiflatTap(logger log event)
                   .leftSemiflatTap(logger log event)
-    } yield Accepted // TODO: yield result
+    } yield result
   }.merge
 
   private implicit val eventDecoder: Decoder[GlobalCommitSyncEvent] = cursor =>
@@ -59,7 +57,7 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow](
       path <- cursor.downField("path").as[projects.Path]
     } yield Project(id, path)
 
-  private implicit lazy val eventInfoToString: GlobalCommitSyncEvent => String = _.show.toString
+  private implicit lazy val eventInfoToString: GlobalCommitSyncEvent => String = _.toString
 
   private def logError(event: GlobalCommitSyncEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
     case NonFatal(exception) =>
@@ -78,6 +76,6 @@ private[events] object EventHandler {
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[EventHandler[IO]] = for {
-    commitEventSynchronizer <- GlobalCommitEventSynchronizer(gitLabThrottler, executionTimeRecorder, logger)
-  } yield new EventHandler[IO](categoryName, commitEventSynchronizer, logger)
+    globalCommitEventSynchronizer <- GlobalCommitEventSynchronizer(gitLabThrottler, executionTimeRecorder, logger)
+  } yield new EventHandler[IO](categoryName, globalCommitEventSynchronizer, logger)
 }

@@ -21,7 +21,10 @@ package historytraversal
 
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.all._
+import ch.datascience.commiteventservice.events.categories
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.Generators._
+import ch.datascience.commiteventservice.events.categories.common
+import ch.datascience.commiteventservice.events.categories.common.CommitInfo
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
@@ -78,7 +81,7 @@ class CommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSer
             .willReturn(okJson(responseJson.toString()))
         }
 
-        finder.findCommitInfo(projectId, commitId)(maybeAccessToken).unsafeRunSync() shouldBe CommitInfo(
+        finder.findCommitInfo(projectId, commitId)(maybeAccessToken).unsafeRunSync() shouldBe common.CommitInfo(
           id = commitId,
           message = commitMessage,
           committedDate = committedDate,
@@ -96,7 +99,7 @@ class CommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSer
             .willReturn(okJson(responseJson.toString()))
         }
 
-        finder.findCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync() shouldBe CommitInfo(
+        finder.findCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync() shouldBe common.CommitInfo(
           id = commitId,
           message = commitMessage,
           committedDate = committedDate,
@@ -156,7 +159,7 @@ class CommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSer
             .willReturn(okJson(responseJson.toString()))
         }
 
-        finder.getMaybeCommitInfo(projectId, commitId)(maybeAccessToken).unsafeRunSync() shouldBe CommitInfo(
+        finder.getMaybeCommitInfo(projectId, commitId)(maybeAccessToken).unsafeRunSync() shouldBe common.CommitInfo(
           id = commitId,
           message = commitMessage,
           committedDate = committedDate,
@@ -177,7 +180,7 @@ class CommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSer
             .willReturn(okJson(responseJson.toString()))
         }
 
-        finder.getMaybeCommitInfo(projectId, commitId)(maybeAccessToken).unsafeRunSync() shouldBe CommitInfo(
+        finder.getMaybeCommitInfo(projectId, commitId)(maybeAccessToken).unsafeRunSync() shouldBe common.CommitInfo(
           id = commitId,
           message = commitMessage,
           committedDate = committedDate,
@@ -195,7 +198,7 @@ class CommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSer
             .willReturn(okJson(responseJson.toString()))
         }
 
-        finder.getMaybeCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync() shouldBe CommitInfo(
+        finder.getMaybeCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync() shouldBe common.CommitInfo(
           id = commitId,
           message = commitMessage,
           committedDate = committedDate,

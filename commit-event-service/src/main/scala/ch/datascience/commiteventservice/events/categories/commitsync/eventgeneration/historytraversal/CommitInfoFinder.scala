@@ -20,7 +20,7 @@ package ch.datascience.commiteventservice.events.categories.commitsync.eventgene
 
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitInfo
+import ch.datascience.commiteventservice.events.categories.common.CommitInfo
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl

@@ -33,6 +33,7 @@ import org.http4s.{EntityDecoder, Status}
 
 import scala.concurrent.ExecutionContext
 import cats.syntax.all._
+import ch.datascience.commiteventservice.events.categories.common.CommitInfo
 
 private trait LatestCommitFinder[Interpretation[_]] {
   def findLatestCommit(

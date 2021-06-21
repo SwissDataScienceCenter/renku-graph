@@ -19,7 +19,7 @@
 package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal
 
 import cats.MonadError
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.{CommitEvent, Person}
+import ch.datascience.commiteventservice.events.categories.common.eventgeneration.{CommitEvent, Person}
 import io.circe.literal._
 import io.circe.{Encoder, Json}
 

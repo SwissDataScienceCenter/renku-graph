@@ -18,7 +18,7 @@
 
 package ch.datascience.commiteventservice.events.categories.commitsync
 
-import Generators._
+import ch.datascience.commiteventservice.events.categories.commitsync.Generators._
 import ch.datascience.generators.Generators.Implicits._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

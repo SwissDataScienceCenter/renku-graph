@@ -21,9 +21,10 @@ package eventgeneration
 package historytraversal
 
 import cats.syntax.all._
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEvent._
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.UpdateResult._
+import ch.datascience.commiteventservice.events.categories.common.eventgeneration.CommitEvent._
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.Generators._
+import ch.datascience.commiteventservice.events.categories.common.CommitInfo
+import ch.datascience.commiteventservice.events.categories.common.eventgeneration.CommitEvent
 import ch.datascience.events.consumers.Project
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -33,6 +34,7 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import ch.datascience.commiteventservice.events.categories.common.UpdateResult._
 
 import java.time.Instant
 import scala.util._

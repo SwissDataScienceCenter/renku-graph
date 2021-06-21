@@ -2,8 +2,6 @@ package ch.datascience.commiteventservice.events.categories.globalcommitsync
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.commiteventservice.Microservice
-import ch.datascience.commiteventservice.events.categories.globalcommitsync.EventHandler
-import ch.datascience.commiteventservice.events.categories.globalcommitsync.{EventHandler, categoryName}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism

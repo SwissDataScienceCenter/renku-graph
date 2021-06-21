@@ -21,8 +21,8 @@ package ch.datascience.commiteventservice.events.categories.commitsync.eventgene
 import cats.MonadThrow
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEvent
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
+import ch.datascience.commiteventservice.events.categories.common.eventgeneration.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
+import ch.datascience.commiteventservice.events.categories.common.eventgeneration.CommitEvent
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.events.EventBody

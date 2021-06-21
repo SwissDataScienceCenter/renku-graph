@@ -18,6 +18,7 @@
 
 package ch.datascience.commiteventservice.events.categories.commitsync
 
+import ch.datascience.commiteventservice.events.categories.common.eventgeneration.Person
 import io.circe.Json
 import io.circe.syntax._
 

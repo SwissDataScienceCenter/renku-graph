@@ -21,10 +21,10 @@ package eventgeneration.historytraversal
 
 import cats.effect._
 import cats.syntax.all._
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.UpdateResult
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.UpdateResult._
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.{CommitEvent, CommitInfo}
+import ch.datascience.commiteventservice.events.categories.common.UpdateResult._
+import ch.datascience.commiteventservice.events.categories.common.eventgeneration.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
+import ch.datascience.commiteventservice.events.categories.common.eventgeneration.CommitEvent
+import ch.datascience.commiteventservice.events.categories.common.{CommitInfo, UpdateResult}
 import ch.datascience.events.consumers.Project
 import ch.datascience.graph.model.events.BatchDate
 import org.typelevel.log4cats.Logger

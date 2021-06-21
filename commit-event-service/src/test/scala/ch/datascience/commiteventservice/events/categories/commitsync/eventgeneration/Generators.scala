@@ -18,8 +18,12 @@
 
 package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration
 
+import ch.datascience.commiteventservice.events.categories
 import ch.datascience.commiteventservice.events.categories.commitsync.ProjectInfo
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
+import ch.datascience.commiteventservice.events.categories.common.eventgeneration.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
+import ch.datascience.commiteventservice.events.categories.common
+import ch.datascience.commiteventservice.events.categories.common.CommitInfo
+import ch.datascience.commiteventservice.events.categories.common.eventgeneration.{Author, Commit, CommitEvent, Committer}
 import ch.datascience.events.consumers.Project
 import ch.datascience.generators.Generators.listOf
 import ch.datascience.graph.model.EventsGenerators.{batchDates, commitIds, commitMessages, committedDates}
@@ -48,7 +52,7 @@ private object Generators {
     author        <- authors
     committer     <- committers
     parents       <- listOf(commitIds)
-  } yield CommitInfo(id, message, committedDate, author, committer, parents)
+  } yield common.CommitInfo(id, message, committedDate, author, committer, parents)
 
   implicit lazy val newCommitEvents: Gen[CommitEvent] = for {
     commitId      <- commitIds
