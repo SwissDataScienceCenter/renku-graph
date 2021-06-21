@@ -33,7 +33,7 @@ import eu.timepit.refined.auto._
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog._
 import io.renku.eventlog.events.categories.statuschange.Generators._
-import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.AncestorsToTriplesGenerated
+import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.{AllEventsToNew, AncestorsToTriplesGenerated, AncestorsToTriplesStore}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -51,7 +51,7 @@ class StatusChangerSpec
 
     "succeeds if db update completes" in new MockedTestCase {
 
-      val updateResults = updateResultsGen(event.projectPath).generateOne
+      val updateResults = updateResultsGen(event).generateOne
 
       (dbUpdater.updateDB _).expects(event).returning(Kleisli.pure(updateResults))
       (gaugesUpdater.updateGauges _).expects(updateResults).returning(().pure[IO])
@@ -76,7 +76,7 @@ class StatusChangerSpec
 
       val exception = exceptions.generateOne
 
-      val updateResults = updateResultsGen(event.projectPath).generateOne
+      val updateResults = updateResultsGen(event).generateOne
       (dbUpdater.updateDB _).expects(event).returning(Kleisli.pure(updateResults))
       (gaugesUpdater.updateGauges _).expects(updateResults).returning(exception.raiseError[IO, Unit])
 
@@ -112,7 +112,7 @@ class StatusChangerSpec
           )
           .arguments(eventId.id)
           .build
-          .mapResult(_ => updateResultsGen(projectPaths.generateOne).generateOne)
+          .mapResult(_ => genUpdateResult(projectPaths.generateOne).generateOne)
           .queryExecution
 
         val failingQuery = SqlStatement[IO](name = "failing dbUpdater query")
@@ -124,7 +124,7 @@ class StatusChangerSpec
           )
           .arguments(eventId.id)
           .build
-          .mapResult(_ => updateResultsGen(projectPaths.generateOne).generateOne)
+          .mapResult(_ => genUpdateResult(projectPaths.generateOne).generateOne)
           .queryExecution
 
         passingQuery.run(session) >> failingQuery.run(session)
@@ -141,8 +141,17 @@ class StatusChangerSpec
     override def ap[A, B](ff: Gen[A => B])(fa: Gen[A]): Gen[B] = ff.flatMap(f => fa.map(f))
   }
 
-  private def updateResultsGen(projectPath: projects.Path): Gen[DBUpdateResults] = for {
-    statuses <- eventStatuses.toGeneratorOfSet()
-    counts   <- statuses.toList.map(s => nonNegativeInts().map(count => s -> count.value)).sequence
-  } yield DBUpdateResults(projectPath, counts.toMap)
+  private def updateResultsGen(event: StatusChangeEvent): Gen[DBUpdateResults] = event match {
+    case AncestorsToTriplesGenerated(_, projectPath) =>
+      genUpdateResult(projectPath)
+    case AncestorsToTriplesStore(_, projectPath) =>
+      genUpdateResult(projectPath)
+    case AllEventsToNew => Gen.const(DBUpdateResults.ForAllProjects)
+  }
+
+  private def genUpdateResult(forProject: projects.Path) =
+    for {
+      statuses <- eventStatuses.toGeneratorOfSet()
+      counts   <- statuses.toList.map(s => nonNegativeInts().map(count => s -> count.value)).sequence
+    } yield DBUpdateResults.ForProject(forProject, counts.toMap)
 }

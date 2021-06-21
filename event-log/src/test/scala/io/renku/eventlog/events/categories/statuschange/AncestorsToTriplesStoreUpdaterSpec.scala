@@ -67,7 +67,7 @@ class AncestorsToTriplesStoreUpdaterSpec
         .useK {
           dbUpdater.updateDB(AncestorsToTriplesStore(CompoundEventId(eventId, projectId), projectPath))
         }
-        .unsafeRunSync() shouldBe DBUpdateResults(
+        .unsafeRunSync() shouldBe DBUpdateResults.ForProject(
         projectPath,
         Map(EventStatus.TriplesGenerated -> eventsBeforeToChange.size)
       )

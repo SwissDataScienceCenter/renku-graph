@@ -48,7 +48,7 @@ private class AncestorsToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow
   ): UpdateResult[Interpretation] = for {
     idsAndStatuses <- updateAncestorsStatus(event)
     _              <- cleanUp(idsAndStatuses, event)
-  } yield DBUpdateResults(event.projectPath, idsAndStatuses.groupBy(s => s._2).view.mapValues(_.size).toMap)
+  } yield DBUpdateResults.ForProject(event.projectPath, idsAndStatuses.groupBy(s => s._2).view.mapValues(_.size).toMap)
 
   private def cleanUp(idsAndStatuses: List[(EventId, EventStatus)],
                       event:          AncestorsToTriplesGenerated

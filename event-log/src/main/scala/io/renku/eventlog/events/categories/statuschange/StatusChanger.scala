@@ -22,8 +22,6 @@ import cats.data.Kleisli
 import cats.effect.BracketThrow
 import cats.syntax.all._
 import ch.datascience.db.SessionResource
-import ch.datascience.graph.model.events.EventStatus
-import ch.datascience.graph.model.projects
 import io.renku.eventlog.EventLogDB
 import skunk.Transaction
 
@@ -34,8 +32,6 @@ private trait StatusChanger[Interpretation[_]] {
       dbUpdater:                                    DBUpdater[Interpretation, E]
   ): Interpretation[Unit]
 }
-
-private final case class DBUpdateResults(projectPath: projects.Path, changedStatusCounts: Map[EventStatus, Int])
 
 private class StatusChangerImpl[Interpretation[_]: BracketThrow](
     sessionResource: SessionResource[Interpretation, EventLogDB],

@@ -140,5 +140,10 @@ class EventHandlerSpec
       },
       "newStatus":    "TRIPLES_STORE"
     }"""
+    case StatusChangeEvent.AllEventsToNew =>
+      json"""{
+      "categoryName": "EVENTS_STATUS_CHANGE",
+      "newStatus":    "NEW"
+    }"""
   }
 }

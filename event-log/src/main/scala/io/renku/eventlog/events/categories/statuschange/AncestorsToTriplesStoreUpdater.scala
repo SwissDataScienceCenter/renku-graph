@@ -26,6 +26,7 @@ import ch.datascience.metrics.LabeledHistogram
 import eu.timepit.refined.auto._
 import io.renku.eventlog.ExecutionDate
 import io.renku.eventlog.TypeSerializers._
+import io.renku.eventlog.events.categories.statuschange.DBUpdateResults.ForProject
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.AncestorsToTriplesStore
 import skunk.data.Completion
 import skunk.implicits._
@@ -43,7 +44,7 @@ private class AncestorsToTriplesStoreUpdater[Interpretation[_]: BracketThrow: Sy
       event: AncestorsToTriplesStore
   ): UpdateResult[Interpretation] = for {
     updatedCount <- updateAncestorsStatus(event)
-  } yield DBUpdateResults(event.projectPath, Map(EventStatus.TriplesGenerated -> updatedCount))
+  } yield ForProject(event.projectPath, Map(EventStatus.TriplesGenerated -> updatedCount))
 
   private def updateAncestorsStatus(event: AncestorsToTriplesStore) = measureExecutionTime {
     SqlStatement(name = "status_change_event - triples_store")

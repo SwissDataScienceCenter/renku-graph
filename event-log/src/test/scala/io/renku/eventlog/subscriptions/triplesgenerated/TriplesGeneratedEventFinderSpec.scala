@@ -197,7 +197,7 @@ private class TriplesGeneratedEventFinderSpec
         expectUnderTransformationGaugeIncrement(projectPath)
 
         givenPrioritisation(
-          takes = List(ProjectInfo(projectId, projectPath, event1Date, 1)),
+          takes = List(ProjectInfo(projectId, projectPath, List(event1Date, event2Date, event3Date).max, 1)),
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 

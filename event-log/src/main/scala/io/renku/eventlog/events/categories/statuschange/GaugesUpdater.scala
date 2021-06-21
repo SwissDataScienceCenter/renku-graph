@@ -34,15 +34,21 @@ private class GaugesUpdaterImpl[Interpretation[_]](
     underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path]
 ) extends GaugesUpdater[Interpretation] {
 
-  override def updateGauges(dbUpdateResults: DBUpdateResults): Interpretation[Unit] = {
-    import dbUpdateResults._
+  override def updateGauges(dbUpdateResults: DBUpdateResults): Interpretation[Unit] = dbUpdateResults match {
 
-    def sumCounts(of: EventStatus*): Double =
-      changedStatusCounts.view.filterKeys(of.contains).values.sum
+    case DBUpdateResults.ForProject(projectPath, changedStatusCounts) =>
+      def sumCounts(of: EventStatus*): Double =
+        changedStatusCounts.view.filterKeys(of.contains).values.sum
 
-    awaitingGenerationGauge.update(projectPath     -> -sumCounts(New, GenerationRecoverableFailure))
-    underTriplesGenerationGauge.update(projectPath -> -sumCounts(GeneratingTriples))
-    awaitingTransformationGauge.update(projectPath -> -sumCounts(TriplesGenerated, TransformationRecoverableFailure))
-    underTransformationGauge.update(projectPath    -> -sumCounts(TransformingTriples))
+      awaitingGenerationGauge.update(projectPath     -> -sumCounts(New, GenerationRecoverableFailure))
+      underTriplesGenerationGauge.update(projectPath -> -sumCounts(GeneratingTriples))
+      awaitingTransformationGauge.update(projectPath -> -sumCounts(TriplesGenerated, TransformationRecoverableFailure))
+      underTransformationGauge.update(projectPath    -> -sumCounts(TransformingTriples))
+    case DBUpdateResults.ForAllProjects =>
+      awaitingGenerationGauge.reset()
+      underTriplesGenerationGauge.reset()
+      awaitingTransformationGauge.reset()
+      underTransformationGauge.reset()
+
   }
 }

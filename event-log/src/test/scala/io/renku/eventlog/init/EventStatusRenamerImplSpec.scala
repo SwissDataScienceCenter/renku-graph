@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.init
 
+import Generators._
 import cats.data.Kleisli
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
@@ -30,13 +31,12 @@ import eu.timepit.refined.auto._
 import io.circe.literal.JsonStringContext
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.init.model.Event
+import io.renku.eventlog.{events => _, _}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk._
 import skunk.codec.all._
 import skunk.implicits._
-import Generators._
-import io.renku.eventlog.{CompoundId, CreatedDate, EventDataFetching, EventDate, EventLogDataProvisioning, ExecutionDate}
 
 class EventStatusRenamerImplSpec
     extends AnyWordSpec
@@ -54,35 +54,37 @@ class EventStatusRenamerImplSpec
   )
 
   "run" should {
-    s"rename all the events from PROCESSING to GENERATING_TRIPLES, " +
-      s"RECOVERABLE_FAILURE to GENERATION_RECOVERABLE_FAILURE and " +
-      s"NON_RECOVERABLE_FAILURE to GENERATION_NON_RECOVERABLE_FAILURE" in new TestCase {
+    "rename all the events from PROCESSING to GENERATING_TRIPLES, " +
+      "RECOVERABLE_FAILURE to GENERATION_RECOVERABLE_FAILURE and " +
+      "NON_RECOVERABLE_FAILURE to GENERATION_NON_RECOVERABLE_FAILURE" in new TestCase {
         val processingEvents = events.generateNonEmptyList(minElements = 2)
         processingEvents.map(event => store(event, withStatus = "PROCESSING"))
 
         val recoverableEvents = events.generateNonEmptyList(minElements = 2)
-        recoverableEvents.map(event => store(event, withStatus = "GENERATION_RECOVERABLE_FAILURE"))
+        recoverableEvents.map(event => store(event, withStatus = "RECOVERABLE_FAILURE"))
 
         val nonRecoverableEvents = events.generateNonEmptyList(minElements = 2)
-        nonRecoverableEvents.map(event => store(event, withStatus = "GENERATION_NON_RECOVERABLE_FAILURE"))
+        nonRecoverableEvents.map(event => store(event, withStatus = "NON_RECOVERABLE_FAILURE"))
 
         val otherEvents = events.generateNonEmptyList()
         otherEvents.map(event => store(event, withStatus = event.status.toString))
 
-        eventStatusRenamer.run().unsafeRunSync() shouldBe ((): Unit)
+        eventStatusRenamer.run().unsafeRunSync() shouldBe ()
 
         findEventsCompoundId(status = GeneratingTriples).toSet shouldBe processingEvents
           .map(_.compoundEventId)
           .toList
           .toSet
-        findEventsCompoundId(status = GenerationRecoverableFailure).toSet shouldBe recoverableEvents
-          .map(_.compoundEventId)
-          .toList
-          .toSet
-        findEventsCompoundId(status = GenerationNonRecoverableFailure).toSet shouldBe nonRecoverableEvents
-          .map(_.compoundEventId)
-          .toList
-          .toSet
+        findEventsCompoundId(status = GenerationRecoverableFailure).toSet shouldBe
+          (recoverableEvents ++ otherEvents.filter(_.status == GenerationRecoverableFailure))
+            .map(_.compoundEventId)
+            .toList
+            .toSet
+        findEventsCompoundId(status = GenerationNonRecoverableFailure).toSet shouldBe
+          (nonRecoverableEvents ++ otherEvents.filter(_.status == GenerationNonRecoverableFailure))
+            .map(_.compoundEventId)
+            .toList
+            .toSet
 
         logger.loggedOnly(
           Info(s"'PROCESSING' event status renamed to 'GENERATING_TRIPLES'"),
@@ -91,7 +93,7 @@ class EventStatusRenamerImplSpec
         )
       }
 
-    s"Not do anything if there are no events with the status PROCESSING" in new TestCase {
+    "not do anything if there are no events with the status PROCESSING" in new TestCase {
       val otherEvents = events.generateNonEmptyList()
       otherEvents.map(event => store(event, withStatus = event.status.toString))
 
@@ -107,7 +109,6 @@ class EventStatusRenamerImplSpec
         Info(s"'NON_RECOVERABLE_FAILURE' event status renamed to 'GENERATION_NON_RECOVERABLE_FAILURE'")
       )
     }
-
   }
 
   private trait TestCase {

@@ -22,9 +22,7 @@ import cats.Show
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.projects
 
-private sealed trait StatusChangeEvent extends Product with Serializable {
-  val projectPath: projects.Path
-}
+private sealed trait StatusChangeEvent extends Product with Serializable
 
 private object StatusChangeEvent {
   final case class AncestorsToTriplesGenerated(eventId: CompoundEventId, projectPath: projects.Path)
@@ -44,6 +42,13 @@ private object StatusChangeEvent {
     implicit lazy val show: Show[AncestorsToTriplesStore] = Show.show {
       case AncestorsToTriplesStore(eventId, projectPath) =>
         s"$eventId, projectPath = $projectPath, status = TRIPLE_STORE"
+    }
+  }
+
+  type AllEventsToNew = AllEventsToNew.type
+  final case object AllEventsToNew extends StatusChangeEvent {
+    implicit lazy val show: Show[AllEventsToNew] = Show.show { case AllEventsToNew =>
+      s"All events status = NEW"
     }
   }
 

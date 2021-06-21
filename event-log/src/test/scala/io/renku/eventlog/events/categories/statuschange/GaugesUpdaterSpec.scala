@@ -37,9 +37,9 @@ class GaugesUpdaterSpec extends AnyWordSpec with should.Matchers with MockFactor
 
   "updateGauges" should {
 
-    "update values in all the gauges depending on the given update values" in new TestCase {
+    "update values in all the gauges depending on the given update values for a specific project" in new TestCase {
 
-      val updateResults = DBUpdateResults(projectPath, countsForAllStatuses.generateOne)
+      val updateResults = DBUpdateResults.ForProject(projectPath, countsForAllStatuses.generateOne)
 
       val awaitingGenerationChange = List(
         updateResults.getCount(New),
@@ -64,6 +64,21 @@ class GaugesUpdaterSpec extends AnyWordSpec with should.Matchers with MockFactor
       (underTransformationGauge.update _)
         .expects(projectPath -> -underTransformationGaugeChange)
         .returning(().pure[Try])
+
+      gaugesUpdater.updateGauges(updateResults) shouldBe ().pure[Try]
+    }
+
+    "reset values in all the gauges for all projects" in new TestCase {
+
+      val updateResults = DBUpdateResults.ForAllProjects
+
+      (awaitingGenerationGauge.reset _).expects().returning(().pure[Try])
+
+      (awaitingTransformationGauge.reset _).expects().returning(().pure[Try])
+
+      (underTriplesGenerationGauge.reset _).expects().returning(().pure[Try])
+
+      (underTransformationGauge.reset _).expects().returning(().pure[Try])
 
       gaugesUpdater.updateGauges(updateResults) shouldBe ().pure[Try]
     }
@@ -109,7 +124,7 @@ class GaugesUpdaterSpec extends AnyWordSpec with should.Matchers with MockFactor
     AwaitingDeletion                    -> awaitingDeletion.value
   )
 
-  private implicit class DBUpdateResultsOps(dbUpdateResults: DBUpdateResults) {
+  private implicit class DBUpdateResultsOps(dbUpdateResults: DBUpdateResults.ForProject) {
     def getCount(eventStatus: EventStatus): Int = dbUpdateResults.changedStatusCounts.getOrElse(eventStatus, 0)
   }
 }
