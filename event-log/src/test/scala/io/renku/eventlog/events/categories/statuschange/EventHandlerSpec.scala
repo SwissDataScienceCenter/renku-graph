@@ -35,6 +35,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.renku.eventlog.events.categories.statuschange.Generators._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent._
+import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
@@ -54,7 +55,8 @@ class EventHandlerSpec
     "decode a valid event and pass it to the events updater" in new TestCase {
       Seq(
         ancestorsToTriplesGeneratedEvents.map(stubUpdateStatuses(updateResult = ().pure[IO])).generateOne,
-        ancestorsToTripleStoreEvents.map(stubUpdateStatuses(updateResult = ().pure[IO])).generateOne
+        ancestorsToTripleStoreEvents.map(stubUpdateStatuses(updateResult = ().pure[IO])).generateOne,
+        Gen.const(AllEventsToNew).map(stubUpdateStatuses(updateResult = ().pure[IO])).generateOne
       ) foreach { case (event, eventAsString) =>
         handler.handle(requestContent(event.asJson)).unsafeRunSync() shouldBe Accepted
 

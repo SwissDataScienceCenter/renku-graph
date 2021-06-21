@@ -50,28 +50,34 @@ class AllEventsToNewUpdaterSpec
 
     "change the status of all events to NEW except SKIPPED events" in new TestCase {
 
-      val events = projectIdentifiers.generateNonEmptyList(2).flatMap { case (projectId, projectPath) =>
-        Gen
-          .oneOf(EventStatus.all.filterNot(_ == EventStatus.Skipped))
-          .generateNonEmptyList(2)
-          .map(addEvent(_, projectId, projectPath) -> projectId)
-      }
+      val events = projectIdentifiers
+        .generateNonEmptyList(2)
+        .flatMap { case (projectId, projectPath) =>
+          Gen
+            .oneOf(EventStatus.all.diff(Set(EventStatus.Skipped, EventStatus.AwaitingDeletion)))
+            .generateNonEmptyList(2)
+            .map(addEvent(_, projectId, projectPath) -> projectId)
+        }
+        .toList
 
       val skippedEventProjectId = projectIds.generateOne
+      val skippedEvent          = addEvent(EventStatus.Skipped, skippedEventProjectId)
 
-      val skippedEvent = addEvent(EventStatus.Skipped, skippedEventProjectId)
+      val awaitingDeletionEventProjectId = projectIds.generateOne
+      val awaitingDeletionEvent          = addEvent(EventStatus.AwaitingDeletion, skippedEventProjectId)
 
       sessionResource
         .useK(dbUpdater.updateDB(AllEventsToNew))
         .unsafeRunSync() shouldBe DBUpdateResults.ForAllProjects
 
-      events.map { case (eventId, projectId) =>
+      events.flatMap { case (eventId, projectId) =>
         findFullEvent(CompoundEventId(eventId, projectId))
       } shouldBe events.map { case (eventId, _) =>
         (eventId, EventStatus.New, None, None, List())
       }
 
-      findEvent(CompoundEventId(skippedEvent, skippedEventProjectId)).map(_._2) shouldBe Some(EventStatus.Skipped)
+      findEvent(CompoundEventId(skippedEvent, skippedEventProjectId)).map(_._2)                   shouldBe Some(EventStatus.Skipped)
+      findEvent(CompoundEventId(awaitingDeletionEvent, awaitingDeletionEventProjectId)).map(_._2) shouldBe None
     }
   }
 

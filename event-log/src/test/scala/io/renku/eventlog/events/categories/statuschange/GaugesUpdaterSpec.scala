@@ -37,7 +37,7 @@ class GaugesUpdaterSpec extends AnyWordSpec with should.Matchers with MockFactor
 
   "updateGauges" should {
 
-    "update values in all the gauges depending on the given update values for a specific project" in new TestCase {
+    s"update values for all projects in all the gauges in case of the ${DBUpdateResults.ForProject} update" in new TestCase {
 
       val updateResults = DBUpdateResults.ForProject(projectPath, countsForAllStatuses.generateOne)
 
@@ -68,16 +68,13 @@ class GaugesUpdaterSpec extends AnyWordSpec with should.Matchers with MockFactor
       gaugesUpdater.updateGauges(updateResults) shouldBe ().pure[Try]
     }
 
-    "reset values in all the gauges for all projects" in new TestCase {
+    s"reset all the gauges in case of ${DBUpdateResults.ForAllProjects} update" in new TestCase {
 
       val updateResults = DBUpdateResults.ForAllProjects
 
       (awaitingGenerationGauge.reset _).expects().returning(().pure[Try])
-
       (awaitingTransformationGauge.reset _).expects().returning(().pure[Try])
-
       (underTriplesGenerationGauge.reset _).expects().returning(().pure[Try])
-
       (underTransformationGauge.reset _).expects().returning(().pure[Try])
 
       gaugesUpdater.updateGauges(updateResults) shouldBe ().pure[Try]

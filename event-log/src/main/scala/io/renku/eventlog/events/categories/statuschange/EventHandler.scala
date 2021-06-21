@@ -52,7 +52,8 @@ private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurre
   override def handle(request: EventRequestContent): Interpretation[EventSchedulingResult] = {
     fromEither[Interpretation](request.event.validateCategoryName) >> tryHandle(
       requestAs[AncestorsToTriplesGenerated],
-      requestAs[AncestorsToTriplesStore]
+      requestAs[AncestorsToTriplesStore],
+      requestAs[AllEventsToNew]
     )(request)
   }.merge
 
@@ -91,9 +92,8 @@ private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurre
   )(implicit updaterFactory: LabeledHistogram[Interpretation, Name] => DBUpdater[Interpretation, E], show: Show[E]) =
     statusChanger
       .updateStatuses(event)(updaterFactory(execTimes))
-      .recoverWith { case NonFatal(e) =>
-        logger.logError(event, e) >> e.raiseError[Interpretation, Unit]
-      } >> logger.logInfo(event, "Processed")
+      .recoverWith { case NonFatal(e) => logger.logError(event, e) >> e.raiseError[Interpretation, Unit] }
+      .flatTap(_ => logger.logInfo(event, "Processed"))
 }
 
 private object EventHandler {
@@ -141,4 +141,10 @@ private object EventHandler {
            }
     } yield AncestorsToTriplesStore(CompoundEventId(id, projectId), projectPath)
   }
+
+  private implicit val allEventNewDecoder: Decoder[AllEventsToNew] =
+    _.downField("newStatus").as[EventStatus] >>= {
+      case EventStatus.New => Right(AllEventsToNew)
+      case status          => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
+    }
 }

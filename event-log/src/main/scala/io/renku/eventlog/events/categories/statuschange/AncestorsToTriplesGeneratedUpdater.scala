@@ -63,14 +63,11 @@ private class AncestorsToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow
 
   private def executeRemovalQueries(
       event:      AncestorsToTriplesGenerated
-  )(eventsWindow: List[(EventId, EventStatus)]): Kleisli[Interpretation, Session[Interpretation], Unit] = Kleisli {
-    session =>
-      List(
-        removeAncestorsProcessingTimes(eventsWindow, event.eventId.projectId).run(session),
-        removeAncestorsPayloads(eventsWindow, event.eventId.projectId).run(session),
-        removeAwaitingDeletionEvents(eventsWindow, event.eventId.projectId).run(session)
-      ).sequence.void
-  }
+  )(eventsWindow: List[(EventId, EventStatus)]): Kleisli[Interpretation, Session[Interpretation], Unit] = for {
+    _ <- removeAncestorsProcessingTimes(eventsWindow, event.eventId.projectId)
+    _ <- removeAncestorsPayloads(eventsWindow, event.eventId.projectId)
+    _ <- removeAwaitingDeletionEvents(eventsWindow, event.eventId.projectId)
+  } yield ()
 
   private def updateAncestorsStatus(event: AncestorsToTriplesGenerated) = measureExecutionTime {
     SqlStatement(name = "status_change_event - triples_generated")
@@ -150,8 +147,8 @@ private class AncestorsToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow
           SqlStatement(name = "status_change_event - awaiting_deletion_event_removal")
             .command[projects.Id](
               sql"""DELETE FROM event
-              WHERE event_id IN (#${eventIdsToRemove.map(id => s"'$id'").mkString(",")})
-                AND project_id = $projectIdEncoder""".command
+                    WHERE event_id IN (#${eventIdsToRemove.map(id => s"'$id'").mkString(",")})
+                      AND project_id = $projectIdEncoder""".command
             )
             .arguments(projectId)
             .build
