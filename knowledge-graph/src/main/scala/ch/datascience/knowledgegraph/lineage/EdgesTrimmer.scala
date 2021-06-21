@@ -97,11 +97,26 @@ private class EdgesTrimmerImpl[Interpretation[_]: MonadThrow]() extends EdgesTri
             findEdgesConnected[T](to.tail, remainingEdges, foundEdges)
           case (foundEdgesWithLocation, remainingEdges) =>
             val locationsToCheck = foundEdgesWithLocation.collect(locationsOtherThan(nodeToCheck)).flatten
-            findEdgesConnected[T](to.tail ++ locationsToCheck,
-                                  remainingEdges,
-                                  foundEdges ++ removeSiblings(foundEdgesWithLocation, nodeToCheck)
+            findEdgesConnected[T](
+              to.tail ++ locationsToCheck,
+              edgesToCheck = remainingEdges ++ reAdd[T](foundEdgesWithLocation,
+                                                        whenEdgeContains = to.tail.headOption,
+                                                        without = nodeToCheck
+              ),
+              foundEdges combine removeSiblings(foundEdgesWithLocation, nodeToCheck)
             )
         }
+    }
+  }
+
+  private def reAdd[T <: TraversalDirection](edgeMap: EdgeMap, whenEdgeContains: Option[Location], without: Location)(
+      implicit traversalStrategy:                     TraversalStrategy[T]
+  ): EdgeMap = {
+    import traversalStrategy._
+
+    whenEdgeContains match {
+      case Some(location) => removeNode(edgeMap filter edgeContaining(location), without)
+      case None           => Map.empty
     }
   }
 
@@ -115,6 +130,8 @@ private class EdgesTrimmerImpl[Interpretation[_]: MonadThrow]() extends EdgesTri
 
     def removeSiblings(edges: EdgeMap, nodeToCheck: Location): EdgeMap
 
+    def removeNode(edges: EdgeMap, nodeToRemove: Location): EdgeMap
+
     def edgeContaining(location: Location): ((RunInfo, FromAndToNodes)) => Boolean
 
     def locationsOtherThan(
@@ -124,8 +141,13 @@ private class EdgesTrimmerImpl[Interpretation[_]: MonadThrow]() extends EdgesTri
 
   private implicit lazy val toTraversalStrategy: TraversalStrategy[To] = new TraversalStrategy[To] {
 
+    def removeNode(edges: EdgeMap, nodeToRemove: Location): EdgeMap =
+      edges.foldLeft(Map.empty: EdgeMap) { case (acc, (runInfo, (from, to))) =>
+        acc + (runInfo -> (from.filterNot(_ == nodeToRemove), to))
+      }
+
     def removeSiblings(edges: EdgeMap, nodeToCheck: Location): EdgeMap =
-      edges.foldLeft(Map.empty[RunInfo, FromAndToNodes]) {
+      edges.foldLeft(Map.empty: EdgeMap) {
         case (graphWithoutSiblings, entry @ (_, (from, to)))
             if from.contains(nodeToCheck) && to.contains(nodeToCheck) =>
           graphWithoutSiblings + entry
@@ -148,8 +170,13 @@ private class EdgesTrimmerImpl[Interpretation[_]: MonadThrow]() extends EdgesTri
 
   private implicit lazy val fromTraversalStrategy: TraversalStrategy[From] = new TraversalStrategy[From] {
 
+    def removeNode(edges: EdgeMap, nodeToRemove: Location): EdgeMap =
+      edges.foldLeft(Map.empty: EdgeMap) { case (acc, (runInfo, (from, to))) =>
+        acc + (runInfo -> (from, to.filterNot(_ == nodeToRemove)))
+      }
+
     def removeSiblings(edges: EdgeMap, nodeToCheck: Location): EdgeMap =
-      edges.foldLeft(Map.empty[RunInfo, FromAndToNodes]) {
+      edges.foldLeft(Map.empty: EdgeMap) {
         case (graphWithoutSiblings, entry @ (_, (from, to)))
             if from.contains(nodeToCheck) && to.contains(nodeToCheck) =>
           graphWithoutSiblings + entry
