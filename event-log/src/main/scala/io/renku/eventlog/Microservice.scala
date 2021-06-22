@@ -33,7 +33,6 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.EventEndpoint
-import io.renku.eventlog.eventspatching.IOEventsPatchingEndpoint
 import io.renku.eventlog.init.DbInitializer
 import io.renku.eventlog.metrics._
 import io.renku.eventlog.processingstatus.IOProcessingStatusEndpoint
@@ -110,12 +109,6 @@ object Microservice extends IOMicroservice {
                                   )
         eventEndpoint            <- EventEndpoint(eventConsumersRegistry)
         processingStatusEndpoint <- IOProcessingStatusEndpoint(sessionResource, queriesExecTimes, ApplicationLogger)
-        eventsPatchingEndpoint <- IOEventsPatchingEndpoint(sessionResource,
-                                                           awaitingGenerationGauge,
-                                                           underTriplesGenerationGauge,
-                                                           queriesExecTimes,
-                                                           ApplicationLogger
-                                  )
         statusChangeEndpoint <- IOStatusChangeEndpoint(
                                   sessionResource,
                                   awaitingGenerationGauge,
@@ -139,7 +132,6 @@ object Microservice extends IOMicroservice {
         microserviceRoutes = new MicroserviceRoutes[IO](
                                eventEndpoint,
                                processingStatusEndpoint,
-                               eventsPatchingEndpoint,
                                statusChangeEndpoint,
                                subscriptionsEndpoint,
                                eventDetailsEndpoint,

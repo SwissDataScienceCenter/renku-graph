@@ -29,7 +29,6 @@ import ch.datascience.http.ErrorMessage._
 import ch.datascience.metrics.RoutesMetrics
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.EventEndpoint
-import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
 import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
 import io.renku.eventlog.statuschange.StatusChangeEndpoint
 import io.renku.eventlog.subscriptions.SubscriptionsEndpoint
@@ -41,7 +40,6 @@ import scala.util.Try
 private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     eventEndpoint:            EventEndpoint[F],
     processingStatusEndpoint: ProcessingStatusEndpoint[F],
-    eventsPatchingEndpoint:   EventsPatchingEndpoint[F],
     statusChangeEndpoint:     StatusChangeEndpoint[F],
     subscriptionsEndpoint:    SubscriptionsEndpoint[F],
     eventDetailsEndpoint:     EventDetailsEndpoint[F],
@@ -52,7 +50,6 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   import ProjectIdParameter._
   import eventDetailsEndpoint._
   import eventEndpoint._
-  import eventsPatchingEndpoint._
   import org.http4s.HttpRoutes
   import processingStatusEndpoint._
   import routesMetrics._
@@ -62,7 +59,6 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   // format: off
   lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
     case request @ POST  -> Root / "events"                                            => processEvent(request)
-    case request @ PATCH -> Root / "events"                                            => triggerEventsPatching(request)
     case           GET   -> Root / "events"/ EventId(eventId) / ProjectId(projectId)   => getDetails(CompoundEventId(eventId, projectId))
     case request @ PATCH -> Root / "events" / EventId(eventId) / ProjectId(projectId)  => changeStatus(CompoundEventId(eventId, projectId), request)
     case           GET   -> Root / "processing-status" :? `project-id`(maybeProjectId) => maybeFindProcessingStatus(maybeProjectId)

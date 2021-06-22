@@ -7,7 +7,6 @@ This is a microservice which provides CRUD operations for Event Log DB.
 | Method | Path                                    | Description                                                    |
 |--------|-----------------------------------------|----------------------------------------------------------------|
 |  GET   | ```/events/:event-id/:project-id```     | Retrieve chosen event's data                                   |
-|  PATCH | ```/events```                           | Changes events' data by applying the given patch               |
 |  POST  | ```/events```                           | Send an event for processing                                   |
 |  PATCH | ```/events/:event-id/:project-id```     | Updates chosen event's data                                    |
 |  GET   | ```/metrics```                          | Returns Prometheus metrics of the service                      |
@@ -38,30 +37,6 @@ Response body example:
   "body": "JSON payload"
 }
 ```
-
-#### PATCH /events
-
-Changes events' data by applying the given patch.
-
-**NOTICE:**
-Be aware that the given patch affects all the events in the Event Log.
-
-**Request**
-
-```json
-{
-  "status": "NEW"
-}
-```
-
-**Response**
-
-| Status                     | Description                                          |
-|----------------------------|------------------------------------------------------|
-| ACCEPTED (202)             | When the given data patch got accepted               |
-| BAD_REQUEST (400)          | When request body is not valid                       |
-| INTERNAL SERVER ERROR (500)| When there were problems with processing the request |
-
 #### POST /events
 
 Accepts an event as multipart requests.

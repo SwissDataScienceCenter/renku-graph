@@ -23,6 +23,7 @@ import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.http.client.RestClient
+import org.http4s.Method.POST
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -39,15 +40,16 @@ private class EventsReSchedulerImpl[Interpretation[_]: ConcurrentEffect: Timer](
     with EventsReScheduler[Interpretation] {
 
   import io.circe.literal._
-  import org.http4s.Method.PATCH
   import org.http4s.Status.Accepted
-  import org.http4s.circe._
   import org.http4s.{Request, Response, Status}
 
   override def triggerEventsReScheduling(): Interpretation[Unit] =
     for {
-      uri           <- validateUri(s"$eventLogUrl/events")
-      sendingResult <- send(request(PATCH, uri).withEntity(json"""{"status": "NEW"}"""))(mapResponse)
+      uri <- validateUri(s"$eventLogUrl/events")
+      sendingResult <-
+        send(
+          request(POST, uri).withMultipartBuilder.addPart("event", json"""{"newStatus": "NEW"}""").build()
+        )(mapResponse)
     } yield sendingResult
 
   private lazy val mapResponse

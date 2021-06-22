@@ -30,7 +30,6 @@ import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.interpreters.TestRoutesMetrics
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.EventEndpoint
-import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
 import io.renku.eventlog.processingstatus.{ProcessingStatusEndpoint, ProcessingStatusFinder}
 import io.renku.eventlog.statuschange.{StatusChangeEndpoint, StatusUpdatesRunner}
 import io.renku.eventlog.subscriptions.{EventProducersRegistry, SubscriptionsEndpoint}
@@ -66,16 +65,6 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
       val response = routes.call(request)
 
       response.status shouldBe Ok
-    }
-
-    "define a PATCH /events endpoint" in new TestCase {
-      val request = Request[IO](PATCH, uri"events")
-
-      (eventsPatchingEndpoint.triggerEventsPatching _).expects(request).returning(Response[IO](Accepted).pure[IO])
-
-      val response = routes.call(request)
-
-      response.status shouldBe Accepted
     }
 
     "define a POST /events endpoint" in new TestCase {
@@ -169,7 +158,6 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
   private trait TestCase {
     val eventEndpoint            = mock[EventEndpoint[IO]]
     val processingStatusEndpoint = mock[TestProcessingStatusEndpoint]
-    val eventsPatchingEndpoint   = mock[EventsPatchingEndpoint[IO]]
     val routesMetrics            = TestRoutesMetrics()
     val statusChangeEndpoint     = mock[TestStatusChangeEndpoint]
     val subscriptionsEndpoint    = mock[TestSubscriptionEndpoint]
@@ -177,7 +165,6 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
     val routes = new MicroserviceRoutes[IO](
       eventEndpoint,
       processingStatusEndpoint,
-      eventsPatchingEndpoint,
       statusChangeEndpoint,
       subscriptionsEndpoint,
       eventDetailsEndpoint,
