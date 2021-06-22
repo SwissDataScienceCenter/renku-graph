@@ -23,13 +23,14 @@ import cats.effect.{BracketThrow, Sync}
 import cats.syntax.all._
 import ch.datascience.db.implicits._
 import ch.datascience.db.{DbClient, SqlStatement}
-import ch.datascience.graph.model.events.{EventId, EventStatus}
+import ch.datascience.graph.model.events.{EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
 import eu.timepit.refined.auto._
 import io.renku.eventlog.ExecutionDate
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.AncestorsToTriplesGenerated
+import skunk.data.Completion
 import skunk.implicits._
 import skunk.{Session, ~}
 
@@ -46,31 +47,65 @@ private class AncestorsToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow
   override def updateDB(
       event: AncestorsToTriplesGenerated
   ): UpdateResult[Interpretation] = for {
+    _              <- updateEvent(event)
     idsAndStatuses <- updateAncestorsStatus(event)
     _              <- cleanUp(idsAndStatuses, event)
   } yield DBUpdateResults.ForProject(event.projectPath, idsAndStatuses.groupBy(s => s._2).view.mapValues(_.size).toMap)
 
-  private def cleanUp(idsAndStatuses: List[(EventId, EventStatus)],
-                      event:          AncestorsToTriplesGenerated
-  ): Kleisli[Interpretation, Session[Interpretation], Unit] = Kleisli { session =>
-    idsAndStatuses
-      .sliding(size = partitionSize, step = partitionSize)
-      .map(executeRemovalQueries(event)(_).run(session))
-      .toList
-      .sequence
+  private def updateEvent(event: AncestorsToTriplesGenerated) = for {
+    _ <- updateStatus(event)
+    _ <- updatePayload(event)
+    _ <- updateProcessingTime(event)
+  } yield ()
+
+  private def updateStatus(event: AncestorsToTriplesGenerated) = measureExecutionTime {
+    SqlStatement(name = "status_change_event - triples_generated_status")
+      .command[ExecutionDate ~ EventId ~ projects.Id](
+        sql"""UPDATE event evt
+          SET status = '#${EventStatus.TriplesGenerated.value}', 
+            execution_date = $executionDateEncoder, 
+            message = NULL
+          WHERE evt.event_id = $eventIdEncoder AND evt.project_id = $projectIdEncoder AND evt.status = '#${EventStatus.GeneratingTriples.value}'""".command
+      )
+      .arguments(ExecutionDate(now()) ~ event.eventId.id ~ event.eventId.projectId)
+      .build
+      .flatMapResult {
+        case Completion.Update(1) => ().pure[Interpretation]
+        case _ =>
+          new Exception(s"Could not update event ${event.eventId} to status ${EventStatus.TriplesGenerated} ")
+            .raiseError[Interpretation, Unit]
+      }
+  }
+
+  private def updatePayload(event: AncestorsToTriplesGenerated) = measureExecutionTime {
+    SqlStatement(name = "status_change_event - triples_generated_payload")
+      .command(
+        sql"""INSERT INTO event_payload (event_id, project_id, payload, schema_version)
+            VALUES ($eventIdEncoder,  $projectIdEncoder, $eventPayloadEncoder, $schemaVersionEncoder)
+            ON CONFLICT (event_id, project_id, schema_version)
+            DO UPDATE SET payload = EXCLUDED.payload;""".command
+      )
+      .arguments(event.eventId.id ~ event.eventId.projectId ~ event.payload ~ event.schemaVersion)
+      .build
       .void
   }
 
-  private def executeRemovalQueries(
-      event:      AncestorsToTriplesGenerated
-  )(eventsWindow: List[(EventId, EventStatus)]): Kleisli[Interpretation, Session[Interpretation], Unit] = for {
-    _ <- removeAncestorsProcessingTimes(eventsWindow, event.eventId.projectId)
-    _ <- removeAncestorsPayloads(eventsWindow, event.eventId.projectId)
-    _ <- removeAwaitingDeletionEvents(eventsWindow, event.eventId.projectId)
-  } yield ()
+  private def updateProcessingTime(event: AncestorsToTriplesGenerated) = measureExecutionTime {
+    SqlStatement(name = "status_change_event - triples_generated_processing_time")
+      .command[EventId ~ projects.Id ~ EventStatus ~ EventProcessingTime](
+        sql"""INSERT INTO status_processing_time(event_id, project_id, status, processing_time)
+                VALUES($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $eventProcessingTimeEncoder)
+                ON CONFLICT (event_id, project_id, status)
+                DO UPDATE SET processing_time = EXCLUDED.processing_time;
+                """.command
+      )
+      .arguments(event.eventId.id ~ event.eventId.projectId ~ EventStatus.TriplesGenerated ~ event.processingTime)
+      .build
+      .mapResult(_ => 1)
+  }
 
   private def updateAncestorsStatus(event: AncestorsToTriplesGenerated) = measureExecutionTime {
-    SqlStatement(name = "status_change_event - triples_generated")
+    SqlStatement(name = "status_change_event - triples_generated_ancestors")
       .select[ExecutionDate ~ projects.Id ~ projects.Id ~ EventId ~ EventId, EventId ~ EventStatus](
         sql"""UPDATE event evt
               SET status = '#${EventStatus.TriplesGenerated.value}', 
@@ -100,6 +135,25 @@ private class AncestorsToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow
       .build(_.toList)
 
   }
+
+  private def cleanUp(idsAndStatuses: List[(EventId, EventStatus)],
+                      event:          AncestorsToTriplesGenerated
+  ): Kleisli[Interpretation, Session[Interpretation], Unit] = Kleisli { session =>
+    idsAndStatuses
+      .sliding(size = partitionSize, step = partitionSize)
+      .map(executeRemovalQueries(event)(_).run(session))
+      .toList
+      .sequence
+      .void
+  }
+
+  private def executeRemovalQueries(
+      event:      AncestorsToTriplesGenerated
+  )(eventsWindow: List[(EventId, EventStatus)]): Kleisli[Interpretation, Session[Interpretation], Unit] = for {
+    _ <- removeAncestorsProcessingTimes(eventsWindow, event.eventId.projectId)
+    _ <- removeAncestorsPayloads(eventsWindow, event.eventId.projectId)
+    _ <- removeAwaitingDeletionEvents(eventsWindow, event.eventId.projectId)
+  } yield ()
 
   private def removeAncestorsPayloads(idsAndStatuses: List[(EventId, EventStatus)], projectId: projects.Id) =
     idsAndStatuses.filterNot { case (_, status) =>

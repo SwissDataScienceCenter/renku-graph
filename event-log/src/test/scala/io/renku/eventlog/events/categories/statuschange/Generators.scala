@@ -21,16 +21,21 @@ package io.renku.eventlog.events.categories.statuschange
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.EventsGenerators._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent._
+import io.renku.eventlog.EventContentGenerators._
 
 private object Generators {
 
   lazy val ancestorsToTriplesGeneratedEvents = for {
-    eventId     <- compoundEventIds
-    projectPath <- projectPaths
-  } yield AncestorsToTriplesGenerated(eventId, projectPath)
+    eventId        <- compoundEventIds
+    projectPath    <- projectPaths
+    processingTime <- eventProcessingTimes
+    payload        <- eventPayloads
+    schemaVersion  <- projectSchemaVersions
+  } yield AncestorsToTriplesGenerated(eventId, projectPath, processingTime, payload, schemaVersion)
 
   lazy val ancestorsToTripleStoreEvents = for {
-    eventId     <- compoundEventIds
-    projectPath <- projectPaths
-  } yield AncestorsToTriplesStore(eventId, projectPath)
+    eventId        <- compoundEventIds
+    projectPath    <- projectPaths
+    processingTime <- eventProcessingTimes
+  } yield AncestorsToTriplesStore(eventId, projectPath, processingTime)
 }

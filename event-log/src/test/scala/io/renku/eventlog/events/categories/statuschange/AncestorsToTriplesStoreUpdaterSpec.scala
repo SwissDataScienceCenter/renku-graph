@@ -25,7 +25,7 @@ import ch.datascience.generators.Generators.{positiveInts, timestamps, timestamp
 import ch.datascience.graph.model.EventsGenerators.{eventBodies, eventIds, eventProcessingTimes}
 import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import ch.datascience.graph.model.events.EventStatus.FailureStatus
-import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventStatus}
+import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages, eventPayloads}
@@ -37,6 +37,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant
 import scala.util.Random
+import cats.syntax.all._
 
 class AncestorsToTriplesStoreUpdaterSpec
     extends AnyWordSpec
@@ -48,7 +49,8 @@ class AncestorsToTriplesStoreUpdaterSpec
   "updateDB" should {
 
     "change the status of all TRIPLES_GENERATED events up to the current event with the status TRIPLES_STORE" in new TestCase {
-      val eventDate = eventDates.generateOne
+      val eventDate           = eventDates.generateOne
+      val eventProcessingTime = eventProcessingTimes.generateOne
 
       val eventsBeforeNotToChange = EventStatus.all
         .filterNot(_ == EventStatus.TriplesGenerated)
@@ -58,14 +60,16 @@ class AncestorsToTriplesStoreUpdaterSpec
         addEvent(EventStatus.TriplesGenerated, timestamps(max = eventDate.value).generateAs(EventDate))
       }
 
-      val eventId = addEvent(EventStatus.TriplesStore, eventDate)
+      val eventId = addEvent(EventStatus.TransformingTriples, eventDate, eventProcessingTime.some)
 
       val newEventIdAfterEvent =
         addEvent(EventStatus.New, timestamps(min = eventDate.value, max = now).generateAs(EventDate))
 
       sessionResource
         .useK {
-          dbUpdater.updateDB(AncestorsToTriplesStore(CompoundEventId(eventId, projectId), projectPath))
+          dbUpdater.updateDB(
+            AncestorsToTriplesStore(CompoundEventId(eventId, projectId), projectPath, eventProcessingTime)
+          )
         }
         .unsafeRunSync() shouldBe DBUpdateResults.ForProject(
         projectPath,
@@ -94,8 +98,8 @@ class AncestorsToTriplesStoreUpdaterSpec
 
       val Some((_, EventStatus.TriplesStore, _, maybePayload, processingTimes)) =
         findFullEvent(CompoundEventId(eventId, projectId))
-      maybePayload             shouldBe a[Some[_]]
-      processingTimes.nonEmpty shouldBe true
+      maybePayload                                  shouldBe a[Some[_]]
+      processingTimes.contains(eventProcessingTime) shouldBe true
     }
   }
 
@@ -109,9 +113,12 @@ class AncestorsToTriplesStoreUpdaterSpec
     val dbUpdater        = new AncestorsToTriplesStoreUpdater[IO](queriesExecTimes, currentTime)
 
     val now = Instant.now()
-    currentTime.expects().returning(now)
+    currentTime.expects().returning(now).anyNumberOfTimes()
 
-    def addEvent(status: EventStatus, eventDate: EventDate): EventId = {
+    def addEvent(status:                   EventStatus,
+                 eventDate:                EventDate,
+                 maybeEventProcessingTime: Option[EventProcessingTime] = None
+    ): EventId = {
       val eventId = CompoundEventId(eventIds.generateOne, projectId)
 
       storeEvent(
@@ -126,16 +133,18 @@ class AncestorsToTriplesStoreUpdaterSpec
           case _ => eventMessages.generateOption
         },
         maybeEventPayload = status match {
-          case EventStatus.TriplesStore | EventStatus.TriplesGenerated => eventPayloads.generateSome
-          case EventStatus.AwaitingDeletion                            => eventPayloads.generateOption
-          case _                                                       => eventPayloads.generateNone
+          case EventStatus.TransformingTriples | EventStatus.TriplesStore | EventStatus.TriplesGenerated =>
+            eventPayloads.generateSome
+          case EventStatus.AwaitingDeletion => eventPayloads.generateOption
+          case _                            => eventPayloads.generateNone
         }
       )
 
-      status match {
-        case EventStatus.TriplesGenerated | EventStatus.TriplesStore =>
+      (maybeEventProcessingTime, status) match {
+        case (Some(processingTime), _) => upsertProcessingTime(eventId, status, processingTime)
+        case (_, EventStatus.TriplesGenerated | EventStatus.TriplesStore) =>
           upsertProcessingTime(eventId, status, eventProcessingTimes.generateOne)
-        case EventStatus.AwaitingDeletion =>
+        case (_, EventStatus.AwaitingDeletion) =>
           if (Random.nextBoolean()) {
             upsertProcessingTime(eventId, status, eventProcessingTimes.generateOne)
           } else ()

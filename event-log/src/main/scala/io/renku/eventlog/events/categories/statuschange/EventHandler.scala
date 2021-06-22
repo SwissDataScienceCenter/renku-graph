@@ -28,12 +28,12 @@ import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
 import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult}
-import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventId, EventStatus}
-import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventId, EventProcessingTime, EventStatus}
+import ch.datascience.graph.model.{SchemaVersion, projects}
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import io.circe.{Decoder, DecodingFailure}
-import io.renku.eventlog.EventLogDB
-import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent._
+import io.circe.{DecodingFailure, parser}
+import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.{AllEventsToNew, _}
+import io.renku.eventlog.{EventLogDB, EventPayload}
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -67,10 +67,9 @@ private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurre
   private def requestAs[E <: StatusChangeEvent](request: EventRequestContent)(implicit
       updaterFactory:                                    LabeledHistogram[Interpretation, SqlStatement.Name] => DBUpdater[Interpretation, E],
       show:                                              Show[E],
-      decoder:                                           Decoder[E]
+      decoder:                                           EventRequestContent => Either[DecodingFailure, E]
   ): EitherT[Interpretation, EventSchedulingResult, EventSchedulingResult] = EitherT(
-    request.event
-      .as[E]
+    decode[E](request)
       .map(startUpdate)
       .leftMap(_ => BadRequest)
       .leftWiden[EventSchedulingResult]
@@ -118,32 +117,52 @@ private object EventHandler {
 
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-  private implicit val eventTriplesGeneratedDecoder: Decoder[AncestorsToTriplesGenerated] = { cursor =>
-    for {
-      id          <- cursor.downField("id").as[EventId]
-      projectId   <- cursor.downField("project").downField("id").as[projects.Id]
-      projectPath <- cursor.downField("project").downField("path").as[projects.Path]
-      _ <- cursor.downField("newStatus").as[EventStatus].flatMap {
-             case EventStatus.TriplesGenerated => Right(())
-             case status                       => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
-           }
-    } yield AncestorsToTriplesGenerated(CompoundEventId(id, projectId), projectPath)
+  private def decode[E <: StatusChangeEvent](request: EventRequestContent)(implicit
+      decoder:                                        EventRequestContent => Either[DecodingFailure, E]
+  ) =
+    decoder(request)
+
+  private implicit lazy val eventTriplesGeneratedDecoder
+      : EventRequestContent => Either[DecodingFailure, AncestorsToTriplesGenerated] = {
+    case EventRequestContent(event, Some(payload)) =>
+      for {
+        id                   <- event.hcursor.downField("id").as[EventId]
+        projectId            <- event.hcursor.downField("project").downField("id").as[projects.Id]
+        projectPath          <- event.hcursor.downField("project").downField("path").as[projects.Path]
+        processingTime       <- event.hcursor.downField("processingTime").as[EventProcessingTime]
+        payloadJson          <- parser.parse(payload).leftMap(p => DecodingFailure(s"Could not parse payload: $p", Nil))
+        eventPayload         <- payloadJson.hcursor.downField("payload").as[EventPayload]
+        payloadSchemaVersion <- payloadJson.hcursor.downField("schemaVersion").as[SchemaVersion]
+        _ <- event.hcursor.downField("newStatus").as[EventStatus].flatMap {
+               case EventStatus.TriplesGenerated => Right(())
+               case status                       => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
+             }
+      } yield AncestorsToTriplesGenerated(CompoundEventId(id, projectId),
+                                          projectPath,
+                                          processingTime,
+                                          eventPayload,
+                                          payloadSchemaVersion
+      )
+    case _ => Left(DecodingFailure(s"Missing event payload", Nil))
   }
 
-  private implicit val eventTripleStoreDecoder: Decoder[AncestorsToTriplesStore] = { cursor =>
-    for {
-      id          <- cursor.downField("id").as[EventId]
-      projectId   <- cursor.downField("project").downField("id").as[projects.Id]
-      projectPath <- cursor.downField("project").downField("path").as[projects.Path]
-      _ <- cursor.downField("newStatus").as[EventStatus].flatMap {
-             case EventStatus.TriplesStore => Right(())
-             case status                   => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
-           }
-    } yield AncestorsToTriplesStore(CompoundEventId(id, projectId), projectPath)
+  private implicit lazy val eventTripleStoreDecoder
+      : EventRequestContent => Either[DecodingFailure, AncestorsToTriplesStore] = {
+    case EventRequestContent(event, _) =>
+      for {
+        id             <- event.hcursor.downField("id").as[EventId]
+        projectId      <- event.hcursor.downField("project").downField("id").as[projects.Id]
+        projectPath    <- event.hcursor.downField("project").downField("path").as[projects.Path]
+        processingTime <- event.hcursor.downField("processingTime").as[EventProcessingTime]
+        _ <- event.hcursor.downField("newStatus").as[EventStatus].flatMap {
+               case EventStatus.TriplesStore => Right(())
+               case status                   => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
+             }
+      } yield AncestorsToTriplesStore(CompoundEventId(id, projectId), projectPath, processingTime)
   }
 
-  private implicit val allEventNewDecoder: Decoder[AllEventsToNew] =
-    _.downField("newStatus").as[EventStatus] >>= {
+  private implicit lazy val allEventNewDecoder: EventRequestContent => Either[DecodingFailure, AllEventsToNew] =
+    _.event.hcursor.downField("newStatus").as[EventStatus] >>= {
       case EventStatus.New => Right(AllEventsToNew)
       case status          => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
     }

@@ -19,28 +19,35 @@
 package io.renku.eventlog.events.categories.statuschange
 
 import cats.Show
-import ch.datascience.graph.model.events.CompoundEventId
-import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime}
+import ch.datascience.graph.model.{SchemaVersion, projects}
+import io.renku.eventlog.EventPayload
 
 private sealed trait StatusChangeEvent extends Product with Serializable
 
 private object StatusChangeEvent {
-  final case class AncestorsToTriplesGenerated(eventId: CompoundEventId, projectPath: projects.Path)
-      extends StatusChangeEvent
+  final case class AncestorsToTriplesGenerated(eventId:        CompoundEventId,
+                                               projectPath:    projects.Path,
+                                               processingTime: EventProcessingTime,
+                                               payload:        EventPayload,
+                                               schemaVersion:  SchemaVersion
+  ) extends StatusChangeEvent
 
   object AncestorsToTriplesGenerated {
     implicit lazy val show: Show[AncestorsToTriplesGenerated] = Show.show {
-      case AncestorsToTriplesGenerated(eventId, projectPath) =>
+      case AncestorsToTriplesGenerated(eventId, projectPath, _, _, _) =>
         s"$eventId, projectPath = $projectPath, status = TRIPLES_GENERATED"
     }
   }
 
-  final case class AncestorsToTriplesStore(eventId: CompoundEventId, projectPath: projects.Path)
-      extends StatusChangeEvent
+  final case class AncestorsToTriplesStore(eventId:        CompoundEventId,
+                                           projectPath:    projects.Path,
+                                           processingTime: EventProcessingTime
+  ) extends StatusChangeEvent
 
   object AncestorsToTriplesStore {
     implicit lazy val show: Show[AncestorsToTriplesStore] = Show.show {
-      case AncestorsToTriplesStore(eventId, projectPath) =>
+      case AncestorsToTriplesStore(eventId, projectPath, _) =>
         s"$eventId, projectPath = $projectPath, status = TRIPLE_STORE"
     }
   }

@@ -19,8 +19,9 @@
 package io.renku.eventlog.events.categories.statuschange
 
 import cats.effect.{BracketThrow, Sync}
+import cats.syntax.all._
 import ch.datascience.db.{DbClient, SqlStatement}
-import ch.datascience.graph.model.events.{EventId, EventStatus}
+import ch.datascience.graph.model.events.{EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
 import eu.timepit.refined.auto._
@@ -43,15 +44,54 @@ private class AncestorsToTriplesStoreUpdater[Interpretation[_]: BracketThrow: Sy
   override def updateDB(
       event: AncestorsToTriplesStore
   ): UpdateResult[Interpretation] = for {
+    _            <- updateEvent(event)
     updatedCount <- updateAncestorsStatus(event)
   } yield ForProject(event.projectPath, Map(EventStatus.TriplesGenerated -> updatedCount))
 
+  private def updateEvent(event: AncestorsToTriplesStore) = for {
+    _ <- updateStatus(event)
+    _ <- updateProcessingTime(event)
+  } yield ()
+
+  private def updateStatus(event: AncestorsToTriplesStore) = measureExecutionTime {
+    SqlStatement(name = "status_change_event - triples_store_status")
+      .command[ExecutionDate ~ EventId ~ projects.Id](
+        sql"""UPDATE event evt
+          SET status = '#${EventStatus.TriplesStore.value}',
+            execution_date = $executionDateEncoder,
+            message = NULL
+          WHERE evt.event_id = $eventIdEncoder AND evt.project_id = $projectIdEncoder AND evt.status = '#${EventStatus.TransformingTriples.value}'""".command
+      )
+      .arguments(ExecutionDate(now()) ~ event.eventId.id ~ event.eventId.projectId)
+      .build
+      .flatMapResult {
+        case Completion.Update(1) => ().pure[Interpretation]
+        case _ =>
+          new Exception(s"Could not update event ${event.eventId} to status ${EventStatus.TriplesStore}")
+            .raiseError[Interpretation, Unit]
+      }
+  }
+
+  private def updateProcessingTime(event: AncestorsToTriplesStore) = measureExecutionTime {
+    SqlStatement(name = "status_change_event - triples_store_processing_time")
+      .command[EventId ~ projects.Id ~ EventStatus ~ EventProcessingTime](
+        sql"""INSERT INTO status_processing_time(event_id, project_id, status, processing_time)
+                VALUES($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $eventProcessingTimeEncoder)
+                ON CONFLICT (event_id, project_id, status)
+                DO UPDATE SET processing_time = EXCLUDED.processing_time;
+                """.command
+      )
+      .arguments(event.eventId.id ~ event.eventId.projectId ~ EventStatus.TriplesStore ~ event.processingTime)
+      .build
+      .mapResult(_ => 1)
+  }
+
   private def updateAncestorsStatus(event: AncestorsToTriplesStore) = measureExecutionTime {
-    SqlStatement(name = "status_change_event - triples_store")
+    SqlStatement(name = "status_change_event - triples_store_ancestors")
       .command[ExecutionDate ~ projects.Id ~ projects.Id ~ EventId ~ EventId](
         sql"""UPDATE event evt
-              SET status = '#${EventStatus.TriplesStore.value}', 
-                  execution_date = $executionDateEncoder, 
+              SET status = '#${EventStatus.TriplesStore.value}',
+                  execution_date = $executionDateEncoder,
                   message = NULL
               WHERE project_id = $projectIdEncoder
                 AND status = '#${EventStatus.TriplesGenerated.value}'

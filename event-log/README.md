@@ -104,7 +104,17 @@ Changes the status of events. The events for which the status will be changed ar
     "id":   12,
     "path": "namespace/project-name"
   },
-  "newStatus": "TRIPLES_GENERATED"
+  "newStatus": "TRIPLES_GENERATED",
+  "processingTime": "PT2.023S"
+}
+```
+
+`payload` part:
+
+```json
+{
+  "payload": "json-ld payload as string",
+  "schemaVersion": "8"
 }
 ```
 
@@ -122,7 +132,8 @@ Changes the status of events. The events for which the status will be changed ar
     "id":   12,
     "path": "namespace/project-name"
   },
-  "newStatus": "TRIPLES_STORE"
+  "newStatus": "TRIPLES_STORE",
+  "processingTime": "PT2.023S"
 }
 ```
 

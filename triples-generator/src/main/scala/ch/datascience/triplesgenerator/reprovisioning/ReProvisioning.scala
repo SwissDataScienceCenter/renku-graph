@@ -60,9 +60,7 @@ class ReProvisioningImpl[Interpretation[_]](
   override def run(): Interpretation[Unit] =
     (for {
       currentVersionPair <- OptionT(renkuVersionPairFinder.find() recoverWith tryAgain(renkuVersionPairFinder.find()))
-      _ <- OptionT.liftF(
-             decideIfReprovisioningRequired(currentVersionPair)
-           )
+      _                  <- OptionT.liftF(decideIfReprovisioningRequired(currentVersionPair))
     } yield ()).value.void
 
   private def decideIfReprovisioningRequired(currentVersionPair: RenkuVersionPair) =

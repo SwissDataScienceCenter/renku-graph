@@ -91,7 +91,7 @@ private class AwaitingGenerationEventFinderSpec
         finder.popEvent().unsafeRunSync() shouldBe None
 
         queriesExecTimes.verifyExecutionTimeMeasured("awaiting_generation - find projects",
-                                                     "awaiting_generation - find oldest",
+                                                     "awaiting_generation - find latest",
                                                      "awaiting_generation - update status"
         )
       }
@@ -145,7 +145,7 @@ private class AwaitingGenerationEventFinderSpec
         finder.popEvent().unsafeRunSync() shouldBe None
 
         queriesExecTimes.verifyExecutionTimeMeasured("awaiting_generation - find projects",
-                                                     "awaiting_generation - find oldest",
+                                                     "awaiting_generation - find latest",
                                                      "awaiting_generation - update status"
         )
       }

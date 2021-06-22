@@ -19,12 +19,14 @@
 package io.renku.eventlog.events.categories.statuschange
 
 import cats.effect.IO
+import cats.syntax.all._
 import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{timestamps, timestampsNotInTheFuture}
 import ch.datascience.graph.model.EventsGenerators.{eventBodies, eventIds, eventProcessingTimes}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventStatus}
+import ch.datascience.graph.model.SchemaVersion
+import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages, eventPayloads}
@@ -47,7 +49,10 @@ class AncestorsToTriplesGeneratedUpdaterSpec
   "updateDB" should {
 
     "change the status of all events up to the current event with the status TRIPLES_GENERATED" in new TestCase {
-      val eventDate = eventDates.generateOne
+      val eventDate            = eventDates.generateOne
+      val eventPayload         = eventPayloads.generateOne
+      val eventProcessingTime  = eventProcessingTimes.generateOne
+      val payloadSchemaVersion = projectSchemaVersions.generateOne
 
       val eventsBeforeToChange = EventStatus.all
         .diff(Set(EventStatus.Skipped, EventStatus.AwaitingDeletion))
@@ -57,14 +62,26 @@ class AncestorsToTriplesGeneratedUpdaterSpec
       val awaitingDeletionEventIdBeforeEvent =
         addEvent(EventStatus.AwaitingDeletion, timestamps(max = eventDate.value).generateAs(EventDate))
 
-      val eventId = addEvent(EventStatus.TriplesGenerated, eventDate)
+      val eventId = addEvent(EventStatus.GeneratingTriples,
+                             eventDate,
+                             eventProcessingTime.some,
+                             eventPayload.some,
+                             payloadSchemaVersion.some
+      )
 
       val newEventIdAfterEvent =
         addEvent(EventStatus.New, timestamps(min = eventDate.value, max = now).generateAs(EventDate))
 
       sessionResource
         .useK {
-          dbUpdater.updateDB(AncestorsToTriplesGenerated(CompoundEventId(eventId, projectId), projectPath))
+          dbUpdater.updateDB(
+            AncestorsToTriplesGenerated(CompoundEventId(eventId, projectId),
+                                        projectPath,
+                                        eventProcessingTime,
+                                        eventPayload,
+                                        payloadSchemaVersion
+            )
+          )
         }
         .unsafeRunSync() shouldBe DBUpdateResults.ForProject(
         projectPath,
@@ -83,10 +100,15 @@ class AncestorsToTriplesGeneratedUpdaterSpec
       findEvent(CompoundEventId(eventId, projectId)).map(_._2)                            shouldBe Some(EventStatus.TriplesGenerated)
       findEvent(CompoundEventId(newEventIdAfterEvent, projectId)).map(_._2)               shouldBe Some(EventStatus.New)
 
-      val Some((_, EventStatus.TriplesGenerated, _, maybePayload, processingTimes)) =
-        findFullEvent(CompoundEventId(eventId, projectId))
-      maybePayload             shouldBe a[Some[_]]
-      processingTimes.nonEmpty shouldBe true
+      val Some(
+        (actualEventId, EventStatus.TriplesGenerated, None, Some(actualEventPayload), actualEventProcessingTimes)
+      ) =
+        findFullEvent(
+          CompoundEventId(eventId, projectId)
+        )
+      actualEventId                                            shouldBe eventId
+      actualEventPayload                                       shouldBe eventPayload
+      actualEventProcessingTimes.contains(eventProcessingTime) shouldBe true
     }
   }
 
@@ -100,9 +122,14 @@ class AncestorsToTriplesGeneratedUpdaterSpec
     val dbUpdater        = new AncestorsToTriplesGeneratedUpdater[IO](queriesExecTimes, currentTime)
 
     val now = Instant.now()
-    currentTime.expects().returning(now)
+    currentTime.expects().returning(now).anyNumberOfTimes()
 
-    def addEvent(status: EventStatus, eventDate: EventDate): EventId = {
+    def addEvent(status:              EventStatus,
+                 eventDate:           EventDate,
+                 maybeProcessingTime: Option[EventProcessingTime] = None,
+                 maybePayload:        Option[EventPayload] = None,
+                 maybeSchemaVersion:  Option[SchemaVersion] = None
+    ): EventId = {
       val eventId = CompoundEventId(eventIds.generateOne, projectId)
 
       storeEvent(
@@ -116,17 +143,23 @@ class AncestorsToTriplesGeneratedUpdaterSpec
           case _: EventStatus.FailureStatus => eventMessages.generateSome
           case _ => eventMessages.generateOption
         },
-        maybeEventPayload = status match {
-          case _: EventStatus.TriplesStore | EventStatus.TriplesGenerated => eventPayloads.generateSome
-          case _: EventStatus.AwaitingDeletion => eventPayloads.generateOption
+        maybeEventPayload = (maybePayload, status) match {
+          case (somePayload @ Some(_), _) => somePayload
+          case (_, _: EventStatus.TriplesStore | EventStatus.TriplesGenerated) => eventPayloads.generateSome
+          case (_, _: EventStatus.AwaitingDeletion) => eventPayloads.generateOption
           case _ => eventPayloads.generateNone
+        },
+        payloadSchemaVersion = maybeSchemaVersion match {
+          case Some(schemaVersion) => schemaVersion
+          case None                => projectSchemaVersions.generateOne
         }
       )
 
-      status match {
-        case _: EventStatus.TriplesGenerated | EventStatus.TriplesStore =>
+      (maybeProcessingTime, status) match {
+        case (Some(processingTime), _) => upsertProcessingTime(eventId, status, processingTime)
+        case (_, _: EventStatus.TriplesGenerated | EventStatus.TriplesStore) =>
           upsertProcessingTime(eventId, status, eventProcessingTimes.generateOne)
-        case _: EventStatus.AwaitingDeletion =>
+        case (_, _: EventStatus.AwaitingDeletion) =>
           if (Random.nextBoolean()) {
             upsertProcessingTime(eventId, status, eventProcessingTimes.generateOne)
           } else ()

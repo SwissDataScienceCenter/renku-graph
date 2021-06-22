@@ -23,6 +23,7 @@ import cats.Show
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
 import ch.datascience.db.SqlStatement
+import ch.datascience.events.consumers.EventRequestContent
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -54,11 +55,25 @@ class EventHandlerSpec
 
     "decode a valid event and pass it to the events updater" in new TestCase {
       Seq(
-        ancestorsToTriplesGeneratedEvents.map(stubUpdateStatuses(updateResult = ().pure[IO])).generateOne,
-        ancestorsToTripleStoreEvents.map(stubUpdateStatuses(updateResult = ().pure[IO])).generateOne,
-        Gen.const(AllEventsToNew).map(stubUpdateStatuses(updateResult = ().pure[IO])).generateOne
-      ) foreach { case (event, eventAsString) =>
-        handler.handle(requestContent(event.asJson)).unsafeRunSync() shouldBe Accepted
+        ancestorsToTriplesGeneratedEvents
+          .map(stubUpdateStatuses(updateResult = ().pure[IO]))
+          .map(event =>
+            event -> Some(
+              json"""{"payload": ${event._1.payload.value}, "schemaVersion":${event._1.schemaVersion.value} } """.noSpaces
+            )
+          )
+          .generateOne,
+        ancestorsToTripleStoreEvents
+          .map(stubUpdateStatuses(updateResult = ().pure[IO]))
+          .map(event => event -> None)
+          .generateOne,
+        Gen
+          .const(AllEventsToNew)
+          .map(stubUpdateStatuses(updateResult = ().pure[IO]))
+          .map(event => event -> None)
+          .generateOne
+      ) foreach { case ((event, eventAsString), maybePayload) =>
+        handler.handle(EventRequestContent(event.asJson, maybePayload)).unsafeRunSync() shouldBe Accepted
 
         eventually {
           logger.loggedOnly(Info(s"$categoryName: $eventAsString -> Processed"),
@@ -72,7 +87,7 @@ class EventHandlerSpec
     s"log an error if the events updater fails" in new TestCase {
       val exception = exceptions.generateOne
       val (event, eventAsString) =
-        ancestorsToTriplesGeneratedEvents
+        ancestorsToTripleStoreEvents
           .map(stubUpdateStatuses(updateResult = exception.raiseError[IO, Unit]))
           .generateOne
 
@@ -122,7 +137,7 @@ class EventHandlerSpec
   }
 
   private implicit def eventEncoder[E <: StatusChangeEvent]: Encoder[E] = Encoder.instance[E] {
-    case StatusChangeEvent.AncestorsToTriplesGenerated(eventId, path) =>
+    case StatusChangeEvent.AncestorsToTriplesGenerated(eventId, path, processingTime, _, _) =>
       json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",
       "id":           ${eventId.id.value},
@@ -130,9 +145,10 @@ class EventHandlerSpec
         "id":         ${eventId.projectId.value},
         "path":       ${path.value}
       },
-      "newStatus":    "TRIPLES_GENERATED"
+      "newStatus":    "TRIPLES_GENERATED",
+      "processingTime": ${processingTime.value}
     }"""
-    case StatusChangeEvent.AncestorsToTriplesStore(eventId, path) =>
+    case StatusChangeEvent.AncestorsToTriplesStore(eventId, path, processingTime) =>
       json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",
       "id":           ${eventId.id.value},
@@ -140,7 +156,8 @@ class EventHandlerSpec
         "id":         ${eventId.projectId.value},
         "path":       ${path.value}
       },
-      "newStatus":    "TRIPLES_STORE"
+      "newStatus":    "TRIPLES_STORE",
+      "processingTime": ${processingTime.value}
     }"""
     case StatusChangeEvent.AllEventsToNew =>
       json"""{

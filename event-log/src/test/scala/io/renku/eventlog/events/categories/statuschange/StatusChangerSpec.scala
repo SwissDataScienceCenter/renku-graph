@@ -63,7 +63,12 @@ class StatusChangerSpec
 
       findEvent(eventId).map(_._2) shouldBe Some(initialStatus)
 
-      val event: StatusChangeEvent = AncestorsToTriplesGenerated(eventId, projectPaths.generateOne)
+      val event: StatusChangeEvent = AncestorsToTriplesGenerated(eventId,
+                                                                 projectPaths.generateOne,
+                                                                 eventProcessingTimes.generateOne,
+                                                                 eventPayloads.generateOne,
+                                                                 projectSchemaVersions.generateOne
+      )
 
       intercept[Exception] {
         statusChanger.updateStatuses(event).unsafeRunSync()
@@ -142,9 +147,9 @@ class StatusChangerSpec
   }
 
   private def updateResultsGen(event: StatusChangeEvent): Gen[DBUpdateResults] = event match {
-    case AncestorsToTriplesGenerated(_, projectPath) =>
+    case AncestorsToTriplesGenerated(_, projectPath, _, _, _) =>
       genUpdateResult(projectPath)
-    case AncestorsToTriplesStore(_, projectPath) =>
+    case AncestorsToTriplesStore(_, projectPath, _) =>
       genUpdateResult(projectPath)
     case AllEventsToNew => Gen.const(DBUpdateResults.ForAllProjects)
   }
