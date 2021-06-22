@@ -27,13 +27,14 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{exceptions, nonNegativeInts}
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.events.EventStatus.GeneratingTriples
 import ch.datascience.graph.model.events.{EventId, EventStatus}
 import ch.datascience.graph.model.projects
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog._
 import io.renku.eventlog.events.categories.statuschange.Generators._
-import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.{AllEventsToNew, ToTriplesGenerated, ToTriplesStore}
+import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.{AllEventsToNew, ToNew, ToTriplesGenerated, ToTriplesStore}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -91,7 +92,7 @@ class StatusChangerSpec
 
   private trait MockedTestCase {
 
-    val event = Gen.oneOf(ancestorsToTriplesGeneratedEvents, ancestorsToTripleStoreEvents).generateOne
+    val event = Gen.oneOf(toTriplesGeneratedEvents, toTripleStoreEvents, toNewEvents).generateOne
 
     implicit val dbUpdater: DBUpdater[IO, StatusChangeEvent] = mock[DBUpdater[IO, StatusChangeEvent]]
 
@@ -147,16 +148,14 @@ class StatusChangerSpec
   }
 
   private def updateResultsGen(event: StatusChangeEvent): Gen[DBUpdateResults] = event match {
-    case ToTriplesGenerated(_, projectPath, _, _, _) =>
-      genUpdateResult(projectPath)
-    case ToTriplesStore(_, projectPath, _) =>
-      genUpdateResult(projectPath)
-    case AllEventsToNew => Gen.const(DBUpdateResults.ForAllProjects)
+    case AllEventsToNew                              => Gen.const(DBUpdateResults.ForAllProjects)
+    case ToTriplesGenerated(_, projectPath, _, _, _) => genUpdateResult(projectPath)
+    case ToTriplesStore(_, projectPath, _)           => genUpdateResult(projectPath)
+    case ToNew(_, projectPath)                       => Gen.const(DBUpdateResults.ForProject(projectPath, Map(GeneratingTriples -> 1)))
   }
 
-  private def genUpdateResult(forProject: projects.Path) =
-    for {
-      statuses <- eventStatuses.toGeneratorOfSet()
-      counts   <- statuses.toList.map(s => nonNegativeInts().map(count => s -> count.value)).sequence
-    } yield DBUpdateResults.ForProject(forProject, counts.toMap)
+  private def genUpdateResult(forProject: projects.Path) = for {
+    statuses <- eventStatuses.toGeneratorOfSet()
+    counts   <- statuses.toList.map(s => nonNegativeInts().map(count => s -> count.value)).sequence
+  } yield DBUpdateResults.ForProject(forProject, counts.toMap)
 }

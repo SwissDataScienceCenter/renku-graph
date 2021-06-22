@@ -27,6 +27,7 @@ import ch.datascience.events.consumers.EventRequestContent
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.metrics.TestLabeledHistogram
@@ -34,6 +35,7 @@ import eu.timepit.refined.auto._
 import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
+import io.renku.eventlog.EventPayload
 import io.renku.eventlog.events.categories.statuschange.Generators._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent._
 import org.scalacheck.Gen
@@ -55,24 +57,20 @@ class EventHandlerSpec
 
     "decode a valid event and pass it to the events updater" in new TestCase {
       Seq(
-        ancestorsToTriplesGeneratedEvents
-          .map(stubUpdateStatuses(updateResult = ().pure[IO]))
-          .map(event =>
-            event -> Some(
-              json"""{"payload": ${event._1.payload.value}, "schemaVersion":${event._1.schemaVersion.value} } """.noSpaces
-            )
-          )
-          .generateOne,
-        ancestorsToTripleStoreEvents
-          .map(stubUpdateStatuses(updateResult = ().pure[IO]))
-          .map(event => event -> None)
-          .generateOne,
         Gen
           .const(AllEventsToNew)
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
+          .map(event => event -> None),
+        toTriplesGeneratedEvents
+          .map(stubUpdateStatuses(updateResult = ().pure[IO]))
+          .map(event => event -> Some((event._1.payload -> event._1.schemaVersion).asJson.noSpaces)),
+        toTripleStoreEvents
+          .map(stubUpdateStatuses(updateResult = ().pure[IO]))
+          .map(event => event -> None),
+        toNewEvents
+          .map(stubUpdateStatuses(updateResult = ().pure[IO]))
           .map(event => event -> None)
-          .generateOne
-      ) foreach { case ((event, eventAsString), maybePayload) =>
+      ).map(_.generateOne) foreach { case ((event, eventAsString), maybePayload) =>
         handler.handle(EventRequestContent(event.asJson, maybePayload)).unsafeRunSync() shouldBe Accepted
 
         eventually {
@@ -87,7 +85,7 @@ class EventHandlerSpec
     s"log an error if the events updater fails" in new TestCase {
       val exception = exceptions.generateOne
       val (event, eventAsString) =
-        ancestorsToTripleStoreEvents
+        toTripleStoreEvents
           .map(stubUpdateStatuses(updateResult = exception.raiseError[IO, Unit]))
           .generateOne
 
@@ -137,6 +135,11 @@ class EventHandlerSpec
   }
 
   private implicit def eventEncoder[E <: StatusChangeEvent]: Encoder[E] = Encoder.instance[E] {
+    case StatusChangeEvent.AllEventsToNew =>
+      json"""{
+      "categoryName": "EVENTS_STATUS_CHANGE",
+      "newStatus":    "NEW"
+    }"""
     case StatusChangeEvent.ToTriplesGenerated(eventId, path, processingTime, _, _) =>
       json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",
@@ -159,10 +162,22 @@ class EventHandlerSpec
       "newStatus":    "TRIPLES_STORE",
       "processingTime": ${processingTime.value}
     }"""
-    case StatusChangeEvent.AllEventsToNew =>
+    case StatusChangeEvent.ToNew(eventId, path) =>
       json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",
+      "id":           ${eventId.id.value},
+      "project": {
+        "id":         ${eventId.projectId.value},
+        "path":       ${path.value}
+      },
       "newStatus":    "NEW"
+    }"""
+  }
+
+  private implicit lazy val payloadEncoder: Encoder[(EventPayload, SchemaVersion)] = Encoder.instance {
+    case (payload, schemaVersion) => json"""{
+      "payload": ${payload.value}, 
+      "schemaVersion":${schemaVersion.value}
     }"""
   }
 }

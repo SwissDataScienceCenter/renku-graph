@@ -177,6 +177,5 @@ class ToTriplesGeneratedUpdaterSpec
         (eventId.id, status, maybeMessage, maybePayload, processingTime.map(_._2))
       }
     }
-
   }
 }

@@ -54,7 +54,7 @@ private class ToTriplesStoreUpdater[Interpretation[_]: BracketThrow: Sync](
   } yield ()
 
   private def updateStatus(event: ToTriplesStore) = measureExecutionTime {
-    SqlStatement(name = "status_change_event - triples_store_status")
+    SqlStatement(name = "to_triples_store - status update")
       .command[ExecutionDate ~ EventId ~ projects.Id](
         sql"""UPDATE event evt
           SET status = '#${EventStatus.TriplesStore.value}',
@@ -73,7 +73,7 @@ private class ToTriplesStoreUpdater[Interpretation[_]: BracketThrow: Sync](
   }
 
   private def updateProcessingTime(event: ToTriplesStore) = measureExecutionTime {
-    SqlStatement(name = "status_change_event - triples_store_processing_time")
+    SqlStatement(name = "to_triples_store - processing_time add")
       .command[EventId ~ projects.Id ~ EventStatus ~ EventProcessingTime](
         sql"""INSERT INTO status_processing_time(event_id, project_id, status, processing_time)
                 VALUES($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $eventProcessingTimeEncoder)
@@ -87,7 +87,7 @@ private class ToTriplesStoreUpdater[Interpretation[_]: BracketThrow: Sync](
   }
 
   private def updateAncestorsStatus(event: ToTriplesStore) = measureExecutionTime {
-    SqlStatement(name = "status_change_event - triples_store_ancestors")
+    SqlStatement(name = "to_triples_store - ancestors update")
       .command[ExecutionDate ~ projects.Id ~ projects.Id ~ EventId ~ EventId](
         sql"""UPDATE event evt
               SET status = '#${EventStatus.TriplesStore.value}',
@@ -112,7 +112,5 @@ private class ToTriplesStoreUpdater[Interpretation[_]: BracketThrow: Sync](
         case Completion.Update(count) => count
         case _                        => 0
       }
-
   }
-
 }

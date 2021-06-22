@@ -44,7 +44,7 @@ private class AllEventsToNewUpdater[Interpretation[_]: BracketThrow: Sync](
   } yield DBUpdateResults.ForAllProjects
 
   private def updateStatuses() = measureExecutionTime {
-    SqlStatement(name = "status_change_event - triples_generated")
+    SqlStatement(name = "all_to_new - status update")
       .command[ExecutionDate](
         sql"""UPDATE event evt
               SET status = '#${EventStatus.New.value}', 
@@ -58,7 +58,7 @@ private class AllEventsToNewUpdater[Interpretation[_]: BracketThrow: Sync](
   }
 
   private def removeAllProcessingTimes() = measureExecutionTime {
-    SqlStatement(name = "status_change_event - processing_time_removal")
+    SqlStatement(name = "all_to_new - processing_times removal")
       .command[skunk.Void](
         sql"""TRUNCATE TABLE status_processing_time""".command
       )
@@ -68,7 +68,7 @@ private class AllEventsToNewUpdater[Interpretation[_]: BracketThrow: Sync](
   }
 
   private def removeAllPayloads() = measureExecutionTime {
-    SqlStatement(name = "status_change_event - payload_removal")
+    SqlStatement(name = "all_to_new - payloads removal")
       .command[skunk.Void](
         sql"""TRUNCATE TABLE event_payload""".command
       )
@@ -78,7 +78,7 @@ private class AllEventsToNewUpdater[Interpretation[_]: BracketThrow: Sync](
   }
 
   private def removeAwaitingDeletionEvents() = measureExecutionTime {
-    SqlStatement(name = "status_change_event - awaiting_deletion_event_removal")
+    SqlStatement(name = "all_to_new - awaiting_deletions removal")
       .command[skunk.Void](
         sql"""DELETE FROM event
               WHERE event_id = '#${EventStatus.AwaitingDeletion.value}'

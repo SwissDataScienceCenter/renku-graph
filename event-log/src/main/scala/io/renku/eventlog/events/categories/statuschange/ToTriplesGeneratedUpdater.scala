@@ -23,6 +23,7 @@ import cats.effect.{BracketThrow, Sync}
 import cats.syntax.all._
 import ch.datascience.db.implicits._
 import ch.datascience.db.{DbClient, SqlStatement}
+import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TriplesGenerated}
 import ch.datascience.graph.model.events.{EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
@@ -44,9 +45,7 @@ private class ToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow: Sync](
 
   private lazy val partitionSize = 50
 
-  override def updateDB(
-      event: ToTriplesGenerated
-  ): UpdateResult[Interpretation] = for {
+  override def updateDB(event: ToTriplesGenerated): UpdateResult[Interpretation] = for {
     _              <- updateEvent(event)
     idsAndStatuses <- updateAncestorsStatus(event)
     _              <- cleanUp(idsAndStatuses, event)
@@ -59,31 +58,33 @@ private class ToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow: Sync](
   } yield ()
 
   private def updateStatus(event: ToTriplesGenerated) = measureExecutionTime {
-    SqlStatement(name = "status_change_event - triples_generated_status")
+    SqlStatement(name = "to_triples_generated - status update")
       .command[ExecutionDate ~ EventId ~ projects.Id](
         sql"""UPDATE event evt
-          SET status = '#${EventStatus.TriplesGenerated.value}', 
+          SET status = '#${TriplesGenerated.value}', 
             execution_date = $executionDateEncoder, 
             message = NULL
-          WHERE evt.event_id = $eventIdEncoder AND evt.project_id = $projectIdEncoder AND evt.status = '#${EventStatus.GeneratingTriples.value}'""".command
+          WHERE evt.event_id = $eventIdEncoder 
+            AND evt.project_id = $projectIdEncoder 
+            AND evt.status = '#${GeneratingTriples.value}'""".command
       )
       .arguments(ExecutionDate(now()) ~ event.eventId.id ~ event.eventId.projectId)
       .build
       .flatMapResult {
         case Completion.Update(1) => ().pure[Interpretation]
         case _ =>
-          new Exception(s"Could not update event ${event.eventId} to status ${EventStatus.TriplesGenerated} ")
+          new Exception(s"Could not update event ${event.eventId} to status $TriplesGenerated")
             .raiseError[Interpretation, Unit]
       }
   }
 
   private def updatePayload(event: ToTriplesGenerated) = measureExecutionTime {
-    SqlStatement(name = "status_change_event - triples_generated_payload")
+    SqlStatement(name = "to_triples_generated - payload upload")
       .command(
         sql"""INSERT INTO event_payload (event_id, project_id, payload, schema_version)
-            VALUES ($eventIdEncoder,  $projectIdEncoder, $eventPayloadEncoder, $schemaVersionEncoder)
-            ON CONFLICT (event_id, project_id, schema_version)
-            DO UPDATE SET payload = EXCLUDED.payload;""".command
+              VALUES ($eventIdEncoder,  $projectIdEncoder, $eventPayloadEncoder, $schemaVersionEncoder)
+              ON CONFLICT (event_id, project_id, schema_version)
+              DO UPDATE SET payload = EXCLUDED.payload;""".command
       )
       .arguments(event.eventId.id ~ event.eventId.projectId ~ event.payload ~ event.schemaVersion)
       .build
@@ -91,24 +92,24 @@ private class ToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow: Sync](
   }
 
   private def updateProcessingTime(event: ToTriplesGenerated) = measureExecutionTime {
-    SqlStatement(name = "status_change_event - triples_generated_processing_time")
+    SqlStatement(name = "to_triples_generated - processing_time add")
       .command[EventId ~ projects.Id ~ EventStatus ~ EventProcessingTime](
         sql"""INSERT INTO status_processing_time(event_id, project_id, status, processing_time)
-                VALUES($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $eventProcessingTimeEncoder)
-                ON CONFLICT (event_id, project_id, status)
-                DO UPDATE SET processing_time = EXCLUDED.processing_time;
-                """.command
+              VALUES($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $eventProcessingTimeEncoder)
+              ON CONFLICT (event_id, project_id, status)
+              DO UPDATE SET processing_time = EXCLUDED.processing_time;
+              """.command
       )
-      .arguments(event.eventId.id ~ event.eventId.projectId ~ EventStatus.TriplesGenerated ~ event.processingTime)
+      .arguments(event.eventId.id ~ event.eventId.projectId ~ TriplesGenerated ~ event.processingTime)
       .build
       .void
   }
 
   private def updateAncestorsStatus(event: ToTriplesGenerated) = measureExecutionTime {
-    SqlStatement(name = "status_change_event - triples_generated_ancestors")
+    SqlStatement(name = "to_triples_generated - ancestors update")
       .select[ExecutionDate ~ projects.Id ~ projects.Id ~ EventId ~ EventId, EventId ~ EventStatus](
         sql"""UPDATE event evt
-              SET status = '#${EventStatus.TriplesGenerated.value}', 
+              SET status = '#${TriplesGenerated.value}', 
                   execution_date = $executionDateEncoder, 
                   message = NULL
               FROM (
@@ -133,7 +134,6 @@ private class ToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow: Sync](
         ExecutionDate(now()) ~ event.eventId.projectId ~ event.eventId.projectId ~ event.eventId.id ~ event.eventId.id
       )
       .build(_.toList)
-
   }
 
   private def cleanUp(idsAndStatuses: List[(EventId, EventStatus)],
@@ -157,12 +157,12 @@ private class ToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow: Sync](
 
   private def removeAncestorsPayloads(idsAndStatuses: List[(EventId, EventStatus)], projectId: projects.Id) =
     idsAndStatuses.filterNot { case (_, status) =>
-      Set(EventStatus.New, EventStatus.GeneratingTriples, EventStatus.Skipped).contains(status)
+      Set(EventStatus.New, GeneratingTriples, EventStatus.Skipped).contains(status)
     } match {
       case Nil => Kleisli.pure(())
       case eventIdsToRemove =>
         measureExecutionTime {
-          SqlStatement(name = "status_change_event - payload_removal")
+          SqlStatement(name = "to_triples_generated - payloads removal")
             .command[projects.Id](
               sql"""DELETE FROM event_payload
                     WHERE event_id IN (#${eventIdsToRemove.map { case (id, _) => s"'$id'" }.mkString(",")})
@@ -176,12 +176,12 @@ private class ToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow: Sync](
 
   private def removeAncestorsProcessingTimes(idsAndStatuses: List[(EventId, EventStatus)], projectId: projects.Id) =
     idsAndStatuses.filterNot { case (_, status) =>
-      Set(EventStatus.New, EventStatus.GeneratingTriples, EventStatus.Skipped).contains(status)
+      Set(EventStatus.New, GeneratingTriples, EventStatus.Skipped).contains(status)
     } match {
       case Nil => Kleisli.pure(())
       case eventIdsToRemove =>
         measureExecutionTime {
-          SqlStatement(name = "status_change_event - processing_time_removal")
+          SqlStatement(name = "to_triples_generated - processing_times removal")
             .command[projects.Id](
               sql"""DELETE FROM status_processing_time
                     WHERE event_id IN (#${eventIdsToRemove.map { case (id, _) => s"'$id'" }.mkString(",")})
@@ -198,7 +198,7 @@ private class ToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow: Sync](
       case Nil => Kleisli.pure(())
       case eventIdsToRemove =>
         measureExecutionTime {
-          SqlStatement(name = "status_change_event - awaiting_deletion_event_removal")
+          SqlStatement(name = "to_triples_generated - awaiting_deletions removal")
             .command[projects.Id](
               sql"""DELETE FROM event
                     WHERE event_id IN (#${eventIdsToRemove.map(id => s"'$id'").mkString(",")})

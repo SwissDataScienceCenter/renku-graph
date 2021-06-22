@@ -25,7 +25,7 @@ import io.renku.eventlog.EventContentGenerators._
 
 private object Generators {
 
-  lazy val ancestorsToTriplesGeneratedEvents = for {
+  lazy val toTriplesGeneratedEvents = for {
     eventId        <- compoundEventIds
     projectPath    <- projectPaths
     processingTime <- eventProcessingTimes
@@ -33,9 +33,14 @@ private object Generators {
     schemaVersion  <- projectSchemaVersions
   } yield ToTriplesGenerated(eventId, projectPath, processingTime, payload, schemaVersion)
 
-  lazy val ancestorsToTripleStoreEvents = for {
+  lazy val toTripleStoreEvents = for {
     eventId        <- compoundEventIds
     projectPath    <- projectPaths
     processingTime <- eventProcessingTimes
   } yield ToTriplesStore(eventId, projectPath, processingTime)
+
+  lazy val toNewEvents = for {
+    eventId     <- compoundEventIds
+    projectPath <- projectPaths
+  } yield ToNew(eventId, projectPath)
 }

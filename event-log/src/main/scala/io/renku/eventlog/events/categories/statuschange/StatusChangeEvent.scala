@@ -19,6 +19,7 @@
 package io.renku.eventlog.events.categories.statuschange
 
 import cats.Show
+import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime}
 import ch.datascience.graph.model.{SchemaVersion, projects}
 import io.renku.eventlog.EventPayload
@@ -26,17 +27,24 @@ import io.renku.eventlog.EventPayload
 private sealed trait StatusChangeEvent extends Product with Serializable
 
 private object StatusChangeEvent {
+
+  final case class ToNew(eventId: CompoundEventId, projectPath: projects.Path) extends StatusChangeEvent
+  object ToNew {
+    implicit lazy val show: Show[ToNew] = Show.show { case ToNew(eventId, projectPath) =>
+      s"$eventId, projectPath = $projectPath, status = $New"
+    }
+  }
+
   final case class ToTriplesGenerated(eventId:        CompoundEventId,
                                       projectPath:    projects.Path,
                                       processingTime: EventProcessingTime,
                                       payload:        EventPayload,
                                       schemaVersion:  SchemaVersion
   ) extends StatusChangeEvent
-
   object ToTriplesGenerated {
     implicit lazy val show: Show[ToTriplesGenerated] = Show.show {
       case ToTriplesGenerated(eventId, projectPath, _, _, _) =>
-        s"$eventId, projectPath = $projectPath, status = TRIPLES_GENERATED"
+        s"$eventId, projectPath = $projectPath, status = $TriplesGenerated"
     }
   }
 
@@ -44,17 +52,16 @@ private object StatusChangeEvent {
                                   projectPath:    projects.Path,
                                   processingTime: EventProcessingTime
   ) extends StatusChangeEvent
-
   object ToTriplesStore {
     implicit lazy val show: Show[ToTriplesStore] = Show.show { case ToTriplesStore(eventId, projectPath, _) =>
-      s"$eventId, projectPath = $projectPath, status = TRIPLE_STORE"
+      s"$eventId, projectPath = $projectPath, status = $TriplesStore"
     }
   }
 
   type AllEventsToNew = AllEventsToNew.type
   final case object AllEventsToNew extends StatusChangeEvent {
     implicit lazy val show: Show[AllEventsToNew] = Show.show { case AllEventsToNew =>
-      s"All events status = NEW"
+      s"All events status = $New"
     }
   }
 

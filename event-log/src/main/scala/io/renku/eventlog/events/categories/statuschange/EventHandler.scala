@@ -32,7 +32,7 @@ import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventId
 import ch.datascience.graph.model.{SchemaVersion, projects}
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.circe.{DecodingFailure, parser}
-import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.{AllEventsToNew, _}
+import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent._
 import io.renku.eventlog.{EventLogDB, EventPayload}
 import org.typelevel.log4cats.Logger
 
@@ -53,6 +53,7 @@ private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurre
     fromEither[Interpretation](request.event.validateCategoryName) >> tryHandle(
       requestAs[ToTriplesGenerated],
       requestAs[ToTriplesStore],
+      requestAs[ToNew],
       requestAs[AllEventsToNew]
     )(request)
   }.merge
@@ -158,6 +159,19 @@ private object EventHandler {
                case status                   => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
              }
       } yield ToTriplesStore(CompoundEventId(id, projectId), projectPath, processingTime)
+  }
+
+  private implicit lazy val eventToNewDecoder: EventRequestContent => Either[DecodingFailure, ToNew] = {
+    case EventRequestContent(event, _) =>
+      for {
+        id          <- event.hcursor.downField("id").as[EventId]
+        projectId   <- event.hcursor.downField("project").downField("id").as[projects.Id]
+        projectPath <- event.hcursor.downField("project").downField("path").as[projects.Path]
+        _ <- event.hcursor.downField("newStatus").as[EventStatus].flatMap {
+               case EventStatus.New => Right(())
+               case status          => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
+             }
+      } yield ToNew(CompoundEventId(id, projectId), projectPath)
   }
 
   private implicit lazy val allEventNewDecoder: EventRequestContent => Either[DecodingFailure, AllEventsToNew] =
