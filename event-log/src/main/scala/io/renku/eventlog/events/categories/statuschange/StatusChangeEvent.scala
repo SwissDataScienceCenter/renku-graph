@@ -26,29 +26,28 @@ import io.renku.eventlog.EventPayload
 private sealed trait StatusChangeEvent extends Product with Serializable
 
 private object StatusChangeEvent {
-  final case class AncestorsToTriplesGenerated(eventId:        CompoundEventId,
-                                               projectPath:    projects.Path,
-                                               processingTime: EventProcessingTime,
-                                               payload:        EventPayload,
-                                               schemaVersion:  SchemaVersion
+  final case class ToTriplesGenerated(eventId:        CompoundEventId,
+                                      projectPath:    projects.Path,
+                                      processingTime: EventProcessingTime,
+                                      payload:        EventPayload,
+                                      schemaVersion:  SchemaVersion
   ) extends StatusChangeEvent
 
-  object AncestorsToTriplesGenerated {
-    implicit lazy val show: Show[AncestorsToTriplesGenerated] = Show.show {
-      case AncestorsToTriplesGenerated(eventId, projectPath, _, _, _) =>
+  object ToTriplesGenerated {
+    implicit lazy val show: Show[ToTriplesGenerated] = Show.show {
+      case ToTriplesGenerated(eventId, projectPath, _, _, _) =>
         s"$eventId, projectPath = $projectPath, status = TRIPLES_GENERATED"
     }
   }
 
-  final case class AncestorsToTriplesStore(eventId:        CompoundEventId,
-                                           projectPath:    projects.Path,
-                                           processingTime: EventProcessingTime
+  final case class ToTriplesStore(eventId:        CompoundEventId,
+                                  projectPath:    projects.Path,
+                                  processingTime: EventProcessingTime
   ) extends StatusChangeEvent
 
-  object AncestorsToTriplesStore {
-    implicit lazy val show: Show[AncestorsToTriplesStore] = Show.show {
-      case AncestorsToTriplesStore(eventId, projectPath, _) =>
-        s"$eventId, projectPath = $projectPath, status = TRIPLE_STORE"
+  object ToTriplesStore {
+    implicit lazy val show: Show[ToTriplesStore] = Show.show { case ToTriplesStore(eventId, projectPath, _) =>
+      s"$eventId, projectPath = $projectPath, status = TRIPLE_STORE"
     }
   }
 

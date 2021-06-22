@@ -25,7 +25,7 @@ import ch.datascience.control.Throttler
 import ch.datascience.data.ErrorMessage
 import ch.datascience.events.consumers.EventRequestContent
 import ch.datascience.graph.config.EventLogUrl
-import ch.datascience.graph.model.SchemaVersion
+import ch.datascience.graph.model.{SchemaVersion, projects}
 import ch.datascience.graph.model.events.EventStatus.FailureStatus
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventProcessingTime, EventStatus}
 import ch.datascience.http.client.RestClient
@@ -34,8 +34,9 @@ import ch.datascience.http.client.RestClientError.{ClientException, Connectivity
 import ch.datascience.rdfstore.JsonLDTriples
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
+import org.http4s.Method.POST
 import org.http4s.Status.{BadGateway, GatewayTimeout, ServiceUnavailable}
-import org.http4s.{Status, Uri}
+import org.http4s.{Method, Status, Uri}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -44,12 +45,16 @@ import scala.language.postfixOps
 
 private trait EventStatusUpdater[Interpretation[_]] {
   def toTriplesGenerated(eventId:        CompoundEventId,
+                         projectPath:    projects.Path,
                          payload:        JsonLDTriples,
                          schemaVersion:  SchemaVersion,
                          processingTime: EventProcessingTime
   ): Interpretation[Unit]
 
-  def toTriplesStore(eventId: CompoundEventId, processingTime: EventProcessingTime): Interpretation[Unit]
+  def toTriplesStore(eventId:        CompoundEventId,
+                     projectPath:    projects.Path,
+                     processingTime: EventProcessingTime
+  ): Interpretation[Unit]
 
   def rollback[S <: EventStatus](eventId: CompoundEventId)(implicit rollbackStatus: () => S): Interpretation[Unit]
 
@@ -81,15 +86,22 @@ private class EventStatusUpdaterImpl[Interpretation[_]: ConcurrentEffect: Timer]
   import org.http4s.{Request, Response}
 
   override def toTriplesGenerated(eventId:        CompoundEventId,
+                                  projectPath:    projects.Path,
                                   payload:        JsonLDTriples,
                                   schemaVersion:  SchemaVersion,
                                   processingTime: EventProcessingTime
-  ): Interpretation[Unit] = sendStatusChange(
+  ): Interpretation[Unit] = sendEventStatusChange(
     eventId,
     eventContent = EventRequestContent(
       event = json"""{
-        "status": ${EventStatus.TriplesGenerated.value},
-        "processingTime": $processingTime
+        "categoryName": "EVENTS_STATUS_CHANGE",
+        "id": ${eventId.id.value},
+        "project": {
+          "id":   ${eventId.projectId.value},
+          "path": ${projectPath.value}
+        },
+        "newStatus": ${EventStatus.TriplesGenerated.value},
+        "processingTime": ${processingTime.value}
       }""",
       maybePayload = json"""{
         "payload": ${payload.value.noSpaces},
@@ -99,14 +111,23 @@ private class EventStatusUpdaterImpl[Interpretation[_]: ConcurrentEffect: Timer]
     responseMapping
   )
 
-  override def toTriplesStore(eventId: CompoundEventId, processingTime: EventProcessingTime): Interpretation[Unit] =
-    sendStatusChange(
+  override def toTriplesStore(eventId:        CompoundEventId,
+                              projectPath:    projects.Path,
+                              processingTime: EventProcessingTime
+  ): Interpretation[Unit] =
+    sendEventStatusChange(
       eventId,
       eventContent = EventRequestContent(
-        event = json"""{
-          "status":         ${EventStatus.TriplesStore.value}, 
-          "processingTime": $processingTime
-        }"""
+        event = json"""{ 
+                          "categoryName": "EVENTS_STATUS_CHANGE",
+                          "id": ${eventId.id.value},
+                          "project": {
+                            "id":   ${eventId.projectId.value},
+                            "path": ${projectPath.value}
+                          },
+                          "newStatus": ${EventStatus.TriplesStore.value}, 
+                          "processingTime": ${processingTime.value}
+                        }"""
       ),
       responseMapping
     )
@@ -149,6 +170,20 @@ private class EventStatusUpdaterImpl[Interpretation[_]: ConcurrentEffect: Timer]
                      )
   } yield sendingResult
 
+  private def sendEventStatusChange(
+      eventId:      CompoundEventId,
+      eventContent: EventRequestContent,
+      responseMapping: PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[
+        Unit
+      ]]
+  ): Interpretation[Unit] = for {
+    uri <- validateUri(s"$eventLogUrl/events")
+    request = createRequest(uri, eventContent, POST)
+    sendingResult <- send(request)(responseMapping) recoverWith retryOnServerError(
+                       Eval.always(sendEventStatusChange(eventId, eventContent, responseMapping))
+                     )
+  } yield sendingResult
+
   private def retryOnServerError(
       retry: Eval[Interpretation[Unit]]
   ): PartialFunction[Throwable, Interpretation[Unit]] = {
@@ -164,8 +199,8 @@ private class EventStatusUpdaterImpl[Interpretation[_]: ConcurrentEffect: Timer]
     result <- retry.value
   } yield result
 
-  private def createRequest(uri: Uri, eventRequestContent: EventRequestContent) =
-    request(PATCH, uri).withMultipartBuilder
+  private def createRequest(uri: Uri, eventRequestContent: EventRequestContent, method: Method = PATCH) =
+    request(method, uri).withMultipartBuilder
       .addPart("event", eventRequestContent.event)
       .maybeAddPart("payload", eventRequestContent.maybePayload)
       .build()

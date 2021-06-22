@@ -51,8 +51,8 @@ private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurre
 
   override def handle(request: EventRequestContent): Interpretation[EventSchedulingResult] = {
     fromEither[Interpretation](request.event.validateCategoryName) >> tryHandle(
-      requestAs[AncestorsToTriplesGenerated],
-      requestAs[AncestorsToTriplesStore],
+      requestAs[ToTriplesGenerated],
+      requestAs[ToTriplesStore],
       requestAs[AllEventsToNew]
     )(request)
   }.merge
@@ -123,31 +123,30 @@ private object EventHandler {
     decoder(request)
 
   private implicit lazy val eventTriplesGeneratedDecoder
-      : EventRequestContent => Either[DecodingFailure, AncestorsToTriplesGenerated] = {
+      : EventRequestContent => Either[DecodingFailure, ToTriplesGenerated] = {
     case EventRequestContent(event, Some(payload)) =>
       for {
-        id                   <- event.hcursor.downField("id").as[EventId]
-        projectId            <- event.hcursor.downField("project").downField("id").as[projects.Id]
-        projectPath          <- event.hcursor.downField("project").downField("path").as[projects.Path]
-        processingTime       <- event.hcursor.downField("processingTime").as[EventProcessingTime]
-        payloadJson          <- parser.parse(payload).leftMap(p => DecodingFailure(s"Could not parse payload: $p", Nil))
-        eventPayload         <- payloadJson.hcursor.downField("payload").as[EventPayload]
-        payloadSchemaVersion <- payloadJson.hcursor.downField("schemaVersion").as[SchemaVersion]
+        id             <- event.hcursor.downField("id").as[EventId]
+        projectId      <- event.hcursor.downField("project").downField("id").as[projects.Id]
+        projectPath    <- event.hcursor.downField("project").downField("path").as[projects.Path]
+        processingTime <- event.hcursor.downField("processingTime").as[EventProcessingTime]
         _ <- event.hcursor.downField("newStatus").as[EventStatus].flatMap {
                case EventStatus.TriplesGenerated => Right(())
                case status                       => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
              }
-      } yield AncestorsToTriplesGenerated(CompoundEventId(id, projectId),
-                                          projectPath,
-                                          processingTime,
-                                          eventPayload,
-                                          payloadSchemaVersion
+        payloadJson          <- parser.parse(payload).leftMap(p => DecodingFailure(s"Could not parse payload: $p", Nil))
+        eventPayload         <- payloadJson.hcursor.downField("payload").as[EventPayload]
+        payloadSchemaVersion <- payloadJson.hcursor.downField("schemaVersion").as[SchemaVersion]
+      } yield ToTriplesGenerated(CompoundEventId(id, projectId),
+                                 projectPath,
+                                 processingTime,
+                                 eventPayload,
+                                 payloadSchemaVersion
       )
     case _ => Left(DecodingFailure(s"Missing event payload", Nil))
   }
 
-  private implicit lazy val eventTripleStoreDecoder
-      : EventRequestContent => Either[DecodingFailure, AncestorsToTriplesStore] = {
+  private implicit lazy val eventTripleStoreDecoder: EventRequestContent => Either[DecodingFailure, ToTriplesStore] = {
     case EventRequestContent(event, _) =>
       for {
         id             <- event.hcursor.downField("id").as[EventId]
@@ -158,7 +157,7 @@ private object EventHandler {
                case EventStatus.TriplesStore => Right(())
                case status                   => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
              }
-      } yield AncestorsToTriplesStore(CompoundEventId(id, projectId), projectPath, processingTime)
+      } yield ToTriplesStore(CompoundEventId(id, projectId), projectPath, processingTime)
   }
 
   private implicit lazy val allEventNewDecoder: EventRequestContent => Either[DecodingFailure, AllEventsToNew] =

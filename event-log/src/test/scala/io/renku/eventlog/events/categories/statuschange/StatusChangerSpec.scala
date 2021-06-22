@@ -33,7 +33,7 @@ import eu.timepit.refined.auto._
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog._
 import io.renku.eventlog.events.categories.statuschange.Generators._
-import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.{AllEventsToNew, AncestorsToTriplesGenerated, AncestorsToTriplesStore}
+import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.{AllEventsToNew, ToTriplesGenerated, ToTriplesStore}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -63,11 +63,11 @@ class StatusChangerSpec
 
       findEvent(eventId).map(_._2) shouldBe Some(initialStatus)
 
-      val event: StatusChangeEvent = AncestorsToTriplesGenerated(eventId,
-                                                                 projectPaths.generateOne,
-                                                                 eventProcessingTimes.generateOne,
-                                                                 eventPayloads.generateOne,
-                                                                 projectSchemaVersions.generateOne
+      val event: StatusChangeEvent = ToTriplesGenerated(eventId,
+                                                        projectPaths.generateOne,
+                                                        eventProcessingTimes.generateOne,
+                                                        eventPayloads.generateOne,
+                                                        projectSchemaVersions.generateOne
       )
 
       intercept[Exception] {
@@ -147,9 +147,9 @@ class StatusChangerSpec
   }
 
   private def updateResultsGen(event: StatusChangeEvent): Gen[DBUpdateResults] = event match {
-    case AncestorsToTriplesGenerated(_, projectPath, _, _, _) =>
+    case ToTriplesGenerated(_, projectPath, _, _, _) =>
       genUpdateResult(projectPath)
-    case AncestorsToTriplesStore(_, projectPath, _) =>
+    case ToTriplesStore(_, projectPath, _) =>
       genUpdateResult(projectPath)
     case AllEventsToNew => Gen.const(DBUpdateResults.ForAllProjects)
   }

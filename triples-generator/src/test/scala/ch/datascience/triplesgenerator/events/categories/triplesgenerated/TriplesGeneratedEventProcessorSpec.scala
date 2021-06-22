@@ -26,7 +26,7 @@ import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.SchemaVersion
+import ch.datascience.graph.model.{SchemaVersion, projects}
 import ch.datascience.graph.model.events.EventStatus.TriplesGenerated
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects.Path
@@ -79,7 +79,7 @@ class TriplesGeneratedEventProcessorSpec
 
       successfulTriplesCurationAndUpload(triplesGeneratedEvent)
 
-      expectEventMarkedAsDone(triplesGeneratedEvent.compoundEventId)
+      expectEventMarkedAsDone(triplesGeneratedEvent.compoundEventId, triplesGeneratedEvent.project.path)
 
       eventProcessor.process(triplesGeneratedEvent) shouldBe context.unit
 
@@ -190,9 +190,11 @@ class TriplesGeneratedEventProcessorSpec
 
       val exception = exceptions.generateOne
       (eventStatusUpdater
-        .toTriplesStore(_: CompoundEventId, _: EventProcessingTime))
-        .expects(triplesGeneratedEvent.compoundEventId,
-                 EventProcessingTime(Duration.ofMillis(executionTimeRecorder.elapsedTime.value))
+        .toTriplesStore(_: CompoundEventId, _: projects.Path, _: EventProcessingTime))
+        .expects(
+          triplesGeneratedEvent.compoundEventId,
+          triplesGeneratedEvent.project.path,
+          EventProcessingTime(Duration.ofMillis(executionTimeRecorder.elapsedTime.value))
         )
         .returning(context.raiseError(exception))
 
@@ -304,19 +306,29 @@ class TriplesGeneratedEventProcessorSpec
         .expects(commitEventId, EventStatus.TransformationNonRecoverableFailure, exception)
         .returning(context.unit)
 
-    def expectEventMarkedAsDone(compoundEventId: CompoundEventId) =
+    def expectEventMarkedAsDone(compoundEventId: CompoundEventId, projectPath: projects.Path) =
       (eventStatusUpdater
-        .toTriplesStore(_: CompoundEventId, _: EventProcessingTime))
-        .expects(compoundEventId, EventProcessingTime(Duration.ofMillis(executionTimeRecorder.elapsedTime.value)))
+        .toTriplesStore(_: CompoundEventId, _: projects.Path, _: EventProcessingTime))
+        .expects(compoundEventId,
+                 projectPath,
+                 EventProcessingTime(Duration.ofMillis(executionTimeRecorder.elapsedTime.value))
+        )
         .returning(context.unit)
 
     def expectEventMarkedAsTriplesGenerated(event: TriplesGeneratedEvent) =
       (eventStatusUpdater
-        .toTriplesGenerated(_: CompoundEventId, _: JsonLDTriples, _: SchemaVersion, _: EventProcessingTime))
-        .expects(event.compoundEventId,
-                 event.triples,
-                 event.schemaVersion,
-                 EventProcessingTime(Duration.ofMillis(executionTimeRecorder.elapsedTime.value))
+        .toTriplesGenerated(_: CompoundEventId,
+                            _: projects.Path,
+                            _: JsonLDTriples,
+                            _: SchemaVersion,
+                            _: EventProcessingTime
+        ))
+        .expects(
+          event.compoundEventId,
+          event.project.path,
+          event.triples,
+          event.schemaVersion,
+          EventProcessingTime(Duration.ofMillis(executionTimeRecorder.elapsedTime.value))
         )
         .returning(context.unit)
 

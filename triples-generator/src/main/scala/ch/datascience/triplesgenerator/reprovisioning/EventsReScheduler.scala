@@ -48,7 +48,9 @@ private class EventsReSchedulerImpl[Interpretation[_]: ConcurrentEffect: Timer](
       uri <- validateUri(s"$eventLogUrl/events")
       sendingResult <-
         send(
-          request(POST, uri).withMultipartBuilder.addPart("event", json"""{"newStatus": "NEW"}""").build()
+          request(POST, uri).withMultipartBuilder
+            .addPart("event", json"""{"categoryName": "EVENTS_STATUS_CHANGE", "newStatus": "NEW"}""")
+            .build()
         )(mapResponse)
     } yield sendingResult
 

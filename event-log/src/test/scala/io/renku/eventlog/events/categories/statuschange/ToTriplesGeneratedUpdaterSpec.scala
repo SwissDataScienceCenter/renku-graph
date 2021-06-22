@@ -31,7 +31,7 @@ import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages, eventPayloads}
 import io.renku.eventlog._
-import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.AncestorsToTriplesGenerated
+import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.ToTriplesGenerated
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -39,7 +39,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import java.time.Instant
 import scala.util.Random
 
-class AncestorsToTriplesGeneratedUpdaterSpec
+class ToTriplesGeneratedUpdaterSpec
     extends AnyWordSpec
     with InMemoryEventLogDbSpec
     with TypeSerializers
@@ -75,11 +75,11 @@ class AncestorsToTriplesGeneratedUpdaterSpec
       sessionResource
         .useK {
           dbUpdater.updateDB(
-            AncestorsToTriplesGenerated(CompoundEventId(eventId, projectId),
-                                        projectPath,
-                                        eventProcessingTime,
-                                        eventPayload,
-                                        payloadSchemaVersion
+            ToTriplesGenerated(CompoundEventId(eventId, projectId),
+                               projectPath,
+                               eventProcessingTime,
+                               eventPayload,
+                               payloadSchemaVersion
             )
           )
         }
@@ -119,7 +119,7 @@ class AncestorsToTriplesGeneratedUpdaterSpec
 
     val currentTime      = mockFunction[Instant]
     val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val dbUpdater        = new AncestorsToTriplesGeneratedUpdater[IO](queriesExecTimes, currentTime)
+    val dbUpdater        = new ToTriplesGeneratedUpdater[IO](queriesExecTimes, currentTime)
 
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()

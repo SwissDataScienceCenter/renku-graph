@@ -21,7 +21,7 @@ package io.renku.eventlog.events.categories.statuschange
 import cats.effect.{BracketThrow, Sync}
 import ch.datascience.db.SqlStatement
 import ch.datascience.metrics.LabeledHistogram
-import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.{AllEventsToNew, AncestorsToTriplesGenerated, AncestorsToTriplesStore}
+import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.{AllEventsToNew, ToTriplesGenerated, ToTriplesStore}
 
 private trait DBUpdater[Interpretation[_], E <: StatusChangeEvent] {
   def updateDB(event: E): UpdateResult[Interpretation]
@@ -34,12 +34,12 @@ private object DBUpdater {
   ) = factory(queriesExecTimes)
 
   implicit def factoryToTriplesGeneratorUpdater[Interpretation[_]: BracketThrow: Sync]
-      : LabeledHistogram[Interpretation, SqlStatement.Name] => DBUpdater[Interpretation, AncestorsToTriplesGenerated] =
-    new AncestorsToTriplesGeneratedUpdater(_)
+      : LabeledHistogram[Interpretation, SqlStatement.Name] => DBUpdater[Interpretation, ToTriplesGenerated] =
+    new ToTriplesGeneratedUpdater(_)
 
   implicit def factoryToTriplesStoreUpdater[Interpretation[_]: BracketThrow: Sync]
-      : LabeledHistogram[Interpretation, SqlStatement.Name] => DBUpdater[Interpretation, AncestorsToTriplesStore] =
-    new AncestorsToTriplesStoreUpdater(_)
+      : LabeledHistogram[Interpretation, SqlStatement.Name] => DBUpdater[Interpretation, ToTriplesStore] =
+    new ToTriplesStoreUpdater(_)
 
   implicit def factoryToAllEventsNewUpdater[Interpretation[_]: BracketThrow: Sync]
       : LabeledHistogram[Interpretation, SqlStatement.Name] => DBUpdater[Interpretation, AllEventsToNew] =

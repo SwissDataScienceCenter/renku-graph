@@ -161,9 +161,10 @@ private class AwaitingGenerationEventFinderSpec
 
       expectGaugeUpdated(times = events.size)
 
-      events foreach { case (eventId, _, eventDate, projectPath) =>
-        givenPrioritisationAnyOccupancy(
+      events.sortBy(_._3).reverse.zipWithIndex foreach { case ((eventId, _, eventDate, projectPath), index) =>
+        givenPrioritisation(
           takes = List(ProjectInfo(eventId.projectId, projectPath, eventDate, 0)),
+          totalOccupancy = index,
           returns = List(ProjectIds(eventId.projectId, projectPath) -> MaxPriority)
         )
       }
@@ -199,14 +200,14 @@ private class AwaitingGenerationEventFinderSpec
 
       findEvents(EventStatus.GeneratingTriples) shouldBe List.empty
 
-      val eventsPerProject = events.groupBy(_._4)
+      val eventsPerProject = events.groupBy(_._4).toList.sortBy(_._2.maxBy(_._3)._3).reverse
 
       expectGaugeUpdated(times = eventsPerProject.size)
 
-      eventsPerProject foreach { case (projectPath, events) =>
+      eventsPerProject.zipWithIndex foreach { case ((projectPath, events), index) =>
         val (eventIdOfTheNewestEvent, _, _, _) = events.sortBy(_._3).reverse.head
         (projectPrioritisation.prioritise _)
-          .expects(*, *)
+          .expects(*, index)
           .returning(List(ProjectIds(eventIdOfTheNewestEvent.projectId, projectPath) -> MaxPriority))
       }
 
@@ -216,7 +217,7 @@ private class AwaitingGenerationEventFinderSpec
 
       findEvents(status = GeneratingTriples).eventIdsOnly should contain theSameElementsAs eventsPerProject.map {
         case (_, list) => list.maxBy(_._3)._1
-      }.toList
+      }
 
       givenPrioritisation(takes = Nil, totalOccupancy = eventsPerProject.size, returns = Nil)
 
@@ -253,11 +254,6 @@ private class AwaitingGenerationEventFinderSpec
     def givenPrioritisation(takes: List[ProjectInfo], totalOccupancy: Long, returns: List[(ProjectIds, Priority)]) =
       (projectPrioritisation.prioritise _)
         .expects(takes, totalOccupancy)
-        .returning(returns)
-
-    def givenPrioritisationAnyOccupancy(takes: List[ProjectInfo], returns: List[(ProjectIds, Priority)]) =
-      (projectPrioritisation.prioritise _)
-        .expects(takes, *)
         .returning(returns)
   }
 

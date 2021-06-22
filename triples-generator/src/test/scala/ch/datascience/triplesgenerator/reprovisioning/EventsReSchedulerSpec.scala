@@ -38,7 +38,10 @@ class EventsReSchedulerSpec extends AnyWordSpec with ExternalServiceStubbing wit
 
       stubFor {
         post(urlEqualTo("/events"))
-          .withMultipartRequestBody(aMultipart("event").withBody(equalToJson(json"""{"newStatus": "NEW"}""".spaces2)))
+          .withMultipartRequestBody(
+            aMultipart("event")
+              .withBody(equalToJson(json"""{"categoryName": "EVENTS_STATUS_CHANGE" ,"newStatus": "NEW"}""".spaces2))
+          )
           .willReturn(aResponse().withStatus(Accepted.code))
       }
 

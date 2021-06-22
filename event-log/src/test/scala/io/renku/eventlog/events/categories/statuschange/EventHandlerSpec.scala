@@ -137,7 +137,7 @@ class EventHandlerSpec
   }
 
   private implicit def eventEncoder[E <: StatusChangeEvent]: Encoder[E] = Encoder.instance[E] {
-    case StatusChangeEvent.AncestorsToTriplesGenerated(eventId, path, processingTime, _, _) =>
+    case StatusChangeEvent.ToTriplesGenerated(eventId, path, processingTime, _, _) =>
       json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",
       "id":           ${eventId.id.value},
@@ -148,7 +148,7 @@ class EventHandlerSpec
       "newStatus":    "TRIPLES_GENERATED",
       "processingTime": ${processingTime.value}
     }"""
-    case StatusChangeEvent.AncestorsToTriplesStore(eventId, path, processingTime) =>
+    case StatusChangeEvent.ToTriplesStore(eventId, path, processingTime) =>
       json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",
       "id":           ${eventId.id.value},

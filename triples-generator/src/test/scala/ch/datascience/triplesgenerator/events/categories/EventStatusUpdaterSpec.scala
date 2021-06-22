@@ -53,12 +53,21 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
         val processingTime = eventProcessingTimes.generateOne
 
         stubFor {
-          patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
+          post(urlEqualTo(s"/events"))
             .withMultipartRequestBody(
               aMultipart("event")
                 .withBody(
                   equalToJson(
-                    json"""{"status": "TRIPLES_GENERATED", "processingTime": ${processingTime.value}}""".spaces2
+                    json"""{
+                            "categoryName": "EVENTS_STATUS_CHANGE",
+                            "id": ${eventId.id.value},
+                            "project": {
+                              "id": ${eventId.projectId.value},
+                              "path": ${projectPath.value}
+                            },
+                            "newStatus": "TRIPLES_GENERATED", 
+                            "processingTime": ${processingTime.value}
+                          }""".spaces2
                   )
                 )
             )
@@ -74,7 +83,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
         }
 
         updater
-          .toTriplesGenerated(eventId, rawTriples, schemaVersion, processingTime)
+          .toTriplesGenerated(eventId, projectPath, rawTriples, schemaVersion, processingTime)
           .unsafeRunSync() shouldBe ((): Unit)
       }
     }
@@ -84,12 +93,21 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
       val status         = BadRequest
 
       stubFor {
-        patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
+        post(urlEqualTo(s"/events"))
           .withMultipartRequestBody(
             aMultipart("event")
               .withBody(
                 equalToJson(
-                  json"""{"status": "TRIPLES_GENERATED", "processingTime": ${processingTime.value}}""".spaces2
+                  json"""{
+                          "categoryName": "EVENTS_STATUS_CHANGE",
+                          "id":           ${eventId.id.value},
+                          "project": {
+                            "id":   ${eventId.projectId.value},
+                            "path": ${projectPath.value}
+                          },
+                          "newStatus": "TRIPLES_GENERATED", 
+                          "processingTime": ${processingTime.value}
+                        }""".spaces2
                 )
               )
           )
@@ -105,8 +123,8 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
       }
 
       intercept[Exception] {
-        updater.toTriplesGenerated(eventId, rawTriples, schemaVersion, processingTime).unsafeRunSync()
-      }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/${eventId.projectId} returned $status; body: "
+        updater.toTriplesGenerated(eventId, projectPath, rawTriples, schemaVersion, processingTime).unsafeRunSync()
+      }.getMessage shouldBe s"POST $eventLogUrl/events returned $status; body: "
     }
   }
 
@@ -117,17 +135,26 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
         val processingTime = eventProcessingTimes.generateOne
 
         stubFor {
-          patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
+          post(urlEqualTo(s"/events"))
             .withMultipartRequestBody(
               aMultipart("event")
                 .withBody(
-                  equalToJson(json"""{"status": "TRIPLES_STORE", "processingTime": $processingTime}""".spaces2)
+                  equalToJson(json"""{
+                              "categoryName": "EVENTS_STATUS_CHANGE",
+                              "id":           ${eventId.id.value},
+                              "project": {
+                                "id":   ${eventId.projectId.value},
+                                "path": ${projectPath.value}
+                              },
+                              "newStatus": "TRIPLES_STORE", 
+                              "processingTime": ${processingTime.value}
+                            }""".spaces2)
                 )
             )
             .willReturn(aResponse().withStatus(status.code))
         }
 
-        updater.toTriplesStore(eventId, processingTime).unsafeRunSync() shouldBe ((): Unit)
+        updater.toTriplesStore(eventId, projectPath, processingTime).unsafeRunSync() shouldBe ((): Unit)
       }
     }
 
@@ -136,19 +163,28 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
       val status         = BadRequest
 
       stubFor {
-        patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
+        post(urlEqualTo(s"/events"))
           .withMultipartRequestBody(
             aMultipart("event")
               .withBody(
-                equalToJson(json"""{"status": "TRIPLES_STORE", "processingTime": $processingTime}""".spaces2)
+                equalToJson(json"""{
+                            "categoryName": "EVENTS_STATUS_CHANGE",
+                            "id":           ${eventId.id.value},
+                            "project": {
+                              "id":   ${eventId.projectId.value},
+                              "path": ${projectPath.value}
+                            },
+                            "newStatus": "TRIPLES_STORE", 
+                            "processingTime": ${processingTime.value}
+                           }""".spaces2)
               )
           )
           .willReturn(aResponse().withStatus(status.code))
       }
 
       intercept[Exception] {
-        updater.toTriplesStore(eventId, processingTime).unsafeRunSync() shouldBe ((): Unit)
-      }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/${eventId.projectId} returned $status; body: "
+        updater.toTriplesStore(eventId, projectPath, processingTime).unsafeRunSync() shouldBe ((): Unit)
+      }.getMessage shouldBe s"POST $eventLogUrl/events returned $status; body: " // TODO add the event id to the log message
     }
   }
 
@@ -262,8 +298,8 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
     Set(BadGateway, ServiceUnavailable, GatewayTimeout) foreach { errorStatus =>
       s"retry if remote responds with status such as $errorStatus" in {
         Set(
-          updater.toTriplesGenerated(eventId, rawTriples, schemaVersion, eventProcessingTimes.generateOne),
-          updater.toTriplesStore(eventId, eventProcessingTimes.generateOne),
+          updater.toTriplesGenerated(eventId, projectPath, rawTriples, schemaVersion, eventProcessingTimes.generateOne),
+          updater.toTriplesStore(eventId, projectPath, eventProcessingTimes.generateOne),
           updater.rollback[New](eventId),
           updater.toFailure(eventId, failureEventStatuses.generateOne, exceptions.generateOne)
         ) foreach { updateFunction =>
@@ -303,11 +339,12 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
     )
     val updateFunctions = List(
       "toTriplesGenerated" -> updater.toTriplesGenerated(eventId,
+                                                         projectPath,
                                                          rawTriples,
                                                          schemaVersion,
                                                          eventProcessingTimes.generateOne
       ),
-      "toTriplesStore" -> updater.toTriplesStore(eventId, eventProcessingTimes.generateOne),
+      "toTriplesStore" -> updater.toTriplesStore(eventId, projectPath, eventProcessingTimes.generateOne),
       "rollback"       -> updater.rollback[New](eventId),
       "toFailure"      -> updater.toFailure(eventId, failureEventStatuses.generateOne, exceptions.generateOne)
     )
@@ -359,6 +396,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
   )
 
   private lazy val eventId       = compoundEventIds.generateOne
+  private lazy val projectPath   = projectPaths.generateOne
   private lazy val rawTriples    = jsonLDTriples.generateOne
   private lazy val schemaVersion = projectSchemaVersions.generateOne
 }

@@ -251,7 +251,10 @@ class CommitEventProcessorSpec
         .expects(commit, maybeAccessToken)
         .returning(rightT[Try, ProcessingRecoverableError](triples))
 
-      expectEventMarkedAsTriplesGenerated(CompoundEventId(commit.eventId, commit.project.id), triples)
+      expectEventMarkedAsTriplesGenerated(CompoundEventId(commit.eventId, commit.project.id),
+                                          commit.project.path,
+                                          triples
+      )
     }
 
     def expectEventMarkedAsRecoverableFailure(commitEventId: CompoundEventId, exception: Throwable) =
@@ -264,10 +267,14 @@ class CommitEventProcessorSpec
         .expects(commitEventId, EventStatus.GenerationNonRecoverableFailure, exception)
         .returning(context.unit)
 
-    def expectEventMarkedAsTriplesGenerated(compoundEventId: CompoundEventId, triples: JsonLDTriples) =
+    def expectEventMarkedAsTriplesGenerated(compoundEventId: CompoundEventId,
+                                            projectPath:     Path,
+                                            triples:         JsonLDTriples
+    ) =
       (eventStatusUpdater
-        .toTriplesGenerated(_: CompoundEventId, _: JsonLDTriples, _: SchemaVersion, _: EventProcessingTime))
+        .toTriplesGenerated(_: CompoundEventId, _: Path, _: JsonLDTriples, _: SchemaVersion, _: EventProcessingTime))
         .expects(compoundEventId,
+                 projectPath,
                  triples,
                  schemaVersion,
                  EventProcessingTime(Duration.ofMillis(singleEventTimeRecorder.elapsedTime.value))

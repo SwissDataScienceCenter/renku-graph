@@ -140,7 +140,10 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]: MonadError[*[_],
   private lazy val updateEventLog: ((ElapsedTime, UploadingResult)) => Interpretation[Unit] = {
     case (elapsedTime, Uploaded(event)) =>
       statusUpdater
-        .toTriplesStore(event.compoundEventId, EventProcessingTime(Duration ofMillis elapsedTime.value))
+        .toTriplesStore(event.compoundEventId,
+                        event.project.path,
+                        EventProcessingTime(Duration ofMillis elapsedTime.value)
+        )
         .recoverWith(logEventLogUpdateError(event, "done"))
     case (_, RecoverableError(event, cause)) =>
       statusUpdater

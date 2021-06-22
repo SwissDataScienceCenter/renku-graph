@@ -117,6 +117,7 @@ private class CommitEventProcessor[Interpretation[_]](
     uploadingResults match {
       case TriplesGenerated(commit, triples, schemaVersion, processingTime) =>
         statusUpdater.toTriplesGenerated(CompoundEventId(commit.eventId, commit.project.id),
+                                         commit.project.path,
                                          triples,
                                          schemaVersion,
                                          processingTime

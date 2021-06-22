@@ -28,32 +28,32 @@ import eu.timepit.refined.auto._
 import io.renku.eventlog.ExecutionDate
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.categories.statuschange.DBUpdateResults.ForProject
-import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.AncestorsToTriplesStore
+import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.ToTriplesStore
 import skunk.data.Completion
 import skunk.implicits._
 import skunk.~
 
 import java.time.Instant
 
-private class AncestorsToTriplesStoreUpdater[Interpretation[_]: BracketThrow: Sync](
+private class ToTriplesStoreUpdater[Interpretation[_]: BracketThrow: Sync](
     queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
-    with DBUpdater[Interpretation, AncestorsToTriplesStore] {
+    with DBUpdater[Interpretation, ToTriplesStore] {
 
   override def updateDB(
-      event: AncestorsToTriplesStore
+      event: ToTriplesStore
   ): UpdateResult[Interpretation] = for {
     _            <- updateEvent(event)
     updatedCount <- updateAncestorsStatus(event)
   } yield ForProject(event.projectPath, Map(EventStatus.TriplesGenerated -> updatedCount))
 
-  private def updateEvent(event: AncestorsToTriplesStore) = for {
+  private def updateEvent(event: ToTriplesStore) = for {
     _ <- updateStatus(event)
     _ <- updateProcessingTime(event)
   } yield ()
 
-  private def updateStatus(event: AncestorsToTriplesStore) = measureExecutionTime {
+  private def updateStatus(event: ToTriplesStore) = measureExecutionTime {
     SqlStatement(name = "status_change_event - triples_store_status")
       .command[ExecutionDate ~ EventId ~ projects.Id](
         sql"""UPDATE event evt
@@ -72,7 +72,7 @@ private class AncestorsToTriplesStoreUpdater[Interpretation[_]: BracketThrow: Sy
       }
   }
 
-  private def updateProcessingTime(event: AncestorsToTriplesStore) = measureExecutionTime {
+  private def updateProcessingTime(event: ToTriplesStore) = measureExecutionTime {
     SqlStatement(name = "status_change_event - triples_store_processing_time")
       .command[EventId ~ projects.Id ~ EventStatus ~ EventProcessingTime](
         sql"""INSERT INTO status_processing_time(event_id, project_id, status, processing_time)
@@ -86,7 +86,7 @@ private class AncestorsToTriplesStoreUpdater[Interpretation[_]: BracketThrow: Sy
       .mapResult(_ => 1)
   }
 
-  private def updateAncestorsStatus(event: AncestorsToTriplesStore) = measureExecutionTime {
+  private def updateAncestorsStatus(event: ToTriplesStore) = measureExecutionTime {
     SqlStatement(name = "status_change_event - triples_store_ancestors")
       .command[ExecutionDate ~ projects.Id ~ projects.Id ~ EventId ~ EventId](
         sql"""UPDATE event evt

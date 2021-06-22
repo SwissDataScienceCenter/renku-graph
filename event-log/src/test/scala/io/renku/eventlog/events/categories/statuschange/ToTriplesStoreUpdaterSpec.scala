@@ -19,6 +19,7 @@
 package io.renku.eventlog.events.categories.statuschange
 
 import cats.effect.IO
+import cats.syntax.all._
 import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{positiveInts, timestamps, timestampsNotInTheFuture}
@@ -29,7 +30,7 @@ import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcess
 import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages, eventPayloads}
-import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.AncestorsToTriplesStore
+import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.ToTriplesStore
 import io.renku.eventlog.{EventDate, ExecutionDate, InMemoryEventLogDbSpec, TypeSerializers}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -37,9 +38,8 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant
 import scala.util.Random
-import cats.syntax.all._
 
-class AncestorsToTriplesStoreUpdaterSpec
+class ToTriplesStoreUpdaterSpec
     extends AnyWordSpec
     with InMemoryEventLogDbSpec
     with TypeSerializers
@@ -68,7 +68,7 @@ class AncestorsToTriplesStoreUpdaterSpec
       sessionResource
         .useK {
           dbUpdater.updateDB(
-            AncestorsToTriplesStore(CompoundEventId(eventId, projectId), projectPath, eventProcessingTime)
+            ToTriplesStore(CompoundEventId(eventId, projectId), projectPath, eventProcessingTime)
           )
         }
         .unsafeRunSync() shouldBe DBUpdateResults.ForProject(
@@ -110,7 +110,7 @@ class AncestorsToTriplesStoreUpdaterSpec
 
     val currentTime      = mockFunction[Instant]
     val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val dbUpdater        = new AncestorsToTriplesStoreUpdater[IO](queriesExecTimes, currentTime)
+    val dbUpdater        = new ToTriplesStoreUpdater[IO](queriesExecTimes, currentTime)
 
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()
