@@ -18,8 +18,10 @@
 
 package io.renku.eventlog.events.categories.statuschange
 
+import cats.Applicative
+import cats.syntax.all._
 import ch.datascience.graph.model.events.EventStatus
-import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, GenerationRecoverableFailure, New, TransformationRecoverableFailure, TransformingTriples, TriplesGenerated}
+import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 
@@ -27,7 +29,7 @@ private trait GaugesUpdater[Interpretation[_]] {
   def updateGauges(dbUpdateResults: DBUpdateResults): Interpretation[Unit]
 }
 
-private class GaugesUpdaterImpl[Interpretation[_]](
+private class GaugesUpdaterImpl[Interpretation[_]: Applicative](
     awaitingGenerationGauge:     LabeledGauge[Interpretation, projects.Path],
     awaitingTransformationGauge: LabeledGauge[Interpretation, projects.Path],
     underTransformationGauge:    LabeledGauge[Interpretation, projects.Path],
@@ -36,19 +38,26 @@ private class GaugesUpdaterImpl[Interpretation[_]](
 
   override def updateGauges(dbUpdateResults: DBUpdateResults): Interpretation[Unit] = dbUpdateResults match {
 
-    case DBUpdateResults.ForProject(projectPath, changedStatusCounts) =>
-      def sumCounts(of: EventStatus*): Double =
-        changedStatusCounts.view.filterKeys(of.contains).values.sum
+    case DBUpdateResults.ForProjects(projectsAndCounts) =>
+      projectsAndCounts
+        .map { case (projectPath, changedStatusCounts) =>
+          def sum(of: EventStatus*): Double =
+            changedStatusCounts.view.filterKeys(of.contains).values.sum
+          List(
+            awaitingGenerationGauge.update(projectPath     -> sum(New, GenerationRecoverableFailure)),
+            underTriplesGenerationGauge.update(projectPath -> sum(GeneratingTriples)),
+            awaitingTransformationGauge.update(projectPath -> sum(TriplesGenerated, TransformationRecoverableFailure)),
+            underTransformationGauge.update(projectPath    -> sum(TransformingTriples))
+          ).sequence
+        }
+        .toList
+        .sequence
+        .void
 
-      awaitingGenerationGauge.update(projectPath     -> -sumCounts(New, GenerationRecoverableFailure))
-      underTriplesGenerationGauge.update(projectPath -> -sumCounts(GeneratingTriples))
-      awaitingTransformationGauge.update(projectPath -> -sumCounts(TriplesGenerated, TransformationRecoverableFailure))
-      underTransformationGauge.update(projectPath    -> -sumCounts(TransformingTriples))
     case DBUpdateResults.ForAllProjects =>
-      awaitingGenerationGauge.reset()
-      underTriplesGenerationGauge.reset()
-      awaitingTransformationGauge.reset()
-      underTransformationGauge.reset()
-
+      List(awaitingGenerationGauge, underTriplesGenerationGauge, awaitingTransformationGauge, underTransformationGauge)
+        .map(_.reset())
+        .sequence
+        .void
   }
 }

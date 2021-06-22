@@ -37,33 +37,37 @@ class GaugesUpdaterSpec extends AnyWordSpec with should.Matchers with MockFactor
 
   "updateGauges" should {
 
-    s"update values for all projects in all the gauges in case of the ${DBUpdateResults.ForProject} update" in new TestCase {
+    s"update values for all projects in all the gauges in case of the ${DBUpdateResults.ForProjects} update" in new TestCase {
+      val projectsPath = projectPaths.generateNonEmptyList()
 
-      val updateResults = DBUpdateResults.ForProject(projectPath, countsForAllStatuses.generateOne)
+      val updateResults =
+        DBUpdateResults.ForProjects(projectsPath.map(_ -> countsForAllStatuses.generateOne).toList.toSet)
 
-      val awaitingGenerationChange = List(
-        updateResults.getCount(New),
-        updateResults.getCount(GenerationRecoverableFailure)
-      ).sum.toDouble
-      (awaitingGenerationGauge.update _).expects(projectPath -> -awaitingGenerationChange).returning(().pure[Try])
+      projectsPath.toList.foreach { projectPath =>
+        val awaitingGenerationChange = List(
+          updateResults.getCount(projectPath, New),
+          updateResults.getCount(projectPath, GenerationRecoverableFailure)
+        ).sum.toDouble
+        (awaitingGenerationGauge.update _).expects(projectPath -> awaitingGenerationChange).returning(().pure[Try])
 
-      val awaitingTransformationChange = List(
-        updateResults.getCount(TriplesGenerated),
-        updateResults.getCount(TransformationRecoverableFailure)
-      ).sum.toDouble
-      (awaitingTransformationGauge.update _)
-        .expects(projectPath -> -awaitingTransformationChange)
-        .returning(().pure[Try])
+        val awaitingTransformationChange = List(
+          updateResults.getCount(projectPath, TriplesGenerated),
+          updateResults.getCount(projectPath, TransformationRecoverableFailure)
+        ).sum.toDouble
+        (awaitingTransformationGauge.update _)
+          .expects(projectPath -> awaitingTransformationChange)
+          .returning(().pure[Try])
 
-      val underGenerationGaugeChange = List(updateResults.getCount(GeneratingTriples)).sum.toDouble
-      (underTriplesGenerationGauge.update _)
-        .expects(projectPath -> -underGenerationGaugeChange)
-        .returning(().pure[Try])
+        val underGenerationGaugeChange = List(updateResults.getCount(projectPath, GeneratingTriples)).sum.toDouble
+        (underTriplesGenerationGauge.update _)
+          .expects(projectPath -> underGenerationGaugeChange)
+          .returning(().pure[Try])
 
-      val underTransformationGaugeChange = List(updateResults.getCount(TransformingTriples)).sum.toDouble
-      (underTransformationGauge.update _)
-        .expects(projectPath -> -underTransformationGaugeChange)
-        .returning(().pure[Try])
+        val underTransformationGaugeChange = List(updateResults.getCount(projectPath, TransformingTriples)).sum.toDouble
+        (underTransformationGauge.update _)
+          .expects(projectPath -> underTransformationGaugeChange)
+          .returning(().pure[Try])
+      }
 
       gaugesUpdater.updateGauges(updateResults) shouldBe ().pure[Try]
     }
@@ -82,7 +86,6 @@ class GaugesUpdaterSpec extends AnyWordSpec with should.Matchers with MockFactor
   }
 
   private trait TestCase {
-    val projectPath = projectPaths.generateOne
 
     val awaitingGenerationGauge     = mock[LabeledGauge[Try, projects.Path]]
     val awaitingTransformationGauge = mock[LabeledGauge[Try, projects.Path]]
@@ -121,7 +124,13 @@ class GaugesUpdaterSpec extends AnyWordSpec with should.Matchers with MockFactor
     AwaitingDeletion                    -> awaitingDeletion.value
   )
 
-  private implicit class DBUpdateResultsOps(dbUpdateResults: DBUpdateResults.ForProject) {
-    def getCount(eventStatus: EventStatus): Int = dbUpdateResults.changedStatusCounts.getOrElse(eventStatus, 0)
+  private implicit class DBUpdateResultsOps(dbUpdateResults: DBUpdateResults.ForProjects) {
+    def getCount(projectPath: projects.Path, eventStatus: EventStatus): Int =
+      dbUpdateResults.statusCounts
+        .find { case (path, _) => path == projectPath }
+        .map { case (_, statusCount) =>
+          statusCount.getOrElse(eventStatus, 0)
+        }
+        .getOrElse(0)
   }
 }

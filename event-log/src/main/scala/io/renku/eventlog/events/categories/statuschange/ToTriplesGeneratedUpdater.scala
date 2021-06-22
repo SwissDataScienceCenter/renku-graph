@@ -23,7 +23,7 @@ import cats.effect.{BracketThrow, Sync}
 import cats.syntax.all._
 import ch.datascience.db.implicits._
 import ch.datascience.db.{DbClient, SqlStatement}
-import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TriplesGenerated}
+import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
@@ -46,35 +46,39 @@ private class ToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow: Sync](
   private lazy val partitionSize = 50
 
   override def updateDB(event: ToTriplesGenerated): UpdateResult[Interpretation] = for {
-    _              <- updateEvent(event)
-    idsAndStatuses <- updateAncestorsStatus(event)
-    _              <- cleanUp(idsAndStatuses, event)
-  } yield DBUpdateResults.ForProject(event.projectPath, idsAndStatuses.groupBy(s => s._2).view.mapValues(_.size).toMap)
+    updateResults      <- updateEvent(event)
+    idsAndUpdateResult <- updateAncestorsStatus(event)
+    (idsAndStatuses, ancestorsUpdateResults) = idsAndUpdateResult
+    _ <- cleanUp(idsAndStatuses, event)
+  } yield ancestorsUpdateResults combine updateResults: DBUpdateResults
 
   private def updateEvent(event: ToTriplesGenerated) = for {
-    _ <- updateStatus(event)
-    _ <- updatePayload(event)
-    _ <- updateProcessingTime(event)
-  } yield ()
+    updateResults <- updateStatus(event)
+    _             <- updatePayload(event)
+    _             <- updateProcessingTime(event)
+  } yield updateResults
 
   private def updateStatus(event: ToTriplesGenerated) = measureExecutionTime {
     SqlStatement(name = "to_triples_generated - status update")
       .command[ExecutionDate ~ EventId ~ projects.Id](
         sql"""UPDATE event evt
-          SET status = '#${TriplesGenerated.value}', 
-            execution_date = $executionDateEncoder, 
-            message = NULL
-          WHERE evt.event_id = $eventIdEncoder 
-            AND evt.project_id = $projectIdEncoder 
-            AND evt.status = '#${GeneratingTriples.value}'""".command
+              SET status = '#${TriplesGenerated.value}', 
+                execution_date = $executionDateEncoder, 
+                message = NULL
+              WHERE evt.event_id = $eventIdEncoder 
+                AND evt.project_id = $projectIdEncoder 
+                AND evt.status = '#${GeneratingTriples.value}'""".command
       )
       .arguments(ExecutionDate(now()) ~ event.eventId.id ~ event.eventId.projectId)
       .build
       .flatMapResult {
-        case Completion.Update(1) => ().pure[Interpretation]
+        case Completion.Update(1) =>
+          DBUpdateResults
+            .ForProjects(event.projectPath, Map(GeneratingTriples -> -1, TriplesGenerated -> 1))
+            .pure[Interpretation]
         case _ =>
           new Exception(s"Could not update event ${event.eventId} to status $TriplesGenerated")
-            .raiseError[Interpretation, Unit]
+            .raiseError[Interpretation, DBUpdateResults.ForProjects]
       }
   }
 
@@ -116,7 +120,7 @@ private class ToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow: Sync](
                 SELECT event_id, project_id, status 
                 FROM event
                 WHERE project_id = $projectIdEncoder
-                  AND #${`status IN`(EventStatus.all.filterNot(_ == EventStatus.Skipped))} 
+                  AND #${`status IN`(Set(New, GeneratingTriples, GenerationRecoverableFailure, AwaitingDeletion))}
                   AND event_date <= (
                     SELECT event_date
                     FROM event
@@ -134,6 +138,15 @@ private class ToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow: Sync](
         ExecutionDate(now()) ~ event.eventId.projectId ~ event.eventId.projectId ~ event.eventId.id ~ event.eventId.id
       )
       .build(_.toList)
+      .mapResult { idsAndStatuses =>
+        val decrementedStatuses = idsAndStatuses.groupMapReduce(_._2)(_ => -1)(_ + _)
+        val incrementedStatuses =
+          TriplesGenerated -> (idsAndStatuses.size - idsAndStatuses.count(_._2 == EventStatus.AwaitingDeletion))
+        idsAndStatuses -> DBUpdateResults.ForProjects(
+          event.projectPath,
+          decrementedStatuses + incrementedStatuses
+        )
+      }
   }
 
   private def cleanUp(idsAndStatuses: List[(EventId, EventStatus)],
@@ -147,17 +160,32 @@ private class ToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow: Sync](
       .void
   }
 
-  private def executeRemovalQueries(
-      event:      ToTriplesGenerated
-  )(eventsWindow: List[(EventId, EventStatus)]): Kleisli[Interpretation, Session[Interpretation], Unit] = for {
+  private def executeRemovalQueries(event: ToTriplesGenerated)(eventsWindow: List[(EventId, EventStatus)]) = for {
     _ <- removeAncestorsProcessingTimes(eventsWindow, event.eventId.projectId)
     _ <- removeAncestorsPayloads(eventsWindow, event.eventId.projectId)
-    _ <- removeAwaitingDeletionEvents(eventsWindow, event.eventId.projectId)
+    _ <- removeAwaitingDeletionEvents(eventsWindow, event)
   } yield ()
+
+  private def removeAncestorsProcessingTimes(idsAndStatuses: List[(EventId, EventStatus)], projectId: projects.Id) =
+    idsAndStatuses.filterNot { case (_, status) => Set(New, GeneratingTriples, Skipped).contains(status) } match {
+      case Nil => Kleisli.pure(())
+      case eventIdsToRemove =>
+        measureExecutionTime {
+          SqlStatement(name = "to_triples_generated - processing_times removal")
+            .command[projects.Id](
+              sql"""DELETE FROM status_processing_time
+                    WHERE event_id IN (#${eventIdsToRemove.map { case (id, _) => s"'$id'" }.mkString(",")})
+                      AND project_id = $projectIdEncoder""".command
+            )
+            .arguments(projectId)
+            .build
+            .void
+        }
+    }
 
   private def removeAncestorsPayloads(idsAndStatuses: List[(EventId, EventStatus)], projectId: projects.Id) =
     idsAndStatuses.filterNot { case (_, status) =>
-      Set(EventStatus.New, GeneratingTriples, EventStatus.Skipped).contains(status)
+      Set(New, GeneratingTriples, Skipped).contains(status)
     } match {
       case Nil => Kleisli.pure(())
       case eventIdsToRemove =>
@@ -174,28 +202,9 @@ private class ToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow: Sync](
         }
     }
 
-  private def removeAncestorsProcessingTimes(idsAndStatuses: List[(EventId, EventStatus)], projectId: projects.Id) =
-    idsAndStatuses.filterNot { case (_, status) =>
-      Set(EventStatus.New, GeneratingTriples, EventStatus.Skipped).contains(status)
-    } match {
-      case Nil => Kleisli.pure(())
-      case eventIdsToRemove =>
-        measureExecutionTime {
-          SqlStatement(name = "to_triples_generated - processing_times removal")
-            .command[projects.Id](
-              sql"""DELETE FROM status_processing_time
-                    WHERE event_id IN (#${eventIdsToRemove.map { case (id, _) => s"'$id'" }.mkString(",")})
-                      AND project_id = $projectIdEncoder""".command
-            )
-            .arguments(projectId)
-            .build
-            .void
-        }
-    }
-
-  private def removeAwaitingDeletionEvents(idsAndStatuses: List[(EventId, EventStatus)], projectId: projects.Id) =
-    idsAndStatuses.collect { case (id, EventStatus.AwaitingDeletion) => id } match {
-      case Nil => Kleisli.pure(())
+  private def removeAwaitingDeletionEvents(idsAndStatuses: List[(EventId, EventStatus)], event: ToTriplesGenerated) =
+    idsAndStatuses.collect { case (id, AwaitingDeletion) => id } match {
+      case Nil => Kleisli.pure(DBUpdateResults.ForProjects(event.projectPath, Map()))
       case eventIdsToRemove =>
         measureExecutionTime {
           SqlStatement(name = "to_triples_generated - awaiting_deletions removal")
@@ -204,7 +213,7 @@ private class ToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow: Sync](
                     WHERE event_id IN (#${eventIdsToRemove.map(id => s"'$id'").mkString(",")})
                       AND project_id = $projectIdEncoder""".command
             )
-            .arguments(projectId)
+            .arguments(event.eventId.projectId)
             .build
             .void
         }

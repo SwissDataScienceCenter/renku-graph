@@ -20,14 +20,15 @@ package io.renku.eventlog.events.categories.statuschange
 
 import cats.effect.{BracketThrow, Sync}
 import cats.syntax.all._
+import ch.datascience.db.implicits._
 import ch.datascience.db.{DbClient, SqlStatement}
+import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
 import eu.timepit.refined.auto._
 import io.renku.eventlog.ExecutionDate
 import io.renku.eventlog.TypeSerializers._
-import io.renku.eventlog.events.categories.statuschange.DBUpdateResults.ForProject
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.ToTriplesStore
 import skunk.data.Completion
 import skunk.implicits._
@@ -44,14 +45,14 @@ private class ToTriplesStoreUpdater[Interpretation[_]: BracketThrow: Sync](
   override def updateDB(
       event: ToTriplesStore
   ): UpdateResult[Interpretation] = for {
-    _            <- updateEvent(event)
-    updatedCount <- updateAncestorsStatus(event)
-  } yield ForProject(event.projectPath, Map(EventStatus.TriplesGenerated -> updatedCount))
+    updateResults          <- updateEvent(event)
+    ancestorsUpdateResults <- updateAncestorsStatus(event)
+  } yield updateResults combine ancestorsUpdateResults
 
   private def updateEvent(event: ToTriplesStore) = for {
-    _ <- updateStatus(event)
-    _ <- updateProcessingTime(event)
-  } yield ()
+    updateResults <- updateStatus(event)
+    _             <- updateProcessingTime(event)
+  } yield updateResults
 
   private def updateStatus(event: ToTriplesStore) = measureExecutionTime {
     SqlStatement(name = "to_triples_store - status update")
@@ -60,15 +61,20 @@ private class ToTriplesStoreUpdater[Interpretation[_]: BracketThrow: Sync](
           SET status = '#${EventStatus.TriplesStore.value}',
             execution_date = $executionDateEncoder,
             message = NULL
-          WHERE evt.event_id = $eventIdEncoder AND evt.project_id = $projectIdEncoder AND evt.status = '#${EventStatus.TransformingTriples.value}'""".command
+          WHERE evt.event_id = $eventIdEncoder 
+            AND evt.project_id = $projectIdEncoder 
+            AND evt.status = '#${EventStatus.TransformingTriples.value}'""".command
       )
       .arguments(ExecutionDate(now()) ~ event.eventId.id ~ event.eventId.projectId)
       .build
       .flatMapResult {
-        case Completion.Update(1) => ().pure[Interpretation]
+        case Completion.Update(1) =>
+          DBUpdateResults
+            .ForProjects(event.projectPath, Map(TransformingTriples -> -1, TriplesStore -> 1))
+            .pure[Interpretation]
         case _ =>
           new Exception(s"Could not update event ${event.eventId} to status ${EventStatus.TriplesStore}")
-            .raiseError[Interpretation, Unit]
+            .raiseError[Interpretation, DBUpdateResults.ForProjects]
       }
   }
 
@@ -76,10 +82,10 @@ private class ToTriplesStoreUpdater[Interpretation[_]: BracketThrow: Sync](
     SqlStatement(name = "to_triples_store - processing_time add")
       .command[EventId ~ projects.Id ~ EventStatus ~ EventProcessingTime](
         sql"""INSERT INTO status_processing_time(event_id, project_id, status, processing_time)
-                VALUES($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $eventProcessingTimeEncoder)
-                ON CONFLICT (event_id, project_id, status)
-                DO UPDATE SET processing_time = EXCLUDED.processing_time;
-                """.command
+              VALUES($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $eventProcessingTimeEncoder)
+              ON CONFLICT (event_id, project_id, status)
+              DO UPDATE SET processing_time = EXCLUDED.processing_time;
+              """.command
       )
       .arguments(event.eventId.id ~ event.eventId.projectId ~ EventStatus.TriplesStore ~ event.processingTime)
       .build
@@ -88,29 +94,43 @@ private class ToTriplesStoreUpdater[Interpretation[_]: BracketThrow: Sync](
 
   private def updateAncestorsStatus(event: ToTriplesStore) = measureExecutionTime {
     SqlStatement(name = "to_triples_store - ancestors update")
-      .command[ExecutionDate ~ projects.Id ~ projects.Id ~ EventId ~ EventId](
+      .select[ExecutionDate ~ projects.Id ~ projects.Id ~ EventId ~ EventId, EventStatus](
         sql"""UPDATE event evt
               SET status = '#${EventStatus.TriplesStore.value}',
                   execution_date = $executionDateEncoder,
                   message = NULL
-              WHERE project_id = $projectIdEncoder
-                AND status = '#${EventStatus.TriplesGenerated.value}'
-                AND event_date <= (
-                  SELECT event_date
-                  FROM event
-                  WHERE project_id = $projectIdEncoder
-                    AND event_id = $eventIdEncoder
-                )
-                AND event_id <> $eventIdEncoder
-           """.command
+              FROM (
+                SELECT event_id, project_id, status 
+                FROM event
+                WHERE project_id = $projectIdEncoder
+                  AND #${`status IN`(Set(TriplesGenerated, TransformingTriples, TransformationRecoverableFailure))}
+                  AND event_date <= (
+                    SELECT event_date
+                    FROM event
+                    WHERE project_id = $projectIdEncoder
+                      AND event_id = $eventIdEncoder
+                  )
+                  AND event_id <> $eventIdEncoder
+                    FOR UPDATE
+              ) old_evt
+              WHERE evt.event_id = old_evt.event_id AND evt.project_id = old_evt.project_id 
+              RETURNING old_evt.status
+         """.query(eventStatusDecoder)
       )
       .arguments(
         ExecutionDate(now()) ~ event.eventId.projectId ~ event.eventId.projectId ~ event.eventId.id ~ event.eventId.id
       )
-      .build
-      .mapResult {
-        case Completion.Update(count) => count
-        case _                        => 0
+      .build(_.toList)
+      .mapResult { oldStatuses =>
+        val decrementedStatuses = oldStatuses.groupBy(identity).view.mapValues(-_.size).toMap
+        val incrementedStatuses = TriplesStore -> oldStatuses.size
+        DBUpdateResults.ForProjects(
+          event.projectPath,
+          decrementedStatuses + incrementedStatuses
+        )
       }
   }
+
+  private def `status IN`(statuses: Set[EventStatus]) =
+    s"status IN (${statuses.map(s => s"'$s'").toList.mkString(",")})"
 }

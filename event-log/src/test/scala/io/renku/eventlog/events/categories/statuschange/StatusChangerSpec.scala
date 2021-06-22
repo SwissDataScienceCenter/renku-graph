@@ -151,11 +151,11 @@ class StatusChangerSpec
     case AllEventsToNew                              => Gen.const(DBUpdateResults.ForAllProjects)
     case ToTriplesGenerated(_, projectPath, _, _, _) => genUpdateResult(projectPath)
     case ToTriplesStore(_, projectPath, _)           => genUpdateResult(projectPath)
-    case ToNew(_, projectPath)                       => Gen.const(DBUpdateResults.ForProject(projectPath, Map(GeneratingTriples -> 1)))
+    case ToNew(_, projectPath)                       => Gen.const(DBUpdateResults.ForProjects(projectPath, Map(GeneratingTriples -> 1)))
   }
 
   private def genUpdateResult(forProject: projects.Path) = for {
     statuses <- eventStatuses.toGeneratorOfSet()
     counts   <- statuses.toList.map(s => nonNegativeInts().map(count => s -> count.value)).sequence
-  } yield DBUpdateResults.ForProject(forProject, counts.toMap)
+  } yield DBUpdateResults.ForProjects(forProject, counts.toMap)
 }

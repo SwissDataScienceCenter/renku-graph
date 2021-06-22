@@ -53,9 +53,9 @@ class ToNewUpdaterSpec
 
       sessionResource
         .useK(dbUpdater.updateDB(ToNew(CompoundEventId(eventId, projectId), projectPath)))
-        .unsafeRunSync() shouldBe DBUpdateResults.ForProject(
+        .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
         projectPath,
-        Map(EventStatus.GeneratingTriples -> 1)
+        Map(GeneratingTriples -> -1, New -> 1)
       )
 
       findEvent(CompoundEventId(eventId, projectId)).map(_._2)      shouldBe Some(New)

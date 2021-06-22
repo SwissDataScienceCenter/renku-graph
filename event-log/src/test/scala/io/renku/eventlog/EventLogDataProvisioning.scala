@@ -23,7 +23,7 @@ import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUr
 import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.{projectPaths, projectSchemaVersions}
-import ch.datascience.graph.model.events.EventStatus.{TransformationRecoverableFailure, TransformingTriples, TriplesGenerated, TriplesStore}
+import ch.datascience.graph.model.events.EventStatus.{AwaitingDeletion, TransformationRecoverableFailure, TransformingTriples, TriplesGenerated, TriplesStore}
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.model.{SchemaVersion, projects}
@@ -121,21 +121,23 @@ trait EventLogDataProvisioning {
                                    eventStatus:     EventStatus,
                                    schemaVersion:   SchemaVersion,
                                    maybePayload:    Option[EventPayload]
-  ): Unit = (eventStatus, maybePayload) match {
-    case (TriplesGenerated | TransformationRecoverableFailure | TransformingTriples | TriplesStore, Some(payload)) =>
-      execute[Unit] {
-        Kleisli { session =>
-          val query: Command[EventId ~ projects.Id ~ EventPayload ~ SchemaVersion] =
-            sql"""INSERT INTO
-                  event_payload (event_id, project_id, payload, schema_version)
-                  VALUES ($eventIdEncoder, $projectIdEncoder, $eventPayloadEncoder, $schemaVersionEncoder)
-                  ON CONFLICT (event_id, project_id, schema_version)
-                  DO UPDATE SET payload = excluded.payload
-            """.command
-          session
-            .prepare(query)
-            .use(_.execute(compoundEventId.id ~ compoundEventId.projectId ~ payload ~ schemaVersion))
-            .void
+  ): Unit = eventStatus match {
+    case TriplesGenerated | TransformationRecoverableFailure | TransformingTriples | TriplesStore | AwaitingDeletion =>
+      maybePayload foreach { payload =>
+        execute[Unit] {
+          Kleisli { session =>
+            val query: Command[EventId ~ projects.Id ~ EventPayload ~ SchemaVersion] =
+              sql"""INSERT INTO
+                    event_payload (event_id, project_id, payload, schema_version)
+                    VALUES ($eventIdEncoder, $projectIdEncoder, $eventPayloadEncoder, $schemaVersionEncoder)
+                    ON CONFLICT (event_id, project_id, schema_version)
+                    DO UPDATE SET payload = excluded.payload
+              """.command
+            session
+              .prepare(query)
+              .use(_.execute(compoundEventId.id ~ compoundEventId.projectId ~ payload ~ schemaVersion))
+              .void
+          }
         }
       }
     case _ => ()

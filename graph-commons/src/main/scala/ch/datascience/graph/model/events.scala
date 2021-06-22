@@ -90,15 +90,15 @@ object events {
 
     val all: Set[EventStatus] = Set(
       New,
-      GeneratingTriples,
-      TriplesGenerated,
-      TransformingTriples,
-      TriplesStore,
       Skipped,
+      GeneratingTriples,
       GenerationRecoverableFailure,
       GenerationNonRecoverableFailure,
+      TriplesGenerated,
+      TransformingTriples,
       TransformationRecoverableFailure,
       TransformationNonRecoverableFailure,
+      TriplesStore,
       AwaitingDeletion
     )
 
@@ -159,7 +159,7 @@ object events {
     }
     type TransformationNonRecoverableFailure = TransformationNonRecoverableFailure.type
 
-    implicit val eventStatusDecoder: Decoder[EventStatus] = decodeString.emap { value =>
+    implicit val eventStatusJsonDecoder: Decoder[EventStatus] = decodeString.emap { value =>
       Either.fromOption(
         EventStatus.all.find(_.value == value),
         ifNone = s"'$value' unknown EventStatus"

@@ -45,20 +45,19 @@ trait EventDataFetching {
       }
     }
 
-  protected def findPayload(eventId: CompoundEventId): Option[(CompoundEventId, EventPayload)] =
-    execute {
-      Kleisli { session =>
-        val query: Query[EventId ~ projects.Id, (CompoundEventId, EventPayload)] =
-          sql"""SELECT event_id, project_id, payload
-                FROM event_payload
-                WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder;"""
-            .query(eventIdDecoder ~ projectIdDecoder ~ eventPayloadDecoder)
-            .map { case eventId ~ projectId ~ eventPayload =>
-              (CompoundEventId(eventId, projectId), eventPayload)
-            }
-        session.prepare(query).use(_.option(eventId.id ~ eventId.projectId))
-      }
+  protected def findPayload(eventId: CompoundEventId): Option[(CompoundEventId, EventPayload)] = execute {
+    Kleisli { session =>
+      val query: Query[EventId ~ projects.Id, (CompoundEventId, EventPayload)] =
+        sql"""SELECT event_id, project_id, payload
+              FROM event_payload
+              WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder;"""
+          .query(eventIdDecoder ~ projectIdDecoder ~ eventPayloadDecoder)
+          .map { case eventId ~ projectId ~ eventPayload =>
+            (CompoundEventId(eventId, projectId), eventPayload)
+          }
+      session.prepare(query).use(_.option(eventId.id ~ eventId.projectId))
     }
+  }
 
   protected def findProjects: List[(projects.Id, projects.Path, EventDate)] = execute {
     Kleisli { session =>

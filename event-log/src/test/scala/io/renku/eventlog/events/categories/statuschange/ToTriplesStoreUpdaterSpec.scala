@@ -19,19 +19,18 @@
 package io.renku.eventlog.events.categories.statuschange
 
 import cats.effect.IO
-import cats.syntax.all._
 import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.{positiveInts, timestamps, timestampsNotInTheFuture}
+import ch.datascience.generators.Generators.{timestamps, timestampsNotInTheFuture}
 import ch.datascience.graph.model.EventsGenerators.{eventBodies, eventIds, eventProcessingTimes}
 import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
-import ch.datascience.graph.model.events.EventStatus.FailureStatus
+import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages, eventPayloads}
+import io.renku.eventlog._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.ToTriplesStore
-import io.renku.eventlog.{EventDate, ExecutionDate, InMemoryEventLogDbSpec, TypeSerializers}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -49,57 +48,59 @@ class ToTriplesStoreUpdaterSpec
   "updateDB" should {
 
     "change the status of all TRIPLES_GENERATED events up to the current event with the status TRIPLES_STORE" in new TestCase {
-      val eventDate           = eventDates.generateOne
-      val eventProcessingTime = eventProcessingTimes.generateOne
+      val eventDate = eventDates.generateOne
 
-      val eventsBeforeNotToChange = EventStatus.all
-        .filterNot(_ == EventStatus.TriplesGenerated)
-        .map(status => addEvent(status, timestamps(max = eventDate.value).generateAs(EventDate)) -> status)
+      val statusesToUpdate = Set(TriplesGenerated, TransformingTriples, TransformationRecoverableFailure)
+      val eventsToUpdate   = statusesToUpdate.map(addEvent(_, timestamps(max = eventDate.value).generateAs(EventDate)))
+      val eventsToSkip = EventStatus.all
+        .diff(statusesToUpdate)
+        .map(addEvent(_, timestamps(max = eventDate.value).generateAs(EventDate))) +
+        addEvent(TriplesGenerated, timestamps(min = eventDate.value, max = now).generateAs(EventDate))
 
-      val eventsBeforeToChange = (1 to positiveInts(max = 10).generateOne).map { _ =>
-        addEvent(EventStatus.TriplesGenerated, timestamps(max = eventDate.value).generateAs(EventDate))
-      }
+      val event = addEvent(TransformingTriples, eventDate)
 
-      val eventId = addEvent(EventStatus.TransformingTriples, eventDate, eventProcessingTime.some)
+      val statusChangeEvent =
+        ToTriplesStore(CompoundEventId(event._1, projectId), projectPath, eventProcessingTimes.generateOne)
 
-      val newEventIdAfterEvent =
-        addEvent(EventStatus.New, timestamps(min = eventDate.value, max = now).generateAs(EventDate))
+      sessionResource.useK(dbUpdater updateDB statusChangeEvent).unsafeRunSync() shouldBe DBUpdateResults
+        .ForProjects(
+          projectPath,
+          statusesToUpdate
+            .map(_ -> -1)
+            .toMap +
+            (TransformingTriples -> (-1 /* for the event */ - 1 /* for the old TransformingTriples */ )) +
+            (TriplesStore        -> (eventsToUpdate.size + 1 /* for the event */ ))
+        )
 
-      sessionResource
-        .useK {
-          dbUpdater.updateDB(
-            ToTriplesStore(CompoundEventId(eventId, projectId), projectPath, eventProcessingTime)
-          )
+      findFullEvent(CompoundEventId(event._1, projectId))
+        .map { case (_, status, _, maybePayload, processingTimes) =>
+          status        shouldBe TriplesStore
+          maybePayload  shouldBe a[Some[_]]
+          processingTimes should contain(statusChangeEvent.processingTime)
         }
-        .unsafeRunSync() shouldBe DBUpdateResults.ForProject(
-        projectPath,
-        Map(EventStatus.TriplesGenerated -> eventsBeforeToChange.size)
-      )
+        .getOrElse(fail("No event found for main event"))
 
-      eventsBeforeNotToChange.map { case (eventId, originalStatus) =>
-        findFullEvent(CompoundEventId(eventId, projectId)) -> originalStatus
-      } foreach {
-        case (Some((_, EventStatus.TriplesStore, _, Some(_), processingTimes)), EventStatus.TriplesStore) =>
-          processingTimes.nonEmpty shouldBe true
-        case (Some((_, actualStatus: FailureStatus, Some(_), _, _)), originalStatus) =>
-          actualStatus shouldBe originalStatus
-        case (Some((_, actualStatus, _, _, _)), originalStatus) =>
-          actualStatus shouldBe originalStatus
-        case (None, originalStatus) => fail(s"Event not found with status $originalStatus")
-      }
-
-      eventsBeforeToChange.flatMap(eventId => findFullEvent(CompoundEventId(eventId, projectId))) foreach {
-        case (_, EventStatus.TriplesStore, None, Some(_), processingTimes) =>
-          processingTimes.nonEmpty shouldBe true
-        case _ => fail("Events to change were not in TriplesStore status")
-      }
-
-      findEvent(CompoundEventId(newEventIdAfterEvent, projectId)).map(_._2) shouldBe Some(EventStatus.New)
-
-      val Some((_, EventStatus.TriplesStore, _, maybePayload, processingTimes)) =
+      eventsToUpdate.map { case (eventId, status, _, originalPayload, originalProcessingTimes) =>
         findFullEvent(CompoundEventId(eventId, projectId))
-      maybePayload                                  shouldBe a[Some[_]]
-      processingTimes.contains(eventProcessingTime) shouldBe true
+          .map { case (_, status, maybeMessage, maybePayload, processingTimes) =>
+            status          shouldBe TriplesStore
+            maybeMessage    shouldBe None
+            maybePayload    shouldBe originalPayload
+            processingTimes shouldBe originalProcessingTimes
+          }
+          .getOrElse(fail(s"No event found with old $status status"))
+      }
+
+      eventsToSkip.map { case (eventId, originalStatus, originalMessage, originalPayload, originalProcessingTimes) =>
+        findFullEvent(CompoundEventId(eventId, projectId))
+          .map { case (_, status, maybeMessage, maybePayload, processingTimes) =>
+            status          shouldBe originalStatus
+            maybeMessage    shouldBe originalMessage
+            maybePayload    shouldBe originalPayload
+            processingTimes shouldBe originalProcessingTimes
+          }
+          .getOrElse(fail(s"No event found with old $originalStatus status"))
+      }
     }
   }
 
@@ -115,11 +116,19 @@ class ToTriplesStoreUpdaterSpec
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()
 
-    def addEvent(status:                   EventStatus,
-                 eventDate:                EventDate,
-                 maybeEventProcessingTime: Option[EventProcessingTime] = None
-    ): EventId = {
+    def addEvent(status:    EventStatus,
+                 eventDate: EventDate
+    ): (EventId, EventStatus, Option[EventMessage], Option[EventPayload], List[EventProcessingTime]) = {
       val eventId = CompoundEventId(eventIds.generateOne, projectId)
+      val maybeMessage = status match {
+        case _: FailureStatus => eventMessages.generateSome
+        case _ => eventMessages.generateOption
+      }
+      val maybePayload = status match {
+        case TransformingTriples | EventStatus.TriplesStore | TriplesGenerated => eventPayloads.generateSome
+        case EventStatus.AwaitingDeletion                                      => eventPayloads.generateOption
+        case _                                                                 => eventPayloads.generateNone
+      }
 
       storeEvent(
         eventId,
@@ -128,33 +137,26 @@ class ToTriplesStoreUpdaterSpec
         eventDate,
         eventBodies.generateOne,
         projectPath = projectPath,
-        maybeMessage = status match {
-          case _: EventStatus.FailureStatus => eventMessages.generateSome
-          case _ => eventMessages.generateOption
-        },
-        maybeEventPayload = status match {
-          case EventStatus.TransformingTriples | EventStatus.TriplesStore | EventStatus.TriplesGenerated =>
-            eventPayloads.generateSome
-          case EventStatus.AwaitingDeletion => eventPayloads.generateOption
-          case _                            => eventPayloads.generateNone
-        }
+        maybeMessage = maybeMessage,
+        maybeEventPayload = maybePayload
       )
 
-      (maybeEventProcessingTime, status) match {
-        case (Some(processingTime), _) => upsertProcessingTime(eventId, status, processingTime)
-        case (_, EventStatus.TriplesGenerated | EventStatus.TriplesStore) =>
-          upsertProcessingTime(eventId, status, eventProcessingTimes.generateOne)
-        case (_, EventStatus.AwaitingDeletion) =>
-          if (Random.nextBoolean()) {
-            upsertProcessingTime(eventId, status, eventProcessingTimes.generateOne)
-          } else ()
-        case _ => ()
+      val processingTimes = status match {
+        case TriplesGenerated | EventStatus.TriplesStore => List(eventProcessingTimes.generateOne)
+        case EventStatus.AwaitingDeletion =>
+          if (Random.nextBoolean()) List(eventProcessingTimes.generateOne)
+          else Nil
+        case _ => Nil
       }
 
-      eventId.id
+      processingTimes.foreach(upsertProcessingTime(eventId, status, _))
+
+      (eventId.id, status, maybeMessage, maybePayload, processingTimes)
     }
 
-    def findFullEvent(eventId: CompoundEventId) = {
+    def findFullEvent(
+        eventId: CompoundEventId
+    ): Option[(EventId, EventStatus, Option[EventMessage], Option[EventPayload], List[EventProcessingTime])] = {
       val maybeEvent     = findEvent(eventId)
       val maybePayload   = findPayload(eventId).map(_._2)
       val processingTime = findProcessingTime(eventId)
@@ -162,6 +164,5 @@ class ToTriplesStoreUpdaterSpec
         (eventId.id, status, maybeMessage, maybePayload, processingTime.map(_._2))
       }
     }
-
   }
 }

@@ -56,7 +56,7 @@ private class ToNewUpdater[Interpretation[_]: BracketThrow: Sync](
       .flatMapResult {
         case Completion.Update(1) =>
           DBUpdateResults
-            .ForProject(event.projectPath, Map(GeneratingTriples -> 1))
+            .ForProjects(event.projectPath, Map(GeneratingTriples -> -1, New -> 1))
             .pure[Interpretation]
             .widen[DBUpdateResults]
         case _ =>

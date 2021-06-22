@@ -18,6 +18,8 @@
 
 package io.renku.eventlog.events.categories.statuschange
 
+import cats.Monoid
+import cats.syntax.all._
 import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.graph.model.projects
 
@@ -25,7 +27,25 @@ private sealed trait DBUpdateResults
 
 private object DBUpdateResults {
 
-  final case class ForProject(projectPath: projects.Path, changedStatusCounts: Map[EventStatus, Int])
-      extends DBUpdateResults
+  final case class ForProjects(statusCounts: Set[(projects.Path, Map[EventStatus, Int])]) extends DBUpdateResults
+
+  object ForProjects {
+    def apply(projectPath: projects.Path, statusCount: Map[EventStatus, Int]): ForProjects = ForProjects(
+      Set(projectPath -> statusCount)
+    )
+  }
+
   final case object ForAllProjects extends DBUpdateResults
+
+  implicit val monoid: Monoid[DBUpdateResults.ForProjects] = new Monoid[DBUpdateResults.ForProjects] {
+    override def combine(x: DBUpdateResults.ForProjects, y: DBUpdateResults.ForProjects): DBUpdateResults.ForProjects =
+      ForProjects(
+        (x.statusCounts.toSeq ++ y.statusCounts.toSeq)
+          .groupBy(_._1)
+          .map { case (path, pathAndCounts) => path -> pathAndCounts.map(_._2).combineAll }
+          .toSet
+      )
+
+    override def empty: ForProjects = ForProjects(Set.empty)
+  }
 }
