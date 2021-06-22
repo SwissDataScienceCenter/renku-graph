@@ -18,12 +18,12 @@
 
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
-import cats.{Id, Parallel}
 import cats.data.{Kleisli, NonEmptyList}
 import cats.effect.{BracketThrow, IO, Sync}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
+import cats.{Id, Parallel}
 import ch.datascience.db.implicits._
+import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventStatus}
 import ch.datascience.graph.model.projects
@@ -68,7 +68,7 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Sync: Paralle
   private def findEventAndUpdateForProcessing = for {
     maybeProject <- selectCandidateProject()
     maybeIdAndProjectAndBody <- maybeProject
-                                  .map(idAndPath => measureExecutionTime(findOldestEvent(idAndPath)))
+                                  .map(idAndPath => measureExecutionTime(findLatestEvent(idAndPath)))
                                   .getOrElse(Kleisli.pure(Option.empty[AwaitingGenerationEvent]))
     maybeBody <- markAsProcessing(maybeIdAndProjectAndBody)
   } yield maybeProject -> maybeBody
@@ -82,30 +82,36 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Sync: Paralle
   private def findProjectsWithEventsInQueue =
     SqlStatement(
       name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find projects")
-    ).select[EventStatus ~ ExecutionDate ~ Int, ProjectInfo](
+    ).select[ExecutionDate ~ Int, ProjectInfo](
       sql"""
       SELECT
         proj.project_id,
         proj.project_path,
         proj.latest_event_date,
-        (SELECT count(event_id) from event evt_int where evt_int.project_id = proj.project_id and evt_int.status = $eventStatusEncoder) as current_occupancy
-      FROM (
-        SELECT DISTINCT
-          proj.project_id,
-          proj.project_path,
-          proj.latest_event_date
-        FROM event evt
-        JOIN project proj on evt.project_id = proj.project_id
-        WHERE #${`status IN`(New, GenerationRecoverableFailure)} AND execution_date < $executionDateEncoder
-        ORDER BY proj.latest_event_date DESC
-        LIMIT $int4
-      ) proj
+        (SELECT count(event_id) from event evt_int where evt_int.project_id = proj.project_id and evt_int.status = '#${GeneratingTriples.value}') as current_occupancy
+      FROM project proj
+      WHERE 
+        EXISTS (
+          SELECT candidate_events.event_id
+          FROM (
+            SELECT evt.event_id, evt.status
+            FROM event evt
+            WHERE evt.project_id = proj.project_id 
+              AND #${`status IN`(New, GenerationRecoverableFailure, GeneratingTriples)} 
+              AND execution_date <= $executionDateEncoder
+            ORDER BY evt.event_date DESC
+            LIMIT 1
+          ) candidate_events
+          WHERE candidate_events.status <> '#${GeneratingTriples.value}'
+        )
+      ORDER BY proj.latest_event_date DESC
+      LIMIT $int4
       """
         .query(projectIdDecoder ~ projectPathDecoder ~ eventDateDecoder ~ int8)
         .map { case projectId ~ projectPath ~ eventDate ~ (currentOccupancy: Long) =>
           ProjectInfo(projectId, projectPath, eventDate, Refined.unsafeApply(currentOccupancy.toInt))
         }
-    ).arguments(GeneratingTriples ~ ExecutionDate(now()) ~ projectsFetchingLimit.value)
+    ).arguments(ExecutionDate(now()) ~ projectsFetchingLimit.value)
       .build(_.toList)
 
   private def findTotalOccupancy: SqlStatement[Interpretation, Long] =
@@ -118,23 +124,23 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Sync: Paralle
     ).arguments(GeneratingTriples)
       .build[Id](_.unique)
 
-  private def findOldestEvent(idAndPath: ProjectIds) = {
+  private def findLatestEvent(idAndPath: ProjectIds) = {
     val executionDate = ExecutionDate(now())
     SqlStatement(
-      name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find oldest")
+      name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find latest")
     ).select[projects.Path ~ projects.Id ~ ExecutionDate ~ ExecutionDate, AwaitingGenerationEvent](
       sql"""
        SELECT evt.event_id, evt.project_id, $projectPathEncoder AS project_path, evt.event_body
        FROM (
-         SELECT project_id, min(event_date) AS min_event_date
+         SELECT project_id, max(event_date) AS max_event_date
          FROM event
          WHERE project_id = $projectIdEncoder
            AND #${`status IN`(New, GenerationRecoverableFailure)}
            AND execution_date < $executionDateEncoder
          GROUP BY project_id
-       ) oldest_event_date
-       JOIN event evt ON oldest_event_date.project_id = evt.project_id 
-         AND oldest_event_date.min_event_date = evt.event_date
+       ) newest_event_date
+       JOIN event evt ON newest_event_date.project_id = evt.project_id 
+         AND newest_event_date.max_event_date = evt.event_date
          AND #${`status IN`(New, GenerationRecoverableFailure)}
          AND execution_date < $executionDateEncoder
        LIMIT 1

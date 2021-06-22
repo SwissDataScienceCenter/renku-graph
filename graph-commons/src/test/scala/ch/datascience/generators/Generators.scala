@@ -231,10 +231,9 @@ object Generators {
   def timestamps(
       min: Instant = Instant.EPOCH,
       max: Instant = now().plus(2000, JAVA_DAYS)
-  ): Gen[Instant] =
-    Gen
-      .choose(min.toEpochMilli, max.toEpochMilli)
-      .map(Instant.ofEpochMilli)
+  ): Gen[Instant] = Gen
+    .choose(min.toEpochMilli, max.toEpochMilli)
+    .map(Instant.ofEpochMilli)
 
   def relativeTimestamps(
       lessThanAgo: JavaDuration = JavaDuration.ofDays(365 * 5),

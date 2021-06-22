@@ -34,7 +34,7 @@ import io.renku.eventlog._
 import io.renku.eventlog.subscriptions.triplesgenerated.ProjectPrioritisation.{Priority, ProjectInfo}
 import io.renku.eventlog.subscriptions.{EventFinder, ProjectIds, SubscriptionTypeSerializers}
 import skunk._
-import skunk.codec.all.int4
+import skunk.codec.all.{int4, int8}
 import skunk.data.Completion
 import skunk.implicits._
 
@@ -81,7 +81,8 @@ private class TriplesGeneratedEventFinderImpl[Interpretation[_]: Sync: BracketTh
         SELECT DISTINCT
           proj.project_id,
           proj.project_path,
-          proj.latest_event_date
+          proj.latest_event_date,
+          (SELECT count(event_id) from event evt_int where evt_int.project_id = proj.project_id and evt_int.status = '#${TransformingTriples.value}') as current_occupancy
         FROM project proj
         WHERE 
           EXISTS (
@@ -99,9 +100,11 @@ private class TriplesGeneratedEventFinderImpl[Interpretation[_]: Sync: BracketTh
           )
         ORDER BY proj.latest_event_date DESC
         LIMIT $int4
-      """.query(projectIdDecoder ~ projectPathDecoder ~ eventDateDecoder).map {
-      case projectId ~ projectPath ~ eventDate => ProjectInfo(projectId, projectPath, eventDate, Refined.unsafeApply(1))
-    }
+      """
+      .query(projectIdDecoder ~ projectPathDecoder ~ eventDateDecoder ~ int8)
+      .map { case projectId ~ projectPath ~ eventDate ~ (currentOccupancy: Long) =>
+        ProjectInfo(projectId, projectPath, eventDate, Refined.unsafeApply(currentOccupancy.toInt))
+      }
   ).arguments(ExecutionDate(now()) ~ projectsFetchingLimit.value)
     .build(_.toList)
 

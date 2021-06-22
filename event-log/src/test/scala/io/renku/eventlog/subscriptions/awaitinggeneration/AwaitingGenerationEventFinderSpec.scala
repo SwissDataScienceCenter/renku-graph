@@ -18,9 +18,6 @@
 
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
-import java.time.temporal.ChronoUnit.{HOURS => H}
-import java.time.Instant
-
 import cats.effect.IO
 import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
@@ -42,6 +39,8 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import java.time.Instant
+
 private class AwaitingGenerationEventFinderSpec
     extends AnyWordSpec
     with InMemoryEventLogDbSpec
@@ -50,23 +49,22 @@ private class AwaitingGenerationEventFinderSpec
 
   "popEvent" should {
 
-    "return an event with event date farthest in the past " +
-      s"and status $New or $GenerationRecoverableFailure " +
+    s"find the most recent event in status $New or $GenerationRecoverableFailure " +
       s"and mark it as $GeneratingTriples" in new TestCase {
 
         val projectId   = projectIds.generateOne
         val projectPath = projectPaths.generateOne
 
-        val (event1Id, event1Body, latestEventDate, _) = createEvent(
+        val (_, _, notLatestEventDate, _) = createEvent(
           status = New,
-          eventDate = EventDate(now.minus(1, H)),
+          eventDate = timestampsNotInTheFuture.generateAs(EventDate),
           projectId = projectId,
           projectPath = projectPath
         )
 
-        val (event2Id, event2Body, _, _) = createEvent(
-          status = EventStatus.GenerationRecoverableFailure,
-          EventDate(now.minus(5, H)),
+        val (event2Id, event2Body, latestEventDate, _) = createEvent(
+          status = GenerationRecoverableFailure,
+          eventDate = timestamps(min = notLatestEventDate.value, max = now).generateAs(EventDate),
           projectId = projectId,
           projectPath = projectPath
         )
@@ -77,7 +75,7 @@ private class AwaitingGenerationEventFinderSpec
         expectUnderProcessingGaugeIncrement(projectPath)
 
         givenPrioritisation(
-          takes = List(ProjectInfo(projectId, projectPath, latestEventDate, 0)),
+          takes = List(ProjectInfo(projectId, projectPath, latestEventDate, currentOccupancy = 0)),
           totalOccupancy = 0,
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
@@ -88,24 +86,7 @@ private class AwaitingGenerationEventFinderSpec
 
         findEvents(EventStatus.GeneratingTriples).noBatchDate shouldBe List((event2Id, executionDate))
 
-        expectWaitingEventsGaugeDecrement(projectPath)
-        expectUnderProcessingGaugeIncrement(projectPath)
-
-        givenPrioritisation(
-          takes = List(ProjectInfo(projectId, projectPath, latestEventDate, 1)),
-          totalOccupancy = 1,
-          returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
-        )
-
-        finder.popEvent().unsafeRunSync() shouldBe Some(
-          AwaitingGenerationEvent(event1Id, projectPath, event1Body)
-        )
-
-        findEvents(EventStatus.GeneratingTriples).noBatchDate shouldBe List((event1Id, executionDate),
-                                                                            (event2Id, executionDate)
-        )
-
-        givenPrioritisation(takes = Nil, totalOccupancy = 2, returns = Nil)
+        givenPrioritisation(takes = Nil, totalOccupancy = 1, returns = Nil)
 
         finder.popEvent().unsafeRunSync() shouldBe None
 
@@ -115,7 +96,7 @@ private class AwaitingGenerationEventFinderSpec
         )
       }
 
-    "return no event when execution date is in the future " +
+    "find no event when execution date is in the future " +
       s"and status $New or $GenerationRecoverableFailure " in new TestCase {
 
         val projectId   = projectIds.generateOne
@@ -129,14 +110,14 @@ private class AwaitingGenerationEventFinderSpec
 
         val (_, _, event2Date, _) = createEvent(
           status = GenerationRecoverableFailure,
-          executionDate = ExecutionDate(timestampsInTheFuture.generateOne),
+          executionDate = timestampsInTheFuture.generateAs(ExecutionDate),
           projectId = projectId,
           projectPath = projectPath
         )
 
         val (_, _, event3Date, _) = createEvent(
           status = New,
-          executionDate = ExecutionDate(timestampsInTheFuture.generateOne),
+          executionDate = timestampsInTheFuture.generateAs(ExecutionDate),
           projectId = projectId,
           projectPath = projectPath
         )
@@ -169,11 +150,11 @@ private class AwaitingGenerationEventFinderSpec
         )
       }
 
-    "return events from all the projects" in new TestCase {
+    "find the latest events from each the projects" in new TestCase {
 
       val events = readyStatuses
         .generateNonEmptyList(minElements = 2)
-        .map(status => createEvent(status))
+        .map(createEvent(_))
         .toList
 
       findEvents(EventStatus.GeneratingTriples) shouldBe List.empty
@@ -181,9 +162,8 @@ private class AwaitingGenerationEventFinderSpec
       expectGaugeUpdated(times = events.size)
 
       events foreach { case (eventId, _, eventDate, projectPath) =>
-        givenPrioritisation(
+        givenPrioritisationAnyOccupancy(
           takes = List(ProjectInfo(eventId.projectId, projectPath, eventDate, 0)),
-          totalOccupancy = 0,
           returns = List(ProjectIds(eventId.projectId, projectPath) -> MaxPriority)
         )
       }
@@ -195,7 +175,7 @@ private class AwaitingGenerationEventFinderSpec
       findEvents(status = GeneratingTriples).eventIdsOnly should contain theSameElementsAs events.map(_._1)
     }
 
-    "return events from all the projects - case with projectsFetchingLimit > 1" in new TestCaseCommons {
+    "return the latest events from each projects - case with projectsFetchingLimit > 1" in new TestCaseCommons {
 
       val eventLogFind = new AwaitingGenerationEventFinderImpl(
         sessionResource,
@@ -219,21 +199,26 @@ private class AwaitingGenerationEventFinderSpec
 
       findEvents(EventStatus.GeneratingTriples) shouldBe List.empty
 
-      expectGaugeUpdated(times = events.size)
+      val eventsPerProject = events.groupBy(_._4)
 
-      events foreach { case (eventId, _, _, projectPath) =>
+      expectGaugeUpdated(times = eventsPerProject.size)
+
+      eventsPerProject foreach { case (projectPath, events) =>
+        val (eventIdOfTheNewestEvent, _, _, _) = events.sortBy(_._3).reverse.head
         (projectPrioritisation.prioritise _)
-          .expects(*, 0)
-          .returning(List(ProjectIds(eventId.projectId, projectPath) -> MaxPriority))
+          .expects(*, *)
+          .returning(List(ProjectIds(eventIdOfTheNewestEvent.projectId, projectPath) -> MaxPriority))
       }
 
-      events foreach { _ =>
+      eventsPerProject foreach { _ =>
         eventLogFind.popEvent().unsafeRunSync() shouldBe a[Some[_]]
       }
 
-      findEvents(status = GeneratingTriples).eventIdsOnly should contain theSameElementsAs events.map(_._1)
+      findEvents(status = GeneratingTriples).eventIdsOnly should contain theSameElementsAs eventsPerProject.map {
+        case (_, list) => list.maxBy(_._3)._1
+      }.toList
 
-      givenPrioritisation(takes = Nil, totalOccupancy = events.size, returns = Nil)
+      givenPrioritisation(takes = Nil, totalOccupancy = eventsPerProject.size, returns = Nil)
 
       eventLogFind.popEvent().unsafeRunSync() shouldBe None
     }
@@ -268,6 +253,11 @@ private class AwaitingGenerationEventFinderSpec
     def givenPrioritisation(takes: List[ProjectInfo], totalOccupancy: Long, returns: List[(ProjectIds, Priority)]) =
       (projectPrioritisation.prioritise _)
         .expects(takes, totalOccupancy)
+        .returning(returns)
+
+    def givenPrioritisationAnyOccupancy(takes: List[ProjectInfo], returns: List[(ProjectIds, Priority)]) =
+      (projectPrioritisation.prioritise _)
+        .expects(takes, *)
         .returning(returns)
   }
 

@@ -80,7 +80,7 @@ private class TriplesGeneratedEventFinderSpec
         expectUnderTransformationGaugeIncrement(projectPath)
 
         givenPrioritisation(
-          takes = List(ProjectInfo(projectId, projectPath, latestEventDate, 1)),
+          takes = List(ProjectInfo(projectId, projectPath, latestEventDate, 0)),
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
@@ -124,7 +124,7 @@ private class TriplesGeneratedEventFinderSpec
         expectUnderTransformationGaugeIncrement(projectPath)
 
         givenPrioritisation(
-          takes = List(ProjectInfo(projectId, projectPath, latestEventDate, 1)),
+          takes = List(ProjectInfo(projectId, projectPath, latestEventDate, 0)),
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
@@ -197,7 +197,7 @@ private class TriplesGeneratedEventFinderSpec
         expectUnderTransformationGaugeIncrement(projectPath)
 
         givenPrioritisation(
-          takes = List(ProjectInfo(projectId, projectPath, List(event1Date, event2Date, event3Date).max, 1)),
+          takes = List(ProjectInfo(projectId, projectPath, List(event1Date, event2Date, event3Date).max, 0)),
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
@@ -230,7 +230,7 @@ private class TriplesGeneratedEventFinderSpec
 
       events foreach { case (eventId, _, eventDate, projectPath, _) =>
         givenPrioritisation(
-          takes = List(ProjectInfo(eventId.projectId, projectPath, eventDate, 1)),
+          takes = List(ProjectInfo(eventId.projectId, projectPath, eventDate, 0)),
           returns = List(ProjectIds(eventId.projectId, projectPath) -> MaxPriority)
         )
       }
