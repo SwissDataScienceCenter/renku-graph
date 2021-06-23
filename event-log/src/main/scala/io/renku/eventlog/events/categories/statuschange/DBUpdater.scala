@@ -45,6 +45,10 @@ private object DBUpdater {
       : LabeledHistogram[Interpretation, SqlStatement.Name] => DBUpdater[Interpretation, ToNew] =
     new ToNewUpdater(_)
 
+  implicit def factoryToAwaitingDeletionUpdater[Interpretation[_]: BracketThrow: Sync]
+      : LabeledHistogram[Interpretation, SqlStatement.Name] => DBUpdater[Interpretation, ToAwaitingDeletion] =
+    new ToAwaitingDeletionUpdater(_)
+
   implicit def factoryToAllEventsNewUpdater[Interpretation[_]: BracketThrow: Sync]
       : LabeledHistogram[Interpretation, SqlStatement.Name] => DBUpdater[Interpretation, AllEventsToNew] =
     new AllEventsToNewUpdater[Interpretation](_)

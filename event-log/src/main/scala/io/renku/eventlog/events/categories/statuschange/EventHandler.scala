@@ -54,6 +54,7 @@ private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurre
       requestAs[ToTriplesGenerated],
       requestAs[ToTriplesStore],
       requestAs[ToNew],
+      requestAs[ToAwaitingDeletion],
       requestAs[AllEventsToNew]
     )(request)
   }.merge
@@ -172,6 +173,19 @@ private object EventHandler {
                case status          => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
              }
       } yield ToNew(CompoundEventId(id, projectId), projectPath)
+  }
+
+  private implicit lazy val eventToAwaitingDeletionDecoder
+      : EventRequestContent => Either[DecodingFailure, ToAwaitingDeletion] = { case EventRequestContent(event, _) =>
+    for {
+      id          <- event.hcursor.downField("id").as[EventId]
+      projectId   <- event.hcursor.downField("project").downField("id").as[projects.Id]
+      projectPath <- event.hcursor.downField("project").downField("path").as[projects.Path]
+      _ <- event.hcursor.downField("newStatus").as[EventStatus].flatMap {
+             case EventStatus.AwaitingDeletion => Right(())
+             case status                       => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
+           }
+    } yield ToAwaitingDeletion(CompoundEventId(id, projectId), projectPath)
   }
 
   private implicit lazy val allEventNewDecoder: EventRequestContent => Either[DecodingFailure, AllEventsToNew] =

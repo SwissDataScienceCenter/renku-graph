@@ -69,6 +69,9 @@ class EventHandlerSpec
           .map(event => event -> None),
         toNewEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
+          .map(event => event -> None),
+        toAwaitingDeletionEvents
+          .map(stubUpdateStatuses(updateResult = ().pure[IO]))
           .map(event => event -> None)
       ).map(_.generateOne) foreach { case ((event, eventAsString), maybePayload) =>
         handler.handle(EventRequestContent(event.asJson, maybePayload)).unsafeRunSync() shouldBe Accepted
@@ -171,6 +174,16 @@ class EventHandlerSpec
         "path":       ${path.value}
       },
       "newStatus":    "NEW"
+    }"""
+    case StatusChangeEvent.ToAwaitingDeletion(eventId, path) =>
+      json"""{
+      "categoryName": "EVENTS_STATUS_CHANGE",
+      "id":           ${eventId.id.value},
+      "project": {
+        "id":         ${eventId.projectId.value},
+        "path":       ${path.value}
+      },
+      "newStatus":    "AWAITING_DELETION"
     }"""
   }
 

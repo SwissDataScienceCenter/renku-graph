@@ -58,6 +58,13 @@ private object StatusChangeEvent {
     }
   }
 
+  final case class ToAwaitingDeletion(eventId: CompoundEventId, projectPath: projects.Path) extends StatusChangeEvent
+  object ToAwaitingDeletion {
+    implicit lazy val show: Show[ToAwaitingDeletion] = Show.show { case ToAwaitingDeletion(eventId, projectPath) =>
+      s"$eventId, projectPath = $projectPath, status = $AwaitingDeletion"
+    }
+  }
+
   type AllEventsToNew = AllEventsToNew.type
   final case object AllEventsToNew extends StatusChangeEvent {
     implicit lazy val show: Show[AllEventsToNew] = Show.show { case AllEventsToNew =>

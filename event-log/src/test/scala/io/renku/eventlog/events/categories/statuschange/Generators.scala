@@ -43,4 +43,9 @@ private object Generators {
     eventId     <- compoundEventIds
     projectPath <- projectPaths
   } yield ToNew(eventId, projectPath)
+
+  lazy val toAwaitingDeletionEvents = for {
+    eventId     <- compoundEventIds
+    projectPath <- projectPaths
+  } yield ToAwaitingDeletion(eventId, projectPath)
 }
