@@ -22,7 +22,7 @@ import cats.Show
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime}
 import ch.datascience.graph.model.{SchemaVersion, projects}
-import io.renku.eventlog.EventPayload
+import io.renku.eventlog.{EventMessage, EventPayload}
 
 private sealed trait StatusChangeEvent extends Product with Serializable
 
@@ -45,6 +45,17 @@ private object StatusChangeEvent {
     implicit lazy val show: Show[ToTriplesGenerated] = Show.show {
       case ToTriplesGenerated(eventId, projectPath, _, _, _) =>
         s"$eventId, projectPath = $projectPath, status = $TriplesGenerated - update"
+    }
+  }
+
+  final case class ToGenerationRecoverableFailure(eventId:     CompoundEventId,
+                                                  projectPath: projects.Path,
+                                                  message:     EventMessage
+  ) extends StatusChangeEvent
+  object ToGenerationRecoverableFailure {
+    implicit lazy val show: Show[ToGenerationRecoverableFailure] = Show.show {
+      case ToGenerationRecoverableFailure(eventId, projectPath, _) =>
+        s"$eventId, projectPath = $projectPath, status = $GenerationRecoverableFailure - update"
     }
   }
 

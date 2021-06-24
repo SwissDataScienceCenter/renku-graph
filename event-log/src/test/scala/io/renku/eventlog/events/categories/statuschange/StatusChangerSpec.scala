@@ -151,6 +151,10 @@ class StatusChangerSpec
     case AllEventsToNew                              => Gen.const(DBUpdateResults.ForAllProjects)
     case ToTriplesGenerated(_, projectPath, _, _, _) => genUpdateResult(projectPath)
     case ToTriplesStore(_, projectPath, _)           => genUpdateResult(projectPath)
+    case ToGenerationRecoverableFailure(_, projectPath, _) =>
+      Gen.const(
+        DBUpdateResults.ForProjects(projectPath, Map(GeneratingTriples -> -1, GenerationRecoverableFailure -> 1))
+      )
     case RollbackToNew(_, projectPath) =>
       Gen.const(DBUpdateResults.ForProjects(projectPath, Map(GeneratingTriples -> -1, New -> 1)))
     case RollbackToTriplesGenerated(_, projectPath) =>

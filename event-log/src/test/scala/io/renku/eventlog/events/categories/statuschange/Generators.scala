@@ -39,6 +39,12 @@ private object Generators {
     processingTime <- eventProcessingTimes
   } yield ToTriplesStore(eventId, projectPath, processingTime)
 
+  lazy val toGenerationRecoverableFailureEvents = for {
+    eventId     <- compoundEventIds
+    projectPath <- projectPaths
+    message     <- eventMessages
+  } yield ToGenerationRecoverableFailure(eventId, projectPath, message)
+
   lazy val rollbackToNewEvents = for {
     eventId     <- compoundEventIds
     projectPath <- projectPaths

@@ -67,6 +67,9 @@ class EventHandlerSpec
         toTripleStoreEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
           .map(event => event -> None),
+        toGenerationRecoverableFailureEvents
+          .map(stubUpdateStatuses(updateResult = ().pure[IO]))
+          .map(event => event -> None),
         rollbackToNewEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
           .map(event => event -> None),
@@ -167,6 +170,17 @@ class EventHandlerSpec
       },
       "newStatus":    "TRIPLES_STORE",
       "processingTime": ${processingTime.value}
+    }"""
+    case StatusChangeEvent.ToGenerationRecoverableFailure(eventId, path, message) =>
+      json"""{
+      "categoryName": "EVENTS_STATUS_CHANGE",
+      "id":           ${eventId.id.value},
+      "project": {
+        "id":         ${eventId.projectId.value},
+        "path":       ${path.value}
+      },
+      "newStatus":    "GENERATION_RECOVERABLE_FAILURE",
+      "message":      ${message.value}
     }"""
     case StatusChangeEvent.RollbackToNew(eventId, path) =>
       json"""{
