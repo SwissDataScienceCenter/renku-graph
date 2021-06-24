@@ -92,7 +92,7 @@ class StatusChangerSpec
 
   private trait MockedTestCase {
 
-    val event = Gen.oneOf(toTriplesGeneratedEvents, toTripleStoreEvents, toNewEvents).generateOne
+    val event = Gen.oneOf(toTriplesGeneratedEvents, toTripleStoreEvents, rollbackToNewEvents).generateOne
 
     implicit val dbUpdater: DBUpdater[IO, StatusChangeEvent] = mock[DBUpdater[IO, StatusChangeEvent]]
 
@@ -153,6 +153,8 @@ class StatusChangerSpec
     case ToTriplesStore(_, projectPath, _)           => genUpdateResult(projectPath)
     case RollbackToNew(_, projectPath) =>
       Gen.const(DBUpdateResults.ForProjects(projectPath, Map(GeneratingTriples -> -1, New -> 1)))
+    case RollbackToTriplesGenerated(_, projectPath) =>
+      Gen.const(DBUpdateResults.ForProjects(projectPath, Map(TransformingTriples -> -1, TriplesGenerated -> 1)))
     case ToAwaitingDeletion(_, projectPath) =>
       Gen.const(DBUpdateResults.ForProjects(projectPath, Map(eventStatuses.generateOne -> -1, AwaitingDeletion -> 1)))
   }

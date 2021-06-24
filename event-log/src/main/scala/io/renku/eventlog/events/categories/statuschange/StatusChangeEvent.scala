@@ -31,7 +31,7 @@ private object StatusChangeEvent {
   final case class RollbackToNew(eventId: CompoundEventId, projectPath: projects.Path) extends StatusChangeEvent
   object RollbackToNew {
     implicit lazy val show: Show[RollbackToNew] = Show.show { case RollbackToNew(eventId, projectPath) =>
-      s"$eventId, projectPath = $projectPath, status = $New"
+      s"$eventId, projectPath = $projectPath, status = $New - rollback"
     }
   }
 
@@ -44,7 +44,16 @@ private object StatusChangeEvent {
   object ToTriplesGenerated {
     implicit lazy val show: Show[ToTriplesGenerated] = Show.show {
       case ToTriplesGenerated(eventId, projectPath, _, _, _) =>
-        s"$eventId, projectPath = $projectPath, status = $TriplesGenerated"
+        s"$eventId, projectPath = $projectPath, status = $TriplesGenerated - update"
+    }
+  }
+
+  final case class RollbackToTriplesGenerated(eventId: CompoundEventId, projectPath: projects.Path)
+      extends StatusChangeEvent
+  object RollbackToTriplesGenerated {
+    implicit lazy val show: Show[RollbackToTriplesGenerated] = Show.show {
+      case RollbackToTriplesGenerated(eventId, projectPath) =>
+        s"$eventId, projectPath = $projectPath, status = $TriplesGenerated - rollback"
     }
   }
 
@@ -54,7 +63,7 @@ private object StatusChangeEvent {
   ) extends StatusChangeEvent
   object ToTriplesStore {
     implicit lazy val show: Show[ToTriplesStore] = Show.show { case ToTriplesStore(eventId, projectPath, _) =>
-      s"$eventId, projectPath = $projectPath, status = $TriplesStore"
+      s"$eventId, projectPath = $projectPath, status = $TriplesStore - update"
     }
   }
 
@@ -67,9 +76,7 @@ private object StatusChangeEvent {
 
   type AllEventsToNew = AllEventsToNew.type
   final case object AllEventsToNew extends StatusChangeEvent {
-    implicit lazy val show: Show[AllEventsToNew] = Show.show { case AllEventsToNew =>
-      s"All events status = $New"
-    }
+    implicit lazy val show: Show[AllEventsToNew] = Show.show(_ => s"status = $New")
   }
 
   implicit def show[E <: StatusChangeEvent](implicit concreteShow: Show[E]): Show[E] = concreteShow

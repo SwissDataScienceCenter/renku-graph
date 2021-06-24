@@ -67,7 +67,10 @@ class EventHandlerSpec
         toTripleStoreEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
           .map(event => event -> None),
-        toNewEvents
+        rollbackToNewEvents
+          .map(stubUpdateStatuses(updateResult = ().pure[IO]))
+          .map(event => event -> None),
+        rollbackToTriplesGeneratedEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
           .map(event => event -> None),
         toAwaitingDeletionEvents
@@ -174,6 +177,16 @@ class EventHandlerSpec
         "path":       ${path.value}
       },
       "newStatus":    "NEW"
+    }"""
+    case StatusChangeEvent.RollbackToTriplesGenerated(eventId, path) =>
+      json"""{
+      "categoryName": "EVENTS_STATUS_CHANGE",
+      "id":           ${eventId.id.value},
+      "project": {
+        "id":         ${eventId.projectId.value},
+        "path":       ${path.value}
+      },
+      "newStatus":    "TRIPLES_GENERATED"
     }"""
     case StatusChangeEvent.ToAwaitingDeletion(eventId, path) =>
       json"""{

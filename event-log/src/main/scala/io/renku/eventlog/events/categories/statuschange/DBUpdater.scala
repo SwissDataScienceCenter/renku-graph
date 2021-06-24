@@ -41,9 +41,13 @@ private object DBUpdater {
       : LabeledHistogram[Interpretation, SqlStatement.Name] => DBUpdater[Interpretation, ToTriplesStore] =
     new ToTriplesStoreUpdater(_)
 
-  implicit def factoryToNewUpdater[Interpretation[_]: BracketThrow: Sync]
+  implicit def factoryRollbackToNewUpdater[Interpretation[_]: BracketThrow: Sync]
       : LabeledHistogram[Interpretation, SqlStatement.Name] => DBUpdater[Interpretation, RollbackToNew] =
     new RollbackToNewUpdater(_)
+
+  implicit def factoryRollbackToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow: Sync]
+      : LabeledHistogram[Interpretation, SqlStatement.Name] => DBUpdater[Interpretation, RollbackToTriplesGenerated] =
+    new RollbackToTriplesGeneratedUpdater(_)
 
   implicit def factoryToAwaitingDeletionUpdater[Interpretation[_]: BracketThrow: Sync]
       : LabeledHistogram[Interpretation, SqlStatement.Name] => DBUpdater[Interpretation, ToAwaitingDeletion] =

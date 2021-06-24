@@ -22,19 +22,61 @@ import cats.data.Kleisli
 import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl, subscriberIds, subscriberUrls}
 import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators.timestampsNotInTheFuture
+import ch.datascience.graph.model.EventsGenerators.{eventBodies, eventIds, eventProcessingTimes}
 import ch.datascience.graph.model.GraphModelGenerators.{projectPaths, projectSchemaVersions}
 import ch.datascience.graph.model.events.EventStatus.{AwaitingDeletion, TransformationRecoverableFailure, TransformingTriples, TriplesGenerated, TriplesStore}
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.model.{SchemaVersion, projects}
 import ch.datascience.microservices.MicroserviceBaseUrl
+import io.renku.eventlog.EventContentGenerators.{eventMessages, eventPayloads}
 import skunk._
 import skunk.implicits._
 
 import java.time.Instant
+import scala.util.Random
 
 trait EventLogDataProvisioning {
   self: InMemoryEventLogDb =>
+
+  protected def storeGeneratedEvent(status:      EventStatus,
+                                    eventDate:   EventDate,
+                                    projectId:   projects.Id,
+                                    projectPath: projects.Path
+  ): (EventId, EventStatus, Option[EventMessage], Option[EventPayload], List[EventProcessingTime]) = {
+    val eventId = CompoundEventId(eventIds.generateOne, projectId)
+    val maybeMessage = status match {
+      case _: EventStatus.FailureStatus => eventMessages.generateSome
+      case _ => eventMessages.generateOption
+    }
+    val maybePayload = status match {
+      case TriplesGenerated | TransformingTriples | TriplesStore => eventPayloads.generateSome
+      case AwaitingDeletion                                      => eventPayloads.generateOption
+      case _                                                     => eventPayloads.generateNone
+    }
+    storeEvent(
+      eventId,
+      status,
+      timestampsNotInTheFuture.generateAs(ExecutionDate),
+      eventDate,
+      eventBodies.generateOne,
+      projectPath = projectPath,
+      maybeMessage = maybeMessage,
+      maybeEventPayload = maybePayload
+    )
+
+    val processingTimes = status match {
+      case TriplesGenerated | TriplesStore => List(eventProcessingTimes.generateOne)
+      case AwaitingDeletion =>
+        if (Random.nextBoolean()) List(eventProcessingTimes.generateOne)
+        else Nil
+      case _ => Nil
+    }
+    processingTimes.foreach(upsertProcessingTime(eventId, status, _))
+
+    (eventId.id, status, maybeMessage, maybePayload, processingTimes)
+  }
 
   protected def storeEvent(compoundEventId:      CompoundEventId,
                            eventStatus:          EventStatus,

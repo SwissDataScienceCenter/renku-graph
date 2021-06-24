@@ -18,7 +18,6 @@
 
 package io.renku.eventlog.events.categories.statuschange
 
-import cats.effect.IO
 import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.timestampsNotInTheFuture
@@ -28,8 +27,8 @@ import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventStatus}
 import EventStatus._
 import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
-import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.RollbackToNew
 import io.renku.eventlog._
+import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.RollbackToTriplesGenerated
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -37,7 +36,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant
 
-class RollbackToNewUpdaterSpec
+class RollbackToTriplesGeneratedUpdaterSpec
     extends AnyWordSpec
     with InMemoryEventLogDbSpec
     with TypeSerializers
@@ -46,32 +45,32 @@ class RollbackToNewUpdaterSpec
 
   "updateDB" should {
 
-    s"change the status of the given event from $GeneratingTriples to $New" in new TestCase {
+    s"change the status of the given event from $TransformingTriples to $TriplesGenerated" in new TestCase {
 
-      val eventId      = addEvent(GeneratingTriples)
-      val otherEventId = addEvent(GeneratingTriples)
+      val eventId      = addEvent(TransformingTriples)
+      val otherEventId = addEvent(TransformingTriples)
 
       sessionResource
-        .useK(dbUpdater.updateDB(RollbackToNew(CompoundEventId(eventId, projectId), projectPath)))
+        .useK(dbUpdater updateDB RollbackToTriplesGenerated(CompoundEventId(eventId, projectId), projectPath))
         .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
         projectPath,
-        Map(GeneratingTriples -> -1, New -> 1)
+        Map(TransformingTriples -> -1, TriplesGenerated -> 1)
       )
 
-      findEvent(CompoundEventId(eventId, projectId)).map(_._2)      shouldBe Some(New)
-      findEvent(CompoundEventId(otherEventId, projectId)).map(_._2) shouldBe Some(GeneratingTriples)
+      findEvent(CompoundEventId(eventId, projectId)).map(_._2)      shouldBe Some(TriplesGenerated)
+      findEvent(CompoundEventId(otherEventId, projectId)).map(_._2) shouldBe Some(TransformingTriples)
     }
 
-    s"fail if the given event is not in the $GeneratingTriples status" in new TestCase {
+    s"fail if the given event is not in the $TransformingTriples status" in new TestCase {
 
-      val invalidStatus = Gen.oneOf(EventStatus.all.filterNot(_ == GeneratingTriples)).generateOne
+      val invalidStatus = Gen.oneOf(EventStatus.all.filterNot(_ == TransformingTriples)).generateOne
       val eventId       = addEvent(invalidStatus)
 
       intercept[Exception] {
         sessionResource
-          .useK(dbUpdater.updateDB(RollbackToNew(CompoundEventId(eventId, projectId), projectPath)))
+          .useK(dbUpdater updateDB RollbackToTriplesGenerated(CompoundEventId(eventId, projectId), projectPath))
           .unsafeRunSync()
-      }.getMessage shouldBe s"Could not rollback event ${CompoundEventId(eventId, projectId)} to status $New"
+      }.getMessage shouldBe s"Could not rollback event ${CompoundEventId(eventId, projectId)} to status $TriplesGenerated"
 
       findEvent(CompoundEventId(eventId, projectId)).map(_._2) shouldBe Some(invalidStatus)
     }
@@ -84,7 +83,7 @@ class RollbackToNewUpdaterSpec
 
     val currentTime      = mockFunction[Instant]
     val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val dbUpdater        = new RollbackToNewUpdater[IO](queriesExecTimes, currentTime)
+    val dbUpdater        = new RollbackToTriplesGeneratedUpdater(queriesExecTimes, currentTime)
 
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()

@@ -39,10 +39,15 @@ private object Generators {
     processingTime <- eventProcessingTimes
   } yield ToTriplesStore(eventId, projectPath, processingTime)
 
-  lazy val toNewEvents = for {
+  lazy val rollbackToNewEvents = for {
     eventId     <- compoundEventIds
     projectPath <- projectPaths
   } yield RollbackToNew(eventId, projectPath)
+
+  lazy val rollbackToTriplesGeneratedEvents = for {
+    eventId     <- compoundEventIds
+    projectPath <- projectPaths
+  } yield RollbackToTriplesGenerated(eventId, projectPath)
 
   lazy val toAwaitingDeletionEvents = for {
     eventId     <- compoundEventIds
