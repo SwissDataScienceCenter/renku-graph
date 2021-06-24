@@ -28,20 +28,20 @@ import ch.datascience.metrics.LabeledHistogram
 import eu.timepit.refined.auto._
 import io.renku.eventlog.ExecutionDate
 import io.renku.eventlog.TypeSerializers._
-import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.ToNew
+import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.RollbackToNew
 import skunk.data.Completion
 import skunk.implicits._
 import skunk.~
 
 import java.time.Instant
 
-private class ToNewUpdater[Interpretation[_]: BracketThrow: Sync](
+private class RollbackToNewUpdater[Interpretation[_]: BracketThrow: Sync](
     queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
-    with DBUpdater[Interpretation, ToNew] {
+    with DBUpdater[Interpretation, RollbackToNew] {
 
-  override def updateDB(event: ToNew): UpdateResult[Interpretation] = measureExecutionTime {
+  override def updateDB(event: RollbackToNew): UpdateResult[Interpretation] = measureExecutionTime {
     SqlStatement[Interpretation](name = "to_new - status update")
       .command[ExecutionDate ~ EventId ~ projects.Id](
         sql"""UPDATE event

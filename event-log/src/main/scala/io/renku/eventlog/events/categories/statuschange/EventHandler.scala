@@ -53,7 +53,7 @@ private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurre
     fromEither[Interpretation](request.event.validateCategoryName) >> tryHandle(
       requestAs[ToTriplesGenerated],
       requestAs[ToTriplesStore],
-      requestAs[ToNew],
+      requestAs[RollbackToNew],
       requestAs[ToAwaitingDeletion],
       requestAs[AllEventsToNew]
     )(request)
@@ -162,7 +162,7 @@ private object EventHandler {
       } yield ToTriplesStore(CompoundEventId(id, projectId), projectPath, processingTime)
   }
 
-  private implicit lazy val eventToNewDecoder: EventRequestContent => Either[DecodingFailure, ToNew] = {
+  private implicit lazy val eventToNewDecoder: EventRequestContent => Either[DecodingFailure, RollbackToNew] = {
     case EventRequestContent(event, _) =>
       for {
         id          <- event.hcursor.downField("id").as[EventId]
@@ -172,7 +172,7 @@ private object EventHandler {
                case EventStatus.New => Right(())
                case status          => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
              }
-      } yield ToNew(CompoundEventId(id, projectId), projectPath)
+      } yield RollbackToNew(CompoundEventId(id, projectId), projectPath)
   }
 
   private implicit lazy val eventToAwaitingDeletionDecoder

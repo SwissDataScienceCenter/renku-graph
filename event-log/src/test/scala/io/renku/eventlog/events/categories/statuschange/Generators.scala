@@ -42,7 +42,7 @@ private object Generators {
   lazy val toNewEvents = for {
     eventId     <- compoundEventIds
     projectPath <- projectPaths
-  } yield ToNew(eventId, projectPath)
+  } yield RollbackToNew(eventId, projectPath)
 
   lazy val toAwaitingDeletionEvents = for {
     eventId     <- compoundEventIds

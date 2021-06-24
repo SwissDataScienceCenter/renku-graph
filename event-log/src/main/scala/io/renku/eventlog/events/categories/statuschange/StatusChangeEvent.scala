@@ -28,9 +28,9 @@ private sealed trait StatusChangeEvent extends Product with Serializable
 
 private object StatusChangeEvent {
 
-  final case class ToNew(eventId: CompoundEventId, projectPath: projects.Path) extends StatusChangeEvent
-  object ToNew {
-    implicit lazy val show: Show[ToNew] = Show.show { case ToNew(eventId, projectPath) =>
+  final case class RollbackToNew(eventId: CompoundEventId, projectPath: projects.Path) extends StatusChangeEvent
+  object RollbackToNew {
+    implicit lazy val show: Show[RollbackToNew] = Show.show { case RollbackToNew(eventId, projectPath) =>
       s"$eventId, projectPath = $projectPath, status = $New"
     }
   }

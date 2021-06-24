@@ -165,7 +165,7 @@ class EventHandlerSpec
       "newStatus":    "TRIPLES_STORE",
       "processingTime": ${processingTime.value}
     }"""
-    case StatusChangeEvent.ToNew(eventId, path) =>
+    case StatusChangeEvent.RollbackToNew(eventId, path) =>
       json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",
       "id":           ${eventId.id.value},

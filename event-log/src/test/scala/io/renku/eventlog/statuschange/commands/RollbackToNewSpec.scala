@@ -41,7 +41,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant
 
-class ToNewSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory with should.Matchers {
+class RollbackToNewSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory with should.Matchers {
 
   "command" should {
 

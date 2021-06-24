@@ -28,7 +28,7 @@ import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventStatus}
 import EventStatus._
 import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
-import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.ToNew
+import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.RollbackToNew
 import io.renku.eventlog._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -37,7 +37,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant
 
-class ToNewUpdaterSpec
+class RollbackToNewUpdaterSpec
     extends AnyWordSpec
     with InMemoryEventLogDbSpec
     with TypeSerializers
@@ -52,7 +52,7 @@ class ToNewUpdaterSpec
       val otherEventId = addEvent(GeneratingTriples)
 
       sessionResource
-        .useK(dbUpdater.updateDB(ToNew(CompoundEventId(eventId, projectId), projectPath)))
+        .useK(dbUpdater.updateDB(RollbackToNew(CompoundEventId(eventId, projectId), projectPath)))
         .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
         projectPath,
         Map(GeneratingTriples -> -1, New -> 1)
@@ -69,7 +69,7 @@ class ToNewUpdaterSpec
 
       intercept[Exception] {
         sessionResource
-          .useK(dbUpdater.updateDB(ToNew(CompoundEventId(eventId, projectId), projectPath)))
+          .useK(dbUpdater.updateDB(RollbackToNew(CompoundEventId(eventId, projectId), projectPath)))
           .unsafeRunSync()
       }.getMessage shouldBe s"Could not update event ${CompoundEventId(eventId, projectId)} to status $New"
 
@@ -84,7 +84,7 @@ class ToNewUpdaterSpec
 
     val currentTime      = mockFunction[Instant]
     val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val dbUpdater        = new ToNewUpdater[IO](queriesExecTimes, currentTime)
+    val dbUpdater        = new RollbackToNewUpdater[IO](queriesExecTimes, currentTime)
 
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()

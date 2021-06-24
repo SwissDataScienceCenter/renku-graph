@@ -151,7 +151,7 @@ class StatusChangerSpec
     case AllEventsToNew                              => Gen.const(DBUpdateResults.ForAllProjects)
     case ToTriplesGenerated(_, projectPath, _, _, _) => genUpdateResult(projectPath)
     case ToTriplesStore(_, projectPath, _)           => genUpdateResult(projectPath)
-    case ToNew(_, projectPath) =>
+    case RollbackToNew(_, projectPath) =>
       Gen.const(DBUpdateResults.ForProjects(projectPath, Map(GeneratingTriples -> -1, New -> 1)))
     case ToAwaitingDeletion(_, projectPath) =>
       Gen.const(DBUpdateResults.ForProjects(projectPath, Map(eventStatuses.generateOne -> -1, AwaitingDeletion -> 1)))
