@@ -108,7 +108,17 @@ Changes the status of events. The events for which the status will be changed ar
 }
 ```
 
-####Changing status of the specified event from `GENERATING_TRIPLES` to `GENERATION_RECOVERABLE_FAILURE`
+####Changing status of the specified event from processing statuses to failure statuses
+
+**Allowed combinations**
+
+| Processing status    | Failure status                         |
+| -------------------- | -------------------------------------- |
+| GENERATING_TRIPLES   | GENERATION_NON_RECOVERABLE_FAILURE     |
+| GENERATING_TRIPLES   | GENERATION_RECOVERABLE_FAILURE         |
+| TRANSFORMING_TRIPLES | TRANSFORMATION_NON_RECOVERABLE_FAILURE |
+| TRANSFORMING_TRIPLES | TRANSFORMATION_RECOVERABLE_FAILURE     |
+
 
 **Multipart Request**
 
@@ -122,7 +132,7 @@ Changes the status of events. The events for which the status will be changed ar
     "id":   12,
     "path": "namespace/project-name"
   },
-  "newStatus": "GENERATION_RECOVERABLE_FAILURE"
+  "newStatus": "<failure status>"
 }
 ```
 

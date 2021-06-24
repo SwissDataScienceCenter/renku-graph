@@ -18,10 +18,12 @@
 
 package io.renku.eventlog.events.categories.statuschange
 
-import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.EventsGenerators._
-import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent._
+import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.events.EventStatus._
 import io.renku.eventlog.EventContentGenerators._
+import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent._
+import org.scalacheck.Gen
 
 private object Generators {
 
@@ -39,11 +41,17 @@ private object Generators {
     processingTime <- eventProcessingTimes
   } yield ToTriplesStore(eventId, projectPath, processingTime)
 
-  lazy val toGenerationRecoverableFailureEvents = for {
+  lazy val toFailureEvents = for {
     eventId     <- compoundEventIds
     projectPath <- projectPaths
     message     <- eventMessages
-  } yield ToGenerationRecoverableFailure(eventId, projectPath, message)
+    event <- Gen.oneOf(
+               ToFailure(eventId, projectPath, message, GeneratingTriples, GenerationRecoverableFailure),
+               ToFailure(eventId, projectPath, message, GeneratingTriples, GenerationNonRecoverableFailure),
+               ToFailure(eventId, projectPath, message, TransformingTriples, TransformationRecoverableFailure),
+               ToFailure(eventId, projectPath, message, TransformingTriples, TransformationNonRecoverableFailure)
+             )
+  } yield event
 
   lazy val rollbackToNewEvents = for {
     eventId     <- compoundEventIds

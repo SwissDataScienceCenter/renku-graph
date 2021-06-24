@@ -28,7 +28,7 @@ import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
 import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult}
-import ch.datascience.graph.model.events.EventStatus.{AwaitingDeletion, GenerationRecoverableFailure, New, TriplesGenerated, TriplesStore}
+import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples, _}
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.{SchemaVersion, projects}
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
@@ -54,7 +54,7 @@ private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurre
     fromEither[Interpretation](request.event.validateCategoryName) >> tryHandle(
       requestAs[ToTriplesGenerated],
       requestAs[ToTriplesStore],
-      requestAs[ToGenerationRecoverableFailure],
+      requestAs[ToFailure[ProcessingStatus, FailureStatus]],
       requestAs[RollbackToNew],
       requestAs[RollbackToTriplesGenerated],
       requestAs[ToAwaitingDeletion],
@@ -165,19 +165,29 @@ private object EventHandler {
       } yield ToTriplesStore(CompoundEventId(id, projectId), projectPath, processingTime)
   }
 
-  private implicit lazy val eventGenerationRecoverableFailureDecoder
-      : EventRequestContent => Either[DecodingFailure, ToGenerationRecoverableFailure] = {
+  private implicit lazy val eventFailureDecoder
+      : EventRequestContent => Either[DecodingFailure, ToFailure[ProcessingStatus, FailureStatus]] = {
     case EventRequestContent(event, _) =>
       for {
         id          <- event.hcursor.downField("id").as[EventId]
         projectId   <- event.hcursor.downField("project").downField("id").as[projects.Id]
         projectPath <- event.hcursor.downField("project").downField("path").as[projects.Path]
         message     <- event.hcursor.downField("message").as[EventMessage]
-        _ <- event.hcursor.downField("newStatus").as[EventStatus].flatMap {
-               case GenerationRecoverableFailure => Right(())
-               case status                       => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
-             }
-      } yield ToGenerationRecoverableFailure(CompoundEventId(id, projectId), projectPath, message)
+        eventId = CompoundEventId(id, projectId)
+        statusChangeEvent <- event.hcursor.downField("newStatus").as[EventStatus].flatMap {
+                               case status: GenerationRecoverableFailure =>
+                                 ToFailure(eventId, projectPath, message, GeneratingTriples, status).asRight
+                               case status: GenerationNonRecoverableFailure =>
+                                 ToFailure(eventId, projectPath, message, GeneratingTriples, status).asRight
+                               case status: TransformationRecoverableFailure =>
+                                 ToFailure(eventId, projectPath, message, TransformingTriples, status).asRight
+                               case status: TransformationNonRecoverableFailure =>
+                                 ToFailure(eventId, projectPath, message, TransformingTriples, status).asRight
+                               case status =>
+                                 DecodingFailure(s"Unrecognized event status $status", Nil)
+                                   .asLeft[ToFailure[ProcessingStatus, FailureStatus]]
+                             }
+      } yield statusChangeEvent
   }
 
   private implicit lazy val eventRollbackToNewDecoder: EventRequestContent => Either[DecodingFailure, RollbackToNew] = {

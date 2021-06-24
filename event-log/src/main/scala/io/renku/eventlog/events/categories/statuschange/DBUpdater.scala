@@ -20,6 +20,7 @@ package io.renku.eventlog.events.categories.statuschange
 
 import cats.effect.{BracketThrow, Sync}
 import ch.datascience.db.SqlStatement
+import ch.datascience.graph.model.events.EventStatus.{FailureStatus, ProcessingStatus}
 import ch.datascience.metrics.LabeledHistogram
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent._
 
@@ -41,10 +42,10 @@ private object DBUpdater {
       : LabeledHistogram[Interpretation, SqlStatement.Name] => DBUpdater[Interpretation, ToTriplesStore] =
     new ToTriplesStoreUpdater(_)
 
-  implicit def factoryToGenerationRecoverableFailureUpdater[Interpretation[_]: BracketThrow: Sync]
+  implicit def factoryToFailureUpdater[Interpretation[_]: BracketThrow: Sync]
       : LabeledHistogram[Interpretation, SqlStatement.Name] => DBUpdater[Interpretation,
-                                                                         ToGenerationRecoverableFailure
-      ] = new ToGenerationRecoverableFailureUpdater(_)
+                                                                         ToFailure[ProcessingStatus, FailureStatus]
+      ] = new ToFailureUpdater(_)
 
   implicit def factoryRollbackToNewUpdater[Interpretation[_]: BracketThrow: Sync]
       : LabeledHistogram[Interpretation, SqlStatement.Name] => DBUpdater[Interpretation, RollbackToNew] =

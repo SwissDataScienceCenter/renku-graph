@@ -107,8 +107,10 @@ object events {
       override val value: String = "NEW"
     }
 
+    sealed trait ProcessingStatus extends EventStatus
+
     type GeneratingTriples = GeneratingTriples.type
-    final case object GeneratingTriples extends EventStatus {
+    final case object GeneratingTriples extends EventStatus with ProcessingStatus {
       override val value: String = "GENERATING_TRIPLES"
     }
 
@@ -118,7 +120,7 @@ object events {
     }
 
     type TransformingTriples = TransformingTriples.type
-    final case object TransformingTriples extends EventStatus {
+    final case object TransformingTriples extends EventStatus with ProcessingStatus {
       override val value: String = "TRANSFORMING_TRIPLES"
     }
 

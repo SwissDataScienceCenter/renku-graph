@@ -48,16 +48,30 @@ private object StatusChangeEvent {
     }
   }
 
-  final case class ToGenerationRecoverableFailure(eventId:     CompoundEventId,
-                                                  projectPath: projects.Path,
-                                                  message:     EventMessage
-  ) extends StatusChangeEvent
-  object ToGenerationRecoverableFailure {
-    implicit lazy val show: Show[ToGenerationRecoverableFailure] = Show.show {
-      case ToGenerationRecoverableFailure(eventId, projectPath, _) =>
-        s"$eventId, projectPath = $projectPath, status = $GenerationRecoverableFailure - update"
+  final case class ToFailure[+C <: ProcessingStatus, +N <: FailureStatus](eventId:       CompoundEventId,
+                                                                          projectPath:   projects.Path,
+                                                                          message:       EventMessage,
+                                                                          currentStatus: C,
+                                                                          newStatus:     N
+  )(implicit evidence:                                                                   AllowedCombination[C, N])
+      extends StatusChangeEvent
+  object ToFailure {
+    implicit lazy val show: Show[ToFailure[ProcessingStatus, FailureStatus]] = Show.show {
+      case ToFailure(eventId, projectPath, _, _, newStatus) =>
+        s"$eventId, projectPath = $projectPath, status = $newStatus - update"
     }
   }
+
+  sealed trait AllowedCombination[C <: ProcessingStatus, N <: FailureStatus]
+
+  implicit object GenerationToNonRecoverableFailure
+      extends AllowedCombination[GeneratingTriples, GenerationNonRecoverableFailure]
+  implicit object GenerationToRecoverableFailure
+      extends AllowedCombination[GeneratingTriples, GenerationRecoverableFailure]
+  implicit object TransformationToNonRecoverableFailure
+      extends AllowedCombination[TransformingTriples, TransformationNonRecoverableFailure]
+  implicit object TransformationToRecoverableFailure
+      extends AllowedCombination[TransformingTriples, TransformationRecoverableFailure]
 
   final case class RollbackToTriplesGenerated(eventId: CompoundEventId, projectPath: projects.Path)
       extends StatusChangeEvent

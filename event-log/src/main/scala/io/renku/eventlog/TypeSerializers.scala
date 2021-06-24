@@ -81,6 +81,10 @@ trait TypeSerializers {
 
   val eventStatusDecoder: Decoder[EventStatus] = varchar.map(EventStatus.apply)
   val eventStatusEncoder: Encoder[EventStatus] = varchar.values.contramap(_.value)
+  val eventProcessingStatusEncoder: Encoder[EventStatus.ProcessingStatus] =
+    eventStatusEncoder.contramap((s: EventStatus.ProcessingStatus) => s: EventStatus)
+  val eventFailureStatusEncoder: Encoder[EventStatus.FailureStatus] =
+    eventStatusEncoder.contramap((s: EventStatus.FailureStatus) => s: EventStatus)
 
   val schemaVersionDecoder: Decoder[SchemaVersion] = text.map(SchemaVersion.apply)
   val schemaVersionEncoder: Encoder[SchemaVersion] = text.values.contramap(_.value)
