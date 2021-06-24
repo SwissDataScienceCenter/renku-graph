@@ -8,7 +8,6 @@ This is a microservice which provides CRUD operations for Event Log DB.
 |--------|-----------------------------------------|----------------------------------------------------------------|
 |  GET   | ```/events/:event-id/:project-id```     | Retrieve chosen event's data                                   |
 |  POST  | ```/events```                           | Send an event for processing                                   |
-|  PATCH | ```/events/:event-id/:project-id```     | Updates chosen event's data                                    |
 |  GET   | ```/metrics```                          | Returns Prometheus metrics of the service                      |
 |  GET   | ```/ping```                             | Verifies service health                                        |
 |  GET   | ```/processing-status?project-id=:id``` | Finds processing status of events belonging to a project       |
@@ -288,112 +287,6 @@ To fetch various Prometheus metrics of the service.
 |----------------------------|------------------------|
 | OK (200)                   | Containing the metrics |
 | INTERNAL SERVER ERROR (500)| Otherwise              |
-
-#### PATCH /events/:event-id/:project-id
-
-Updates event's data with the given payload.
-
-**Request**
-
-Currently, only status changing payloads are allowed:
-
-- for transitioning event from status `GENERATING_TRIPLES` to `NEW`
-- each status transition can optionally provide a processing_time for the status change in the ISO_8601 format
-  PnDTnHnMn.nS
-
-```json
-{
-  "status": "NEW",
-  "processing_time (optional)": "PT2.023S"
-}
-```
-
-- for transitioning event from status `TRIPLES_GENERATED` to `TRIPLES_STORE`
-
-```json
-{
-  "status": "TRIPLES_STORE",
-  "processing_time (optional)": "PT2.023S"
-}
-```
-
-- for transitioning event from status `GENERATING_TRIPLES` to `TRIPLES_GENERATED`
-- a multipart request is required with the `event` part as follow
-
-```json
-{
-  "status": "TRIPLES_GENERATED",
-  "processing_time (optional)": "PT2.023S"
-}
-
-```
-
-- and a `payload` part as a __STRING encoded json__
-
-```json
-{
-  "payload": "json-ld as string",
-  "schemaVersion": "schema version of the triples"
-}
-```
-
-- for transitioning event from status `GENERATING_TRIPLES` to `GENERATION_RECOVERABLE_FAILURE`
-
-```json
-{
-  "status": "GENERATION_RECOVERABLE_FAILURE",
-  "message": "error message",
-  "processing_time (optional)": "PT2.023S"
-}
-```
-
-- for transitioning event from status `GENERATING_TRIPLES` to `GENERATION_NON_RECOVERABLE_FAILURE`
-
-```json
-{
-  "status": "GENERATION_NON_RECOVERABLE_FAILURE",
-  "message": "error message",
-  "processing_time (optional)": "PT2.023S"
-}
-```
-
-- for transitioning event from status `TRANSFORMING_TRIPLES` to `TRANSFORMATION_RECOVERABLE_FAILURE`
-
-```json
-{
-  "status": "TRANSFORMATION_RECOVERABLE_FAILURE",
-  "message": "error message",
-  "processing_time (optional)": "PT15M"
-}
-```
-
-- for transitioning event from status `TRANSFORMING_TRIPLES` to `TRANSFORMATION_NON_RECOVERABLE_FAILURE`
-
-```json
-{
-  "status": "TRANSFORMATION_NON_RECOVERABLE_FAILURE",
-  "message": "error message",
-  "processing_time (optional)": "P2DT3H4M"
-}
-```
-
-- for transitioning event from any status to `AWAITING_DELETION`
-
-```json
-{
-  "status": "AWAITING_DELETION",
-  "processing_time (optional)": "PT15M"
-}
-```
-
-**Response**
-
-| Status                     | Description                                                                 |
-|----------------------------|-----------------------------------------------------------------------------|
-| OK (200)                   | If status update is successful                                              |
-| BAD_REQUEST (400)          | When invalid payload is given                                               |
-| NOT_FOUND (404)            | When the event does not exists                                              |
-| INTERNAL SERVER ERROR (500)| When some problems occurs                                                   |
 
 #### GET /ping
 

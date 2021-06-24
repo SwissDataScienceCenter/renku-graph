@@ -36,7 +36,6 @@ import io.renku.eventlog.events.EventEndpoint
 import io.renku.eventlog.init.DbInitializer
 import io.renku.eventlog.metrics._
 import io.renku.eventlog.processingstatus.IOProcessingStatusEndpoint
-import io.renku.eventlog.statuschange.IOStatusChangeEndpoint
 import io.renku.eventlog.subscriptions._
 import natchez.Trace.Implicits.noop
 import pureconfig.ConfigSource
@@ -109,15 +108,6 @@ object Microservice extends IOMicroservice {
                                   )
         eventEndpoint            <- EventEndpoint(eventConsumersRegistry)
         processingStatusEndpoint <- IOProcessingStatusEndpoint(sessionResource, queriesExecTimes, ApplicationLogger)
-        statusChangeEndpoint <- IOStatusChangeEndpoint(
-                                  sessionResource,
-                                  awaitingGenerationGauge,
-                                  underTriplesGenerationGauge,
-                                  awaitingTransformationGauge,
-                                  underTransformationGauge,
-                                  queriesExecTimes,
-                                  ApplicationLogger
-                                )
         eventProducersRegistry <- EventProducersRegistry(
                                     sessionResource,
                                     awaitingGenerationGauge,
@@ -132,7 +122,6 @@ object Microservice extends IOMicroservice {
         microserviceRoutes = new MicroserviceRoutes[IO](
                                eventEndpoint,
                                processingStatusEndpoint,
-                               statusChangeEndpoint,
                                subscriptionsEndpoint,
                                eventDetailsEndpoint,
                                new RoutesMetrics[IO](metricsRegistry)

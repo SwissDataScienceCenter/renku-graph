@@ -25,9 +25,9 @@ import ch.datascience.control.Throttler
 import ch.datascience.data.ErrorMessage
 import ch.datascience.events.consumers.EventRequestContent
 import ch.datascience.graph.config.EventLogUrl
-import ch.datascience.graph.model.{SchemaVersion, projects}
 import ch.datascience.graph.model.events.EventStatus.FailureStatus
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventProcessingTime, EventStatus}
+import ch.datascience.graph.model.{SchemaVersion, projects}
 import ch.datascience.http.client.RestClient
 import ch.datascience.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
 import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
@@ -36,7 +36,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import org.http4s.Method.POST
 import org.http4s.Status.{BadGateway, GatewayTimeout, ServiceUnavailable}
-import org.http4s.{Method, Status, Uri}
+import org.http4s.{Status, Uri}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -56,9 +56,15 @@ private trait EventStatusUpdater[Interpretation[_]] {
                      processingTime: EventProcessingTime
   ): Interpretation[Unit]
 
-  def rollback[S <: EventStatus](eventId: CompoundEventId)(implicit rollbackStatus: () => S): Interpretation[Unit]
+  def rollback[S <: EventStatus](eventId: CompoundEventId, projectPath: projects.Path)(implicit
+      rollbackStatus:                     () => S
+  ): Interpretation[Unit]
 
-  def toFailure(eventId: CompoundEventId, eventStatus: FailureStatus, exception: Throwable): Interpretation[Unit]
+  def toFailure(eventId:     CompoundEventId,
+                projectPath: projects.Path,
+                eventStatus: FailureStatus,
+                exception:   Throwable
+  ): Interpretation[Unit]
 }
 
 private class EventStatusUpdaterImpl[Interpretation[_]: ConcurrentEffect: Timer](
@@ -81,7 +87,6 @@ private class EventStatusUpdaterImpl[Interpretation[_]: ConcurrentEffect: Timer]
 
   import cats.effect._
   import io.circe.literal._
-  import org.http4s.Method.PATCH
   import org.http4s.Status.{NotFound, Ok}
   import org.http4s.{Request, Response}
 
@@ -91,7 +96,6 @@ private class EventStatusUpdaterImpl[Interpretation[_]: ConcurrentEffect: Timer]
                                   schemaVersion:  SchemaVersion,
                                   processingTime: EventProcessingTime
   ): Interpretation[Unit] = sendEventStatusChange(
-    eventId,
     eventContent = EventRequestContent(
       event = json"""{
         "categoryName": "EVENTS_STATUS_CHANGE",
@@ -114,73 +118,64 @@ private class EventStatusUpdaterImpl[Interpretation[_]: ConcurrentEffect: Timer]
   override def toTriplesStore(eventId:        CompoundEventId,
                               projectPath:    projects.Path,
                               processingTime: EventProcessingTime
-  ): Interpretation[Unit] =
-    sendEventStatusChange(
-      eventId,
-      eventContent = EventRequestContent(
-        event = json"""{ 
-                          "categoryName": "EVENTS_STATUS_CHANGE",
-                          "id": ${eventId.id.value},
-                          "project": {
-                            "id":   ${eventId.projectId.value},
-                            "path": ${projectPath.value}
-                          },
-                          "newStatus": ${EventStatus.TriplesStore.value}, 
-                          "processingTime": ${processingTime.value}
-                        }"""
-      ),
-      responseMapping
-    )
+  ): Interpretation[Unit] = sendEventStatusChange(
+    eventContent = EventRequestContent(json"""{ 
+      "categoryName": "EVENTS_STATUS_CHANGE",
+      "id": ${eventId.id.value},
+      "project": {
+        "id":   ${eventId.projectId.value},
+        "path": ${projectPath.value}
+      },
+      "newStatus":      ${EventStatus.TriplesStore.value}, 
+      "processingTime": ${processingTime.value}
+    }"""),
+    responseMapping
+  )
 
   override def rollback[S <: EventStatus](
-      eventId:               CompoundEventId
-  )(implicit rollbackStatus: () => S): Interpretation[Unit] =
-    sendStatusChange(
-      eventId,
-      eventContent = EventRequestContent(json"""{"status": ${rollbackStatus().value}}"""),
-      responseMapping
-    )
+      eventId:               CompoundEventId,
+      projectPath:           projects.Path
+  )(implicit rollbackStatus: () => S): Interpretation[Unit] = sendEventStatusChange(
+    eventContent = EventRequestContent(json"""{
+      "categoryName": "EVENTS_STATUS_CHANGE",
+      "id":           ${eventId.id.value},
+      "project": {
+        "id":   ${eventId.projectId.value},
+        "path": ${projectPath.value}
+      },
+      "newStatus": ${rollbackStatus().value}
+    }"""),
+    responseMapping
+  )
 
   override def toFailure(eventId:     CompoundEventId,
+                         projectPath: projects.Path,
                          eventStatus: FailureStatus,
                          exception:   Throwable
-  ): Interpretation[Unit] =
-    sendStatusChange(
-      eventId,
-      eventContent = EventRequestContent(
-        json"""{
-          "status":  ${eventStatus.value},
-          "message": ${ErrorMessage.withStackTrace(exception).value}
-        }"""
-      ),
-      responseMapping
-    )
-
-  private def sendStatusChange(
-      eventId:      CompoundEventId,
-      eventContent: EventRequestContent,
-      responseMapping: PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[
-        Unit
-      ]]
-  ): Interpretation[Unit] = for {
-    uri <- validateUri(s"$eventLogUrl/events/${eventId.id}/${eventId.projectId}")
-    request = createRequest(uri, eventContent)
-    sendingResult <- send(request)(responseMapping) recoverWith retryOnServerError(
-                       Eval.always(sendStatusChange(eventId, eventContent, responseMapping))
-                     )
-  } yield sendingResult
+  ): Interpretation[Unit] = sendEventStatusChange(
+    eventContent = EventRequestContent(json"""{
+      "categoryName": "EVENTS_STATUS_CHANGE",
+      "id":           ${eventId.id.value},
+      "project": {
+        "id":   ${eventId.projectId.value},
+        "path": ${projectPath.value}
+      },
+      "newStatus": ${eventStatus.value},
+      "message":   ${ErrorMessage.withStackTrace(exception).value}
+    }"""),
+    responseMapping
+  )
 
   private def sendEventStatusChange(
-      eventId:      CompoundEventId,
       eventContent: EventRequestContent,
       responseMapping: PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[
         Unit
       ]]
   ): Interpretation[Unit] = for {
     uri <- validateUri(s"$eventLogUrl/events")
-    request = createRequest(uri, eventContent, POST)
+    request = createRequest(uri, eventContent)
     sendingResult <- send(request)(responseMapping) recoverWith retryOnServerError(
-                       Eval.always(sendEventStatusChange(eventId, eventContent, responseMapping))
+                       Eval.always(sendEventStatusChange(eventContent, responseMapping))
                      )
   } yield sendingResult
 
@@ -199,8 +194,8 @@ private class EventStatusUpdaterImpl[Interpretation[_]: ConcurrentEffect: Timer]
     result <- retry.value
   } yield result
 
-  private def createRequest(uri: Uri, eventRequestContent: EventRequestContent, method: Method = PATCH) =
-    request(method, uri).withMultipartBuilder
+  private def createRequest(uri: Uri, eventRequestContent: EventRequestContent) =
+    request(POST, uri).withMultipartBuilder
       .addPart("event", eventRequestContent.event)
       .maybeAddPart("payload", eventRequestContent.maybePayload)
       .build()

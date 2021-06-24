@@ -57,18 +57,16 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
             .withMultipartRequestBody(
               aMultipart("event")
                 .withBody(
-                  equalToJson(
-                    json"""{
-                            "categoryName": "EVENTS_STATUS_CHANGE",
-                            "id": ${eventId.id.value},
-                            "project": {
-                              "id": ${eventId.projectId.value},
-                              "path": ${projectPath.value}
-                            },
-                            "newStatus": "TRIPLES_GENERATED", 
-                            "processingTime": ${processingTime.value}
-                          }""".spaces2
-                  )
+                  equalToJson(json"""{
+                    "categoryName": "EVENTS_STATUS_CHANGE",
+                    "id": ${eventId.id.value},
+                    "project": {
+                      "id": ${eventId.projectId.value},
+                      "path": ${projectPath.value}
+                    },
+                    "newStatus": "TRIPLES_GENERATED", 
+                    "processingTime": ${processingTime.value}
+                  }""".spaces2)
                 )
             )
             .withMultipartRequestBody(
@@ -97,18 +95,16 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
           .withMultipartRequestBody(
             aMultipart("event")
               .withBody(
-                equalToJson(
-                  json"""{
-                          "categoryName": "EVENTS_STATUS_CHANGE",
-                          "id":           ${eventId.id.value},
-                          "project": {
-                            "id":   ${eventId.projectId.value},
-                            "path": ${projectPath.value}
-                          },
-                          "newStatus": "TRIPLES_GENERATED", 
-                          "processingTime": ${processingTime.value}
-                        }""".spaces2
-                )
+                equalToJson(json"""{
+                  "categoryName": "EVENTS_STATUS_CHANGE",
+                  "id":           ${eventId.id.value},
+                  "project": {
+                    "id":   ${eventId.projectId.value},
+                    "path": ${projectPath.value}
+                  },
+                  "newStatus": "TRIPLES_GENERATED", 
+                  "processingTime": ${processingTime.value}
+                }""".spaces2)
               )
           )
           .withMultipartRequestBody(
@@ -140,15 +136,15 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
               aMultipart("event")
                 .withBody(
                   equalToJson(json"""{
-                              "categoryName": "EVENTS_STATUS_CHANGE",
-                              "id":           ${eventId.id.value},
-                              "project": {
-                                "id":   ${eventId.projectId.value},
-                                "path": ${projectPath.value}
-                              },
-                              "newStatus": "TRIPLES_STORE", 
-                              "processingTime": ${processingTime.value}
-                            }""".spaces2)
+                    "categoryName": "EVENTS_STATUS_CHANGE",
+                    "id":           ${eventId.id.value},
+                    "project": {
+                      "id":   ${eventId.projectId.value},
+                      "path": ${projectPath.value}
+                    },
+                    "newStatus": "TRIPLES_STORE", 
+                    "processingTime": ${processingTime.value}
+                  }""".spaces2)
                 )
             )
             .willReturn(aResponse().withStatus(status.code))
@@ -168,22 +164,22 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
             aMultipart("event")
               .withBody(
                 equalToJson(json"""{
-                            "categoryName": "EVENTS_STATUS_CHANGE",
-                            "id":           ${eventId.id.value},
-                            "project": {
-                              "id":   ${eventId.projectId.value},
-                              "path": ${projectPath.value}
-                            },
-                            "newStatus": "TRIPLES_STORE", 
-                            "processingTime": ${processingTime.value}
-                           }""".spaces2)
+                  "categoryName": "EVENTS_STATUS_CHANGE",
+                  "id":           ${eventId.id.value},
+                  "project": {
+                    "id":   ${eventId.projectId.value},
+                    "path": ${projectPath.value}
+                  },
+                  "newStatus": "TRIPLES_STORE", 
+                  "processingTime": ${processingTime.value}
+                }""".spaces2)
               )
           )
           .willReturn(aResponse().withStatus(status.code))
       }
 
       intercept[Exception] {
-        updater.toTriplesStore(eventId, projectPath, processingTime).unsafeRunSync() shouldBe ((): Unit)
+        updater.toTriplesStore(eventId, projectPath, processingTime).unsafeRunSync() shouldBe ()
       }.getMessage shouldBe s"POST $eventLogUrl/events returned $status; body: " // TODO add the event id to the log message
     }
   }
@@ -193,45 +189,69 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
     Set(Ok, NotFound) foreach { status =>
       s"succeed if remote responds with $status - case of $New" in {
         stubFor {
-          patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
+          post(urlEqualTo(s"/events"))
             .withMultipartRequestBody(
               aMultipart("event")
-                .withBody(equalToJson(json"""{"status": "NEW"}""".spaces2))
+                .withBody(equalToJson(json"""{
+                  "categoryName": "EVENTS_STATUS_CHANGE",
+                  "id":           ${eventId.id.value},
+                  "project": {
+                    "id":   ${eventId.projectId.value},
+                    "path": ${projectPath.value}
+                  },
+                  "newStatus": ${New.value}
+                }""".spaces2))
             )
             .willReturn(aResponse().withStatus(status.code))
         }
 
-        updater.rollback[New](eventId).unsafeRunSync() shouldBe ((): Unit)
+        updater.rollback[New](eventId, projectPath).unsafeRunSync() shouldBe ()
       }
 
       s"succeed if remote responds with $status - case of $TriplesGenerated" in {
         stubFor {
-          patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
+          post(urlEqualTo(s"/events"))
             .withMultipartRequestBody(
               aMultipart("event")
-                .withBody(equalToJson(json"""{"status": "TRIPLES_GENERATED"}""".spaces2))
+                .withBody(equalToJson(json"""{
+                  "categoryName": "EVENTS_STATUS_CHANGE",
+                  "id":           ${eventId.id.value},
+                  "project": {
+                    "id":   ${eventId.projectId.value},
+                    "path": ${projectPath.value}
+                  },
+                  "newStatus": ${TriplesGenerated.value}
+                }""".spaces2))
             )
             .willReturn(aResponse().withStatus(status.code))
         }
 
-        updater.rollback[TriplesGenerated](eventId).unsafeRunSync() shouldBe ((): Unit)
+        updater.rollback[TriplesGenerated](eventId, projectPath).unsafeRunSync() shouldBe ()
       }
     }
 
     s"fail if remote responds with status different than $Ok - case of $New" in {
       val status = BadRequest
       stubFor {
-        patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
+        post(urlEqualTo(s"/events"))
           .withMultipartRequestBody(
             aMultipart("event")
-              .withBody(equalToJson(json"""{"status": "NEW"}""".spaces2))
+              .withBody(equalToJson(json"""{
+                  "categoryName": "EVENTS_STATUS_CHANGE",
+                  "id":           ${eventId.id.value},
+                  "project": {
+                    "id":   ${eventId.projectId.value},
+                    "path": ${projectPath.value}
+                  },
+                  "newStatus": ${New.value}
+                }""".spaces2))
           )
           .willReturn(aResponse().withStatus(status.code))
       }
 
       intercept[Exception] {
-        updater.rollback[New](eventId).unsafeRunSync() shouldBe ((): Unit)
-      }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/${eventId.projectId} returned $status; body: "
+        updater.rollback[New](eventId, projectPath).unsafeRunSync() shouldBe ()
+      }.getMessage shouldBe s"POST $eventLogUrl/events returned $status; body: "
     }
 
     s"fail if remote responds with status different than $Ok - case of $TriplesGenerated" in {
@@ -240,14 +260,22 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
         patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
           .withMultipartRequestBody(
             aMultipart("event")
-              .withBody(equalToJson(json"""{"status": "TRIPLES_GENERATED"}""".spaces2))
+              .withBody(equalToJson(json"""{
+                  "categoryName": "EVENTS_STATUS_CHANGE",
+                  "id":           ${eventId.id.value},
+                  "project": {
+                    "id":   ${eventId.projectId.value},
+                    "path": ${projectPath.value}
+                  },
+                  "newStatus": ${TriplesGenerated.value}
+                }""".spaces2))
           )
           .willReturn(aResponse().withStatus(status.code))
       }
 
       intercept[Exception] {
-        updater.rollback[TriplesGenerated](eventId).unsafeRunSync() shouldBe ((): Unit)
-      }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/${eventId.projectId} returned $status; body: "
+        updater.rollback[TriplesGenerated](eventId, projectPath).unsafeRunSync() shouldBe ((): Unit)
+      }.getMessage shouldBe s"POST $eventLogUrl/events returned $status; body: "
     }
   }
 
@@ -259,22 +287,26 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
           s"succeed if remote responds with $status for $eventStatus" in {
             val exception = exceptions.generateOne
             stubFor {
-              patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
+              post(urlEqualTo(s"/events"))
                 .withMultipartRequestBody(
                   aMultipart("event")
                     .withBody(
-                      equalToJson(
-                        json"""{
-                          "status":  ${eventStatus.value},
-                          "message": ${ErrorMessage.withStackTrace(exception).value}
-                        }""".spaces2
-                      )
+                      equalToJson(json"""{
+                        "categoryName": "EVENTS_STATUS_CHANGE",
+                        "id":           ${eventId.id.value},
+                        "project": {
+                          "id":   ${eventId.projectId.value},
+                          "path": ${projectPath.value}
+                        },
+                        "message":   ${ErrorMessage.withStackTrace(exception).value},  
+                        "newStatus": ${eventStatus.value} 
+                      }""".spaces2)
                     )
                 )
                 .willReturn(aResponse().withStatus(status.code))
             }
 
-            updater.toFailure(eventId, eventStatus, exception).unsafeRunSync() shouldBe ((): Unit)
+            updater.toFailure(eventId, projectPath, eventStatus, exception).unsafeRunSync() shouldBe ()
           }
         }
 
@@ -282,13 +314,13 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
           val status = BadRequest
 
           stubFor {
-            patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
+            post(urlEqualTo(s"/events"))
               .willReturn(aResponse().withStatus(status.code))
           }
 
           intercept[Exception] {
-            updater.toFailure(eventId, eventStatus, exceptions.generateOne).unsafeRunSync()
-          }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/${eventId.projectId} returned $status; body: "
+            updater.toFailure(eventId, projectPath, eventStatus, exceptions.generateOne).unsafeRunSync() shouldBe ()
+          }.getMessage shouldBe s"POST $eventLogUrl/events returned $status; body: "
         }
     }
   }
@@ -300,11 +332,10 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
         Set(
           updater.toTriplesGenerated(eventId, projectPath, rawTriples, schemaVersion, eventProcessingTimes.generateOne),
           updater.toTriplesStore(eventId, projectPath, eventProcessingTimes.generateOne),
-          updater.rollback[New](eventId),
-          updater.toFailure(eventId, failureEventStatuses.generateOne, exceptions.generateOne)
+          updater.rollback[New](eventId, projectPath),
+          updater.toFailure(eventId, projectPath, failureEventStatuses.generateOne, exceptions.generateOne)
         ) foreach { updateFunction =>
-          val patchRequest = patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
-            .inScenario("Retry")
+          val patchRequest = post(urlEqualTo(s"/events")).inScenario("Retry")
 
           stubFor {
             patchRequest
@@ -345,8 +376,8 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
                                                          eventProcessingTimes.generateOne
       ),
       "toTriplesStore" -> updater.toTriplesStore(eventId, projectPath, eventProcessingTimes.generateOne),
-      "rollback"       -> updater.rollback[New](eventId),
-      "toFailure"      -> updater.toFailure(eventId, failureEventStatuses.generateOne, exceptions.generateOne)
+      "rollback"       -> updater.rollback[New](eventId, projectPath),
+      "toFailure"      -> updater.toFailure(eventId, projectPath, failureEventStatuses.generateOne, exceptions.generateOne)
     )
     Applicative[List].product(updateFunctions, failureResponses) foreach {
       case ((functionName, updateFunction), (responseName, response)) =>

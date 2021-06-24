@@ -31,10 +31,9 @@ import ch.datascience.interpreters.TestRoutesMetrics
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.EventEndpoint
 import io.renku.eventlog.processingstatus.{ProcessingStatusEndpoint, ProcessingStatusFinder}
-import io.renku.eventlog.statuschange.{StatusChangeEndpoint, StatusUpdatesRunner}
 import io.renku.eventlog.subscriptions.{EventProducersRegistry, SubscriptionsEndpoint}
 import org.http4s.MediaType.application
-import org.http4s.Method.{GET, PATCH, POST}
+import org.http4s.Method.{GET, POST}
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
@@ -75,21 +74,6 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
       val response = routes.call(request)
 
       response.status shouldBe expectedStatus
-    }
-
-    "define a PATCH /events/:event-id/:project-:id endpoint" in new TestCase {
-      val eventId = compoundEventIds.generateOne
-
-      val request = Request[IO](
-        method = PATCH,
-        uri"events" / eventId.id.toString / eventId.projectId.toString
-      )
-
-      (statusChangeEndpoint.changeStatus _).expects(eventId, request).returning(Response[IO](Ok).pure[IO])
-
-      val response = routes.call(request)
-
-      response.status shouldBe Ok
     }
 
     "define a GET /metrics endpoint returning OK with some prometheus metrics" in new TestCase {
@@ -159,13 +143,11 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
     val eventEndpoint            = mock[EventEndpoint[IO]]
     val processingStatusEndpoint = mock[TestProcessingStatusEndpoint]
     val routesMetrics            = TestRoutesMetrics()
-    val statusChangeEndpoint     = mock[TestStatusChangeEndpoint]
     val subscriptionsEndpoint    = mock[TestSubscriptionEndpoint]
     val eventDetailsEndpoint     = mock[EventDetailsEndpoint[IO]]
     val routes = new MicroserviceRoutes[IO](
       eventEndpoint,
       processingStatusEndpoint,
-      statusChangeEndpoint,
       subscriptionsEndpoint,
       eventDetailsEndpoint,
       routesMetrics
@@ -179,9 +161,4 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
       subscriptionCategoryRegistry: EventProducersRegistry[IO],
       logger:                       Logger[IO]
   ) extends SubscriptionsEndpoint[IO](subscriptionCategoryRegistry, logger)
-
-  class TestStatusChangeEndpoint(
-      updateCommandsRunner: StatusUpdatesRunner[IO],
-      logger:               Logger[IO]
-  ) extends StatusChangeEndpoint[IO](updateCommandsRunner, Set.empty, logger)
 }

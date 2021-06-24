@@ -30,7 +30,6 @@ import ch.datascience.metrics.RoutesMetrics
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.EventEndpoint
 import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
-import io.renku.eventlog.statuschange.StatusChangeEndpoint
 import io.renku.eventlog.subscriptions.SubscriptionsEndpoint
 import org.http4s._
 import org.http4s.dsl.Http4sDsl
@@ -40,7 +39,6 @@ import scala.util.Try
 private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     eventEndpoint:            EventEndpoint[F],
     processingStatusEndpoint: ProcessingStatusEndpoint[F],
-    statusChangeEndpoint:     StatusChangeEndpoint[F],
     subscriptionsEndpoint:    SubscriptionsEndpoint[F],
     eventDetailsEndpoint:     EventDetailsEndpoint[F],
     routesMetrics:            RoutesMetrics[F]
@@ -53,14 +51,12 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   import org.http4s.HttpRoutes
   import processingStatusEndpoint._
   import routesMetrics._
-  import statusChangeEndpoint._
   import subscriptionsEndpoint._
 
   // format: off
   lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
     case request @ POST  -> Root / "events"                                            => processEvent(request)
     case           GET   -> Root / "events"/ EventId(eventId) / ProjectId(projectId)   => getDetails(CompoundEventId(eventId, projectId))
-    case request @ PATCH -> Root / "events" / EventId(eventId) / ProjectId(projectId)  => changeStatus(CompoundEventId(eventId, projectId), request)
     case           GET   -> Root / "processing-status" :? `project-id`(maybeProjectId) => maybeFindProcessingStatus(maybeProjectId)
     case           GET   -> Root / "ping"                                              => Ok("pong")
     case request @ POST  -> Root / "subscriptions"                                     => addSubscription(request)

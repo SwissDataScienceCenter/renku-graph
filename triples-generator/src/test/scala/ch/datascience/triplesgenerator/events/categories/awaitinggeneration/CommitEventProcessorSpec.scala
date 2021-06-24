@@ -112,7 +112,7 @@ class CommitEventProcessorSpec
           .expects(commit2, maybeAccessToken)
           .returning(EitherT.liftF(exception2.raiseError[Try, JsonLDTriples]))
 
-        expectEventMarkedAsNonRecoverableFailure(commit2.compoundEventId, exception2)
+        expectEventMarkedAsNonRecoverableFailure(commit2, exception2)
 
         eventProcessor.process(eventId, commitEvents, schemaVersion) shouldBe context.unit
 
@@ -134,7 +134,7 @@ class CommitEventProcessorSpec
         .expects(commit, maybeAccessToken)
         .returning(EitherT.liftF(exception.raiseError[Try, JsonLDTriples]))
 
-      expectEventMarkedAsNonRecoverableFailure(commit.compoundEventId, exception)
+      expectEventMarkedAsNonRecoverableFailure(commit, exception)
 
       eventProcessor.process(eventId, commitEvents, schemaVersion) shouldBe context.unit
 
@@ -156,7 +156,7 @@ class CommitEventProcessorSpec
         .expects(commit, maybeAccessToken)
         .returning(leftT[Try, JsonLDTriples](exception))
 
-      expectEventMarkedAsRecoverableFailure(commit.compoundEventId, exception)
+      expectEventMarkedAsRecoverableFailure(commit, exception)
 
       eventProcessor.process(eventId, commitEvents, schemaVersion) shouldBe context.unit
 
@@ -173,7 +173,7 @@ class CommitEventProcessorSpec
       givenFetchingAccessToken(forProjectPath = commitEvents.head.project.path)
         .returning(exception.raiseError[Try, Option[AccessToken]])
 
-      expectEventRolledBackToNew(commit.compoundEventId)
+      expectEventRolledBackToNew(commit)
 
       eventProcessor.process(eventId, commitEvents, schemaVersion) shouldBe context.unit
 
@@ -257,14 +257,14 @@ class CommitEventProcessorSpec
       )
     }
 
-    def expectEventMarkedAsRecoverableFailure(commitEventId: CompoundEventId, exception: Throwable) =
+    def expectEventMarkedAsRecoverableFailure(commit: CommitEvent, exception: Throwable) =
       (eventStatusUpdater.toFailure _)
-        .expects(commitEventId, EventStatus.GenerationRecoverableFailure, exception)
+        .expects(commit.compoundEventId, commit.project.path, EventStatus.GenerationRecoverableFailure, exception)
         .returning(context.unit)
 
-    def expectEventMarkedAsNonRecoverableFailure(commitEventId: CompoundEventId, exception: Throwable) =
+    def expectEventMarkedAsNonRecoverableFailure(commit: CommitEvent, exception: Throwable) =
       (eventStatusUpdater.toFailure _)
-        .expects(commitEventId, EventStatus.GenerationNonRecoverableFailure, exception)
+        .expects(commit.compoundEventId, commit.project.path, EventStatus.GenerationNonRecoverableFailure, exception)
         .returning(context.unit)
 
     def expectEventMarkedAsTriplesGenerated(compoundEventId: CompoundEventId,
@@ -281,10 +281,10 @@ class CommitEventProcessorSpec
         )
         .returning(context.unit)
 
-    def expectEventRolledBackToNew(commitEventId: CompoundEventId) =
+    def expectEventRolledBackToNew(commit: CommitEvent) =
       (eventStatusUpdater
-        .rollback[New](_: CompoundEventId)(_: () => New))
-        .expects(commitEventId, *)
+        .rollback[New](_: CompoundEventId, _: Path)(_: () => New))
+        .expects(commit.compoundEventId, commit.project.path, *)
         .returning(context.unit)
 
     def logSummary(commits: NonEmptyList[CommitEvent], triplesGenerated: Int = 0, failed: Int = 0) =

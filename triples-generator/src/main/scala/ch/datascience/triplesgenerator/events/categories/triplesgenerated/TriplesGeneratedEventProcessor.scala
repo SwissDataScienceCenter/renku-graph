@@ -147,11 +147,11 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]: MonadError[*[_],
         .recoverWith(logEventLogUpdateError(event, "done"))
     case (_, RecoverableError(event, cause)) =>
       statusUpdater
-        .toFailure(event.compoundEventId, EventStatus.TransformationRecoverableFailure, cause)
+        .toFailure(event.compoundEventId, event.project.path, EventStatus.TransformationRecoverableFailure, cause)
         .recoverWith(logEventLogUpdateError(event, "as failed recoverably"))
     case (_, NonRecoverableError(event, cause)) =>
       statusUpdater
-        .toFailure(event.compoundEventId, EventStatus.TransformationNonRecoverableFailure, cause)
+        .toFailure(event.compoundEventId, event.project.path, EventStatus.TransformationNonRecoverableFailure, cause)
         .recoverWith(logEventLogUpdateError(event, "as failed nonrecoverably"))
   }
 
@@ -177,7 +177,9 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]: MonadError[*[_],
   private def rollback(
       triplesGeneratedEvent: TriplesGeneratedEvent
   ): PartialFunction[Throwable, Interpretation[Option[AccessToken]]] = { case NonFatal(exception) =>
-    statusUpdater.rollback[TriplesGenerated](triplesGeneratedEvent.compoundEventId) >> new Exception(
+    statusUpdater.rollback[TriplesGenerated](triplesGeneratedEvent.compoundEventId,
+                                             triplesGeneratedEvent.project.path
+    ) >> new Exception(
       "transformation failure -> Event rolled back",
       exception
     ).raiseError[Interpretation, Option[AccessToken]]

@@ -18,8 +18,8 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.MonadError
 import cats.syntax.all._
+import cats.{MonadError, MonadThrow}
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.events.CategoryName
 import org.typelevel.log4cats.Logger
@@ -35,7 +35,7 @@ private trait DispatchRecovery[Interpretation[_], CategoryEvent] {
 
 private object LoggingDispatchRecovery {
 
-  def apply[Interpretation[_]: MonadError[*[_], Throwable], CategoryEvent](
+  def apply[Interpretation[_]: MonadThrow, CategoryEvent](
       categoryName: CategoryName,
       logger:       Logger[Interpretation]
   ): Interpretation[DispatchRecovery[Interpretation, CategoryEvent]] =

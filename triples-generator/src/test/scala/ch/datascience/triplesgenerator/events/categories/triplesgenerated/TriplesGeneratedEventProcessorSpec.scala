@@ -27,7 +27,7 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.{SchemaVersion, projects}
-import ch.datascience.graph.model.events.EventStatus.TriplesGenerated
+import ch.datascience.graph.model.events.EventStatus.{TransformationNonRecoverableFailure, TransformationRecoverableFailure, TriplesGenerated}
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
@@ -100,7 +100,7 @@ class TriplesGeneratedEventProcessorSpec
         .expects(triplesGeneratedEvent, maybeAccessToken)
         .returning(leftT[Try, CuratedTriples[Try]](curationException))
 
-      expectEventMarkedAsRecoverableFailure(triplesGeneratedEvent.compoundEventId, curationException)
+      expectEventMarkedAsRecoverableFailure(triplesGeneratedEvent, curationException)
 
       eventProcessor.process(triplesGeneratedEvent) shouldBe context.unit
 
@@ -119,7 +119,7 @@ class TriplesGeneratedEventProcessorSpec
         .expects(triplesGeneratedEvent, maybeAccessToken)
         .returning(EitherT.liftF[Try, ProcessingRecoverableError, CuratedTriples[Try]](context.raiseError(exception)))
 
-      expectEventMarkedAsNonRecoverableFailure(triplesGeneratedEvent.compoundEventId, exception)
+      expectEventMarkedAsNonRecoverableFailure(triplesGeneratedEvent, exception)
 
       eventProcessor.process(triplesGeneratedEvent) shouldBe context.unit
 
@@ -145,7 +145,7 @@ class TriplesGeneratedEventProcessorSpec
           .expects(curatedTriples)
           .returning(context.pure(uploadingError))
 
-        expectEventMarkedAsRecoverableFailure(triplesGeneratedEvent.compoundEventId, uploadingError)
+        expectEventMarkedAsRecoverableFailure(triplesGeneratedEvent, uploadingError)
 
         eventProcessor.process(triplesGeneratedEvent) shouldBe context.unit
 
@@ -171,7 +171,7 @@ class TriplesGeneratedEventProcessorSpec
             .expects(curatedTriples)
             .returning(context.pure(failure))
 
-          expectEventMarkedAsNonRecoverableFailure(triplesGeneratedEvent.compoundEventId, failure)
+          expectEventMarkedAsNonRecoverableFailure(triplesGeneratedEvent, failure)
 
           eventProcessor.process(triplesGeneratedEvent) shouldBe context.unit
 
@@ -296,14 +296,14 @@ class TriplesGeneratedEventProcessorSpec
         .returning(Success(DeliverySuccess))
     }
 
-    def expectEventMarkedAsRecoverableFailure(commitEventId: CompoundEventId, exception: Throwable) =
+    def expectEventMarkedAsRecoverableFailure(event: TriplesGeneratedEvent, exception: Throwable) =
       (eventStatusUpdater.toFailure _)
-        .expects(commitEventId, EventStatus.TransformationRecoverableFailure, exception)
+        .expects(event.compoundEventId, event.project.path, TransformationRecoverableFailure, exception)
         .returning(context.unit)
 
-    def expectEventMarkedAsNonRecoverableFailure(commitEventId: CompoundEventId, exception: Throwable) =
+    def expectEventMarkedAsNonRecoverableFailure(event: TriplesGeneratedEvent, exception: Throwable) =
       (eventStatusUpdater.toFailure _)
-        .expects(commitEventId, EventStatus.TransformationNonRecoverableFailure, exception)
+        .expects(event.compoundEventId, event.project.path, TransformationNonRecoverableFailure, exception)
         .returning(context.unit)
 
     def expectEventMarkedAsDone(compoundEventId: CompoundEventId, projectPath: projects.Path) =

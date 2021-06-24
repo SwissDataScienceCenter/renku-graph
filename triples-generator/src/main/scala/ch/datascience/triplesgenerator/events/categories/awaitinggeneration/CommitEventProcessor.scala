@@ -18,7 +18,7 @@
 
 package ch.datascience.triplesgenerator.events.categories.awaitinggeneration
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.data.{EitherT, NonEmptyList}
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
@@ -49,15 +49,14 @@ private trait EventProcessor[Interpretation[_]] {
   ): Interpretation[Unit]
 }
 
-private class CommitEventProcessor[Interpretation[_]](
+private class CommitEventProcessor[Interpretation[_]: MonadThrow](
     accessTokenFinder:       AccessTokenFinder[Interpretation],
     triplesGenerator:        TriplesGenerator[Interpretation],
     statusUpdater:           EventStatusUpdater[Interpretation],
     logger:                  Logger[Interpretation],
     allEventsTimeRecorder:   ExecutionTimeRecorder[Interpretation],
     singleEventTimeRecorder: ExecutionTimeRecorder[Interpretation]
-)(implicit ME:               MonadError[Interpretation, Throwable])
-    extends EventProcessor[Interpretation] {
+) extends EventProcessor[Interpretation] {
 
   import AccessTokenFinder._
   import TriplesGenerationResult._
@@ -67,13 +66,12 @@ private class CommitEventProcessor[Interpretation[_]](
   def process(eventId:              CompoundEventId,
               events:               NonEmptyList[CommitEvent],
               currentSchemaVersion: SchemaVersion
-  ): Interpretation[Unit] =
-    allEventsTimeRecorder.measureExecutionTime {
-      for {
-        maybeAccessToken <- findAccessToken(events.head.project.path) recoverWith rollbackEvent(events.head)
-        uploadingResults <- generateAllTriples(events, currentSchemaVersion)(maybeAccessToken)
-      } yield uploadingResults
-    } flatMap logSummary recoverWith logError(events.head)
+  ): Interpretation[Unit] = allEventsTimeRecorder.measureExecutionTime {
+    for {
+      maybeAccessToken <- findAccessToken(events.head.project.path) recoverWith rollbackEvent(events.head)
+      uploadingResults <- generateAllTriples(events, currentSchemaVersion)(maybeAccessToken)
+    } yield uploadingResults
+  } flatMap logSummary recoverWith logError(events.head)
 
   private def logError(event: CommitEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
     case NonFatal(exception) =>
@@ -124,11 +122,13 @@ private class CommitEventProcessor[Interpretation[_]](
         )
       case RecoverableError(commit, message) =>
         statusUpdater.toFailure(CompoundEventId(commit.eventId, commit.project.id),
+                                commit.project.path,
                                 EventStatus.GenerationRecoverableFailure,
                                 message
         )
       case NonRecoverableError(commit, cause) =>
         statusUpdater.toFailure(CompoundEventId(commit.eventId, commit.project.id),
+                                commit.project.path,
                                 EventStatus.GenerationNonRecoverableFailure,
                                 cause
         )
@@ -179,11 +179,9 @@ private class CommitEventProcessor[Interpretation[_]](
 
   private def rollbackEvent(commit: CommitEvent): PartialFunction[Throwable, Interpretation[Option[AccessToken]]] = {
     case NonFatal(exception) =>
-      statusUpdater
-        .rollback[EventStatus.New](commit.compoundEventId)
-        .flatMap(_ =>
-          ME.raiseError(new Exception(s"$categoryName: processing failure -> Event rolled back", exception))
-        )
+      statusUpdater.rollback[EventStatus.New](commit.compoundEventId, commit.project.path) >>
+        new Exception(s"$categoryName: processing failure -> Event rolled back", exception)
+          .raiseError[Interpretation, Option[AccessToken]]
   }
 
   private sealed trait TriplesGenerationResult extends Product with Serializable {
@@ -226,20 +224,19 @@ private object IOCommitEventProcessor {
       contextShift:     ContextShift[IO],
       executionContext: ExecutionContext,
       timer:            Timer[IO]
-  ): IO[CommitEventProcessor[IO]] =
-    for {
-      triplesGenerator        <- TriplesGenerator()
-      accessTokenFinder       <- AccessTokenFinder(logger)
-      eventStatusUpdater      <- EventStatusUpdater(categoryName, logger)
-      eventsProcessingTimes   <- metricsRegistry.register[Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
-      allEventsTimeRecorder   <- ExecutionTimeRecorder[IO](logger, maybeHistogram = Some(eventsProcessingTimes))
-      singleEventTimeRecorder <- ExecutionTimeRecorder[IO](logger, maybeHistogram = None)
-    } yield new CommitEventProcessor(
-      accessTokenFinder,
-      triplesGenerator,
-      eventStatusUpdater,
-      logger,
-      allEventsTimeRecorder,
-      singleEventTimeRecorder
-    )
+  ): IO[CommitEventProcessor[IO]] = for {
+    triplesGenerator        <- TriplesGenerator()
+    accessTokenFinder       <- AccessTokenFinder(logger)
+    eventStatusUpdater      <- EventStatusUpdater(categoryName, logger)
+    eventsProcessingTimes   <- metricsRegistry.register[Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
+    allEventsTimeRecorder   <- ExecutionTimeRecorder[IO](logger, maybeHistogram = Some(eventsProcessingTimes))
+    singleEventTimeRecorder <- ExecutionTimeRecorder[IO](logger, maybeHistogram = None)
+  } yield new CommitEventProcessor(
+    accessTokenFinder,
+    triplesGenerator,
+    eventStatusUpdater,
+    logger,
+    allEventsTimeRecorder,
+    singleEventTimeRecorder
+  )
 }
