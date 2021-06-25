@@ -18,18 +18,18 @@
 
 package io.renku.eventlog.events.categories.creation
 
-import cats.{MonadError, Show}
 import cats.data.EitherT.fromEither
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
+import cats.{MonadError, Show}
 import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.events.{EventRequestContent, consumers}
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import ch.datascience.events.consumers.{EventSchedulingResult, Project}
+import ch.datascience.events.{EventRequestContent, consumers}
 import ch.datascience.graph.model.events.{BatchDate, CategoryName, EventBody, EventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import io.circe.{Decoder, DecodingFailure, HCursor}
+import io.circe.{Decoder, DecodingFailure}
 import io.renku.eventlog._
 import io.renku.eventlog.events.categories.creation.Event.{NewEvent, SkippedEvent}
 import org.typelevel.log4cats.Logger
@@ -62,7 +62,7 @@ private class EventHandler[Interpretation[_]: MonadError[*[_], Throwable]](
     s"${event.compoundEventId}, projectPath = ${event.project.path}, status = ${event.status}"
   }
 
-  private implicit val eventDecoder: Decoder[Event] = (cursor: HCursor) =>
+  private implicit val eventDecoder: Decoder[Event] = cursor =>
     cursor.downField("status").as[Option[EventStatus]] flatMap {
       case None | Some(EventStatus.New) =>
         for {
@@ -94,7 +94,7 @@ private class EventHandler[Interpretation[_]: MonadError[*[_], Throwable]](
       }
       .leftMap(_ => DecodingFailure("Invalid Skipped Event message", Nil))
 
-  implicit val projectDecoder: Decoder[Project] = (cursor: HCursor) =>
+  implicit val projectDecoder: Decoder[Project] = cursor =>
     for {
       id   <- cursor.downField("id").as[projects.Id]
       path <- cursor.downField("path").as[projects.Path]

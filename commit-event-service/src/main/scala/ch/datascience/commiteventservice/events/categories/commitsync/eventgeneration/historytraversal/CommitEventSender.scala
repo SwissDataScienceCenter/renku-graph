@@ -108,7 +108,5 @@ private object CommitEventSender {
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[CommitEventSender[IO]] =
-    for {
-      eventLogUrl <- EventLogUrl[IO]()
-    } yield new CommitEventSenderImpl(eventLogUrl, new CommitEventSerializer[IO], logger)
+    EventLogUrl[IO]() map (new CommitEventSenderImpl(_, new CommitEventSerializer[IO], logger))
 }

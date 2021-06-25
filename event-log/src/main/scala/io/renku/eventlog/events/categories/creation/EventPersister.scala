@@ -62,7 +62,6 @@ class EventPersisterImpl[Interpretation[_]: BracketThrow](
           Applicative[Interpretation].whenA(result == Created && event.status == New)(
             waitingEventsGauge.increment(event.project.path)
           )
-
       } yield result
     }
   }
@@ -73,12 +72,11 @@ class EventPersisterImpl[Interpretation[_]: BracketThrow](
       case false => persist(event)
     }
 
-  private def persist(event: Event): Kleisli[Interpretation, Session[Interpretation], Result] =
-    for {
-      updatedCommitEvent <- eventuallyAddToExistingBatch(event)
-      _                  <- upsertProject(updatedCommitEvent)
-      _                  <- insert(updatedCommitEvent)
-    } yield Created
+  private def persist(event: Event): Kleisli[Interpretation, Session[Interpretation], Result] = for {
+    updatedCommitEvent <- eventuallyAddToExistingBatch(event)
+    _                  <- upsertProject(updatedCommitEvent)
+    _                  <- insert(updatedCommitEvent)
+  } yield Created
 
   private def eventuallyAddToExistingBatch(event: Event) =
     findBatchInQueue(event)
@@ -116,7 +114,7 @@ class EventPersisterImpl[Interpretation[_]: BracketThrow](
 
   private lazy val insert: Event => Kleisli[Interpretation, Session[Interpretation], Unit] = {
     case NewEvent(id, project, date, batchDate, body) =>
-      val (createdDate, executionDate) = (CreatedDate.apply _ &&& ExecutionDate.apply _)(now())
+      val (createdDate, executionDate) = (CreatedDate.apply _ &&& ExecutionDate.apply)(now())
       measureExecutionTime(
         SqlStatement(name = "new - create (NEW)")
           .command[
@@ -131,7 +129,7 @@ class EventPersisterImpl[Interpretation[_]: BracketThrow](
           .void
       )
     case SkippedEvent(id, project, date, batchDate, body, message) =>
-      val (createdDate, executionDate) = (CreatedDate.apply _ &&& ExecutionDate.apply _)(now())
+      val (createdDate, executionDate) = (CreatedDate.apply _ &&& ExecutionDate.apply)(now())
       measureExecutionTime(
         SqlStatement(name = "new - create (SKIPPED)")
           .command[
@@ -176,7 +174,6 @@ object EventPersister {
 
   object Result {
     case object Created extends Result
-
     case object Existed extends Result
   }
 }
