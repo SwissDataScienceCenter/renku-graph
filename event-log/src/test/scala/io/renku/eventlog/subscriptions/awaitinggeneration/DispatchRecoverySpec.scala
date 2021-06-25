@@ -42,18 +42,15 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
 
     s"change the status back to $New" in new TestCase {
 
-      val eventRequestContent = EventRequestContent(
-        json"""
-        {
-          "categoryName": "EVENTS_STATUS_CHANGE",
-          "id":           ${event.id.id},
-          "project": {
-            "id":   ${event.id.projectId},
-            "path": ${event.projectPath}
-          },
-          "newStatus": $New
-        }"""
-      )
+      val eventRequestContent = EventRequestContent(json"""{
+        "categoryName": "EVENTS_STATUS_CHANGE",
+        "id":           ${event.id.id},
+        "project": {
+          "id":   ${event.id.projectId},
+          "path": ${event.projectPath}
+        },
+        "newStatus": $New
+      }""")
 
       (eventSender.sendEvent _)
         .expects(eventRequestContent, s"${SubscriptionCategory.name}: Marking event as $New failed")
@@ -70,19 +67,16 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
       val exception  = exceptions.generateOne
       val subscriber = subscriberUrls.generateOne
 
-      val eventRequestContent = EventRequestContent(
-        json"""
-        {
-          "categoryName": "EVENTS_STATUS_CHANGE",
-          "id":           ${event.id.id},
-          "project": {
-            "id":   ${event.id.projectId},
-            "path": ${event.projectPath}
-          },
-          "message": ${EventMessage(exception)},
-          "newStatus": $GenerationNonRecoverableFailure
-        }"""
-      )
+      val eventRequestContent = EventRequestContent(json"""{
+        "categoryName": "EVENTS_STATUS_CHANGE",
+        "id":           ${event.id.id},
+        "project": {
+          "id":   ${event.id.projectId},
+          "path": ${event.projectPath}
+        },
+        "message": ${EventMessage(exception)},
+        "newStatus": $GenerationNonRecoverableFailure
+      }""")
 
       (eventSender.sendEvent _)
         .expects(eventRequestContent,
@@ -101,11 +95,8 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
   private trait TestCase {
     val event = awaitingGenerationEvents.generateOne
 
-    val eventSender = mock[EventSender[Try]]
-    val logger      = TestLogger[Try]()
-    val dispatchRecovery = new DispatchRecoveryImpl[Try](
-      eventSender,
-      logger
-    )
+    val eventSender      = mock[EventSender[Try]]
+    val logger           = TestLogger[Try]()
+    val dispatchRecovery = new DispatchRecoveryImpl[Try](eventSender, logger)
   }
 }

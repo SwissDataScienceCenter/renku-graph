@@ -18,42 +18,64 @@
 
 package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration
 
-import ch.datascience.commiteventservice.events.EventStatusPatcher
+import cats.syntax.all._
 import ch.datascience.commiteventservice.events.categories.commitsync.Generators.fullCommitSyncEvents
 import ch.datascience.commiteventservice.events.categories.commitsync.categoryName
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.UpdateResult.{Deleted, Failed}
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.UpdateResult._
+import ch.datascience.events.EventRequestContent
+import ch.datascience.events.producers.EventSender
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.events.EventStatus.AwaitingDeletion
+import ch.datascience.tinytypes.json.TinyTypeEncoders
+import io.circe.literal._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
-class CommitEventsRemoverSpec extends AnyWordSpec with should.Matchers with MockFactory {
+class CommitEventsRemoverSpec extends AnyWordSpec with should.Matchers with MockFactory with TinyTypeEncoders {
 
   "removeDeletedEvent" should {
-    "return Deleted if marking the event for deletion succeeds" in new TestCase {
-      val event = fullCommitSyncEvents.generateOne
-      (eventPatcher.sendDeletionStatus _).expects(event.project.id, event.id).returning(Success(()))
-      commitRemover.removeDeletedEvent(event.project, event.id) shouldBe Success(Deleted)
+
+    "send the toAwaitingDeletion status change event" in new TestCase {
+
+      val eventRequestContent = EventRequestContent(json"""{
+        "categoryName": "EVENTS_STATUS_CHANGE",
+        "id":           ${event.id},
+        "project": {
+          "id":   ${event.project.id},
+          "path": ${event.project.path}
+        },
+        "newStatus": $AwaitingDeletion
+      }""")
+
+      (eventSender.sendEvent _)
+        .expects(eventRequestContent, s"$categoryName: Marking event as $AwaitingDeletion failed")
+        .returning(().pure[Try])
+
+      commitRemover.removeDeletedEvent(event.project, event.id) shouldBe Deleted.pure[Try]
     }
 
-    "return Failed if marking the event for deletion fails" in new TestCase {
-      val event     = fullCommitSyncEvents.generateOne
-      val exception = exceptions.generateOne
+    "return Failed if sending the toAwaitingDeletion status change event fails" in new TestCase {
 
-      (eventPatcher.sendDeletionStatus _)
-        .expects(event.project.id, event.id)
-        .returning(Failure(exception))
-      commitRemover.removeDeletedEvent(event.project, event.id) shouldBe Success(
-        Failed(s"$categoryName - Commit Remover failed to send commit deletion status", exception)
-      )
+      val exception = exceptions.generateOne
+      (eventSender.sendEvent _)
+        .expects(*, *)
+        .returning(exception.raiseError[Try, Unit])
+
+      commitRemover.removeDeletedEvent(event.project, event.id) shouldBe Failed(
+        s"$categoryName - Commit Remover failed to send commit deletion status",
+        exception
+      ).pure[Try]
     }
   }
 
   private trait TestCase {
-    val eventPatcher  = mock[EventStatusPatcher[Try]]
-    val commitRemover = new CommitEventsRemoverImpl[Try](eventPatcher)
+    val event = fullCommitSyncEvents.generateOne
+
+    val eventSender   = mock[EventSender[Try]]
+    val commitRemover = new CommitEventsRemoverImpl[Try](eventSender)
   }
 }

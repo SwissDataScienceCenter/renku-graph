@@ -22,11 +22,15 @@ package eventgeneration
 import cats.MonadThrow
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.commiteventservice.events.EventStatusPatcher
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.UpdateResult
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.UpdateResult._
+import ch.datascience.events.EventRequestContent
 import ch.datascience.events.consumers.Project
+import ch.datascience.events.producers.EventSender
 import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.events.EventStatus.AwaitingDeletion
+import ch.datascience.tinytypes.json.TinyTypeEncoders
+import io.circe.literal._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -37,17 +41,30 @@ private[commitsync] trait CommitEventsRemover[Interpretation[_]] {
 }
 
 private class CommitEventsRemoverImpl[Interpretation[_]: MonadThrow](
-    eventStatusPatcher: EventStatusPatcher[Interpretation]
-) extends CommitEventsRemover[Interpretation] {
-  override def removeDeletedEvent(project: Project, commitId: CommitId): Interpretation[UpdateResult] =
-    eventStatusPatcher
-      .sendDeletionStatus(project.id, commitId)
-      .map(_ => Deleted: UpdateResult) recoverWith { case NonFatal(e) =>
-      Failed(s"$categoryName - Commit Remover failed to send commit deletion status", e)
-        .pure[Interpretation]
-        .widen[UpdateResult]
-    }
+    eventSender: EventSender[Interpretation]
+) extends CommitEventsRemover[Interpretation]
+    with TinyTypeEncoders {
 
+  override def removeDeletedEvent(project: Project, commitId: CommitId): Interpretation[UpdateResult] =
+    eventSender
+      .sendEvent(
+        EventRequestContent(json"""{
+          "categoryName": "EVENTS_STATUS_CHANGE",
+          "id":           $commitId,
+          "project": {
+            "id":   ${project.id},
+            "path": ${project.path}
+          },
+          "newStatus": $AwaitingDeletion
+        }"""),
+        errorMessage = s"$categoryName: Marking event as $AwaitingDeletion failed"
+      )
+      .map(_ => Deleted: UpdateResult)
+      .recoverWith { case NonFatal(e) =>
+        Failed(s"$categoryName - Commit Remover failed to send commit deletion status", e)
+          .pure[Interpretation]
+          .widen[UpdateResult]
+      }
 }
 
 private[commitsync] object CommitEventsRemover {
@@ -56,7 +73,5 @@ private[commitsync] object CommitEventsRemover {
       concurrentEffect: ConcurrentEffect[IO],
       timer:            Timer[IO],
       executionContext: ExecutionContext
-  ): IO[CommitEventsRemover[IO]] = for {
-    eventStatusPatcher <- EventStatusPatcher(logger)
-  } yield new CommitEventsRemoverImpl[IO](eventStatusPatcher)
+  ): IO[CommitEventsRemover[IO]] = EventSender(logger) map (new CommitEventsRemoverImpl[IO](_))
 }
