@@ -21,6 +21,7 @@ package ch.datascience.events.consumers
 import cats.data.EitherT
 import cats.syntax.all._
 import cats.{MonadError, Show}
+import ch.datascience.events.EventRequestContent
 import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventId}
 import ch.datascience.graph.model.projects

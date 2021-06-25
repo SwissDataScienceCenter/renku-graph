@@ -25,9 +25,9 @@ import cats.syntax.all._
 import cats.{MonadThrow, Show}
 import ch.datascience.db.SqlStatement.Name
 import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.events.consumers
+import ch.datascience.events.{EventRequestContent, consumers}
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
-import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult}
+import ch.datascience.events.consumers.EventSchedulingResult
 import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples, _}
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.{SchemaVersion, projects}

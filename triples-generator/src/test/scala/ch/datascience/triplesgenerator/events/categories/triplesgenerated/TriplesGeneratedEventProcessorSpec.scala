@@ -334,8 +334,8 @@ class TriplesGeneratedEventProcessorSpec
 
     def expectEventRolledBackToTriplesGenerated(event: TriplesGeneratedEvent) =
       (eventStatusUpdater
-        .rollback[TriplesGenerated](_: CompoundEventId)(_: () => TriplesGenerated))
-        .expects(event.compoundEventId, *)
+        .rollback[TriplesGenerated](_: CompoundEventId, _: projects.Path)(_: () => TriplesGenerated))
+        .expects(event.compoundEventId, event.project.path, *)
         .returning(context.unit)
 
     def logSummary(triplesGeneratedEvent: TriplesGeneratedEvent, isSuccessful: Boolean): Assertion =

@@ -22,7 +22,7 @@ package creation
 import cats.MonadError
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.events.consumers.ConsumersModelGenerators._
+import ch.datascience.events.Generators._
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, SchedulingError}
 import ch.datascience.events.consumers.Project
 import ch.datascience.generators.Generators.Implicits._

@@ -18,10 +18,10 @@
 
 package ch.datascience.events.consumers
 
-import ConsumersModelGenerators._
 import cats.Parallel
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
+import ch.datascience.events.Generators._
 import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
 import ch.datascience.generators.Generators.Implicits._

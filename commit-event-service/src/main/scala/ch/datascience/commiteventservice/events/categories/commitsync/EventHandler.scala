@@ -25,9 +25,9 @@ import cats.syntax.all._
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.events.consumers
+import ch.datascience.events.{EventRequestContent, consumers}
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
-import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult, Project}
+import ch.datascience.events.consumers.{EventSchedulingResult, Project}
 import ch.datascience.graph.model.events.{CategoryName, CommitId, LastSyncedDate}
 import ch.datascience.logging.ExecutionTimeRecorder
 import io.circe.Decoder

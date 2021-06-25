@@ -16,15 +16,16 @@
  * limitations under the License.
  */
 
-package ch.datascience.events.consumers
+package ch.datascience.events
 
-import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import ch.datascience.events
+import ch.datascience.generators.Generators.{jsons, nonEmptyStrings}
+import ch.datascience.generators.Generators.Implicits._
 import org.scalacheck.Gen
 
-object ConsumersModelGenerators {
-
-  implicit lazy val projects: Gen[Project] = for {
-    projectId <- projectIds
-    path      <- projectPaths
-  } yield Project(projectId, path)
+object Generators {
+  implicit val eventRequestContents: Gen[EventRequestContent] = for {
+    event        <- jsons
+    maybePayload <- nonEmptyStrings().toGeneratorOfOptions
+  } yield events.EventRequestContent(event, maybePayload)
 }

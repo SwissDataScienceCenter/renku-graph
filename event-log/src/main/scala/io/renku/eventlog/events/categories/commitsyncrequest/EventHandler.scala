@@ -23,9 +23,9 @@ import cats.data.EitherT.fromEither
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.events.consumers
+import ch.datascience.events.{EventRequestContent, consumers}
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
-import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult}
+import ch.datascience.events.consumers.EventSchedulingResult
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.metrics.LabeledHistogram
 import io.circe.Decoder

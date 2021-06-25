@@ -52,12 +52,7 @@ private[subscriptions] object SubscriptionCategory {
                                                     underTriplesGenerationGauge,
                                                     queriesExecTimes
                     )
-    dispatchRecovery <- DispatchRecovery(sessionResource,
-                                         awaitingTriplesGenerationGauge,
-                                         underTriplesGenerationGauge,
-                                         queriesExecTimes,
-                                         logger
-                        )
+    dispatchRecovery <- DispatchRecovery(logger)
     eventDelivery <- EventDelivery[AwaitingGenerationEvent](sessionResource,
                                                             compoundEventIdExtractor = (_: AwaitingGenerationEvent).id,
                                                             queriesExecTimes

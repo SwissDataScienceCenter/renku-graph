@@ -24,9 +24,9 @@ import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.events.consumers
+import ch.datascience.events.{EventRequestContent, consumers}
 import ch.datascience.events.consumers.EventSchedulingResult.Accepted
-import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult}
+import ch.datascience.events.consumers.EventSchedulingResult
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger

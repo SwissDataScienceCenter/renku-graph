@@ -21,7 +21,7 @@ package ch.datascience.tinytypes.json
 import ch.datascience.tinytypes._
 import io.circe.{Encoder, Json}
 
-object TinyTypeEncoders {
+trait TinyTypeEncoders {
 
   implicit def stringEncoder[TT <: StringTinyType]: Encoder[TT] =
     Encoder.instance[TT](ttValue => Json.fromString(ttValue.value))
@@ -44,3 +44,5 @@ object TinyTypeEncoders {
   implicit def durationEncoder[TT <: DurationTinyType]: Encoder[TT] =
     Encoder.instance[TT](ttValue => Json.fromString(ttValue.value.toString))
 }
+
+object TinyTypeEncoders extends TinyTypeEncoders

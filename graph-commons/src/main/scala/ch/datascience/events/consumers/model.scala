@@ -19,7 +19,6 @@
 package ch.datascience.events.consumers
 
 import ch.datascience.graph.model.projects
-import io.circe.Json
 
 final case class Project(id: projects.Id, path: projects.Path)
 
@@ -31,10 +30,4 @@ object EventSchedulingResult {
   case object UnsupportedEventType extends EventSchedulingResult
   case object BadRequest           extends EventSchedulingResult
   final case class SchedulingError(throwable: Throwable) extends EventSchedulingResult
-}
-
-case class EventRequestContent(event: Json, maybePayload: Option[String])
-
-object EventRequestContent {
-  def apply(event: Json): EventRequestContent = EventRequestContent(event, None)
 }

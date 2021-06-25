@@ -131,6 +131,7 @@ Changes the status of events. The events for which the status will be changed ar
     "id":   12,
     "path": "namespace/project-name"
   },
+  "message" : "<failure message>",
   "newStatus": "<failure status>"
 }
 ```

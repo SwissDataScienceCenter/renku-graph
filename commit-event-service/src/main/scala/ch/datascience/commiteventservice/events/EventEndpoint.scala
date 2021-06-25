@@ -23,7 +23,8 @@ import cats.data.EitherT
 import cats.data.EitherT.right
 import cats.effect.Effect
 import cats.syntax.all._
-import ch.datascience.events.consumers.{EventConsumersRegistry, EventRequestContent, EventSchedulingResult}
+import ch.datascience.events.EventRequestContent
+import ch.datascience.events.consumers.{EventConsumersRegistry, EventSchedulingResult}
 import ch.datascience.http.InfoMessage._
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import io.circe.Json

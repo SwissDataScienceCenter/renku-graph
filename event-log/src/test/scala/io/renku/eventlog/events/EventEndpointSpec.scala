@@ -20,7 +20,7 @@ package io.renku.eventlog.events
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.events.consumers.ConsumersModelGenerators.eventRequestContents
+import ch.datascience.events.Generators.eventRequestContents
 import ch.datascience.events.consumers.EventSchedulingResult.SchedulingError
 import ch.datascience.events.consumers.{EventConsumersRegistry, EventSchedulingResult}
 import ch.datascience.generators.Generators.Implicits._

@@ -18,10 +18,11 @@
 
 package io.renku.eventlog.events
 
-import ch.datascience.events.consumers.EventRequestContent
+import ch.datascience.events
+import ch.datascience.events.EventRequestContent
 import io.circe.Json
 
 package object categories {
 
-  def requestContent(event: Json): EventRequestContent = EventRequestContent(event, None)
+  def requestContent(event: Json): EventRequestContent = events.EventRequestContent(event, None)
 }

@@ -23,7 +23,7 @@ import cats.Show
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
 import ch.datascience.db.SqlStatement
-import ch.datascience.events.consumers.EventRequestContent
+import ch.datascience.events
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -80,7 +80,7 @@ class EventHandlerSpec
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
           .map(event => event -> None)
       ).map(_.generateOne) foreach { case ((event, eventAsString), maybePayload) =>
-        handler.handle(EventRequestContent(event.asJson, maybePayload)).unsafeRunSync() shouldBe Accepted
+        handler.handle(events.EventRequestContent(event.asJson, maybePayload)).unsafeRunSync() shouldBe Accepted
 
         eventually {
           logger.loggedOnly(Info(s"$categoryName: $eventAsString -> Processed"),

@@ -51,8 +51,7 @@ private[subscriptions] object SubscriptionCategory {
                                     underTransformationGauge,
                                     queriesExecTimes
       )
-    dispatchRecovery <-
-      DispatchRecovery(sessionResource, awaitingTransformationGauge, underTransformationGauge, queriesExecTimes, logger)
+    dispatchRecovery <- DispatchRecovery(logger)
     eventDelivery <- EventDelivery[TriplesGeneratedEvent](sessionResource,
                                                           compoundEventIdExtractor = (_: TriplesGeneratedEvent).id,
                                                           queriesExecTimes

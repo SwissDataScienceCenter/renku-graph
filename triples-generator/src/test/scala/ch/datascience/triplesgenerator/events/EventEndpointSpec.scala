@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.events
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.events.consumers.ConsumersModelGenerators._
+import ch.datascience.events.Generators._
 import ch.datascience.events.consumers._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._

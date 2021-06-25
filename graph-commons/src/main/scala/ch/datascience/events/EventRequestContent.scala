@@ -16,15 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.events.consumers
+package ch.datascience.events
 
-import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
-import org.scalacheck.Gen
+import io.circe.Json
 
-object ConsumersModelGenerators {
+case class EventRequestContent(event: Json, maybePayload: Option[String])
 
-  implicit lazy val projects: Gen[Project] = for {
-    projectId <- projectIds
-    path      <- projectPaths
-  } yield Project(projectId, path)
+object EventRequestContent {
+  def apply(event: Json): EventRequestContent = EventRequestContent(event, None)
 }

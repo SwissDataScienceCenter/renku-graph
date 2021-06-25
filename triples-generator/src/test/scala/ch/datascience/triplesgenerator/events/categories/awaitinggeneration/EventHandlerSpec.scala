@@ -21,9 +21,11 @@ package ch.datascience.triplesgenerator.events.categories.awaitinggeneration
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.events.consumers.ConsumersModelGenerators._
+import ch.datascience.events
+import ch.datascience.events.EventRequestContent
+import ch.datascience.events.Generators._
 import ch.datascience.events.consumers.EventSchedulingResult._
-import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult}
+import ch.datascience.events.consumers.EventSchedulingResult
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
@@ -155,7 +157,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     val logger                = TestLogger[IO]()
     val handler               = new EventHandler[IO](categoryName, processingRunner, eventBodyDeserializer, renkuVersionPair, logger)
     def requestContent(event: Json, maybePayload: Option[String]): EventRequestContent =
-      EventRequestContent(event, maybePayload)
+      events.EventRequestContent(event, maybePayload)
   }
 
   private implicit lazy val eventEncoder: Encoder[CompoundEventId] =

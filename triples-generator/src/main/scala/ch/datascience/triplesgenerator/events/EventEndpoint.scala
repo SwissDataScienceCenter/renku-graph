@@ -22,7 +22,8 @@ import cats.MonadError
 import cats.data.EitherT
 import cats.data.EitherT.right
 import cats.effect.{Effect, Timer}
-import ch.datascience.events.consumers.{EventConsumersRegistry, EventRequestContent, EventSchedulingResult}
+import ch.datascience.events.EventRequestContent
+import ch.datascience.events.consumers.{EventConsumersRegistry, EventSchedulingResult}
 import ch.datascience.http.ErrorMessage
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningStatus
 import io.circe.Json

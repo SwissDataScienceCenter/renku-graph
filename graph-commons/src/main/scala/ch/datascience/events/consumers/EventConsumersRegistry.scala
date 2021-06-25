@@ -21,6 +21,7 @@ package ch.datascience.events.consumers
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import cats.{MonadError, Parallel}
+import ch.datascience.events.EventRequestContent
 import ch.datascience.events.consumers.EventSchedulingResult.UnsupportedEventType
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
 import ch.datascience.graph.model.events.CategoryName

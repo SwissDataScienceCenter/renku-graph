@@ -18,30 +18,21 @@
 
 package ch.datascience.triplesgenerator.events.categories
 
-import cats.Eval
-import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
+import cats.MonadThrow
+import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.control.Throttler
 import ch.datascience.data.ErrorMessage
-import ch.datascience.events.consumers.EventRequestContent
-import ch.datascience.graph.config.EventLogUrl
-import ch.datascience.graph.model.events.EventStatus.FailureStatus
+import ch.datascience.events
+import ch.datascience.events.EventRequestContent
+import ch.datascience.events.producers.EventSender
+import ch.datascience.graph.model.events.EventStatus.{FailureStatus, TriplesGenerated, TriplesStore}
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.{SchemaVersion, projects}
-import ch.datascience.http.client.RestClient
-import ch.datascience.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
-import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
 import ch.datascience.rdfstore.JsonLDTriples
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.numeric.NonNegative
-import org.http4s.Method.POST
-import org.http4s.Status.{BadGateway, GatewayTimeout, ServiceUnavailable}
-import org.http4s.{Status, Uri}
+import ch.datascience.tinytypes.json.TinyTypeEncoders
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
-import scala.language.postfixOps
 
 private trait EventStatusUpdater[Interpretation[_]] {
   def toTriplesGenerated(eventId:        CompoundEventId,
@@ -67,144 +58,88 @@ private trait EventStatusUpdater[Interpretation[_]] {
   ): Interpretation[Unit]
 }
 
-private class EventStatusUpdaterImpl[Interpretation[_]: ConcurrentEffect: Timer](
-    eventLogUrl:             EventLogUrl,
-    categoryName:            CategoryName,
-    retryDelay:              FiniteDuration,
-    logger:                  Logger[Interpretation],
-    retryInterval:           FiniteDuration = SleepAfterConnectionIssue,
-    maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-    requestTimeoutOverride:  Option[Duration] = None
-)(implicit executionContext: ExecutionContext)
-    extends RestClient[Interpretation, EventStatusUpdater[Interpretation]](Throttler.noThrottling,
-                                                                           logger,
-                                                                           retryInterval = retryInterval,
-                                                                           maxRetries = maxRetries,
-                                                                           requestTimeoutOverride =
-                                                                             requestTimeoutOverride
-    )
-    with EventStatusUpdater[Interpretation] {
+private class EventStatusUpdaterImpl[Interpretation[_]: MonadThrow](
+    eventSender:  EventSender[Interpretation],
+    categoryName: CategoryName
+) extends EventStatusUpdater[Interpretation]
+    with TinyTypeEncoders {
 
-  import cats.effect._
   import io.circe.literal._
-  import org.http4s.Status.{NotFound, Ok}
-  import org.http4s.{Request, Response}
 
   override def toTriplesGenerated(eventId:        CompoundEventId,
                                   projectPath:    projects.Path,
                                   payload:        JsonLDTriples,
                                   schemaVersion:  SchemaVersion,
                                   processingTime: EventProcessingTime
-  ): Interpretation[Unit] = sendEventStatusChange(
-    eventContent = EventRequestContent(
+  ): Interpretation[Unit] = eventSender.sendEvent(
+    eventContent = events.EventRequestContent(
       event = json"""{
         "categoryName": "EVENTS_STATUS_CHANGE",
-        "id": ${eventId.id.value},
+        "id": ${eventId.id},
         "project": {
-          "id":   ${eventId.projectId.value},
-          "path": ${projectPath.value}
+          "id":   ${eventId.projectId},
+          "path": $projectPath
         },
-        "newStatus": ${EventStatus.TriplesGenerated.value},
-        "processingTime": ${processingTime.value}
-      }""",
+        "newStatus": $TriplesGenerated,
+        "processingTime": $processingTime }""",
       maybePayload = json"""{
         "payload": ${payload.value.noSpaces},
-        "schemaVersion": ${schemaVersion.value}
+        "schemaVersion": $schemaVersion
       }""".noSpaces.some
     ),
-    responseMapping
+    errorMessage = s"$categoryName: Change event status as $TriplesGenerated failed"
   )
 
   override def toTriplesStore(eventId:        CompoundEventId,
                               projectPath:    projects.Path,
                               processingTime: EventProcessingTime
-  ): Interpretation[Unit] = sendEventStatusChange(
+  ): Interpretation[Unit] = eventSender.sendEvent(
     eventContent = EventRequestContent(json"""{ 
       "categoryName": "EVENTS_STATUS_CHANGE",
-      "id": ${eventId.id.value},
+      "id": ${eventId.id},
       "project": {
-        "id":   ${eventId.projectId.value},
-        "path": ${projectPath.value}
+        "id":   ${eventId.projectId},
+        "path": $projectPath
       },
-      "newStatus":      ${EventStatus.TriplesStore.value}, 
-      "processingTime": ${processingTime.value}
+      "newStatus":      $TriplesStore, 
+      "processingTime": $processingTime
     }"""),
-    responseMapping
+    errorMessage = s"$categoryName: Change event status as $TriplesStore failed"
   )
 
   override def rollback[S <: EventStatus](
       eventId:               CompoundEventId,
       projectPath:           projects.Path
-  )(implicit rollbackStatus: () => S): Interpretation[Unit] = sendEventStatusChange(
+  )(implicit rollbackStatus: () => S): Interpretation[Unit] = eventSender.sendEvent(
     eventContent = EventRequestContent(json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",
-      "id":           ${eventId.id.value},
+      "id":           ${eventId.id},
       "project": {
-        "id":   ${eventId.projectId.value},
-        "path": ${projectPath.value}
+        "id":   ${eventId.projectId},
+        "path": $projectPath
       },
       "newStatus": ${rollbackStatus().value}
     }"""),
-    responseMapping
+    errorMessage = s"$categoryName: Change event status as ${rollbackStatus().value} failed"
   )
 
   override def toFailure(eventId:     CompoundEventId,
                          projectPath: projects.Path,
                          eventStatus: FailureStatus,
                          exception:   Throwable
-  ): Interpretation[Unit] = sendEventStatusChange(
+  ): Interpretation[Unit] = eventSender.sendEvent(
     eventContent = EventRequestContent(json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",
-      "id":           ${eventId.id.value},
+      "id":           ${eventId.id},
       "project": {
-        "id":   ${eventId.projectId.value},
-        "path": ${projectPath.value}
+        "id":   ${eventId.projectId},
+        "path": $projectPath
       },
-      "newStatus": ${eventStatus.value},
+      "newStatus": $eventStatus,
       "message":   ${ErrorMessage.withStackTrace(exception).value}
     }"""),
-    responseMapping
+    errorMessage = s"$categoryName: Change event status as $eventStatus failed"
   )
-
-  private def sendEventStatusChange(
-      eventContent: EventRequestContent,
-      responseMapping: PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[
-        Unit
-      ]]
-  ): Interpretation[Unit] = for {
-    uri <- validateUri(s"$eventLogUrl/events")
-    request = createRequest(uri, eventContent)
-    sendingResult <- send(request)(responseMapping) recoverWith retryOnServerError(
-                       Eval.always(sendEventStatusChange(eventContent, responseMapping))
-                     )
-  } yield sendingResult
-
-  private def retryOnServerError(
-      retry: Eval[Interpretation[Unit]]
-  ): PartialFunction[Throwable, Interpretation[Unit]] = {
-    case UnexpectedResponseException(ServiceUnavailable | GatewayTimeout | BadGateway, message) =>
-      waitAndRetry(retry, message)
-    case exception @ (_: ConnectivityException | _: ClientException) =>
-      waitAndRetry(retry, exception.getMessage)
-  }
-
-  private def waitAndRetry(retry: Eval[Interpretation[Unit]], errorMessage: String) = for {
-    _      <- logger.error(s"$categoryName: sending status change failed - retrying in $retryDelay - $errorMessage")
-    _      <- Timer[Interpretation] sleep retryDelay
-    result <- retry.value
-  } yield result
-
-  private def createRequest(uri: Uri, eventRequestContent: EventRequestContent) =
-    request(POST, uri).withMultipartBuilder
-      .addPart("event", eventRequestContent.event)
-      .maybeAddPart("payload", eventRequestContent.maybePayload)
-      .build()
-
-  private lazy val responseMapping
-      : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[Unit]] = {
-    case (Ok, _, _)       => ().pure[Interpretation]
-    case (NotFound, _, _) => ().pure[Interpretation]
-  }
 }
 
 private object EventStatusUpdater {
@@ -220,6 +155,6 @@ private object EventStatusUpdater {
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[EventStatusUpdater[IO]] = for {
-    eventLogUrl <- EventLogUrl[IO]()
-  } yield new EventStatusUpdaterImpl(eventLogUrl, categoryName, retryDelay = 30 seconds, logger)
+    eventSender <- EventSender(logger)
+  } yield new EventStatusUpdaterImpl(eventSender, categoryName)
 }

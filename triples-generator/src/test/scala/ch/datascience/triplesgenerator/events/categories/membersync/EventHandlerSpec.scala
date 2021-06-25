@@ -19,8 +19,9 @@
 package ch.datascience.triplesgenerator.events.categories.membersync
 
 import cats.effect.IO
-import ch.datascience.events.consumers.ConsumersModelGenerators._
-import ch.datascience.events.consumers.EventRequestContent
+import ch.datascience.events
+import ch.datascience.events.EventRequestContent
+import ch.datascience.events.Generators._
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -90,7 +91,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     val logger              = TestLogger[IO]()
     val handler             = new EventHandler[IO](categoryName, membersSynchronizer, logger)
 
-    def requestContent(event: Json): EventRequestContent = EventRequestContent(event, None)
+    def requestContent(event: Json): EventRequestContent = events.EventRequestContent(event, None)
   }
 
   implicit lazy val eventEncoder: Encoder[projects.Path] =

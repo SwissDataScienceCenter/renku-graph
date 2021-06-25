@@ -20,8 +20,10 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 
 import cats.effect.IO
 import cats.syntax.all._
+import ch.datascience.events
+import ch.datascience.events.EventRequestContent
 import ch.datascience.events.consumers.EventSchedulingResult._
-import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult, Project}
+import ch.datascience.events.consumers.{EventSchedulingResult, Project}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
@@ -161,7 +163,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     val handler               = new EventHandler[IO](categoryName, processingRunner, eventBodyDeserializer, logger)
 
     def requestContent(event: Json, maybePayload: Option[String]): EventRequestContent =
-      EventRequestContent(event, maybePayload)
+      events.EventRequestContent(event, maybePayload)
   }
 
   private implicit lazy val eventEncoder: Encoder[(CompoundEventId, Project)] =

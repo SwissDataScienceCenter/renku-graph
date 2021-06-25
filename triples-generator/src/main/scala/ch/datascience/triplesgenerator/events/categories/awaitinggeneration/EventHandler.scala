@@ -23,10 +23,10 @@ import cats.{MonadError, Show}
 import cats.data.EitherT.{fromEither, fromOption}
 import cats.data.NonEmptyList
 import cats.effect.{ContextShift, Effect, IO, Timer}
-import ch.datascience.events.consumers
+import ch.datascience.events.{EventRequestContent, consumers}
 import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
-import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult}
+import ch.datascience.events.consumers.EventSchedulingResult
 import ch.datascience.graph.model.RenkuVersionPair
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventBody}
 import ch.datascience.metrics.MetricsRegistry
