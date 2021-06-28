@@ -18,17 +18,15 @@
 
 package ch.datascience.triplesgenerator.events.categories.awaitinggeneration
 
+import EventProcessingGenerators._
 import cats.MonadError
+import cats.data.EitherT
 import cats.data.EitherT.{leftT, rightT}
-import cats.data.{EitherT, NonEmptyList}
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.events.consumers.ConsumersModelGenerators._
-import ch.datascience.events.consumers.Project
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.EventStatus.New
@@ -43,13 +41,9 @@ import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater
-import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent.{CommitEventWithParent, CommitEventWithoutParent}
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.IOCommitEventProcessor.eventsProcessingTimesBuilder
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.auto._
-import eu.timepit.refined.numeric.Positive
 import io.prometheus.client.Histogram
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -75,110 +69,76 @@ class CommitEventProcessorSpec
 
   "process" should {
 
-    "succeed if events are successfully turned into triples" in new TestCase {
+    "succeed if event is successfully turned into triples" in new TestCase {
 
-      val commitEvents = commitsLists().generateOne
+      val commitEvent = commitEvents.generateOne
 
-      givenFetchingAccessToken(forProjectPath = commitEvents.head.project.path)
+      givenFetchingAccessToken(commitEvent.project.path)
         .returning(maybeAccessToken.pure[Try])
 
-      val commitsAndTriples = generateTriples(forCommits = commitEvents)
+      successfulTriplesGeneration(commitEvent -> jsonLDTriples.generateOne)
 
-      commitsAndTriples.toList foreach successfulTriplesGeneration
+      eventProcessor.process(commitEvent, schemaVersion) shouldBe ().pure[Try]
 
-      eventProcessor.process(eventId, commitEvents, schemaVersion) shouldBe context.unit
-
-      logSummary(commitEvents, triplesGenerated = commitsAndTriples.size)
+      logSummary(commitEvent)
 
       verifyMetricsCollected()
     }
 
-    "succeed if events are successfully turned into triples " +
-      "even if some of them failed in different stages" in new TestCase {
+    "succeed if event fails during triples generation" in new TestCase {
 
-        val commitEvents                         = commitsLists(size = Gen.const(3)).generateOne
-        val commit1 +: commit2 +: commit3 +: Nil = commitEvents.toList
+      val commitEvent = commitEvents.generateOne
 
-        givenFetchingAccessToken(forProjectPath = commitEvents.head.project.path)
-          .returning(context.pure(maybeAccessToken))
-
-        val successfulCommitsAndTriples = generateTriples(forCommits = NonEmptyList.of(commit1, commit3))
-
-        successfulCommitsAndTriples.toList foreach successfulTriplesGeneration
-
-        val exception2 = exceptions.generateOne
-        (triplesFinder
-          .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
-          .expects(commit2, maybeAccessToken)
-          .returning(EitherT.liftF(exception2.raiseError[Try, JsonLDTriples]))
-
-        expectEventMarkedAsNonRecoverableFailure(commit2, exception2)
-
-        eventProcessor.process(eventId, commitEvents, schemaVersion) shouldBe context.unit
-
-        logError(commit2, exception2)
-        logSummary(commitEvents, triplesGenerated = successfulCommitsAndTriples.size, failed = 1)
-      }
-
-    "succeed and mark event with NonRecoverableFailure if finding triples fails" in new TestCase {
-
-      val commitEvents  = commitsLists(size = Gen.const(1)).generateOne
-      val commit +: Nil = commitEvents.toList
-
-      givenFetchingAccessToken(forProjectPath = commitEvents.head.project.path)
-        .returning(context.pure(maybeAccessToken))
+      givenFetchingAccessToken(forProjectPath = commitEvent.project.path)
+        .returning(maybeAccessToken.pure[Try])
 
       val exception = exceptions.generateOne
       (triplesFinder
         .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
-        .expects(commit, maybeAccessToken)
+        .expects(commitEvent, maybeAccessToken)
         .returning(EitherT.liftF(exception.raiseError[Try, JsonLDTriples]))
 
-      expectEventMarkedAsNonRecoverableFailure(commit, exception)
+      expectEventMarkedAsNonRecoverableFailure(commitEvent, exception)
 
-      eventProcessor.process(eventId, commitEvents, schemaVersion) shouldBe context.unit
+      eventProcessor.process(commitEvent, schemaVersion) shouldBe ().pure[Try]
 
-      logError(commitEvents.head, exception)
-      logSummary(commitEvents, failed = 1)
+      logError(commitEvent, exception)
     }
 
     s"succeed and mark event with RecoverableFailure if finding triples fails with $GenerationRecoverableError" in new TestCase {
 
-      val commitEvents  = commitsLists(size = Gen.const(1)).generateOne
-      val commit +: Nil = commitEvents.toList
+      val commitEvent = commitEvents.generateOne
 
-      givenFetchingAccessToken(forProjectPath = commitEvents.head.project.path)
-        .returning(context.pure(maybeAccessToken))
+      givenFetchingAccessToken(commitEvent.project.path)
+        .returning(maybeAccessToken.pure[Try])
 
       val exception = GenerationRecoverableError(nonBlankStrings().generateOne.value)
       (triplesFinder
         .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
-        .expects(commit, maybeAccessToken)
+        .expects(commitEvent, maybeAccessToken)
         .returning(leftT[Try, JsonLDTriples](exception))
 
-      expectEventMarkedAsRecoverableFailure(commit, exception)
+      expectEventMarkedAsRecoverableFailure(commitEvent, exception)
 
-      eventProcessor.process(eventId, commitEvents, schemaVersion) shouldBe context.unit
+      eventProcessor.process(commitEvent, schemaVersion) shouldBe ().pure[Try]
 
-      logError(commitEvents.head, exception, exception.getMessage)
-      logSummary(commitEvents, failed = 1)
+      logError(commitEvent, exception, exception.getMessage)
     }
 
     s"put event into status $New if finding access token fails" in new TestCase {
 
-      val commitEvents  = commitsLists(size = Gen.const(1)).generateOne
-      val commit +: Nil = commitEvents.toList
+      val commitEvent = commitEvents.generateOne
 
       val exception = exceptions.generateOne
-      givenFetchingAccessToken(forProjectPath = commitEvents.head.project.path)
+      givenFetchingAccessToken(commitEvent.project.path)
         .returning(exception.raiseError[Try, Option[AccessToken]])
 
-      expectEventRolledBackToNew(commit)
+      expectEventRolledBackToNew(commitEvent)
 
-      eventProcessor.process(eventId, commitEvents, schemaVersion) shouldBe context.unit
+      eventProcessor.process(commitEvent, schemaVersion) shouldBe ().pure[Try]
 
       logger.getMessages(Error).map(_.message) shouldBe List(
-        s"${logMessageCommon(commit)}: commit Event processing failure"
+        s"${logMessageCommon(commitEvent)}: commit Event processing failure"
       )
     }
   }
@@ -215,9 +175,7 @@ class CommitEventProcessorSpec
   private lazy val eventsProcessingTimes = eventsProcessingTimesBuilder.create()
 
   private trait TestCase {
-    val context = MonadError[Try, Throwable]
 
-    val eventId          = compoundEventIds.generateOne
     val maybeAccessToken = Gen.option(accessTokens).generateOne
     val schemaVersion    = projectSchemaVersions.generateOne
 
@@ -241,9 +199,6 @@ class CommitEventProcessorSpec
         .findAccessToken(_: Path)(_: Path => String))
         .expects(forProjectPath, projectPathToPath)
 
-    def generateTriples(forCommits: NonEmptyList[CommitEvent]): NonEmptyList[(CommitEvent, JsonLDTriples)] =
-      forCommits map (_ -> jsonLDTriples.generateOne)
-
     def successfulTriplesGeneration(commitAndTriples: (CommitEvent, JsonLDTriples)) = {
       val (commit, triples) = commitAndTriples
       (triplesFinder
@@ -260,12 +215,12 @@ class CommitEventProcessorSpec
     def expectEventMarkedAsRecoverableFailure(commit: CommitEvent, exception: Throwable) =
       (eventStatusUpdater.toFailure _)
         .expects(commit.compoundEventId, commit.project.path, EventStatus.GenerationRecoverableFailure, exception)
-        .returning(context.unit)
+        .returning(().pure[Try])
 
     def expectEventMarkedAsNonRecoverableFailure(commit: CommitEvent, exception: Throwable) =
       (eventStatusUpdater.toFailure _)
         .expects(commit.compoundEventId, commit.project.path, EventStatus.GenerationNonRecoverableFailure, exception)
-        .returning(context.unit)
+        .returning(().pure[Try])
 
     def expectEventMarkedAsTriplesGenerated(compoundEventId: CompoundEventId,
                                             projectPath:     Path,
@@ -279,21 +234,17 @@ class CommitEventProcessorSpec
                  schemaVersion,
                  EventProcessingTime(Duration.ofMillis(singleEventTimeRecorder.elapsedTime.value))
         )
-        .returning(context.unit)
+        .returning(().pure[Try])
 
     def expectEventRolledBackToNew(commit: CommitEvent) =
       (eventStatusUpdater
         .rollback[New](_: CompoundEventId, _: Path)(_: () => New))
         .expects(commit.compoundEventId, commit.project.path, *)
-        .returning(context.unit)
+        .returning(().pure[Try])
 
-    def logSummary(commits: NonEmptyList[CommitEvent], triplesGenerated: Int = 0, failed: Int = 0) =
-      logger.logged(
-        Info(
-          s"${commonLogMessage(commits.head)} processed in ${allEventsTimeRecorder.elapsedTime}ms: " +
-            s"${commits.size} commits, $triplesGenerated successfully processed, $failed failed"
-        )
-      )
+    def logSummary(commit: CommitEvent) = logger.logged(
+      Info(s"${commonLogMessage(commit)} processed in ${allEventsTimeRecorder.elapsedTime}ms")
+    )
 
     def logError(commit: CommitEvent, exception: Exception, message: String = "failed"): Assertion =
       logger.logged(Error(s"${commonLogMessage(commit)} $message", exception))
@@ -308,20 +259,4 @@ class CommitEventProcessorSpec
         .flatMap(_.samples.asScala.map(_.name))
         .exists(_ startsWith "triples_generation_processing_times") shouldBe true
   }
-
-  private def commits(commitId: CommitId, project: Project): Gen[CommitEvent] =
-    for {
-      maybeParentId <- Gen.option(commitIds)
-    } yield maybeParentId match {
-      case None           => CommitEventWithoutParent(EventId(commitId.value), project, commitId)
-      case Some(parentId) => CommitEventWithParent(EventId(commitId.value), project, commitId, parentId)
-    }
-
-  private def commitsLists(size: Gen[Int Refined Positive] = positiveInts(max = 5)): Gen[NonEmptyList[CommitEvent]] =
-    for {
-      commitId <- commitIds
-      project  <- projects
-      size     <- size
-      commits  <- Gen.listOfN(size.value, commits(commitId, project))
-    } yield NonEmptyList.fromListUnsafe(commits)
 }

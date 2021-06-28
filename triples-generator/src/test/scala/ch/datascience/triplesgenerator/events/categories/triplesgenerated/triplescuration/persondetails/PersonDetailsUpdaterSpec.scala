@@ -67,7 +67,7 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
         .expects(project.path, maybeAccessToken)
         .returning(EitherT.rightT[Try, ProcessingRecoverableError](projectMembers))
 
-      val personsWithGitlabIds = personEntities(withGitLabId).map(_.to[persondetails.Person]).generateSet()
+      val personsWithGitlabIds = personEntities(withGitLabId).map(_.to[persondetails.Person]).generateFixedSizeSet()
       (personsAndProjectMembersMatcher.merge _)
         .expects(trimmedPersons, projectMembers)
         .returning(personsWithGitlabIds)
@@ -172,7 +172,7 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
 
     val project        = projects.generateOne
     val curatedTriples = curatedTriplesObjects[Try].generateOne
-    val trimmedPersons = personEntities().map(_.to[persondetails.Person]).generateSet()
+    val trimmedPersons = personEntities().map(_.to[persondetails.Person]).generateFixedSizeSet()
     val eventId        = eventIds.generateOne
 
     val personTrimmer                   = mock[PersonTrimmer[Try]]

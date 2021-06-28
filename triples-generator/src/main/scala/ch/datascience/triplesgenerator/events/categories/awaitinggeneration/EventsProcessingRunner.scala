@@ -18,7 +18,6 @@
 
 package ch.datascience.triplesgenerator.events.categories.awaitinggeneration
 
-import cats.data.NonEmptyList
 import cats.effect.IO._
 import cats.effect._
 import cats.effect.concurrent.Semaphore
@@ -27,7 +26,6 @@ import ch.datascience.events.consumers.EventSchedulingResult
 import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
 import ch.datascience.graph.model.SchemaVersion
-import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.metrics.MetricsRegistry
 import com.typesafe.config.{Config, ConfigFactory}
 import org.typelevel.log4cats.Logger
@@ -36,68 +34,61 @@ import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 private trait EventsProcessingRunner[Interpretation[_]] {
-  def scheduleForProcessing(eventId:              CompoundEventId,
-                            events:               NonEmptyList[CommitEvent],
-                            currentSchemaVersion: SchemaVersion
+  def scheduleForProcessing(
+      event:                CommitEvent,
+      currentSchemaVersion: SchemaVersion
   ): Interpretation[EventSchedulingResult]
 }
 
-private class EventsProcessingRunnerImpl(
-    eventProcessor:        EventProcessor[IO],
+private class EventsProcessingRunnerImpl[Interpretation[_]: Concurrent](
+    eventProcessor:        EventProcessor[Interpretation],
     generationProcesses:   GenerationProcessesNumber,
-    semaphore:             Semaphore[IO],
-    subscriptionMechanism: SubscriptionMechanism[IO],
-    logger:                Logger[IO]
-)(implicit cs:             ContextShift[IO])
-    extends EventsProcessingRunner[IO] {
+    semaphore:             Semaphore[Interpretation],
+    subscriptionMechanism: SubscriptionMechanism[Interpretation],
+    logger:                Logger[Interpretation]
+) extends EventsProcessingRunner[Interpretation] {
 
   import subscriptionMechanism._
 
-  override def scheduleForProcessing(eventId:              CompoundEventId,
-                                     events:               NonEmptyList[CommitEvent],
+  override def scheduleForProcessing(event:                CommitEvent,
                                      currentSchemaVersion: SchemaVersion
-  ): IO[EventSchedulingResult] =
-    semaphore.available flatMap {
-      case 0 => Busy.pure[IO]
-      case _ =>
-        {
-          for {
-            _ <- semaphore.acquire
-            _ <- process(eventId, events, currentSchemaVersion).start
-          } yield Accepted: EventSchedulingResult
-        } recoverWith releasingSemaphore
-    }
+  ): Interpretation[EventSchedulingResult] = semaphore.available flatMap {
+    case 0 => Busy.pure[Interpretation].widen[EventSchedulingResult]
+    case _ =>
+      {
+        for {
+          _ <- semaphore.acquire
+          _ <- Concurrent[Interpretation].start(process(event, currentSchemaVersion))
+        } yield Accepted: EventSchedulingResult
+      } recoverWith releasingSemaphore
+  }
 
-  private def process(eventId:              CompoundEventId,
-                      events:               NonEmptyList[CommitEvent],
-                      currentSchemaVersion: SchemaVersion
-  ) = {
+  private def process(event: CommitEvent, currentSchemaVersion: SchemaVersion) = {
     for {
-      _ <- eventProcessor.process(eventId, events, currentSchemaVersion)
+      _ <- eventProcessor.process(event, currentSchemaVersion)
       _ <- releaseAndNotify()
     } yield ()
   } recoverWith { case NonFatal(exception) =>
     for {
       _ <- releaseAndNotify()
-      _ <- logger.error(exception)(s"Processing event $eventId failed")
+      _ <- logger.error(exception)(s"Processing event ${event.compoundEventId} failed")
     } yield ()
   }
 
-  private def releasingSemaphore[O]: PartialFunction[Throwable, IO[O]] = { case NonFatal(exception) =>
+  private def releasingSemaphore[O]: PartialFunction[Throwable, Interpretation[O]] = { case NonFatal(exception) =>
     semaphore.available flatMap {
-      case available if available == generationProcesses.value => exception.raiseError[IO, O]
+      case available if available == generationProcesses.value => exception.raiseError[Interpretation, O]
       case _ =>
         semaphore.release flatMap { _ =>
-          exception.raiseError[IO, O]
+          exception.raiseError[Interpretation, O]
         }
     }
   }
 
-  private def releaseAndNotify(): IO[Unit] =
-    for {
-      _ <- semaphore.release
-      _ <- renewSubscription().start
-    } yield ()
+  private def releaseAndNotify(): Interpretation[Unit] = for {
+    _ <- semaphore.release
+    _ <- Concurrent[Interpretation].start(renewSubscription())
+  } yield ()
 }
 
 private object IOEventsProcessingRunner {

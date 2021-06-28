@@ -18,7 +18,7 @@
 
 package ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog
 
-import ammonite.ops.{CommandResult, root}
+import ammonite.ops.root
 import cats.data.EitherT
 import cats.data.EitherT._
 import cats.effect.{ContextShift, IO}
@@ -35,10 +35,9 @@ import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.{CommitEvent, categoryName}
-import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent._
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.RepositoryPath
+import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.{CommitEvent, categoryName}
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -57,7 +56,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
       "check out the commit, " +
       "do not clean the repo if .gitattributes files is committed" +
       "call 'renku migrate', " +
-      "call 'renku log' without --revision when no parent commit, " +
+      "call 'renku export', " +
       "convert the stream to RDF model and " +
       "removes the temp directory" in new TestCase {
 
@@ -90,12 +89,12 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
 
         (renku
           .migrate(_: CommitEvent)(_: RepositoryPath))
-          .expects(commitWithoutParent, repositoryDirectory)
+          .expects(commitEvent, repositoryDirectory)
           .returning(IO.unit)
 
         (renku
-          .log(_: CommitEventWithoutParent)(_: (CommitEventWithoutParent, Path) => CommandResult, _: RepositoryPath))
-          .expects(commitWithoutParent, renku.commitWithoutParentTriplesFinder, repositoryDirectory)
+          .`export`(_: RepositoryPath))
+          .expects(repositoryDirectory)
           .returning(rightT[IO, ProcessingRecoverableError](triples))
 
         (file
@@ -104,7 +103,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
           .returning(IO.unit)
           .atLeastOnce()
 
-        triplesGenerator.generateTriples(commitWithoutParent).value.unsafeRunSync() shouldBe Right(triples)
+        triplesGenerator.generateTriples(commitEvent).value.unsafeRunSync() shouldBe Right(triples)
       }
 
     "create a temp directory, " +
@@ -112,7 +111,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
       "check out the commit, " +
       "clean the repo if it's not clean " +
       "call 'renku migrate', " +
-      "call 'renku log' without --revision when no parent commit, " +
+      "call 'renku export', " +
       "convert the stream to RDF model and " +
       "removes the temp directory" in new TestCase {
 
@@ -152,12 +151,12 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
 
         (renku
           .migrate(_: CommitEvent)(_: RepositoryPath))
-          .expects(commitWithoutParent, repositoryDirectory)
+          .expects(commitEvent, repositoryDirectory)
           .returning(IO.unit)
 
         (renku
-          .log(_: CommitEventWithoutParent)(_: (CommitEventWithoutParent, Path) => CommandResult, _: RepositoryPath))
-          .expects(commitWithoutParent, renku.commitWithoutParentTriplesFinder, repositoryDirectory)
+          .`export`(_: RepositoryPath))
+          .expects(repositoryDirectory)
           .returning(rightT[IO, ProcessingRecoverableError](triples))
 
         (file
@@ -166,14 +165,14 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
           .returning(IO.unit)
           .atLeastOnce()
 
-        triplesGenerator.generateTriples(commitWithoutParent).value.unsafeRunSync() shouldBe Right(triples)
+        triplesGenerator.generateTriples(commitEvent).value.unsafeRunSync() shouldBe Right(triples)
       }
 
     "create a temp directory, " +
       "clone the repo into it, " +
       "check out the commit, " +
       "call 'renku migrate', " +
-      "call 'renku log' without --revision when no parent commit, " +
+      "call 'renku export', " +
       "convert the stream to RDF model and " +
       "removes the temp directory" in new TestCase {
 
@@ -201,12 +200,12 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
 
         (renku
           .migrate(_: CommitEvent)(_: RepositoryPath))
-          .expects(commitWithoutParent, repositoryDirectory)
+          .expects(commitEvent, repositoryDirectory)
           .returning(IO.unit)
 
         (renku
-          .log(_: CommitEventWithoutParent)(_: (CommitEventWithoutParent, Path) => CommandResult, _: RepositoryPath))
-          .expects(commitWithoutParent, renku.commitWithoutParentTriplesFinder, repositoryDirectory)
+          .`export`(_: RepositoryPath))
+          .expects(repositoryDirectory)
           .returning(rightT[IO, ProcessingRecoverableError](triples))
 
         (file
@@ -215,60 +214,10 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
           .returning(IO.unit)
           .atLeastOnce()
 
-        triplesGenerator.generateTriples(commitWithoutParent).value.unsafeRunSync() shouldBe Right(triples)
+        triplesGenerator.generateTriples(commitEvent).value.unsafeRunSync() shouldBe Right(triples)
       }
 
-    "create a temp directory, " +
-      "clone the repo into it, " +
-      "check out the commit, " +
-      "call 'renku migrate', " +
-      "call 'renku log' with --revision when there's a parent commit, " +
-      "convert the stream to RDF model and " +
-      "removes the temp directory" in new TestCase {
-
-        (file
-          .mkdir(_: Path))
-          .expects(repositoryDirectory.value)
-          .returning(IO.pure(repositoryDirectory.value))
-
-        (gitLabRepoUrlFinder
-          .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
-          .expects(projectPath, maybeAccessToken)
-          .returning(IO.pure(gitRepositoryUrl))
-
-        (git
-          .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
-          .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
-          .returning(rightT[IO, GenerationRecoverableError](()))
-
-        (git
-          .checkout(_: CommitId)(_: RepositoryPath))
-          .expects(commitId, repositoryDirectory)
-          .returning(IO.unit)
-
-        (file.exists(_: Path)).expects(dirtyRepoFilePath).returning(false.pure[IO])
-
-        val commitWithParent = toCommitWithParent(commitWithoutParent)
-        (renku
-          .migrate(_: CommitEvent)(_: RepositoryPath))
-          .expects(commitWithParent, repositoryDirectory)
-          .returning(IO.unit)
-
-        (renku
-          .log(_: CommitEventWithParent)(_: (CommitEventWithParent, Path) => CommandResult, _: RepositoryPath))
-          .expects(commitWithParent, renku.commitWithParentTriplesFinder, repositoryDirectory)
-          .returning(rightT(triples))
-
-        (file
-          .deleteDirectory(_: Path))
-          .expects(repositoryDirectory.value)
-          .returning(IO.unit)
-          .atLeastOnce()
-
-        triplesGenerator.generateTriples(commitWithParent).value.unsafeRunSync() shouldBe Right(triples)
-      }
-
-    s"return $GenerationRecoverableError if 'renku log' returns one" in new TestCase {
+    s"return $GenerationRecoverableError if 'renku export' returns one" in new TestCase {
 
       (file
         .mkdir(_: Path))
@@ -292,16 +241,15 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
 
       (file.exists(_: Path)).expects(dirtyRepoFilePath).returning(false.pure[IO])
 
-      val commitWithParent = toCommitWithParent(commitWithoutParent)
       (renku
         .migrate(_: CommitEvent)(_: RepositoryPath))
-        .expects(commitWithParent, repositoryDirectory)
+        .expects(commitEvent, repositoryDirectory)
         .returning(IO.unit)
 
       val error = GenerationRecoverableError(nonBlankStrings().generateOne)
       (renku
-        .log(_: CommitEventWithParent)(_: (CommitEventWithParent, Path) => CommandResult, _: RepositoryPath))
-        .expects(commitWithParent, renku.commitWithParentTriplesFinder, repositoryDirectory)
+        .`export`(_: RepositoryPath))
+        .expects(repositoryDirectory)
         .returning(leftT(error))
 
       (file
@@ -310,7 +258,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
         .returning(IO.unit)
         .atLeastOnce()
 
-      triplesGenerator.generateTriples(commitWithParent).value.unsafeRunSync() shouldBe Left(error)
+      triplesGenerator.generateTriples(commitEvent).value.unsafeRunSync() shouldBe Left(error)
     }
 
     s"return $GenerationRecoverableError if cloning the repo returns such error" in new TestCase {
@@ -338,7 +286,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
         .returning(IO.unit)
         .atLeastOnce()
 
-      triplesGenerator.generateTriples(commitWithoutParent).value.unsafeRunSync() shouldBe Left(
+      triplesGenerator.generateTriples(commitEvent).value.unsafeRunSync() shouldBe Left(
         exception
       )
     }
@@ -352,9 +300,9 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
         .returning(IO.raiseError(exception))
 
       val actual = intercept[Exception] {
-        triplesGenerator.generateTriples(commitWithoutParent)(maybeAccessToken).value.unsafeRunSync()
+        triplesGenerator.generateTriples(commitEvent)(maybeAccessToken).value.unsafeRunSync()
       }
-      actual.getMessage shouldBe s"${commonLogMessage(commitWithoutParent)} triples generation failed"
+      actual.getMessage shouldBe s"${commonLogMessage(commitEvent)} triples generation failed"
       actual.getCause   shouldBe exception
     }
 
@@ -378,9 +326,9 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesGenerator.generateTriples(commitWithoutParent)(maybeAccessToken).value.unsafeRunSync()
+        triplesGenerator.generateTriples(commitEvent)(maybeAccessToken).value.unsafeRunSync()
       }
-      actual.getMessage shouldBe s"${commonLogMessage(commitWithoutParent)} triples generation failed"
+      actual.getMessage shouldBe s"${commonLogMessage(commitEvent)} triples generation failed"
       actual.getCause   shouldBe exception
     }
 
@@ -411,10 +359,10 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesGenerator.generateTriples(commitWithoutParent).value.unsafeRunSync()
+        triplesGenerator.generateTriples(commitEvent).value.unsafeRunSync()
       }
 
-      actual.getMessage should startWith(s"${commonLogMessage(commitWithoutParent)} triples generation failed: ")
+      actual.getMessage should startWith(s"${commonLogMessage(commitEvent)} triples generation failed: ")
       actual.getMessage should not include accessToken.value
       actual.getMessage should include(accessToken.toString)
       actual.getCause shouldBe null
@@ -450,13 +398,13 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesGenerator.generateTriples(commitWithoutParent)(maybeAccessToken).value.unsafeRunSync()
+        triplesGenerator.generateTriples(commitEvent)(maybeAccessToken).value.unsafeRunSync()
       }
-      actual.getMessage shouldBe s"${commonLogMessage(commitWithoutParent)} triples generation failed"
+      actual.getMessage shouldBe s"${commonLogMessage(commitEvent)} triples generation failed"
       actual.getCause   shouldBe exception
     }
 
-    "fail when checking if a file exists" in new TestCase {
+    "fail when checking if a file exists fails" in new TestCase {
 
       (file
         .mkdir(_: Path))
@@ -491,13 +439,13 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesGenerator.generateTriples(commitWithoutParent)(maybeAccessToken).value.unsafeRunSync()
+        triplesGenerator.generateTriples(commitEvent)(maybeAccessToken).value.unsafeRunSync()
       }
-      actual.getMessage shouldBe s"${commonLogMessage(commitWithoutParent)} triples generation failed"
+      actual.getMessage shouldBe s"${commonLogMessage(commitEvent)} triples generation failed"
       actual.getCause   shouldBe exception
     }
 
-    "fail when removing a file" in new TestCase {
+    "fail when removing a file fails" in new TestCase {
 
       (file
         .mkdir(_: Path))
@@ -539,13 +487,13 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesGenerator.generateTriples(commitWithoutParent)(maybeAccessToken).value.unsafeRunSync()
+        triplesGenerator.generateTriples(commitEvent)(maybeAccessToken).value.unsafeRunSync()
       }
-      actual.getMessage shouldBe s"${commonLogMessage(commitWithoutParent)} triples generation failed"
+      actual.getMessage shouldBe s"${commonLogMessage(commitEvent)} triples generation failed"
       actual.getCause   shouldBe exception
     }
 
-    "fail when checking out the current revision" in new TestCase {
+    "fail when checking out the current revision fails" in new TestCase {
 
       (file
         .mkdir(_: Path))
@@ -589,9 +537,9 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesGenerator.generateTriples(commitWithoutParent)(maybeAccessToken).value.unsafeRunSync()
+        triplesGenerator.generateTriples(commitEvent)(maybeAccessToken).value.unsafeRunSync()
       }
-      actual.getMessage shouldBe s"${commonLogMessage(commitWithoutParent)} triples generation failed"
+      actual.getMessage shouldBe s"${commonLogMessage(commitEvent)} triples generation failed"
       actual.getCause   shouldBe exception
     }
 
@@ -622,7 +570,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
       val exception = exceptions.generateOne
       (renku
         .migrate(_: CommitEvent)(_: RepositoryPath))
-        .expects(commitWithoutParent, repositoryDirectory)
+        .expects(commitEvent, repositoryDirectory)
         .returning(IO.raiseError(exception))
 
       (file
@@ -632,13 +580,13 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesGenerator.generateTriples(commitWithoutParent)(maybeAccessToken).value.unsafeRunSync()
+        triplesGenerator.generateTriples(commitEvent)(maybeAccessToken).value.unsafeRunSync()
       }
-      actual.getMessage shouldBe s"${commonLogMessage(commitWithoutParent)} triples generation failed"
+      actual.getMessage shouldBe s"${commonLogMessage(commitEvent)} triples generation failed"
       actual.getCause   shouldBe exception
     }
 
-    "fail if calling 'renku log' fails" in new TestCase {
+    "fail if calling 'renku export' fails" in new TestCase {
 
       (file
         .mkdir(_: Path))
@@ -664,13 +612,13 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
 
       (renku
         .migrate(_: CommitEvent)(_: RepositoryPath))
-        .expects(commitWithoutParent, repositoryDirectory)
+        .expects(commitEvent, repositoryDirectory)
         .returning(IO.unit)
 
       val exception = exceptions.generateOne
       (renku
-        .log(_: CommitEventWithoutParent)(_: (CommitEventWithoutParent, Path) => CommandResult, _: RepositoryPath))
-        .expects(commitWithoutParent, renku.commitWithoutParentTriplesFinder, repositoryDirectory)
+        .`export`(_: RepositoryPath))
+        .expects(repositoryDirectory)
         .returning(EitherT.right[ProcessingRecoverableError](exception.raiseError[IO, JsonLDTriples]))
 
       (file
@@ -680,9 +628,9 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesGenerator.generateTriples(commitWithoutParent)(maybeAccessToken).value.unsafeRunSync()
+        triplesGenerator.generateTriples(commitEvent)(maybeAccessToken).value.unsafeRunSync()
       }
-      actual.getMessage shouldBe s"${commonLogMessage(commitWithoutParent)} triples generation failed"
+      actual.getMessage shouldBe s"${commonLogMessage(commitEvent)} triples generation failed"
       actual.getCause   shouldBe exception
     }
 
@@ -712,12 +660,12 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
 
       (renku
         .migrate(_: CommitEvent)(_: RepositoryPath))
-        .expects(commitWithoutParent, repositoryDirectory)
+        .expects(commitEvent, repositoryDirectory)
         .returning(IO.unit)
 
       (renku
-        .log(_: CommitEventWithoutParent)(_: (CommitEventWithoutParent, Path) => CommandResult, _: RepositoryPath))
-        .expects(commitWithoutParent, renku.commitWithoutParentTriplesFinder, repositoryDirectory)
+        .export(_: RepositoryPath))
+        .expects(repositoryDirectory)
         .returning(rightT(triples))
 
       val exception = exceptions.generateOne
@@ -728,9 +676,9 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
         .atLeastOnce()
 
       val actual = intercept[Exception] {
-        triplesGenerator.generateTriples(commitWithoutParent)(maybeAccessToken).value.unsafeRunSync()
+        triplesGenerator.generateTriples(commitEvent)(maybeAccessToken).value.unsafeRunSync()
       }
-      actual.getMessage shouldBe s"${commonLogMessage(commitWithoutParent)} triples generation failed"
+      actual.getMessage shouldBe s"${commonLogMessage(commitEvent)} triples generation failed"
       actual.getCause   shouldBe exception
     }
   }
@@ -745,18 +693,10 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
       .map(_.value)
       .getOrElse("path") / s"$projectPath.git"
 
-    lazy val commitWithoutParent @ CommitEventWithoutParent(_, _, commitId) = {
+    lazy val commitEvent @ CommitEvent(_, _, commitId) = {
       val commitId = commitIds.generateOne
-      CommitEventWithoutParent(EventId(commitId.value), Project(projectIds.generateOne, projectPath), commitId)
+      CommitEvent(EventId(commitId.value), Project(projectIds.generateOne, projectPath), commitId)
     }
-
-    def toCommitWithParent(commitWithoutParent: CommitEventWithoutParent): CommitEventWithParent =
-      CommitEventWithParent(
-        commitWithoutParent.eventId,
-        commitWithoutParent.project,
-        commitWithoutParent.commitId,
-        commitIds.generateOne
-      )
 
     val pathDifferentiator: Int = Gen.choose(1, 100).generateOne
 

@@ -19,49 +19,45 @@
 package ch.datascience.triplesgenerator
 package events.categories.awaitinggeneration
 
-import cats.{MonadError, Show}
 import cats.data.EitherT.{fromEither, fromOption}
-import cats.data.NonEmptyList
 import cats.effect.{ContextShift, Effect, IO, Timer}
-import ch.datascience.events.{EventRequestContent, consumers}
+import cats.{MonadThrow, Show}
+import ch.datascience.events.consumers.EventSchedulingResult
 import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
-import ch.datascience.events.consumers.EventSchedulingResult
+import ch.datascience.events.{EventRequestContent, consumers}
 import ch.datascience.graph.model.RenkuVersionPair
-import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventBody}
+import ch.datascience.graph.model.events.{CategoryName, EventBody}
 import ch.datascience.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private[events] class EventHandler[Interpretation[_]: Effect](
+private[events] class EventHandler[Interpretation[_]: Effect: MonadThrow](
     override val categoryName: CategoryName,
     eventsProcessingRunner:    EventsProcessingRunner[Interpretation],
     eventBodyDeserializer:     EventBodyDeserializer[Interpretation],
     currentVersionPair:        RenkuVersionPair,
     logger:                    Logger[Interpretation]
-)(implicit
-    ME: MonadError[Interpretation, Throwable]
 ) extends consumers.EventHandler[Interpretation] {
 
   import currentVersionPair.schemaVersion
-  import eventBodyDeserializer.toCommitEvents
+  import eventBodyDeserializer.toCommitEvent
   import eventsProcessingRunner.scheduleForProcessing
 
   override def handle(requestContent: EventRequestContent): Interpretation[EventSchedulingResult] = {
     for {
-      _            <- fromEither[Interpretation](requestContent.event.validateCategoryName)
-      eventId      <- fromEither(requestContent.event.getEventId)
-      eventBody    <- fromOption[Interpretation](requestContent.maybePayload.map(EventBody.apply), BadRequest)
-      commitEvents <- toCommitEvents(eventBody).toRightT(recoverTo = BadRequest)
-      result <- scheduleForProcessing(eventId, commitEvents, schemaVersion).toRightT
-                  .semiflatTap(logger.log(eventId -> commitEvents))
-                  .leftSemiflatTap(logger.log(eventId -> commitEvents))
+      _           <- fromEither[Interpretation](requestContent.event.validateCategoryName)
+      eventBody   <- fromOption[Interpretation](requestContent.maybePayload.map(EventBody.apply), BadRequest)
+      commitEvent <- toCommitEvent(eventBody).toRightT(recoverTo = BadRequest)
+      result <- scheduleForProcessing(commitEvent, schemaVersion).toRightT
+                  .semiflatTap(logger.log(commitEvent))
+                  .leftSemiflatTap(logger.log(commitEvent))
     } yield result
   }.merge
 
-  private implicit lazy val eventInfoToString: Show[(CompoundEventId, NonEmptyList[CommitEvent])] = Show.show {
-    case (eventId, events) => s"$eventId, projectPath = ${events.head.project.path}"
+  private implicit lazy val eventInfoToString: Show[CommitEvent] = Show.show { event =>
+    s"${event.compoundEventId}, projectPath = ${event.project.path}"
   }
 }
 

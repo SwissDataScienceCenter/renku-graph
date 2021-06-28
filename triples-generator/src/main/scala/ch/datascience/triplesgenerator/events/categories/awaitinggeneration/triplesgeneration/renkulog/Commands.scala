@@ -23,7 +23,7 @@ import cats.MonadError
 import cats.data.EitherT
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.ServiceUrl
-import ch.datascience.graph.config.{GitLabUrl, RenkuLogTimeout}
+import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
@@ -32,7 +32,6 @@ import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent
-import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent._
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 
 import scala.concurrent.ExecutionContext
@@ -148,22 +147,17 @@ private object Commands {
     }
   }
 
-  class Renku(
-      timeout: RenkuLogTimeout
-  )(implicit
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO],
-      ME:               MonadError[IO, Throwable],
-      executionContext: ExecutionContext
+  class Renku(renkuExport: Path => CommandResult = %%("renku", "graph", "export")(_))(implicit
+      contextShift:        ContextShift[IO],
+      timer:               Timer[IO],
+      ME:                  MonadError[IO, Throwable],
+      executionContext:    ExecutionContext
   ) {
 
     import cats.syntax.all._
 
-    import scala.util.Try
-
     def migrate(commitEvent: CommitEvent)(implicit destinationDirectory: RepositoryPath): IO[Unit] =
-      IO(%%("renku", "migrate")(destinationDirectory.value))
-        .flatMap(_ => IO.unit)
+      IO(%%("renku", "migrate")(destinationDirectory.value)).void
         .recoverWith { case NonFatal(exception) =>
           IO.raiseError {
             new Exception(
@@ -173,73 +167,17 @@ private object Commands {
           }
         }
 
-    def log[T <: CommitEvent](
-        commit: T
-    )(implicit
-        generateTriples:      (T, Path) => CommandResult,
-        destinationDirectory: RepositoryPath
-    ): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] =
+    def export(implicit destinationDirectory: RepositoryPath): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] =
       EitherT {
-        IO.race(
-          call(generateTriples(commit, destinationDirectory.value)),
-          timer sleep timeout.value
-        ).flatMap {
-          case Left(result) => IO.pure(result)
-          case Right(_)     => timeoutExceededError(commit)
+        {
+          for {
+            triplesAsString <- IO(renkuExport(destinationDirectory.value).out.string.trim)
+            wrappedTriples  <- JsonLDTriples.parse[IO](triplesAsString)
+          } yield wrappedTriples.asRight[ProcessingRecoverableError]
+        }.recoverWith {
+          case ShelloutException(result) if result.exitCode == 137 =>
+            GenerationRecoverableError("Not enough memory").asLeft[JsonLDTriples].pure[IO]
         }
       }
-
-    private def timeoutExceededError(commitEvent: CommitEvent): IO[Either[ProcessingRecoverableError, JsonLDTriples]] =
-      ME.raiseError {
-        new Exception(
-          s"'renku log' execution for commit: ${commitEvent.commitId}, project: ${commitEvent.project.id} took longer than $timeout - terminating"
-        )
-      }
-
-    private def call(generateTriples: => CommandResult): IO[Either[ProcessingRecoverableError, JsonLDTriples]] =
-      IO.cancelable[Either[ProcessingRecoverableError, JsonLDTriples]] { callback =>
-        executionContext.execute { () =>
-          {
-            for {
-              triplesAsString <- Try(generateTriples.out.string.trim)
-              wrappedTriples  <- JsonLDTriples.parse[Try](triplesAsString)
-            } yield callback(Right(Right(wrappedTriples)))
-          }.recover {
-            case NonFatal(ShelloutException(result)) if result.exitCode == 137 =>
-              callback(Right(Left(GenerationRecoverableError("Not enough memory"))))
-            case NonFatal(exception) =>
-              callback(Left(exception))
-          }.fold(throw _, identity)
-        }
-        IO.unit
-      }
-
-    implicit val commitWithoutParentTriplesFinder: (CommitEventWithoutParent, Path) => CommandResult = {
-      case (_, destinationDirectory) =>
-        %%("renku", "log", "--format", "json-ld", "--strict")(destinationDirectory)
-    }
-
-    implicit val commitWithParentTriplesFinder: (CommitEventWithParent, Path) => CommandResult = {
-      case (commit, destinationDirectory) =>
-        val changedFiles = %%(
-          "git",
-          "diff-tree",
-          "--no-commit-id",
-          "--name-only",
-          "-r",
-          commit.commitId.toString
-        )(destinationDirectory).out.lines
-
-        %%(
-          "renku",
-          "log",
-          "--format",
-          "json-ld",
-          "--strict",
-          "--revision",
-          s"${commit.parentId}..${commit.commitId}",
-          changedFiles
-        )(destinationDirectory)
-    }
   }
 }

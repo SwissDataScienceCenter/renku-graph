@@ -64,7 +64,7 @@ class ProjectsResourcesSpec
   private val (parentProject, project) = {
     val creator = personEntities(withGitLabId, withEmail).generateOne
     val (parent, child) = projectEntities[entities.Project.ForksCount.Zero](visibilityPublic).generateOne
-      .copy(maybeCreator = creator.some, members = personEntities(withGitLabId).generateSet() + creator)
+      .copy(maybeCreator = creator.some, members = personEntities(withGitLabId).generateFixedSizeSet() + creator)
       .forkOnce()
 
     dataProjects(parent).generateOne -> dataProjects(

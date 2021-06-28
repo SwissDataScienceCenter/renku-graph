@@ -22,27 +22,6 @@ import ch.datascience.events.consumers.Project
 import ch.datascience.graph.model.events._
 import ch.datascience.triplesgenerator.events.categories.models.CategoryEvent
 
-private sealed trait CommitEvent extends Product with Serializable with CategoryEvent {
-  val eventId:  EventId
-  val project:  Project
-  val commitId: CommitId
-
+private final case class CommitEvent(eventId: EventId, project: Project, commitId: CommitId) extends CategoryEvent {
   override val compoundEventId = CompoundEventId(eventId, project.id)
-}
-
-private object CommitEvent {
-
-  final case class CommitEventWithParent(
-      eventId:  EventId,
-      project:  Project,
-      commitId: CommitId,
-      parentId: CommitId
-  ) extends CommitEvent
-
-  final case class CommitEventWithoutParent(
-      eventId:  EventId,
-      project:  Project,
-      commitId: CommitId
-  ) extends CommitEvent
-
 }

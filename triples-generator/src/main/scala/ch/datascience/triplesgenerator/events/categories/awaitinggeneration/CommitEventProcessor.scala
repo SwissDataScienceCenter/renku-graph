@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.events.categories.awaitinggeneration
 
 import cats.MonadThrow
-import cats.data.{EitherT, NonEmptyList}
+import cats.data.EitherT
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.graph.model.SchemaVersion
@@ -43,10 +43,7 @@ import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 private trait EventProcessor[Interpretation[_]] {
-  def process(eventId:              CompoundEventId,
-              events:               NonEmptyList[CommitEvent],
-              currentSchemaVersion: SchemaVersion
-  ): Interpretation[Unit]
+  def process(event: CommitEvent, currentSchemaVersion: SchemaVersion): Interpretation[Unit]
 }
 
 private class CommitEventProcessor[Interpretation[_]: MonadThrow](
@@ -63,28 +60,18 @@ private class CommitEventProcessor[Interpretation[_]: MonadThrow](
   import accessTokenFinder._
   import triplesGenerator._
 
-  def process(eventId:              CompoundEventId,
-              events:               NonEmptyList[CommitEvent],
-              currentSchemaVersion: SchemaVersion
-  ): Interpretation[Unit] = allEventsTimeRecorder.measureExecutionTime {
-    for {
-      maybeAccessToken <- findAccessToken(events.head.project.path) recoverWith rollbackEvent(events.head)
-      uploadingResults <- generateAllTriples(events, currentSchemaVersion)(maybeAccessToken)
-    } yield uploadingResults
-  } flatMap logSummary recoverWith logError(events.head)
+  def process(event: CommitEvent, currentSchemaVersion: SchemaVersion): Interpretation[Unit] =
+    allEventsTimeRecorder.measureExecutionTime {
+      for {
+        maybeAccessToken <- findAccessToken(event.project.path) recoverWith rollbackEvent(event)
+        uploadingResult  <- generateAndUpdateStatus(event, currentSchemaVersion)(maybeAccessToken)
+      } yield uploadingResult
+    } flatMap logSummary recoverWith logError(event)
 
   private def logError(event: CommitEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
     case NonFatal(exception) =>
       logger.error(exception)(s"${logMessageCommon(event)}: commit Event processing failure")
   }
-
-  private def generateAllTriples(
-      commits:                 NonEmptyList[CommitEvent],
-      currentSchemaVersion:    SchemaVersion
-  )(implicit maybeAccessToken: Option[AccessToken]): Interpretation[NonEmptyList[TriplesGenerationResult]] =
-    commits
-      .map(commit => generateAndUpdateStatus(commit, currentSchemaVersion))
-      .sequence
 
   private def generateAndUpdateStatus(
       commit:                  CommitEvent,
@@ -160,21 +147,10 @@ private class CommitEventProcessor[Interpretation[_]: MonadThrow](
       .map(_ => NonRecoverableError(commit, exception): TriplesGenerationResult)
   }
 
-  private def logSummary: ((ElapsedTime, NonEmptyList[TriplesGenerationResult])) => Interpretation[Unit] = {
-    case (elapsedTime, uploadingResults) =>
-      val (processed, failed) =
-        uploadingResults.foldLeft((List.empty[TriplesGenerated], List.empty[GenerationError])) {
-          case ((allProcessed, allFailed), processed @ TriplesGenerated(_, _, _, _)) =>
-            (allProcessed :+ processed, allFailed)
-          case ((allProcessed, allFailed), failed: GenerationError) =>
-            (allProcessed, allFailed :+ failed)
-        }
-      logger.info(
-        s"${logMessageCommon(uploadingResults.head.commit)} processed in ${elapsedTime}ms: " +
-          s"${uploadingResults.size} commits, " +
-          s"${processed.size} successfully processed, " +
-          s"${failed.size} failed"
-      )
+  private def logSummary: ((ElapsedTime, TriplesGenerationResult)) => Interpretation[Unit] = {
+    case (elapsedTime, uploadingResult @ TriplesGenerated(_, _, _, _)) =>
+      logger.info(s"${logMessageCommon(uploadingResult.commit)} processed in ${elapsedTime}ms")
+    case _ => ().pure[Interpretation]
   }
 
   private def rollbackEvent(commit: CommitEvent): PartialFunction[Throwable, Interpretation[Option[AccessToken]]] = {

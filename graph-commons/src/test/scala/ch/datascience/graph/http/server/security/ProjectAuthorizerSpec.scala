@@ -87,7 +87,7 @@ class ProjectAuthorizerSpec extends AnyWordSpec with InMemoryRdfStore with shoul
     "fail if the given project is non-public and the user does not have rights for it" in new TestCase {
       val project = projectEntities[Project.ForksCount.Zero](visibilityNonPublic).generateOne.copy(
         visibility = Gen.oneOf(Private, Internal).generateOne,
-        members = personEntities.generateSet()
+        members = personEntities.generateFixedSizeSet()
       )
 
       loadToStore(project.asJsonLD)
@@ -100,7 +100,7 @@ class ProjectAuthorizerSpec extends AnyWordSpec with InMemoryRdfStore with shoul
     "fail if the given project is non-public and there's no authorized user" in new TestCase {
       val project = projectEntities[Project.ForksCount.Zero](visibilityNonPublic).generateOne.copy(
         visibility = Gen.oneOf(Private, Internal).generateOne,
-        members = personEntities.generateSet()
+        members = personEntities.generateFixedSizeSet()
       )
 
       loadToStore(project.asJsonLD)

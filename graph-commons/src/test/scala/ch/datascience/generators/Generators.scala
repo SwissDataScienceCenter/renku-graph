@@ -355,11 +355,17 @@ object Generators {
       def generateAs[TT <: TinyType { type V = T }](implicit ttFactory: T => TT): TT =
         generateExample(generator map ttFactory)
 
-      def generateList(ofSize: Int Refined Positive): List[T] =
+      def generateFixedSizeList(ofSize: Int Refined Positive): List[T] =
         generateNonEmptyList(minElements = ofSize, maxElements = ofSize).toList
 
-      def generateSet(ofSize: Int Refined Positive = 5): Set[T] =
+      def generateList(minElements: Int Refined NonNegative = 0, maxElements: Int Refined Positive = 5): List[T] =
+        generateExample(listOf(generator, minElements, maxElements))
+
+      def generateFixedSizeSet(ofSize: Int Refined Positive = 5): Set[T] =
         generateExample(setOf(generator, minElements = ofSize, maxElements = ofSize))
+
+      def generateSet(minElements: Int Refined NonNegative = 0, maxElements: Int Refined Positive = 5): Set[T] =
+        generateExample(setOf(generator, minElements, maxElements))
 
       def generateNonEmptyList(minElements: Int Refined Positive = 1,
                                maxElements: Int Refined Positive = 5

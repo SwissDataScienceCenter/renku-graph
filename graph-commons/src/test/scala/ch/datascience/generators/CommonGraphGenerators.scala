@@ -27,7 +27,7 @@ import ch.datascience.crypto.AesCrypto
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.Schemas
-import ch.datascience.graph.config.{GitLabApiUrl, GitLabUrl, RenkuBaseUrl, RenkuLogTimeout}
+import ch.datascience.graph.config.{GitLabApiUrl, GitLabUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.CliVersion
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.RestClientError._
@@ -49,8 +49,6 @@ import org.scalacheck.{Arbitrary, Gen}
 
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Base64
-import scala.concurrent.duration._
-import scala.language.postfixOps
 import scala.util.Try
 
 object CommonGraphGenerators {
@@ -103,8 +101,6 @@ object CommonGraphGenerators {
     .listOfN(3, positiveInts(max = 50))
     .map(_.mkString("."))
     .map(CliVersion.apply)
-
-  implicit val renkuLogTimeouts: Gen[RenkuLogTimeout] = durations(max = 5 hours) map RenkuLogTimeout.apply
 
   implicit val microserviceBaseUrls: Gen[MicroserviceBaseUrl] = for {
     protocol <- Arbitrary.arbBool.arbitrary map {

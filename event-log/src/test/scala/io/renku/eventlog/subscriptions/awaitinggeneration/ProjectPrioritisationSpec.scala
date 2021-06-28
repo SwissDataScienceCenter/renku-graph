@@ -125,7 +125,7 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
         val project2 = projectInfos.generateOne.copy(currentOccupancy = 1, latestEventDate = EventDate(now()))
         val project3 = projectInfos.generateOne.copy(currentOccupancy = 12)
 
-        val projectsAwaitingGeneration = projectInfos.generateList(4).map(_.copy(currentOccupancy = 0))
+        val projectsAwaitingGeneration = projectInfos.generateFixedSizeList(4).map(_.copy(currentOccupancy = 0))
 
         val projects = List(project0, project1, project2, project3) ++ projectsAwaitingGeneration
 
