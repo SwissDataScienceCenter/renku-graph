@@ -30,13 +30,12 @@ import ch.datascience.http.client.RestClientError.{ClientException, Connectivity
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import org.http4s.Method.POST
-import org.http4s.Status.{BadGateway, GatewayTimeout, NotFound, Ok, ServiceUnavailable}
+import org.http4s.Status.{Accepted, BadGateway, GatewayTimeout, NotFound, ServiceUnavailable}
 import org.http4s.{Request, Response, Status, Uri}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.{Duration, FiniteDuration}
-import scala.concurrent.duration._
+import scala.concurrent.duration.{Duration, FiniteDuration, _}
 import scala.language.postfixOps
 
 trait EventSender[Interpretation[_]] {
@@ -92,8 +91,7 @@ class EventSenderImpl[Interpretation[_]: ConcurrentEffect: Timer](
 
   private lazy val responseMapping
       : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[Unit]] = {
-    case (Ok, _, _)       => ().pure[Interpretation]
-    case (NotFound, _, _) => ().pure[Interpretation]
+    case (Accepted | NotFound, _, _) => ().pure[Interpretation]
   }
 }
 

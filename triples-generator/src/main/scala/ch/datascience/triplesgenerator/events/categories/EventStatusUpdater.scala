@@ -81,7 +81,8 @@ private class EventStatusUpdaterImpl[Interpretation[_]: MonadThrow](
           "path": $projectPath
         },
         "newStatus": $TriplesGenerated,
-        "processingTime": $processingTime }""",
+        "processingTime": $processingTime
+      }""",
       maybePayload = json"""{
         "payload": ${payload.value.noSpaces},
         "schemaVersion": $schemaVersion

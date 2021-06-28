@@ -101,10 +101,20 @@ object Microservice extends IOMicroservice {
                                            queriesExecTimes,
                                            ApplicationLogger
                                          )
+        statusChangeEventSubscription <- events.categories.statuschange.SubscriptionFactory(
+                                           sessionResource,
+                                           awaitingGenerationGauge,
+                                           underTriplesGenerationGauge,
+                                           awaitingTransformationGauge,
+                                           underTransformationGauge,
+                                           queriesExecTimes,
+                                           ApplicationLogger
+                                         )
         eventConsumersRegistry <- consumers.EventConsumersRegistry(
                                     creationSubscription,
                                     zombieEventsSubscription,
-                                    commitSyncRequestSubscription
+                                    commitSyncRequestSubscription,
+                                    statusChangeEventSubscription
                                   )
         eventEndpoint            <- EventEndpoint(eventConsumersRegistry)
         processingStatusEndpoint <- IOProcessingStatusEndpoint(sessionResource, queriesExecTimes, ApplicationLogger)

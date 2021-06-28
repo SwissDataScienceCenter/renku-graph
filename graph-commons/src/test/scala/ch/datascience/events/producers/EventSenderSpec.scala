@@ -29,7 +29,7 @@ import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER
 import com.github.tomakehurst.wiremock.stubbing.Scenario
 import eu.timepit.refined.auto._
-import org.http4s.Status.{BadGateway, GatewayTimeout, NotFound, Ok, ServiceUnavailable}
+import org.http4s.Status.{Accepted, BadGateway, GatewayTimeout, NotFound, ServiceUnavailable}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -40,7 +40,7 @@ import scala.language.postfixOps
 class EventSenderSpec extends AnyWordSpec with ExternalServiceStubbing with should.Matchers {
 
   "sendEvent" should {
-    Set(Ok, NotFound) foreach { status =>
+    Set(Accepted, NotFound) foreach { status =>
       s"succeed if remote responds with status such as $status" in new TestCase {
         val eventRequest = post(urlEqualTo(s"/events"))
         stubFor {
@@ -77,7 +77,7 @@ class EventSenderSpec extends AnyWordSpec with ExternalServiceStubbing with shou
         stubFor {
           eventRequest
             .whenScenarioStateIs("Successful")
-            .willReturn(aResponse().withStatus(Ok.code))
+            .willReturn(aResponse().withStatus(Accepted.code))
         }
         eventSender
           .sendEvent(eventRequestContents.generateOne, nonBlankStrings().generateOne.value)
@@ -115,7 +115,7 @@ class EventSenderSpec extends AnyWordSpec with ExternalServiceStubbing with shou
       stubFor {
         eventRequest
           .whenScenarioStateIs("Successful")
-          .willReturn(aResponse().withStatus(Ok.code))
+          .willReturn(aResponse().withStatus(Accepted.code))
       }
 
       eventSender
