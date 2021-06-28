@@ -7,7 +7,6 @@ import org.scalacheck.Gen
 
 private object Generators {
   lazy val globalCommitSyncEvents: Gen[GlobalCommitSyncEvent] = for {
-//    commitId       <- commitIds
     projectId      <- projectIds
     projectPath    <- projectPaths
     lastSyncedDate <- lastSyncedDates

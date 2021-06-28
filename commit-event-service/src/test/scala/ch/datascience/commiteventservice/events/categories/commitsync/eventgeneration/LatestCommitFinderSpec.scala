@@ -19,7 +19,7 @@
 package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration
 
 import cats.effect.{ConcurrentEffect, IO, Timer}
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.Generators._
+import ch.datascience.commiteventservice.events.categories.common.Generators._
 import ch.datascience.commiteventservice.events.categories.common.CommitInfo
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators.{oauthAccessTokens, personalAccessTokens}

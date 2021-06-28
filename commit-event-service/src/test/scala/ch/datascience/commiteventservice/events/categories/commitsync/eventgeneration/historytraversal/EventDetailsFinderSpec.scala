@@ -19,7 +19,7 @@
 package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration
 package historytraversal
 
-import Generators._
+import ch.datascience.commiteventservice.events.categories.common.Generators._
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.config.EventLogUrl

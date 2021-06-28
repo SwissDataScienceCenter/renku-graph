@@ -22,7 +22,7 @@ package historytraversal
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.commiteventservice.events.categories
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.Generators._
+import ch.datascience.commiteventservice.events.categories.common.Generators._
 import ch.datascience.commiteventservice.events.categories.common
 import ch.datascience.commiteventservice.events.categories.common.CommitInfo
 import ch.datascience.control.Throttler
@@ -159,14 +159,16 @@ class CommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSer
             .willReturn(okJson(responseJson.toString()))
         }
 
-        finder.getMaybeCommitInfo(projectId, commitId)(maybeAccessToken).unsafeRunSync() shouldBe common.CommitInfo(
-          id = commitId,
-          message = commitMessage,
-          committedDate = committedDate,
-          author = author,
-          committer = committer,
-          parents = parents
-        ).some
+        finder.getMaybeCommitInfo(projectId, commitId)(maybeAccessToken).unsafeRunSync() shouldBe common
+          .CommitInfo(
+            id = commitId,
+            message = commitMessage,
+            committedDate = committedDate,
+            author = author,
+            committer = committer,
+            parents = parents
+          )
+          .some
       }
 
     "get commit info from the configured url " +
@@ -180,14 +182,16 @@ class CommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSer
             .willReturn(okJson(responseJson.toString()))
         }
 
-        finder.getMaybeCommitInfo(projectId, commitId)(maybeAccessToken).unsafeRunSync() shouldBe common.CommitInfo(
-          id = commitId,
-          message = commitMessage,
-          committedDate = committedDate,
-          author = author,
-          committer = committer,
-          parents = parents
-        ).some
+        finder.getMaybeCommitInfo(projectId, commitId)(maybeAccessToken).unsafeRunSync() shouldBe common
+          .CommitInfo(
+            id = commitId,
+            message = commitMessage,
+            committedDate = committedDate,
+            author = author,
+            committer = committer,
+            parents = parents
+          )
+          .some
       }
 
     "get commit info from the configured url " +
@@ -198,14 +202,16 @@ class CommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSer
             .willReturn(okJson(responseJson.toString()))
         }
 
-        finder.getMaybeCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync() shouldBe common.CommitInfo(
-          id = commitId,
-          message = commitMessage,
-          committedDate = committedDate,
-          author = author,
-          committer = committer,
-          parents = parents
-        ).some
+        finder.getMaybeCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync() shouldBe common
+          .CommitInfo(
+            id = commitId,
+            message = commitMessage,
+            committedDate = committedDate,
+            author = author,
+            committer = committer,
+            parents = parents
+          )
+          .some
       }
 
     "return None if remote client responds with Not found" in new TestCase {

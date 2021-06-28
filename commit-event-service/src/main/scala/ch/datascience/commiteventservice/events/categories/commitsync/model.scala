@@ -33,9 +33,3 @@ private final case class MinimalCommitSyncEvent(override val project: Project) e
   override lazy val toString: String =
     s"projectId = ${project.id}, projectPath = ${project.path}"
 }
-
-private final case class ProjectInfo(
-    id:         Id,
-    visibility: Visibility,
-    path:       Path
-)

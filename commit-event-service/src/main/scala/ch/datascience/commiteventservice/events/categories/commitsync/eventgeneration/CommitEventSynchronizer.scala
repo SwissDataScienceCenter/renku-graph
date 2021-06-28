@@ -18,15 +18,18 @@
 
 package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration
 
+import cats.{Applicative, MonadThrow}
 import cats.data.StateT
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import cats.{Applicative, MonadThrow}
 import ch.datascience.commiteventservice.events.EventStatusPatcher
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.SynchronizationSummary.{SummaryKey, SummaryState, add}
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.SynchronizationSummary
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.{CommitInfoFinder, CommitToEventLog, EventDetailsFinder}
 import ch.datascience.commiteventservice.events.categories.commitsync._
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.SynchronizationSummary
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.SynchronizationSummary.{SummaryKey, SummaryState, add}
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.{CommitInfoFinder, CommitToEventLog, EventDetailsFinder}
+import ch.datascience.commiteventservice.events.categories.common.UpdateResult._
+import ch.datascience.commiteventservice.events.categories.common.eventgeneration.CommitWithParents
+import ch.datascience.commiteventservice.events.categories.common.{CommitInfo, UpdateResult}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.events.consumers.Project
@@ -37,20 +40,7 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import org.typelevel.log4cats.Logger
-import ch.datascience.commiteventservice.events.categories.common.UpdateResult._
-import ch.datascience.commiteventservice.events.categories.common.eventgeneration.CommitWithParents
-import ch.datascience.commiteventservice.events.categories.common.{CommitInfo, UpdateResult}
 
-import cats.MonadThrow
-import cats.effect.{ConcurrentEffect, IO, Timer}
-import cats.syntax.all._
-import ch.datascience.commiteventservice.events.EventStatusPatcher
-import ch.datascience.events.consumers.Project
-import ch.datascience.graph.model.events.CommitId
-import org.typelevel.log4cats.Logger
-
-import scala.concurrent.ExecutionContext
-import scala.util.control.NonFatal
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 private[commitsync] trait CommitEventSynchronizer[Interpretation[_]] {
@@ -69,13 +59,13 @@ private[commitsync] class CommitEventSynchronizerImpl[Interpretation[_]: MonadTh
     clock:                 java.time.Clock = java.time.Clock.systemUTC()
 ) extends CommitEventSynchronizer[Interpretation] {
 
-  import executionTimeRecorder._
   import accessTokenFinder._
-  import latestCommitFinder._
-  import commitToEventLog._
   import commitInfoFinder._
+  import commitToEventLog._
   import eventDetailsFinder._
   import eventStatusPatcher._
+  import executionTimeRecorder._
+  import latestCommitFinder._
 
   override def synchronizeEvents(event: CommitSyncEvent): Interpretation[Unit] = (for {
     maybeAccessToken  <- findAccessToken(event.project.id)

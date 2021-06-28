@@ -20,7 +20,7 @@ package ch.datascience.commiteventservice.events.categories.commitsync.eventgene
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import Generators._
+import ch.datascience.commiteventservice.events.categories.common.Generators._
 import ch.datascience.commiteventservice.events.categories.common.CommitInfo
 import ch.datascience.commiteventservice.events.categories.common.eventgeneration.{Author, Committer}
 import ch.datascience.graph.model.GraphModelGenerators._

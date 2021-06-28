@@ -80,6 +80,17 @@ private[categories] object Person {
   sealed trait WithEmail { self: Person =>
     def email: Email
   }
+
+  import io.circe.Json
+  import io.circe.syntax._
+
+  implicit class PersonOps(person: Person) {
+
+    lazy val emailToJson: Json = person match {
+      case person: Person.WithEmail => person.email.value.asJson
+      case _ => Json.Null
+    }
+  }
 }
 
 import ch.datascience.commiteventservice.events.categories.common.eventgeneration.Person._

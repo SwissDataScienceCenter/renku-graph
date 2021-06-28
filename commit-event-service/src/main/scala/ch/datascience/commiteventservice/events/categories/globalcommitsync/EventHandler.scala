@@ -45,11 +45,12 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow](
     } yield result
   }.merge
 
-  private implicit val eventDecoder: Decoder[GlobalCommitSyncEvent] = cursor =>
-    for {
-      project    <- cursor.downField("project").as[Project]
-      lastSynced <- cursor.downField("lastSynced").as[LastSyncedDate]
-    } yield GlobalCommitSyncEvent(project, lastSynced)
+  private implicit val eventDecoder: Decoder[GlobalCommitSyncEvent] =
+    cursor =>
+      for {
+        project    <- cursor.downField("project").as[Project]
+        lastSynced <- cursor.downField("lastSynced").as[LastSyncedDate]
+      } yield GlobalCommitSyncEvent(project, lastSynced)
 
   private implicit lazy val projectDecoder: Decoder[Project] = cursor =>
     for {

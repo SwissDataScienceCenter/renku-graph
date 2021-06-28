@@ -3,19 +3,22 @@ package ch.datascience.commiteventservice.events.categories.globalcommitsync
 import cats.syntax.all._
 import ch.datascience.commiteventservice.events.EventStatusPatcher
 import ch.datascience.commiteventservice.events.categories.common.CommitInfo
+import ch.datascience.commiteventservice.events.categories.common.Generators.commitInfos
 import ch.datascience.commiteventservice.events.categories.globalcommitsync.Generators.globalCommitSyncEvents
 import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.history.EventDetailsFinder
-import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.{CommitWithParents, GlobalCommitEventSynchronizerImpl}
+import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.{CommitWithParents, GitLabCommitFetcher, GlobalCommitEventSynchronizerImpl}
 import ch.datascience.generators.CommonGraphGenerators.personalAccessTokens
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
+import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.EventsGenerators.batchDates
 import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.graph.tokenrepository.AccessTokenFinder.projectIdToPath
+import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Error
+import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.logging.TestExecutionTimeRecorder
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -27,10 +30,25 @@ import scala.util.{Failure, Success, Try}
 class GlobalCommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with MockFactory {
 
   "synchronizeEvents" should {
-    "succeed if there are events in GitLab which were deleted in the beginning" in new TestCase {
+    "succeed if commits are in sync between EL and GitLab" in new TestCase {
       val event = globalCommitSyncEvents.generateOne
-      true should be(true)
+
+      givenAccessTokenIsFound(event.project.id)
+
+      givenAtLeastOneCommitForProjectIsFound(event.project.id)
+
+      commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
+
+      logger.loggedOnly(
+        Info(s"${logMessageCommon(event)} -> event skipped in ${executionTimeRecorder.elapsedTime}ms")
+      )
     }
+
+    "succeed if the only event in Event Log has the id '0000000000000000000000000000000000000000'" +
+      "log the event as skipped" in new TestCase {
+        val event = globalCommitSyncEvents.generateOne
+
+      }
 
     "fail if finding Access Token for one of the event fails" in new TestCase {
       val event     = globalCommitSyncEvents.generateOne
@@ -58,6 +76,8 @@ class GlobalCommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers
 
     val accessTokenFinder = mock[AccessTokenFinder[Try]]
 
+    val gitLabCommitFetcher = mock[GitLabCommitFetcher[Try]]
+
     val eventDetailsFinder = mock[EventDetailsFinder[Try]]
 
     val eventStatusPatcher = mock[EventStatusPatcher[Try]]
@@ -65,6 +85,7 @@ class GlobalCommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers
     val executionTimeRecorder = TestExecutionTimeRecorder[Try](logger)
 
     val commitEventSynchronizer = new GlobalCommitEventSynchronizerImpl[Try](accessTokenFinder,
+                                                                             gitLabCommitFetcher,
                                                                              eventDetailsFinder,
                                                                              eventStatusPatcher,
                                                                              executionTimeRecorder,
@@ -76,9 +97,14 @@ class GlobalCommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers
       .expects(projectId, projectIdToPath)
       .returning(Success(maybeAccessToken))
 
-//    def givenLatestCommitIsFound(commitInfo: CommitInfo, projectId: Id) = (latestCommitFinder.findLatestCommit _)
-//      .expects(projectId, maybeAccessToken)
-//      .returning(OptionT.some[Try](commitInfo))
+    def givenAtLeastOneCommitForProjectIsFound(projectId: Id,
+                                               expectedCommitInfos: List[CommitInfo] =
+                                                 commitInfos.generateNonEmptyList().toList
+    ) =
+      (gitLabCommitFetcher
+        .fetchAllGitLabCommits(_: projects.Id)(_: Option[AccessToken]))
+        .expects(projectId, maybeAccessToken)
+        .returning(Success(expectedCommitInfos))
 
     def givenCommitIsInGL = ???
 //    (commitInfo: CommitInfo, projectId: Id) = (commitInfoFinder

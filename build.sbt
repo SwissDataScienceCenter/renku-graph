@@ -168,10 +168,10 @@ lazy val commonSettings = Seq(
     "-Xlint:package-object-classes", // Class or object defined in package object.
     "-Xlint:private-shadow", // A private field (or class parameter) shadows a superclass field.
     "-Wdead-code", // Warn when dead code is identified.
-    "-Wunused:imports", // Warn if an import selector is not referenced.
-    "-Wunused:patvars", // Warn if a variable bound in a pattern is unused.
-    "-Wunused:locals", // Warn if a local definition is unused.
-    "-Wunused:explicits", // Warn if an explicit parameter is unused.
+//    "-Wunused:imports", // Warn if an import selector is not referenced.
+//    "-Wunused:patvars", // Warn if a variable bound in a pattern is unused.
+//    "-Wunused:locals", // Warn if a local definition is unused.
+//    "-Wunused:explicits", // Warn if an explicit parameter is unused.
     "-Wvalue-discard", // Warn when non-Unit expression results are unused.
     "-Ybackend-parallelism", "8",
     "-Ycache-plugin-class-loader:last-modified", // Enables caching of classloaders for compiler plugins

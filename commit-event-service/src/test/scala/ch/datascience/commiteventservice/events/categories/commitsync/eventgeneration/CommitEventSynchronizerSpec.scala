@@ -22,7 +22,7 @@ import cats.data.OptionT
 import cats.syntax.all._
 import ch.datascience.commiteventservice.events.EventStatusPatcher
 import ch.datascience.commiteventservice.events.categories.commitsync.Generators._
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.Generators.commitInfos
+import ch.datascience.commiteventservice.events.categories.common.Generators.commitInfos
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.{CommitInfoFinder, CommitToEventLog, EventDetailsFinder}
 import ch.datascience.commiteventservice.events.categories.commitsync.{categoryName, logMessageCommon}
 import ch.datascience.commiteventservice.events.categories.common.CommitInfo

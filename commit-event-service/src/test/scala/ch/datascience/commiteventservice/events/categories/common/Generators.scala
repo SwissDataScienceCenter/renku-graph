@@ -1,28 +1,7 @@
-/*
- * Copyright 2021 Swiss Data Science Center (SDSC)
- * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
- * Eidgenössische Technische Hochschule Zürich (ETHZ).
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+package ch.datascience.commiteventservice.events.categories.common
 
-package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration
-
-import ch.datascience.commiteventservice.events.categories
-import ch.datascience.commiteventservice.events.categories.commitsync.ProjectInfo
-import ch.datascience.commiteventservice.events.categories.common.eventgeneration.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
 import ch.datascience.commiteventservice.events.categories.common
-import ch.datascience.commiteventservice.events.categories.common.CommitInfo
+import ch.datascience.commiteventservice.events.categories.common.eventgeneration.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
 import ch.datascience.commiteventservice.events.categories.common.eventgeneration.{Author, Commit, CommitEvent, Committer}
 import ch.datascience.events.consumers.Project
 import ch.datascience.generators.Generators.listOf
@@ -32,7 +11,7 @@ import ch.datascience.graph.model.events.CommitId
 import org.scalacheck.Gen
 import org.scalacheck.Gen.choose
 
-private object Generators {
+private[categories] object Generators {
 
   implicit val commits: Gen[Commit] = for {
     id      <- commitIds

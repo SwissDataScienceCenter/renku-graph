@@ -22,7 +22,7 @@ package historytraversal
 
 import cats.syntax.all._
 import ch.datascience.commiteventservice.events.categories.common.eventgeneration.CommitEvent._
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.Generators._
+import ch.datascience.commiteventservice.events.categories.common.Generators._
 import ch.datascience.commiteventservice.events.categories.common.CommitInfo
 import ch.datascience.commiteventservice.events.categories.common.eventgeneration.CommitEvent
 import ch.datascience.events.consumers.Project

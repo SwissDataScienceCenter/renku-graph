@@ -19,7 +19,7 @@
 package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration
 package historytraversal
 
-import Generators._
+import ch.datascience.commiteventservice.events.categories.common.Generators._
 import cats.MonadError
 import ch.datascience.commiteventservice.events.categories.common.eventgeneration.{CommitEvent, Person}
 import ch.datascience.generators.Generators.Implicits._
