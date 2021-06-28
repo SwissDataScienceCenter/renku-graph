@@ -32,6 +32,7 @@ object model {
   private[lineage] final class RunDate private (val value: Instant) extends AnyVal with InstantTinyType
   private[lineage] implicit object RunDate extends TinyTypeFactory[RunDate](new RunDate(_))
   private[lineage] type FromAndToNodes = (Set[Node.Location], Set[Node.Location])
+  private[lineage] type EdgeMapEntry   = (RunInfo, FromAndToNodes)
   private[lineage] type EdgeMap        = Map[RunInfo, FromAndToNodes]
 
   final case class Lineage private (edges: Set[Edge], nodes: Set[Node]) extends LineageOps
