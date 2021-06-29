@@ -18,8 +18,8 @@
 
 package io.renku.jsonld
 
-import cats.implicits.catsSyntaxEitherId
-import io.circe.{Encoder, Json}
+import cats.syntax.all._
+import io.circe.{Encoder, Json, JsonNumber}
 import io.renku.jsonld.JsonLD.MalformedJsonLD
 import io.renku.jsonld.flatten.{JsonLDArrayFlatten, JsonLDEntityFlatten}
 
@@ -49,13 +49,15 @@ object JsonLD {
 
   def fromString(value: String): JsonLD = JsonLDValue(value)
 
-  def fromInt(value: Int): JsonLD = JsonLDValue(value)
+  def fromInt(value: Int): JsonLD = JsonLDValue(Json.fromInt(value).asNumber.getOrElse(throw new Exception("")))
 
-  def fromLong(value: Long): JsonLD = JsonLDValue(value)
+  def fromLong(value: Long): JsonLD = JsonLDValue(Json.fromLong(value).asNumber.getOrElse(throw new Exception("")))
 
-  def fromInstant(value: Instant): JsonLD = JsonLDValue(value, "http://www.w3.org/2001/XMLSchema#dateTime")
+  def fromNumber(value: JsonNumber): JsonLD = JsonLDValue(value)
 
-  def fromLocalDate(value: LocalDate): JsonLD = JsonLDValue(value, "http://schema.org/Date")
+  def fromInstant(value: Instant): JsonLD = JsonLDInstantValue.from(value)
+
+  def fromLocalDate(value: LocalDate): JsonLD = JsonLDLocalDateValue.from(value)
 
   def fromBoolean(value: Boolean): JsonLD = JsonLDValue(value)
 
@@ -147,6 +149,16 @@ object JsonLD {
   private[jsonld] object JsonLDValue {
     def apply[V](value: V, entityType: String)(implicit encoder: Encoder[V]): JsonLDValue[V] =
       JsonLDValue[V](value, Some(entityType))
+  }
+
+  private[jsonld] object JsonLDInstantValue {
+    val entityType = Schema.from("http://www.w3.org/2001/XMLSchema", "#") / "dateTime"
+    def from(instant: Instant): JsonLDValue[Instant] = JsonLDValue(instant, entityType.show.some)
+  }
+
+  private[jsonld] object JsonLDLocalDateValue {
+    val entityType = Schema.from("http://schema.org") / "Date"
+    def from(localDate: LocalDate): JsonLDValue[LocalDate] = JsonLDValue(localDate, entityType.show.some)
   }
 
   private[jsonld] final case object JsonLDNull extends JsonLD {

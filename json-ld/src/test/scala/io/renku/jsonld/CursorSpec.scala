@@ -23,6 +23,7 @@ import io.circe.DecodingFailure
 import io.renku.jsonld.generators.Generators.Implicits._
 import io.renku.jsonld.generators.JsonLDGenerators._
 import io.renku.jsonld.syntax._
+import org.scalacheck.Arbitrary
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -35,6 +36,23 @@ class CursorSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
       forAll { json: JsonLD =>
         json.cursor.as[JsonLD] shouldBe json.asRight[DecodingFailure]
       }
+    }
+  }
+
+  "entityId" should {
+
+    "return a Cursor pointing to object of the given type" in {
+      forAll { (id: EntityId, entityType: EntityType, property: (Property, JsonLD)) =>
+        val cursor = JsonLD
+          .entity(id, EntityTypes.of(entityType), property)
+          .cursor
+
+        cursor.entityId shouldBe cursor
+      }
+    }
+
+    "return an empty Cursor if object is not an JsonLDEntity" in {
+      JsonLD.fromInt(Arbitrary.arbInt.arbitrary.generateOne).cursor.entityId shouldBe Cursor.Empty
     }
   }
 

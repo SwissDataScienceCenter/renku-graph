@@ -20,7 +20,7 @@ package io.renku.jsonld
 
 import cats.Show
 import cats.syntax.all._
-import io.circe.{Encoder, Json}
+import io.circe.{Decoder, DecodingFailure, Encoder, Json}
 
 sealed abstract class EntityType(val value: String) extends Product with Serializable
 
@@ -33,6 +33,10 @@ object EntityType {
 
   implicit val entityTypeJsonEncoder: Encoder[EntityType] = Encoder.instance(t => Json.fromString(t.value))
 
+  implicit val entityTypeJsonDecoder: Decoder[EntityType] = Decoder.instance {
+    _.as[String].map(EntityType.of)
+  }
+
   implicit val show: Show[EntityType] = Show.show[EntityType] { case UrlEntityType(value) => value }
 }
 
@@ -40,6 +44,8 @@ import cats.data.NonEmptyList
 
 final case class EntityTypes(list: NonEmptyList[EntityType]) {
   lazy val toList: List[EntityType] = list.toList
+  def contains(types: EntityTypes): Boolean = (list.toList diff types.toList).isEmpty
+  def contains(types: EntityType*): Boolean = (list.toList diff types).isEmpty
 }
 
 object EntityTypes {
@@ -56,6 +62,18 @@ object EntityTypes {
       case only +: Nil => only.asJson
       case multiple    => Json.arr(multiple.map(_.asJson): _*)
     }
+  }
+
+  implicit val entityTypeJsonDecoder: Decoder[EntityTypes] = Decoder.instance { cursor =>
+    cursor
+      .as[List[EntityType]]
+      .flatMap {
+        case head :: tail => EntityTypes.of(head, tail: _*).asRight[DecodingFailure]
+        case Nil          => DecodingFailure("Types cannot be an empty list", Nil).asLeft[EntityTypes]
+      }
+      .leftFlatMap { _ =>
+        cursor.as[EntityType].map(EntityTypes.of(_))
+      }
   }
 
   implicit val show: Show[EntityTypes] = Show.show[EntityTypes](_.list.map(_.show).nonEmptyIntercalate("; "))
