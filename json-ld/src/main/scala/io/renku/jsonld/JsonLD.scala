@@ -130,7 +130,7 @@ object JsonLD {
 
   private[jsonld] final case class JsonLDValue[V](
       value:          V,
-      maybeType:      Option[String] = None
+      maybeType:      Option[EntityTypes] = None
   )(implicit encoder: Encoder[V])
       extends JsonLD {
     override lazy val toJson: Json = maybeType match {
@@ -147,18 +147,20 @@ object JsonLD {
   }
 
   private[jsonld] object JsonLDValue {
-    def apply[V](value: V, entityType: String)(implicit encoder: Encoder[V]): JsonLDValue[V] =
+    def apply[V](value: V, entityType: EntityTypes)(implicit encoder: Encoder[V]): JsonLDValue[V] =
       JsonLDValue[V](value, Some(entityType))
   }
 
   private[jsonld] object JsonLDInstantValue {
-    val entityType = Schema.from("http://www.w3.org/2001/XMLSchema", "#") / "dateTime"
-    def from(instant: Instant): JsonLDValue[Instant] = JsonLDValue(instant, entityType.show.some)
+    val entityTypes = EntityTypes.of(Schema.from("http://www.w3.org/2001/XMLSchema", "#") / "dateTime")
+
+    def from(instant: Instant): JsonLDValue[Instant] = JsonLDValue(instant, entityTypes.some)
   }
 
   private[jsonld] object JsonLDLocalDateValue {
-    val entityType = Schema.from("http://schema.org") / "Date"
-    def from(localDate: LocalDate): JsonLDValue[LocalDate] = JsonLDValue(localDate, entityType.show.some)
+    val entityTypes = EntityTypes.of(Schema.from("http://schema.org") / "Date")
+
+    def from(localDate: LocalDate): JsonLDValue[LocalDate] = JsonLDValue(localDate, entityTypes.some)
   }
 
   private[jsonld] final case object JsonLDNull extends JsonLD {
