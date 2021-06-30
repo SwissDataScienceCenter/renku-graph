@@ -167,7 +167,7 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       givenCommitIsNotInGL(event.id, event.project.id)
 
       (eventStatusPatcher.sendDeletionStatus _)
-        .expects(event.project.id, event.id)
+        .expects(event.project.id, Seq(event.id))
         .returning(Try(()))
 
       givenEventIsInEL(parentCommit.id, event.project.id)(returning =
@@ -176,7 +176,7 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       givenCommitIsNotInGL(parentCommit.id, event.project.id)
 
       (eventStatusPatcher.sendDeletionStatus _)
-        .expects(event.project.id, parentCommit.id)
+        .expects(event.project.id, Seq(parentCommit.id))
         .returning(Try(()))
 
       commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
@@ -210,7 +210,7 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       givenCommitIsNotInGL(parentCommit.id, event.project.id)
 
       (eventStatusPatcher.sendDeletionStatus _)
-        .expects(event.project.id, parentCommit.id)
+        .expects(event.project.id, Seq(parentCommit.id))
         .returning(Try(()))
 
       commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
@@ -359,7 +359,7 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       val exception = exceptions.generateOne
 
       (eventStatusPatcher.sendDeletionStatus _)
-        .expects(event.project.id, latestCommitInfo.id)
+        .expects(event.project.id, Seq(latestCommitInfo.id))
         .throwing(exception)
 
       givenEventIsNotInEL(parent1Commit, event.project.id)

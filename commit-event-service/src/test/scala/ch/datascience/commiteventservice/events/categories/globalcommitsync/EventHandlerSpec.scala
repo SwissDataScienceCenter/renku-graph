@@ -2,7 +2,7 @@ package ch.datascience.commiteventservice.events.categories.globalcommitsync
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.commiteventservice.events.categories.globalcommitsync.Generators.globalCommitSyncEvents
+import ch.datascience.commiteventservice.events.categories.globalcommitsync.Generators.{globalCommitSyncEvents, globalCommitSyncEventsNonZero}
 import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.GlobalCommitEventSynchronizer
 import ch.datascience.events.consumers.EventRequestContent
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
@@ -20,48 +20,48 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class EventHandlerSpec     extends AnyWordSpec
-  with MockFactory
-  with should.Matchers
-  with Eventually
-  with IntegrationPatience {
+class EventHandlerSpec
+    extends AnyWordSpec
+    with MockFactory
+    with should.Matchers
+    with Eventually
+    with IntegrationPatience {
 
   "handle" should {
-
 
     "decode an event from the request, " +
       "schedule commit synchronization " +
       s"and return $Accepted - full commit sync event case" in new TestCase {
 
-      val event = globalCommitSyncEvents.generateOne
+        val event = globalCommitSyncEventsNonZero.generateOne
 
-      (commitEventSynchronizer.synchronizeEvents _)
-        .expects(event)
-        .returning(().pure[IO])
+        (commitEventSynchronizer.synchronizeEvents _)
+          .expects(event)
+          .returning(().pure[IO])
 
-      handler.handle(requestContent(event.asJson)).unsafeRunSync() shouldBe Accepted
+        handler.handle(requestContent(event.asJson)).unsafeRunSync() shouldBe Accepted
 
-      logger.loggedOnly(Info(s"${logMessageCommon(event)} -> $Accepted"))
-    }
+        logger.loggedOnly(Info(s"${logMessageCommon(event)} -> $Accepted"))
+      }
 
     "decode an event from the request, " +
       "schedule commit synchronization " +
       s"and return $Accepted - minimal commit sync event case" in new TestCase {
 
-      val event = globalCommitSyncEvents.generateOne
+        val event = globalCommitSyncEventsNonZero.generateOne
 
-      (commitEventSynchronizer.synchronizeEvents _)
-        .expects(event)
-        .returning(().pure[IO])
+        (commitEventSynchronizer.synchronizeEvents _)
+          .expects(event)
+          .returning(().pure[IO])
 
-      handler.handle(requestContent(event.asJson)).unsafeRunSync() shouldBe Accepted
+        handler.handle(requestContent(event.asJson)).unsafeRunSync() shouldBe Accepted
 
-      logger.loggedOnly(Info(s"${logMessageCommon(event)} -> $Accepted"))
-    }
+        logger.loggedOnly(Info(s"${logMessageCommon(event)} -> $Accepted"))
+      }
 
     s"return $Accepted and log an error if scheduling event synchronization fails" in new TestCase {
 
-      val event = globalCommitSyncEvents.generateOne
+      val event = globalCommitSyncEventsNonZero.generateOne
 
       (commitEventSynchronizer.synchronizeEvents _)
         .expects(event)
@@ -98,7 +98,6 @@ class EventHandlerSpec     extends AnyWordSpec
 
   }
 
-
   private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
@@ -112,13 +111,14 @@ class EventHandlerSpec     extends AnyWordSpec
   }
 
   private implicit def eventEncoder[E <: GlobalCommitSyncEvent]: Encoder[E] = Encoder.instance[E] {
-    case GlobalCommitSyncEvent(project, lastSynced) => json"""{
+    case GlobalCommitSyncEvent(project, lastSynced, commitIds) => json"""{
         "categoryName": "GLOBAL_COMMIT_SYNC",
         "project": {
           "id":         ${project.id.value},
           "path":       ${project.path.value}
         },
-        "lastSynced":   ${lastSynced.value}
+        "lastSynced":   ${lastSynced.value},
+        "commitIds":    [${commitIds.mkString(", ")}]
       }"""
   }
 

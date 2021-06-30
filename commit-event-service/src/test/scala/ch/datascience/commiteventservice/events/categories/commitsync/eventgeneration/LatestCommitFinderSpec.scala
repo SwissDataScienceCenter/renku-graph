@@ -162,6 +162,7 @@ class LatestCommitFinderSpec extends AnyWordSpec with MockFactory with ExternalS
     "committer_email": ${commitInfo.committer.emailToJson},
     "message":         ${commitInfo.message.value},
     "committed_date":  ${commitInfo.committedDate.value},
-    "parent_ids":      ${commitInfo.parents.map(_.value)}
+    "parent_ids":      ${commitInfo.parents.map(_.value)},
+    "deleteme":      1
   }"""
 }

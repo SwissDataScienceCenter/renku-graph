@@ -21,6 +21,7 @@ package ch.datascience.commiteventservice.events.categories.globalcommitsync.eve
 import cats.data.OptionT
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.all._
+import ch.datascience.commiteventservice.events.categories.common.CommitInfo
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
@@ -61,22 +62,36 @@ private class LatestCommitFinderImpl[Interpretation[_]: ConcurrentEffect: Timer]
       maybeAccessToken: Option[AccessToken]
   ): OptionT[Interpretation, CommitId] = OptionT {
     for {
-      stringUri       <- s"$gitLabUrl/api/v4/projects/$projectId/repository/commits".pure[Interpretation]
-      uri             <- validateUri(stringUri) map (_.withQueryParam("per_page", "1"))
-      maybeCommitInfo <- send(request(GET, uri, maybeAccessToken))(mapResponse)
-    } yield maybeCommitInfo
+      stringUri     <- s"$gitLabUrl/api/v4/projects/$projectId/repository/commits".pure[Interpretation]
+      uri           <- validateUri(stringUri) map (_.withQueryParam("per_page", "1"))
+      maybeCommitId <- send(request(GET, uri, maybeAccessToken))(mapResponse)
+    } yield maybeCommitId
   }
 
   private lazy val mapResponse: PartialFunction[(Status, Request[Interpretation], Response[Interpretation]),
                                                 Interpretation[Option[CommitId]]
   ] = {
-    case (Ok, _, response)    => response.as[Option[CommitId]] map (_.headOption)
+    case (Ok, _, response)    => response.as[List[CommitInfo]] map (_.headOption.map(_.id))
     case (NotFound, _, _)     => Option.empty[CommitId].pure[Interpretation]
     case (Unauthorized, _, _) => UnauthorizedException.raiseError
   }
 
-  private implicit val commitIdEntityDecoder: EntityDecoder[Interpretation, Option[CommitId]] =
-    jsonOf[Interpretation, Option[CommitId]]
+  private implicit val commitInfosEntityDecoder: EntityDecoder[Interpretation, List[CommitInfo]] = {
+    implicit val infosDecoder: Decoder[List[CommitInfo]] = decodeList[CommitInfo]
+    jsonOf[Interpretation, List[CommitInfo]]
+  }
+
+  // TODO: make this work
+//  private implicit val commitIdDecoder: Decoder[CommitId] = (cursor: HCursor) => {
+//    for {
+//      id <- cursor.downField("id").as[CommitId]
+//    } yield id
+//  }
+//
+//  private implicit val commitIdEntityDecoder: EntityDecoder[Interpretation, List[CommitId]] = {
+//    implicit val idDecoder: Decoder[List[CommitId]] = decodeList[CommitId](commitIdDecoder)
+//    jsonOf[Interpretation, List[CommitId]]
+//  }
 
 }
 

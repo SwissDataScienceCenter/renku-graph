@@ -35,8 +35,8 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.ExecutionContext
 
 private trait EventStatusPatcher[Interpretation[_]] {
-  def sendDeletionStatus(projectId: projects.Id, eventId: CommitId): Interpretation[Unit]
-
+  def sendDeletionStatus(projectId: projects.Id, eventIds: CommitId*): Interpretation[Unit]
+  def sendCreationStatus(projectId: projects.Id, eventIds: CommitId*): Interpretation[Unit]
 }
 
 private class EventStatusPatcherImpl[Interpretation[_]: MonadThrow: ConcurrentEffect: Timer](
@@ -45,14 +45,16 @@ private class EventStatusPatcherImpl[Interpretation[_]: MonadThrow: ConcurrentEf
 )(implicit executionContext: ExecutionContext)
     extends RestClient[Interpretation, EventStatusPatcher[Interpretation]](Throttler.noThrottling, logger)
     with EventStatusPatcher[Interpretation] {
-  override def sendDeletionStatus(projectId: projects.Id, eventId: CommitId): Interpretation[Unit] =
+  override def sendDeletionStatus(projectId: projects.Id, eventIds: CommitId*): Interpretation[Unit] =
     for {
-      uri <- validateUri(s"$eventLogUrl/events/$eventId/$projectId")
+      uri <- validateUri(s"$eventLogUrl/events/$eventIds/$projectId")
       sendingResult <-
         send(
           request(PATCH, uri).withMultipartBuilder.addPart("event", json"""{"status": "AWAITING_DELETION"}""").build()
         )(mapResponse)
     } yield sendingResult
+
+  override def sendCreationStatus(projectId: projects.Id, eventIds: CommitId*): Interpretation[Unit] = ???
 
   private lazy val mapResponse
       : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[Unit]] = {

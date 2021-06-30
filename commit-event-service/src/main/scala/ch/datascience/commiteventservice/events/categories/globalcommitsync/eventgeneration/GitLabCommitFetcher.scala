@@ -33,7 +33,7 @@ trait GitLabCommitFetcher[Interpretation[_]] {
   ): Interpretation[ProjectCommitStats]
   def fetchAllGitLabCommits(projectId: projects.Id)(implicit
       maybeAccessToken:                Option[AccessToken]
-  ): Interpretation[List[CommitInfo]]
+  ): Interpretation[List[CommitId]]
 }
 
 private class GitLabCommitFetcherImpl[Interpretation[_]: ConcurrentEffect: Timer](
@@ -53,7 +53,7 @@ private class GitLabCommitFetcherImpl[Interpretation[_]: ConcurrentEffect: Timer
     with GitLabCommitFetcher[Interpretation] {
   override def fetchAllGitLabCommits(projectId: projects.Id)(implicit
       maybeAccessToken:                         Option[AccessToken]
-  ): Interpretation[List[CommitInfo]] = ???
+  ): Interpretation[List[CommitId]] = ???
 
   override def fetchCommitStats(projectId: projects.Id)(implicit
       maybeAccessToken:                    Option[AccessToken]
