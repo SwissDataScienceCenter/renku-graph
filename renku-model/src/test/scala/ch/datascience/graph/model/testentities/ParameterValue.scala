@@ -16,13 +16,13 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.entities
+package ch.datascience.graph.model.testentities
 
 import ch.datascience.graph.model.RenkuBaseUrl
-import ch.datascience.rdfstore.entities.CommandParameterBase.{CommandInput, CommandInputOrOutput, CommandOutput, CommandParameter, Name}
-import ch.datascience.rdfstore.entities.ParameterValue.PathParameterValue.{InputParameterValue, OutputParameterValue}
-import ch.datascience.rdfstore.entities.ParameterValue.VariableParameterValue.ValueOverride
-import ch.datascience.rdfstore.entities.ParameterValue._
+import CommandParameterBase.{CommandInput, CommandInputOrOutput, CommandOutput, CommandParameter, Name}
+import ParameterValue.PathParameterValue.{InputParameterValue, OutputParameterValue}
+import ParameterValue.VariableParameterValue.ValueOverride
+import ParameterValue._
 import ch.datascience.tinytypes.constraints.{NonBlank, UUID}
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.renku.jsonld.syntax._

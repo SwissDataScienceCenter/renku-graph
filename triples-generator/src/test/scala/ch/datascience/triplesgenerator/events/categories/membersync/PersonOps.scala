@@ -18,10 +18,10 @@
 
 package ch.datascience.triplesgenerator.events.categories.membersync
 
-import ch.datascience.rdfstore.entities
+import ch.datascience.graph.model.testentities.Person
 
 private object PersonOps {
 
-  implicit lazy val toKGProjectMember: entities.Person => Option[KGProjectMember] =
+  implicit lazy val toKGProjectMember: Person => Option[KGProjectMember] =
     person => person.maybeGitLabId.map(gitLabId => KGProjectMember(person.resourceId, gitLabId))
 }

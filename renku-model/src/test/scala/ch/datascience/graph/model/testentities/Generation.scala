@@ -16,11 +16,11 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.entities
+package ch.datascience.graph.model.testentities
 
 import ch.datascience.graph.model.GitLabApiUrl
-import ch.datascience.rdfstore.entities.Entity.OutputEntity
-import ch.datascience.rdfstore.entities.Generation.Id
+import Entity.OutputEntity
+import Generation.Id
 import ch.datascience.tinytypes.constraints.UUID
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 

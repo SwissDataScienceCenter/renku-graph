@@ -25,9 +25,10 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets._
-import ch.datascience.graph.model.{RenkuBaseUrl, projects}
 import ch.datascience.graph.model.projects.Path
+import ch.datascience.graph.model.testentities.EntitiesGenerators._
 import ch.datascience.graph.model.users.{Affiliation, Email, Name => UserName}
+import ch.datascience.graph.model.{RenkuBaseUrl, projects}
 import ch.datascience.http.InfoMessage._
 import ch.datascience.http.rest.Links
 import ch.datascience.http.rest.Links.Rel.Self
@@ -39,7 +40,6 @@ import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
 import ch.datascience.knowledgegraph.datasets.model
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.entities._
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import io.circe.Decoder._
 import io.circe.syntax._

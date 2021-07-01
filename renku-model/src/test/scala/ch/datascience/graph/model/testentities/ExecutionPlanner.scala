@@ -16,21 +16,21 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.entities
+package ch.datascience.graph.model.testentities
 
+import CommandParameterBase.CommandInput._
+import CommandParameterBase.CommandOutput._
+import CommandParameterBase.CommandParameter.ParameterDefaultValue
+import CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
+import Entity.{Checksum, InputEntity, OutputEntity}
+import ExecutionPlanner.ActivityData
+import ParameterValue.VariableParameterValue.ValueOverride
+import ParameterValue.{PathParameterValue, VariableParameterValue}
 import cats.Semigroup
 import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.CliVersion
-import ch.datascience.rdfstore.entities.CommandParameterBase.CommandInput._
-import ch.datascience.rdfstore.entities.CommandParameterBase.CommandOutput._
-import ch.datascience.rdfstore.entities.CommandParameterBase.CommandParameter.ParameterDefaultValue
-import ch.datascience.rdfstore.entities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
-import ch.datascience.rdfstore.entities.Entity.{Checksum, InputEntity, OutputEntity}
-import ch.datascience.rdfstore.entities.ExecutionPlanner.ActivityData
-import ch.datascience.rdfstore.entities.ParameterValue.VariableParameterValue.ValueOverride
-import ch.datascience.rdfstore.entities.ParameterValue.{PathParameterValue, VariableParameterValue}
+import ch.datascience.graph.model.{CliVersion, testentities}
 
 final case class ExecutionPlanner(runPlan:                  RunPlan,
                                   activityData:             ActivityData,
@@ -83,7 +83,7 @@ final case class ExecutionPlanner(runPlan:                  RunPlan,
     createParameterFactories,
     validateStartTime
   ) mapN { case (_, _, parameterFactories, (activityTime, author, cliVersion)) =>
-    Activity(
+    testentities.Activity(
       activityIds.generateOne,
       activityTime,
       Activity.EndTime(activityTime.value),

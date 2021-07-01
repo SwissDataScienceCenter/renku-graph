@@ -16,10 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.entities
+package ch.datascience.graph.model.testentities
 
 import ch.datascience.graph.model.RenkuBaseUrl
-import ch.datascience.rdfstore.entities.PublicationEvent._
+import PublicationEvent._
 import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, NonBlank}
 import ch.datascience.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
 

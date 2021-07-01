@@ -16,11 +16,11 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.entities
+package ch.datascience.graph.model.testentities
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.RenkuBaseUrl
-import ch.datascience.rdfstore.entities.Entity.Checksum
+import Entity.Checksum
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.renku.jsonld._

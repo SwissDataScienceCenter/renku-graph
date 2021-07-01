@@ -29,8 +29,8 @@ import ch.datascience.graph.acceptancetests.tooling.ModelImplicits
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.testentities.Project
 import ch.datascience.http.client.AccessToken
-import ch.datascience.rdfstore.entities
 import ch.datascience.webhookservice.model.HookToken
 import io.renku.jsonld.JsonLD
 import org.http4s.Status._
@@ -40,7 +40,7 @@ import org.scalatest.matchers.should
 
 object RdfStoreProvisioning extends ModelImplicits with Eventually with AcceptanceTestPatience with should.Matchers {
 
-  def `data in the RDF store`[FC <: entities.Project.ForksCount](
+  def `data in the RDF store`[FC <: Project.ForksCount](
       project:            data.Project[FC],
       triples:            JsonLD
   )(implicit accessToken: AccessToken): Assertion = {

@@ -16,20 +16,20 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.entities
+package ch.datascience.graph.model.testentities
 
+import CommandParameterBase.CommandInput._
+import CommandParameterBase.CommandOutput.{LocationCommandOutput, MappedCommandOutput}
+import CommandParameterBase._
+import Entity.InputEntity
+import ParameterValue.PathParameterValue.{InputParameterValue, OutputParameterValue}
+import ParameterValue.VariableParameterValue
+import Project.ForksCount
+import RunPlan.{Command, CommandParameters}
 import cats.Show
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.{RenkuBaseUrl, datasets}
-import ch.datascience.rdfstore.entities.CommandParameterBase.CommandInput._
-import ch.datascience.rdfstore.entities.CommandParameterBase.CommandOutput.{LocationCommandOutput, MappedCommandOutput}
-import ch.datascience.rdfstore.entities.CommandParameterBase._
-import ch.datascience.rdfstore.entities.Entity.InputEntity
-import ch.datascience.rdfstore.entities.ParameterValue.PathParameterValue.{InputParameterValue, OutputParameterValue}
-import ch.datascience.rdfstore.entities.ParameterValue.VariableParameterValue
-import ch.datascience.rdfstore.entities.Project.ForksCount
-import ch.datascience.rdfstore.entities.RunPlan.{Command, CommandParameters}
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax.JsonEncoderOps
 

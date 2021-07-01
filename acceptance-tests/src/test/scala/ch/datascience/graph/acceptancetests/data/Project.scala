@@ -22,7 +22,7 @@ import Project._
 import cats.data.Validated
 import cats.syntax.all._
 import ch.datascience.graph.model.projects.{Description, Id, Name, Path}
-import ch.datascience.rdfstore.entities
+import ch.datascience.graph.model.testentities
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
 import eu.timepit.refined.api.Refined
@@ -33,15 +33,15 @@ import eu.timepit.refined.numeric.Positive
 import java.net.{MalformedURLException, URL}
 import java.time.Instant
 
-final case class Project[+FC <: entities.Project.ForksCount](entitiesProject:  entities.Project[FC],
-                                                             id:               Id,
-                                                             maybeDescription: Option[Description],
-                                                             updatedAt:        DateUpdated,
-                                                             urls:             Urls,
-                                                             tags:             Set[Tag],
-                                                             starsCount:       StarsCount,
-                                                             permissions:      Permissions,
-                                                             statistics:       Statistics
+final case class Project[+FC <: testentities.Project.ForksCount](entitiesProject:  testentities.Project[FC],
+                                                                 id:               Id,
+                                                                 maybeDescription: Option[Description],
+                                                                 updatedAt:        DateUpdated,
+                                                                 urls:             Urls,
+                                                                 tags:             Set[Tag],
+                                                                 starsCount:       StarsCount,
+                                                                 permissions:      Permissions,
+                                                                 statistics:       Statistics
 ) {
   val path: Path = entitiesProject.path
   val name: Name = entitiesProject.name

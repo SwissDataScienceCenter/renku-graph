@@ -25,9 +25,9 @@ import ch.datascience.graph.model.Schemas._
 import ch.datascience.graph.model.projects.{DateCreated, Name, ResourceId, Visibility}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
-import ch.datascience.rdfstore.entities.EntitiesGenerators._
-import ch.datascience.rdfstore.entities.Project
-import ch.datascience.rdfstore.entities.Project.ForksCount
+import ch.datascience.graph.model.testentities.EntitiesGenerators._
+import ch.datascience.graph.model.testentities.Project
+import Project.ForksCount
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQuery}
 import eu.timepit.refined.auto._
 import io.renku.jsonld.syntax._

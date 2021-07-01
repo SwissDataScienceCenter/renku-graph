@@ -16,8 +16,15 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.entities
+package ch.datascience.graph.model.testentities
 
+import Activity.Order
+import Dataset.{AdditionalInfo, Identification, Provenance}
+import Entity.{Checksum, InputEntity}
+import Project.ForksCount
+import PublicationEvent.AboutEvent
+import RunPlan.CommandParameters
+import RunPlan.CommandParameters.CommandParameterFactory
 import cats.Applicative
 import ch.datascience.generators.Generators.Implicits.GenOps
 import ch.datascience.generators.Generators._
@@ -26,13 +33,6 @@ import ch.datascience.graph.model._
 import ch.datascience.graph.model.datasets.{Date, DerivedFrom, ExternalSameAs, Identifier, InitialVersion, PartId, TopmostSameAs}
 import ch.datascience.graph.model.projects.Visibility
 import ch.datascience.graph.model.users.{Email, GitLabId}
-import ch.datascience.rdfstore.entities.Activity.Order
-import ch.datascience.rdfstore.entities.Dataset.{AdditionalInfo, Identification, Provenance}
-import ch.datascience.rdfstore.entities.Entity.{Checksum, InputEntity}
-import ch.datascience.rdfstore.entities.Project.ForksCount
-import ch.datascience.rdfstore.entities.PublicationEvent.AboutEvent
-import ch.datascience.rdfstore.entities.RunPlan.CommandParameters
-import ch.datascience.rdfstore.entities.RunPlan.CommandParameters.CommandParameterFactory
 import ch.datascience.tinytypes.InstantTinyType
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -43,9 +43,14 @@ import java.time.Instant
 
 object EntitiesGenerators extends EntitiesGenerators
 
-trait EntitiesGenerators {
+private object Instances {
   implicit val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
   implicit val gitLabApiUrl: GitLabApiUrl = gitLabApiUrls.generateOne
+}
+
+trait EntitiesGenerators {
+  implicit val renkuBaseUrl: RenkuBaseUrl = Instances.renkuBaseUrl
+  implicit val gitLabApiUrl: GitLabApiUrl = Instances.gitLabApiUrl
 
   def invalidationTimes(min: InstantTinyType): Gen[InvalidationTime] = invalidationTimes(min.value)
 

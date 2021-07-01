@@ -20,10 +20,10 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated.tripl
 
 import cats.syntax.all._
 import ch.datascience.graph.model.projects.{DateCreated, Name, ResourceId}
+import ch.datascience.graph.model.testentities.Project.ForksCount
+import ch.datascience.graph.model.testentities._
 import ch.datascience.graph.model.{SchemaVersion, users}
 import ch.datascience.rdfstore.JsonLDTriples
-import ch.datascience.rdfstore.entities.Project.ForksCount
-import ch.datascience.rdfstore.entities.{Project, _}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
 import io.circe.optics.JsonOptics._

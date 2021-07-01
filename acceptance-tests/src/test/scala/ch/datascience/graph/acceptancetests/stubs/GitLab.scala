@@ -30,12 +30,12 @@ import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.Id
+import ch.datascience.graph.model.testentities.{Person, Project, ProjectWithParent}
 import ch.datascience.graph.model.{GitLabApiUrl, GitLabUrl, users}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.http.server.security.model.AuthUser
-import ch.datascience.rdfstore.entities
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.client.{MappingBuilder, WireMock}
@@ -173,7 +173,7 @@ object GitLab {
   def `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(
       project:            data.Project[_]
   )(implicit accessToken: AccessToken): Unit = {
-    implicit val personEncoder: Encoder[entities.Person] = Encoder.instance { person =>
+    implicit val personEncoder: Encoder[Person] = Encoder.instance { person =>
       json"""{
           "id":       ${person.maybeGitLabId.map(_.value)},
           "username": ${person.name.value},
@@ -192,7 +192,7 @@ object GitLab {
     ()
   }
 
-  def `GET <gitlabApi>/projects/:id returning OK`[FC <: entities.Project.ForksCount](
+  def `GET <gitlabApi>/projects/:id returning OK`[FC <: Project.ForksCount](
       project:            data.Project[FC]
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
@@ -208,7 +208,7 @@ object GitLab {
     ()
   }
 
-  def `GET <gitlabApi>/projects/:path returning OK with`[FC <: entities.Project.ForksCount](
+  def `GET <gitlabApi>/projects/:path returning OK with`[FC <: Project.ForksCount](
       project:            data.Project[FC],
       withStatistics:     Boolean = false
   )(implicit accessToken: AccessToken): Unit = {
@@ -266,7 +266,7 @@ object GitLab {
             }"""
               .deepMerge(
                 project.entitiesProject match {
-                  case withParent: entities.ProjectWithParent[FC] =>
+                  case withParent: ProjectWithParent[FC] =>
                     json"""{"forked_from_project":  {"path_with_namespace": ${withParent.parent.path.value}} }"""
                   case _ => Json.obj()
                 }

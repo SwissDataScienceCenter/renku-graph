@@ -16,13 +16,13 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.entities
+package ch.datascience.graph.model.testentities
 
 import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
 import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.{GitLabApiUrl, RenkuBaseUrl}
-import ch.datascience.rdfstore.entities.Dataset._
+import Dataset._
 import io.renku.jsonld.JsonLDEncoder.encodeList
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, JsonLD, Property}

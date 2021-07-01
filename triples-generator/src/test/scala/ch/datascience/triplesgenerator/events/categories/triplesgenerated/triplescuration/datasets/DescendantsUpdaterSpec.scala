@@ -23,8 +23,8 @@ import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{Identifier, TopmostDerivedFrom, TopmostSameAs}
-import ch.datascience.rdfstore.entities.Dataset._
-import ch.datascience.rdfstore.entities._
+import ch.datascience.graph.model.testentities.Dataset._
+import ch.datascience.graph.model.testentities._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQuery}
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CurationGenerators.curatedTriplesObjects

@@ -28,8 +28,7 @@ import ch.datascience.graph.acceptancetests.data.Project._
 import ch.datascience.graph.config.RenkuBaseUrlLoader
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model._
-import ch.datascience.rdfstore.entities
-import ch.datascience.rdfstore.entities.fixed
+import ch.datascience.graph.model.testentities.EntitiesGenerators._
 import org.scalacheck.Gen
 
 import java.time.Instant.now
@@ -41,8 +40,8 @@ package object data {
   val renkuResourcesUrl:     renku.ResourcesUrl = renku.ResourcesUrl("http://localhost:9004/knowledge-graph")
   implicit val renkuBaseUrl: RenkuBaseUrl       = RenkuBaseUrlLoader[Try]().fold(throw _, identity)
 
-  def dataProjects[FC <: entities.Project.ForksCount](
-      projectGen: Gen[entities.Project[FC]]
+  def dataProjects[FC <: testentities.Project.ForksCount](
+      projectGen: Gen[testentities.Project[FC]]
   ): Gen[Project[FC]] = for {
     project          <- projectGen
     id               <- projectIds
@@ -55,8 +54,8 @@ package object data {
     statistics       <- statisticsObjects
   } yield Project(project, id, maybeDescription, updatedAt, urls, tags, starsCount, permissions, statistics)
 
-  def dataProjects[FC <: entities.Project.ForksCount](
-      project: entities.Project[FC]
+  def dataProjects[FC <: testentities.Project.ForksCount](
+      project: testentities.Project[FC]
   ): Gen[Project[FC]] = dataProjects(fixed(project))
 
   implicit lazy val urlsObjects: Gen[Urls] = for {

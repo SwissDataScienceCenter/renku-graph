@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.entities
+package ch.datascience.graph.model.testentities
 
 import cats.Show
 import cats.syntax.all._

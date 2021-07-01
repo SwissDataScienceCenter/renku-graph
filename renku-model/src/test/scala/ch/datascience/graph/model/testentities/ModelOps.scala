@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.entities
+package ch.datascience.graph.model.testentities
 
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.syntax.all._
@@ -26,8 +26,8 @@ import ch.datascience.generators.Generators.sentenceContaining
 import ch.datascience.graph.model.GraphModelGenerators.datasetIdentifiers
 import ch.datascience.graph.model.datasets.{DateCreated, DerivedFrom, Description, InitialVersion, InternalSameAs, Keyword, Name, SameAs, Title}
 import ch.datascience.graph.model._
-import ch.datascience.rdfstore.entities.ModelOps.DatasetForkingResult
-import ch.datascience.rdfstore.entities.Project.ForksCount
+import ModelOps.DatasetForkingResult
+import Project.ForksCount
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive

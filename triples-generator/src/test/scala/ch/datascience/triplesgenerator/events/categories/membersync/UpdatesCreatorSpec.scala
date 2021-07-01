@@ -21,11 +21,11 @@ package ch.datascience.triplesgenerator.events.categories.membersync
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import ch.datascience.graph.model.testentities.{Project, _}
 import ch.datascience.graph.model.users.{Email, GitLabId}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.graph.model.{projects, users}
 import ch.datascience.rdfstore.InMemoryRdfStore
-import ch.datascience.rdfstore.entities._
 import ch.datascience.triplesgenerator.events.categories.membersync.Generators._
 import ch.datascience.triplesgenerator.events.categories.membersync.PersonOps._
 import io.renku.jsonld.syntax._

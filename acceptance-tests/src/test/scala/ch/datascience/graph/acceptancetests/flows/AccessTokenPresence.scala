@@ -21,8 +21,8 @@ package ch.datascience.graph.acceptancetests.flows
 import ch.datascience.graph.acceptancetests.data.Project
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices.tokenRepositoryClient
+import ch.datascience.graph.model.testentities
 import ch.datascience.http.client.AccessToken
-import ch.datascience.rdfstore.entities
 import io.circe.syntax._
 import org.http4s.Status._
 import org.scalatest.Assertion
@@ -30,7 +30,7 @@ import org.scalatest.matchers.should
 
 object AccessTokenPresence extends should.Matchers {
 
-  def givenAccessTokenPresentFor[FC <: entities.Project.ForksCount](
+  def givenAccessTokenPresentFor[FC <: testentities.Project.ForksCount](
       project:            Project[FC]
   )(implicit accessToken: AccessToken): Assertion = {
 

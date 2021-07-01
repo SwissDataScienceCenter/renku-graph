@@ -20,17 +20,16 @@ package ch.datascience.knowledgegraph.projects.rest
 
 import cats.syntax.all._
 import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.testentities._
 import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder._
-import ch.datascience.rdfstore.entities
-import ch.datascience.rdfstore.entities._
 import io.renku.jsonld.syntax._
 
 private object Converters extends Converters
 
 private trait Converters {
 
-  implicit lazy val entitiesToKGProject: Project[entities.Project.ForksCount] => KGProject = {
-    case project: entities.ProjectWithParent[_] =>
+  implicit lazy val entitiesToKGProject: Project[Project.ForksCount] => KGProject = {
+    case project: ProjectWithParent[_] =>
       KGProject(
         project.path,
         project.name,
@@ -41,7 +40,7 @@ private trait Converters {
         project.parent.to[Parent].some,
         project.version
       )
-    case project: entities.Project[_] =>
+    case project: Project[_] =>
       KGProject(
         project.path,
         project.name,
@@ -54,7 +53,7 @@ private trait Converters {
       )
   }
 
-  implicit lazy val entitiesToParent: Project[entities.Project.ForksCount.NonZero] => Parent = project =>
+  implicit lazy val entitiesToParent: Project[Project.ForksCount.NonZero] => Parent = project =>
     Parent(
       projects.ResourceId(project.asEntityId),
       project.name,

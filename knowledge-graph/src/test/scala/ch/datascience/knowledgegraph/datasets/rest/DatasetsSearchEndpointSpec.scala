@@ -35,7 +35,7 @@ import ch.datascience.http.rest.paging.{PagingHeaders, PagingResponse}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
-import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
+import ch.datascience.graph.model.testentities.EntitiesGenerators._
 import ch.datascience.knowledgegraph.datasets.model.DatasetCreator
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.{DatasetSearchResult, ProjectsCount}
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.{Phrase, query}
@@ -212,10 +212,19 @@ class DatasetsSearchEndpointSpec
     title            <- datasetTitles
     name             <- datasetNames
     maybeDescription <- Gen.option(datasetDescriptions)
-    creators         <- nonEmptySet(datasetCreators, maxElements = 4)
+    creators         <- nonEmptySet(personEntities, maxElements = 4)
     dates            <- datasetDates
     projectsCount    <- nonNegativeInts() map (_.value) map ProjectsCount.apply
     keywords         <- listOf(datasetKeywords)
     images           <- listOf(datasetImageUris)
-  } yield DatasetSearchResult(id, title, name, maybeDescription, creators, dates, projectsCount, keywords, images)
+  } yield DatasetSearchResult(id,
+                              title,
+                              name,
+                              maybeDescription,
+                              creators.map(_.to[DatasetCreator]),
+                              dates,
+                              projectsCount,
+                              keywords,
+                              images
+  )
 }

@@ -25,6 +25,8 @@ import ch.datascience.generators.Generators
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects.Visibility
+import ch.datascience.graph.model.testentities.EntitiesGenerators._
+import ch.datascience.graph.model.testentities.{Dataset, Person, Project}
 import ch.datascience.http.rest.SortBy.Direction
 import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.http.rest.paging.model.{Page, PerPage, Total}
@@ -36,9 +38,7 @@ import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.entities.EntitiesGenerators.projectEntities
-import ch.datascience.rdfstore.entities._
-import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder, entities}
+import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import eu.timepit.refined.api.Refined
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -819,7 +819,7 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
     (dataset1, dataset2, dataset3)
   }
 
-  private implicit class DatasetOps(dataset: entities.Dataset[_ <: entities.Dataset.Provenance]) {
+  private implicit class DatasetOps(dataset: Dataset[_ <: Dataset.Provenance]) {
 
     def toDatasetSearchResult(projectsCount: Int): DatasetSearchResult = DatasetSearchResult(
       dataset.identification.identifier,
@@ -834,7 +834,7 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
     )
   }
 
-  private implicit class DatasetsListOps(datasets: List[entities.Dataset[_ <: entities.Dataset.Provenance]]) {
+  private implicit class DatasetsListOps(datasets: List[Dataset[_ <: Dataset.Provenance]]) {
 
     def toDatasetSearchResult(matchIdFrom: List[DatasetSearchResult]): Option[DatasetSearchResult] =
       datasets

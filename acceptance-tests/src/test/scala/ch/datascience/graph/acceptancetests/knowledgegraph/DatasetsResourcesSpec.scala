@@ -31,13 +31,13 @@ import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TestReadabilityTools._
 import ch.datascience.graph.model.datasets.{DatePublished, Identifier, Title}
 import ch.datascience.graph.model.projects.Visibility
+import ch.datascience.graph.model.testentities
+import ch.datascience.graph.model.testentities.ModelOps.DatasetForkingResult
+import ch.datascience.graph.model.testentities.{gitLabApiUrl => _, renkuBaseUrl => _, _}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.http.rest.Links.{Href, Rel, _links}
 import ch.datascience.http.server.EndpointTester._
-import ch.datascience.rdfstore.entities
-import ch.datascience.rdfstore.entities.ModelOps.DatasetForkingResult
-import ch.datascience.rdfstore.entities.{gitLabApiUrl => _, renkuBaseUrl => _, _}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import eu.timepit.refined.auto._
 import io.circe.literal._
@@ -67,7 +67,7 @@ class DatasetsResourcesSpec
     implicit val accessToken: AccessToken = user.accessToken
 
     val project = dataProjects(
-      projectEntities[entities.Project.ForksCount.Zero](visibilityPublic).generateOne
+      projectEntities[testentities.Project.ForksCount.Zero](visibilityPublic).generateOne
     ).generateOne
     val dataset1         = datasetEntities(datasetProvenanceInternal, fixed(project.entitiesProject)).generateOne
     val dataset2         = datasetEntities(datasetProvenanceInternal, fixed(project.entitiesProject)).generateOne
@@ -169,7 +169,7 @@ class DatasetsResourcesSpec
       val DatasetForkingResult(dataset4, dataset5Fork) = dataset4Original.forkProject()
       val dataset6WithoutText                          = datasetEntities(datasetProvenanceInternal).generateOne
       val dataset7Private = datasetEntities(datasetProvenanceInternal,
-                                            projectEntities[entities.Project.ForksCount.Zero](visibilityNonPublic)
+                                            projectEntities[testentities.Project.ForksCount.Zero](visibilityNonPublic)
       ).generateOne.makeTitleContaining(text)
 
       Given("some datasets with title, description, name and author containing some arbitrary chosen text")
@@ -273,12 +273,12 @@ class DatasetsResourcesSpec
 
       val dataset2Private = datasetEntities(
         datasetProvenanceInternal,
-        projectEntities[entities.Project.ForksCount.Zero](Gen.oneOf(Visibility.Private, Visibility.Internal))
+        projectEntities[testentities.Project.ForksCount.Zero](Gen.oneOf(Visibility.Private, Visibility.Internal))
       ).generateOne.makeTitleContaining(text)
 
       val dataset3PrivateWithAccess = datasetEntities(
         datasetProvenanceInternal,
-        projectEntities[entities.Project.ForksCount.Zero](Gen.oneOf(Visibility.Private, Visibility.Internal))
+        projectEntities[testentities.Project.ForksCount.Zero](Gen.oneOf(Visibility.Private, Visibility.Internal))
           .map(_.copy(members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some))))
       ).generateOne.makeTitleContaining(text)
 
@@ -301,7 +301,7 @@ class DatasetsResourcesSpec
       ).flatMap(sortCreators)
     }
 
-    def pushToStore(dataset: entities.Dataset[entities.Dataset.Provenance])(implicit
+    def pushToStore(dataset: Dataset[Dataset.Provenance])(implicit
         accessToken:         AccessToken
     ): Unit = {
       val project = dataProjects(dataset.project).generateOne
@@ -317,13 +317,13 @@ object DatasetsResources {
   import ch.datascience.json.JsonOps._
   import ch.datascience.tinytypes.json.TinyTypeEncoders._
 
-  def briefJson(dataset: entities.Dataset[entities.Dataset.Provenance])(implicit
-      encoder:           Encoder[entities.Dataset[entities.Dataset.Provenance]]
+  def briefJson(dataset: Dataset[Dataset.Provenance])(implicit
+      encoder:           Encoder[Dataset[Dataset.Provenance]]
   ): Json = encoder(dataset)
 
-  implicit def datasetEncoder[P <: entities.Dataset.Provenance](implicit
+  implicit def datasetEncoder[P <: Dataset.Provenance](implicit
       provenanceEncoder: Encoder[P]
-  ): Encoder[entities.Dataset[P]] = Encoder.instance { dataset =>
+  ): Encoder[Dataset[P]] = Encoder.instance { dataset =>
     json"""{
       "identifier": ${dataset.identification.identifier.value},
       "versions": {
@@ -342,8 +342,8 @@ object DatasetsResources {
       .deepMerge(provenanceEncoder(dataset.provenance))
   }
 
-  implicit def provenanceEncoder: Encoder[entities.Dataset.Provenance] = Encoder.instance {
-    case provenance: entities.Dataset.Provenance.Modified => json"""{
+  implicit def provenanceEncoder: Encoder[Dataset.Provenance] = Encoder.instance {
+    case provenance: Dataset.Provenance.Modified => json"""{
         "derivedFrom": ${provenance.derivedFrom.value}
       }"""
     case provenance => json"""{
@@ -351,9 +351,9 @@ object DatasetsResources {
       }"""
   }
 
-  def searchResultJson[P <: entities.Dataset.Provenance](dataset:       entities.Dataset[P],
-                                                         projectsCount: Int,
-                                                         actualResults: List[Json]
+  def searchResultJson[P <: Dataset.Provenance](dataset:       Dataset[P],
+                                                projectsCount: Int,
+                                                actualResults: List[Json]
   ): Json = {
     val actualIdentifier = actualResults
       .findId(dataset.identification.title)
@@ -379,7 +379,7 @@ object DatasetsResources {
       }
   }
 
-  private implicit def publishedEncoder[P <: entities.Dataset.Provenance]: Encoder[(Set[entities.Person], P#D)] =
+  private implicit def publishedEncoder[P <: Dataset.Provenance]: Encoder[(Set[Person], P#D)] =
     Encoder.instance {
       case (creators, DatePublished(date)) => json"""{
           "creator": ${creators.toList},
@@ -390,8 +390,8 @@ object DatasetsResources {
         }"""
     }
 
-  private implicit lazy val personEncoder: Encoder[entities.Person] = Encoder.instance[entities.Person] {
-    case entities.Person(name, maybeEmail, _, _) => json"""{
+  private implicit lazy val personEncoder: Encoder[Person] = Encoder.instance[Person] {
+    case Person(name, maybeEmail, _, _) => json"""{
       "name": $name
     }""" addIfDefined ("email" -> maybeEmail)
   }

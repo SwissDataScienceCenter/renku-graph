@@ -22,12 +22,12 @@ import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{DerivedFrom, SameAs, TopmostDerivedFrom}
+import ch.datascience.graph.model.testentities.Dataset._
+import ch.datascience.graph.model.testentities._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
-import ch.datascience.rdfstore.entities.Dataset._
-import ch.datascience.rdfstore.entities._
 import eu.timepit.refined.auto._
 import io.renku.jsonld.EntityId
 import io.renku.jsonld.syntax._

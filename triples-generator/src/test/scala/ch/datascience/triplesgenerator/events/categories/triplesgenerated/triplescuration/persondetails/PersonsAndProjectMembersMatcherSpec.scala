@@ -21,8 +21,8 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated.tripl
 import PersonDetailsGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.booleans
+import ch.datascience.graph.model.testentities._
 import ch.datascience.graph.model.users.Username
-import ch.datascience.rdfstore.entities._
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails
 import eu.timepit.refined.auto._
 import org.scalatest.matchers.should

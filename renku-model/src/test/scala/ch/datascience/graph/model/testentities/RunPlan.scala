@@ -16,12 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.entities
+package ch.datascience.graph.model.testentities
 
 import ch.datascience.graph.model.RenkuBaseUrl
-import ch.datascience.rdfstore.entities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter, Position}
-import ch.datascience.rdfstore.entities.Project.ForksCount
-import ch.datascience.rdfstore.entities.RunPlan._
+import CommandParameterBase.{CommandInput, CommandOutput, CommandParameter, Position}
+import Project.ForksCount
+import RunPlan._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
 

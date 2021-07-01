@@ -24,6 +24,8 @@ import ch.datascience.generators.Generators.{httpUrls => urls, _}
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.model.projects.ResourceId._
+import ch.datascience.graph.model.testentities
+import ch.datascience.graph.model.testentities.EntitiesGenerators._
 import ch.datascience.knowledgegraph.projects.model.Forking.ForksCount
 import ch.datascience.knowledgegraph.projects.model.Permissions._
 import ch.datascience.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount, Tag}
@@ -32,15 +34,13 @@ import ch.datascience.knowledgegraph.projects.model.Urls.{HttpUrl, ReadmeUrl, Ss
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
 import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder._
-import ch.datascience.rdfstore.entities
-import ch.datascience.rdfstore.entities.EntitiesGenerators._
 import org.scalacheck.Gen
 
 private object ProjectsGenerators {
 
   implicit val projects: Gen[Project] = for {
     kgProject <- Gen
-                   .oneOf(projectEntities[entities.Project.ForksCount.Zero](visibilityAny),
+                   .oneOf(projectEntities[testentities.Project.ForksCount.Zero](visibilityAny),
                           projectWitParentEntities(visibilityAny)
                    )
                    .map(_.to[KGProject])

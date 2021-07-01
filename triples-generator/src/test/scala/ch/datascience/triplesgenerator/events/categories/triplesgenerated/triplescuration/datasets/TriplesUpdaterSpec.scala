@@ -21,8 +21,8 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated.tripl
 import ch.datascience.generators.CommonGraphGenerators.fusekiBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.rdfstore.entities.Dataset._
-import ch.datascience.rdfstore.entities._
+import ch.datascience.graph.model.testentities.Dataset._
+import ch.datascience.graph.model.testentities._
 import ch.datascience.rdfstore.{FusekiBaseUrl, JsonLDTriples}
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CurationGenerators.curatedTriplesObjects
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.TopmostDataFinder.TopmostData

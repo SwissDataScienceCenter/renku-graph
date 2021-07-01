@@ -16,11 +16,11 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.entities
+package ch.datascience.graph.model.testentities
 
 import ch.datascience.graph.model.projects.{DateCreated, Name, Path, ResourceId, Visibility}
 import ch.datascience.graph.model.{CliVersion, GitLabApiUrl, RenkuBaseUrl, SchemaVersion}
-import ch.datascience.rdfstore.entities.Project.ForksCount
+import Project.ForksCount
 import ch.datascience.tinytypes.constraints.PositiveInt
 import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
 import eu.timepit.refined.api.Refined

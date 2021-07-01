@@ -20,12 +20,11 @@ package ch.datascience.knowledgegraph.datasets
 
 import ch.datascience.generators.CommonGraphGenerators.sortBys
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.RenkuBaseUrl
+import ch.datascience.graph.model.{RenkuBaseUrl, testentities}
 import ch.datascience.graph.model.datasets._
+import ch.datascience.graph.model.testentities.{Dataset, Person, Project}
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
-import ch.datascience.rdfstore.entities
-import ch.datascience.rdfstore.entities._
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 
@@ -36,12 +35,12 @@ package object rest {
   implicit lazy val personToCreator: Person => DatasetCreator =
     person => DatasetCreator(person.maybeEmail, person.name, person.maybeAffiliation)
 
-  implicit lazy val projectToDatasetProject: entities.Project[_] => DatasetProject =
+  implicit lazy val projectToDatasetProject: Project[_] => DatasetProject =
     project => DatasetProject(project.path, project.name)
 
   implicit def internalToNonModified(implicit
       renkuBaseUrl: RenkuBaseUrl
-  ): entities.Dataset[Dataset.Provenance.Internal] => NonModifiedDataset =
+  ): testentities.Dataset[Dataset.Provenance.Internal] => NonModifiedDataset =
     dataset =>
       NonModifiedDataset(
         dataset.identification.identifier,
@@ -64,7 +63,7 @@ package object rest {
 
   implicit def importedExternalToNonModified(implicit
       renkuBaseUrl: RenkuBaseUrl
-  ): entities.Dataset[Dataset.Provenance.ImportedExternal] => NonModifiedDataset =
+  ): testentities.Dataset[Dataset.Provenance.ImportedExternal] => NonModifiedDataset =
     dataset =>
       NonModifiedDataset(
         dataset.identification.identifier,
@@ -87,7 +86,7 @@ package object rest {
 
   implicit def importedInternalToNonModified[P <: Dataset.Provenance.ImportedInternal](implicit
       renkuBaseUrl: RenkuBaseUrl
-  ): entities.Dataset[P] => NonModifiedDataset =
+  ): testentities.Dataset[P] => NonModifiedDataset =
     dataset =>
       NonModifiedDataset(
         dataset.identification.identifier,
@@ -110,7 +109,7 @@ package object rest {
 
   implicit def modifiedToModified(implicit
       renkuBaseUrl: RenkuBaseUrl
-  ): entities.Dataset[Dataset.Provenance.Modified] => ModifiedDataset =
+  ): testentities.Dataset[Dataset.Provenance.Modified] => ModifiedDataset =
     dataset =>
       ModifiedDataset(
         dataset.identifier,

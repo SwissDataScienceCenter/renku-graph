@@ -16,15 +16,9 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.model
+package ch.datascience.graph.model.testentities
 
-import ch.datascience.graph.model.views.UrlResourceRenderer
-import ch.datascience.tinytypes.constraints.{Url, UrlOps}
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+trait HavingInvalidationTime {
 
-final class RenkuBaseUrl private (val value: String) extends AnyVal with StringTinyType
-object RenkuBaseUrl
-    extends TinyTypeFactory[RenkuBaseUrl](new RenkuBaseUrl(_))
-    with Url
-    with UrlOps[RenkuBaseUrl]
-    with UrlResourceRenderer[RenkuBaseUrl]
+  def invalidationTime: InvalidationTime
+}

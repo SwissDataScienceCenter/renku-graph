@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.entities
+package ch.datascience.graph.model.testentities
 
 import ch.datascience.graph.model.users.{Affiliation, Email, GitLabId, Name}
 import ch.datascience.graph.model.{GitLabApiUrl, RenkuBaseUrl}

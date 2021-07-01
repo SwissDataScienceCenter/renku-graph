@@ -34,10 +34,10 @@ import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{BatchDate, CommitId, EventBody, EventId, EventStatus}
 import ch.datascience.graph.model.projects._
+import ch.datascience.graph.model.testentities.Project.ForksCount
+import ch.datascience.graph.model.testentities.{gitLabApiUrl => _, renkuBaseUrl => _, _}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.microservices.MicroserviceIdentifier
-import ch.datascience.rdfstore.entities.Project.ForksCount
-import ch.datascience.rdfstore.entities.{gitLabApiUrl => _, renkuBaseUrl => _, _}
 import io.circe.literal._
 import io.renku.eventlog._
 import org.scalacheck.Gen

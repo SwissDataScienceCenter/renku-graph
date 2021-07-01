@@ -16,14 +16,14 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.entities
+package ch.datascience.graph.model.testentities
 
 import cats.syntax.all._
 import ch.datascience.graph.model.RenkuBaseUrl
-import ch.datascience.rdfstore.entities.CommandParameterBase.CommandInput.InputDefaultValue
-import ch.datascience.rdfstore.entities.CommandParameterBase.CommandOutput.{FolderCreation, OutputDefaultValue}
-import ch.datascience.rdfstore.entities.CommandParameterBase.CommandParameter.ParameterDefaultValue
-import ch.datascience.rdfstore.entities.CommandParameterBase._
+import CommandParameterBase.CommandInput.InputDefaultValue
+import CommandParameterBase.CommandOutput.{FolderCreation, OutputDefaultValue}
+import CommandParameterBase.CommandParameter.ParameterDefaultValue
+import CommandParameterBase._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
 import eu.timepit.refined.api.Refined

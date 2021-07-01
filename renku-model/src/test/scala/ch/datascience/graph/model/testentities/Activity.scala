@@ -16,12 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.entities
+package ch.datascience.graph.model.testentities
 
 import cats.syntax.all._
 import ch.datascience.graph.model.{GitLabApiUrl, RenkuBaseUrl}
-import ch.datascience.rdfstore.entities.Activity._
-import ch.datascience.rdfstore.entities.Entity.{Checksum, OutputEntity}
+import Activity._
+import Entity.{Checksum, OutputEntity}
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints.{BoundedInstant, PositiveInt, UUID}
 

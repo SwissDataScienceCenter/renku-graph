@@ -16,10 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.entities
+package ch.datascience.graph.model.testentities
 
 import ch.datascience.graph.model.{GitLabApiUrl, RenkuBaseUrl}
-import ch.datascience.rdfstore.entities.Usage.Id
+import Usage.Id
 import ch.datascience.tinytypes.constraints.UUID
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 

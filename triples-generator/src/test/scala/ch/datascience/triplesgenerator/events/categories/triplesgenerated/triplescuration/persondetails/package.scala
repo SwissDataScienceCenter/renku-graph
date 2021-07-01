@@ -18,9 +18,9 @@
 
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration
 
-import ch.datascience.rdfstore.entities
+import ch.datascience.graph.model.testentities
 
 package object persondetails {
-  private[persondetails] implicit lazy val toPersonDetailsPerson: entities.Person => persondetails.Person =
+  private[persondetails] implicit lazy val toPersonDetailsPerson: testentities.Person => persondetails.Person =
     person => persondetails.Person(person.resourceId, person.maybeGitLabId, person.name, person.maybeEmail)
 }

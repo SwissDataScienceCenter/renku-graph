@@ -22,8 +22,8 @@ import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.jsonLDTriples
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.datasets.{ExternalSameAs, InternalSameAs}
+import ch.datascience.graph.model.testentities._
 import ch.datascience.rdfstore.JsonLDTriples
-import ch.datascience.rdfstore.entities._
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should

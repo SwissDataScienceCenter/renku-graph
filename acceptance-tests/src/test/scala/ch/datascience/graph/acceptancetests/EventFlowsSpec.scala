@@ -28,10 +28,9 @@ import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.tooling._
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.events.EventStatus._
+import ch.datascience.graph.model.testentities.EntitiesGenerators._
+import ch.datascience.graph.model.testentities.Project.ForksCount
 import ch.datascience.http.client.AccessToken
-import ch.datascience.rdfstore.entities.EntitiesGenerators.personEntities
-import ch.datascience.rdfstore.entities.Project.ForksCount
-import ch.datascience.rdfstore.entities._
 import ch.datascience.webhookservice.model.HookToken
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen

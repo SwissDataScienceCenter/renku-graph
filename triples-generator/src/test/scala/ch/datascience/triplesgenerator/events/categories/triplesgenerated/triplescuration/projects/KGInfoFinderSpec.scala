@@ -25,7 +25,7 @@ import ch.datascience.graph.model.users
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.entities.EntitiesGenerators._
+import ch.datascience.graph.model.testentities.EntitiesGenerators._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should

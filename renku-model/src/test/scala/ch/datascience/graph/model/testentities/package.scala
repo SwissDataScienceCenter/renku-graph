@@ -16,20 +16,19 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore
+package ch.datascience.graph.model
 
 import cats.kernel.Semigroup
 import ch.datascience.graph.model.datasets.SameAs
 import ch.datascience.graph.model.projects.Visibility
 import ch.datascience.graph.model.projects.Visibility.{Internal, Private, Public}
-import ch.datascience.graph.model.{RenkuBaseUrl, Schemas}
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
 import io.renku.jsonld._
 
 import java.time.{Instant, LocalDate}
 
-package object entities extends Schemas with EntitiesGenerators with ModelOps {
+package object testentities extends Schemas with EntitiesGenerators with ModelOps {
 
   implicit val renkuBaseUrlToEntityId: RenkuBaseUrl => EntityId = url => EntityId of url.value
 

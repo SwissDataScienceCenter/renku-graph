@@ -21,9 +21,9 @@ package ch.datascience.triplesgenerator.reprovisioning
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits.GenOps
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.testentities._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.entities._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.generators.VersionGenerators.renkuVersionPairs
 import io.renku.jsonld.syntax._

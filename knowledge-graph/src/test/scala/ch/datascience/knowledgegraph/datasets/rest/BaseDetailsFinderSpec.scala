@@ -19,9 +19,10 @@
 package ch.datascience.knowledgegraph.datasets.rest
 
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.testentities
+import ch.datascience.graph.model.testentities._
+import ch.datascience.knowledgegraph.datasets.model
 import ch.datascience.knowledgegraph.datasets.model._
-import ch.datascience.rdfstore.entities
-import ch.datascience.rdfstore.entities.EntitiesGenerators._
 import io.circe.literal._
 import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
@@ -39,7 +40,7 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
         datasetEntities(datasetProvenanceImportedExternal),
         blankStrings()
       ) { (dataset, description) =>
-        nonModifiedToResultSet(dataset, description).as[List[Dataset]](datasetsDecoder) shouldBe Right {
+        nonModifiedToResultSet(dataset, description).as[List[model.Dataset]](datasetsDecoder) shouldBe Right {
           List(
             dataset
               .to[NonModifiedDataset]
@@ -62,7 +63,7 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
         datasetEntities(datasetProvenanceModified),
         blankStrings()
       ) { (dataset, description) =>
-        modifiedToResultSet(dataset, description).as[List[Dataset]](datasetsDecoder) shouldBe Right {
+        modifiedToResultSet(dataset, description).as[List[model.Dataset]](datasetsDecoder) shouldBe Right {
           List(
             dataset
               .to[ModifiedDataset]
@@ -78,7 +79,7 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
     }
   }
 
-  private def nonModifiedToResultSet(dataset:     entities.Dataset[entities.Dataset.Provenance.ImportedExternal],
+  private def nonModifiedToResultSet(dataset:     testentities.Dataset[testentities.Dataset.Provenance.ImportedExternal],
                                      description: String
   ) = {
     val binding = json"""{
@@ -97,7 +98,7 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
     json"""{"results": {"bindings": [$binding]}}"""
   }
 
-  private def modifiedToResultSet(dataset:     entities.Dataset[entities.Dataset.Provenance.Modified],
+  private def modifiedToResultSet(dataset:     testentities.Dataset[testentities.Dataset.Provenance.Modified],
                                   description: String
   ) = {
     val binding = json"""{

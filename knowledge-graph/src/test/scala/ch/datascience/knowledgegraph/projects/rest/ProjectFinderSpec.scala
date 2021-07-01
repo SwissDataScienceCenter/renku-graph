@@ -28,14 +28,14 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.projects.Path
+import ch.datascience.graph.model.testentities.EntitiesGenerators._
+import ch.datascience.graph.model.testentities.Project
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.graph.tokenrepository.AccessTokenFinder.projectPathToPath
 import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.projects.model
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
 import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder.KGProject
-import ch.datascience.rdfstore.entities
-import ch.datascience.rdfstore.entities._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -47,7 +47,7 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
   "findProject" should {
 
     "merge the project metadata found in the KG and in GitLab" in new TestCase {
-      val kgProject = projectEntities[entities.Project.ForksCount.Zero](visibilityAny).generateOne.to[KGProject]
+      val kgProject = projectEntities[Project.ForksCount.Zero](visibilityAny).generateOne.to[KGProject]
       (kgProjectFinder
         .findProject(_: Path))
         .expects(kgProject.path)
@@ -67,7 +67,7 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
 
     "merge the project metadata found in the KG and in GitLab - case when no AuthUser given" in new TestCase {
 
-      val kgProject = projectEntities[entities.Project.ForksCount.Zero](visibilityAny).generateOne.to[KGProject]
+      val kgProject = projectEntities[Project.ForksCount.Zero](visibilityAny).generateOne.to[KGProject]
       (kgProjectFinder
         .findProject(_: Path))
         .expects(kgProject.path)
@@ -110,7 +110,7 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
 
     "return None if there's no project for the path in GitLab" in new TestCase {
 
-      val kgProject = projectEntities[entities.Project.ForksCount.Zero](visibilityAny).generateOne.to[KGProject]
+      val kgProject = projectEntities[Project.ForksCount.Zero](visibilityAny).generateOne.to[KGProject]
       (kgProjectFinder
         .findProject(_: Path))
         .expects(kgProject.path)
@@ -127,7 +127,7 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
 
     "return None if no access token can be found for the given project path" in new TestCase {
 
-      val kgProject = projectEntities[entities.Project.ForksCount.Zero](visibilityAny).generateOne.to[KGProject]
+      val kgProject = projectEntities[Project.ForksCount.Zero](visibilityAny).generateOne.to[KGProject]
       (kgProjectFinder
         .findProject(_: Path))
         .expects(kgProject.path)
@@ -164,7 +164,7 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
 
     "fail if finding access token failed" in new TestCase {
 
-      val kgProject = projectEntities[entities.Project.ForksCount.Zero](visibilityAny).generateOne.to[KGProject]
+      val kgProject = projectEntities[Project.ForksCount.Zero](visibilityAny).generateOne.to[KGProject]
       (kgProjectFinder
         .findProject(_: Path))
         .expects(kgProject.path)
@@ -183,7 +183,7 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
 
     "fail if finding project in GitLab failed" in new TestCase {
 
-      val kgProject = projectEntities[entities.Project.ForksCount.Zero](visibilityAny).generateOne.to[KGProject]
+      val kgProject = projectEntities[Project.ForksCount.Zero](visibilityAny).generateOne.to[KGProject]
       (kgProjectFinder
         .findProject(_: Path))
         .expects(kgProject.path)

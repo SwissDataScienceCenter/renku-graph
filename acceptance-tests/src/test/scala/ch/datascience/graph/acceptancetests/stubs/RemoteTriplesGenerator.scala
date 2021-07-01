@@ -24,10 +24,9 @@ import ch.datascience.graph.acceptancetests.data
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.tooling.TestLogger
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.{CliVersion, GitLabApiUrl, RenkuBaseUrl}
-import ch.datascience.rdfstore.entities
-import ch.datascience.rdfstore.entities.EntitiesGenerators._
-import ch.datascience.rdfstore.entities.{Activity, ExecutionPlanner, Person, RunPlan}
+import ch.datascience.graph.model.testentities.EntitiesGenerators._
+import ch.datascience.graph.model.testentities.{Activity, ExecutionPlanner, Person, RunPlan}
+import ch.datascience.graph.model._
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.client.{MappingBuilder, WireMock}
@@ -46,7 +45,7 @@ object RemoteTriplesGenerator {
   private val port: Int Refined Positive = 8080
 
   def `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`[
-      FC <: entities.Project.ForksCount
+      FC <: testentities.Project.ForksCount
   ](
       project:             data.Project[FC],
       commitId:            CommitId,

@@ -32,13 +32,12 @@ import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TestReadabilityTools._
-import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.{projects, testentities}
+import ch.datascience.graph.model.testentities.Project.{ForksCount, _}
+import ch.datascience.graph.model.testentities.{gitLabApiUrl => _, renkuBaseUrl => _, _}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.server.EndpointTester._
-import ch.datascience.rdfstore.entities
-import ch.datascience.rdfstore.entities.Project.{ForksCount, _}
-import ch.datascience.rdfstore.entities.{gitLabApiUrl => _, renkuBaseUrl => _, _}
 import io.circe.literal._
 import io.circe.{Encoder, Json}
 import io.renku.jsonld.JsonLD
@@ -62,7 +61,7 @@ class ProjectsResourcesSpec
 
   private val (parentProject, project) = {
     val creator = personEntities(withGitLabId, withEmail).generateOne
-    val (parent, child) = projectEntities[entities.Project.ForksCount.Zero](visibilityPublic).generateOne
+    val (parent, child) = projectEntities[testentities.Project.ForksCount.Zero](visibilityPublic).generateOne
       .copy(maybeCreator = creator.some, members = personEntities(withGitLabId).generateFixedSizeSet() + creator)
       .forkOnce()
 
@@ -131,7 +130,7 @@ class ProjectsResourcesSpec
 
 object ProjectsResources {
 
-  def fullJson(project: data.Project[entities.Project.ForksCount]): Json = json"""{
+  def fullJson(project: data.Project[testentities.Project.ForksCount]): Json = json"""{
     "identifier":  ${project.id.value}, 
     "path":        ${project.path.value}, 
     "name":        ${project.name.value},
@@ -174,8 +173,8 @@ object ProjectsResources {
     }""" addIfDefined ("readme" -> urls.maybeReadme.map(_.value))
   }
 
-  private implicit lazy val forkingEncoder: Encoder[(ForksCount, entities.Project[ForksCount])] = Encoder.instance {
-    case (forksCount, project: entities.ProjectWithParent[_]) => json"""{
+  private implicit lazy val forkingEncoder: Encoder[(ForksCount, testentities.Project[ForksCount])] = Encoder.instance {
+    case (forksCount, project: ProjectWithParent[_]) => json"""{
       "forksCount": ${forksCount.value},
       "parent": {
         "path":    ${project.parent.path.value},
