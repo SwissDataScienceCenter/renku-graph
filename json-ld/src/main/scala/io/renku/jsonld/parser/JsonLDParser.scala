@@ -1,4 +1,5 @@
 package io.renku.jsonld.parser
+
 import cats.syntax.all._
 import io.circe.{Json, JsonNumber, JsonObject}
 import io.renku.jsonld.JsonLD.{JsonLDInstantValue, JsonLDLocalDateValue, JsonLDValue}

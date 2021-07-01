@@ -46,7 +46,7 @@ class ToTriplesGeneratedUpdaterSpec
 
   "updateDB" should {
 
-    "change the status of all events up to the current event with the status TRIPLES_GENERATED" in new TestCase {
+    "change statuses to TRIPLES_GENERATED of all events older than the current event" in new TestCase {
       val eventDate        = eventDates.generateOne
       val statusesToUpdate = Set(New, GeneratingTriples, GenerationRecoverableFailure, AwaitingDeletion)
       val eventsToUpdate   = statusesToUpdate.map(addEvent(_, timestamps(max = eventDate.value).generateAs(EventDate)))

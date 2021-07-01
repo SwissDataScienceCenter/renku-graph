@@ -202,8 +202,8 @@ private class ToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow: Sync](
         }
     }
 
-  private def removeAwaitingDeletionEvents(idsAndStatuses: List[(EventId, EventStatus)], event: ToTriplesGenerated) =
-    idsAndStatuses.collect { case (id, AwaitingDeletion) => id } match {
+  private def removeAwaitingDeletionEvents(eventsWindow: List[(EventId, EventStatus)], event: ToTriplesGenerated) =
+    eventsWindow.collect { case (id, AwaitingDeletion) => id } match {
       case Nil => Kleisli.pure(DBUpdateResults.ForProjects(event.projectPath, Map()))
       case eventIdsToRemove =>
         measureExecutionTime {
