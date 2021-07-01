@@ -22,8 +22,8 @@ import cats.data.OptionT
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.model.projects
+import ch.datascience.graph.config.GitLabUrlLoader
+import ch.datascience.graph.model.{GitLabUrl, projects}
 import ch.datascience.graph.model.projects.{Description, Id, Visibility}
 import ch.datascience.http.client.{AccessToken, RestClient}
 import ch.datascience.knowledgegraph.projects.model.Forking.ForksCount
@@ -180,6 +180,6 @@ private object GitLabProjectFinder {
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[GitLabProjectFinder[IO]] = for {
-    gitLabUrl <- GitLabUrl[IO]()
+    gitLabUrl <- GitLabUrlLoader[IO]()
   } yield new GitLabProjectFinderImpl(gitLabUrl, gitLabThrottler, logger)
 }

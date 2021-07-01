@@ -19,10 +19,10 @@
 package ch.datascience.knowledgegraph.projects.rest
 
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
-import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.config.RenkuBaseUrlLoader
 import ch.datascience.graph.model.projects._
 import ch.datascience.graph.model.views.RdfResource
-import ch.datascience.graph.model.{SchemaVersion, users}
+import ch.datascience.graph.model.{RenkuBaseUrl, SchemaVersion, users}
 import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder._
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
@@ -45,7 +45,7 @@ private class KGProjectFinderImpl[Interpretation[_]: ConcurrentEffect: Timer](
     with KGProjectFinder[Interpretation] {
 
   import cats.syntax.all._
-  import ch.datascience.graph.Schemas._
+  import ch.datascience.graph.model.Schemas._
   import eu.timepit.refined.auto._
   import io.circe.Decoder
 
@@ -158,7 +158,7 @@ private object KGProjectFinder {
   def apply(
       timeRecorder:   SparqlQueryTimeRecorder[IO],
       rdfStoreConfig: IO[RdfStoreConfig] = RdfStoreConfig[IO](),
-      renkuBaseUrl:   IO[RenkuBaseUrl] = RenkuBaseUrl[IO](),
+      renkuBaseUrl:   IO[RenkuBaseUrl] = RenkuBaseUrlLoader[IO](),
       logger:         Logger[IO] = ApplicationLogger
   )(implicit
       executionContext: ExecutionContext,

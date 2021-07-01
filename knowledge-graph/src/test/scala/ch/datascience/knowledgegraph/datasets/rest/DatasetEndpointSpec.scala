@@ -20,13 +20,12 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators.{renkuBaseUrls, renkuResourcesUrls}
+import ch.datascience.generators.CommonGraphGenerators.renkuResourcesUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets._
-import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.{RenkuBaseUrl, projects}
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.model.users.{Affiliation, Email, Name => UserName}
 import ch.datascience.http.InfoMessage._

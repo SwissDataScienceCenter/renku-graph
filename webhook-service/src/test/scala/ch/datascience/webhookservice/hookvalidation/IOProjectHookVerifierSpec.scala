@@ -23,7 +23,7 @@ import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.config.GitLabUrl
+import ch.datascience.graph.model.GitLabUrl
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.RestClientError.UnauthorizedException

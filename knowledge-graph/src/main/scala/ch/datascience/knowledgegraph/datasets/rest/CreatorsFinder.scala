@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ConcurrentEffect, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.Schemas._
+import ch.datascience.graph.model.Schemas._
 import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.users.{Affiliation, Email, Name => UserName}
 import ch.datascience.knowledgegraph.datasets.model.DatasetCreator

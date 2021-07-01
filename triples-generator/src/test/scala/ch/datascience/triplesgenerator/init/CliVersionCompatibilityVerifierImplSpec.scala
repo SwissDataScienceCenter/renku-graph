@@ -19,12 +19,12 @@
 package ch.datascience.triplesgenerator.init
 
 import cats.data.NonEmptyList
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.triplesgenerator.generators.VersionGenerators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.triplesgenerator.generators.VersionGenerators._
-import ch.datascience.generators.Generators.Implicits._
 
 import scala.util.{Failure, Success, Try}
 

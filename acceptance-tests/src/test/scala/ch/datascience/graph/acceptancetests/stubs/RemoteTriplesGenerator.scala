@@ -23,9 +23,8 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.data
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.tooling.TestLogger
-import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
-import ch.datascience.graph.model.CliVersion
 import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.{CliVersion, GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.rdfstore.entities
 import ch.datascience.rdfstore.entities.EntitiesGenerators._
 import ch.datascience.rdfstore.entities.{Activity, ExecutionPlanner, Person, RunPlan}

@@ -21,7 +21,7 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 import cats.data.{EitherT, OptionT}
 import cats.syntax.all._
 import cats.{MonadError, MonadThrow}
-import ch.datascience.rdfstore.SparqlValueEncoder.sparqlEncode
+import ch.datascience.graph.model.views.SparqlValueEncoder.sparqlEncode
 import ch.datascience.tinytypes.TinyType
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.circe.Decoder.decodeString

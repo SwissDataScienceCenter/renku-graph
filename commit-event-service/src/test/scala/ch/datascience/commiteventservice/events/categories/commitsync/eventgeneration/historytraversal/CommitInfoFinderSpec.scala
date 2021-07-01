@@ -25,8 +25,8 @@ import ch.datascience.commiteventservice.events.categories.commitsync.eventgener
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.GitLabUrl
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.CommittedDate
 import ch.datascience.http.client.RestClientError.UnauthorizedException

@@ -19,7 +19,7 @@
 package ch.datascience.graph.acceptancetests.knowledgegraph
 
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators.accessTokens
+import ch.datascience.generators.CommonGraphGenerators.{accessTokens, _}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.data
 import ch.datascience.graph.acceptancetests.data.Project.Permissions._
@@ -32,7 +32,6 @@ import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TestReadabilityTools._
-import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}

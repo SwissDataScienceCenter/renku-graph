@@ -23,7 +23,7 @@ import cats.syntax.all._
 import cats.{Applicative, MonadError}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.graph.config.GitLabUrl
+import ch.datascience.graph.config.GitLabUrlLoader
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, AccessTokenFinderImpl, TokenRepositoryUrl}
 import ch.datascience.http.client.AccessToken
@@ -142,7 +142,7 @@ object HookValidator {
       timer:            Timer[IO]
   ): IO[HookValidator[IO]] = for {
     tokenRepositoryUrl <- TokenRepositoryUrl[IO]()
-    gitLabUrl          <- GitLabUrl[IO]()
+    gitLabUrl          <- GitLabUrlLoader[IO]()
   } yield new HookValidatorImpl[IO](
     projectHookUrl,
     new IOProjectHookVerifier(gitLabUrl, gitLabThrottler, ApplicationLogger),

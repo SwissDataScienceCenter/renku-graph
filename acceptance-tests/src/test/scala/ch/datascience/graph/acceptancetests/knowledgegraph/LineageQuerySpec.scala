@@ -19,7 +19,7 @@
 package ch.datascience.graph.acceptancetests.knowledgegraph
 
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators.accessTokens
+import ch.datascience.generators.CommonGraphGenerators.{accessTokens, authUsers}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning.`data in the RDF store`
@@ -28,13 +28,12 @@ import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import ch.datascience.graph.model
-import ch.datascience.graph.model.GraphModelGenerators.authUsers
 import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.entities
 import ch.datascience.rdfstore.entities.LineageExemplarData.ExemplarData
 import ch.datascience.rdfstore.entities.Project.ForksCount
-import ch.datascience.rdfstore.entities.{renkuBaseUrl => _, gitLabApiUrl => _, _}
+import ch.datascience.rdfstore.entities.{gitLabApiUrl => _, renkuBaseUrl => _, _}
 import io.circe.Json
 import io.circe.literal._
 import io.renku.jsonld.JsonLD

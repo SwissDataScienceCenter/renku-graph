@@ -43,7 +43,7 @@ private class StatsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer](
     with StatsFinder[Interpretation] {
 
   import EntityCount._
-  import ch.datascience.graph.Schemas._
+  import ch.datascience.graph.model.Schemas._
 
   override def entitiesCount(): Interpretation[Map[EntityLabel, Count]] =
     queryExpecting[List[(EntityLabel, Count)]](using = query) map (_.toMap)

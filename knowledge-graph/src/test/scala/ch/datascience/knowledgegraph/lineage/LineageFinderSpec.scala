@@ -19,6 +19,7 @@
 package ch.datascience.knowledgegraph.lineage
 
 import cats.syntax.all._
+import ch.datascience.generators.CommonGraphGenerators.authUsers
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
@@ -28,7 +29,7 @@ import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.knowledgegraph.lineage.LineageGenerators._
-import ch.datascience.knowledgegraph.lineage.model.{EdgeMap, _}
+import ch.datascience.knowledgegraph.lineage.model._
 import ch.datascience.rdfstore.SparqlQuery
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Assertion

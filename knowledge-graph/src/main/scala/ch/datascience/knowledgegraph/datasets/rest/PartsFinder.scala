@@ -19,7 +19,7 @@
 package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ConcurrentEffect, Timer}
-import ch.datascience.graph.Schemas._
+import ch.datascience.graph.model.Schemas._
 import ch.datascience.graph.model.datasets._
 import ch.datascience.knowledgegraph.datasets.model.DatasetPart
 import ch.datascience.rdfstore.SparqlQuery.Prefixes

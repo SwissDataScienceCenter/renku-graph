@@ -19,13 +19,12 @@
 package ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog
 
 import ammonite.ops.Path
-import cats.MonadError
+import cats.{MonadError, MonadThrow}
 import cats.data.EitherT
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.ServiceUrl
-import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.{GitLabUrl, projects}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.rdfstore.JsonLDTriples
@@ -44,9 +43,7 @@ private object Commands {
   final class RepositoryPath private (val value: Path) extends AnyVal with AbsolutePathTinyType
   object RepositoryPath extends TinyTypeFactory[RepositoryPath](new RepositoryPath(_))
 
-  class GitLabRepoUrlFinder[Interpretation[_]](
-      gitLabUrl: GitLabUrl
-  )(implicit ME: MonadError[Interpretation, Throwable]) {
+  class GitLabRepoUrlFinder[Interpretation[_]: MonadThrow](gitLabUrl: GitLabUrl) {
 
     import java.net.URL
 
@@ -64,7 +61,7 @@ private object Commands {
     private def merge(gitLabUrl:    GitLabUrl,
                       urlTokenPart: String,
                       projectPath:  projects.Path
-    ): Interpretation[ServiceUrl] = ME.fromEither {
+    ): Interpretation[ServiceUrl] = MonadThrow[Interpretation].fromEither {
       ServiceUrl.from {
         val url              = gitLabUrl.value
         val protocol         = new URL(url).getProtocol

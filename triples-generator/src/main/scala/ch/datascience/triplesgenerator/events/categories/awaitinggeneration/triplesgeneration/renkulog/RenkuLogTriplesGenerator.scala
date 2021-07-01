@@ -23,7 +23,7 @@ import cats.Applicative
 import cats.data.EitherT
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.config.GitLabUrl
+import ch.datascience.graph.config.GitLabUrlLoader
 import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.JsonLDTriples
@@ -139,7 +139,7 @@ private[events] object RenkuLogTriplesGenerator {
       executionContext: ExecutionContext,
       timer:            Timer[IO]
   ): IO[TriplesGenerator[IO]] = for {
-    gitLabUrl <- GitLabUrl[IO]()
+    gitLabUrl <- GitLabUrlLoader[IO]()
   } yield new RenkuLogTriplesGenerator(
     new GitLabRepoUrlFinder[IO](gitLabUrl),
     new Commands.Renku,

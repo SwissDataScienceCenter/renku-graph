@@ -18,14 +18,13 @@
 
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects
 
-import ch.datascience.graph.Schemas._
-import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
+import ch.datascience.graph.model.Schemas._
 import ch.datascience.graph.model.projects.{DateCreated, Name, Path, ResourceId, Visibility}
-import ch.datascience.graph.model.users
 import ch.datascience.graph.model.views.RdfResource
+import ch.datascience.graph.model.views.SparqlValueEncoder.sparqlEncode
+import ch.datascience.graph.model.{GitLabApiUrl, RenkuBaseUrl, users}
 import ch.datascience.rdfstore.SparqlQuery
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
-import ch.datascience.rdfstore.SparqlValueEncoder.sparqlEncode
 import eu.timepit.refined.auto._
 
 private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl) {
@@ -34,9 +33,9 @@ private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitL
     val rdfResource = ResourceId(renkuBaseUrl, projectPath).showAs[RdfResource]
     maybeForkPath match {
       case Some(forkPath) =>
-        val q = SparqlQuery(
+        SparqlQuery.of(
           name = "upload - project derived update",
-          Set("PREFIX prov: <http://www.w3.org/ns/prov#>"),
+          Prefixes.of(prov -> "prov"),
           s"""|DELETE { $rdfResource prov:wasDerivedFrom ?parentId }
               |INSERT { $rdfResource prov:wasDerivedFrom ${ResourceId(renkuBaseUrl, forkPath).showAs[RdfResource]} }
               |WHERE  { 
@@ -45,11 +44,10 @@ private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitL
               |}
               |""".stripMargin
         )
-        q
       case _ =>
-        SparqlQuery(
+        SparqlQuery.of(
           name = "upload - project derived delete",
-          Set("PREFIX prov: <http://www.w3.org/ns/prov#>"),
+          Prefixes.of(prov -> "prov"),
           s"""|DELETE { $rdfResource prov:wasDerivedFrom ?parentId }
               |WHERE  { $rdfResource prov:wasDerivedFrom ?parentId }
               |""".stripMargin
@@ -61,9 +59,9 @@ private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitL
     val rdfResource     = ResourceId(renkuBaseUrl, projectPath).showAs[RdfResource]
     val creatorResource = creatorId.showAs[RdfResource]
     List(
-      SparqlQuery(
+      SparqlQuery.of(
         name = "upload - project creator update",
-        Set("PREFIX schema: <http://schema.org/>"),
+        Prefixes.of(schema -> "schema"),
         s"""|DELETE { $rdfResource schema:creator ?creatorId }
             |INSERT { $rdfResource schema:creator $creatorResource }
             |WHERE  { 
@@ -78,9 +76,9 @@ private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitL
   def unlinkCreator(projectPath: Path): List[SparqlQuery] = {
     val rdfResource = ResourceId(renkuBaseUrl, projectPath).showAs[RdfResource]
     List(
-      SparqlQuery(
+      SparqlQuery.of(
         name = "upload - project creator unlink",
-        Set("PREFIX schema: <http://schema.org/>"),
+        Prefixes.of(schema -> "schema"),
         s"""|DELETE { $rdfResource schema:creator ?creatorId }
             |WHERE  { 
             |  OPTIONAL { $rdfResource schema:creator ?maybeCreatorId } 
@@ -123,11 +121,11 @@ private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitL
   def updateDateCreated(projectPath: Path, dateCreated: DateCreated): List[SparqlQuery] = {
     val rdfResource = ResourceId(renkuBaseUrl, projectPath).showAs[RdfResource]
     List(
-      SparqlQuery(
+      SparqlQuery.of(
         name = "upload - project dateCreated updated",
-        Set("PREFIX schema: <http://schema.org/>", "PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>"),
+        Prefixes.of(schema -> "schema", xml -> "xml"),
         s"""|DELETE { $rdfResource schema:dateCreated ?date }
-            |INSERT { $rdfResource schema:dateCreated '$dateCreated'^^xsd:dateTime }
+            |INSERT { $rdfResource schema:dateCreated '$dateCreated'^^xml:dateTime }
             |WHERE  {
             |  OPTIONAL { $rdfResource schema:dateCreated ?maybeDate } 
             |  BIND (IF(BOUND(?maybeDate), ?maybeDate, "nonexisting") AS ?date)

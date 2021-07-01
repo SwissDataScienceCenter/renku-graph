@@ -21,7 +21,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.Parallel
 import cats.effect.{ConcurrentEffect, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.Schemas._
+import ch.datascience.graph.model.Schemas._
 import ch.datascience.graph.model.datasets.{Date, DateCreated, DatePublished, Description, Identifier, ImageUri, Keyword, Name, Title}
 import ch.datascience.graph.model.projects.Visibility
 import ch.datascience.http.rest.paging.Paging.PagedResultsFinder

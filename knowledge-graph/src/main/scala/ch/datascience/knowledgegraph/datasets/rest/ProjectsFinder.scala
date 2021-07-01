@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ConcurrentEffect, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.Schemas._
+import ch.datascience.graph.model.Schemas._
 import ch.datascience.graph.model.datasets.Identifier
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{Path, ResourceId}

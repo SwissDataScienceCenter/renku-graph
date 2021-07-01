@@ -20,8 +20,8 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated.tripl
 
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.Schemas._
 import ch.datascience.graph.model.GraphModelGenerators.{projectCreatedDates, projectNames, projectVisibilities}
+import ch.datascience.graph.model.Schemas._
 import ch.datascience.graph.model.projects.{DateCreated, Name, ResourceId, Visibility}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore.SparqlQuery.Prefixes

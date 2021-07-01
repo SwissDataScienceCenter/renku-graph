@@ -19,8 +19,9 @@
 package ch.datascience.knowledgegraph.lineage
 
 import cats.effect.IO
+import ch.datascience.generators.CommonGraphGenerators.authUsers
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators.{authUsers, projectPaths}
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Warn
 import ch.datascience.knowledgegraph.lineage.model._

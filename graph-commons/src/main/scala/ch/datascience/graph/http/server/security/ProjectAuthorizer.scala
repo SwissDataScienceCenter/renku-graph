@@ -23,8 +23,8 @@ import cats.data.EitherT
 import cats.data.EitherT.{leftT, rightT}
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.projects
+import ch.datascience.graph.config.RenkuBaseUrlLoader
+import ch.datascience.graph.model.{RenkuBaseUrl, projects}
 import ch.datascience.graph.model.projects.Visibility._
 import ch.datascience.graph.model.projects.{Path, ResourceId, Visibility}
 import ch.datascience.graph.model.users.GitLabId
@@ -48,7 +48,7 @@ trait ProjectAuthorizer[Interpretation[_]] {
 object ProjectAuthorizer {
   def apply(
       timeRecorder:   SparqlQueryTimeRecorder[IO],
-      renkuBaseUrl:   IO[RenkuBaseUrl] = RenkuBaseUrl[IO](),
+      renkuBaseUrl:   IO[RenkuBaseUrl] = RenkuBaseUrlLoader[IO](),
       rdfStoreConfig: IO[RdfStoreConfig] = RdfStoreConfig[IO](),
       logger:         Logger[IO]
   )(implicit
@@ -81,7 +81,7 @@ class ProjectAuthorizerImpl(
     _       <- validate(maybeAuthUser, records)
   } yield ()
 
-  import ch.datascience.graph.Schemas._
+  import ch.datascience.graph.model.Schemas._
   import eu.timepit.refined.auto._
 
   private def query(path: Path) = SparqlQuery.of(

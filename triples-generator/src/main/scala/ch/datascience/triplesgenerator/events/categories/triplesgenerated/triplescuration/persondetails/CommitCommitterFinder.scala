@@ -23,9 +23,8 @@ import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.graph.config.GitLabApiUrl
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.{GitLabApiUrl, projects}
 import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException}
 import ch.datascience.http.client.{AccessToken, RestClient}
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
@@ -34,9 +33,9 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import org.http4s.Method.GET
 import org.http4s.Status.{Ok, Unauthorized}
+import org.http4s._
 import org.http4s.circe.jsonOf
 import org.http4s.dsl.io.ServiceUnavailable
-import org.http4s._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext

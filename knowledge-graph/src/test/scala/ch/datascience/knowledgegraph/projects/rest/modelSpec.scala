@@ -18,7 +18,6 @@
 
 package ch.datascience.knowledgegraph.projects.rest
 
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._

@@ -18,12 +18,11 @@
 
 package ch.datascience.knowledgegraph.metrics
 
-import java.lang.Thread.sleep
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.Schemas.{prov, schema}
+import ch.datascience.graph.model.Schemas.{prov, schema}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.metrics.LabeledGauge
@@ -33,6 +32,7 @@ import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import java.lang.Thread.sleep
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.postfixOps

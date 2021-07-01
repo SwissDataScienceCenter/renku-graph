@@ -20,8 +20,9 @@ package ch.datascience.knowledgegraph.lineage
 
 import cats.effect._
 import cats.syntax.all._
-import ch.datascience.graph.Schemas._
-import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.config.RenkuBaseUrlLoader
+import ch.datascience.graph.model.RenkuBaseUrl
+import ch.datascience.graph.model.Schemas._
 import ch.datascience.graph.model.projects.{Path, ResourceId, Visibility}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.http.server.security.model.AuthUser
@@ -174,6 +175,6 @@ private object EdgesFinder {
       timer:              Timer[IO]
   ): IO[EdgesFinder[IO]] = for {
     config       <- RdfStoreConfig[IO]()
-    renkuBaseUrl <- RenkuBaseUrl[IO]()
+    renkuBaseUrl <- RenkuBaseUrlLoader[IO]()
   } yield new EdgesFinderImpl(config, renkuBaseUrl, logger, timeRecorder)
 }

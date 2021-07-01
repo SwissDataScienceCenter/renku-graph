@@ -19,9 +19,9 @@
 package ch.datascience.knowledgegraph.graphql
 
 import cats.effect.IO
+import ch.datascience.generators.CommonGraphGenerators.authUsers
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.GraphModelGenerators.authUsers
 import ch.datascience.http.ErrorMessage
 import ch.datascience.http.ErrorMessage._
 import ch.datascience.http.server.EndpointTester._

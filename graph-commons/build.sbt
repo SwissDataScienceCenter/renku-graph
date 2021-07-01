@@ -23,14 +23,7 @@ libraryDependencies += "com.github.pureconfig" %% "pureconfig"      % pureConfig
 libraryDependencies += "com.github.pureconfig" %% "pureconfig-cats" % pureConfigVersion
 
 val refinedVersion = "0.9.26"
-libraryDependencies += "eu.timepit" %% "refined"            % refinedVersion
 libraryDependencies += "eu.timepit" %% "refined-pureconfig" % refinedVersion
-
-val circeVersion = "0.14.1"
-libraryDependencies += "io.circe" %% "circe-core"    % circeVersion
-libraryDependencies += "io.circe" %% "circe-literal" % circeVersion
-libraryDependencies += "io.circe" %% "circe-optics"  % circeVersion
-libraryDependencies += "io.circe" %% "circe-parser"  % circeVersion
 
 libraryDependencies += "io.sentry" % "sentry-logback" % "5.0.1"
 
@@ -45,9 +38,6 @@ libraryDependencies += "org.http4s" %% "http4s-dsl"                % http4sVersi
 libraryDependencies += "org.http4s" %% "http4s-prometheus-metrics" % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-server"             % http4sVersion
 
-val catsVersion = "2.6.0"
-libraryDependencies += "org.typelevel" %% "cats-core"   % catsVersion
-libraryDependencies += "org.typelevel" %% "cats-free"   % catsVersion
 libraryDependencies += "org.typelevel" %% "cats-effect" % "2.4.1"
 
 libraryDependencies += "org.typelevel" %% "log4cats-core" % "2.0.1"
@@ -64,7 +54,4 @@ libraryDependencies += "org.apache.jena" % "jena-fuseki-main"   % jenaVersion % 
 libraryDependencies += "org.apache.jena" % "jena-rdfconnection" % jenaVersion % Test
 libraryDependencies += "org.apache.jena" % "jena-text"          % jenaVersion % Test
 
-libraryDependencies += "org.scalacheck"    %% "scalacheck"      % "1.14.3"  % Test // version 1.15.1 is broken
-libraryDependencies += "org.scalamock"     %% "scalamock"       % "5.1.0"   % Test
-libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.6"   % Test
-libraryDependencies += "org.scalatestplus" %% "scalacheck-1-14" % "3.2.2.0" % Test
+libraryDependencies += "org.scalamock" %% "scalamock" % "5.1.0" % Test

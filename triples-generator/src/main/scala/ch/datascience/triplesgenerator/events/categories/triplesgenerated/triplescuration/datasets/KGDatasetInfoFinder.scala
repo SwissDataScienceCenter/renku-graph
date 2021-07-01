@@ -43,7 +43,7 @@ private class KGDatasetInfoFinderImpl(
     with KGDatasetInfoFinder[IO] {
 
   import cats.syntax.all._
-  import ch.datascience.graph.Schemas.{renku, schema}
+  import ch.datascience.graph.model.Schemas.{renku, schema}
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import eu.timepit.refined.auto._
 

@@ -20,21 +20,21 @@ package ch.datascience.graph.http.server.security
 
 import cats.effect.IO
 import cats.syntax.all._
+import ch.datascience.generators.CommonGraphGenerators.authUsers
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
-import ch.datascience.graph.model.GraphModelGenerators.{authUsers, projectPaths}
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects.Visibility._
+import ch.datascience.graph.model.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.http.server.security.EndpointSecurityException.AuthorizationFailure
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.EntitiesGenerators._
+import ch.datascience.rdfstore.entities.Project
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.jsonld.syntax._
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.rdfstore.entities.Project
 
 class ProjectAuthorizerSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers {
 

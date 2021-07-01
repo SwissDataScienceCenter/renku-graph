@@ -21,7 +21,7 @@ package ch.datascience.knowledgegraph.lineage
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.Schemas.{prov, schema, wfprov}
+import ch.datascience.graph.model.Schemas.{prov, schema, wfprov}
 import ch.datascience.knowledgegraph.lineage.LineageGenerators._
 import ch.datascience.knowledgegraph.lineage.model.{Edge, Lineage, Node}
 import eu.timepit.refined.auto._

@@ -21,8 +21,8 @@ package ch.datascience.knowledgegraph.datasets
 import cats.Order
 import cats.data.NonEmptyList
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.{DerivedFrom, InitialVersion, SameAs, Url}
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.rdfstore.entities

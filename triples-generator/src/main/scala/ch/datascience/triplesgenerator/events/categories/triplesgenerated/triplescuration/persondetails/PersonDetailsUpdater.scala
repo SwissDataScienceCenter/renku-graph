@@ -25,7 +25,7 @@ import cats.{Monad, MonadError}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.events.consumers.Project
-import ch.datascience.graph.config.GitLabUrl
+import ch.datascience.graph.config.GitLabUrlLoader
 import ch.datascience.graph.model.events.EventId
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
@@ -90,7 +90,7 @@ private[triplescuration] object PersonDetailsUpdater {
   ): IO[PersonDetailsUpdater[IO]] = for {
     projectMembersFinder <- IOGitLabProjectMembersFinder(gitLabThrottler, logger)
     accessTokenFinder    <- AccessTokenFinder(logger)
-    gitLabUrl            <- GitLabUrl[IO]()
+    gitLabUrl            <- GitLabUrlLoader[IO]()
     personTrimmer        <- IOPersonTrimmer(gitLabThrottler, logger)
   } yield new PersonDetailsUpdaterImpl[IO](
     personTrimmer,

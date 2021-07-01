@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.data.{EitherT, OptionT}
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
-import ch.datascience.graph.config.{GitLabUrl, RenkuBaseUrl}
+import ch.datascience.graph.config.{GitLabUrlLoader, RenkuBaseUrlLoader}
 import ch.datascience.graph.model.users
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
@@ -133,8 +133,8 @@ private object IOUpdateFunctionsCreator {
       timeRecorder:            SparqlQueryTimeRecorder[IO]
   )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[UpdatesCreator[IO]] =
     for {
-      renkuBaseUrl     <- RenkuBaseUrl[IO]()
-      gitLabApiUrl     <- GitLabUrl[IO]().map(_.apiV4)
+      renkuBaseUrl     <- RenkuBaseUrlLoader[IO]()
+      gitLabApiUrl     <- GitLabUrlLoader[IO]().map(_.apiV4)
       gitLabInfoFinder <- IOGitLabInfoFinder(gitLabThrottler, logger)
       kgInfoFinder     <- IOKGInfoFinder(timeRecorder, logger)
     } yield new UpdatesCreatorImpl(gitLabInfoFinder, kgInfoFinder, new UpdatesQueryCreator(renkuBaseUrl, gitLabApiUrl))

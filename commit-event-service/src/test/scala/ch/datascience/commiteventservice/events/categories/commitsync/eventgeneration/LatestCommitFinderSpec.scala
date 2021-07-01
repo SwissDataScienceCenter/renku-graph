@@ -23,7 +23,7 @@ import ch.datascience.commiteventservice.events.categories.commitsync.eventgener
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators.{oauthAccessTokens, personalAccessTokens}
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.config.GitLabUrl
+import ch.datascience.graph.model.GitLabUrl
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.interpreters.TestLogger

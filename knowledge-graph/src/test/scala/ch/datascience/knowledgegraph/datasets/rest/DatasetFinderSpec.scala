@@ -20,10 +20,9 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.SameAs
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.model._

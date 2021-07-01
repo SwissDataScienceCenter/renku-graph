@@ -25,9 +25,9 @@ import ch.datascience.graph.acceptancetests.data.Project.Permissions._
 import ch.datascience.graph.acceptancetests.data.Project.Statistics._
 import ch.datascience.graph.acceptancetests.data.Project.Urls._
 import ch.datascience.graph.acceptancetests.data.Project._
-import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.config.RenkuBaseUrlLoader
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.{CliVersion, RenkuVersionPair, SchemaVersion}
+import ch.datascience.graph.model._
 import ch.datascience.rdfstore.entities
 import ch.datascience.rdfstore.entities.fixed
 import org.scalacheck.Gen
@@ -39,7 +39,7 @@ package object data {
   val currentVersionPair:    RenkuVersionPair   = RenkuVersionPair(CliVersion("0.12.2"), SchemaVersion("8"))
   implicit val cliVersion:   CliVersion         = currentVersionPair.cliVersion
   val renkuResourcesUrl:     renku.ResourcesUrl = renku.ResourcesUrl("http://localhost:9004/knowledge-graph")
-  implicit val renkuBaseUrl: RenkuBaseUrl       = RenkuBaseUrl[Try]().fold(throw _, identity)
+  implicit val renkuBaseUrl: RenkuBaseUrl       = RenkuBaseUrlLoader[Try]().fold(throw _, identity)
 
   def dataProjects[FC <: entities.Project.ForksCount](
       projectGen: Gen[entities.Project[FC]]

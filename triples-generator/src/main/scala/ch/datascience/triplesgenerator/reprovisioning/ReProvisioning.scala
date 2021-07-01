@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.data.{NonEmptyList, OptionT}
 import cats.effect.Timer
 import cats.syntax.all._
-import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.config.RenkuBaseUrlLoader
 import ch.datascience.graph.model.RenkuVersionPair
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
@@ -123,24 +123,23 @@ object IOReProvisioning {
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[ReProvisioning[IO]] =
-    for {
-      rdfStoreConfig         <- RdfStoreConfig[IO](configuration)
-      eventsReScheduler      <- IOEventsReScheduler(logger)
-      renkuBaseUrl           <- RenkuBaseUrl[IO]()
-      executionTimeRecorder  <- ExecutionTimeRecorder[IO](ApplicationLogger)
-      triplesRemover         <- TriplesRemoverImpl(rdfStoreConfig, logger, timeRecorder)
-      renkuVersionPairFinder <- RenkuVersionPairFinder(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
-    } yield new ReProvisioningImpl[IO](
-      renkuVersionPairFinder,
-      versionCompatibilityPairs,
-      new ReprovisionJudgeImpl(),
-      triplesRemover,
-      eventsReScheduler,
-      new RenkuVersionPairUpdaterImpl(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder),
-      reProvisioningStatus,
-      executionTimeRecorder,
-      logger,
-      SleepWhenBusy
-    )
+  ): IO[ReProvisioning[IO]] = for {
+    rdfStoreConfig         <- RdfStoreConfig[IO](configuration)
+    eventsReScheduler      <- IOEventsReScheduler(logger)
+    renkuBaseUrl           <- RenkuBaseUrlLoader[IO]()
+    executionTimeRecorder  <- ExecutionTimeRecorder[IO](ApplicationLogger)
+    triplesRemover         <- TriplesRemoverImpl(rdfStoreConfig, logger, timeRecorder)
+    renkuVersionPairFinder <- RenkuVersionPairFinder(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
+  } yield new ReProvisioningImpl[IO](
+    renkuVersionPairFinder,
+    versionCompatibilityPairs,
+    new ReprovisionJudgeImpl(),
+    triplesRemover,
+    eventsReScheduler,
+    new RenkuVersionPairUpdaterImpl(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder),
+    reProvisioningStatus,
+    executionTimeRecorder,
+    logger,
+    SleepWhenBusy
+  )
 }

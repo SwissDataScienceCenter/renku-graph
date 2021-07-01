@@ -22,7 +22,7 @@ package datasets
 import cats.MonadThrow
 import cats.data.OptionT
 import cats.syntax.all._
-import ch.datascience.graph.Schemas._
+import ch.datascience.graph.model.Schemas._
 import ch.datascience.graph.model.datasets.{DerivedFrom, InternalSameAs, SameAs}
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.tinytypes.TinyType

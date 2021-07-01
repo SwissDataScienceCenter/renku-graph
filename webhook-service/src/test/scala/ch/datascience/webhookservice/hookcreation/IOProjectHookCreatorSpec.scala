@@ -22,7 +22,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.config.GitLabUrl
+import ch.datascience.graph.model.GitLabUrl
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.interpreters.TestLogger
@@ -125,7 +125,7 @@ class IOProjectHookCreatorSpec extends AnyWordSpec with MockFactory with Externa
     val hookCreator = new IOProjectHookCreator(gitLabUrl, Throttler.noThrottling, TestLogger())
   }
 
-  private implicit val projectHooks: Gen[ProjectHook] = for {
+  private implicit lazy val projectHooks: Gen[ProjectHook] = for {
     projectId           <- projectIds
     hookUrl             <- projectHookUrls
     serializedHookToken <- serializedHookTokens

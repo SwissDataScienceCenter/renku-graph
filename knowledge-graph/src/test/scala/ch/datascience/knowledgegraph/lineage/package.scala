@@ -18,7 +18,7 @@
 
 package ch.datascience.knowledgegraph
 
-import ch.datascience.graph.Schemas._
+import ch.datascience.graph.model.Schemas._
 import ch.datascience.knowledgegraph.lineage.model._
 import io.renku.jsonld.EntityId
 

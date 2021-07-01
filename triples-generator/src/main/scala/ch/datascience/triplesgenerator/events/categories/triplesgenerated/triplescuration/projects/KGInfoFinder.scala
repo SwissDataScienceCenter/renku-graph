@@ -46,7 +46,7 @@ private class IOKGInfoFinder(
   import eu.timepit.refined.auto._
   import io.circe.Decoder
   import Decoder._
-  import ch.datascience.graph.Schemas._
+  import ch.datascience.graph.model.Schemas._
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
   override def findCreatorId(gitLabId: users.GitLabId): IO[Option[users.ResourceId]] = {

@@ -23,7 +23,8 @@ import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.graph.config.{GitLabApiUrl, GitLabUrl}
+import ch.datascience.graph.config.GitLabUrlLoader
+import ch.datascience.graph.model.GitLabApiUrl
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.model.users.GitLabId
 import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException}
@@ -34,13 +35,13 @@ import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecove
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
-import org.typelevel.log4cats.Logger
 import io.circe.Decoder
 import org.http4s.Method.GET
 import org.http4s._
 import org.http4s.circe.jsonOf
 import org.http4s.dsl.io._
 import org.http4s.util.CaseInsensitiveString
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.{Duration, FiniteDuration}
@@ -156,6 +157,6 @@ private object IOGitLabProjectMembersFinder {
       contextShift:          ContextShift[IO],
       timer:                 Timer[IO]
   ): IO[GitLabProjectMembersFinder[IO]] = for {
-    gitLabUrl <- GitLabUrl[IO]()
+    gitLabUrl <- GitLabUrlLoader[IO]()
   } yield new IOGitLabProjectMembersFinder(gitLabUrl.apiV4, gitLabThrottler, logger)
 }

@@ -21,7 +21,7 @@ package ch.datascience.graph.acceptancetests.tooling
 import cats.effect.concurrent.MVar
 import cats.effect.{ContextShift, Fiber, IO}
 import cats.syntax.all._
-import ch.datascience.graph.Schemas._
+import ch.datascience.graph.model.Schemas._
 import ch.datascience.rdfstore.FusekiBaseUrl
 import org.apache.jena.fuseki.main.FusekiServer
 import org.apache.jena.rdfconnection.RDFConnectionFactory

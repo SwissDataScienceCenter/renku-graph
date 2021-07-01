@@ -19,10 +19,10 @@
 package ch.datascience.knowledgegraph.metrics
 
 import cats.effect.IO
-import cats.syntax.all._
 import cats.implicits.toShow
-import ch.datascience.generators.CommonGraphGenerators.cliVersions
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.GraphModelGenerators.cliVersions
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.EntitiesGenerators.personEntities

@@ -40,6 +40,10 @@ import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 import org.scalatest.time.{Millis, Minutes, Span}
 
+import java.lang.Thread.sleep
+import scala.concurrent.duration._
+import scala.language.postfixOps
+
 class EventFlowsSpec
     extends AnyFeatureSpec
     with ModelImplicits
@@ -219,13 +223,15 @@ class EventFlowsSpec
       And("project members/users exists in GitLab")
       `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project)
 
-      And("the transformation fails recoverably ")
+      And("the transformation fails recoverably")
       `GET <gitlabApi>/projects/:path having connectivity issues`(project)
 
       When("a Push Event arrives")
       webhookServiceClient
         .POST("webhooks/events", HookToken(projectId), data.GitLab.pushEvent(project, commitId))
         .status shouldBe Accepted
+
+      sleep((5 second).toMillis)
 
       Then(s"all the events should get the $TransformationRecoverableFailure status in the Event Log")
       eventually {

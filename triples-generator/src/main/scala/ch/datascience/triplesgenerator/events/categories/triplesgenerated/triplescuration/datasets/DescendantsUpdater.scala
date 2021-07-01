@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets
 
 import cats.MonadThrow
-import ch.datascience.graph.Schemas._
+import ch.datascience.graph.model.Schemas._
 import ch.datascience.graph.model.datasets.{TopmostDerivedFrom, TopmostSameAs}
 import ch.datascience.rdfstore.SparqlQuery
 import ch.datascience.rdfstore.SparqlQuery.Prefixes

@@ -19,17 +19,17 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails
 
 import cats.MonadError
+import cats.syntax.all._
+import ch.datascience.graph.model.GitLabApiUrl
+import ch.datascience.graph.model.Schemas._
 import ch.datascience.graph.model.users.{Email, GitLabId, Name, ResourceId}
 import ch.datascience.graph.model.views.RdfResource
+import ch.datascience.graph.model.views.SparqlValueEncoder.sparqlEncode
 import ch.datascience.rdfstore.SparqlQuery
-import ch.datascience.rdfstore.SparqlValueEncoder.sparqlEncode
+import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.tinytypes.TinyType
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CuratedTriples.CurationUpdatesGroup
 import eu.timepit.refined.auto._
-import ch.datascience.rdfstore.SparqlQuery.Prefixes
-import ch.datascience.graph.Schemas._
-import ch.datascience.graph.config.GitLabApiUrl
-import cats.syntax.all._
 
 private class UpdatesCreator(gitLabApiUrl: GitLabApiUrl) {
 

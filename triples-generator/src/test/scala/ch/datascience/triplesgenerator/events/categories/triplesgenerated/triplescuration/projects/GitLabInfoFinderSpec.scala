@@ -23,11 +23,10 @@ import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects.Path
-import ch.datascience.graph.model.users
+import ch.datascience.graph.model.{GitLabUrl, users}
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.json.JsonOps._

@@ -20,16 +20,15 @@ package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.{RenkuBaseUrl, RenkuVersionPair}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Warn
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.generators.VersionGenerators.renkuVersionPairs
-import ch.datascience.graph.model.RenkuVersionPair
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, EntityTypes, JsonLD}
 import org.scalatest._

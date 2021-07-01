@@ -19,19 +19,19 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration
 package datasets
 
+import CurationGenerators._
+import IOTriplesCurator.CurationRecoverableError
 import cats.MonadError
 import cats.data.EitherT
 import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.{exceptions, serverErrorHttpStatuses}
+import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.http.client.RestClientError.UnexpectedResponseException
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CurationGenerators._
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.DatasetInfoFinder.DatasetInfo
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.TopmostDataFinder.TopmostData
+import datasets.DatasetInfoFinder.DatasetInfo
+import datasets.TopmostDataFinder.TopmostData
 import io.renku.jsonld.generators.JsonLDGenerators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

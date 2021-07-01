@@ -26,12 +26,11 @@ import ch.datascience.graph.acceptancetests.data.Project.Permissions
 import ch.datascience.graph.acceptancetests.data.Project.Permissions._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices.webhookServiceClient
 import ch.datascience.graph.acceptancetests.tooling.TestLogger
-import ch.datascience.graph.config.{GitLabApiUrl, GitLabUrl}
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.Id
-import ch.datascience.graph.model.users
+import ch.datascience.graph.model.{GitLabApiUrl, GitLabUrl, users}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.UrlEncoder.urlEncode
@@ -41,7 +40,7 @@ import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.client.{MappingBuilder, WireMock}
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration
-import com.github.tomakehurst.wiremock.http.Fault
+import com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER
 import com.github.tomakehurst.wiremock.stubbing.{Scenario, StubMapping}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -305,7 +304,7 @@ object GitLab {
   )(implicit accessToken: AccessToken): StubMapping =
     stubFor {
       get(s"/api/v4/projects/${urlEncode(project.path.value)}").withAccessTokenInHeader
-        .willReturn(aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER))
+        .willReturn(aResponse() withFault CONNECTION_RESET_BY_PEER)
     }
 
   private implicit class MappingBuilderOps(builder: MappingBuilder) {

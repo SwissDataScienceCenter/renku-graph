@@ -24,7 +24,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.graph.config.GitLabUrl
+import ch.datascience.graph.config.GitLabUrlLoader
 import ch.datascience.graph.model.events.{CommitId, EventId}
 import ch.datascience.graph.model.users.{Email, Name, ResourceId}
 import ch.datascience.graph.model.{events, projects}
@@ -170,7 +170,7 @@ private object IOPersonTrimmer {
       contextShift:          ContextShift[IO],
       timer:                 Timer[IO]
   ): IO[PersonTrimmer[IO]] = for {
-    gitLabApiUrl          <- GitLabUrl[IO]().map(_.apiV4)
+    gitLabApiUrl          <- GitLabUrlLoader[IO]().map(_.apiV4)
     commitCommitterFinder <- IOCommitCommitterFinder(gitLabApiUrl, gitLabThrottler, logger)
   } yield new PersonTrimmerImpl[IO](new PersonExtractorImpl(), commitCommitterFinder)
 }

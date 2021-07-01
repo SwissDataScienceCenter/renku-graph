@@ -41,7 +41,7 @@ private class BaseDetailsFinder[Interpretation[_]: ConcurrentEffect: Timer](
     extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder) {
 
   import BaseDetailsFinder._
-  import ch.datascience.graph.Schemas._
+  import ch.datascience.graph.model.Schemas._
 
   def findBaseDetails(identifier: Identifier): Interpretation[Option[Dataset]] =
     queryExpecting[List[Dataset]](using = queryForDatasetDetails(identifier)) >>= toSingleDataset

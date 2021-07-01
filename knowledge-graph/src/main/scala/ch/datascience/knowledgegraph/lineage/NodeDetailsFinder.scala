@@ -20,9 +20,9 @@ package ch.datascience.knowledgegraph.lineage
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.Schemas._
-import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.projects
+import ch.datascience.graph.config.RenkuBaseUrlLoader
+import ch.datascience.graph.model.Schemas._
+import ch.datascience.graph.model.{RenkuBaseUrl, projects}
 import ch.datascience.graph.model.projects.ResourceId
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.knowledgegraph.lineage.model.{Node, RunInfo}
@@ -118,7 +118,7 @@ private object NodeDetailsFinder {
       timer:              Timer[IO]
   ): IO[NodeDetailsFinder[IO]] = for {
     config       <- RdfStoreConfig[IO]()
-    renkuBaseUrl <- RenkuBaseUrl[IO]()
+    renkuBaseUrl <- RenkuBaseUrlLoader[IO]()
   } yield new NodeDetailsFinderImpl(config, renkuBaseUrl, logger, timeRecorder)
 
   implicit val locationQuery: (Node.Location, ResourceId) => SparqlQuery = (location, path) =>

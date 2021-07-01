@@ -18,7 +18,6 @@
 
 package ch.datascience.triplesgenerator.generators
 
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.RenkuVersionPair
 import org.scalacheck.Gen

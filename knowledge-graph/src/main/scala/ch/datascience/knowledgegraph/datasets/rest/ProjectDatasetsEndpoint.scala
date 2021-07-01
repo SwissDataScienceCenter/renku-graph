@@ -21,21 +21,21 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.effect._
 import cats.syntax.all._
 import ch.datascience.config.renku
-import ch.datascience.http.InfoMessage._
-import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.config.RenkuBaseUrlLoader
 import ch.datascience.graph.model.datasets.{DerivedFrom, SameAs}
 import ch.datascience.graph.model.projects
 import ch.datascience.http.ErrorMessage
+import ch.datascience.http.InfoMessage._
 import ch.datascience.http.rest.Links._
 import ch.datascience.knowledgegraph.datasets.rest.ProjectDatasetsFinder.ProjectDataset
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
-import org.typelevel.log4cats.Logger
 import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
@@ -108,7 +108,7 @@ object IOProjectDatasetsEndpoint {
   ): IO[ProjectDatasetsEndpoint[IO]] =
     for {
       rdfStoreConfig        <- RdfStoreConfig[IO]()
-      renkuBaseUrl          <- RenkuBaseUrl[IO]()
+      renkuBaseUrl          <- RenkuBaseUrlLoader[IO]()
       renkuResourceUrl      <- renku.ResourcesUrl[IO]()
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
       projectDatasetFinder  <- ProjectDatasetsFinder(rdfStoreConfig, renkuBaseUrl, ApplicationLogger, timeRecorder)

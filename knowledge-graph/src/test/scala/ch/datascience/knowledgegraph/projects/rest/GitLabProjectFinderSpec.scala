@@ -18,18 +18,18 @@
 
 package ch.datascience.knowledgegraph.projects.rest
 
+import ProjectsGenerators._
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators.{oauthAccessTokens, personalAccessTokens}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.blankStrings
-import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model
+import ch.datascience.graph.model.GitLabUrl
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.interpreters.TestLogger
-import ProjectsGenerators._
 import ch.datascience.knowledgegraph.projects.model.Permissions
 import ch.datascience.knowledgegraph.projects.model.Permissions._
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject

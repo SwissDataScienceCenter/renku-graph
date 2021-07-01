@@ -19,7 +19,7 @@
 package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ConcurrentEffect, IO, Timer}
-import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.model.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.{DerivedFrom, Identifier, ImageUri, InitialVersion, Name, SameAs, Title}
 import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.graph.model.views.RdfResource
@@ -57,7 +57,7 @@ private class ProjectDatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Tim
     with ProjectDatasetsFinder[Interpretation] {
 
   import ProjectDatasetsFinderImpl._
-  import ch.datascience.graph.Schemas._
+  import ch.datascience.graph.model.Schemas._
   import eu.timepit.refined.auto._
 
   def findProjectDatasets(projectPath: Path): Interpretation[List[ProjectDataset]] =

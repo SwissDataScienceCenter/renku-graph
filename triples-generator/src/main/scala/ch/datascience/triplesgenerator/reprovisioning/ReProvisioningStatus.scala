@@ -23,16 +23,17 @@ import cats.effect.concurrent.Ref
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.events.consumers.EventConsumersRegistry
-import ch.datascience.graph.Schemas.rdf
-import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.config.RenkuBaseUrlLoader
+import ch.datascience.graph.model.RenkuBaseUrl
+import ch.datascience.graph.model.Schemas.rdf
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.auto._
-import org.typelevel.log4cats.Logger
 import io.circe.Decoder.decodeList
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.jsonld.EntityId
+import org.typelevel.log4cats.Logger
 
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -177,7 +178,7 @@ object ReProvisioningStatus {
   ): IO[ReProvisioningStatus[IO]] =
     for {
       rdfStoreConfig        <- RdfStoreConfig[IO](configuration)
-      renkuBaseUrl          <- RenkuBaseUrl[IO]()
+      renkuBaseUrl          <- RenkuBaseUrlLoader[IO]()
       lastCacheCheckTimeRef <- Ref.of[IO, Long](0)
     } yield new ReProvisioningStatusImpl(eventConsumersRegistry,
                                          rdfStoreConfig,
@@ -192,7 +193,7 @@ object ReProvisioningStatus {
 
 private case object ReProvisioningJsonLD {
 
-  import ch.datascience.graph.Schemas._
+  import ch.datascience.graph.model.Schemas._
 
   def id(implicit renkuBaseUrl: RenkuBaseUrl) = EntityId.of((renkuBaseUrl / "re-provisioning").toString)
 

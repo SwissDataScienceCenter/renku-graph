@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.datasets
 
 import ch.datascience.generators.CommonGraphGenerators.sortBys
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.model.RenkuBaseUrl
 import ch.datascience.graph.model.datasets._
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase

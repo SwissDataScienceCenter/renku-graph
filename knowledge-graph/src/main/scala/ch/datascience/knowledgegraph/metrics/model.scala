@@ -18,7 +18,7 @@
 
 package ch.datascience.knowledgegraph.metrics
 
-import ch.datascience.graph.Schemas
+import ch.datascience.graph.model.Schemas
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.json.TinyTypeDecoders.longDecoder
 import ch.datascience.tinytypes.{LongTinyType, StringTinyType, TinyTypeFactory}

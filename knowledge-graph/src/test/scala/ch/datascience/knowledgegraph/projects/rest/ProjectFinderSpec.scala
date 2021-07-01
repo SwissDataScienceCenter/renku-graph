@@ -26,7 +26,7 @@ import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
-import ch.datascience.graph.model.GraphModelGenerators.{authUsers, projectPaths}
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.graph.tokenrepository.AccessTokenFinder.projectPathToPath

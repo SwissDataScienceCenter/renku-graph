@@ -22,12 +22,12 @@ import ProjectHookVerifier.HookIdentifier
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.graph.config.GitLabUrl
+import ch.datascience.graph.model.GitLabUrl
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.{AccessToken, RestClient}
 import ch.datascience.webhookservice.model.ProjectHookUrl
-import org.typelevel.log4cats.Logger
 import io.circe.Decoder.decodeList
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 

@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.events.categories.membersync
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.graph.Schemas.{rdf, schema}
+import ch.datascience.graph.model.Schemas.{rdf, schema}
 import ch.datascience.graph.model.users
 import ch.datascience.graph.model.users.{GitLabId, ResourceId}
 import ch.datascience.rdfstore.SparqlQuery.Prefixes

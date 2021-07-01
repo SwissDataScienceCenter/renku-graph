@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated.tripl
 package datasets
 
 import cats.syntax.all._
-import ch.datascience.graph.Schemas._
+import ch.datascience.graph.model.Schemas._
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.TopmostDataFinder.TopmostData
 import io.circe.Json

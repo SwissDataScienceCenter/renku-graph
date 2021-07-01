@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated.tripl
 package persondetails
 
 import cats.MonadError
-import ch.datascience.graph.Schemas._
+import ch.datascience.graph.model.Schemas._
 import ch.datascience.graph.model.users.{Email, Name, ResourceId}
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
