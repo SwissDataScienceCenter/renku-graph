@@ -31,8 +31,7 @@ import ch.datascience.graph.acceptancetests.tooling.TokenRepositoryClient._
 import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.testentities
-import ch.datascience.graph.model.testentities.Project.ForksCount
+import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.testentities.{gitLabApiUrl => _, renkuBaseUrl => _, _}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.webhookservice.model.HookToken
@@ -105,7 +104,7 @@ class EventsProcessingStatusSpec
   }
 
   private def givenHookValidationToHookExists(
-      project:            data.Project[testentities.Project.ForksCount]
+      project:            data.Project[ForksCount]
   )(implicit accessToken: AccessToken): Unit = {
     `GET <gitlabApi>/projects/:id returning OK`(project)
     tokenRepositoryClient
@@ -116,7 +115,7 @@ class EventsProcessingStatusSpec
   }
 
   private def sendEventsForProcessing(
-      project:            data.Project[testentities.Project.ForksCount]
+      project:            data.Project[ForksCount]
   )(implicit accessToken: AccessToken) = {
 
     val allCommitIds = commitIds.generateNonEmptyList(minElements = numberOfEvents, maxElements = numberOfEvents).toList

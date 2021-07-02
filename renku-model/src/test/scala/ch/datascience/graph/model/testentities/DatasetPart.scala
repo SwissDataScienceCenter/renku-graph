@@ -60,9 +60,6 @@ object DatasetPart {
         )
     }
 
-  private implicit lazy val sourceUrlEncoder: JsonLDEncoder[PartSource] =
-    JsonLDEncoder.instance(v => JsonLD.fromString(v.value))
-
   implicit def entityIdEncoder[D <: DatasetPart](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[D] =
     EntityIdEncoder.instance(part => renkuBaseUrl / "dataset-files" / part.id / part.entity.location)
 }

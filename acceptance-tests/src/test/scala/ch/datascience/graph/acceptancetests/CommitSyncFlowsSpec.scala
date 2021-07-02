@@ -31,9 +31,8 @@ import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplici
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.events.EventId
 import ch.datascience.graph.model.events.EventStatus.TriplesStore
-import ch.datascience.graph.model.projects.Id
+import ch.datascience.graph.model.projects.{ForksCount, Id}
 import ch.datascience.graph.model.testentities.EntitiesGenerators._
-import ch.datascience.graph.model.testentities.Project.ForksCount
 import ch.datascience.http.client.AccessToken
 import ch.datascience.webhookservice.model.HookToken
 import io.renku.eventlog.TypeSerializers

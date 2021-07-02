@@ -29,8 +29,8 @@ import ch.datascience.graph.acceptancetests.tooling.TestLogger
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.Id
-import ch.datascience.graph.model.testentities.{Person, Project, ProjectWithParent}
+import ch.datascience.graph.model.projects.{ForksCount, Id}
+import ch.datascience.graph.model.testentities.{Person, ProjectWithParent}
 import ch.datascience.graph.model.{GitLabApiUrl, GitLabUrl, users}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
@@ -192,7 +192,7 @@ object GitLab {
     ()
   }
 
-  def `GET <gitlabApi>/projects/:id returning OK`[FC <: Project.ForksCount](
+  def `GET <gitlabApi>/projects/:id returning OK`[FC <: ForksCount](
       project:            data.Project[FC]
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
@@ -208,7 +208,7 @@ object GitLab {
     ()
   }
 
-  def `GET <gitlabApi>/projects/:path returning OK with`[FC <: Project.ForksCount](
+  def `GET <gitlabApi>/projects/:path returning OK with`[FC <: ForksCount](
       project:            data.Project[FC],
       withStatistics:     Boolean = false
   )(implicit accessToken: AccessToken): Unit = {

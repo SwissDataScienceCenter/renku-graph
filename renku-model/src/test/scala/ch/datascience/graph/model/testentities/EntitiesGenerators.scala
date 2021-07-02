@@ -18,11 +18,7 @@
 
 package ch.datascience.graph.model.testentities
 
-import Activity.Order
 import Dataset.{AdditionalInfo, Identification, Provenance}
-import Entity.{Checksum, InputEntity}
-import Project.ForksCount
-import PublicationEvent.AboutEvent
 import RunPlan.CommandParameters
 import RunPlan.CommandParameters.CommandParameterFactory
 import cats.Applicative
@@ -31,7 +27,10 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model._
 import ch.datascience.graph.model.datasets.{Date, DerivedFrom, ExternalSameAs, Identifier, InitialVersion, PartId, TopmostSameAs}
-import ch.datascience.graph.model.projects.Visibility
+import ch.datascience.graph.model.entityModel.{Checksum, Location}
+import ch.datascience.graph.model.projects.{ForksCount, Visibility}
+import ch.datascience.graph.model.publicationEvents.AboutEvent
+import ch.datascience.graph.model.testentities.Entity.InputEntity
 import ch.datascience.graph.model.users.{Email, GitLabId}
 import ch.datascience.tinytypes.InstantTinyType
 import eu.timepit.refined.api.Refined
@@ -57,26 +56,26 @@ trait EntitiesGenerators {
   def invalidationTimes(min: Instant*): Gen[InvalidationTime] =
     timestamps(min = min.max, max = Instant.now()).toGeneratorOf(InvalidationTime)
 
-  val activityIds:        Gen[Activity.Id]        = Gen.uuid.map(uuid => Activity.Id(uuid.toString))
-  val activityStartTimes: Gen[Activity.StartTime] = timestampsNotInTheFuture.map(Activity.StartTime.apply)
-  def activityStartTimes(after: InstantTinyType): Gen[Activity.StartTime] =
-    timestampsNotInTheFuture(after.value).map(Activity.StartTime.apply)
-  val activityOrders: Gen[Activity.Order] = positiveInts(999999).map(_.value).map(Order.apply)
+  val activityIds:        Gen[Activity.Id]          = Gen.uuid.map(uuid => Activity.Id(uuid.toString))
+  val activityStartTimes: Gen[activities.StartTime] = timestampsNotInTheFuture.map(activities.StartTime.apply)
+  def activityStartTimes(after: InstantTinyType): Gen[activities.StartTime] =
+    timestampsNotInTheFuture(after.value).map(activities.StartTime.apply)
+  val activityOrders: Gen[activities.Order] = positiveInts(999999).map(_.value).map(activities.Order.apply)
 
   val entityFileLocations:   Gen[Location.File]   = relativePaths() map Location.File.apply
   val entityFolderLocations: Gen[Location.Folder] = relativePaths() map Location.Folder.apply
   val entityLocations:       Gen[Location]        = Gen.oneOf(entityFileLocations, entityFolderLocations)
   val entityChecksums:       Gen[Checksum]        = nonBlankStrings(40, 40).map(_.value).map(Checksum.apply)
 
-  implicit val runPlanNames: Gen[RunPlan.Name] = nonBlankStrings().map(_.value).generateAs[RunPlan.Name]
-  implicit val runPlanDescriptions: Gen[RunPlan.Description] =
-    sentences().map(_.value).generateAs[RunPlan.Description]
-  implicit val runPlanCommands: Gen[RunPlan.Command] = nonBlankStrings().map(_.value).generateAs[RunPlan.Command]
-  implicit val runPlanProgrammingLanguages: Gen[RunPlan.ProgrammingLanguage] =
-    nonBlankStrings().map(_.value).generateAs[RunPlan.ProgrammingLanguage]
+  implicit val runPlanNames: Gen[runPlans.Name] = nonBlankStrings().map(_.value).generateAs[runPlans.Name]
+  implicit val runPlanDescriptions: Gen[runPlans.Description] =
+    sentences().map(_.value).generateAs[runPlans.Description]
+  implicit val runPlanCommands: Gen[runPlans.Command] = nonBlankStrings().map(_.value).generateAs[runPlans.Command]
+  implicit val runPlanProgrammingLanguages: Gen[runPlans.ProgrammingLanguage] =
+    nonBlankStrings().map(_.value).generateAs[runPlans.ProgrammingLanguage]
 
-  implicit val commandParameterNames: Gen[CommandParameterBase.Name] =
-    nonBlankStrings().map(_.value).generateAs[CommandParameterBase.Name]
+  implicit val commandParameterNames: Gen[commandParameters.Name] =
+    nonBlankStrings().map(_.value).generateAs[commandParameters.Name]
 
   lazy val visibilityPublic:    Gen[Visibility] = fixed(Visibility.Public)
   lazy val visibilityNonPublic: Gen[Visibility] = Gen.oneOf(Visibility.Internal, Visibility.Private)
@@ -88,7 +87,7 @@ trait EntitiesGenerators {
   ): Gen[ProjectWithParent[ForksCount.Zero]] =
     projectEntities[ForksCount.Zero](visibilityGen, minDateCreated).map(_.forkOnce()._2)
 
-  def projectEntities[FC <: Project.ForksCount](
+  def projectEntities[FC <: ForksCount](
       visibilityGen:        Gen[Visibility],
       minDateCreated:       projects.DateCreated = projects.DateCreated(Instant.EPOCH)
   )(implicit forksCountGen: Gen[FC]): Gen[ProjectWithoutParent[FC]] = for {
@@ -112,10 +111,10 @@ trait EntitiesGenerators {
                                version
   )
 
-  implicit val zeroForksProject: Gen[Project.ForksCount.Zero] = Gen.const(Project.ForksCount.Zero)
-  implicit val nonZeroForksProject: Gen[Project.ForksCount.NonZero] =
-    positiveInts(max = 100) map Project.ForksCount.apply
-  def fixedForksCount(count: Int Refined Positive): Gen[Project.ForksCount.NonZero] = Project.ForksCount(count)
+  implicit val zeroForksProject: Gen[ForksCount.Zero] = Gen.const(ForksCount.Zero)
+  implicit val nonZeroForksProject: Gen[ForksCount.NonZero] =
+    positiveInts(max = 100) map ForksCount.apply
+  def fixedForksCount(count: Int Refined Positive): Gen[ForksCount.NonZero] = ForksCount(count)
 
   val datasetIdentifications: Gen[Dataset.Identification] = for {
     identifier <- datasetIdentifiers
@@ -227,7 +226,7 @@ trait EntitiesGenerators {
 
   def importedExternalDatasetEntities(
       sharedInProjects:    Int = 1,
-      projectGen:          Gen[Project[Project.ForksCount.Zero]] = projectEntities(visibilityPublic)
+      projectGen:          Gen[Project[ForksCount.Zero]] = projectEntities(visibilityPublic)
   )(implicit renkuBaseUrl: RenkuBaseUrl): Gen[List[Dataset[Dataset.Provenance.ImportedExternal]]] =
     for {
       dataset <- datasetEntities(datasetProvenanceImportedExternal, projectGen)
@@ -258,7 +257,7 @@ trait EntitiesGenerators {
 
   def datasetEntities[P <: Dataset.Provenance](
       provenanceGen:       ProvenanceGen[P],
-      projectsGen:         Gen[Project[Project.ForksCount]] = projectEntities[ForksCount.Zero](visibilityPublic),
+      projectsGen:         Gen[Project[ForksCount]] = projectEntities[ForksCount.Zero](visibilityPublic),
       identificationGen:   Gen[Identification] = datasetIdentifications,
       additionalInfoGen:   Gen[AdditionalInfo] = datasetAdditionalInfos
   )(implicit renkuBaseUrl: RenkuBaseUrl): Gen[Dataset[P]] = for {
@@ -315,10 +314,10 @@ trait EntitiesGenerators {
 
   def publicationEventEntities(minDateCreated: Instant): Gen[PublicationEvent] = for {
     about            <- nonEmptyStrings() map AboutEvent.apply
-    maybeDescription <- sentences().map(_.value).map(PublicationEvent.Description.apply).toGeneratorOfOptions
-    location         <- relativePaths() map PublicationEvent.Location.apply
-    name             <- nonEmptyStrings() map PublicationEvent.Name.apply
-    startDate        <- timestamps(minDateCreated, max = Instant.now()) map PublicationEvent.StartDate.apply
+    maybeDescription <- sentences().map(_.value).map(publicationEvents.Description.apply).toGeneratorOfOptions
+    location         <- relativePaths() map publicationEvents.Location.apply
+    name             <- nonEmptyStrings() map publicationEvents.Name.apply
+    startDate        <- timestamps(minDateCreated, max = Instant.now()) map publicationEvents.StartDate.apply
   } yield PublicationEvent(about, maybeDescription, location, name, startDate)
 
   lazy val inputEntities: Gen[Entity] = for {

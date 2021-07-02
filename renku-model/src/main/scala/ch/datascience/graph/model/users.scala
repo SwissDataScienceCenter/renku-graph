@@ -19,8 +19,8 @@
 package ch.datascience.graph.model
 
 import cats.syntax.all._
-import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.graph.model.views.SparqlValueEncoder.sparqlEncode
+import ch.datascience.graph.model.views.{EntityIdEncoderOps, RdfResource}
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints.{NonBlank, NonNegativeInt}
 import io.renku.jsonld.EntityId
@@ -28,7 +28,10 @@ import io.renku.jsonld.EntityId
 object users {
 
   final class ResourceId private (val value: String) extends AnyVal with StringTinyType
-  implicit object ResourceId extends TinyTypeFactory[ResourceId](new ResourceId(_)) with NonBlank {
+  implicit object ResourceId
+      extends TinyTypeFactory[ResourceId](new ResourceId(_))
+      with NonBlank
+      with EntityIdEncoderOps[ResourceId] {
 
     def apply(id: EntityId): ResourceId = ResourceId(id.value.toString)
 

@@ -23,6 +23,7 @@ import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{InitialVersion, SameAs}
+import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.testentities._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
@@ -99,7 +100,7 @@ class ProjectDatasetsFinderSpec
 
     "return all datasets of the given project without merging datasets having the same sameAs" in new TestCase {
       val originDataset = datasetEntities(datasetProvenanceInternal).generateOne
-      val project       = projectEntities[Project.ForksCount.Zero](visibilityNonPublic).generateOne
+      val project       = projectEntities[ForksCount.Zero](visibilityNonPublic).generateOne
       val dataset1 = {
         val intermediate = originDataset.importTo(project)
         intermediate.copy(identification = intermediate.identification.copy(title = datasetTitles.generateOne))

@@ -28,9 +28,9 @@ import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import ch.datascience.graph.model
-import ch.datascience.graph.model.{projects, testentities}
+import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.testentities.LineageExemplarData.ExemplarData
-import ch.datascience.graph.model.testentities.Project.ForksCount
 import ch.datascience.graph.model.testentities.{LineageExemplarData, NodeDef, gitLabApiUrl => _, renkuBaseUrl => _, _}
 import ch.datascience.http.client.AccessToken
 import io.circe.Json
@@ -55,7 +55,7 @@ class LineageQuerySpec
 
     implicit val accessToken: AccessToken = accessTokens.generateOne
     val project = dataProjects(
-      projectEntities[testentities.Project.ForksCount.Zero](visibilityPublic)
+      projectEntities[ForksCount.Zero](visibilityPublic)
         .map(
           _.copy(
             path = projects.Path("public/lineage-project"),
@@ -132,7 +132,7 @@ class LineageQuerySpec
 
       And("a project I am not a member of")
       val privateProject =
-        projectEntities[testentities.Project.ForksCount.Zero](visibilityNonPublic).generateOne.copy(
+        projectEntities[ForksCount.Zero](visibilityNonPublic).generateOne.copy(
           path = model.projects.Path("private/secret-project")
         )
 

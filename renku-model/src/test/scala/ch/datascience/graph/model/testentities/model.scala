@@ -19,32 +19,11 @@
 package ch.datascience.graph.model.testentities
 
 import cats.Show
-import cats.syntax.all._
 import ch.datascience.graph.model.views.UrlResourceRenderer
-import ch.datascience.tinytypes.constraints._
 import ch.datascience.tinytypes._
+import ch.datascience.tinytypes.constraints._
 import io.circe.Json
 import io.renku.jsonld.EntityId
-
-import java.time.Instant
-
-sealed trait Location extends Any with RelativePathTinyType
-object Location {
-
-  final class File private (val value: String) extends AnyVal with Location
-  object File extends TinyTypeFactory[File](new File(_)) with RelativePath {
-    def apply(folder: Location.Folder, filename: String): Location.File = Location.File(s"$folder/$filename")
-  }
-
-  final class Folder private (val value: String) extends AnyVal with Location
-  object Folder extends TinyTypeFactory[Folder](new Folder(_)) with RelativePath
-}
-
-final class InvalidationTime private (val value: Instant) extends AnyVal with InstantTinyType
-object InvalidationTime extends TinyTypeFactory[InvalidationTime](new InvalidationTime(_)) with BoundedInstant {
-  import java.time.temporal.ChronoUnit.HOURS
-  protected[this] override def maybeMax: Option[Instant] = now.plus(2, HOURS).some
-}
 
 final case class UrlfiedEntityId(value: String) extends EntityId with StringTinyType {
   override type Value = String

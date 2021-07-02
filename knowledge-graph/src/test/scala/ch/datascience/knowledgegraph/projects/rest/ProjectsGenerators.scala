@@ -21,10 +21,10 @@ package ch.datascience.knowledgegraph.projects.rest
 import Converters._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{httpUrls => urls, _}
+import ch.datascience.graph.model
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.model.projects.ResourceId._
-import ch.datascience.graph.model.testentities
 import ch.datascience.graph.model.testentities.EntitiesGenerators._
 import ch.datascience.knowledgegraph.projects.model.Forking.ForksCount
 import ch.datascience.knowledgegraph.projects.model.Permissions._
@@ -39,11 +39,10 @@ import org.scalacheck.Gen
 private object ProjectsGenerators {
 
   implicit val projects: Gen[Project] = for {
-    kgProject <- Gen
-                   .oneOf(projectEntities[testentities.Project.ForksCount.Zero](visibilityAny),
-                          projectWitParentEntities(visibilityAny)
-                   )
-                   .map(_.to[KGProject])
+    kgProject <-
+      Gen
+        .oneOf(projectEntities[model.projects.ForksCount.Zero](visibilityAny), projectWitParentEntities(visibilityAny))
+        .map(_.to[KGProject])
     gitLabProject <- gitLabProjects
   } yield Project(
     id = gitLabProject.id,

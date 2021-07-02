@@ -29,9 +29,9 @@ import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TestReadabilityTools._
+import ch.datascience.graph.model
 import ch.datascience.graph.model.datasets.{DatePublished, Identifier, Title}
 import ch.datascience.graph.model.projects.Visibility
-import ch.datascience.graph.model.testentities
 import ch.datascience.graph.model.testentities.ModelOps.DatasetForkingResult
 import ch.datascience.graph.model.testentities.{gitLabApiUrl => _, renkuBaseUrl => _, _}
 import ch.datascience.http.client.AccessToken
@@ -67,7 +67,7 @@ class DatasetsResourcesSpec
     implicit val accessToken: AccessToken = user.accessToken
 
     val project = dataProjects(
-      projectEntities[testentities.Project.ForksCount.Zero](visibilityPublic).generateOne
+      projectEntities[model.projects.ForksCount.Zero](visibilityPublic).generateOne
     ).generateOne
     val dataset1         = datasetEntities(datasetProvenanceInternal, fixed(project.entitiesProject)).generateOne
     val dataset2         = datasetEntities(datasetProvenanceInternal, fixed(project.entitiesProject)).generateOne
@@ -169,7 +169,7 @@ class DatasetsResourcesSpec
       val DatasetForkingResult(dataset4, dataset5Fork) = dataset4Original.forkProject()
       val dataset6WithoutText                          = datasetEntities(datasetProvenanceInternal).generateOne
       val dataset7Private = datasetEntities(datasetProvenanceInternal,
-                                            projectEntities[testentities.Project.ForksCount.Zero](visibilityNonPublic)
+                                            projectEntities[model.projects.ForksCount.Zero](visibilityNonPublic)
       ).generateOne.makeTitleContaining(text)
 
       Given("some datasets with title, description, name and author containing some arbitrary chosen text")
@@ -273,12 +273,12 @@ class DatasetsResourcesSpec
 
       val dataset2Private = datasetEntities(
         datasetProvenanceInternal,
-        projectEntities[testentities.Project.ForksCount.Zero](Gen.oneOf(Visibility.Private, Visibility.Internal))
+        projectEntities[model.projects.ForksCount.Zero](Gen.oneOf(Visibility.Private, Visibility.Internal))
       ).generateOne.makeTitleContaining(text)
 
       val dataset3PrivateWithAccess = datasetEntities(
         datasetProvenanceInternal,
-        projectEntities[testentities.Project.ForksCount.Zero](Gen.oneOf(Visibility.Private, Visibility.Internal))
+        projectEntities[model.projects.ForksCount.Zero](Gen.oneOf(Visibility.Private, Visibility.Internal))
           .map(_.copy(members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some))))
       ).generateOne.makeTitleContaining(text)
 

@@ -26,6 +26,7 @@ import ch.datascience.graph.acceptancetests.data.Project.Statistics._
 import ch.datascience.graph.acceptancetests.data.Project.Urls._
 import ch.datascience.graph.acceptancetests.data.Project._
 import ch.datascience.graph.config.RenkuBaseUrlLoader
+import ch.datascience.graph.model
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model._
 import ch.datascience.graph.model.testentities.EntitiesGenerators._
@@ -40,7 +41,7 @@ package object data {
   val renkuResourcesUrl:     renku.ResourcesUrl = renku.ResourcesUrl("http://localhost:9004/knowledge-graph")
   implicit val renkuBaseUrl: RenkuBaseUrl       = RenkuBaseUrlLoader[Try]().fold(throw _, identity)
 
-  def dataProjects[FC <: testentities.Project.ForksCount](
+  def dataProjects[FC <: model.projects.ForksCount](
       projectGen: Gen[testentities.Project[FC]]
   ): Gen[Project[FC]] = for {
     project          <- projectGen
@@ -54,7 +55,7 @@ package object data {
     statistics       <- statisticsObjects
   } yield Project(project, id, maybeDescription, updatedAt, urls, tags, starsCount, permissions, statistics)
 
-  def dataProjects[FC <: testentities.Project.ForksCount](
+  def dataProjects[FC <: model.projects.ForksCount](
       project: testentities.Project[FC]
   ): Gen[Project[FC]] = dataProjects(fixed(project))
 

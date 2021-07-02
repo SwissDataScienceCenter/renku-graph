@@ -23,6 +23,7 @@ import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.authUsers
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.projects.Visibility._
 import ch.datascience.graph.model.testentities._
 import ch.datascience.graph.model.{GitLabApiUrl, RenkuBaseUrl}
@@ -40,7 +41,7 @@ class ProjectAuthorizerSpec extends AnyWordSpec with InMemoryRdfStore with shoul
   "authorize" should {
 
     "succeed if the given project is public and there's no auth user" in new TestCase {
-      val project = projectEntities[Project.ForksCount.Zero](visibilityPublic).generateOne.copy(
+      val project = projectEntities[ForksCount.Zero](visibilityPublic).generateOne.copy(
         visibility = Public
       )
 
@@ -51,7 +52,7 @@ class ProjectAuthorizerSpec extends AnyWordSpec with InMemoryRdfStore with shoul
 
     "succeed if the given project is public and the user has rights for the project" in new TestCase {
       val authUser = authUsers.generateOne
-      val project = projectEntities[Project.ForksCount.Zero](visibilityPublic).generateOne.copy(
+      val project = projectEntities[ForksCount.Zero](visibilityPublic).generateOne.copy(
         visibility = Public,
         members = Set(personEntities.generateOne.copy(maybeGitLabId = authUser.id.some))
       )
@@ -63,7 +64,7 @@ class ProjectAuthorizerSpec extends AnyWordSpec with InMemoryRdfStore with shoul
 
     "succeed if the given project is non-public and the user has rights for the project" in new TestCase {
       val authUser = authUsers.generateOne
-      val project = projectEntities[Project.ForksCount.Zero](visibilityNonPublic).generateOne.copy(
+      val project = projectEntities[ForksCount.Zero](visibilityNonPublic).generateOne.copy(
         visibility = Gen.oneOf(Private, Internal).generateOne,
         members = Set(personEntities.generateOne.copy(maybeGitLabId = authUser.id.some))
       )
@@ -84,7 +85,7 @@ class ProjectAuthorizerSpec extends AnyWordSpec with InMemoryRdfStore with shoul
     }
 
     "fail if the given project is non-public and the user does not have rights for it" in new TestCase {
-      val project = projectEntities[Project.ForksCount.Zero](visibilityNonPublic).generateOne.copy(
+      val project = projectEntities[ForksCount.Zero](visibilityNonPublic).generateOne.copy(
         visibility = Gen.oneOf(Private, Internal).generateOne,
         members = personEntities.generateFixedSizeSet()
       )
@@ -97,7 +98,7 @@ class ProjectAuthorizerSpec extends AnyWordSpec with InMemoryRdfStore with shoul
     }
 
     "fail if the given project is non-public and there's no authorized user" in new TestCase {
-      val project = projectEntities[Project.ForksCount.Zero](visibilityNonPublic).generateOne.copy(
+      val project = projectEntities[ForksCount.Zero](visibilityNonPublic).generateOne.copy(
         visibility = Gen.oneOf(Private, Internal).generateOne,
         members = personEntities.generateFixedSizeSet()
       )

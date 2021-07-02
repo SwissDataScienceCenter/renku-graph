@@ -22,6 +22,7 @@ import Converters._
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.testentities._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder.KGProject
@@ -36,8 +37,8 @@ class KGProjectFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
   "findProject" should {
 
     "return details of the project with the given path when there's no parent" in new TestCase {
-      forAll(projectEntities[Project.ForksCount.Zero](visibilityAny)) { project =>
-        loadToStore(projectEntities[Project.ForksCount.Zero](visibilityAny).generateOne, project)
+      forAll(projectEntities[ForksCount.Zero](visibilityAny)) { project =>
+        loadToStore(projectEntities[ForksCount.Zero](visibilityAny).generateOne, project)
 
         metadataFinder.findProject(project.path).unsafeRunSync() shouldBe Some(project.to[KGProject])
       }

@@ -18,18 +18,21 @@
 
 package ch.datascience.graph.model.testentities
 
-import CommandParameterBase.CommandInput._
-import CommandParameterBase.CommandOutput.{LocationCommandOutput, MappedCommandOutput}
-import CommandParameterBase._
-import Entity.InputEntity
-import ParameterValue.PathParameterValue.{InputParameterValue, OutputParameterValue}
-import ParameterValue.VariableParameterValue
-import Project.ForksCount
-import RunPlan.{Command, CommandParameters}
 import cats.Show
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.{RenkuBaseUrl, datasets}
+import ch.datascience.graph.model.commandParameters.IOStream
+import ch.datascience.graph.model.entityModel.Location
+import ch.datascience.graph.model.projects.ForksCount
+import ch.datascience.graph.model.runPlans.Command
+import ch.datascience.graph.model.testentities.CommandParameterBase.CommandInput._
+import ch.datascience.graph.model.testentities.CommandParameterBase.CommandOutput.{LocationCommandOutput, MappedCommandOutput}
+import ch.datascience.graph.model.testentities.CommandParameterBase._
+import ch.datascience.graph.model.testentities.Entity.InputEntity
+import ch.datascience.graph.model.testentities.ParameterValue.PathParameterValue.{InputParameterValue, OutputParameterValue}
+import ch.datascience.graph.model.testentities.ParameterValue.VariableParameterValue
+import ch.datascience.graph.model.testentities.RunPlan.CommandParameters
+import ch.datascience.graph.model.{RenkuBaseUrl, activities, datasets, parameterValues, runPlans}
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax.JsonEncoderOps
 
@@ -55,9 +58,9 @@ object LineageExemplarData {
       `grid_plot entity`:    NodeDef,
       `cumulative entity`:   NodeDef,
       `activity3 plan1`:     NodeDef,
-      `activity3 date`:      Activity.StartTime,
+      `activity3 date`:      activities.StartTime,
       `activity4 plan2`:     NodeDef,
-      `activity4 date`:      Activity.StartTime
+      `activity4 date`:      activities.StartTime
   )
 
   def apply(
@@ -92,7 +95,7 @@ object LineageExemplarData {
     }
 
     val runPlan1 = RunPlan(
-      RunPlan.Name("runPlan1"),
+      runPlans.Name("runPlan1"),
       Command("python"),
       CommandParameters.of(CommandInput.fromLocation(cleanData),
                            CommandInput.fromLocation(zhbikesFolder),
@@ -115,7 +118,7 @@ object LineageExemplarData {
       .fold(errors => throw new Exception(errors.toList.mkString), identity)
 
     val runPlan2 = RunPlan(
-      RunPlan.Name("runPlan2"),
+      runPlans.Name("runPlan2"),
       Command("python"),
       CommandParameters.of(
         CommandInput.fromLocation(plotData),
@@ -249,7 +252,7 @@ object NodeDef {
     case value: OutputParameterValue   => (value.valueReference -> value.location).show
   }
 
-  private implicit lazy val variableParameterValueShow: Show[(CommandParameter, VariableParameterValue.ValueOverride)] =
+  private implicit lazy val variableParameterValueShow: Show[(CommandParameter, parameterValues.ValueOverride)] =
     Show.show { case (param, valueOverride) =>
       param.maybePrefix.fold(valueOverride.toString)(prefix => s"$prefix$valueOverride")
     }
@@ -271,8 +274,8 @@ object NodeDef {
     }
 
   private implicit def mappingShow[S <: IOStream]: Show[S] = Show.show {
-    case _: IOStream.StdIn.type  => "<"
-    case _: IOStream.StdOut.type => ">"
-    case _: IOStream.StdErr.type => "2>"
+    case _: IOStream.StdIn  => "<"
+    case _: IOStream.StdOut => ">"
+    case _: IOStream.StdErr => "2>"
   }
 }

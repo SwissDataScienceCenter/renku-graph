@@ -19,17 +19,13 @@
 package ch.datascience.graph.model.testentities
 
 import ch.datascience.graph.model.RenkuBaseUrl
-import PublicationEvent._
-import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, NonBlank}
-import ch.datascience.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
+import ch.datascience.graph.model.publicationEvents._
 
-import java.time.Instant
-
-case class PublicationEvent(about:            AboutEvent,
-                            maybeDescription: Option[Description],
-                            location:         Location,
-                            name:             Name,
-                            startDate:        StartDate
+final case class PublicationEvent(about:            AboutEvent,
+                                  maybeDescription: Option[Description],
+                                  location:         Location,
+                                  name:             Name,
+                                  startDate:        StartDate
 )
 
 object PublicationEvent {
@@ -52,19 +48,4 @@ object PublicationEvent {
 
   implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[PublicationEvent] =
     EntityIdEncoder.instance(event => renkuBaseUrl / "datasettags" / s"${event.name}@${event.location}")
-
-  final class AboutEvent private (val value: String) extends AnyVal with StringTinyType
-  implicit object AboutEvent extends TinyTypeFactory[AboutEvent](new AboutEvent(_)) with NonBlank
-
-  final class Description private (val value: String) extends AnyVal with StringTinyType
-  implicit object Description extends TinyTypeFactory[Description](new Description(_)) with NonBlank
-
-  final class Location private (val value: String) extends AnyVal with StringTinyType
-  implicit object Location extends TinyTypeFactory[Location](new Location(_)) with NonBlank
-
-  final class Name private (val value: String) extends AnyVal with StringTinyType
-  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank
-
-  final class StartDate private (val value: Instant) extends AnyVal with InstantTinyType
-  implicit object StartDate extends TinyTypeFactory[StartDate](new StartDate(_)) with InstantNotInTheFuture
 }

@@ -18,16 +18,16 @@
 
 package ch.datascience.graph.model.testentities
 
+import ModelOps.DatasetForkingResult
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.syntax.all._
 import ch.datascience.generators.Generators
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.sentenceContaining
 import ch.datascience.graph.model.GraphModelGenerators.datasetIdentifiers
-import ch.datascience.graph.model.datasets.{DateCreated, DerivedFrom, Description, InitialVersion, InternalSameAs, Keyword, Name, SameAs, Title}
 import ch.datascience.graph.model._
-import ModelOps.DatasetForkingResult
-import Project.ForksCount
+import ch.datascience.graph.model.datasets.{DateCreated, DerivedFrom, Description, InitialVersion, InternalSameAs, Keyword, Name, SameAs, Title}
+import ch.datascience.graph.model.projects.ForksCount
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
@@ -61,14 +61,14 @@ trait ModelOps {
         case proj: ProjectWithParent[FC] =>
           proj.copy(forksCount = ForksCount(Refined.unsafeApply(proj.forksCount.value + times.value)))
         case proj: ProjectWithoutParent[FC] =>
-          proj.copy(forksCount = Project.ForksCount(Refined.unsafeApply(project.forksCount.value + times.value)))
+          proj.copy(forksCount = ForksCount(Refined.unsafeApply(project.forksCount.value + times.value)))
       }
       parent -> (1 to times.value).foldLeft(NonEmptyList.one(newChildGen(parent).generateOne))((childrenGens, _) =>
         newChildGen(parent).generateOne :: childrenGens
       )
     }
 
-    private def newChildGen(parentProject: Project[Project.ForksCount.NonZero]) =
+    private def newChildGen(parentProject: Project[ForksCount.NonZero]) =
       projectEntities[ForksCount.Zero](fixed(parentProject.visibility), parentProject.dateCreated).map(child =>
         ProjectWithParent(
           child.path,
@@ -100,7 +100,7 @@ trait ModelOps {
     }
 
     def importTo[POUT <: Dataset.Provenance](
-        project:              Project[Project.ForksCount]
+        project:              Project[ForksCount]
     )(implicit newProvenance: ProvenanceImportFactory[P, POUT]): Dataset[POUT] = {
       val newIdentifier = datasetIdentifiers.generateOne
       dataset.copy(

@@ -19,7 +19,7 @@
 package ch.datascience.graph.acceptancetests.knowledgegraph
 
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators.{accessTokens, _}
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.data
 import ch.datascience.graph.acceptancetests.data.Project.Permissions._
@@ -32,9 +32,10 @@ import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TestReadabilityTools._
-import ch.datascience.graph.model.{projects, testentities}
-import ch.datascience.graph.model.testentities.Project.{ForksCount, _}
+import ch.datascience.graph.model.projects.ForksCount
+import ch.datascience.graph.model.testentities.Project._
 import ch.datascience.graph.model.testentities.{gitLabApiUrl => _, renkuBaseUrl => _, _}
+import ch.datascience.graph.model.{projects, testentities}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.server.EndpointTester._
@@ -61,7 +62,7 @@ class ProjectsResourcesSpec
 
   private val (parentProject, project) = {
     val creator = personEntities(withGitLabId, withEmail).generateOne
-    val (parent, child) = projectEntities[testentities.Project.ForksCount.Zero](visibilityPublic).generateOne
+    val (parent, child) = projectEntities[ForksCount.Zero](visibilityPublic).generateOne
       .copy(maybeCreator = creator.some, members = personEntities(withGitLabId).generateFixedSizeSet() + creator)
       .forkOnce()
 
@@ -130,7 +131,7 @@ class ProjectsResourcesSpec
 
 object ProjectsResources {
 
-  def fullJson(project: data.Project[testentities.Project.ForksCount]): Json = json"""{
+  def fullJson(project: data.Project[ForksCount]): Json = json"""{
     "identifier":  ${project.id.value}, 
     "path":        ${project.path.value}, 
     "name":        ${project.name.value},
@@ -173,8 +174,9 @@ object ProjectsResources {
     }""" addIfDefined ("readme" -> urls.maybeReadme.map(_.value))
   }
 
-  private implicit lazy val forkingEncoder: Encoder[(ForksCount, testentities.Project[ForksCount])] = Encoder.instance {
-    case (forksCount, project: ProjectWithParent[_]) => json"""{
+  private implicit lazy val forkingEncoder: Encoder[(ForksCount, testentities.Project[ForksCount])] =
+    Encoder.instance {
+      case (forksCount, project: ProjectWithParent[_]) => json"""{
       "forksCount": ${forksCount.value},
       "parent": {
         "path":    ${project.parent.path.value},
@@ -182,10 +184,10 @@ object ProjectsResources {
         "created": ${(project.parent.dateCreated, project.parent.maybeCreator)}
       }
     }"""
-    case (forksCount, _) => json"""{
+      case (forksCount, _) => json"""{
       "forksCount": ${forksCount.value}
     }"""
-  }
+    }
 
   private implicit lazy val createdEncoder: Encoder[(projects.DateCreated, Option[Person])] = Encoder.instance {
     case (dateCreated, Some(creator)) => json"""{

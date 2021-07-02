@@ -20,38 +20,15 @@ package ch.datascience.graph.model
 
 import cats.kernel.Semigroup
 import ch.datascience.graph.model.datasets.SameAs
-import ch.datascience.graph.model.projects.Visibility
-import ch.datascience.graph.model.projects.Visibility.{Internal, Private, Public}
-import ch.datascience.tinytypes._
+import ch.datascience.graph.model.views.TinyTypeJsonLDEncoders
 import ch.datascience.tinytypes.constraints._
 import io.renku.jsonld._
 
-import java.time.{Instant, LocalDate}
-
-package object testentities extends Schemas with EntitiesGenerators with ModelOps {
+package object testentities extends Schemas with EntitiesGenerators with ModelOps with TinyTypeJsonLDEncoders {
 
   implicit val renkuBaseUrlToEntityId: RenkuBaseUrl => EntityId = url => EntityId of url.value
 
-  implicit lazy val visibilityEncoder: JsonLDEncoder[Visibility] = JsonLDEncoder.instance {
-    case Private  => JsonLDEncoder.encodeString(Private.value)
-    case Public   => JsonLDEncoder.encodeString(Public.value)
-    case Internal => JsonLDEncoder.encodeString(Internal.value)
-  }
-
   private implicit lazy val sameAsToPathSegment: SameAs => List[PathSegment] = sameAs => List(PathSegment(sameAs.value))
-
-  implicit def stringTTEncoder[TT <: StringTinyType]: JsonLDEncoder[TT] =
-    JsonLDEncoder.instance(v => JsonLD.fromString(v.value))
-  implicit def relativePathTTEncoder[TT <: RelativePathTinyType]: JsonLDEncoder[TT] =
-    JsonLDEncoder.instance(v => JsonLD.fromString(v.value))
-  implicit def instantTTEncoder[TT <: TinyType { type V = Instant }]: JsonLDEncoder[TT] =
-    JsonLDEncoder.instance(v => JsonLD.fromInstant(v.value))
-  implicit def localDateTTEncoder[TT <: TinyType { type V = LocalDate }]: JsonLDEncoder[TT] =
-    JsonLDEncoder.instance(v => JsonLD.fromLocalDate(v.value))
-  implicit def booleanTTEncoder[TT <: BooleanTinyType]: JsonLDEncoder[TT] =
-    JsonLDEncoder.instance(v => JsonLD.fromBoolean(v.value))
-  implicit def intTTEncoder[TT <: IntTinyType]: JsonLDEncoder[TT] =
-    JsonLDEncoder.instance(v => JsonLD.fromInt(v.value))
 
   implicit class EntityIdOps(entityId: EntityId) {
     lazy val asUrlEntityId: UrlfiedEntityId = UrlfiedEntityId(entityId.value.toString)

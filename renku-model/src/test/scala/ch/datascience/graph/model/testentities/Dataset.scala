@@ -18,11 +18,12 @@
 
 package ch.datascience.graph.model.testentities
 
+import Dataset._
 import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
 import ch.datascience.graph.model.datasets._
+import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.{GitLabApiUrl, RenkuBaseUrl}
-import Dataset._
 import io.renku.jsonld.JsonLDEncoder.encodeList
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, JsonLD, Property}
@@ -34,7 +35,7 @@ case class Dataset[+P <: Provenance](identification: Identification,
                                      additionalInfo: AdditionalInfo,
                                      publishing:     Publishing,
                                      parts:          List[DatasetPart],
-                                     project:        Project[Project.ForksCount]
+                                     project:        Project[ForksCount]
 ) {
 
   def entityId(implicit renkuBaseUrl: RenkuBaseUrl): EntityId = Dataset.entityId(identification.identifier)
@@ -221,7 +222,6 @@ object Dataset {
           schema / "license"     -> maybeLicense.asJsonLD
         )
     }
-
   }
 
   def from[P <: Provenance](identification: Identification,
@@ -229,7 +229,7 @@ object Dataset {
                             additionalInfo: AdditionalInfo,
                             publishing:     Publishing,
                             parts:          List[DatasetPart],
-                            project:        Project[Project.ForksCount]
+                            project:        Project[ForksCount]
   ): ValidatedNel[String, Dataset[P]] =
     validateState(identification.identifier, provenance, project, parts, publishing.publicationEvents).map(_ =>
       Dataset[P](
@@ -244,7 +244,7 @@ object Dataset {
 
   private[Dataset] def validateState[P <: Provenance](identifier:        Identifier,
                                                       provenance:        P,
-                                                      project:           Project[Project.ForksCount],
+                                                      project:           Project[ForksCount],
                                                       parts:             List[DatasetPart],
                                                       publicationEvents: List[PublicationEvent]
   ): ValidatedNel[String, Unit] = List(
@@ -258,7 +258,7 @@ object Dataset {
     Validated.condNel(creators.nonEmpty, (), s"No creators on dataset with id: $identifier")
 
   private[Dataset] def validateDateCreated[P <: Provenance](identifier: Identifier,
-                                                            project:    Project[Project.ForksCount],
+                                                            project:    Project[ForksCount],
                                                             provenance: P
   ): ValidatedNel[String, Unit] = provenance match {
     case prov: Provenance.Internal =>

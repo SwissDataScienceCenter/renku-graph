@@ -18,19 +18,20 @@
 
 package ch.datascience.graph.model.testentities
 
-import CommandParameterBase.CommandInput._
-import CommandParameterBase.CommandOutput._
-import CommandParameterBase.CommandParameter.ParameterDefaultValue
-import CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
-import Entity.{Checksum, InputEntity, OutputEntity}
-import ExecutionPlanner.ActivityData
-import ParameterValue.VariableParameterValue.ValueOverride
-import ParameterValue.{PathParameterValue, VariableParameterValue}
 import cats.Semigroup
 import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.{CliVersion, testentities}
+import ch.datascience.graph.model.commandParameters._
+import ch.datascience.graph.model.entityModel._
+import ch.datascience.graph.model.parameterValues._
+import ch.datascience.graph.model.testentities.CommandParameterBase.CommandInput._
+import ch.datascience.graph.model.testentities.CommandParameterBase.CommandOutput._
+import ch.datascience.graph.model.testentities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
+import ch.datascience.graph.model.testentities.Entity.{InputEntity, OutputEntity}
+import ch.datascience.graph.model.testentities.ExecutionPlanner.ActivityData
+import ch.datascience.graph.model.testentities.ParameterValue.{PathParameterValue, VariableParameterValue}
+import ch.datascience.graph.model.{CliVersion, activities, testentities}
 
 final case class ExecutionPlanner(runPlan:                  RunPlan,
                                   activityData:             ActivityData,
@@ -86,11 +87,11 @@ final case class ExecutionPlanner(runPlan:                  RunPlan,
     testentities.Activity(
       activityIds.generateOne,
       activityTime,
-      Activity.EndTime(activityTime.value),
+      activities.EndTime(activityTime.value),
       author,
       Agent(cliVersion),
       runPlan.project,
-      Activity.Order(1),
+      activities.Order(1),
       Association.factory(Agent(cliVersion), runPlan),
       usageFactories,
       generationFactories,
@@ -193,8 +194,12 @@ final case class ExecutionPlanner(runPlan:                  RunPlan,
 
 object ExecutionPlanner {
 
-  private type ActivityData = (Activity.StartTime, Person, CliVersion)
+  private type ActivityData = (activities.StartTime, Person, CliVersion)
 
-  def of(runPlan: RunPlan, activityTime: Activity.StartTime, author: Person, cliVersion: CliVersion): ExecutionPlanner =
+  def of(runPlan:      RunPlan,
+         activityTime: activities.StartTime,
+         author:       Person,
+         cliVersion:   CliVersion
+  ): ExecutionPlanner =
     ExecutionPlanner(runPlan, (activityTime, author, cliVersion), List.empty, List.empty, List.empty)
 }

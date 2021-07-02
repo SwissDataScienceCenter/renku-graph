@@ -23,6 +23,7 @@ import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.testentities._
 import ch.datascience.rdfstore.InMemoryRdfStore
 import io.renku.jsonld.syntax._
@@ -138,9 +139,9 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
       // This could happen if a user changes their email
       val gitLabId = userGitLabIds.generateOne
       val person   = personEntities(fixed(gitLabId.some)).generateOne
-      val project1 = projectEntities[Project.ForksCount.Zero](visibilityAny).generateOne
+      val project1 = projectEntities[ForksCount.Zero](visibilityAny).generateOne
         .copy(maybeCreator = Some(person), members = Set(person))
-      val project2 = projectEntities[Project.ForksCount.Zero](visibilityAny).generateOne
+      val project2 = projectEntities[ForksCount.Zero](visibilityAny).generateOne
         .copy(maybeCreator = Some(person), members = Set.empty)
       val dataset = {
         val orig = datasetEntities(datasetProvenanceInternal, fixed(project1)).generateOne

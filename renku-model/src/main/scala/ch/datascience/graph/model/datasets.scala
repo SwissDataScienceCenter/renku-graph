@@ -19,8 +19,9 @@
 package ch.datascience.graph.model
 
 import Schemas._
+import ch.datascience.graph.model.views.EntityIdEncoderOps
 import ch.datascience.tinytypes._
-import ch.datascience.tinytypes.constraints._
+import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, LocalDateNotInTheFuture, NonBlank, NonNegativeInt, UUID, Url => UrlConstraint}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string
 import io.renku.jsonld._
@@ -29,6 +30,12 @@ import io.renku.jsonld.syntax._
 import java.time.{Instant, LocalDate, ZoneOffset}
 
 object datasets {
+
+  class ResourceId private (val value: String) extends AnyVal with StringTinyType
+  implicit object ResourceId
+      extends TinyTypeFactory[ResourceId](new ResourceId(_))
+      with UrlConstraint
+      with EntityIdEncoderOps[ResourceId]
 
   sealed trait DatasetIdentifier extends Any with StringTinyType
 
@@ -69,6 +76,15 @@ object datasets {
 
   final class Url private (val value: String) extends AnyVal with StringTinyType
   implicit object Url extends TinyTypeFactory[Url](new Url(_)) with constraints.Url
+
+  class ImageResourceId private (val value: String) extends AnyVal with StringTinyType
+  implicit object ImageResourceId
+      extends TinyTypeFactory[ImageResourceId](new ImageResourceId(_))
+      with UrlConstraint
+      with EntityIdEncoderOps[ImageResourceId]
+
+  final class ImagePosition private (val value: Int) extends AnyVal with IntTinyType
+  implicit object ImagePosition extends TinyTypeFactory[ImagePosition](new ImagePosition(_)) with NonNegativeInt
 
   final class ImageUri private (val value: String) extends AnyVal with StringTinyType
   implicit object ImageUri extends TinyTypeFactory[ImageUri](new ImageUri(_)) with constraints.RelativePath
@@ -172,6 +188,12 @@ object datasets {
     def instant: Instant
   }
 
+  class PartResourceId private (val value: String) extends AnyVal with StringTinyType
+  implicit object PartResourceId
+      extends TinyTypeFactory[PartResourceId](new PartResourceId(_))
+      with UrlConstraint
+      with EntityIdEncoderOps[PartResourceId]
+
   final class DateCreated private (val value: Instant) extends AnyVal with Date with InstantTinyType {
     override def instant: Instant = value
   }
@@ -198,5 +220,8 @@ object datasets {
   }
 
   final class PartSource private (val value: String) extends AnyVal with UrlTinyType
-  implicit object PartSource extends TinyTypeFactory[PartSource](new PartSource(_))
+  implicit object PartSource extends TinyTypeFactory[PartSource](new PartSource(_)) {
+    implicit lazy val jsonLDEncoder: JsonLDEncoder[PartSource] =
+      JsonLDEncoder.instance(v => JsonLD.fromString(v.value))
+  }
 }

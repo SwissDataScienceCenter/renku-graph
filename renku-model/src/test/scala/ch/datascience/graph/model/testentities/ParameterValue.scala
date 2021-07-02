@@ -19,11 +19,13 @@
 package ch.datascience.graph.model.testentities
 
 import ch.datascience.graph.model.RenkuBaseUrl
-import CommandParameterBase.{CommandInput, CommandInputOrOutput, CommandOutput, CommandParameter, Name}
-import ParameterValue.PathParameterValue.{InputParameterValue, OutputParameterValue}
-import ParameterValue.VariableParameterValue.ValueOverride
-import ParameterValue._
-import ch.datascience.tinytypes.constraints.{NonBlank, UUID}
+import ch.datascience.graph.model.commandParameters.Name
+import ch.datascience.graph.model.entityModel.Location
+import ch.datascience.graph.model.parameterValues.ValueOverride
+import ch.datascience.graph.model.testentities.CommandParameterBase.{CommandInput, CommandInputOrOutput, CommandOutput, CommandParameter}
+import ch.datascience.graph.model.testentities.ParameterValue.PathParameterValue.{InputParameterValue, OutputParameterValue}
+import ch.datascience.graph.model.testentities.ParameterValue._
+import ch.datascience.tinytypes.constraints.UUID
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder, _}
@@ -87,8 +89,6 @@ object ParameterValue {
     def factory(value: ValueOverride, valueReference: CommandParameter): Activity => VariableParameterValue =
       VariableParameterValue(Id.generate, valueReference.name, value, valueReference, _)
 
-    final class ValueOverride private (val value: String) extends AnyVal with StringTinyType
-    implicit object ValueOverride extends TinyTypeFactory[ValueOverride](new ValueOverride(_)) with NonBlank
   }
 
   implicit def encoder[PV <: ParameterValue](implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[PV] =

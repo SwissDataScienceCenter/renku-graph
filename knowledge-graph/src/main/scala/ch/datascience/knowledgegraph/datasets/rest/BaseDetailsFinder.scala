@@ -22,7 +22,7 @@ import cats.effect.{ConcurrentEffect, Timer}
 import cats.syntax.all._
 import ch.datascience.graph.model.datasets.{Identifier, ImageUri, Keyword}
 import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.{Path, ResourceId}
+import ch.datascience.graph.model.projects.Path
 import ch.datascience.knowledgegraph.datasets.model.Dataset
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
@@ -214,7 +214,7 @@ private object BaseDetailsFinder {
         maybeDescription <- extract[Option[String]]("description")
                               .map(blankToNone)
                               .flatMap(toOption[Description])
-        projectPath <- extract[projects.ResourceId]("projectId").flatMap(toProjectPath)
+        projectPath <- extract[projects.ResourceId]("projectId") >>= toProjectPath
         projectName <- extract[projects.Name]("projectName")
         dataset <- createDataset(identifier,
                                  title,
@@ -249,7 +249,7 @@ private object BaseDetailsFinder {
     _.downField("results").downField("bindings").as(decodeList[ImageUri])
   }
 
-  def toProjectPath(projectPath: ResourceId) =
+  def toProjectPath(projectPath: projects.ResourceId) =
     projectPath
       .as[Try, Path]
       .toEither

@@ -20,9 +20,7 @@ package ch.datascience.graph.model.testentities
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.RenkuBaseUrl
-import Entity.Checksum
-import ch.datascience.tinytypes.constraints.NonBlank
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.graph.model.entityModel.{Checksum, Location}
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 
@@ -40,9 +38,6 @@ object Entity {
     def factory(location: Location): Generation => OutputEntity =
       (generation: Generation) => OutputEntity(location, entityChecksums.generateOne, generation)
   }
-
-  final class Checksum private (val value: String) extends AnyVal with StringTinyType
-  object Checksum extends TinyTypeFactory[Checksum](new Checksum(_)) with NonBlank
 
   implicit def encoder[E <: Entity](implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[E] = JsonLDEncoder.instance {
     case entity @ InputEntity(location, checksum) =>

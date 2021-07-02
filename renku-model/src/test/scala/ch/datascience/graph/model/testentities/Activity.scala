@@ -18,21 +18,21 @@
 
 package ch.datascience.graph.model.testentities
 
-import cats.syntax.all._
+import ch.datascience.graph.model.activities.{EndTime, Order, StartTime}
+import ch.datascience.graph.model.entityModel._
+import ch.datascience.graph.model.projects.ForksCount
+import ch.datascience.graph.model.testentities.Activity._
+import ch.datascience.graph.model.testentities.Entity.OutputEntity
 import ch.datascience.graph.model.{GitLabApiUrl, RenkuBaseUrl}
-import Activity._
-import Entity.{Checksum, OutputEntity}
 import ch.datascience.tinytypes._
-import ch.datascience.tinytypes.constraints.{BoundedInstant, PositiveInt, UUID}
-
-import java.time.Instant
+import ch.datascience.tinytypes.constraints.UUID
 
 final case class Activity(id:                  Id,
                           startTime:           StartTime,
                           endTime:             EndTime,
                           author:              Person,
                           agent:               Agent,
-                          project:             Project[Project.ForksCount],
+                          project:             Project[ForksCount],
                           order:               Order,
                           associationFactory:  Activity => Association,
                           usageFactories:      List[Activity => Usage],
@@ -70,26 +70,11 @@ object Activity {
 
   }
 
-  final class StartTime private (val value: Instant) extends AnyVal with InstantTinyType
-  implicit object StartTime extends TinyTypeFactory[StartTime](new StartTime(_)) with BoundedInstant {
-    import java.time.temporal.ChronoUnit.HOURS
-    protected[this] override def maybeMax: Option[Instant] = now.plus(24, HOURS).some
-  }
-
-  final class EndTime private (val value: Instant) extends AnyVal with InstantTinyType
-  implicit object EndTime extends TinyTypeFactory[EndTime](new EndTime(_)) with BoundedInstant {
-    import java.time.temporal.ChronoUnit.HOURS
-    protected[this] override def maybeMax: Option[Instant] = now.plus(24, HOURS).some
-  }
-
-  final class Order private (val value: Int) extends AnyVal with IntTinyType
-  implicit object Order extends TinyTypeFactory[Order](new Order(_)) with PositiveInt
-
   def apply(id:                  Id,
             startTime:           StartTime,
             author:              Person,
             agent:               Agent,
-            project:             Project[Project.ForksCount],
+            project:             Project[ForksCount],
             order:               Order,
             associationFactory:  Activity => Association,
             usageFactories:      List[Activity => Usage] = Nil,

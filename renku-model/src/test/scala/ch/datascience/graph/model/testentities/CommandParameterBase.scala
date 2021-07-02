@@ -18,17 +18,11 @@
 
 package ch.datascience.graph.model.testentities
 
-import cats.syntax.all._
 import ch.datascience.graph.model.RenkuBaseUrl
-import CommandParameterBase.CommandInput.InputDefaultValue
-import CommandParameterBase.CommandOutput.{FolderCreation, OutputDefaultValue}
-import CommandParameterBase.CommandParameter.ParameterDefaultValue
-import CommandParameterBase._
-import ch.datascience.tinytypes._
-import ch.datascience.tinytypes.constraints._
-import eu.timepit.refined.api.Refined
+import ch.datascience.graph.model.commandParameters.IOStream.{StdErr, StdIn, StdOut}
+import ch.datascience.graph.model.commandParameters._
+import ch.datascience.graph.model.entityModel.Location
 import eu.timepit.refined.auto._
-import eu.timepit.refined.collection.NonEmpty
 import io.renku.jsonld.JsonLDEncoder._
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
@@ -68,11 +62,6 @@ object CommandParameterBase {
                            defaultValue = value,
                            runPlan
           )
-
-    final class ParameterDefaultValue private (val value: String) extends AnyVal with StringTinyType
-    implicit object ParameterDefaultValue
-        extends TinyTypeFactory[ParameterDefaultValue](new ParameterDefaultValue(_))
-        with NonBlank
 
     implicit def commandParameterEncoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[CommandParameter] =
       JsonLDEncoder.instance {
@@ -157,14 +146,9 @@ object CommandParameterBase {
                                         temporary:           Temporary,
                                         maybeEncodingFormat: Option[EncodingFormat],
                                         runPlan:             RunPlan
-    ) extends CommandInput {
-      val mappedTo: IOStream.In = IOStream.StdIn
-    }
-
-    final case class InputDefaultValue(value: Location) extends TinyType { type V = Location }
-    object InputDefaultValue {
-      implicit val jsonLDEncoder: JsonLDEncoder[InputDefaultValue] =
-        JsonLDEncoder[Location].contramap[InputDefaultValue](_.value)
+    )(implicit renkuBaseUrl:                                 RenkuBaseUrl)
+        extends CommandInput {
+      val mappedTo: IOStream.In = IOStream.StdIn(IOStream.ResourceId((renkuBaseUrl / "iostreams" / StdIn.name).value))
     }
 
     implicit def commandInputEncoder[I <: CommandInput](implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[I] =
@@ -248,6 +232,12 @@ object CommandParameterBase {
     def streamedFromLocation(defaultValue: Location, stream: IOStream.Out): Position => RunPlan => MappedCommandOutput =
       streamedFrom(OutputDefaultValue(defaultValue), stream)
 
+    def stdOut(implicit renkuBaseUrl: RenkuBaseUrl): IOStream.StdOut =
+      IOStream.StdOut(IOStream.ResourceId((renkuBaseUrl / "iostreams" / StdOut.name).value))
+
+    def stdErr(implicit renkuBaseUrl: RenkuBaseUrl): IOStream.StdErr =
+      IOStream.StdErr(IOStream.ResourceId((renkuBaseUrl / "iostreams" / StdErr.name).value))
+
     def streamedFrom(defaultValue: OutputDefaultValue,
                      stream:       IOStream.Out
     ): Position => RunPlan => MappedCommandOutput =
@@ -288,17 +278,6 @@ object CommandParameterBase {
                                          mappedTo:            IOStream.Out,
                                          runPlan:             RunPlan
     ) extends CommandOutput
-
-    final case class OutputDefaultValue(value: Location) extends TinyType { type V = Location }
-    object OutputDefaultValue {
-      implicit val jsonLDEncoder: JsonLDEncoder[OutputDefaultValue] = JsonLDEncoder[Location].contramap(_.value)
-    }
-
-    final class FolderCreation private (val value: Boolean) extends AnyVal with BooleanTinyType
-    implicit object FolderCreation extends TinyTypeFactory[FolderCreation](new FolderCreation(_)) {
-      val no:  FolderCreation = FolderCreation(false)
-      val yes: FolderCreation = FolderCreation(true)
-    }
 
     implicit def commandOutputEncoder[O <: CommandOutput](implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[O] =
       JsonLDEncoder.instance {
@@ -356,52 +335,4 @@ object CommandParameterBase {
       EntityIdEncoder.instance(output => output.runPlan.asEntityId.asUrlEntityId / "outputs" / output.position)
   }
 
-  final class Position private (val value: Int) extends AnyVal with IntTinyType
-  implicit object Position extends TinyTypeFactory[Position](new Position(_)) with PositiveInt {
-    val first:  Position = Position(1)
-    val second: Position = Position(2)
-    val third:  Position = Position(3)
-  }
-
-  final class Name private (val value: String) extends AnyVal with StringTinyType
-  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank
-
-  final class Description private (val value: String) extends AnyVal with StringTinyType
-  implicit object Description extends TinyTypeFactory[Description](new Description(_)) with NonBlank
-
-  final class EncodingFormat private (val value: String) extends AnyVal with StringTinyType
-  implicit object EncodingFormat extends TinyTypeFactory[EncodingFormat](new EncodingFormat(_)) with NonBlank
-
-  final class Temporary private (val value: Boolean) extends AnyVal with BooleanTinyType
-  implicit object Temporary extends TinyTypeFactory[Temporary](new Temporary(_)) {
-    val temporary:    Temporary = Temporary(true)
-    val nonTemporary: Temporary = Temporary(false)
-  }
-
-  sealed abstract class IOStream(val name: String Refined NonEmpty) {
-    override lazy val toString: String = name.toString()
-  }
-
-  object IOStream {
-    sealed trait In    extends IOStream
-    sealed trait Out   extends IOStream
-    case object StdIn  extends IOStream("stdin") with In
-    case object StdOut extends IOStream("stdout") with Out
-    case object StdErr extends IOStream("stderr") with Out
-
-    implicit def encoder[IO <: IOStream](implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[IO] =
-      JsonLDEncoder.instance[IO] { stream =>
-        JsonLD.entity(
-          stream.asEntityId,
-          EntityTypes of renku / "IOStream",
-          renku / "streamType" -> stream.name.toString().asJsonLD
-        )
-      }
-
-    implicit def entityIdEncoder[IO <: IOStream](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[IO] =
-      EntityIdEncoder.instance(stream => EntityId.of(renkuBaseUrl / "iostreams" / stream.name.toString()))
-  }
-
-  final class Prefix private (val value: String) extends AnyVal with StringTinyType
-  implicit object Prefix extends TinyTypeFactory[Prefix](new Prefix(_)) with NonBlank
 }

@@ -18,13 +18,8 @@
 
 package ch.datascience.graph.model.testentities
 
-import ch.datascience.graph.model.projects.{DateCreated, Name, Path, ResourceId, Visibility}
-import ch.datascience.graph.model.{CliVersion, GitLabApiUrl, RenkuBaseUrl, SchemaVersion}
-import Project.ForksCount
-import ch.datascience.tinytypes.constraints.PositiveInt
-import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.numeric.Positive
+import ch.datascience.graph.model._
+import ch.datascience.graph.model.projects.{DateCreated, ForksCount, Name, Path, Visibility}
 
 sealed trait Project[+FC <: ForksCount] extends Project.ProjectOps[FC] {
   val path:         Path
@@ -109,19 +104,6 @@ object Project {
     }
   }
 
-  sealed trait ForksCount extends Any with IntTinyType
-
-  object ForksCount {
-
-    def apply(count: Int Refined Positive): NonZero = NonZero(count.value)
-
-    case object Zero extends ForksCount { override val value: Int = 0 }
-    type Zero = Zero.type
-
-    final class NonZero private (val value: Int) extends AnyVal with ForksCount
-    object NonZero extends TinyTypeFactory[NonZero](new NonZero(_)) with PositiveInt
-  }
-
   implicit def encoder[P <: Project[_]](implicit
       renkuBaseUrl: RenkuBaseUrl,
       gitLabApiUrl: GitLabApiUrl
@@ -155,7 +137,4 @@ object Project {
 
   implicit def entityIdEncoder[P <: Project[_]](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[P] =
     EntityIdEncoder.instance(project => renkuBaseUrl / "projects" / project.path)
-
-  private implicit val projectResourceToEntityId: ResourceId => EntityId =
-    resource => EntityId of resource.value
 }

@@ -22,12 +22,10 @@ import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.{projectCreatedDates, projectNames, projectVisibilities}
 import ch.datascience.graph.model.Schemas._
-import ch.datascience.graph.model.projects.{DateCreated, Name, ResourceId, Visibility}
+import ch.datascience.graph.model.projects.{DateCreated, ForksCount, Name, ResourceId, Visibility}
+import ch.datascience.graph.model.testentities.EntitiesGenerators._
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
-import ch.datascience.graph.model.testentities.EntitiesGenerators._
-import ch.datascience.graph.model.testentities.Project
-import Project.ForksCount
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQuery}
 import eu.timepit.refined.auto._
 import io.renku.jsonld.syntax._
@@ -41,7 +39,7 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
   "updateWasDerivedFrom" should {
 
     "generate query deleting 'prov:wasDerivedFrom' triple from a given project when there is no fork" in new TestCase {
-      val (parent, children) = projectEntities[Project.ForksCount.Zero](visibilityAny).generateOne.fork(times = 2)
+      val (parent, children) = projectEntities[ForksCount.Zero](visibilityAny).generateOne.fork(times = 2)
       val child1             = children.head
       val child2             = children.tail.head
 
@@ -64,9 +62,9 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
 
     "generate query inserting 'prov:wasDerivedFrom' triple to a given project when there is no derivedFrom" in new TestCase {
 
-      val parent = projectEntities[Project.ForksCount.Zero](visibilityAny).generateOne
-      val child1 = projectEntities[Project.ForksCount.Zero](visibilityAny).generateOne
-      val child2 = projectEntities[Project.ForksCount.Zero](visibilityAny).generateOne
+      val parent = projectEntities[ForksCount.Zero](visibilityAny).generateOne
+      val child1 = projectEntities[ForksCount.Zero](visibilityAny).generateOne
+      val child2 = projectEntities[ForksCount.Zero](visibilityAny).generateOne
 
       loadToStore(child1, child2, parent)
 
@@ -87,8 +85,8 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
 
     "generate a query updating 'prov:wasDerivedFrom' triple to a given project when there is already a derivedFrom" in new TestCase {
 
-      val (parent1, child1) = projectEntities[Project.ForksCount.Zero](visibilityAny).generateOne.forkOnce()
-      val (parent2, child2) = projectEntities[Project.ForksCount.Zero](visibilityAny).generateOne.forkOnce()
+      val (parent1, child1) = projectEntities[ForksCount.Zero](visibilityAny).generateOne.forkOnce()
+      val (parent2, child2) = projectEntities[ForksCount.Zero](visibilityAny).generateOne.forkOnce()
 
       loadToStore(child1, child2)
 

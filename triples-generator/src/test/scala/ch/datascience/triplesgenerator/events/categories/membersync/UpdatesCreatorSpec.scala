@@ -21,7 +21,8 @@ package ch.datascience.triplesgenerator.events.categories.membersync
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.testentities.{Project, _}
+import ch.datascience.graph.model.projects.ForksCount
+import ch.datascience.graph.model.testentities._
 import ch.datascience.graph.model.users.{Email, GitLabId}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.graph.model.{projects, users}
@@ -41,7 +42,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
       val memberToRemove1 = personEntities(withGitLabId).generateOne
       val memberToStay    = personEntities(withGitLabId).generateOne
       val allMembers      = Set(memberToRemove0, memberToRemove1, memberToStay)
-      val project         = projectEntities[Project.ForksCount.Zero](visibilityAny).generateOne.copy(members = allMembers)
+      val project         = projectEntities[ForksCount.Zero](visibilityAny).generateOne.copy(members = allMembers)
 
       loadToStore(project)
 
@@ -63,7 +64,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
     "prepare queries to insert links for members existing in KG" in {
       val member     = gitLabProjectMembers.generateOne
       val personInKG = personEntities(fixed(member.gitLabId.some), withEmail).generateOne
-      val project    = projectEntities[Project.ForksCount.Zero](visibilityAny).generateOne.copy(members = Set.empty)
+      val project    = projectEntities[ForksCount.Zero](visibilityAny).generateOne.copy(members = Set.empty)
 
       loadToStore(project.asJsonLD, personInKG.asJsonLD)
 
@@ -81,7 +82,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
 
     "prepare queries to insert links and new person for members non-existing in KG" in {
 
-      val project = projectEntities[Project.ForksCount.Zero](visibilityAny).generateOne.copy(members = Set.empty)
+      val project = projectEntities[ForksCount.Zero](visibilityAny).generateOne.copy(members = Set.empty)
 
       loadToStore(project)
 

@@ -18,10 +18,13 @@
 
 package ch.datascience.graph.model.testentities
 
-import ch.datascience.graph.model.RenkuBaseUrl
-import CommandParameterBase.{CommandInput, CommandOutput, CommandParameter, Position}
-import Project.ForksCount
+import CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
 import RunPlan._
+import ch.datascience.graph.model.RenkuBaseUrl
+import ch.datascience.graph.model.commandParameters.Position
+import ch.datascience.graph.model.entityModel.Location
+import ch.datascience.graph.model.projects.ForksCount
+import ch.datascience.graph.model.runPlans._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
 
@@ -120,23 +123,4 @@ object RunPlan {
     }
   }
 
-  final class Name private (val value: String) extends AnyVal with StringTinyType
-  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank
-
-  final class Description private (val value: String) extends AnyVal with StringTinyType
-  implicit object Description extends TinyTypeFactory[Description](new Description(_)) with NonBlank
-
-  final class Command private (val value: String) extends AnyVal with StringTinyType
-  implicit object Command extends TinyTypeFactory[Command](new Command(_)) with NonBlank
-
-  final class Keyword private (val value: String) extends AnyVal with StringTinyType
-  implicit object Keyword extends TinyTypeFactory[Keyword](new Keyword(_)) with NonBlank
-
-  final class ProgrammingLanguage private (val value: String) extends AnyVal with StringTinyType
-  implicit object ProgrammingLanguage
-      extends TinyTypeFactory[ProgrammingLanguage](new ProgrammingLanguage(_))
-      with NonBlank
-
-  final class SuccessCode private (val value: Int) extends AnyVal with IntTinyType
-  implicit object SuccessCode extends TinyTypeFactory[SuccessCode](new SuccessCode(_)) with NonNegativeInt
 }

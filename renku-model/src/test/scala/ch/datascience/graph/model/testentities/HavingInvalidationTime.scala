@@ -18,7 +18,8 @@
 
 package ch.datascience.graph.model.testentities
 
-trait HavingInvalidationTime {
+import ch.datascience.graph.model.InvalidationTime
 
+trait HavingInvalidationTime {
   def invalidationTime: InvalidationTime
 }

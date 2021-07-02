@@ -18,10 +18,12 @@
 
 package ch.datascience.graph.model
 
-import ch.datascience.graph.model.views.UrlResourceRenderer
+import ch.datascience.graph.model.views.{EntityIdEncoderOps, UrlResourceRenderer}
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
-import io.renku.jsonld.EntityId
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.numeric.Positive
+import io.renku.jsonld.{EntityId, JsonLDEncoder}
 
 import java.time.Instant
 
@@ -46,7 +48,8 @@ object projects {
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with Url
-      with UrlResourceRenderer[ResourceId] {
+      with UrlResourceRenderer[ResourceId]
+      with EntityIdEncoderOps[ResourceId] {
 
     private val regexValidator = s"^http[s]?:\\/\\/.*\\/projects\\/${Path.regexValidator.drop(1)}"
 
@@ -99,7 +102,7 @@ object projects {
 
     import io.circe.Decoder
 
-    implicit lazy val visibilityDecoder: Decoder[Visibility] =
+    implicit lazy val jsonDecoder: Decoder[Visibility] =
       Decoder.decodeString.flatMap { decoded =>
         all.find(_.value == decoded) match {
           case Some(value) => Decoder.const(value)
@@ -109,11 +112,30 @@ object projects {
             )
         }
       }
+
+    implicit lazy val jsonLDEncoder: JsonLDEncoder[Visibility] = JsonLDEncoder.instance {
+      case Private  => JsonLDEncoder.encodeString(Private.value)
+      case Public   => JsonLDEncoder.encodeString(Public.value)
+      case Internal => JsonLDEncoder.encodeString(Internal.value)
+    }
   }
 
   private object VisibilityInstantiator extends (String => Visibility) {
     override def apply(value: String): Visibility = Visibility.all.find(_.value == value).getOrElse {
       throw new IllegalArgumentException(s"'$value' unknown Visibility")
     }
+  }
+
+  sealed trait ForksCount extends Any with IntTinyType
+
+  object ForksCount {
+
+    def apply(count: Int Refined Positive): NonZero = NonZero(count.value)
+
+    case object Zero extends ForksCount { override val value: Int = 0 }
+    type Zero = Zero.type
+
+    final class NonZero private (val value: Int) extends AnyVal with ForksCount
+    object NonZero extends TinyTypeFactory[NonZero](new NonZero(_)) with PositiveInt
   }
 }

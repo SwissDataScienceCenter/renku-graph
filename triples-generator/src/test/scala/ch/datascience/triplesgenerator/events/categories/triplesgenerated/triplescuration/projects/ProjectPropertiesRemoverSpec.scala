@@ -19,8 +19,7 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects
 
 import cats.syntax.all._
-import ch.datascience.graph.model.projects.{DateCreated, Name, ResourceId}
-import ch.datascience.graph.model.testentities.Project.ForksCount
+import ch.datascience.graph.model.projects.{DateCreated, ForksCount, Name, ResourceId}
 import ch.datascience.graph.model.testentities._
 import ch.datascience.graph.model.{SchemaVersion, users}
 import ch.datascience.rdfstore.JsonLDTriples

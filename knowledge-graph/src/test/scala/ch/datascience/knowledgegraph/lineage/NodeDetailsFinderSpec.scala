@@ -156,8 +156,8 @@ class NodeDetailsFinderSpec
       val activity = executionPlanners(
         runPlanEntities(
           CommandInput.streamedFromLocation(input),
-          CommandOutput.streamedFromLocation(output, IOStream.StdOut),
-          CommandOutput.streamedFromLocation(errOutput, IOStream.StdErr)
+          CommandOutput.streamedFromLocation(output, CommandOutput.stdOut),
+          CommandOutput.streamedFromLocation(errOutput, CommandOutput.stdErr)
         )
       ).generateOne
         .planInputParameterValuesFromChecksum(input -> entityChecksums.generateOne)
