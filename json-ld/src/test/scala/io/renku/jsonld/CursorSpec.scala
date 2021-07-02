@@ -39,20 +39,45 @@ class CursorSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
     }
   }
 
-  "entityId" should {
+  "getEntityTypes" should {
 
-    "return a Cursor pointing to object of the given type" in {
+    "return entity's EntityTypes" in {
+      forAll { (id: EntityId, entityTypes: EntityTypes, property: (Property, JsonLD)) =>
+        val cursor = JsonLD
+          .entity(id, entityTypes, property)
+          .cursor
+
+        cursor.getEntityTypes shouldBe entityTypes.asRight[DecodingFailure]
+      }
+    }
+
+    "return a failure for non-JsonLDEntity objects" in {
+      forAll(jsonLDValues) { value =>
+        value.cursor.getEntityTypes shouldBe DecodingFailure("No EntityTypes found on non-JsonLDEntity object", Nil)
+          .asLeft[EntityTypes]
+      }
+    }
+  }
+
+  "downEntityId" should {
+
+    "return a Cursor pointing to entityId of the given entity" in {
       forAll { (id: EntityId, entityType: EntityType, property: (Property, JsonLD)) =>
         val cursor = JsonLD
           .entity(id, EntityTypes.of(entityType), property)
           .cursor
 
-        cursor.entityId shouldBe cursor
+        cursor.downEntityId.jsonLD shouldBe id.asJsonLD
       }
     }
 
+    "return the same Cursor if it's a cursor on JsonLDEntityId" in {
+      val cursor = JsonLD.JsonLDEntityId(entityIds.generateOne).cursor
+      cursor.downEntityId shouldBe cursor
+    }
+
     "return an empty Cursor if object is not an JsonLDEntity" in {
-      JsonLD.fromInt(Arbitrary.arbInt.arbitrary.generateOne).cursor.entityId shouldBe Cursor.Empty
+      JsonLD.fromInt(Arbitrary.arbInt.arbitrary.generateOne).cursor.downEntityId shouldBe Cursor.Empty
     }
   }
 

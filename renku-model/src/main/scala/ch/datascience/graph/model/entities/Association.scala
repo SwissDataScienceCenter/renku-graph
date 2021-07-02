@@ -21,19 +21,30 @@ package ch.datascience.graph.model.entities
 import ch.datascience.graph.model.Schemas.prov
 import ch.datascience.graph.model.associations.ResourceId
 import io.renku.jsonld.syntax.JsonEncoderOps
-import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
+import io.renku.jsonld._
 
 final case class Association(resourceId: ResourceId, agent: Agent, runPlan: RunPlan)
 
 object Association {
 
+  private val entityTypes = EntityTypes of (prov / "Association")
+
   implicit lazy val encoder: JsonLDEncoder[Association] =
     JsonLDEncoder.instance { entity =>
       JsonLD.entity(
         entity.resourceId.asEntityId,
-        EntityTypes of (prov / "Association"),
+        entityTypes,
         prov / "agent"   -> entity.agent.asJsonLD,
         prov / "hadPlan" -> entity.runPlan.resourceId.asEntityId.asJsonLD
       )
     }
+
+  implicit lazy val decoder: JsonLDDecoder[Association] = JsonLDDecoder.entity(entityTypes) { cursor =>
+    import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
+    for {
+      resourceId <- cursor.downEntityId.as[ResourceId]
+      agent      <- cursor.downField(prov / "agent").as[Agent]
+      plan       <- cursor.downField(prov / "hadPlan").as[RunPlan]
+    } yield Association(resourceId, agent, plan)
+  }
 }

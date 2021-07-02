@@ -19,10 +19,9 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration
 
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.GraphModelGenerators.{projectCreatedDates, projectNames, projectPaths, projectVisibilities, userGitLabIds, userNames}
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.model.users
-import ch.datascience.graph.model.users.Email
 import org.scalacheck.Gen
 
 package object projects {
@@ -44,10 +43,4 @@ package object projects {
   private[projects] def gitLabCreator(gitLabId: users.GitLabId = userGitLabIds.generateOne,
                                       name:     users.Name = userNames.generateOne
   ): Gen[GitLabCreator] = GitLabCreator(gitLabId, name)
-
-  private[projects] def kgCreator(maybeEmail: Option[Email] = userEmails.generateOption,
-                                  name:       users.Name = userNames.generateOne
-  ): Gen[KGCreator] = for {
-    resourceId <- userResourceIds(maybeEmail)
-  } yield KGCreator(resourceId, maybeEmail, name)
 }

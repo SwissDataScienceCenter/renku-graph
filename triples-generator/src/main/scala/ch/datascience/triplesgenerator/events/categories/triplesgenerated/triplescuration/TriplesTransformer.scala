@@ -18,9 +18,9 @@
 
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration
 
-import cats.MonadError
+import cats.MonadThrow
 import ch.datascience.http.client.AccessToken
-import ch.datascience.rdfstore.SparqlQueryTimeRecorder
+import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedEvent
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.DatasetInfoEnricher
@@ -36,28 +36,27 @@ trait TriplesTransformer[Interpretation[_]] {
   )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation]
 }
 
-private[events] class TriplesTransformerImpl[Interpretation[_]](
+private[events] class TriplesTransformerImpl[Interpretation[_]: MonadThrow](
     personDetailsUpdater: PersonDetailsUpdater[Interpretation],
     projectInfoUpdater:   ProjectInfoUpdater[Interpretation],
     datasetInfoEnricher:  DatasetInfoEnricher[Interpretation]
-)(implicit ME:            MonadError[Interpretation, Throwable])
-    extends TriplesTransformer[Interpretation] {
+) extends TriplesTransformer[Interpretation] {
 
   import personDetailsUpdater._
   import projectInfoUpdater._
 
   override def transform(
       triplesGeneratedEvent:   TriplesGeneratedEvent
-  )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation] =
-    for {
-      triplesWithPersonDetails <- updatePersonDetails(
-                                    CuratedTriples(triplesGeneratedEvent.triples, updatesGroups = Nil),
-                                    triplesGeneratedEvent.project,
-                                    triplesGeneratedEvent.eventId
-                                  )
-      triplesWithForkInfo         <- updateProjectInfo(triplesGeneratedEvent, triplesWithPersonDetails)
-      triplesWithEnrichedDatasets <- datasetInfoEnricher.enrichDatasetInfo(triplesWithForkInfo)
-    } yield triplesWithEnrichedDatasets
+  )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation] = for {
+    triplesWithPersonDetails <-
+      updatePersonDetails(
+        CuratedTriples(JsonLDTriples(triplesGeneratedEvent.triples.toJson), updatesGroups = Nil),
+        triplesGeneratedEvent.project,
+        triplesGeneratedEvent.eventId
+      )
+    triplesWithForkInfo         <- updateProjectInfo(triplesGeneratedEvent, triplesWithPersonDetails)
+    triplesWithEnrichedDatasets <- datasetInfoEnricher.enrichDatasetInfo(triplesWithForkInfo)
+  } yield triplesWithEnrichedDatasets
 }
 
 private[triplesgenerated] object IOTriplesCurator {

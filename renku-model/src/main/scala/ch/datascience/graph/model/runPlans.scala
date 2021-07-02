@@ -18,7 +18,7 @@
 
 package ch.datascience.graph.model
 
-import ch.datascience.graph.model.views.EntityIdEncoderOps
+import ch.datascience.graph.model.views.EntityIdJsonLdOps
 import ch.datascience.tinytypes.{IntTinyType, StringTinyType, TinyTypeFactory}
 import ch.datascience.tinytypes.constraints.{NonBlank, NonNegativeInt, Url}
 
@@ -28,7 +28,7 @@ object runPlans {
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with Url
-      with EntityIdEncoderOps[ResourceId]
+      with EntityIdJsonLdOps[ResourceId]
 
   final class Name private (val value: String) extends AnyVal with StringTinyType
   implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank

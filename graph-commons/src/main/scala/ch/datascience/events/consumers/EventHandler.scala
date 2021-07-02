@@ -112,9 +112,7 @@ trait EventHandler[Interpretation[_]] {
 
     private def as(
         result: EventSchedulingResult
-    ): PartialFunction[Throwable, Either[EventSchedulingResult, T]] = { case NonFatal(_) =>
-      Left(result)
-    }
+    ): PartialFunction[Throwable, Either[EventSchedulingResult, T]] = { case NonFatal(_) => Left(result) }
 
     private lazy val asSchedulingError: PartialFunction[Throwable, Either[EventSchedulingResult, T]] = {
       case NonFatal(exception) => Left(SchedulingError(exception))

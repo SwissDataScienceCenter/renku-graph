@@ -20,18 +20,29 @@ package ch.datascience.graph.model.entities
 
 import ch.datascience.graph.model.Schemas.prov
 import ch.datascience.graph.model.usages.ResourceId
+import io.renku.jsonld._
 import io.renku.jsonld.syntax.JsonEncoderOps
-import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 
 final case class Usage(resourceId: ResourceId, entity: Entity)
 
 object Usage {
+
+  private val entityTypes = EntityTypes of (prov / "Usage")
+
   implicit lazy val encoder: JsonLDEncoder[Usage] =
     JsonLDEncoder.instance { case Usage(resourceId, entity) =>
       JsonLD.entity(
         resourceId.asEntityId,
-        EntityTypes of (prov / "Usage"),
+        entityTypes,
         prov / "entity" -> entity.asJsonLD
       )
     }
+
+  implicit lazy val decoder: JsonLDDecoder[Usage] = JsonLDDecoder.entity(entityTypes) { cursor =>
+    import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
+    for {
+      resourceId <- cursor.downEntityId.as[ResourceId]
+      entity     <- cursor.downField(prov / "entity").as[Entity]
+    } yield Usage(resourceId, entity)
+  }
 }

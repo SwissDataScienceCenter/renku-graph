@@ -26,8 +26,10 @@ import ch.datascience.generators.Generators.Implicits.GenOps
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model._
+import ch.datascience.graph.model.commandParameters.ParameterDefaultValue
 import ch.datascience.graph.model.datasets.{Date, DerivedFrom, ExternalSameAs, Identifier, InitialVersion, PartId, TopmostSameAs}
 import ch.datascience.graph.model.entityModel.{Checksum, Location}
+import ch.datascience.graph.model.parameterValues.ValueOverride
 import ch.datascience.graph.model.projects.{ForksCount, Visibility}
 import ch.datascience.graph.model.publicationEvents.AboutEvent
 import ch.datascience.graph.model.testentities.Entity.InputEntity
@@ -114,6 +116,7 @@ trait EntitiesGenerators {
   implicit val zeroForksProject: Gen[ForksCount.Zero] = Gen.const(ForksCount.Zero)
   implicit val nonZeroForksProject: Gen[ForksCount.NonZero] =
     positiveInts(max = 100) map ForksCount.apply
+  val anyForksCount: Gen[ForksCount] = Gen.oneOf(zeroForksProject, nonZeroForksProject)
   def fixedForksCount(count: Int Refined Positive): Gen[ForksCount.NonZero] = ForksCount(count)
 
   val datasetIdentifications: Gen[Dataset.Identification] = for {
@@ -343,11 +346,17 @@ trait EntitiesGenerators {
     maybeGitLabId    <- maybeGitLabIds
   } yield Person(name, maybeEmail, maybeAffiliation, maybeGitLabId)
 
+  lazy val parameterDefaultValues: Gen[ParameterDefaultValue] =
+    nonBlankStrings().map(v => ParameterDefaultValue(v.value))
+
   def runPlanEntities(parameterFactories: CommandParameterFactory*): Project[ForksCount] => Gen[RunPlan] = project =>
     for {
       name    <- runPlanNames
       command <- runPlanCommands
     } yield RunPlan(name, command, CommandParameters.of(parameterFactories: _*), project)
+
+  lazy val parameterValueOverrides: Gen[ValueOverride] =
+    nonBlankStrings().map(v => ValueOverride(v.value))
 
   def executionPlanners(runPlanGen: Project[ForksCount] => Gen[RunPlan],
                         projectGen: Gen[Project[ForksCount]] = projectEntities[ForksCount.Zero](visibilityAny)

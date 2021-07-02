@@ -18,7 +18,7 @@
 
 package ch.datascience.graph.model
 
-import ch.datascience.graph.model.views.EntityIdEncoderOps
+import ch.datascience.graph.model.views.EntityIdJsonLdOps
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import ch.datascience.tinytypes.constraints.Url
 
@@ -27,5 +27,5 @@ object usages {
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with Url
-      with EntityIdEncoderOps[ResourceId]
+      with EntityIdJsonLdOps[ResourceId]
 }

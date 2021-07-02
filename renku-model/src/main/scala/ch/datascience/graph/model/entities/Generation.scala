@@ -18,24 +18,48 @@
 
 package ch.datascience.graph.model.entities
 
+import cats.syntax.all._
 import ch.datascience.graph.model.Schemas.prov
+import ch.datascience.graph.model.activities
 import ch.datascience.graph.model.entities.Entity.OutputEntity
 import ch.datascience.graph.model.generations.ResourceId
+import io.circe.DecodingFailure
 import io.renku.jsonld.syntax.JsonEncoderOps
-import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder, Reverse}
+import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder, Reverse}
 
-final case class Generation(resourceId: ResourceId, activity: Activity, entity: OutputEntity)
+final case class Generation(resourceId: ResourceId, activityResourceId: activities.ResourceId, entity: OutputEntity)
 
 object Generation {
+
+  private val entityTypes: EntityTypes = EntityTypes of prov / "Generation"
 
   implicit lazy val encoder: JsonLDEncoder[Generation] =
     JsonLDEncoder.instance { generation =>
       JsonLD.entity(
         generation.resourceId.asEntityId,
-        EntityTypes of prov / "Generation",
+        entityTypes,
         Reverse.ofJsonLDsUnsafe(prov / "qualifiedGeneration" -> generation.entity.asJsonLD),
-        prov / "activity" -> generation.activity.resourceId.asEntityId.asJsonLD
+        prov / "activity" -> generation.activityResourceId.asEntityId.asJsonLD
       )
     }
 
+  implicit lazy val decoder: JsonLDDecoder[Generation] = JsonLDDecoder.entity(entityTypes) { cursor =>
+    import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
+    for {
+      resourceId         <- cursor.downEntityId.as[ResourceId]
+      activityResourceId <- cursor.downField(prov / "activity").as[activities.ResourceId]
+      entity <- cursor.top
+                  .map(
+                    _.cursor
+                      .as[List[OutputEntity]]
+                      .map(_.filter(e => e.generationResourceId == resourceId))
+                      .flatMap {
+                        case entity :: Nil => Right(Some(entity))
+                        case _             => Right(None)
+                      }
+                  )
+                  .flatMap(_.sequence)
+                  .getOrElse(Left(DecodingFailure("Generation without or with multiple entities", Nil)))
+    } yield Generation(resourceId, activityResourceId, entity)
+  }
 }

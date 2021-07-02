@@ -46,6 +46,13 @@ final case class EntityTypes(list: NonEmptyList[EntityType]) {
   lazy val toList: List[EntityType] = list.toList
   def contains(types: EntityTypes): Boolean = (list.toList diff types.toList).isEmpty
   def contains(types: EntityType*): Boolean = (list.toList diff types).isEmpty
+
+  override def hashCode(): Int = list.toList.toSet.hashCode()
+
+  override def equals(obj: Any): Boolean = Option(obj).exists {
+    case v: EntityTypes => v.list.toList.toSet == list.toList.toSet
+    case _ => false
+  }
 }
 
 object EntityTypes {

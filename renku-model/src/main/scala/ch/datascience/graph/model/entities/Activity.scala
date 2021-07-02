@@ -18,34 +18,39 @@
 
 package ch.datascience.graph.model.entities
 
-import ch.datascience.graph.model.GitLabApiUrl
-import ch.datascience.graph.model.Schemas._
+import cats.syntax.all._
 import ch.datascience.graph.model.activities.{EndTime, Order, ResourceId, StartTime}
-import ch.datascience.graph.model.projects.ForksCount
-import ch.datascience.graph.model.views.TinyTypeJsonLDEncoders.{instantTTEncoder, intTTEncoder}
-import io.renku.jsonld.syntax.JsonEncoderOps
-import io.renku.jsonld._
+import ch.datascience.graph.model.projects
+import io.circe.DecodingFailure
 
-final case class Activity(resourceId:  ResourceId,
-                          startTime:   StartTime,
-                          endTime:     EndTime,
-                          author:      Person,
-                          agent:       Agent,
-                          project:     Project[ForksCount],
-                          order:       Order,
-                          association: Association,
-                          usages:      List[Usage],
-                          generations: List[Generation],
-                          parameters:  List[ParameterValue]
+final case class Activity(resourceId:        ResourceId,
+                          startTime:         StartTime,
+                          endTime:           EndTime,
+                          author:            Person,
+                          agent:             Agent,
+                          projectResourceId: projects.ResourceId,
+                          order:             Order,
+                          association:       Association,
+                          usages:            List[Usage],
+                          generations:       List[Generation],
+                          parameters:        List[ParameterValue]
 )
 
 object Activity {
+  import ch.datascience.graph.model.GitLabApiUrl
+  import ch.datascience.graph.model.Schemas._
+  import io.renku.jsonld._
+  import io.renku.jsonld.syntax._
 
-  implicit def encoder(implicit gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Activity] =
-    JsonLDEncoder.instance { entity =>
+  private val entityTypes: EntityTypes = EntityTypes of (prov / "Activity")
+
+  implicit def encoder(implicit gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Activity] = JsonLDEncoder.instance {
+    entity =>
+      import ch.datascience.graph.model.views.TinyTypeJsonLDEncoders.{instantTTEncoder, intTTEncoder}
+
       JsonLD.entity(
         entity.resourceId.asEntityId,
-        EntityTypes of (prov / "Activity"),
+        entityTypes,
         Reverse.ofJsonLDsUnsafe((prov / "activity") -> entity.generations.asJsonLD),
         prov / "startedAtTime"        -> entity.startTime.asJsonLD,
         prov / "endedAtTime"          -> entity.endTime.asJsonLD,
@@ -53,9 +58,48 @@ object Activity {
         prov / "qualifiedAssociation" -> entity.association.asJsonLD,
         prov / "qualifiedUsage"       -> entity.usages.asJsonLD,
         renku / "parameter"           -> entity.parameters.asJsonLD,
-        schema / "isPartOf"           -> entity.project.asJsonLD,
+        schema / "isPartOf"           -> entity.projectResourceId.asEntityId.asJsonLD,
         renku / "order"               -> entity.order.asJsonLD
       )
-    }
+  }
 
+  implicit lazy val decoder: JsonLDDecoder[Activity] = JsonLDDecoder.entity(entityTypes) { cursor =>
+    import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
+    import io.renku.jsonld.JsonLDDecoder.decodeList
+
+    for {
+      resourceId <- cursor.downEntityId.as[ResourceId]
+      generations <- cursor.top
+                       .map(_.cursor.as[List[Generation]].map(_.filter(_.activityResourceId == resourceId)))
+                       .getOrElse(Right(List.empty[Generation]))
+      startedAtTime <- cursor.downField(prov / "startedAtTime").as[StartTime]
+      endedAtTime   <- cursor.downField(prov / "endedAtTime").as[EndTime]
+      agent <- cursor.downField(prov / "wasAssociatedWith").as[List[Agent]] >>= {
+                 case agent :: Nil => Right(agent)
+                 case _            => Left(DecodingFailure("Activity without or with multiple agents", Nil))
+               }
+      author <- cursor.downField(prov / "wasAssociatedWith").as[List[Person]] >>= {
+                  case author :: Nil => Right(author)
+                  case _             => Left(DecodingFailure("Activity without or with multiple authors", Nil))
+                }
+      projectId   <- cursor.downField(schema / "isPartOf").downEntityId.as[projects.ResourceId]
+      order       <- cursor.downField(renku / "order").as[Order]
+      association <- cursor.downField(prov / "qualifiedAssociation").as[Association]
+      usages      <- cursor.downField(prov / "qualifiedUsage").as[List[Usage]]
+      parameters <- cursor
+                      .downField(renku / "parameter")
+                      .as[List[ParameterValue]](decodeList(ParameterValue.decoder(association.runPlan)))
+    } yield Activity(resourceId,
+                     startedAtTime,
+                     endedAtTime,
+                     author,
+                     agent,
+                     projectId,
+                     order,
+                     association,
+                     usages,
+                     generations,
+                     parameters
+    )
+  }
 }

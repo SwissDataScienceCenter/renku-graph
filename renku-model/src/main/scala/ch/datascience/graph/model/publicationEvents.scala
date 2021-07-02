@@ -18,7 +18,7 @@
 
 package ch.datascience.graph.model
 
-import ch.datascience.graph.model.views.EntityIdEncoderOps
+import ch.datascience.graph.model.views.EntityIdJsonLdOps
 import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, NonBlank, Url}
 import ch.datascience.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
 
@@ -30,7 +30,7 @@ object publicationEvents {
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with Url
-      with EntityIdEncoderOps[ResourceId]
+      with EntityIdJsonLdOps[ResourceId]
 
   final class AboutEvent private (val value: String) extends AnyVal with StringTinyType
   implicit object AboutEvent extends TinyTypeFactory[AboutEvent](new AboutEvent(_)) with NonBlank

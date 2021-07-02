@@ -18,7 +18,7 @@
 
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.data.EitherT.right
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
@@ -30,9 +30,9 @@ import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
+import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater
 import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater._
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.{IOTriplesCurator, TriplesTransformer}
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult._
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplesuploading.{IOUploader, TriplesUploadResult, Uploader}
@@ -49,11 +49,12 @@ private trait EventProcessor[Interpretation[_]] {
   ): Interpretation[Unit]
 }
 
-private class TriplesGeneratedEventProcessor[Interpretation[_]: MonadError[*[_], Throwable]](
+private class TriplesGeneratedEventProcessor[Interpretation[_]: MonadThrow](
     accessTokenFinder:     AccessTokenFinder[Interpretation],
     triplesCurator:        TriplesTransformer[Interpretation],
     uploader:              Uploader[Interpretation],
     statusUpdater:         EventStatusUpdater[Interpretation],
+    jsonLDDeserializer:    JsonLDDeserializer[Interpretation],
     logger:                Logger[Interpretation],
     executionTimeRecorder: ExecutionTimeRecorder[Interpretation]
 ) extends EventProcessor[Interpretation] {
@@ -62,6 +63,7 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]: MonadError[*[_],
   import UploadingResult._
   import accessTokenFinder._
   import executionTimeRecorder._
+  import jsonLDDeserializer._
   import triplesCurator._
   import uploader._
 
@@ -83,16 +85,14 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]: MonadError[*[_],
   }
 
   private def transformAndUpload(
-      triplesGeneratedEvent:   TriplesGeneratedEvent
+      event:                   TriplesGeneratedEvent
   )(implicit maybeAccessToken: Option[AccessToken]): Interpretation[UploadingResult] = {
     for {
-      curatedTriples <-
-        transform(triplesGeneratedEvent).leftSemiflatMap(
-          toUploadingError(triplesGeneratedEvent)
-        )
-      result <- right[UploadingResult](upload(curatedTriples).flatMap(toUploadingResult(triplesGeneratedEvent, _)))
+      _              <- deserializeToModel(event).leftSemiflatMap(toUploadingError(event))
+      curatedTriples <- transform(event).leftSemiflatMap(toUploadingError(event))
+      result         <- right[UploadingResult](upload(curatedTriples) >>= (toUploadingResult(event, _)))
     } yield result
-  }.merge recoverWith nonRecoverableFailure(triplesGeneratedEvent)
+  }.merge recoverWith nonRecoverableFailure(event)
 
   private def toUploadingResult(triplesGeneratedEvent: TriplesGeneratedEvent,
                                 triplesUploadResult:   TriplesUploadResult
@@ -130,11 +130,10 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]: MonadError[*[_],
 
   private def toUploadingError(
       triplesGeneratedEvent: TriplesGeneratedEvent
-  ): PartialFunction[Throwable, Interpretation[UploadingResult]] = {
-    case curationError @ CurationRecoverableError(message, _) =>
-      logger
-        .error(curationError)(s"${logMessageCommon(triplesGeneratedEvent)} $message")
-        .map(_ => RecoverableError(triplesGeneratedEvent, curationError))
+  ): PartialFunction[Throwable, Interpretation[UploadingResult]] = { case error: ProcessingRecoverableError =>
+    logger
+      .error(error)(s"${logMessageCommon(triplesGeneratedEvent)} ${error.getMessage}")
+      .map(_ => RecoverableError(triplesGeneratedEvent, error))
   }
 
   private lazy val updateEventLog: ((ElapsedTime, UploadingResult)) => Interpretation[Unit] = {
@@ -224,20 +223,21 @@ private object IOTriplesGeneratedEventProcessor {
       contextShift:     ContextShift[IO],
       executionContext: ExecutionContext,
       timer:            Timer[IO]
-  ): IO[TriplesGeneratedEventProcessor[IO]] =
-    for {
-      uploader              <- IOUploader(logger, timeRecorder)
-      accessTokenFinder     <- AccessTokenFinder(logger)
-      triplesCurator        <- IOTriplesCurator(gitLabThrottler, logger, timeRecorder)
-      eventStatusUpdater    <- EventStatusUpdater(categoryName, logger)
-      eventsProcessingTimes <- metricsRegistry.register[Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
-      executionTimeRecorder <- ExecutionTimeRecorder[IO](logger, maybeHistogram = Some(eventsProcessingTimes))
-    } yield new TriplesGeneratedEventProcessor(
-      accessTokenFinder,
-      triplesCurator,
-      uploader,
-      eventStatusUpdater,
-      logger,
-      executionTimeRecorder
-    )
+  ): IO[TriplesGeneratedEventProcessor[IO]] = for {
+    uploader              <- IOUploader(logger, timeRecorder)
+    accessTokenFinder     <- AccessTokenFinder(logger)
+    triplesCurator        <- IOTriplesCurator(gitLabThrottler, logger, timeRecorder)
+    eventStatusUpdater    <- EventStatusUpdater(categoryName, logger)
+    eventsProcessingTimes <- metricsRegistry.register[Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
+    executionTimeRecorder <- ExecutionTimeRecorder[IO](logger, maybeHistogram = Some(eventsProcessingTimes))
+    jsonLDDeserializer    <- JsonLDDeserializer(gitLabThrottler, logger)
+  } yield new TriplesGeneratedEventProcessor(
+    accessTokenFinder,
+    triplesCurator,
+    uploader,
+    eventStatusUpdater,
+    jsonLDDeserializer,
+    logger,
+    executionTimeRecorder
+  )
 }

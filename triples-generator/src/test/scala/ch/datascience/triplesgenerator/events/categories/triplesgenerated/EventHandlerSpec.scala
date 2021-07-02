@@ -28,7 +28,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
+import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
@@ -48,9 +48,9 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
       "schedule triples generation " +
       s"and return $Accepted if event processor accepted the event" in new TestCase {
 
-        val triplesGeneratedEvent = eventBody.toTriplesGeneratedEvent
-        (eventBodyDeserializer.toTriplesGeneratedEvent _)
-          .expects(eventId, project, schemaVersion, eventBody)
+        val triplesGeneratedEvent = triplesGeneratedEvents.generateOne
+        (eventBodyDeserializer.toEvent _)
+          .expects(eventId, project, eventBody -> schemaVersion)
           .returning(triplesGeneratedEvent.pure[IO])
 
         (processingRunner.scheduleForProcessing _)
@@ -73,9 +73,9 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
       "schedule triples generation " +
       s"and return $Busy if event processor returned $Busy" in new TestCase {
 
-        val triplesGeneratedEvent = eventBody.toTriplesGeneratedEvent
-        (eventBodyDeserializer.toTriplesGeneratedEvent _)
-          .expects(eventId, project, schemaVersion, eventBody)
+        val triplesGeneratedEvent = triplesGeneratedEvents.generateOne
+        (eventBodyDeserializer.toEvent _)
+          .expects(eventId, project, eventBody -> schemaVersion)
           .returning(triplesGeneratedEvent.pure[IO])
 
         (processingRunner.scheduleForProcessing _)
@@ -123,9 +123,9 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
     s"return $SchedulingError when event processor fails while accepting the event" in new TestCase {
 
-      val triplesGeneratedEvent = eventBody.toTriplesGeneratedEvent
-      (eventBodyDeserializer.toTriplesGeneratedEvent _)
-        .expects(eventId, project, schemaVersion, eventBody)
+      val triplesGeneratedEvent = triplesGeneratedEvents.generateOne
+      (eventBodyDeserializer.toEvent _)
+        .expects(eventId, project, eventBody -> schemaVersion)
         .returning(triplesGeneratedEvent.pure[IO])
 
       val exception = exceptions.generateOne
@@ -177,9 +177,4 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
         }
       }"""
     }
-
-  private implicit class EventBodyOps(eventBody: EventBody) {
-    lazy val toTriplesGeneratedEvent: TriplesGeneratedEvent =
-      triplesGeneratedEvents.generateOne
-  }
 }

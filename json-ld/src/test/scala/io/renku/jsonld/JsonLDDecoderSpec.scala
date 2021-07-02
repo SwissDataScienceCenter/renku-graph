@@ -18,29 +18,66 @@
 
 package io.renku.jsonld
 
+import JsonLDDecoder._
 import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.jsonld.generators.Generators.Implicits._
+import io.renku.jsonld.generators.Generators.{localDates, nonEmptyStrings, timestamps}
 import io.renku.jsonld.generators.JsonLDGenerators._
 import io.renku.jsonld.syntax._
+import org.scalacheck.Arbitrary._
+import org.scalacheck.Gen
 import org.scalatest.matchers.should
+import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class JsonLDDecoderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class JsonLDDecoderSpec
+    extends AnyWordSpec
+    with ScalaCheckPropertyChecks
+    with should.Matchers
+    with TableDrivenPropertyChecks {
 
-  "implicit decoders" should {
-
-    "allow to successfully decode String JsonLDValues to String" in {
+  "emap" should {
+    "use the given function to map the result" in {
       forAll { value: String =>
-        JsonLD.fromString(value).cursor.as[String] shouldBe Right(value)
+        val decoder = decodeString.emap(_.length.asRight[String])
+        JsonLD.fromString(value).cursor.as[Int](decoder) shouldBe Right(value.length)
       }
     }
 
-    "fail to decode non-String JsonLDValues to String" in {
-      forAll { value: Int =>
-        val json = JsonLD.fromInt(value)
-        json.cursor.as[String] shouldBe Left(DecodingFailure(s"Cannot decode $json to String", Nil))
+    "fail with the message given in the mapping function" in {
+      forAll { value: String =>
+        val message = nonEmptyStrings().generateOne
+        val decoder = decodeString.emap(_ => message.asLeft[Int])
+        JsonLD.fromString(value).cursor.as[Int](decoder).leftMap(_.message) shouldBe Left(message)
+      }
+    }
+  }
+
+  "implicit decoders" should {
+
+    val scenarios = Table(
+      ("type", "decoder", "generator", "illegal json value"),
+      ("String", decodeString, arbString.arbitrary.map(v => v -> JsonLD.fromString(v)), JsonLD.fromInt(1)),
+      ("Long", decodeLong, arbLong.arbitrary.map(v => v -> JsonLD.fromLong(v)), JsonLD.fromString("a")),
+      ("Int", decodeInt, arbInt.arbitrary.map(v => v -> JsonLD.fromInt(v)), JsonLD.fromString("a")),
+      ("Boolean", decodeBoolean, arbBool.arbitrary.map(v => v -> JsonLD.fromBoolean(v)), JsonLD.fromString("a")),
+      ("Instant", decodeInstant, timestamps.map(v => v -> JsonLD.fromInstant(v)), JsonLD.fromInt(1)),
+      ("LocalDate", decodeLocalDate, localDates.map(v => v -> JsonLD.fromLocalDate(v)), JsonLD.fromInt(1))
+    )
+
+    forAll(scenarios) { case (typeName, decoder, generator, illegalType) =>
+      s"allow to successfully decode $typeName JsonLDValues to $typeName" in {
+        forAll(generator) { case (value, jsonLD) =>
+          jsonLD.cursor.as(decoder) shouldBe Right(value)
+        }
+      }
+
+      s"fail to decode JsonLDValues of illegal type to $typeName" in {
+        forAll(generator) { case (_, _) =>
+          illegalType.cursor.as(decoder) shouldBe Left(DecodingFailure(s"Cannot decode $illegalType to $typeName", Nil))
+        }
       }
     }
 
@@ -49,9 +86,30 @@ class JsonLDDecoderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
         json.cursor.as[JsonLD] shouldBe Right(json)
       }
     }
+
+    "allow to decode to Some for optional property if it exists" in {
+      forAll(entityIds, entityTypesObject, properties, Gen.oneOf(jsonLDValues, jsonLDEntities)) {
+        (entityId, entityTypes, property, value) =>
+          JsonLD
+            .entity(entityId, entityTypes, property -> value)
+            .cursor
+            .downField(property)
+            .as[Option[JsonLD]] shouldBe Some(value).asRight
+      }
+    }
+
+    "allow to decode to None for optional property if it does not exists" in {
+      forAll { (entityId: EntityId, entityTypes: EntityTypes) =>
+        JsonLD
+          .entity(entityId, entityTypes, Map.empty[Property, JsonLD])
+          .cursor
+          .downField(schema / "non-existing")
+          .as[Option[JsonLD]] shouldBe None.asRight
+      }
+    }
   }
 
-  "encode" should {
+  "decode" should {
 
     val parent1 = Parent("parent1", Child("parent1child"))
     val parent2 = Parent("parent2", Child("parent2child"))
@@ -133,18 +191,24 @@ class JsonLDDecoderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
     }
   }
 
-  private case class Parent(name: String, child: Child)
+  private lazy val schema = Schema.from("http://io.renku")
+
+  private case class Parent(id: EntityId, types: EntityTypes, name: String, child: Child)
+  private object Parent {
+    val entityTypes: EntityTypes = EntityTypes.of(schema / "Parent")
+
+    def apply(name: String, child: Child): Parent =
+      Parent(EntityId.of(s"parent/$name"), entityTypes, name, child)
+  }
   private case class Child(name: String)
   private case class ValuesContainer(name: String, tags: List[String])
   private case class ParentsContainer(name: String, parents: List[Parent])
   private case class ListOfList(name: String, list: List[List[String]])
   private case class ContainerHList(name: String, parent: Parent, child: Child)
 
-  private val schema = Schema.from("http://io.renku")
-
   private implicit lazy val parentEncoder: JsonLDEncoder[Parent] = JsonLDEncoder.instance(parent =>
-    JsonLD.entity(EntityId.of(s"parent/${parent.name}"),
-                  EntityTypes.of(schema / "Parent"),
+    JsonLD.entity(parent.id,
+                  parent.types,
                   schema / "name"  -> parent.name.asJsonLD,
                   schema / "child" -> parent.child.asJsonLD
     )
@@ -184,7 +248,7 @@ class JsonLDDecoderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
       )
     )
 
-  private implicit lazy val HListEncoder: JsonLDEncoder[ContainerHList] =
+  private implicit lazy val hListEncoder: JsonLDEncoder[ContainerHList] =
     JsonLDEncoder.instance(hList =>
       JsonLD.entity(
         EntityId.of(s"hlist/${hList.name}"),
@@ -197,9 +261,11 @@ class JsonLDDecoderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
   private implicit lazy val parentDecoder: JsonLDDecoder[Parent] =
     JsonLDDecoder.entity(EntityTypes.of(schema / "Parent")) { cursor =>
       for {
+        id    <- cursor.downEntityId.as[EntityId]
+        types <- cursor.getEntityTypes
         name  <- cursor.downField(schema / "name").as[String]
         child <- cursor.downField(schema / "child").as[Child]
-      } yield Parent(name, child)
+      } yield Parent(id, types, name, child)
     }
 
   private implicit lazy val childDecoder: JsonLDDecoder[Child] =

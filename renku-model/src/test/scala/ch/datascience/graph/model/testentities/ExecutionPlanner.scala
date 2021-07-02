@@ -42,18 +42,7 @@ final case class ExecutionPlanner(runPlan:                  RunPlan,
 
   def planParameterValues(
       valuesOverrides: (ParameterDefaultValue, ValueOverride)*
-  ): ValidatedNel[String, ExecutionPlanner] = {
-    val validatedValues = runPlan.parameters.traverse { argument =>
-      valuesOverrides
-        .foldMapK {
-          case (defaultValue, _) => Option.when(defaultValue == argument.defaultValue)(argument)
-          case _                 => Option.empty[CommandParameter]
-        }
-        .toValidNel(s"No execution value for argument with default value ${argument.defaultValue}")
-    }
-
-    validatedValues.map(_ => this.copy(parametersValueOverrides = valuesOverrides.toList))
-  }
+  ): ExecutionPlanner = this.copy(parametersValueOverrides = parametersValueOverrides ::: valuesOverrides.toList)
 
   def planInputParameterValuesFromChecksum(
       valuesOverrides: (Location, Checksum)*
@@ -79,11 +68,13 @@ final case class ExecutionPlanner(runPlan:                  RunPlan,
   ): ExecutionPlanner = this.copy(outputsValueOverrides = valuesOverrides.toList)
 
   def buildProvenanceGraph: ValidatedNel[String, Activity] = (
+    validateParameterValueOverride,
     validateInputsValueOverride,
     validateOutputsValueOverride,
     createParameterFactories,
+    createGenerationFactories,
     validateStartTime
-  ) mapN { case (_, _, parameterFactories, (activityTime, author, cliVersion)) =>
+  ) mapN { case (_, _, _, parameterFactories, generationFactories, (activityTime, author, cliVersion)) =>
     testentities.Activity(
       activityIds.generateOne,
       activityTime,
@@ -97,6 +88,15 @@ final case class ExecutionPlanner(runPlan:                  RunPlan,
       generationFactories,
       parameterFactories
     )
+  }
+
+  private lazy val validateParameterValueOverride = runPlan.parameters.traverse { parameter =>
+    parametersValueOverrides
+      .foldMapK {
+        case (defaultValue, _) => Option.when(defaultValue == parameter.defaultValue)(parameter)
+        case _                 => Option.empty[CommandParameter]
+      }
+      .toValidNel(s"No execution value for parameter with default value ${parameter.defaultValue}")
   }
 
   private lazy val validateInputsValueOverride = runPlan.inputs.traverse {
@@ -128,7 +128,7 @@ final case class ExecutionPlanner(runPlan:                  RunPlan,
     Usage.factory(entity)
   }
 
-  private lazy val generationFactories = runPlan.outputs
+  private lazy val createGenerationFactories: ValidatedNel[String, List[Activity => Generation]] = runPlan.outputs
     .foldLeft(List.empty[LocationCommandOutput]) {
       case (commandOutputs, output: LocationCommandOutput) => commandOutputs :+ output
       case (commandOutputs, _) => commandOutputs
@@ -139,7 +139,13 @@ final case class ExecutionPlanner(runPlan:                  RunPlan,
         .map { case (_, locationOverride) => locationOverride }
         .getOrElse(output.defaultValue.value)
     )
-    .map(location => Generation.factory(OutputEntity.factory(location)))
+    .map {
+      case _: Location.FileOrFolder =>
+        "FileOrFolder Location cannot be used to define output default value".invalidNel[Location]
+      case location: Location => location.validNel[String]
+    }
+    .sequence
+    .map(locations => locations.map(location => Generation.factory(OutputEntity.factory(location))))
 
   private lazy val createParameterFactories =
     createVariableParameterFactories |+| createPathParameterFactoriesForInputs |+| createPathParameterFactoriesForOutputs

@@ -19,11 +19,15 @@
 package ch.datascience.graph.model
 
 import Schemas._
-import ch.datascience.graph.model.views.EntityIdEncoderOps
+import cats.syntax.all._
+import ch.datascience.graph.model.views.EntityIdJsonLdOps
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, LocalDateNotInTheFuture, NonBlank, NonNegativeInt, UUID, Url => UrlConstraint}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string
+import io.circe.DecodingFailure
+import io.renku.jsonld.JsonLDDecoder.{decodeEntityId, decodeString}
+import io.renku.jsonld.JsonLDEncoder._
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 
@@ -35,7 +39,7 @@ object datasets {
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with UrlConstraint
-      with EntityIdEncoderOps[ResourceId]
+      with EntityIdJsonLdOps[ResourceId]
 
   sealed trait DatasetIdentifier extends Any with StringTinyType
 
@@ -81,7 +85,7 @@ object datasets {
   implicit object ImageResourceId
       extends TinyTypeFactory[ImageResourceId](new ImageResourceId(_))
       with UrlConstraint
-      with EntityIdEncoderOps[ImageResourceId]
+      with EntityIdJsonLdOps[ImageResourceId]
 
   final class ImagePosition private (val value: Int) extends AnyVal with IntTinyType
   implicit object ImagePosition extends TinyTypeFactory[ImagePosition](new ImagePosition(_)) with NonNegativeInt
@@ -97,12 +101,18 @@ object datasets {
 
     def apply(datasetEntityId: EntityId): DerivedFrom = DerivedFrom(datasetEntityId.toString)
 
+    private val entityTypes = EntityTypes of (schema / "URL")
+
     implicit val derivedFromJsonLdEncoder: JsonLDEncoder[DerivedFrom] = JsonLDEncoder.instance { derivedFrom =>
       JsonLD.entity(
         EntityId of s"_:${java.util.UUID.randomUUID()}",
-        EntityTypes of (schema / "URL"),
+        entityTypes,
         schema / "url" -> EntityId.of(derivedFrom.value).asJsonLD
       )
+    }
+
+    implicit lazy val jsonLDDecoder: JsonLDDecoder[DerivedFrom] = JsonLDDecoder.entity(entityTypes) {
+      _.downField(schema / "url").downEntityId.as[EntityId].map(DerivedFrom(_))
     }
   }
 
@@ -156,20 +166,32 @@ object datasets {
     implicit def jsonLdEncoder[S <: SameAs](implicit sameAsEncoder: JsonLDEncoder[S]): JsonLDEncoder[S] =
       sameAsEncoder
 
+    private val urlEntityTypes = EntityTypes of (schema / "URL")
+
     implicit lazy val internalSameAsEncoder: JsonLDEncoder[InternalSameAs] = JsonLDEncoder.instance { sameAs =>
       JsonLD.entity(
         EntityId of s"_:${java.util.UUID.randomUUID()}",
-        EntityTypes of (schema / "URL"),
+        urlEntityTypes,
         schema / "url" -> EntityId.of(sameAs.value).asJsonLD
       )
+    }
+
+    implicit lazy val internalSameAsDecoder: JsonLDDecoder[InternalSameAs] = JsonLDDecoder.entity(urlEntityTypes) {
+      _.downField(schema / "url").downEntityId.as[EntityId].map(SameAs(_))
     }
 
     implicit lazy val externalSameAsEncoder: JsonLDEncoder[ExternalSameAs] = JsonLDEncoder.instance { sameAs =>
       JsonLD.entity(
         EntityId of s"_:${java.util.UUID.randomUUID()}",
-        EntityTypes of (schema / "URL"),
+        urlEntityTypes,
         schema / "url" -> sameAs.value.asJsonLD
       )
+    }
+
+    implicit lazy val externalSameAsDecoder: JsonLDDecoder[ExternalSameAs] = JsonLDDecoder.entity(urlEntityTypes) {
+      _.downField(schema / "url")
+        .as[String]
+        .flatMap(url => SameAs.external(Refined.unsafeApply(url)).leftMap(err => DecodingFailure(err.getMessage, Nil)))
     }
   }
 
@@ -192,7 +214,7 @@ object datasets {
   implicit object PartResourceId
       extends TinyTypeFactory[PartResourceId](new PartResourceId(_))
       with UrlConstraint
-      with EntityIdEncoderOps[PartResourceId]
+      with EntityIdJsonLdOps[PartResourceId]
 
   final class DateCreated private (val value: Instant) extends AnyVal with Date with InstantTinyType {
     override def instant: Instant = value
@@ -223,5 +245,7 @@ object datasets {
   implicit object PartSource extends TinyTypeFactory[PartSource](new PartSource(_)) {
     implicit lazy val jsonLDEncoder: JsonLDEncoder[PartSource] =
       JsonLDEncoder.instance(v => JsonLD.fromString(v.value))
+    implicit lazy val jsonLDDecoder: JsonLDDecoder[PartSource] =
+      decodeString.emap(value => from(value).leftMap(_.getMessage))
   }
 }

@@ -74,5 +74,5 @@ class DatasetInfoFinderSpec extends AnyWordSpec with should.Matchers {
     }
   }
 
-  private lazy val infoFinder = new DatasetInfoFinderImpl[Try]()
+  private lazy val infoFinder = new DatasetInfoFinderImpl[Try]
 }

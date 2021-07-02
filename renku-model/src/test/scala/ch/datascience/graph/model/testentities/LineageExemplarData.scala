@@ -22,7 +22,7 @@ import cats.Show
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.commandParameters.IOStream
-import ch.datascience.graph.model.entityModel.Location
+import ch.datascience.graph.model.entityModel.{Location, LocationLike}
 import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.runPlans.Command
 import ch.datascience.graph.model.testentities.CommandParameterBase.CommandInput._
@@ -257,7 +257,7 @@ object NodeDef {
       param.maybePrefix.fold(valueOverride.toString)(prefix => s"$prefix$valueOverride")
     }
 
-  private implicit def pathParameterValueShow[P <: CommandInputOrOutput]: Show[(P, Location)] =
+  private implicit def pathParameterValueShow[P <: CommandInputOrOutput]: Show[(P, LocationLike)] =
     Show.show {
       case (param: LocationCommandInput, location) =>
         param.maybePrefix.fold(location.toString)(prefix => s"$prefix$location")

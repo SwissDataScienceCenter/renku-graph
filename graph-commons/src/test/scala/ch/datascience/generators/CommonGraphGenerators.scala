@@ -44,8 +44,8 @@ import ch.datascience.rdfstore._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
-import io.circe.literal._
 import io.renku.jsonld.Schema
+import io.renku.jsonld.generators.JsonLDGenerators
 import org.http4s.Status
 import org.http4s.Status._
 import org.scalacheck.{Arbitrary, Gen}
@@ -197,19 +197,8 @@ object CommonGraphGenerators {
       }
 
   implicit val jsonLDTriples: Gen[JsonLDTriples] = for {
-    subject <- nonEmptyStrings()
-    obj     <- nonEmptyStrings()
-  } yield JsonLDTriples {
-    json"""{
-        "@context": {
-          "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
-          "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
-          "xsd": "http://www.w3.org/2001/XMLSchema#"
-        },
-        "@id": $subject,
-        "rdfs:label": $obj
-      }"""
-  }
+    jsonLD <- JsonLDGenerators.jsonLDEntities
+  } yield JsonLDTriples(jsonLD.toJson)
 
   implicit lazy val sparqlPrefixes: Gen[SparqlQuery.Prefix] = Gen.oneOf(
     SparqlQuery.Prefix("prov", Schemas.prov),

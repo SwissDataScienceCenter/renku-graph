@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated.tripl
 
 import ch.datascience.graph.model.projects.{DateCreated, Name, Path, Visibility}
 import ch.datascience.graph.model.users
-import ch.datascience.graph.model.users.{Email, GitLabId}
+import ch.datascience.graph.model.users.GitLabId
 
 private final case class GitLabProject(path:            Path,
                                        name:            Name,
@@ -31,5 +31,3 @@ private final case class GitLabProject(path:            Path,
 )
 
 private final case class GitLabCreator(gitLabId: GitLabId, name: users.Name)
-
-private final case class KGCreator(resourceId: users.ResourceId, maybeEmail: Option[Email], name: users.Name)

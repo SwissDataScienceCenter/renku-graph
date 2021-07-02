@@ -16,14 +16,13 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.model.views
+package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
-import io.renku.jsonld.{EntityId, EntityIdEncoder}
+import ch.datascience.graph.model.entities.Dataset.Provenance
+import ch.datascience.graph.model.entities._
 
-trait EntityIdEncoderOps[TT <: StringTinyType] {
-  self: TinyTypeFactory[TT] =>
-
-  implicit lazy val entityIdJsonLDEncoder: EntityIdEncoder[TT] =
-    EntityIdEncoder.instance[TT](id => EntityId.of(id.value))
-}
+private case class ProjectMetadata( //project:    Project,
+                                    persons:    Set[Person],
+                                    activities: List[Activity],
+                                    datasets:   List[Dataset[Provenance]]
+)

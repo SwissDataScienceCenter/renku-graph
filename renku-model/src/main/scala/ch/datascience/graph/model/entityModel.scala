@@ -18,30 +18,51 @@
 
 package ch.datascience.graph.model
 
-import ch.datascience.graph.model.views.EntityIdEncoderOps
-import ch.datascience.tinytypes.{RelativePathTinyType, StringTinyType, TinyTypeFactory}
+import cats.syntax.all._
+import ch.datascience.graph.model.views.EntityIdJsonLdOps
 import ch.datascience.tinytypes.constraints.{NonBlank, RelativePath, Url}
+import ch.datascience.tinytypes.{RelativePathTinyType, StringTinyType, TinyTypeFactory}
+import io.renku.jsonld.JsonLDDecoder
+import io.renku.jsonld.JsonLDDecoder._
 
 object entityModel {
+
   class ResourceId private (val value: String) extends AnyVal with StringTinyType
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with Url
-      with EntityIdEncoderOps[ResourceId]
+      with EntityIdJsonLdOps[ResourceId]
 
-  sealed trait Location extends Any with RelativePathTinyType
+  sealed trait LocationLike extends Any with RelativePathTinyType {
+    override def equals(obj: Any): Boolean =
+      Option(obj).exists {
+        case v: LocationLike => v.value == value
+        case _ => false
+      }
+
+    override def hashCode(): Int = value.hashCode
+  }
+
+  sealed trait Location extends Any with LocationLike
+
   object Location {
 
-    final class File private (val value: String) extends AnyVal with Location
+    final class File private (val value: String) extends Location
     object File extends TinyTypeFactory[File](new File(_)) with RelativePath {
       def apply(folder: Location.Folder, filename: String): Location.File = Location.File(s"$folder/$filename")
     }
 
-    final class Folder private (val value: String) extends AnyVal with Location
+    final class Folder private (val value: String) extends Location with LocationLike
     object Folder extends TinyTypeFactory[Folder](new Folder(_)) with RelativePath
+
+    final class FileOrFolder private (val value: String) extends LocationLike
+    object FileOrFolder extends TinyTypeFactory[FileOrFolder](new FileOrFolder(_)) with RelativePath {
+      implicit lazy val jsonLDDecoder: JsonLDDecoder[FileOrFolder] =
+        decodeString.emap(value => from(value).leftMap(_.getMessage))
+    }
   }
 
   final class Checksum private (val value: String) extends AnyVal with StringTinyType
-  object Checksum extends TinyTypeFactory[Checksum](new Checksum(_)) with NonBlank
+  implicit object Checksum extends TinyTypeFactory[Checksum](new Checksum(_)) with NonBlank
 
 }

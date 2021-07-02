@@ -58,7 +58,7 @@ class KGInfoFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheck
   private trait TestCase {
     private val logger       = TestLogger[IO]()
     private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
-    val finder               = new IOKGInfoFinder(rdfStoreConfig, logger, timeRecorder)
+    val finder               = new KGInfoFinderImpl(rdfStoreConfig, logger, timeRecorder)
   }
 
   private def findPerson(resourceId: users.ResourceId): Set[String] =

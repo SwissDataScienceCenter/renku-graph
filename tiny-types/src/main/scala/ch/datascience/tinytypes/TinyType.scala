@@ -18,8 +18,8 @@
 
 package ch.datascience.tinytypes
 
-import cats.{MonadError, MonadThrow}
 import cats.syntax.all._
+import cats.{MonadError, MonadThrow, Show}
 import ch.datascience.tinytypes.constraints.PathSegment
 import io.circe.Json
 
@@ -109,6 +109,8 @@ abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT)
 
     def showAs[View](implicit renderer: Renderer[View, TT]): String = renderer.render(tinyType)
   }
+
+  implicit lazy val show: Show[TT] = Show.show(_.toString)
 }
 
 trait TinyTypeConverter[TT <: TinyType, OUT] extends (TT => Either[Exception, OUT])

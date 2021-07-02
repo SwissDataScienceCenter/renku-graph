@@ -34,11 +34,13 @@ object PublicationEvent {
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
+  private val entityTypes = EntityTypes of schema / "PublicationEvent"
+
   implicit val encoder: JsonLDEncoder[PublicationEvent] =
     JsonLDEncoder.instance { case PublicationEvent(resourceId, about, maybeDescription, location, name, startDate) =>
       JsonLD.entity(
         resourceId.asEntityId,
-        EntityTypes of schema / "PublicationEvent",
+        entityTypes,
         schema / "about"       -> about.asJsonLD,
         schema / "description" -> maybeDescription.asJsonLD,
         schema / "location"    -> location.asJsonLD,
@@ -46,4 +48,16 @@ object PublicationEvent {
         schema / "startDate"   -> startDate.asJsonLD
       )
     }
+
+  implicit lazy val decoder: JsonLDDecoder[PublicationEvent] = JsonLDDecoder.entity(entityTypes) { cursor =>
+    import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
+    for {
+      resourceId       <- cursor.downEntityId.as[ResourceId]
+      about            <- cursor.downField(schema / "about").as[AboutEvent]
+      maybeDescription <- cursor.downField(schema / "description").as[Option[Description]]
+      location         <- cursor.downField(schema / "location").as[Location]
+      name             <- cursor.downField(schema / "name").as[Name]
+      startDate        <- cursor.downField(schema / "startDate").as[StartDate]
+    } yield PublicationEvent(resourceId, about, maybeDescription, location, name, startDate)
+  }
 }

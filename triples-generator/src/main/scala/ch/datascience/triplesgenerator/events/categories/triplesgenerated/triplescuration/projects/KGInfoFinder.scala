@@ -31,7 +31,7 @@ private trait KGInfoFinder[Interpretation[_]] {
   def findCreatorId(gitLabId: users.GitLabId): Interpretation[Option[users.ResourceId]]
 }
 
-private class IOKGInfoFinder(
+private class KGInfoFinderImpl(
     rdfStoreConfig: RdfStoreConfig,
     logger:         Logger[IO],
     timeRecorder:   SparqlQueryTimeRecorder[IO]
@@ -80,7 +80,7 @@ private class IOKGInfoFinder(
   }
 }
 
-private object IOKGInfoFinder {
+private object KGInfoFinder {
   def apply(
       timeRecorder:   SparqlQueryTimeRecorder[IO],
       logger:         Logger[IO],
@@ -89,8 +89,7 @@ private object IOKGInfoFinder {
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[KGInfoFinder[IO]] =
-    for {
-      config <- rdfStoreConfig
-    } yield new IOKGInfoFinder(config, logger, timeRecorder)
+  ): IO[KGInfoFinder[IO]] = for {
+    config <- rdfStoreConfig
+  } yield new KGInfoFinderImpl(config, logger, timeRecorder)
 }

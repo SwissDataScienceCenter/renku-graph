@@ -18,11 +18,15 @@
 
 package ch.datascience.graph.model.entities
 
+import cats.syntax.all._
 import ch.datascience.graph.model.Schemas._
+import ch.datascience.graph.model.commandParameters
 import ch.datascience.graph.model.commandParameters.Name
 import ch.datascience.graph.model.entities.CommandParameterBase._
-import ch.datascience.graph.model.entityModel.Location
+import ch.datascience.graph.model.entityModel.{Location, LocationLike}
 import ch.datascience.graph.model.parameterValues._
+import io.circe.DecodingFailure
+import io.renku.jsonld.JsonLDDecoder
 
 sealed trait ParameterValue {
   type ValueReference <: CommandParameterBase
@@ -33,11 +37,11 @@ sealed trait ParameterValue {
 
 object ParameterValue {
 
-  sealed trait PathParameterValue extends ParameterValue {
+  sealed trait PathParameterValue extends ParameterValue with Product with Serializable {
     override type ValueReference <: CommandInputOrOutput
     val resourceId: ResourceId
     val name:       Name
-    val location:   Location
+    val location:   LocationLike
   }
 
   final case class VariableParameterValue(resourceId:     ResourceId,
@@ -50,7 +54,7 @@ object ParameterValue {
 
   final case class InputParameterValue(resourceId:     ResourceId,
                                        name:           Name,
-                                       location:       Location,
+                                       location:       LocationLike,
                                        valueReference: CommandInput
   ) extends PathParameterValue {
     type ValueReference = CommandInput
@@ -58,7 +62,7 @@ object ParameterValue {
 
   final case class OutputParameterValue(resourceId:     ResourceId,
                                         name:           Name,
-                                        location:       Location,
+                                        location:       LocationLike,
                                         valueReference: CommandOutput
   ) extends PathParameterValue {
     type ValueReference = CommandOutput
@@ -68,12 +72,15 @@ object ParameterValue {
   import io.renku.jsonld.syntax._
   import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 
+  private val pathParameterTypes     = EntityTypes of (renku / "ParameterValue", renku / "PathParameterValue")
+  private val variableParameterTypes = EntityTypes of (renku / "ParameterValue", renku / "VariableParameterValue")
+
   implicit def encoder[PV <: ParameterValue]: JsonLDEncoder[PV] =
     JsonLDEncoder.instance {
       case InputParameterValue(resourceId, name, location, valueReference) =>
         JsonLD.entity(
           resourceId.asEntityId,
-          EntityTypes of (renku / "ParameterValue", renku / "PathParameterValue"),
+          pathParameterTypes,
           schema / "name"           -> name.asJsonLD,
           prov / "atLocation"       -> location.asJsonLD,
           schema / "valueReference" -> valueReference.resourceId.asEntityId.asJsonLD
@@ -81,7 +88,7 @@ object ParameterValue {
       case OutputParameterValue(resourceId, name, location, valueReference) =>
         JsonLD.entity(
           resourceId.asEntityId,
-          EntityTypes of (renku / "ParameterValue", renku / "PathParameterValue"),
+          pathParameterTypes,
           schema / "name"           -> name.asJsonLD,
           prov / "atLocation"       -> location.asJsonLD,
           schema / "valueReference" -> valueReference.resourceId.asEntityId.asJsonLD
@@ -89,11 +96,52 @@ object ParameterValue {
       case VariableParameterValue(resourceId, name, valueOverride, valueReference) =>
         JsonLD.entity(
           resourceId.asEntityId,
-          EntityTypes of (renku / "ParameterValue", renku / "PathParameterValue"),
+          variableParameterTypes,
           schema / "name"           -> name.asJsonLD,
           schema / "value"          -> valueOverride.asJsonLD,
           schema / "valueReference" -> valueReference.resourceId.asEntityId.asJsonLD
         )
     }
 
+  def decoder(runPlan: RunPlan): JsonLDDecoder[ParameterValue] = cursor =>
+    pathParameterDecoder(runPlan)(cursor) orElse variableParameterDecoder(runPlan)(cursor)
+
+  private def pathParameterDecoder(runPlan: RunPlan): JsonLDDecoder[PathParameterValue] =
+    JsonLDDecoder.entity(pathParameterTypes) { cursor =>
+      import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
+      for {
+        resourceId       <- cursor.downEntityId.as[ResourceId]
+        name             <- cursor.downField(schema / "name").as[Name]
+        location         <- cursor.downField(prov / "atLocation").as[Location.FileOrFolder]
+        valueReferenceId <- cursor.downField(schema / "valueReference").downEntityId.as[commandParameters.ResourceId]
+        parameterValue <-
+          Either.fromOption(
+            runPlan
+              .findInput(valueReferenceId)
+              .map(InputParameterValue(resourceId, name, location, _))
+              .orElse(
+                runPlan
+                  .findOutput(valueReferenceId)
+                  .map(OutputParameterValue(resourceId, name, location, _))
+              ),
+            DecodingFailure(s"PathParameterValue points to a non-existing command parameter $valueReferenceId", Nil)
+          )
+      } yield parameterValue
+    }
+
+  private def variableParameterDecoder(runPlan: RunPlan): JsonLDDecoder[VariableParameterValue] =
+    JsonLDDecoder.entity(variableParameterTypes) { cursor =>
+      import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
+      for {
+        resourceId       <- cursor.downEntityId.as[ResourceId]
+        name             <- cursor.downField(schema / "name").as[Name]
+        valueOverride    <- cursor.downField(schema / "value").as[ValueOverride]
+        valueReferenceId <- cursor.downField(schema / "valueReference").downEntityId.as[commandParameters.ResourceId]
+        commandParameter <-
+          Either.fromOption(
+            runPlan.findParameter(valueReferenceId),
+            DecodingFailure(s"VariableParameterValue points to a non-existing command parameter $valueReferenceId", Nil)
+          )
+      } yield VariableParameterValue(resourceId, name, valueOverride, commandParameter)
+    }
 }

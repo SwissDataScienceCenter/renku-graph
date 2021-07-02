@@ -22,4 +22,5 @@ import ch.datascience.graph.model.events.CategoryName
 
 package object triplesgenerated {
   val categoryName: CategoryName = CategoryName("TRIPLES_GENERATED")
+
 }

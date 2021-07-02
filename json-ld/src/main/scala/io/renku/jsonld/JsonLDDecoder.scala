@@ -19,15 +19,20 @@
 package io.renku.jsonld
 
 import cats.syntax.all._
-import io.circe.DecodingFailure
-import io.renku.jsonld.Cursor.{ArrayCursor, FlattenedArrayCursor, FlattenedJsonCursor, ListItemCursor}
-import io.renku.jsonld.JsonLD.{JsonLDArray, JsonLDEntity, JsonLDEntityId, JsonLDValue}
+import io.circe.{DecodingFailure, JsonNumber}
+import io.renku.jsonld.Cursor._
+import io.renku.jsonld.JsonLD._
 import io.renku.jsonld.JsonLDDecoder.Result
+
+import java.time.{Instant, LocalDate}
 
 /** A type class that provides a conversion from a [[Cursor]] to an object of type `A`
   */
-trait JsonLDDecoder[A] extends Serializable {
+trait JsonLDDecoder[A] extends (Cursor => Result[A]) with Serializable {
   def apply(cursor: Cursor): Result[A]
+
+  def emap[B](f: A => Either[String, B]): JsonLDDecoder[B] =
+    this(_).flatMap(f(_).leftMap(s => DecodingFailure(s, Nil)))
 }
 
 abstract class JsonLDEntityDecoder[A](val entityTypes: EntityTypes) extends JsonLDDecoder[A] {
@@ -37,6 +42,8 @@ abstract class JsonLDEntityDecoder[A](val entityTypes: EntityTypes) extends Json
 object JsonLDDecoder {
 
   type Result[A] = Either[DecodingFailure, A]
+
+  final def apply[A](implicit jsonLDDecoder: JsonLDDecoder[A]): JsonLDDecoder[A] = jsonLDDecoder
 
   final def instance[A](f: Cursor => Result[A]): JsonLDDecoder[A] = (c: Cursor) => f(c)
 
@@ -72,9 +79,48 @@ object JsonLDDecoder {
     case json => DecodingFailure(s"Cannot decode $json to String", Nil).asLeft
   }
 
+  implicit val decodeLong: JsonLDDecoder[Long] = _.jsonLD match {
+    case json @ JsonLDValue(value: JsonNumber, _) =>
+      value.toLong.map(_.asRight).getOrElse(DecodingFailure(s"Cannot decode $json to Long", Nil).asLeft)
+    case json => DecodingFailure(s"Cannot decode $json to Long", Nil).asLeft
+  }
+
+  implicit val decodeInt: JsonLDDecoder[Int] = _.jsonLD match {
+    case json @ JsonLDValue(value: JsonNumber, _) =>
+      value.toInt.map(_.asRight).getOrElse(DecodingFailure(s"Cannot decode $json to Int", Nil).asLeft)
+    case json => DecodingFailure(s"Cannot decode $json to Int", Nil).asLeft
+  }
+
+  implicit val decodeBoolean: JsonLDDecoder[Boolean] = _.jsonLD match {
+    case JsonLDValue(value: Boolean, _) => Right(value)
+    case json => DecodingFailure(s"Cannot decode $json to Boolean", Nil).asLeft
+  }
+
+  implicit val decodeInstant: JsonLDDecoder[Instant] = _.jsonLD match {
+    case JsonLDValue(value: Instant, Some(JsonLDInstantValue.entityTypes)) => Right(value)
+    case json => DecodingFailure(s"Cannot decode $json to Instant", Nil).asLeft
+  }
+
+  implicit val decodeLocalDate: JsonLDDecoder[LocalDate] = _.jsonLD match {
+    case JsonLDValue(value: LocalDate, Some(JsonLDLocalDateValue.entityTypes)) => Right(value)
+    case json => DecodingFailure(s"Cannot decode $json to LocalDate", Nil).asLeft
+  }
+
   implicit val decodeEntityId: JsonLDDecoder[EntityId] = _.jsonLD match {
     case JsonLDEntityId(value) => Right(value)
     case json                  => DecodingFailure(s"Cannot decode $json to EntityId", Nil).asLeft
+  }
+
+  implicit val decodeEntityTypes: JsonLDDecoder[EntityTypes] = _.jsonLD match {
+    case JsonLDEntity(_, entityTypes, _, _) => Right(entityTypes)
+    case json                               => DecodingFailure(s"Cannot decode $json to EntityTypes", Nil).asLeft
+  }
+
+  implicit def decodeOption[I](implicit itemDecoder: JsonLDDecoder[I]): JsonLDDecoder[Option[I]] = { cursor =>
+    cursor.jsonLD match {
+      case JsonLD.JsonLDNull => None.asRight[DecodingFailure]
+      case _                 => itemDecoder(cursor).map(Option(_))
+    }
   }
 
   implicit def decodeList[I](implicit itemDecoder: JsonLDDecoder[I]): JsonLDDecoder[List[I]] = {

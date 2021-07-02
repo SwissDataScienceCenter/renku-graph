@@ -39,7 +39,7 @@ private trait DatasetInfoFinder[Interpretation[_]] {
   def findDatasetsInfo(triples: JsonLDTriples): Interpretation[Set[DatasetInfo]]
 }
 
-private class DatasetInfoFinderImpl[Interpretation[_]: MonadThrow]() extends DatasetInfoFinder[Interpretation] {
+private class DatasetInfoFinderImpl[Interpretation[_]: MonadThrow] extends DatasetInfoFinder[Interpretation] {
 
   import CollectedInfo._
 

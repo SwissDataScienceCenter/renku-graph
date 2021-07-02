@@ -18,6 +18,7 @@
 
 package ch.datascience.tinytypes
 
+import cats.syntax.all._
 import ch.datascience.generators.Generators._
 import ch.datascience.tinytypes.constraints.PathSegment
 import org.scalacheck.Gen
@@ -128,6 +129,25 @@ class TinyTypeFactorySpec extends AnyWordSpec with should.Matchers {
       val Left(exception) = result
       exception            shouldBe an[IllegalArgumentException]
       exception.getMessage shouldBe invalidValueMessage
+    }
+  }
+
+  "implicit show" should {
+
+    "return a String value of the 'value' property" in {
+      ("abc" +: 2 +: 2L +: true +: Nil) foreach { someValue =>
+        case class InnerTinyType(v: Any) extends TinyType {
+          type V = Any
+          override val value: Any = v
+        }
+
+        object InnerTinyTypeFactory extends TinyTypeFactory[InnerTinyType](InnerTinyType)
+        import InnerTinyTypeFactory.show
+
+        val tinyType = InnerTinyTypeFactory(someValue)
+
+        tinyType.show shouldBe someValue.toString
+      }
     }
   }
 }

@@ -50,7 +50,8 @@ object CliVersion extends TinyTypeFactory[CliVersion](new CliVersion(_)) with No
   import ch.datascience.tinytypes.json.TinyTypeDecoders
   import io.circe.Decoder
 
-  implicit val jsonDecoder: Decoder[CliVersion] = TinyTypeDecoders.stringDecoder(this)
+  implicit val jsonDecoder: Decoder[CliVersion]         = TinyTypeDecoders.stringDecoder(this)
+  implicit val factory:     TinyTypeFactory[CliVersion] = CliVersion
 }
 
 final case class RenkuVersionPair(cliVersion: CliVersion, schemaVersion: SchemaVersion)
@@ -72,5 +73,6 @@ object RenkuVersionPair {
 final class SchemaVersion private (val value: String) extends AnyVal with StringTinyType
 object SchemaVersion extends TinyTypeFactory[SchemaVersion](new SchemaVersion(_)) with NonBlank {
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
-  implicit val decoder: Decoder[SchemaVersion] = stringDecoder(SchemaVersion)
+  implicit val decoder: Decoder[SchemaVersion]         = stringDecoder(SchemaVersion)
+  implicit val factory: TinyTypeFactory[SchemaVersion] = SchemaVersion
 }

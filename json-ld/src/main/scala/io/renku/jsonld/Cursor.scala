@@ -18,7 +18,9 @@
 
 package io.renku.jsonld
 
-import io.renku.jsonld.JsonLD.{JsonLDArray, JsonLDEntity, JsonLDEntityId, JsonLDValue}
+import io.circe.DecodingFailure
+import io.renku.jsonld.JsonLD._
+import io.renku.jsonld.syntax._
 
 abstract class Cursor {
 
@@ -32,10 +34,18 @@ abstract class Cursor {
 
   def as[T](implicit decoder: JsonLDDecoder[T]): JsonLDDecoder.Result[T] = decoder(this)
 
-  def entityId: Cursor = jsonLD match {
-    case JsonLDEntity(_, _, _, _) => this
-    case _                        => Empty
+  def getEntityTypes: JsonLDDecoder.Result[EntityTypes] = jsonLD match {
+    case JsonLDEntity(_, entityTypes, _, _) => Right(entityTypes)
+    case _                                  => Left(DecodingFailure("No EntityTypes found on non-JsonLDEntity object", Nil))
   }
+
+  def downEntityId: Cursor = jsonLD match {
+    case JsonLDEntity(entityId, _, _, _) => new PropertyCursor(this, Property("@id"), entityId.asJsonLD)
+    case _: JsonLDEntityId[_] => this
+    case _ => Empty
+  }
+
+  def downType(searchedTypes: EntityTypes): Cursor = downType(searchedTypes.toList: _*)
 
   def downType(searchedTypes: EntityType*): Cursor = jsonLD match {
     case JsonLDEntity(_, types, _, _) if searchedTypes.diff(types.list.toList).isEmpty => this
@@ -45,7 +55,7 @@ abstract class Cursor {
   lazy val downArray: Cursor = jsonLD match {
     case array @ JsonLDArray(_) =>
       this match {
-        case cursor: FlattenedArrayCursor => new FlattenedArrayCursor(cursor, array, cursor.allEntities)
+        case cursor: FlattenedArrayCursor => FlattenedArrayCursor(cursor, array, cursor.allEntities)
         case cursor: Cursor               => new ArrayCursor(cursor, array)
       }
     case _ => Empty
@@ -65,7 +75,7 @@ abstract class Cursor {
           case (name, entity: JsonLDEntity) => new PropertyCursor(this, name, entity)
           case (_, entities: JsonLDArray) =>
             this match {
-              case cursor: FlattenedJsonCursor => new FlattenedArrayCursor(cursor, entities, cursor.allEntities)
+              case cursor: FlattenedJsonCursor => FlattenedArrayCursor(cursor, entities, cursor.allEntities)
               case cursor => new ArrayCursor(cursor, entities)
             }
           case _ => throw new UnsupportedOperationException("needs implementation")

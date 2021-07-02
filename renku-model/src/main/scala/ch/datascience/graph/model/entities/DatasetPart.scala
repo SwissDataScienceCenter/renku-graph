@@ -19,11 +19,10 @@
 package ch.datascience.graph.model.entities
 
 import ch.datascience.graph.model.InvalidationTime
-import ch.datascience.graph.model.datasets.{DateCreated, PartExternal, PartId, PartResourceId, PartSource, Url}
+import ch.datascience.graph.model.datasets.{DateCreated, PartExternal, PartResourceId, PartSource, Url}
 
 final case class DatasetPart(
     resourceId:            PartResourceId,
-    id:                    PartId,
     external:              PartExternal,
     entity:                Entity,
     dateCreated:           DateCreated,
@@ -39,10 +38,12 @@ object DatasetPart {
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
+  private val entityTypes = EntityTypes of (prov / "Entity", schema / "DigitalDocument")
+
   implicit lazy val encoder: JsonLDEncoder[DatasetPart] = JsonLDEncoder.instance { part =>
     JsonLD.entity(
       part.resourceId.asEntityId,
-      EntityTypes of (prov / "Entity", schema / "DigitalDocument"),
+      entityTypes,
       renku / "external"         -> part.external.asJsonLD,
       prov / "entity"            -> part.entity.asJsonLD,
       schema / "dateCreated"     -> part.dateCreated.asJsonLD,
@@ -50,5 +51,18 @@ object DatasetPart {
       renku / "source"           -> part.maybeSource.asJsonLD,
       prov / "invalidatedAtTime" -> part.maybeInvalidationTime.asJsonLD
     )
+  }
+
+  implicit lazy val decoder: JsonLDDecoder[DatasetPart] = JsonLDDecoder.entity(entityTypes) { cursor =>
+    import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
+    for {
+      resourceId            <- cursor.downEntityId.as[PartResourceId]
+      external              <- cursor.downField(renku / "external").as[PartExternal]
+      entity                <- cursor.downField(prov / "entity").as[Entity]
+      dateCreated           <- cursor.downField(schema / "dateCreated").as[DateCreated]
+      maybeUrl              <- cursor.downField(schema / "url").as[Option[Url]]
+      maybeSource           <- cursor.downField(renku / "source").as[Option[PartSource]]
+      maybeInvalidationTime <- cursor.downField(prov / "invalidatedAtTime").as[Option[InvalidationTime]]
+    } yield DatasetPart(resourceId, external, entity, dateCreated, maybeUrl, maybeSource, maybeInvalidationTime)
   }
 }

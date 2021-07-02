@@ -16,16 +16,27 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.model
+package ch.datascience.graph.model.views
 
-import ch.datascience.graph.model.views.EntityIdJsonLdOps
+import cats.syntax.all._
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
-import ch.datascience.tinytypes.constraints.Url
+import io.circe.DecodingFailure
+import io.renku.jsonld.{EntityId, EntityIdEncoder, JsonLDDecoder}
 
-object associations {
-  class ResourceId private (val value: String) extends AnyVal with StringTinyType
-  implicit object ResourceId
-      extends TinyTypeFactory[ResourceId](new ResourceId(_))
-      with Url
-      with EntityIdJsonLdOps[ResourceId]
+trait EntityIdJsonLdOps[TT <: StringTinyType] {
+  self: TinyTypeFactory[TT] =>
+
+  implicit lazy val entityIdJsonLDEncoder: EntityIdEncoder[TT] =
+    EntityIdEncoder.instance[TT](id => EntityId.of(id.value))
+
+  implicit lazy val entityIdJsonLDDecoder: JsonLDDecoder[TT] =
+    JsonLDDecoder.instance {
+      JsonLDDecoder.decodeEntityId >>> {
+        _.flatMap(entityId =>
+          self
+            .from(entityId.toString)
+            .leftMap(e => DecodingFailure(s"Cannot decode $entityId entityId: ${e.getMessage}", Nil))
+        )
+      }
+    }
 }

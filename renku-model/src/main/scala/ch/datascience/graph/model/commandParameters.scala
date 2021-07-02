@@ -20,16 +20,17 @@ package ch.datascience.graph.model
 
 import cats.syntax.all._
 import ch.datascience.graph.model.Schemas.renku
-import ch.datascience.graph.model.entityModel.Location
-import ch.datascience.graph.model.views.EntityIdEncoderOps
+import ch.datascience.graph.model.entityModel.{Location, LocationLike}
+import ch.datascience.graph.model.views.EntityIdJsonLdOps
 import ch.datascience.graph.model.views.TinyTypeJsonLDEncoders._
-import ch.datascience.tinytypes.constraints.{NonBlank, PositiveInt, Url}
 import ch.datascience.tinytypes._
+import ch.datascience.tinytypes.constraints.{NonBlank, PositiveInt, Url}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
+import io.circe.DecodingFailure
+import io.renku.jsonld._
 import io.renku.jsonld.syntax.JsonEncoderOps
-import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 
 object commandParameters {
 
@@ -37,7 +38,7 @@ object commandParameters {
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with Url
-      with EntityIdEncoderOps[ResourceId]
+      with EntityIdJsonLdOps[ResourceId]
 
   final class Name private (val value: String) extends AnyVal with StringTinyType
   implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank
@@ -64,15 +65,20 @@ object commandParameters {
   final class Prefix private (val value: String) extends AnyVal with StringTinyType
   implicit object Prefix extends TinyTypeFactory[Prefix](new Prefix(_)) with NonBlank
 
-  final case class InputDefaultValue(value: Location) extends TinyType { type V = Location }
+  final case class InputDefaultValue(value: LocationLike) extends TinyType { type V = LocationLike }
   object InputDefaultValue {
-    implicit val jsonLDEncoder: JsonLDEncoder[InputDefaultValue] =
-      JsonLDEncoder[Location].contramap[InputDefaultValue](_.value)
+    implicit val jsonLDEncoder: JsonLDEncoder[InputDefaultValue] = JsonLDEncoder[LocationLike].contramap(_.value)
+
+    implicit val jsonLDDecoder: JsonLDDecoder[InputDefaultValue] =
+      JsonLDDecoder[Location.FileOrFolder].emap(InputDefaultValue(_).asRight[String])
   }
 
-  final case class OutputDefaultValue(value: Location) extends TinyType { type V = Location }
-  object OutputDefaultValue {
-    implicit val jsonLDEncoder: JsonLDEncoder[OutputDefaultValue] = JsonLDEncoder[Location].contramap(_.value)
+  final case class OutputDefaultValue(value: LocationLike) extends TinyType { type V = LocationLike }
+  implicit object OutputDefaultValue {
+    implicit val jsonLDEncoder: JsonLDEncoder[OutputDefaultValue] = JsonLDEncoder[LocationLike].contramap(_.value)
+
+    implicit val jsonLDDecoder: JsonLDDecoder[OutputDefaultValue] =
+      JsonLDDecoder[Location.FileOrFolder].emap(OutputDefaultValue(_).asRight[String])
   }
 
   final class FolderCreation private (val value: Boolean) extends AnyVal with BooleanTinyType
@@ -95,7 +101,7 @@ object commandParameters {
     implicit object ResourceId
         extends TinyTypeFactory[ResourceId](new ResourceId(_))
         with Url
-        with EntityIdEncoderOps[ResourceId]
+        with EntityIdJsonLdOps[ResourceId]
 
     sealed trait In  extends IOStream
     sealed trait Out extends IOStream
@@ -108,14 +114,40 @@ object commandParameters {
     case class StdErr(override val resourceId: ResourceId) extends IOStream(resourceId, StdErr.name) with Out
     object StdErr { val name: String Refined NonEmpty = "stderr" }
 
+    private val entityTypes = EntityTypes of renku / "IOStream"
+
     implicit def encoder[IO <: IOStream]: JsonLDEncoder[IO] =
       JsonLDEncoder.instance[IO] { stream =>
         JsonLD.entity(
           stream.resourceId.asEntityId,
-          EntityTypes of renku / "IOStream",
+          entityTypes,
           renku / "streamType" -> stream.name.toString().asJsonLD
         )
       }
-  }
 
+    implicit lazy val stdInDecoder: JsonLDDecoder[IOStream.In] =
+      JsonLDDecoder.entity(entityTypes) { cursor =>
+        import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
+        for {
+          resourceId <- cursor.downEntityId.as[ResourceId]
+          _ <- cursor.downField(renku / "streamType").as[String] >>= {
+                 case StdIn.name.value => ().asRight
+                 case name             => DecodingFailure(s"$name is cannot be decoded to ${StdIn.name}", Nil).asLeft
+               }
+        } yield StdIn(resourceId): IOStream.In
+      }
+
+    implicit lazy val stdOutDecoder: JsonLDDecoder[IOStream.Out] =
+      JsonLDDecoder.entity(entityTypes) { cursor =>
+        import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
+        for {
+          resourceId <- cursor.downEntityId.as[ResourceId]
+          stdOut <- cursor.downField(renku / "streamType").as[String] >>= {
+                      case StdOut.name.value => StdOut(resourceId).asRight
+                      case StdErr.name.value => StdErr(resourceId).asRight
+                      case name              => DecodingFailure(s"$name is cannot be decoded to ${StdIn.name}", Nil).asLeft
+                    }
+        } yield stdOut
+      }
+  }
 }

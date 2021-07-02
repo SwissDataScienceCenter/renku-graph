@@ -18,8 +18,11 @@
 
 package ch.datascience.graph.model.entities
 
+import cats.syntax.all._
+import ch.datascience.graph.model.Schemas.{prov, renku, wfprov}
 import ch.datascience.graph.model.entityModel._
-import io.renku.jsonld.EntityTypes
+import ch.datascience.graph.model.generations
+import io.renku.jsonld.{EntityTypes, JsonLDDecoder}
 
 sealed trait Entity {
   val resourceId: ResourceId
@@ -30,10 +33,16 @@ sealed trait Entity {
 object Entity {
 
   final case class InputEntity(resourceId: ResourceId, location: Location, checksum: Checksum) extends Entity
-  final case class OutputEntity(resourceId: ResourceId, location: Location, checksum: Checksum, generation: Generation)
-      extends Entity
+  final case class OutputEntity(resourceId:           ResourceId,
+                                location:             Location,
+                                checksum:             Checksum,
+                                generationResourceId: generations.ResourceId
+  ) extends Entity
 
   import io.renku.jsonld.JsonLDEncoder
+
+  private val fileEntityTypes: EntityTypes = EntityTypes of (prov / "Entity", wfprov / "Artifact")
+  private val folderEntityTypes = EntityTypes of (prov / "Entity", wfprov / "Artifact", prov / "Collection")
 
   implicit def encoder[E <: Entity]: JsonLDEncoder[E] = {
     import ch.datascience.graph.model.Schemas._
@@ -43,8 +52,8 @@ object Entity {
 
     lazy val toEntityTypes: Entity => EntityTypes = { entity =>
       entity.location match {
-        case Location.File(_)   => EntityTypes of (prov / "Entity", wfprov / "Artifact")
-        case Location.Folder(_) => EntityTypes of (prov / "Entity", wfprov / "Artifact", prov / "Collection")
+        case Location.File(_)   => fileEntityTypes
+        case Location.Folder(_) => folderEntityTypes
       }
     }
 
@@ -56,14 +65,49 @@ object Entity {
           prov / "atLocation" -> location.asJsonLD,
           renku / "checksum"  -> checksum.asJsonLD
         )
-      case entity @ OutputEntity(resourceId, location, checksum, generation) =>
+      case entity @ OutputEntity(resourceId, location, checksum, generationResourceId) =>
         JsonLD.entity(
           resourceId.asEntityId,
           toEntityTypes(entity),
           prov / "atLocation"          -> location.asJsonLD,
           renku / "checksum"           -> checksum.asJsonLD,
-          prov / "qualifiedGeneration" -> generation.resourceId.asEntityId.asJsonLD
+          prov / "qualifiedGeneration" -> generationResourceId.asEntityId.asJsonLD
         )
     }
   }
+
+  import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
+
+  implicit lazy val inputEntityDecoder: JsonLDDecoder[InputEntity] =
+    JsonLDDecoder.entity(fileEntityTypes) { cursor =>
+      for {
+        resourceId  <- cursor.downEntityId.as[ResourceId]
+        entityTypes <- cursor.getEntityTypes
+        location    <- cursor.downField(prov / "atLocation").as[Location](locationDecoder(entityTypes))
+        checksum    <- cursor.downField(renku / "checksum").as[Checksum]
+      } yield InputEntity(resourceId, location, checksum)
+    }
+
+  implicit lazy val outputEntityDecoder: JsonLDDecoder[OutputEntity] =
+    JsonLDDecoder.entity(fileEntityTypes) { cursor =>
+      for {
+        resourceId            <- cursor.downEntityId.as[ResourceId]
+        entityTypes           <- cursor.getEntityTypes
+        location              <- cursor.downField(prov / "atLocation").as[Location](locationDecoder(entityTypes))
+        checksum              <- cursor.downField(renku / "checksum").as[Checksum]
+        qualifiedGenerationId <- cursor.downField(prov / "qualifiedGeneration").as[generations.ResourceId]
+      } yield OutputEntity(resourceId, location, checksum, qualifiedGenerationId)
+    }
+
+  implicit lazy val entityDecoder: JsonLDDecoder[Entity] =
+    cursor => inputEntityDecoder(cursor) orElse outputEntityDecoder(cursor)
+
+  private def locationDecoder(entityTypes: EntityTypes): JsonLDDecoder[Location] =
+    JsonLDDecoder.decodeString.emap { value =>
+      entityTypes match {
+        case `fileEntityTypes`   => Location.File.from(value).leftMap(_.getMessage)
+        case `folderEntityTypes` => Location.Folder.from(value).leftMap(_.getMessage)
+        case other               => s"Entity with unknown $other types".asLeft
+      }
+    }
 }

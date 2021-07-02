@@ -18,15 +18,15 @@
 
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 
-import cats.MonadError
+import cats.syntax.all._
 import ch.datascience.events.consumers.Project
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.EventBody
-import ch.datascience.rdfstore.JsonLDTriples
-import io.circe._
+import io.renku.jsonld.JsonLD
+import io.renku.jsonld.generators.JsonLDGenerators.jsonLDEntities
+import io.renku.jsonld.parser.ParsingFailure
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -34,51 +34,40 @@ import scala.util.{Failure, Try}
 
 class EventBodyDeserialiserSpec extends AnyWordSpec with should.Matchers {
 
-  "toJsonLDTriples" should {
+  "toEvent" should {
 
-    "produce TriplesGeneratedEvent if the Json string can be successfully deserialized" in new TestCase {
-      deserializer.toTriplesGeneratedEvent(compoundEventId,
-                                           project,
-                                           schemaVersion,
-                                           triplesGenerationEvent(jsonldTriples)
-      ) shouldBe context
-        .pure(
-          TriplesGeneratedEvent(
-            compoundEventId.id,
-            project,
-            jsonldTriples,
-            schemaVersion
-          )
-        )
-
+    "produce TriplesGeneratedEvent if the Json string can be successfully deserialized to JsonLD" in new TestCase {
+      deserializer.toEvent(compoundEventId,
+                           project,
+                           toEventBody(jsonldTriples) -> schemaVersion
+      ) shouldBe TriplesGeneratedEvent(
+        compoundEventId.id,
+        project,
+        jsonldTriples,
+        schemaVersion
+      ).pure[Try]
     }
 
     "fail if parsing fails" in new TestCase {
-      val Failure(ParsingFailure(message, underlying)) =
-        deserializer.toTriplesGeneratedEvent(compoundEventId, project, schemaVersion, EventBody("{"))
+      val Failure(parsingFailure) = deserializer.toEvent(compoundEventId, project, EventBody("{") -> schemaVersion)
 
-      message    shouldBe s"TriplesGeneratedEvent cannot be deserialised: $compoundEventId"
-      underlying shouldBe a[ParsingFailure]
+      parsingFailure.getMessage shouldBe s"TriplesGeneratedEvent cannot be deserialised: $compoundEventId"
+      parsingFailure.getCause   shouldBe a[ParsingFailure]
     }
   }
 
   private trait TestCase {
-    val context         = MonadError[Try, Throwable]
     val compoundEventId = compoundEventIds.generateOne
-
-    val jsonldTriples = jsonLDTriples.generateOne
-    val schemaVersion = projectSchemaVersions.generateOne
 
     val projectId   = projectIds.generateOne
     val projectPath = projectPaths.generateOne
+    val project     = Project(projectId, projectPath)
 
-    val project = Project(projectId, projectPath)
+    val jsonldTriples = jsonLDEntities.generateOne
+    val schemaVersion = projectSchemaVersions.generateOne
 
     val deserializer = new EventBodyDeserializerImpl[Try]
 
-    def triplesGenerationEvent(jsonldTriples: JsonLDTriples): EventBody = EventBody {
-      jsonldTriples.value.noSpaces
-    }
-
+    def toEventBody(jsonld: JsonLD): EventBody = EventBody(jsonld.toJson.noSpaces)
   }
 }

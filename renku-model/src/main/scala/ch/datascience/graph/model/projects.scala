@@ -18,7 +18,7 @@
 
 package ch.datascience.graph.model
 
-import ch.datascience.graph.model.views.{EntityIdEncoderOps, UrlResourceRenderer}
+import ch.datascience.graph.model.views.{EntityIdJsonLdOps, UrlResourceRenderer}
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
 import eu.timepit.refined.api.Refined
@@ -49,7 +49,7 @@ object projects {
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with Url
       with UrlResourceRenderer[ResourceId]
-      with EntityIdEncoderOps[ResourceId] {
+      with EntityIdJsonLdOps[ResourceId] {
 
     private val regexValidator = s"^http[s]?:\\/\\/.*\\/projects\\/${Path.regexValidator.drop(1)}"
 

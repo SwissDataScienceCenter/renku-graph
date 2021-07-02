@@ -20,6 +20,7 @@ package ch.datascience.graph.model.entities
 
 import ch.datascience.graph.model.Schemas._
 import ch.datascience.graph.model.commandParameters._
+import io.renku.jsonld.JsonLDDecoder
 
 sealed trait CommandParameterBase {
   type DefaultValue
@@ -50,20 +51,34 @@ object CommandParameterBase {
 
   object CommandParameter {
 
+    private val entityTypes: EntityTypes = EntityTypes of (renku / "CommandParameter", renku / "CommandParameterBase")
+
     implicit lazy val commandParameterEncoder: JsonLDEncoder[CommandParameter] =
       JsonLDEncoder.instance {
         case CommandParameter(resourceId, position, name, maybeDescription, maybePrefix, defaultValue) =>
           JsonLD.entity(
             resourceId.asEntityId,
-            EntityTypes of (renku / "CommandParameter", renku / "CommandParameterBase"),
+            entityTypes,
+            renku / "position"      -> position.asJsonLD,
             schema / "name"         -> name.asJsonLD,
             schema / "description"  -> maybeDescription.asJsonLD,
-            renku / "position"      -> position.asJsonLD,
             renku / "prefix"        -> maybePrefix.asJsonLD,
             schema / "defaultValue" -> defaultValue.asJsonLD,
             rdfs / "label"          -> s"""Command Parameter "$defaultValue"""".asJsonLD
           )
       }
+
+    implicit lazy val decoder: JsonLDDecoder[CommandParameter] = JsonLDDecoder.entity(entityTypes) { cursor =>
+      import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
+      for {
+        resourceId       <- cursor.downEntityId.as[ResourceId]
+        position         <- cursor.downField(renku / "position").as[Position]
+        name             <- cursor.downField(schema / "name").as[Name]
+        maybeDescription <- cursor.downField(schema / "description").as[Option[Description]]
+        maybePrefix      <- cursor.downField(renku / "prefix").as[Option[Prefix]]
+        defaultValue     <- cursor.downField(schema / "defaultValue").as[ParameterDefaultValue]
+      } yield CommandParameter(resourceId, position, name, maybeDescription, maybePrefix, defaultValue)
+    }
   }
 
   sealed trait CommandInputOrOutput extends CommandParameterBase
@@ -97,6 +112,8 @@ object CommandParameterBase {
 
   object CommandInput {
 
+    private val entityTypes = EntityTypes of (renku / "CommandInput", renku / "CommandParameterBase")
+
     implicit def commandInputEncoder[I <: CommandInput]: JsonLDEncoder[I] =
       JsonLDEncoder.instance {
         case LocationCommandInput(resourceId,
@@ -110,7 +127,7 @@ object CommandParameterBase {
             ) =>
           JsonLD.entity(
             resourceId.asEntityId,
-            EntityTypes of (renku / "CommandInput", renku / "CommandParameterBase"),
+            entityTypes,
             schema / "name"           -> name.asJsonLD,
             schema / "description"    -> maybeDescription.asJsonLD,
             renku / "position"        -> position.asJsonLD,
@@ -132,18 +149,55 @@ object CommandParameterBase {
             ) =>
           JsonLD.entity(
             resourceId.asEntityId,
-            EntityTypes of (renku / "CommandInput", renku / "CommandParameterBase"),
+            entityTypes,
+            renku / "position"        -> position.asJsonLD,
             schema / "name"           -> name.asJsonLD,
             schema / "description"    -> maybeDescription.asJsonLD,
-            renku / "position"        -> position.asJsonLD,
             renku / "prefix"          -> maybePrefix.asJsonLD,
             schema / "defaultValue"   -> defaultValue.asJsonLD,
-            renku / "mappedTo"        -> mappedTo.asJsonLD,
             renku / "isTemporary"     -> temporary.asJsonLD,
             schema / "encodingFormat" -> maybeEncodingFormat.asJsonLD,
+            renku / "mappedTo"        -> mappedTo.asJsonLD,
             rdfs / "label"            -> s"""Command Input Template "$defaultValue"""".asJsonLD
           )
       }
+
+    implicit lazy val decoder: JsonLDDecoder[CommandInput] = JsonLDDecoder.entity(entityTypes) { cursor =>
+      import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
+      for {
+        resourceId          <- cursor.downEntityId.as[ResourceId]
+        position            <- cursor.downField(renku / "position").as[Position]
+        name                <- cursor.downField(schema / "name").as[Name]
+        maybeDescription    <- cursor.downField(schema / "description").as[Option[Description]]
+        maybePrefix         <- cursor.downField(renku / "prefix").as[Option[Prefix]]
+        defaultValue        <- cursor.downField(schema / "defaultValue").as[InputDefaultValue]
+        temporary           <- cursor.downField(renku / "isTemporary").as[Temporary]
+        maybeEncodingFormat <- cursor.downField(schema / "encodingFormat").as[Option[EncodingFormat]]
+        maybeMappedTo       <- cursor.downField(renku / "mappedTo").as[Option[IOStream.In]]
+      } yield maybeMappedTo match {
+        case None =>
+          LocationCommandInput(resourceId,
+                               position,
+                               name,
+                               maybeDescription,
+                               maybePrefix,
+                               defaultValue,
+                               temporary,
+                               maybeEncodingFormat
+          )
+        case Some(mappedTo) =>
+          MappedCommandInput(resourceId,
+                             position,
+                             name,
+                             maybeDescription,
+                             maybePrefix,
+                             defaultValue,
+                             temporary,
+                             maybeEncodingFormat,
+                             mappedTo
+          )
+      }
+    }
   }
 
   sealed trait CommandOutput extends CommandInputOrOutput {
@@ -178,6 +232,8 @@ object CommandParameterBase {
 
   object CommandOutput {
 
+    private val entityTypes = EntityTypes of (renku / "CommandOutput", renku / "CommandParameterBase")
+
     implicit def commandOutputEncoder[O <: CommandOutput]: JsonLDEncoder[O] =
       JsonLDEncoder.instance {
         case LocationCommandOutput(resourceId,
@@ -192,10 +248,10 @@ object CommandParameterBase {
             ) =>
           JsonLD.entity(
             resourceId.asEntityId,
-            EntityTypes of (renku / "CommandOutput", renku / "CommandParameterBase"),
+            entityTypes,
+            renku / "position"        -> position.asJsonLD,
             schema / "name"           -> name.asJsonLD,
             schema / "description"    -> maybeDescription.asJsonLD,
-            renku / "position"        -> position.asJsonLD,
             renku / "prefix"          -> maybePrefix.asJsonLD,
             schema / "defaultValue"   -> defaultValue.asJsonLD,
             renku / "isTemporary"     -> temporary.asJsonLD,
@@ -216,10 +272,10 @@ object CommandParameterBase {
             ) =>
           JsonLD.entity(
             resourceId.asEntityId,
-            EntityTypes of (renku / "CommandOutput", renku / "CommandParameterBase"),
+            entityTypes,
+            renku / "position"        -> position.asJsonLD,
             schema / "name"           -> name.asJsonLD,
             schema / "description"    -> maybeDescription.asJsonLD,
-            renku / "position"        -> position.asJsonLD,
             renku / "prefix"          -> maybePrefix.asJsonLD,
             schema / "defaultValue"   -> defaultValue.asJsonLD,
             renku / "mappedTo"        -> mappedTo.asJsonLD,
@@ -229,5 +285,45 @@ object CommandParameterBase {
             rdfs / "label"            -> s"""Command Output Template "$defaultValue"""".asJsonLD
           )
       }
+
+    implicit lazy val decoder: JsonLDDecoder[CommandOutput] = JsonLDDecoder.entity(entityTypes) { cursor =>
+      import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
+      for {
+        resourceId          <- cursor.downEntityId.as[ResourceId]
+        position            <- cursor.downField(renku / "position").as[Position]
+        name                <- cursor.downField(schema / "name").as[Name]
+        maybeDescription    <- cursor.downField(schema / "description").as[Option[Description]]
+        maybePrefix         <- cursor.downField(renku / "prefix").as[Option[Prefix]]
+        defaultValue        <- cursor.downField(schema / "defaultValue").as[OutputDefaultValue]
+        folderCreation      <- cursor.downField(renku / "createFolder").as[FolderCreation]
+        temporary           <- cursor.downField(renku / "isTemporary").as[Temporary]
+        maybeEncodingFormat <- cursor.downField(schema / "encodingFormat").as[Option[EncodingFormat]]
+        maybeMappedTo       <- cursor.downField(renku / "mappedTo").as[Option[IOStream.Out]]
+      } yield maybeMappedTo match {
+        case None =>
+          LocationCommandOutput(resourceId,
+                                position,
+                                name,
+                                maybeDescription,
+                                maybePrefix,
+                                defaultValue,
+                                folderCreation,
+                                temporary,
+                                maybeEncodingFormat
+          )
+        case Some(mappedTo) =>
+          MappedCommandOutput(resourceId,
+                              position,
+                              name,
+                              maybeDescription,
+                              maybePrefix,
+                              defaultValue,
+                              folderCreation,
+                              temporary,
+                              maybeEncodingFormat,
+                              mappedTo
+          )
+      }
+    }
   }
 }

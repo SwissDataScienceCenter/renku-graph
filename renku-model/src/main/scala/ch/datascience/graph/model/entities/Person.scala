@@ -18,8 +18,10 @@
 
 package ch.datascience.graph.model.entities
 
+import cats.syntax.all._
 import ch.datascience.graph.model.GitLabApiUrl
 import ch.datascience.graph.model.users.{Affiliation, Email, GitLabId, Name, ResourceId}
+import io.circe.DecodingFailure
 import io.renku.jsonld.JsonLDEncoder.encodeOption
 import io.renku.jsonld._
 
@@ -37,11 +39,13 @@ object Person {
   import ch.datascience.graph.model.views.TinyTypeJsonLDEncoders._
   import io.renku.jsonld.syntax._
 
+  private val entityTypes = EntityTypes.of(prov / "Person", schema / "Person")
+
   implicit def encoder(implicit gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Person] =
     JsonLDEncoder.instance { person =>
       JsonLD.entity(
         person.resourceId.asEntityId,
-        EntityTypes.of(prov / "Person", schema / "Person"),
+        entityTypes,
         schema / "email"       -> person.maybeEmail.asJsonLD,
         schema / "name"        -> person.name.asJsonLD,
         rdfs / "label"         -> person.name.asJsonLD,
@@ -50,13 +54,39 @@ object Person {
       )
     }
 
+  private val gitLabSameAsTypes:          EntityTypes = EntityTypes.of(schema / "URL")
+  private val gitLabSameAsAdditionalType: String      = "GitLab"
+
   private def gitLabIdEncoder(implicit gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[GitLabId] = JsonLDEncoder.instance {
     gitLabId =>
       JsonLD.entity(
         EntityId of (gitLabApiUrl / "users" / gitLabId).toString,
-        EntityTypes.of(schema / "URL"),
+        gitLabSameAsTypes,
         schema / "identifier"     -> gitLabId.value.asJsonLD,
-        schema / "additionalType" -> "GitLab".asJsonLD
+        schema / "additionalType" -> gitLabSameAsAdditionalType.asJsonLD
       )
+  }
+
+  import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
+  import io.renku.jsonld.JsonLDDecoder._
+
+  implicit lazy val decoder: JsonLDDecoder[Person] = JsonLDDecoder.entity(entityTypes) { cursor =>
+    for {
+      resourceId       <- cursor.downEntityId.as[ResourceId]
+      name             <- cursor.downField(schema / "name").as[Name]
+      maybeEmail       <- cursor.downField(schema / "email").as[Option[Email]]
+      maybeAffiliation <- cursor.downField(schema / "affiliation").as[Option[Affiliation]]
+      maybeGitLabId    <- cursor.downField(schema / "sameAs").as[Option[GitLabId]](decodeOption(gitLabIdDecoder))
+    } yield Person(resourceId, name, maybeEmail, maybeAffiliation, maybeGitLabId)
+  }
+
+  private lazy val gitLabIdDecoder: JsonLDDecoder[GitLabId] = JsonLDDecoder.entity(gitLabSameAsTypes) { cursor =>
+    for {
+      _ <- cursor.downField(schema / "additionalType").as[String].flatMap {
+             case `gitLabSameAsAdditionalType` => ().asRight
+             case additionalType               => DecodingFailure(s"Unknown $additionalType type of Person SameAs", Nil).asLeft
+           }
+      gitLabId <- cursor.downField(schema / "identifier").as[GitLabId]
+    } yield gitLabId
   }
 }

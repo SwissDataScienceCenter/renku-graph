@@ -22,6 +22,7 @@ import cats.MonadError
 import cats.data.EitherT
 import cats.data.EitherT.{leftT, rightT}
 import cats.effect.{ContextShift, IO, Timer}
+import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
@@ -77,6 +78,8 @@ class TriplesGeneratedEventProcessorSpec
       givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
         .returning(context.pure(maybeAccessToken))
 
+      givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(projectMetadatas.generateOne))
+
       successfulTriplesCurationAndUpload(triplesGeneratedEvent)
 
       expectEventMarkedAsDone(triplesGeneratedEvent.compoundEventId, triplesGeneratedEvent.project.path)
@@ -88,10 +91,48 @@ class TriplesGeneratedEventProcessorSpec
       verifyMetricsCollected()
     }
 
+    s"mark event with TransformationRecoverableFailure if deserialization fails with ProcessingRecoverableError" in new TestCase {
+
+      givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
+        .returning(context.pure(maybeAccessToken))
+
+      val exception       = exceptions.generateOne
+      val processingError = new Exception(exception) with ProcessingRecoverableError
+      givenDeserialization(triplesGeneratedEvent, returning = EitherT.leftT(processingError))
+
+      expectEventMarkedAsRecoverableFailure(triplesGeneratedEvent, processingError)
+
+      eventProcessor.process(triplesGeneratedEvent) shouldBe context.unit
+
+      logError(triplesGeneratedEvent, processingError, processingError.getMessage)
+      logSummary(triplesGeneratedEvent, isSuccessful = false)
+    }
+    "mark event with TransformationNonRecoverableFailure if deserialization fails" in new TestCase {
+
+      givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
+        .returning(context.pure(maybeAccessToken))
+
+      val exception = exceptions.generateOne
+
+      givenDeserialization(triplesGeneratedEvent,
+                           returning =
+                             EitherT.right[ProcessingRecoverableError](exception.raiseError[Try, ProjectMetadata])
+      )
+
+      expectEventMarkedAsNonRecoverableFailure(triplesGeneratedEvent, exception)
+
+      eventProcessor.process(triplesGeneratedEvent) shouldBe context.unit
+
+      logError(triplesGeneratedEvent, exception, exception.getMessage)
+      logSummary(triplesGeneratedEvent, isSuccessful = false)
+    }
+
     s"mark event with TransformationRecoverableFailure if transforming triples fails with $CurationRecoverableError" in new TestCase {
 
       givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
         .returning(context.pure(maybeAccessToken))
+
+      givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(projectMetadatas.generateOne))
 
       val exeption          = exceptions.generateOne
       val curationException = CurationRecoverableError(nonBlankStrings().generateOne.value, exeption)
@@ -113,6 +154,8 @@ class TriplesGeneratedEventProcessorSpec
       givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
         .returning(context.pure(maybeAccessToken))
 
+      givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(projectMetadatas.generateOne))
+
       val exception = exceptions.generateOne
       (triplesTransformer
         .transform(_: TriplesGeneratedEvent)(_: Option[AccessToken]))
@@ -132,6 +175,8 @@ class TriplesGeneratedEventProcessorSpec
 
         givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
           .returning(context.pure(maybeAccessToken))
+
+        givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(projectMetadatas.generateOne))
 
         val curatedTriples = curatedTriplesObjects[Try].generateOne
         (triplesTransformer
@@ -160,6 +205,8 @@ class TriplesGeneratedEventProcessorSpec
           givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
             .returning(context.pure(maybeAccessToken))
 
+          givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(projectMetadatas.generateOne))
+
           val curatedTriples = curatedTriplesObjects[Try].generateOne
           (triplesTransformer
             .transform(_: TriplesGeneratedEvent)(_: Option[AccessToken]))
@@ -185,6 +232,8 @@ class TriplesGeneratedEventProcessorSpec
 
       givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
         .returning(context.pure(maybeAccessToken))
+
+      givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(projectMetadatas.generateOne))
 
       successfulTriplesCurationAndUpload(triplesGeneratedEvent)
 
@@ -267,6 +316,7 @@ class TriplesGeneratedEventProcessorSpec
     val triplesTransformer    = mock[TriplesTransformer[Try]]
     val triplesUploader       = mock[Uploader[Try]]
     val eventStatusUpdater    = mock[EventStatusUpdater[Try]]
+    val jsonLDDeserializer    = mock[JsonLDDeserializer[Try]]
     val logger                = TestLogger[Try]()
     val executionTimeRecorder = TestExecutionTimeRecorder[Try](logger, Option(eventsProcessingTimes))
     val eventProcessor = new TriplesGeneratedEventProcessor[Try](
@@ -274,6 +324,7 @@ class TriplesGeneratedEventProcessorSpec
       triplesTransformer,
       triplesUploader,
       eventStatusUpdater,
+      jsonLDDeserializer,
       logger,
       executionTimeRecorder
     )
@@ -284,7 +335,7 @@ class TriplesGeneratedEventProcessorSpec
         .expects(forProjectPath, projectPathToPath)
 
     def successfulTriplesCurationAndUpload(triplesGeneratedEvent: TriplesGeneratedEvent) = {
-      val curatedTriples = CuratedTriples[Try](triplesGeneratedEvent.triples, Nil)
+      val curatedTriples = CuratedTriples[Try](JsonLDTriples(triplesGeneratedEvent.triples.toJson), Nil)
       (triplesTransformer
         .transform(_: TriplesGeneratedEvent)(_: Option[AccessToken]))
         .expects(triplesGeneratedEvent, maybeAccessToken)
@@ -295,6 +346,11 @@ class TriplesGeneratedEventProcessorSpec
         .expects(curatedTriples)
         .returning(Success(DeliverySuccess))
     }
+
+    def givenDeserialization(event:     TriplesGeneratedEvent,
+                             returning: EitherT[Try, ProcessingRecoverableError, ProjectMetadata]
+    ) =
+      (jsonLDDeserializer.deserializeToModel _).expects(event).returning(returning)
 
     def expectEventMarkedAsRecoverableFailure(event: TriplesGeneratedEvent, exception: Throwable) =
       (eventStatusUpdater.toFailure _)
@@ -326,7 +382,7 @@ class TriplesGeneratedEventProcessorSpec
         .expects(
           event.compoundEventId,
           event.project.path,
-          event.triples,
+          JsonLDTriples(event.triples.toJson),
           event.schemaVersion,
           EventProcessingTime(Duration.ofMillis(executionTimeRecorder.elapsedTime.value))
         )

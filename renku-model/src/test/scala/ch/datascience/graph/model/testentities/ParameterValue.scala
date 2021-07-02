@@ -20,9 +20,9 @@ package ch.datascience.graph.model.testentities
 
 import ch.datascience.graph.model.RenkuBaseUrl
 import ch.datascience.graph.model.commandParameters.Name
-import ch.datascience.graph.model.entityModel.Location
+import ch.datascience.graph.model.entityModel.LocationLike
 import ch.datascience.graph.model.parameterValues.ValueOverride
-import ch.datascience.graph.model.testentities.CommandParameterBase.{CommandInput, CommandInputOrOutput, CommandOutput, CommandParameter}
+import ch.datascience.graph.model.testentities.CommandParameterBase._
 import ch.datascience.graph.model.testentities.ParameterValue.PathParameterValue.{InputParameterValue, OutputParameterValue}
 import ch.datascience.graph.model.testentities.ParameterValue._
 import ch.datascience.tinytypes.constraints.UUID
@@ -44,21 +44,21 @@ object ParameterValue {
     override type ValueReference <: CommandInputOrOutput
     val id:       Id
     val name:     Name
-    val location: Location
+    val location: LocationLike
     val activity: Activity
   }
 
   object PathParameterValue {
 
-    def factory(location: Location, valueReference: CommandInput): Activity => PathParameterValue =
+    def factory(location: LocationLike, valueReference: CommandInput): Activity => PathParameterValue =
       InputParameterValue(Id.generate, valueReference.name, location, valueReference, _)
 
-    def factory(location: Location, valueReference: CommandOutput): Activity => PathParameterValue =
+    def factory(location: LocationLike, valueReference: CommandOutput): Activity => PathParameterValue =
       OutputParameterValue(Id.generate, valueReference.name, location, valueReference, _)
 
     final case class InputParameterValue(id:             Id,
                                          name:           Name,
-                                         location:       Location,
+                                         location:       LocationLike,
                                          valueReference: CommandInput,
                                          activity:       Activity
     ) extends PathParameterValue {
@@ -67,7 +67,7 @@ object ParameterValue {
 
     final case class OutputParameterValue(id:             Id,
                                           name:           Name,
-                                          location:       Location,
+                                          location:       LocationLike,
                                           valueReference: CommandOutput,
                                           activity:       Activity
     ) extends PathParameterValue {

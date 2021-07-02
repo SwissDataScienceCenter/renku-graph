@@ -47,19 +47,18 @@ private[triplescuration] class DatasetInfoEnricherImpl[Interpretation[_]: MonadT
   import topmostDataFinder._
   import triplesUpdater._
 
-  def enrichDatasetInfo(curatedTriples: CuratedTriples[Interpretation]): CurationResults[Interpretation] =
-    for {
-      datasetInfos <- findDatasetsInfo(curatedTriples.triples).asRightT
-      topmostInfos <- EitherT(
-                        datasetInfos
-                          .map(findTopmostData)
-                          .toList
-                          .sequence
-                          .map(_.asRight[ProcessingRecoverableError])
-                          .recover(maybeToRecoverableError)
-                      )
-      updatedTriples = topmostInfos.foldLeft(curatedTriples)(mergeTopmostDataIntoTriples)
-    } yield topmostInfos.foldLeft(updatedTriples)(descendantsUpdater.prepareUpdates[Interpretation])
+  def enrichDatasetInfo(curatedTriples: CuratedTriples[Interpretation]): CurationResults[Interpretation] = for {
+    datasetInfos <- findDatasetsInfo(curatedTriples.triples).asRightT
+    topmostInfos <- EitherT(
+                      datasetInfos
+                        .map(findTopmostData)
+                        .toList
+                        .sequence
+                        .map(_.asRight[ProcessingRecoverableError])
+                        .recover(maybeToRecoverableError)
+                    )
+    updatedTriples = topmostInfos.foldLeft(curatedTriples)(mergeTopmostDataIntoTriples)
+  } yield topmostInfos.foldLeft(updatedTriples)(descendantsUpdater.prepareUpdates[Interpretation])
 
   private lazy val maybeToRecoverableError
       : PartialFunction[Throwable, Either[ProcessingRecoverableError, List[TopmostData]]] = {
@@ -87,7 +86,7 @@ private[triplescuration] object DatasetInfoEnricher {
     for {
       topmostDataFinder <- IOTopmostDataFinder(logger, timeRecorder)
     } yield new DatasetInfoEnricherImpl[IO](
-      new DatasetInfoFinderImpl[IO](),
+      new DatasetInfoFinderImpl[IO],
       new TriplesUpdater(),
       topmostDataFinder,
       new DescendantsUpdater()

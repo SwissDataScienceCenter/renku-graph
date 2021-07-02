@@ -19,7 +19,7 @@
 package ch.datascience.graph.model
 
 import cats.syntax.all._
-import ch.datascience.graph.model.views.EntityIdEncoderOps
+import ch.datascience.graph.model.views.EntityIdJsonLdOps
 import ch.datascience.tinytypes.{InstantTinyType, IntTinyType, StringTinyType, TinyTypeFactory}
 import ch.datascience.tinytypes.constraints.{BoundedInstant, PositiveInt, Url}
 
@@ -31,7 +31,7 @@ object activities {
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with Url
-      with EntityIdEncoderOps[ResourceId]
+      with EntityIdJsonLdOps[ResourceId]
 
   final class StartTime private (val value: Instant) extends AnyVal with InstantTinyType
   implicit object StartTime extends TinyTypeFactory[StartTime](new StartTime(_)) with BoundedInstant {

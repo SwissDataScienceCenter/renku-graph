@@ -19,60 +19,54 @@
 package ch.datascience.triplesgenerator
 package events.categories.triplesgenerated
 
-import cats.{MonadError, Show}
 import cats.data.EitherT.{fromEither, fromOption}
 import cats.effect.{ContextShift, Effect, IO, Timer}
+import cats.{MonadThrow, Show}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.events.{EventRequestContent, consumers}
 import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
 import ch.datascience.events.consumers.{EventSchedulingResult, Project}
+import ch.datascience.events.{EventRequestContent, consumers}
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventBody}
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
+import io.circe.parser.{parse => parseJson}
 import org.typelevel.log4cats.Logger
-import io.circe.parser
 
 import scala.concurrent.ExecutionContext
 
-private[events] class EventHandler[Interpretation[_]: Effect](
+private[events] class EventHandler[Interpretation[_]: Effect: MonadThrow](
     override val categoryName: CategoryName,
     eventsProcessingRunner:    EventsProcessingRunner[Interpretation],
     eventBodyDeserializer:     EventBodyDeserializer[Interpretation],
     logger:                    Logger[Interpretation]
-)(implicit
-    ME: MonadError[Interpretation, Throwable]
 ) extends consumers.EventHandler[Interpretation] {
 
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
+  import eventBodyDeserializer._
   import eventsProcessingRunner.scheduleForProcessing
   import io.circe.Decoder
 
   private type IdAndBody = (CompoundEventId, EventBody)
 
   override def handle(request: EventRequestContent): Interpretation[EventSchedulingResult] = {
-
     for {
-      _       <- fromEither[Interpretation](request.event.validateCategoryName)
-      eventId <- fromEither(request.event.getEventId)
-      project <- fromEither(request.event.getProject)
-      eventBodyJson <-
-        fromOption[Interpretation](request.maybePayload.flatMap(str => parser.parse(str).toOption), BadRequest)
+      _                  <- fromEither(request.event.validateCategoryName)
+      eventId            <- fromEither(request.event.getEventId)
+      project            <- fromEither(request.event.getProject)
+      eventBodyString    <- fromOption(request.maybePayload, BadRequest)
+      eventBodyJson      <- fromEither(parseJson(eventBodyString)).leftMap(_ => BadRequest)
       eventBodyAndSchema <- fromEither(eventBodyJson.as[(EventBody, SchemaVersion)]).leftMap(_ => BadRequest)
-      (eventBody, schemaVersion) = eventBodyAndSchema
-      triplesGeneratedEvent <-
-        eventBodyDeserializer
-          .toTriplesGeneratedEvent(eventId, project, schemaVersion, eventBody)
-          .toRightT(recoverTo = BadRequest)
-      result <- scheduleForProcessing(triplesGeneratedEvent).toRightT
-                  .semiflatTap(logger.log(eventId -> triplesGeneratedEvent.project))
-                  .leftSemiflatTap(logger.log(eventId -> triplesGeneratedEvent.project))
+      event              <- toEvent(eventId, project, eventBodyAndSchema).toRightT(recoverTo = BadRequest)
+      result <- scheduleForProcessing(event).toRightT
+                  .semiflatTap(logger.log(eventId -> event.project))
+                  .leftSemiflatTap(logger.log(eventId -> event.project))
     } yield result
   }.merge
 
-  private implicit lazy val eventInfoToString: Show[(CompoundEventId, Project)] = Show.show { case (eventId, project) =>
+  private implicit lazy val eventInfoShow: Show[(CompoundEventId, Project)] = Show.show { case (eventId, project) =>
     s"$eventId, projectPath = ${project.path}"
   }
 

@@ -18,12 +18,15 @@
 
 package io.renku.jsonld
 
+import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.renku.jsonld.generators.Generators.Implicits._
 import io.renku.jsonld.generators.JsonLDGenerators._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+
+import scala.util.Random
 
 class EntityTypeSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
@@ -38,6 +41,22 @@ class EntityTypeSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
 
     "return string representations of all the types separated with `; `" in {
       forAll { t: EntityTypes => t.show shouldBe t.list.map(_.value).nonEmptyIntercalate("; ") }
+    }
+  }
+  "EntityTypes.equals" should {
+    "return true if the types are identical regardless of the order" in {
+      forAll { t: EntityTypes =>
+        val equalTypes = EntityTypes(NonEmptyList.fromListUnsafe(Random.shuffle(t.list.toList)))
+        t            shouldBe equalTypes
+        t.hashCode() shouldBe equalTypes.hashCode()
+      }
+    }
+
+    "return false if the types are not identical" in {
+      forAll { (t1: EntityTypes, t2: EntityTypes) =>
+        t1            should not be t2
+        t1.hashCode() should not be t2.hashCode()
+      }
     }
   }
 }

@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects
+package ch.datascience.triplesgenerator.events.categories.triplesgenerated
+package triplescuration.projects
 
 import cats.MonadError
 import cats.data.{EitherT, OptionT}
@@ -28,7 +29,6 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
 import ch.datascience.rdfstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedEvent
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CuratedTriples.CurationUpdatesGroup
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
 import eu.timepit.refined.auto._
@@ -136,6 +136,6 @@ private object IOUpdateFunctionsCreator {
       renkuBaseUrl     <- RenkuBaseUrlLoader[IO]()
       gitLabApiUrl     <- GitLabUrlLoader[IO]().map(_.apiV4)
       gitLabInfoFinder <- IOGitLabInfoFinder(gitLabThrottler, logger)
-      kgInfoFinder     <- IOKGInfoFinder(timeRecorder, logger)
+      kgInfoFinder     <- KGInfoFinder(timeRecorder, logger)
     } yield new UpdatesCreatorImpl(gitLabInfoFinder, kgInfoFinder, new UpdatesQueryCreator(renkuBaseUrl, gitLabApiUrl))
 }

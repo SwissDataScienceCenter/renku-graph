@@ -19,14 +19,15 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 
 import ch.datascience.events.consumers.ConsumersModelGenerators._
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.{exceptions, nonEmptyStrings}
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators.projectSchemaVersions
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
+import io.renku.jsonld.generators.JsonLDGenerators.jsonLDEntities
 import org.scalacheck.Gen
 
-object TriplesGeneratedGenerators {
+private object TriplesGeneratedGenerators {
+
   lazy val curationRecoverableErrors: Gen[CurationRecoverableError] = for {
     message   <- nonEmptyStrings()
     exception <- exceptions
@@ -35,7 +36,9 @@ object TriplesGeneratedGenerators {
   implicit val triplesGeneratedEvents: Gen[TriplesGeneratedEvent] = for {
     eventId       <- eventIds
     project       <- projects
-    triples       <- jsonLDTriples
+    entities      <- jsonLDEntities
     schemaVersion <- projectSchemaVersions
-  } yield TriplesGeneratedEvent(eventId, project, triples, schemaVersion)
+  } yield TriplesGeneratedEvent(eventId, project, entities, schemaVersion)
+
+  lazy val projectMetadatas: Gen[ProjectMetadata] = Gen.const(ProjectMetadata(Set.empty, Nil, Nil))
 }

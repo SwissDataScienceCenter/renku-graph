@@ -133,6 +133,7 @@ object JsonLD {
       maybeType:      Option[EntityTypes] = None
   )(implicit encoder: Encoder[V])
       extends JsonLD {
+
     override lazy val toJson: Json = maybeType match {
       case None    => Json.obj("@value" -> value.asJson)
       case Some(t) => Json.obj("@type" -> t.asJson, "@value" -> value.asJson)

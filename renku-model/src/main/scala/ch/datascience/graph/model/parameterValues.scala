@@ -18,7 +18,7 @@
 
 package ch.datascience.graph.model
 
-import ch.datascience.graph.model.views.EntityIdEncoderOps
+import ch.datascience.graph.model.views.EntityIdJsonLdOps
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import ch.datascience.tinytypes.constraints.{NonBlank, Url}
 
@@ -27,7 +27,7 @@ object parameterValues {
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with Url
-      with EntityIdEncoderOps[ResourceId]
+      with EntityIdJsonLdOps[ResourceId]
 
   final class ValueOverride private (val value: String) extends AnyVal with StringTinyType
   implicit object ValueOverride extends TinyTypeFactory[ValueOverride](new ValueOverride(_)) with NonBlank
