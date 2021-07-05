@@ -14,8 +14,8 @@ webhookService:
     requests:
       memory: 150Mi
     limits:
-      memory: 350Mi
-  jvmXmx: 100M
+      memory: 550Mi
+  jvmXmx: 200M
   gitlab:
     rateLimit: 100/sec
   threadsNumber: 3
@@ -122,10 +122,10 @@ commitEventService:
     port: 9006
   resources:
     requests:
-      memory: 250Mi
+      memory: 700Mi
     limits:
       memory: 450Mi
-  jvmXmx: 200M
+  jvmXmx: 300M
   gitlab:
     rateLimit: 100/sec
   threadsNumber: 3
