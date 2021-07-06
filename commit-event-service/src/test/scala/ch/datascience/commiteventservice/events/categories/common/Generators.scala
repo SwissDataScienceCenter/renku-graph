@@ -1,8 +1,7 @@
 package ch.datascience.commiteventservice.events.categories.common
 
 import ch.datascience.commiteventservice.events.categories.common
-import ch.datascience.commiteventservice.events.categories.common.eventgeneration.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
-import ch.datascience.commiteventservice.events.categories.common.eventgeneration.{Author, Commit, CommitEvent, Committer}
+import ch.datascience.commiteventservice.events.categories.common.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
 import ch.datascience.events.consumers.Project
 import ch.datascience.generators.Generators.listOf
 import ch.datascience.graph.model.EventsGenerators.{batchDates, commitIds, commitMessages, committedDates}

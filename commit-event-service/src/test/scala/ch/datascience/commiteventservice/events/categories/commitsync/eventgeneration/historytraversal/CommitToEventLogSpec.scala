@@ -21,10 +21,9 @@ package eventgeneration
 package historytraversal
 
 import cats.syntax.all._
-import ch.datascience.commiteventservice.events.categories.common.eventgeneration.CommitEvent._
+import ch.datascience.commiteventservice.events.categories.common.CommitEvent._
 import ch.datascience.commiteventservice.events.categories.common.Generators._
-import ch.datascience.commiteventservice.events.categories.common.CommitInfo
-import ch.datascience.commiteventservice.events.categories.common.eventgeneration.CommitEvent
+import ch.datascience.commiteventservice.events.categories.common.{CommitEvent, CommitEventSender, CommitInfo, CommitToEventLogImpl}
 import ch.datascience.events.consumers.Project
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._

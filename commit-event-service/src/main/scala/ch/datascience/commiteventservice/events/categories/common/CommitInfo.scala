@@ -18,7 +18,6 @@
 
 package ch.datascience.commiteventservice.events.categories.common
 
-import ch.datascience.commiteventservice.events.categories.common.eventgeneration.{Author, Committer}
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.users.{Email, Name}
 

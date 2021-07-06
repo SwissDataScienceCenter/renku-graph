@@ -16,14 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal
+package ch.datascience.commiteventservice.events.categories.common
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.commiteventservice.events.categories.common.eventgeneration.CommitEvent._
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration._
+import ch.datascience.commiteventservice.events.categories.common.CommitEvent._
 import ch.datascience.commiteventservice.events.categories.common.Generators._
-import ch.datascience.commiteventservice.events.categories.common.eventgeneration.CommitEvent
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.EventLogUrl

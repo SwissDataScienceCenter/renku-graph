@@ -10,6 +10,7 @@ import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects
 import eu.timepit.refined.api.Refined
+import eu.timepit.refined.numeric.{NonNegative, Positive}
 import org.scalacheck.Gen
 
 private object Generators {
@@ -19,7 +20,12 @@ private object Generators {
   )
 
   def globalCommitSyncEvents(commitCount: CommitCount): Gen[GlobalCommitSyncEvent] =
-    globalCommitSyncEvents(commitIdsGen = listOf(commitIds, Refined.unsafeApply(commitCount.value)))
+    globalCommitSyncEvents(commitIdsGen =
+      listOf(commitIds,
+             minElements = Refined.unsafeApply(commitCount.value),
+             maxElements = Refined.unsafeApply(commitCount.value)
+      )
+    )
 
   def globalCommitSyncEvents(projectIdGen: Gen[projects.Id] = projectIds,
                              commitIdsGen: Gen[List[CommitId]] = listOf(commitIds)

@@ -22,14 +22,12 @@ import cats.{Applicative, MonadThrow}
 import cats.data.StateT
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.commiteventservice.events.EventStatusPatcher
 import ch.datascience.commiteventservice.events.categories.commitsync._
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.SynchronizationSummary
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.SynchronizationSummary.{SummaryKey, SummaryState, add}
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.{CommitInfoFinder, CommitToEventLog, EventDetailsFinder}
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.{CommitInfoFinder, EventDetailsFinder}
 import ch.datascience.commiteventservice.events.categories.common.UpdateResult._
-import ch.datascience.commiteventservice.events.categories.common.eventgeneration.CommitWithParents
-import ch.datascience.commiteventservice.events.categories.common.{CommitInfo, UpdateResult}
+import ch.datascience.commiteventservice.events.categories.common.{CommitInfo, CommitToEventLog, CommitWithParents, EventStatusPatcher, UpdateResult}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.events.consumers.Project

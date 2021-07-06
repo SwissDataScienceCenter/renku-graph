@@ -20,14 +20,12 @@ package ch.datascience.commiteventservice.events.categories.commitsync.eventgene
 
 import cats.data.OptionT
 import cats.syntax.all._
-import ch.datascience.commiteventservice.events.EventStatusPatcher
 import ch.datascience.commiteventservice.events.categories.commitsync.Generators._
 import ch.datascience.commiteventservice.events.categories.common.Generators.commitInfos
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.{CommitInfoFinder, CommitToEventLog, EventDetailsFinder}
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.{CommitInfoFinder, EventDetailsFinder}
 import ch.datascience.commiteventservice.events.categories.commitsync.{categoryName, logMessageCommon}
-import ch.datascience.commiteventservice.events.categories.common.CommitInfo
+import ch.datascience.commiteventservice.events.categories.common.{CommitInfo, CommitToEventLog, CommitWithParents, EventStatusPatcher}
 import ch.datascience.commiteventservice.events.categories.common.UpdateResult._
-import ch.datascience.commiteventservice.events.categories.common.eventgeneration.CommitWithParents
 import ch.datascience.events.consumers.Project
 import ch.datascience.generators.CommonGraphGenerators.personalAccessTokens
 import ch.datascience.generators.Generators.Implicits._
@@ -167,7 +165,7 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       givenCommitIsNotInGL(event.id, event.project.id)
 
       (eventStatusPatcher.sendDeletionStatus _)
-        .expects(event.project.id, Seq(event.id))
+        .expects(event.project.id, event.id)
         .returning(Try(()))
 
       givenEventIsInEL(parentCommit.id, event.project.id)(returning =
@@ -176,7 +174,7 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       givenCommitIsNotInGL(parentCommit.id, event.project.id)
 
       (eventStatusPatcher.sendDeletionStatus _)
-        .expects(event.project.id, Seq(parentCommit.id))
+        .expects(event.project.id, parentCommit.id)
         .returning(Try(()))
 
       commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
@@ -210,7 +208,7 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       givenCommitIsNotInGL(parentCommit.id, event.project.id)
 
       (eventStatusPatcher.sendDeletionStatus _)
-        .expects(event.project.id, Seq(parentCommit.id))
+        .expects(event.project.id, parentCommit.id)
         .returning(Try(()))
 
       commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
@@ -359,7 +357,7 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       val exception = exceptions.generateOne
 
       (eventStatusPatcher.sendDeletionStatus _)
-        .expects(event.project.id, Seq(latestCommitInfo.id))
+        .expects(event.project.id, latestCommitInfo.id)
         .throwing(exception)
 
       givenEventIsNotInEL(parent1Commit, event.project.id)

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.events
+package ch.datascience.commiteventservice.events.categories.common
 
 import cats.MonadThrow
 import cats.effect.{ConcurrentEffect, IO, Timer}
@@ -34,27 +34,24 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private trait EventStatusPatcher[Interpretation[_]] {
-  def sendDeletionStatus(projectId: projects.Id, eventIds: CommitId*): Interpretation[Unit]
-  def sendCreationStatus(projectId: projects.Id, eventIds: CommitId*): Interpretation[Unit]
+private[categories] trait EventStatusPatcher[Interpretation[_]] {
+  def sendDeletionStatus(projectId: projects.Id, eventId: CommitId): Interpretation[Unit]
 }
 
-private class EventStatusPatcherImpl[Interpretation[_]: MonadThrow: ConcurrentEffect: Timer](
+private[categories] class EventStatusPatcherImpl[Interpretation[_]: MonadThrow: ConcurrentEffect: Timer](
     logger:                  Logger[Interpretation],
     eventLogUrl:             EventLogUrl
 )(implicit executionContext: ExecutionContext)
     extends RestClient[Interpretation, EventStatusPatcher[Interpretation]](Throttler.noThrottling, logger)
     with EventStatusPatcher[Interpretation] {
-  override def sendDeletionStatus(projectId: projects.Id, eventIds: CommitId*): Interpretation[Unit] =
+  override def sendDeletionStatus(projectId: projects.Id, eventId: CommitId): Interpretation[Unit] =
     for {
-      uri <- validateUri(s"$eventLogUrl/events/$eventIds/$projectId")
+      uri <- validateUri(s"$eventLogUrl/events/$eventId/$projectId")
       sendingResult <-
         send(
           request(PATCH, uri).withMultipartBuilder.addPart("event", json"""{"status": "AWAITING_DELETION"}""").build()
         )(mapResponse)
     } yield sendingResult
-
-  override def sendCreationStatus(projectId: projects.Id, eventIds: CommitId*): Interpretation[Unit] = ???
 
   private lazy val mapResponse
       : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[Unit]] = {
@@ -63,7 +60,7 @@ private class EventStatusPatcherImpl[Interpretation[_]: MonadThrow: ConcurrentEf
 
 }
 
-private object EventStatusPatcher {
+private[categories] object EventStatusPatcher {
   def apply(logger:     Logger[IO])(implicit
       executionContext: ExecutionContext,
       concurrentEffect: ConcurrentEffect[IO],

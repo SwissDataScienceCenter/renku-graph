@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.events
+package ch.datascience.commiteventservice.events.categories.common
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.generators.Generators.Implicits._

@@ -16,15 +16,13 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.events.categories.commitsync
-package eventgeneration.historytraversal
+package ch.datascience.commiteventservice.events.categories.common
 
 import cats.effect._
 import cats.syntax.all._
+import ch.datascience.commiteventservice.events.categories.commitsync.categoryName
+import ch.datascience.commiteventservice.events.categories.common.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
 import ch.datascience.commiteventservice.events.categories.common.UpdateResult._
-import ch.datascience.commiteventservice.events.categories.common.eventgeneration.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
-import ch.datascience.commiteventservice.events.categories.common.eventgeneration.CommitEvent
-import ch.datascience.commiteventservice.events.categories.common.{CommitInfo, UpdateResult}
 import ch.datascience.events.consumers.Project
 import ch.datascience.graph.model.events.BatchDate
 import org.typelevel.log4cats.Logger
@@ -32,15 +30,15 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-private[eventgeneration] trait CommitToEventLog[Interpretation[_]] {
+private[categories] trait CommitToEventLog[Interpretation[_]] {
   def storeCommitsInEventLog(project:     Project,
                              startCommit: CommitInfo,
                              batchDate:   BatchDate
   ): Interpretation[UpdateResult]
 }
 
-private class CommitToEventLogImpl[Interpretation[_]: MonadThrow](
-    commitEventSender: CommitEventSender[Interpretation]
+private[categories] class CommitToEventLogImpl[Interpretation[_]: MonadThrow](
+    commitEventSender: CommitEventSender[Interpretation] //TODO fix up tests
 ) extends CommitToEventLog[Interpretation] {
 
   import commitEventSender._
@@ -88,7 +86,7 @@ private class CommitToEventLogImpl[Interpretation[_]: MonadThrow](
 
 }
 
-private[eventgeneration] object CommitToEventLog {
+private[categories] object CommitToEventLog {
   def apply(
       logger: Logger[IO]
   )(implicit

@@ -18,11 +18,10 @@
 
 package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration
 
+import ch.datascience.commiteventservice.events.categories.common.Generators._
+import ch.datascience.commiteventservice.events.categories.common.{Author, CommitInfo, Committer}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.commiteventservice.events.categories.common.Generators._
-import ch.datascience.commiteventservice.events.categories.common.CommitInfo
-import ch.datascience.commiteventservice.events.categories.common.eventgeneration.{Author, Committer}
 import ch.datascience.graph.model.GraphModelGenerators._
 import io.circe.literal._
 import org.scalatest.matchers.should

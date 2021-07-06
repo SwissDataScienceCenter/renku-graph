@@ -1,33 +1,29 @@
-package ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration
+package ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.gitlab
 
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
-import ch.datascience.commiteventservice.events.categories.common.CommitInfo
+import cats.syntax.all._
+import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.ProjectCommitStats
+import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.ProjectCommitStats.CommitCount
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
+import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects
+import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.http.client.{AccessToken, RestClient}
+import ch.datascience.tinytypes.json.TinyTypeDecoders.stringDecoder
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
-import org.typelevel.log4cats.Logger
 import org.http4s.Method.GET
+import org.http4s.Status.{Ok, Unauthorized}
 import org.http4s._
 import org.http4s.circe.jsonOf
-import org.http4s.dsl.io._
-import org.http4s.dsl.request
-import org.http4s.util.CaseInsensitiveString
-import cats.syntax.all._
-import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.ProjectCommitStats.CommitCount
-import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.ProjectCommitStats._
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.http.client.RestClientError.UnauthorizedException
-import ch.datascience.tinytypes.json.TinyTypeDecoders.stringDecoder
-import org.http4s.Status.{Ok, Unauthorized}
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
-trait GitLabCommitFetcher[Interpretation[_]] {
+private[globalcommitsync] trait GitLabCommitFetcher[Interpretation[_]] {
   def fetchCommitStats(projectId: projects.Id)(implicit
       maybeAccessToken:           Option[AccessToken]
   ): Interpretation[ProjectCommitStats]
@@ -36,7 +32,7 @@ trait GitLabCommitFetcher[Interpretation[_]] {
   ): Interpretation[List[CommitId]]
 }
 
-private class GitLabCommitFetcherImpl[Interpretation[_]: ConcurrentEffect: Timer](
+private[globalcommitsync] class GitLabCommitFetcherImpl[Interpretation[_]: ConcurrentEffect: Timer](
     gitLabUrl:               GitLabUrl,
     gitLabThrottler:         Throttler[Interpretation, GitLab],
     logger:                  Logger[Interpretation],
@@ -97,7 +93,7 @@ private class GitLabCommitFetcherImpl[Interpretation[_]: ConcurrentEffect: Timer
 
 }
 
-private object GitLabCommitFetcher {
+private[globalcommitsync] object GitLabCommitFetcher {
   def apply(
       gitLabThrottler: Throttler[IO, GitLab],
       logger:          Logger[IO]

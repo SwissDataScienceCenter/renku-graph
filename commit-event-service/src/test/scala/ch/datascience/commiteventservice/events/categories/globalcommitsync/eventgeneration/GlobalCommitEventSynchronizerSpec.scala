@@ -1,9 +1,11 @@
-package ch.datascience.commiteventservice.events.categories.globalcommitsync
+package ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration
 
-import ch.datascience.commiteventservice.events.EventStatusPatcher
+import ch.datascience.commiteventservice.events.categories.common.UpdateResult.Created
+import ch.datascience.commiteventservice.events.categories.common.{CommitToEventLog, EventStatusPatcher}
 import ch.datascience.commiteventservice.events.categories.globalcommitsync.Generators.globalCommitSyncEventsNonZero
 import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.ProjectCommitStats.CommitCount
-import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.{GitLabCommitFetcher, GlobalCommitEventSynchronizerImpl, ProjectCommitStats}
+import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.gitlab.GitLabCommitFetcher
+import ch.datascience.commiteventservice.events.categories.globalcommitsync.{categoryName, logMessageCommon}
 import ch.datascience.events.consumers.Project
 import ch.datascience.generators.CommonGraphGenerators.personalAccessTokens
 import ch.datascience.generators.Generators.Implicits._
@@ -71,9 +73,11 @@ class GlobalCommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers
 
         givenNoCommitsInGL(event.project.id)
 
-        (eventStatusPatcher.sendDeletionStatus _)
-          .expects(event.project.id, event.commits)
-          .returning(Try(()))
+        event.commits.map { commit =>
+          (eventStatusPatcher.sendDeletionStatus _)
+            .expects(event.project.id, commit)
+            .returning(Try(()))
+        }
 
         commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
 
@@ -91,7 +95,7 @@ class GlobalCommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers
         val commitsInGL = event.commits.filterNot(_ == commitIdToDelete)
 
         (eventStatusPatcher.sendDeletionStatus _)
-          .expects(event.project.id, Seq(commitIdToDelete))
+          .expects(event.project.id, commitIdToDelete)
           .returning(Try(()))
 
         commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
@@ -111,9 +115,9 @@ class GlobalCommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers
 
         givenCommitsInGL(event.project.id, commitsInGL)
 
-        (eventStatusPatcher.sendCreationStatus _)
-          .expects(event.project.id, newCommitsInGL)
-          .returning(Try(()))
+        (commitToEventLog.storeCommitsInEventLog _)
+          .expects(event.project, ???, batchDate) // TODO: figure out event info
+          .returning(Success(Created))
 
         commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
 
@@ -128,9 +132,11 @@ class GlobalCommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers
 
       givenNoCommitsInGL(event.project.id)
 
-      (eventStatusPatcher.sendDeletionStatus _)
-        .expects(event.project.id, event.commits)
-        .returning(Try(()))
+      event.commits.map { commit =>
+        (eventStatusPatcher.sendDeletionStatus _)
+          .expects(event.project.id, commit)
+          .returning(Try(()))
+      }
 
       commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
 
@@ -145,9 +151,11 @@ class GlobalCommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers
 
       givenProjectDoesntExistInGL(event.project.id)
 
-      (eventStatusPatcher.sendDeletionStatus _)
-        .expects(event.project.id, event.commits)
-        .returning(Try(()))
+      event.commits.map { commit =>
+        (eventStatusPatcher.sendDeletionStatus _)
+          .expects(event.project.id, commit)
+          .returning(Try(()))
+      }
 
       commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
 
@@ -174,11 +182,14 @@ class GlobalCommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers
 
     val eventStatusPatcher = mock[EventStatusPatcher[Try]]
 
+    val commitToEventLog = mock[CommitToEventLog[Try]]
+
     val executionTimeRecorder = TestExecutionTimeRecorder[Try](logger)
 
     val commitEventSynchronizer = new GlobalCommitEventSynchronizerImpl[Try](accessTokenFinder,
                                                                              gitLabCommitFetcher,
                                                                              eventStatusPatcher,
+                                                                             commitToEventLog,
                                                                              executionTimeRecorder,
                                                                              logger
     )
