@@ -122,9 +122,9 @@ commitEventService:
     port: 9006
   resources:
     requests:
-      memory: 700Mi
+      memory: 250Mi
     limits:
-      memory: 450Mi
+      memory: 700Mi
   jvmXmx: 300M
   gitlab:
     rateLimit: 100/sec
