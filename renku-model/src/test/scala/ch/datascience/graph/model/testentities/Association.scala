@@ -18,7 +18,8 @@
 
 package ch.datascience.graph.model.testentities
 
-import ch.datascience.graph.model.{GitLabApiUrl, RenkuBaseUrl}
+import cats.syntax.all._
+import ch.datascience.graph.model.{GitLabApiUrl, RenkuBaseUrl, associations, entities}
 import io.renku.jsonld._
 
 final case class Association(activity: Activity, agent: Agent, runPlan: RunPlan)
@@ -30,13 +31,19 @@ object Association {
 
   import io.renku.jsonld.syntax._
 
+  implicit lazy val toEntitiesAssociation: Association => entities.Association = association =>
+    entities.Association(associations.ResourceId(association.asEntityId.show),
+                         association.agent.to[entities.Agent],
+                         association.runPlan.to[entities.RunPlan]
+    )
+
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Association] =
     JsonLDEncoder.instance { entity =>
       JsonLD.entity(
         entity.asEntityId,
         EntityTypes of (prov / "Association"),
         prov / "agent"   -> entity.agent.asJsonLD,
-        prov / "hadPlan" -> entity.runPlan.asEntityId.asJsonLD
+        prov / "hadPlan" -> entity.runPlan.asJsonLD
       )
     }
 

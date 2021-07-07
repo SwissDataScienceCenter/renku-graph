@@ -19,7 +19,7 @@
 package ch.datascience.graph.model.testentities
 
 import ch.datascience.graph.model.users.{Affiliation, Email, GitLabId, Name}
-import ch.datascience.graph.model.{GitLabApiUrl, RenkuBaseUrl}
+import ch.datascience.graph.model._
 
 final case class Person(
     name:             Name,
@@ -38,6 +38,15 @@ object Person {
   import io.renku.jsonld._
   import JsonLDEncoder._
   import io.renku.jsonld.syntax._
+
+  implicit lazy val toEntitiesPerson: Person => entities.Person = person =>
+    entities.Person(
+      users.ResourceId(person.asEntityId),
+      person.name,
+      person.maybeEmail,
+      person.maybeAffiliation,
+      person.maybeGitLabId
+    )
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Person] =
     JsonLDEncoder.instance { entity =>

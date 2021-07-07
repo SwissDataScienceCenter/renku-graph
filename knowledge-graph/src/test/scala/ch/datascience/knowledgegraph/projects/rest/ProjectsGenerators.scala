@@ -41,7 +41,7 @@ private object ProjectsGenerators {
   implicit val projects: Gen[Project] = for {
     kgProject <-
       Gen
-        .oneOf(projectEntities[model.projects.ForksCount.Zero](visibilityAny), projectWitParentEntities(visibilityAny))
+        .oneOf(projectEntities[model.projects.ForksCount.Zero](visibilityAny), projectWithParentEntities(visibilityAny))
         .map(_.to[KGProject])
     gitLabProject <- gitLabProjects
   } yield Project(

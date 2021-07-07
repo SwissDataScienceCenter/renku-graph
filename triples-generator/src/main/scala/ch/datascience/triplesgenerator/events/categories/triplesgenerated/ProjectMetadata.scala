@@ -18,11 +18,69 @@
 
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 
+import cats.syntax.all._
+import cats.data.ValidatedNel
 import ch.datascience.graph.model.entities.Dataset.Provenance
 import ch.datascience.graph.model.entities._
+import ch.datascience.graph.model
 
-private case class ProjectMetadata( //project:    Project,
-                                    persons:    Set[Person],
-                                    activities: List[Activity],
-                                    datasets:   List[Dataset[Provenance]]
-)
+private case class ProjectMetadata(project: Project, activities: List[Activity], datasets: List[Dataset[Provenance]])
+
+private object ProjectMetadata {
+
+  def from(project:    Project,
+           activities: List[Activity],
+           datasets:   List[Dataset[Provenance]]
+  ): ValidatedNel[String, ProjectMetadata] = List(
+    validateProjectRefs(project, activities, datasets),
+    validateDates(project, activities, datasets)
+  ).sequence.void.map(_ => ProjectMetadata(project, activities, datasets))
+
+  private def validateProjectRefs(project:    Project,
+                                  activities: List[Activity],
+                                  datasets:   List[Dataset[Provenance]]
+  ): ValidatedNel[String, Unit] = activities
+    .map(activity =>
+      if (activity.projectResourceId == project.resourceId) ().validNel[String]
+      else s"Activity ${activity.resourceId} points to a wrong project ${activity.projectResourceId}".invalidNel
+    )
+    .sequence
+    .void |+| datasets
+    .map(dataset =>
+      if (dataset.projectResourceId == project.resourceId) ().validNel[String]
+      else s"Dataset ${dataset.resourceId} points to a wrong project ${dataset.projectResourceId}".invalidNel
+    )
+    .sequence
+    .void
+
+  private def validateDates(project:    Project,
+                            activities: List[Activity],
+                            datasets:   List[Dataset[Provenance]]
+  ): ValidatedNel[String, Unit] = project match {
+    case _: ProjectWithParent => ().validNel[String]
+    case _ =>
+      activities
+        .map { activity =>
+          import activity._
+          if ((startTime.value compareTo project.dateCreated.value) >= 0) ().validNel[String]
+          else s"Activity $resourceId startTime $startTime is older than project ${project.dateCreated}".invalidNel
+        }
+        .sequence
+        .void |+| datasets
+        .map {
+          def compareDateWithProject(dataset: Dataset[Provenance], dateCreated: model.datasets.DateCreated) =
+            if ((dateCreated compareTo project.dateCreated.value) >= 0) ().validNel[String]
+            else
+              s"Dataset ${dataset.identification.identifier} startTime $dateCreated is older than project ${project.dateCreated}".invalidNel
+
+          dataset =>
+            dataset.provenance match {
+              case p: Provenance.Internal => compareDateWithProject(dataset, p.date)
+              case p: Provenance.Modified => compareDateWithProject(dataset, p.date)
+              case _ => ().validNel[String]
+            }
+        }
+        .sequence
+        .void
+  }
+}

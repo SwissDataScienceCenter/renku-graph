@@ -19,11 +19,13 @@
 package ch.datascience.graph.model
 
 import cats.syntax.all._
-import ch.datascience.graph.model.views.EntityIdJsonLdOps
+import ch.datascience.graph.model.entityModel.Location.FileOrFolder.from
+import ch.datascience.graph.model.views.{EntityIdJsonLdOps, TinyTypeJsonLDOps}
 import ch.datascience.tinytypes.constraints.{NonBlank, RelativePath, Url}
 import ch.datascience.tinytypes.{RelativePathTinyType, StringTinyType, TinyTypeFactory}
-import io.renku.jsonld.JsonLDDecoder
+import io.renku.jsonld.{JsonLDDecoder, JsonLDEncoder}
 import io.renku.jsonld.JsonLDDecoder._
+import io.renku.jsonld.JsonLDEncoder._
 
 object entityModel {
 
@@ -43,26 +45,37 @@ object entityModel {
     override def hashCode(): Int = value.hashCode
   }
 
+  object LocationLike {
+    implicit lazy val jsonLDDecoder: JsonLDDecoder[LocationLike] =
+      decodeString.emap(value => from(value).leftMap(_.getMessage))
+
+    implicit lazy val jsonLDEncoder: JsonLDEncoder[LocationLike] = encodeString.contramap(_.value)
+  }
+
   sealed trait Location extends Any with LocationLike
 
   object Location {
 
     final class File private (val value: String) extends Location
-    object File extends TinyTypeFactory[File](new File(_)) with RelativePath {
+    object File extends TinyTypeFactory[File](new File(_)) with RelativePath with TinyTypeJsonLDOps[File] {
       def apply(folder: Location.Folder, filename: String): Location.File = Location.File(s"$folder/$filename")
     }
 
     final class Folder private (val value: String) extends Location with LocationLike
-    object Folder extends TinyTypeFactory[Folder](new Folder(_)) with RelativePath
+    object Folder extends TinyTypeFactory[Folder](new Folder(_)) with RelativePath with TinyTypeJsonLDOps[Folder]
 
     final class FileOrFolder private (val value: String) extends LocationLike
     object FileOrFolder extends TinyTypeFactory[FileOrFolder](new FileOrFolder(_)) with RelativePath {
       implicit lazy val jsonLDDecoder: JsonLDDecoder[FileOrFolder] =
         decodeString.emap(value => from(value).leftMap(_.getMessage))
     }
+
+    implicit lazy val jsonLDEncoder: JsonLDEncoder[Location] = encodeString.contramap(_.value)
   }
 
   final class Checksum private (val value: String) extends AnyVal with StringTinyType
-  implicit object Checksum extends TinyTypeFactory[Checksum](new Checksum(_)) with NonBlank
-
+  implicit object Checksum
+      extends TinyTypeFactory[Checksum](new Checksum(_))
+      with NonBlank
+      with TinyTypeJsonLDOps[Checksum]
 }

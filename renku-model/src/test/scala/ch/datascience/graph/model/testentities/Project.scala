@@ -104,6 +104,41 @@ object Project {
     }
   }
 
+  implicit lazy val toEntitiesProject: Project[ForksCount] => entities.Project = {
+    case p: ProjectWithoutParent[ForksCount] => toEntitiesProjectWithoutParent(p)
+    case p: ProjectWithParent[ForksCount]    => toEntitiesProjectWithParent(p)
+  }
+
+  private val toEntitiesProjectWithoutParent: ProjectWithoutParent[ForksCount] => entities.ProjectWithoutParent =
+    project =>
+      entities.ProjectWithoutParent(
+        projects.ResourceId(project.asEntityId),
+        project.path,
+        project.name,
+        project.agent,
+        project.dateCreated,
+        project.maybeCreator.map(_.to[entities.Person]),
+        project.visibility,
+        project.members.map(_.to[entities.Person]),
+        project.version
+      )
+  private val toEntitiesProjectWithParent: ProjectWithParent[ForksCount] => entities.ProjectWithParent =
+    project =>
+      entities.ProjectWithParent(
+        projects.ResourceId(project.asEntityId),
+        project.path,
+        project.name,
+        project.agent,
+        project.dateCreated,
+        project.maybeCreator.map(_.to[entities.Person]),
+        project.visibility,
+        project.members.map(_.to[entities.Person]),
+        project.version,
+        project.parent.resourceId
+      )
+
+  val types: EntityTypes = EntityTypes.of(prov / "Location", schema / "Project")
+
   implicit def encoder[P <: Project[_]](implicit
       renkuBaseUrl: RenkuBaseUrl,
       gitLabApiUrl: GitLabApiUrl
@@ -111,7 +146,7 @@ object Project {
     case project: ProjectWithParent[_] =>
       JsonLD.entity(
         project.asEntityId,
-        EntityTypes.of(prov / "Location", schema / "Project"),
+        types,
         schema / "name"             -> project.name.asJsonLD,
         schema / "agent"            -> project.agent.asJsonLD,
         schema / "dateCreated"      -> project.dateCreated.asJsonLD,
@@ -124,7 +159,7 @@ object Project {
     case project: Project[_] =>
       JsonLD.entity(
         project.asEntityId,
-        EntityTypes.of(prov / "Location", schema / "Project"),
+        types,
         schema / "name"             -> project.name.asJsonLD,
         schema / "agent"            -> project.agent.asJsonLD,
         schema / "dateCreated"      -> project.dateCreated.asJsonLD,

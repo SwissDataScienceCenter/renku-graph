@@ -18,13 +18,13 @@
 
 package ch.datascience.graph.model
 
-import ch.datascience.graph.model.views.EntityIdJsonLdOps
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.graph.model.views.{EntityIdJsonLdOps, TinyTypeJsonLDOps}
 import ch.datascience.tinytypes.constraints.{NonBlank, Url}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
 object agents {
   final class Label private (val value: String) extends AnyVal with StringTinyType
-  implicit object Label extends TinyTypeFactory[Label](new Label(_)) with NonBlank
+  implicit object Label extends TinyTypeFactory[Label](new Label(_)) with NonBlank with TinyTypeJsonLDOps[Label]
 
   class ResourceId private (val value: String) extends AnyVal with StringTinyType
   implicit object ResourceId

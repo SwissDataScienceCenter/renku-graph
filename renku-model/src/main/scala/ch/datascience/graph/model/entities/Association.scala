@@ -18,33 +18,48 @@
 
 package ch.datascience.graph.model.entities
 
+import cats.syntax.all._
 import ch.datascience.graph.model.Schemas.prov
 import ch.datascience.graph.model.associations.ResourceId
-import io.renku.jsonld.syntax.JsonEncoderOps
+import ch.datascience.graph.model.{agents, runPlans}
+import io.circe.DecodingFailure
 import io.renku.jsonld._
+import io.renku.jsonld.syntax._
 
 final case class Association(resourceId: ResourceId, agent: Agent, runPlan: RunPlan)
 
 object Association {
 
-  private val entityTypes = EntityTypes of (prov / "Association")
+  val entityTypes: EntityTypes = EntityTypes of (prov / "Association")
 
-  implicit lazy val encoder: JsonLDEncoder[Association] =
-    JsonLDEncoder.instance { entity =>
-      JsonLD.entity(
-        entity.resourceId.asEntityId,
-        entityTypes,
-        prov / "agent"   -> entity.agent.asJsonLD,
-        prov / "hadPlan" -> entity.runPlan.resourceId.asEntityId.asJsonLD
-      )
-    }
+  implicit lazy val encoder: JsonLDEncoder[Association] = JsonLDEncoder.instance { entity =>
+    JsonLD.entity(
+      entity.resourceId.asEntityId,
+      entityTypes,
+      prov / "agent"   -> entity.agent.asJsonLD,
+      prov / "hadPlan" -> entity.runPlan.resourceId.asEntityId.asJsonLD
+    )
+  }
 
   implicit lazy val decoder: JsonLDDecoder[Association] = JsonLDDecoder.entity(entityTypes) { cursor =>
-    import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
+    def multipleToNone[T]: List[T] => Either[DecodingFailure, Option[T]] = {
+      case entity :: Nil => Right(Some(entity))
+      case _             => Right(None)
+    }
+
     for {
-      resourceId <- cursor.downEntityId.as[ResourceId]
-      agent      <- cursor.downField(prov / "agent").as[Agent]
-      plan       <- cursor.downField(prov / "hadPlan").as[RunPlan]
+      resourceId      <- cursor.downEntityId.as[ResourceId]
+      agentResourceId <- cursor.downField(prov / "agent").downEntityId.as[agents.ResourceId]
+      agent <- cursor.top
+                 .map(_.cursor.as[List[Agent]].map(_.filter(_.resourceId == agentResourceId)).flatMap(multipleToNone))
+                 .flatMap(_.sequence)
+                 .getOrElse(DecodingFailure(s"Association $resourceId without or with multiple Agents", Nil).asLeft)
+
+      planResourceId <- cursor.downField(prov / "hadPlan").downEntityId.as[runPlans.ResourceId]
+      plan <- cursor.top
+                .map(_.cursor.as[List[RunPlan]].map(_.filter(_.resourceId == planResourceId)).flatMap(multipleToNone))
+                .flatMap(_.sequence)
+                .getOrElse(DecodingFailure(s"Association $resourceId without or with multiple RunPlans", Nil).asLeft)
     } yield Association(resourceId, agent, plan)
   }
 }

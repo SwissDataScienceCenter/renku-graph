@@ -18,7 +18,8 @@
 
 package ch.datascience.graph.model.testentities
 
-import ch.datascience.graph.model.RenkuBaseUrl
+import cats.syntax.all._
+import ch.datascience.graph.model.{RenkuBaseUrl, entities, parameterValues}
 import ch.datascience.graph.model.commandParameters.Name
 import ch.datascience.graph.model.entityModel.LocationLike
 import ch.datascience.graph.model.parameterValues.ValueOverride
@@ -46,6 +47,27 @@ object ParameterValue {
     val name:     Name
     val location: LocationLike
     val activity: Activity
+  }
+
+  implicit lazy val toEntitiesParameterValue: ParameterValue => entities.ParameterValue = {
+    case p: VariableParameterValue =>
+      entities.ParameterValue.VariableParameterValue(parameterValues.ResourceId(p.asEntityId.show),
+                                                     p.name,
+                                                     p.value,
+                                                     p.valueReference.to[CommandParameter]
+      )
+    case p: OutputParameterValue =>
+      entities.ParameterValue.OutputParameterValue(parameterValues.ResourceId(p.asEntityId.show),
+                                                   p.name,
+                                                   p.location,
+                                                   p.valueReference.to[entities.CommandParameterBase.CommandOutput]
+      )
+    case p: InputParameterValue =>
+      entities.ParameterValue.InputParameterValue(parameterValues.ResourceId(p.asEntityId.show),
+                                                  p.name,
+                                                  p.location,
+                                                  p.valueReference.to[entities.CommandParameterBase.CommandInput]
+      )
   }
 
   object PathParameterValue {
@@ -112,7 +134,7 @@ object ParameterValue {
       case value @ VariableParameterValue(_, name, valueOverride, valueReference, _) =>
         JsonLD.entity(
           value.asEntityId,
-          EntityTypes of (renku / "ParameterValue", renku / "PathParameterValue"),
+          EntityTypes of (renku / "ParameterValue", renku / "VariableParameterValue"),
           schema / "name"           -> name.asJsonLD,
           schema / "value"          -> valueOverride.asJsonLD,
           schema / "valueReference" -> valueReference.asEntityId.asJsonLD

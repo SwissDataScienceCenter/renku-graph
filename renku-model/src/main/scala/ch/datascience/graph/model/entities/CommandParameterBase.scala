@@ -35,7 +35,6 @@ sealed trait CommandParameterBase {
 
 object CommandParameterBase {
 
-  import ch.datascience.graph.model.views.TinyTypeJsonLDEncoders._
   import io.renku.jsonld.syntax._
   import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 
@@ -69,7 +68,6 @@ object CommandParameterBase {
       }
 
     implicit lazy val decoder: JsonLDDecoder[CommandParameter] = JsonLDDecoder.entity(entityTypes) { cursor =>
-      import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
       for {
         resourceId       <- cursor.downEntityId.as[ResourceId]
         position         <- cursor.downField(renku / "position").as[Position]
@@ -112,7 +110,7 @@ object CommandParameterBase {
 
   object CommandInput {
 
-    private val entityTypes = EntityTypes of (renku / "CommandInput", renku / "CommandParameterBase")
+    val entityTypes: EntityTypes = EntityTypes of (renku / "CommandInput", renku / "CommandParameterBase")
 
     implicit def commandInputEncoder[I <: CommandInput]: JsonLDEncoder[I] =
       JsonLDEncoder.instance {
@@ -163,7 +161,6 @@ object CommandParameterBase {
       }
 
     implicit lazy val decoder: JsonLDDecoder[CommandInput] = JsonLDDecoder.entity(entityTypes) { cursor =>
-      import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
       for {
         resourceId          <- cursor.downEntityId.as[ResourceId]
         position            <- cursor.downField(renku / "position").as[Position]
@@ -287,7 +284,6 @@ object CommandParameterBase {
       }
 
     implicit lazy val decoder: JsonLDDecoder[CommandOutput] = JsonLDDecoder.entity(entityTypes) { cursor =>
-      import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
       for {
         resourceId          <- cursor.downEntityId.as[ResourceId]
         position            <- cursor.downField(renku / "position").as[Position]

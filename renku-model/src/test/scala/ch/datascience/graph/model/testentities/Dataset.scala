@@ -21,9 +21,9 @@ package ch.datascience.graph.model.testentities
 import Dataset._
 import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
+import ch.datascience.graph.model.{GitLabApiUrl, RenkuBaseUrl, entities, projects}
 import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.projects.ForksCount
-import ch.datascience.graph.model.{GitLabApiUrl, RenkuBaseUrl}
 import io.renku.jsonld.JsonLDEncoder.encodeList
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, JsonLD, Property}
@@ -134,6 +134,48 @@ object Dataset {
     }
 
     import ch.datascience.graph.model.datasets.DerivedFrom._
+
+    private[Dataset] implicit def toEntitiesProvenance(
+        identification: entities.Dataset.Identification
+    ): Provenance => entities.Dataset.Provenance = {
+      case Internal(_, _, date, creators) =>
+        entities.Dataset.Provenance.Internal(identification.resourceId,
+                                             identification.identifier,
+                                             date,
+                                             creators.map(_.to[entities.Person])
+        )
+      case ImportedExternal(_, sameAs, _, date, creators) =>
+        entities.Dataset.Provenance.ImportedExternal(identification.resourceId,
+                                                     identification.identifier,
+                                                     sameAs,
+                                                     date,
+                                                     creators.map(_.to[entities.Person])
+        )
+      case Modified(_, derivedFrom, _, initialVersion, date, creators) =>
+        entities.Dataset.Provenance.Modified(identification.resourceId,
+                                             derivedFrom,
+                                             TopmostDerivedFrom(derivedFrom),
+                                             initialVersion,
+                                             date,
+                                             creators.map(_.to[entities.Person])
+        )
+      case ImportedInternalAncestorExternal(_, sameAs, _, _, date, creators) =>
+        entities.Dataset.Provenance.ImportedInternalAncestorExternal(identification.resourceId,
+                                                                     identification.identifier,
+                                                                     sameAs,
+                                                                     TopmostSameAs(sameAs),
+                                                                     date,
+                                                                     creators.map(_.to[entities.Person])
+        )
+      case ImportedInternalAncestorInternal(_, sameAs, _, _, date, creators) =>
+        entities.Dataset.Provenance.ImportedInternalAncestorInternal(identification.resourceId,
+                                                                     identification.identifier,
+                                                                     sameAs,
+                                                                     TopmostSameAs(sameAs),
+                                                                     date,
+                                                                     creators.map(_.to[entities.Person])
+        )
+    }
 
     private[Dataset] implicit def encoder(implicit
         renkuBaseUrl: RenkuBaseUrl,
@@ -316,6 +358,43 @@ object Dataset {
     }.combineAll
   }.getOrElse(Validated.validNel(()))
 
+  implicit lazy val toEntitiesDataset: Dataset[Provenance] => entities.Dataset[entities.Dataset.Provenance] = {
+    dataset: Dataset[Provenance] =>
+      val maybeInvalidationTime = dataset match {
+        case d: Dataset[Provenance] with HavingInvalidationTime => d.invalidationTime.some
+        case _ => None
+      }
+      val identification = entities.Dataset.Identification(ResourceId((dataset: Dataset[Provenance]).asEntityId.show),
+                                                           dataset.identification.identifier,
+                                                           dataset.identification.title,
+                                                           dataset.identification.name
+      )
+      entities.Dataset(
+        identification,
+        dataset.provenance.to[entities.Dataset.Provenance](Provenance.toEntitiesProvenance(identification)),
+        entities.Dataset.AdditionalInfo(
+          dataset.additionalInfo.url,
+          dataset.additionalInfo.maybeDescription,
+          dataset.additionalInfo.keywords.sorted,
+          dataset.additionalInfo.images.zipWithIndex.map { case (url, idx) =>
+            val imagePosition = ImagePosition(idx)
+            entities.Dataset.Image(
+              ImageResourceId(imageEntityId((dataset: Dataset[Provenance]).asEntityId, imagePosition).show),
+              url,
+              imagePosition
+            )
+          },
+          dataset.additionalInfo.maybeLicense
+        ),
+        entities.Dataset.Publishing(dataset.publishing.publicationEvents.map(_.to[entities.PublicationEvent]),
+                                    dataset.publishing.maybeVersion
+        ),
+        dataset.parts.map(_.to[entities.DatasetPart]),
+        projects.ResourceId(dataset.project.asEntityId.show),
+        maybeInvalidationTime
+      )
+  }
+
   import io.renku.jsonld.JsonLDEncoder._
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
@@ -368,10 +447,13 @@ object Dataset {
   private def imageUrlEncoder(datasetEntityId: EntityId): JsonLDEncoder[(ImageUri, Int)] =
     JsonLDEncoder.instance { case (imageUrl, position) =>
       JsonLD.entity(
-        datasetEntityId.asUrlEntityId / "images" / position.toString,
+        imageEntityId(datasetEntityId, position),
         EntityTypes of schema / "ImageObject",
         (schema / "contentUrl") -> imageUrl.asJsonLD,
         (schema / "position")   -> position.asJsonLD
       )
     }
+
+  private def imageEntityId(datasetEntityId: EntityId, position: ImagePosition): UrlfiedEntityId =
+    datasetEntityId.asUrlEntityId / "images" / position.toString
 }

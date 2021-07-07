@@ -20,11 +20,12 @@ package ch.datascience.graph.model.testentities
 
 import CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
 import RunPlan._
-import ch.datascience.graph.model.RenkuBaseUrl
+import cats.syntax.all._
 import ch.datascience.graph.model.commandParameters.Position
 import ch.datascience.graph.model.entityModel.Location
 import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.runPlans._
+import ch.datascience.graph.model._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
 
@@ -77,6 +78,29 @@ object RunPlan {
 
     def of(parameters: CommandParameterFactory*): List[CommandParameterFactory] = parameters.toList
   }
+
+  implicit lazy val toEntitiesRunPlan: RunPlan => entities.RunPlan =
+    runPlan => {
+      val maybeInvalidationTime = runPlan match {
+        case plan: RunPlan with HavingInvalidationTime => plan.invalidationTime.some
+        case _ => None
+      }
+
+      entities.RunPlan(
+        runPlans.ResourceId(runPlan.asEntityId.show),
+        runPlan.name,
+        runPlan.maybeDescription,
+        runPlan.command,
+        runPlan.maybeProgrammingLanguage,
+        runPlan.keywords,
+        runPlan.parameters.map(_.to[entities.CommandParameterBase.CommandParameter]),
+        runPlan.inputs.map(_.to[entities.CommandParameterBase.CommandInput]),
+        runPlan.outputs.map(_.to[entities.CommandParameterBase.CommandOutput]),
+        runPlan.successCodes,
+        projects.ResourceId(runPlan.project.asEntityId),
+        maybeInvalidationTime
+      )
+    }
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[RunPlan] = JsonLDEncoder.instance {
     case plan: RunPlan with HavingInvalidationTime =>

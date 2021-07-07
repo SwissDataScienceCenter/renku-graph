@@ -23,9 +23,10 @@ import ch.datascience.graph.model.entityModel._
 import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.testentities.Activity._
 import ch.datascience.graph.model.testentities.Entity.OutputEntity
-import ch.datascience.graph.model.{GitLabApiUrl, RenkuBaseUrl}
+import ch.datascience.graph.model.{GitLabApiUrl, RenkuBaseUrl, activities, entities, projects}
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints.UUID
+import cats.syntax.all._
 
 final case class Activity(id:                  Id,
                           startTime:           StartTime,
@@ -94,6 +95,21 @@ object Activity {
 
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
+
+  implicit lazy val toEntitiesActivity: Activity => entities.Activity = activity =>
+    entities.Activity(
+      activities.ResourceId(activity.asEntityId.show),
+      activity.startTime,
+      activity.endTime,
+      activity.author.to[entities.Person],
+      activity.agent.to[entities.Agent],
+      projects.ResourceId(activity.project.asEntityId.show),
+      activity.order,
+      activity.association.to[entities.Association],
+      activity.usages.map(_.to[entities.Usage]),
+      activity.generations.map(_.to[entities.Generation]),
+      activity.parameters.map(_.to[entities.ParameterValue])
+    )
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Activity] =
     JsonLDEncoder.instance { entity =>

@@ -20,7 +20,7 @@ package ch.datascience.graph.model
 
 import Schemas._
 import cats.syntax.all._
-import ch.datascience.graph.model.views.EntityIdJsonLdOps
+import ch.datascience.graph.model.views.{EntityIdJsonLdOps, TinyTypeJsonLDOps}
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, LocalDateNotInTheFuture, NonBlank, NonNegativeInt, UUID, Url => UrlConstraint}
 import eu.timepit.refined.api.Refined
@@ -52,34 +52,39 @@ object datasets {
   implicit object Identifier
       extends TinyTypeFactory[Identifier](new Identifier(_))
       with DatasetIdentifierFactory[Identifier]
+      with TinyTypeJsonLDOps[Identifier]
       with NonBlank
 
   final class InitialVersion private (val value: String) extends AnyVal with DatasetIdentifier
   implicit object InitialVersion
       extends TinyTypeFactory[InitialVersion](new InitialVersion(_))
       with DatasetIdentifierFactory[InitialVersion]
+      with TinyTypeJsonLDOps[InitialVersion]
       with NonBlank
 
   final class Title private (val value: String) extends AnyVal with StringTinyType
-  implicit object Title extends TinyTypeFactory[Title](new Title(_)) with NonBlank
+  implicit object Title extends TinyTypeFactory[Title](new Title(_)) with NonBlank with TinyTypeJsonLDOps[Title]
 
   final class Name private (val value: String) extends AnyVal with StringTinyType
-  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank
+  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank with TinyTypeJsonLDOps[Name]
 
   final class Description private (val value: String) extends AnyVal with StringTinyType
-  implicit object Description extends TinyTypeFactory[Description](new Description(_)) with NonBlank
+  implicit object Description
+      extends TinyTypeFactory[Description](new Description(_))
+      with NonBlank
+      with TinyTypeJsonLDOps[Description]
 
   final class License private (val value: String) extends AnyVal with StringTinyType
-  implicit object License extends TinyTypeFactory[License](new License(_)) with NonBlank
+  implicit object License extends TinyTypeFactory[License](new License(_)) with NonBlank with TinyTypeJsonLDOps[License]
 
   final class Version private (val value: String) extends AnyVal with StringTinyType
-  implicit object Version extends TinyTypeFactory[Version](new Version(_)) with NonBlank
+  implicit object Version extends TinyTypeFactory[Version](new Version(_)) with NonBlank with TinyTypeJsonLDOps[Version]
 
   final class Keyword private (val value: String) extends AnyVal with StringTinyType
-  implicit object Keyword extends TinyTypeFactory[Keyword](new Keyword(_)) with NonBlank
+  implicit object Keyword extends TinyTypeFactory[Keyword](new Keyword(_)) with NonBlank with TinyTypeJsonLDOps[Keyword]
 
   final class Url private (val value: String) extends AnyVal with StringTinyType
-  implicit object Url extends TinyTypeFactory[Url](new Url(_)) with constraints.Url
+  implicit object Url extends TinyTypeFactory[Url](new Url(_)) with constraints.Url with TinyTypeJsonLDOps[Url]
 
   class ImageResourceId private (val value: String) extends AnyVal with StringTinyType
   implicit object ImageResourceId
@@ -88,13 +93,22 @@ object datasets {
       with EntityIdJsonLdOps[ImageResourceId]
 
   final class ImagePosition private (val value: Int) extends AnyVal with IntTinyType
-  implicit object ImagePosition extends TinyTypeFactory[ImagePosition](new ImagePosition(_)) with NonNegativeInt
+  implicit object ImagePosition
+      extends TinyTypeFactory[ImagePosition](new ImagePosition(_))
+      with NonNegativeInt
+      with TinyTypeJsonLDOps[ImagePosition]
 
   final class ImageUri private (val value: String) extends AnyVal with StringTinyType
-  implicit object ImageUri extends TinyTypeFactory[ImageUri](new ImageUri(_)) with constraints.RelativePath
+  implicit object ImageUri
+      extends TinyTypeFactory[ImageUri](new ImageUri(_))
+      with constraints.RelativePath
+      with TinyTypeJsonLDOps[ImageUri]
 
   final class PartLocation private (val value: String) extends AnyVal with StringTinyType
-  implicit object PartLocation extends TinyTypeFactory[PartLocation](new PartLocation(_)) with constraints.RelativePath
+  implicit object PartLocation
+      extends TinyTypeFactory[PartLocation](new PartLocation(_))
+      with constraints.RelativePath
+      with TinyTypeJsonLDOps[PartLocation]
 
   final class DerivedFrom private (val value: String) extends AnyVal with StringTinyType
   implicit object DerivedFrom extends TinyTypeFactory[DerivedFrom](new DerivedFrom(_)) with constraints.Url {
@@ -219,7 +233,10 @@ object datasets {
   final class DateCreated private (val value: Instant) extends AnyVal with Date with InstantTinyType {
     override def instant: Instant = value
   }
-  implicit object DateCreated extends TinyTypeFactory[DateCreated](new DateCreated(_)) with InstantNotInTheFuture
+  implicit object DateCreated
+      extends TinyTypeFactory[DateCreated](new DateCreated(_))
+      with InstantNotInTheFuture
+      with TinyTypeJsonLDOps[DateCreated]
 
   final class DatePublished private (val value: LocalDate) extends AnyVal with Date with LocalDateTinyType {
     override def instant: Instant = value.atStartOfDay().toInstant(ZoneOffset.UTC)
@@ -227,16 +244,19 @@ object datasets {
   implicit object DatePublished
       extends TinyTypeFactory[DatePublished](new DatePublished(_))
       with LocalDateNotInTheFuture
+      with TinyTypeJsonLDOps[DatePublished]
 
   final class PartId private (val value: String) extends AnyVal with StringTinyType
-  implicit object PartId extends TinyTypeFactory[PartId](new PartId(_)) with UUID {
+  implicit object PartId extends TinyTypeFactory[PartId](new PartId(_)) with UUID with TinyTypeJsonLDOps[PartId] {
     def generate: PartId = PartId {
       java.util.UUID.randomUUID.toString
     }
   }
 
   final class PartExternal private (val value: Boolean) extends AnyVal with BooleanTinyType
-  implicit object PartExternal extends TinyTypeFactory[PartExternal](new PartExternal(_)) {
+  implicit object PartExternal
+      extends TinyTypeFactory[PartExternal](new PartExternal(_))
+      with TinyTypeJsonLDOps[PartExternal] {
     val yes: PartExternal = PartExternal(true)
     val no:  PartExternal = PartExternal(false)
   }

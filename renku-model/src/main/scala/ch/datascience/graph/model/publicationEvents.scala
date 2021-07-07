@@ -18,7 +18,7 @@
 
 package ch.datascience.graph.model
 
-import ch.datascience.graph.model.views.EntityIdJsonLdOps
+import ch.datascience.graph.model.views.{EntityIdJsonLdOps, TinyTypeJsonLDOps}
 import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, NonBlank, Url}
 import ch.datascience.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
 
@@ -33,17 +33,29 @@ object publicationEvents {
       with EntityIdJsonLdOps[ResourceId]
 
   final class AboutEvent private (val value: String) extends AnyVal with StringTinyType
-  implicit object AboutEvent extends TinyTypeFactory[AboutEvent](new AboutEvent(_)) with NonBlank
+  implicit object AboutEvent
+      extends TinyTypeFactory[AboutEvent](new AboutEvent(_))
+      with NonBlank
+      with TinyTypeJsonLDOps[AboutEvent]
 
   final class Description private (val value: String) extends AnyVal with StringTinyType
-  implicit object Description extends TinyTypeFactory[Description](new Description(_)) with NonBlank
+  implicit object Description
+      extends TinyTypeFactory[Description](new Description(_))
+      with NonBlank
+      with TinyTypeJsonLDOps[Description]
 
   final class Location private (val value: String) extends AnyVal with StringTinyType
-  implicit object Location extends TinyTypeFactory[Location](new Location(_)) with NonBlank
+  implicit object Location
+      extends TinyTypeFactory[Location](new Location(_))
+      with NonBlank
+      with TinyTypeJsonLDOps[Location]
 
   final class Name private (val value: String) extends AnyVal with StringTinyType
-  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank
+  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank with TinyTypeJsonLDOps[Name]
 
   final class StartDate private (val value: Instant) extends AnyVal with InstantTinyType
-  implicit object StartDate extends TinyTypeFactory[StartDate](new StartDate(_)) with InstantNotInTheFuture
+  implicit object StartDate
+      extends TinyTypeFactory[StartDate](new StartDate(_))
+      with InstantNotInTheFuture
+      with TinyTypeJsonLDOps[StartDate]
 }

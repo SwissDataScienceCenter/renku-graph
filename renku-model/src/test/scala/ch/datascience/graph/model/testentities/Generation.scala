@@ -18,7 +18,8 @@
 
 package ch.datascience.graph.model.testentities
 
-import ch.datascience.graph.model.GitLabApiUrl
+import cats.syntax.all._
+import ch.datascience.graph.model.{GitLabApiUrl, activities, entities, generations}
 import Entity.OutputEntity
 import Generation.Id
 import ch.datascience.tinytypes.constraints.UUID
@@ -40,6 +41,13 @@ object Generation {
   import ch.datascience.graph.model.RenkuBaseUrl
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
+
+  implicit lazy val toEntitiesGeneration: Generation => entities.Generation = generation =>
+    entities.Generation(
+      generations.ResourceId(generation.asEntityId.show),
+      activities.ResourceId(generation.activity.asEntityId.show),
+      generation.entity.to[entities.Entity.OutputEntity]
+    )
 
   def factory(entityFactory: Generation => OutputEntity): Activity => Generation =
     activity => Generation(Id.generate, activity, entityFactory)

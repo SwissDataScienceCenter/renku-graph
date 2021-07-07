@@ -18,9 +18,10 @@
 
 package ch.datascience.graph.model.testentities
 
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.RenkuBaseUrl
 import ch.datascience.graph.model.entityModel.{Checksum, Location}
+import ch.datascience.graph.model.{RenkuBaseUrl, entities, entityModel, generations}
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 
@@ -38,6 +39,21 @@ object Entity {
     def factory(location: Location): Generation => OutputEntity =
       (generation: Generation) => OutputEntity(location, entityChecksums.generateOne, generation)
   }
+
+  implicit lazy val toEntity: Entity => entities.Entity = {
+    case e: InputEntity  => toInputEntity(e)
+    case e: OutputEntity => toOutputEntity(e)
+  }
+
+  implicit lazy val toInputEntity: InputEntity => entities.Entity.InputEntity = entity =>
+    entities.Entity.InputEntity(entityModel.ResourceId(entity.asEntityId.show), entity.location, entity.checksum)
+
+  implicit lazy val toOutputEntity: OutputEntity => entities.Entity.OutputEntity = entity =>
+    entities.Entity.OutputEntity(entityModel.ResourceId(entity.asEntityId.show),
+                                 entity.location,
+                                 entity.checksum,
+                                 generations.ResourceId(entity.generation.asEntityId.show)
+    )
 
   implicit def encoder[E <: Entity](implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[E] = JsonLDEncoder.instance {
     case entity @ InputEntity(location, checksum) =>

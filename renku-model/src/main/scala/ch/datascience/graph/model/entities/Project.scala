@@ -18,10 +18,13 @@
 
 package ch.datascience.graph.model.entities
 
-import ch.datascience.graph.model.projects._
-import ch.datascience.graph.model._
-import io.renku.jsonld.JsonLDDecoder
 import cats.syntax.all._
+import ch.datascience.graph.model._
+import ch.datascience.graph.model.projects._
+import io.circe.DecodingFailure
+import io.renku.jsonld.JsonLDDecoder
+
+import scala.util.Try
 
 sealed trait Project {
   val resourceId:   ResourceId
@@ -61,7 +64,6 @@ final case class ProjectWithParent(resourceId:       ResourceId,
 object Project {
 
   import ch.datascience.graph.model.Schemas._
-  import ch.datascience.graph.model.views.TinyTypeJsonLDEncoders._
   import io.renku.jsonld.syntax._
   import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 
@@ -96,39 +98,49 @@ object Project {
         )
     }
 
-  implicit def decoder(gitLabInfo: GitLabProjectInfo, potentialMembers: List[Person])(implicit
+  implicit def decoder(gitLabInfo: GitLabProjectInfo, potentialMembers: Set[Person])(implicit
       renkuBaseUrl:                RenkuBaseUrl
   ): JsonLDDecoder[Project] = JsonLDDecoder.entity(entityTypes) { cursor =>
-    import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
-
     def byName(member: ProjectMember): Person => Boolean =
       person => person.name == member.name || person.name.value == member.username.value
 
-    val maybeCreator: Option[Person] =
-      gitLabInfo.maybeCreatorGitLabId
-        .flatMap(creatorId => gitLabInfo.members.find(_.gitLabId == creatorId))
-        .flatMap { projectMember =>
-          potentialMembers.find(byName(projectMember)).map(_.copy(maybeGitLabId = Some(projectMember.gitLabId)))
-        }
+    def toPerson(projectMember: ProjectMember): Person = Person(
+      users.ResourceId((renkuBaseUrl / "persons" / projectMember.name).show),
+      projectMember.name,
+      None,
+      None,
+      projectMember.gitLabId.some
+    )
+
+    val maybeCreator: Option[Person] = gitLabInfo.maybeCreator.map(creator =>
+      potentialMembers
+        .find(byName(creator))
+        .map(_.copy(maybeGitLabId = Some(creator.gitLabId)))
+        .getOrElse(toPerson(creator))
+    )
 
     val members: Set[Person] = gitLabInfo.members.map(projectMember =>
       potentialMembers
         .find(byName(projectMember))
         .map(_.copy(maybeGitLabId = Some(projectMember.gitLabId)))
-        .getOrElse(
-          Person(users.ResourceId((renkuBaseUrl / "persons" / projectMember.name).show),
-                 projectMember.name,
-                 None,
-                 None,
-                 projectMember.gitLabId.some
-          )
-        )
+        .getOrElse(toPerson(projectMember))
     )
+
+    def checkProjectsMatching(resourceId: ResourceId) = resourceId
+      .as[Try, projects.Path]
+      .toEither
+      .leftMap(_ => DecodingFailure(s"Cannot extract project path from $resourceId", Nil))
+      .flatMap {
+        case path if path == gitLabInfo.path => Right(())
+        case path =>
+          Left(DecodingFailure(s"Project '$path' found in JsonLD does not match '${gitLabInfo.path}'", Nil))
+      }
 
     for {
       resourceId    <- cursor.downEntityId.as[ResourceId]
       agent         <- cursor.downField(schema / "agent").as[CliVersion]
       schemaVersion <- cursor.downField(schema / "schemaVersion").as[SchemaVersion]
+      _             <- checkProjectsMatching(resourceId)
     } yield gitLabInfo.maybeParentPath match {
       case Some(parentPath) =>
         ProjectWithParent(
@@ -157,13 +169,13 @@ object Project {
     }
   }
 
-  final case class GitLabProjectInfo(name:                 Name,
-                                     path:                 Path,
-                                     dateCreated:          DateCreated,
-                                     maybeCreatorGitLabId: Option[users.GitLabId],
-                                     members:              Set[ProjectMember],
-                                     visibility:           Visibility,
-                                     maybeParentPath:      Option[Path]
+  final case class GitLabProjectInfo(name:            Name,
+                                     path:            Path,
+                                     dateCreated:     DateCreated,
+                                     maybeCreator:    Option[ProjectMember],
+                                     members:         Set[ProjectMember],
+                                     visibility:      Visibility,
+                                     maybeParentPath: Option[Path]
   )
   final case class ProjectMember(name: users.Name, username: users.Username, gitLabId: users.GitLabId)
 }

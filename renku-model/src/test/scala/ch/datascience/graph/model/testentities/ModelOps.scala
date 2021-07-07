@@ -322,6 +322,8 @@ trait ModelOps {
 
   implicit class DatasetPartOps(part: DatasetPart) {
 
+    def to[T](implicit convert: DatasetPart => T): T = convert(part)
+
     private[ModelOps] def invalidate(
         time: InvalidationTime
     ): ValidatedNel[String, DatasetPart with HavingInvalidationTime] =
@@ -342,6 +344,8 @@ trait ModelOps {
 
   implicit class RunPlanOps(runPlan: RunPlan) {
 
+    def to[T](implicit convert: RunPlan => T): T = convert(runPlan)
+
     def invalidate(time: InvalidationTime): ValidatedNel[String, RunPlan with HavingInvalidationTime] =
       Validated.condNel(
         test = (time.value compareTo runPlan.project.dateCreated.value) >= 0,
@@ -360,6 +364,47 @@ trait ModelOps {
         s"Invalidation time $time on RunPlan with name: ${runPlan.name} is older than project date"
       )
   }
+
+  implicit class CommandParameterBaseOps[P <: CommandParameterBase](parameter: P) {
+    def to[T](implicit convert: P => T): T = convert(parameter)
+  }
+
+  implicit class AssociationOps(association: Association) {
+    def to[T](implicit convert: Association => T): T = convert(association)
+  }
+
+  implicit class AgentOps(agent: Agent) {
+    def to[T](implicit convert: Agent => T): T = convert(agent)
+  }
+
+  implicit class EntityOps[E <: Entity](entity: E) {
+    def to[T](implicit convert: E => T): T = convert(entity)
+  }
+
+  implicit class UsageOps(usage: Usage) {
+    def to[T](implicit convert: Usage => T): T = convert(usage)
+  }
+
+  implicit class GenerationOps(generation: Generation) {
+    def to[T](implicit convert: Generation => T): T = convert(generation)
+  }
+
+  implicit class ParameterValueOps[P <: ParameterValue](parameter: P) {
+    def to[T](implicit convert: P => T): T = convert(parameter)
+  }
+
+  implicit class ActivityOps(activity: Activity) {
+    def to[T](implicit convert: Activity => T): T = convert(activity)
+  }
+
+  implicit class PublicationEventOps(publicationEvent: PublicationEvent) {
+    def to[T](implicit convert: PublicationEvent => T): T = convert(publicationEvent)
+  }
+
+  implicit class ProvenanceOps(provenance: Dataset.Provenance) {
+    def to[T](implicit convert: Dataset.Provenance => T): T = convert(provenance)
+  }
+
 }
 
 object ModelOps extends ModelOps {

@@ -20,7 +20,7 @@ package ch.datascience.graph.model
 
 import cats.syntax.all._
 import ch.datascience.graph.model.views.SparqlValueEncoder.sparqlEncode
-import ch.datascience.graph.model.views.{EntityIdJsonLdOps, RdfResource}
+import ch.datascience.graph.model.views.{EntityIdJsonLdOps, RdfResource, TinyTypeJsonLDOps}
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints.{NonBlank, NonNegativeInt}
 import io.renku.jsonld.EntityId
@@ -46,7 +46,11 @@ object users {
   }
 
   final class GitLabId private (val value: Int) extends AnyVal with IntTinyType
-  implicit object GitLabId extends TinyTypeFactory[GitLabId](new GitLabId(_)) with NonNegativeInt {
+  implicit object GitLabId
+      extends TinyTypeFactory[GitLabId](new GitLabId(_))
+      with NonNegativeInt
+      with TinyTypeJsonLDOps[GitLabId] {
+
     def parse(value: String): Either[IllegalArgumentException, GitLabId] =
       Either
         .fromOption(value.toIntOption, ifNone = new IllegalArgumentException(s"$value not a valid GitLabId"))
@@ -54,7 +58,7 @@ object users {
   }
 
   final class Email private (val value: String) extends AnyVal with StringTinyType
-  implicit object Email extends TinyTypeFactory[Email](new Email(_)) with NonBlank {
+  implicit object Email extends TinyTypeFactory[Email](new Email(_)) with NonBlank with TinyTypeJsonLDOps[Email] {
 
     addConstraint(
       check = _.split('@').toList match {
@@ -70,11 +74,14 @@ object users {
   }
 
   final class Name private (val value: String) extends AnyVal with StringTinyType
-  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank
+  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank with TinyTypeJsonLDOps[Name]
 
   final class Username private (val value: String) extends AnyVal with StringTinyType
   implicit object Username extends TinyTypeFactory[Username](new Username(_)) with NonBlank
 
   final class Affiliation private (val value: String) extends AnyVal with StringTinyType
-  implicit object Affiliation extends TinyTypeFactory[Affiliation](new Affiliation(_)) with NonBlank
+  implicit object Affiliation
+      extends TinyTypeFactory[Affiliation](new Affiliation(_))
+      with NonBlank
+      with TinyTypeJsonLDOps[Affiliation]
 }

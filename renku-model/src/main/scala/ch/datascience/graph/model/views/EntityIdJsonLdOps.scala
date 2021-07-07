@@ -26,10 +26,10 @@ import io.renku.jsonld.{EntityId, EntityIdEncoder, JsonLDDecoder}
 trait EntityIdJsonLdOps[TT <: StringTinyType] {
   self: TinyTypeFactory[TT] =>
 
-  implicit lazy val entityIdJsonLDEncoder: EntityIdEncoder[TT] =
+  implicit lazy val encoder: EntityIdEncoder[TT] =
     EntityIdEncoder.instance[TT](id => EntityId.of(id.value))
 
-  implicit lazy val entityIdJsonLDDecoder: JsonLDDecoder[TT] =
+  implicit lazy val decoder: JsonLDDecoder[TT] =
     JsonLDDecoder.instance {
       JsonLDDecoder.decodeEntityId >>> {
         _.flatMap(entityId =>

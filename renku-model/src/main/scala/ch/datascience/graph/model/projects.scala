@@ -18,7 +18,7 @@
 
 package ch.datascience.graph.model
 
-import ch.datascience.graph.model.views.{EntityIdJsonLdOps, UrlResourceRenderer}
+import ch.datascience.graph.model.views.{EntityIdJsonLdOps, TinyTypeJsonLDOps, UrlResourceRenderer}
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
 import eu.timepit.refined.api.Refined
@@ -30,12 +30,10 @@ import java.time.Instant
 object projects {
 
   final class Id private (val value: Int) extends AnyVal with IntTinyType
-
-  implicit object Id extends TinyTypeFactory[Id](new Id(_)) with NonNegativeInt
+  implicit object Id extends TinyTypeFactory[Id](new Id(_)) with NonNegativeInt with TinyTypeJsonLDOps[Id]
 
   class Path private (val value: String) extends AnyVal with RelativePathTinyType
-
-  implicit object Path extends TinyTypeFactory[Path](new Path(_)) with RelativePath {
+  implicit object Path extends TinyTypeFactory[Path](new Path(_)) with RelativePath with TinyTypeJsonLDOps[Path] {
     private val allowedFirstChar         = ('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9') :+ '_'
     private[projects] val regexValidator = "^([\\w.-]+)(\\/([\\w.-]+))+$"
     addConstraint(
@@ -61,8 +59,7 @@ object projects {
     def apply(renkuBaseUrl: RenkuBaseUrl, projectPath: Path): ResourceId =
       ResourceId((renkuBaseUrl / "projects" / projectPath).value)
 
-    def apply(id: EntityId): ResourceId =
-      ResourceId(id.value.toString)
+    def apply(id: EntityId): ResourceId = ResourceId(id.value.toString)
 
     private val pathExtractor = "^.*\\/projects\\/(.*)$".r
     implicit lazy val projectPathConverter: TinyTypeConverter[ResourceId, Path] = {
@@ -72,16 +69,26 @@ object projects {
   }
 
   final class Name private (val value: String) extends AnyVal with StringTinyType
-  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank
+  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank with TinyTypeJsonLDOps[Name]
 
   final class DateCreated private (val value: Instant) extends AnyVal with InstantTinyType
-  implicit object DateCreated extends TinyTypeFactory[DateCreated](new DateCreated(_)) with InstantNotInTheFuture
+  implicit object DateCreated
+      extends TinyTypeFactory[DateCreated](new DateCreated(_))
+      with InstantNotInTheFuture
+      with TinyTypeJsonLDOps[DateCreated]
 
   final class FilePath private (val value: String) extends AnyVal with RelativePathTinyType
-  object FilePath extends TinyTypeFactory[FilePath](new FilePath(_)) with RelativePath with RelativePathOps[FilePath]
+  object FilePath
+      extends TinyTypeFactory[FilePath](new FilePath(_))
+      with RelativePath
+      with RelativePathOps[FilePath]
+      with TinyTypeJsonLDOps[FilePath]
 
   final class Description private (val value: String) extends AnyVal with StringTinyType
-  implicit object Description extends TinyTypeFactory[Description](new Description(_)) with NonBlank
+  implicit object Description
+      extends TinyTypeFactory[Description](new Description(_))
+      with NonBlank
+      with TinyTypeJsonLDOps[Description]
 
   sealed trait Visibility extends StringTinyType with Product with Serializable
   object Visibility extends TinyTypeFactory[Visibility](VisibilityInstantiator) {

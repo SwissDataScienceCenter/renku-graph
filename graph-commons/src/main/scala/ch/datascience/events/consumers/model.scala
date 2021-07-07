@@ -18,9 +18,16 @@
 
 package ch.datascience.events.consumers
 
+import cats.Show
 import ch.datascience.graph.model.projects
 
 final case class Project(id: projects.Id, path: projects.Path)
+
+object Project {
+  implicit lazy val show: Show[Project] = Show.show { case Project(id, path) =>
+    s"projectId = $id, projectPath = $path"
+  }
+}
 
 sealed trait EventSchedulingResult extends Product with Serializable
 

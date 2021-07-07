@@ -18,8 +18,10 @@
 
 package ch.datascience.graph.model.entities
 
+import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
 import ch.datascience.graph.model.activities.{EndTime, Order, ResourceId, StartTime}
+import ch.datascience.graph.model.entities.ParameterValue.{InputParameterValue, OutputParameterValue}
 import ch.datascience.graph.model.projects
 import io.circe.DecodingFailure
 
@@ -42,12 +44,68 @@ object Activity {
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  private val entityTypes: EntityTypes = EntityTypes of (prov / "Activity")
+  val entityTypes: EntityTypes = EntityTypes of (prov / "Activity")
+
+  def from(resourceId:        ResourceId,
+           startTime:         StartTime,
+           endTime:           EndTime,
+           author:            Person,
+           agent:             Agent,
+           projectResourceId: projects.ResourceId,
+           order:             Order,
+           association:       Association,
+           usages:            List[Usage],
+           generations:       List[Generation],
+           parameters:        List[ParameterValue]
+  ): ValidatedNel[String, Activity] =
+    validateState(usages, generations, parameters).map { _ =>
+      Activity(
+        resourceId,
+        startTime,
+        endTime,
+        author,
+        agent,
+        projectResourceId,
+        order,
+        association,
+        usages,
+        generations,
+        parameters
+      )
+    }
+
+  private[Activity] def validateState(usages:      List[Usage],
+                                      generations: List[Generation],
+                                      parameters:  List[ParameterValue]
+  ): ValidatedNel[String, Unit] = List(
+    validateUsages(usages, parameters),
+    validateGenerations(generations, parameters)
+  ).sequence.void
+
+  private[Activity] def validateUsages(usages:     List[Usage],
+                                       parameters: List[ParameterValue]
+  ): ValidatedNel[String, Unit] = parameters.foldLeft(Validated.validNel[String, Unit](())) {
+    case (result, param: InputParameterValue) =>
+      result |+| usages
+        .find(_.entity.location == param.location)
+        .void
+        .toValidNel(s"No Usage found for InputParameterValue with ${param.location}")
+    case (result, _) => result
+  }
+
+  private[Activity] def validateGenerations(generations: List[Generation],
+                                            parameters:  List[ParameterValue]
+  ): ValidatedNel[String, Unit] = parameters.foldLeft(Validated.validNel[String, Unit](())) {
+    case (result, param: OutputParameterValue) =>
+      result |+| generations
+        .find(_.entity.location == param.location)
+        .void
+        .toValidNel(s"No Generation found for OutputParameterValue with ${param.location}")
+    case (result, _) => result
+  }
 
   implicit def encoder(implicit gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Activity] = JsonLDEncoder.instance {
     entity =>
-      import ch.datascience.graph.model.views.TinyTypeJsonLDEncoders.{instantTTEncoder, intTTEncoder}
-
       JsonLD.entity(
         entity.resourceId.asEntityId,
         entityTypes,
@@ -64,7 +122,6 @@ object Activity {
   }
 
   implicit lazy val decoder: JsonLDDecoder[Activity] = JsonLDDecoder.entity(entityTypes) { cursor =>
-    import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
     import io.renku.jsonld.JsonLDDecoder.decodeList
 
     for {
@@ -76,11 +133,11 @@ object Activity {
       endedAtTime   <- cursor.downField(prov / "endedAtTime").as[EndTime]
       agent <- cursor.downField(prov / "wasAssociatedWith").as[List[Agent]] >>= {
                  case agent :: Nil => Right(agent)
-                 case _            => Left(DecodingFailure("Activity without or with multiple agents", Nil))
+                 case _            => Left(DecodingFailure(s"Activity $resourceId without or with multiple agents", Nil))
                }
       author <- cursor.downField(prov / "wasAssociatedWith").as[List[Person]] >>= {
                   case author :: Nil => Right(author)
-                  case _             => Left(DecodingFailure("Activity without or with multiple authors", Nil))
+                  case _             => Left(DecodingFailure(s"Activity $resourceId without or with multiple authors", Nil))
                 }
       projectId   <- cursor.downField(schema / "isPartOf").downEntityId.as[projects.ResourceId]
       order       <- cursor.downField(renku / "order").as[Order]
@@ -89,17 +146,21 @@ object Activity {
       parameters <- cursor
                       .downField(renku / "parameter")
                       .as[List[ParameterValue]](decodeList(ParameterValue.decoder(association.runPlan)))
-    } yield Activity(resourceId,
-                     startedAtTime,
-                     endedAtTime,
-                     author,
-                     agent,
-                     projectId,
-                     order,
-                     association,
-                     usages,
-                     generations,
-                     parameters
-    )
+      activity <- Activity
+                    .from(resourceId,
+                          startedAtTime,
+                          endedAtTime,
+                          author,
+                          agent,
+                          projectId,
+                          order,
+                          association,
+                          usages,
+                          generations,
+                          parameters
+                    )
+                    .leftMap(s => DecodingFailure(s.toList.mkString("; "), Nil))
+                    .toEither
+    } yield activity
   }
 }

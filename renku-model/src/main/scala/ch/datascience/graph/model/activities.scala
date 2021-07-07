@@ -19,9 +19,9 @@
 package ch.datascience.graph.model
 
 import cats.syntax.all._
-import ch.datascience.graph.model.views.EntityIdJsonLdOps
-import ch.datascience.tinytypes.{InstantTinyType, IntTinyType, StringTinyType, TinyTypeFactory}
+import ch.datascience.graph.model.views.{EntityIdJsonLdOps, TinyTypeJsonLDOps}
 import ch.datascience.tinytypes.constraints.{BoundedInstant, PositiveInt, Url}
+import ch.datascience.tinytypes._
 
 import java.time.Instant
 
@@ -34,17 +34,23 @@ object activities {
       with EntityIdJsonLdOps[ResourceId]
 
   final class StartTime private (val value: Instant) extends AnyVal with InstantTinyType
-  implicit object StartTime extends TinyTypeFactory[StartTime](new StartTime(_)) with BoundedInstant {
+  implicit object StartTime
+      extends TinyTypeFactory[StartTime](new StartTime(_))
+      with BoundedInstant
+      with TinyTypeJsonLDOps[StartTime] {
     import java.time.temporal.ChronoUnit.HOURS
     protected[this] override def maybeMax: Option[Instant] = now.plus(24, HOURS).some
   }
 
   final class EndTime private (val value: Instant) extends AnyVal with InstantTinyType
-  implicit object EndTime extends TinyTypeFactory[EndTime](new EndTime(_)) with BoundedInstant {
+  implicit object EndTime
+      extends TinyTypeFactory[EndTime](new EndTime(_))
+      with BoundedInstant
+      with TinyTypeJsonLDOps[EndTime] {
     import java.time.temporal.ChronoUnit.HOURS
     protected[this] override def maybeMax: Option[Instant] = now.plus(24, HOURS).some
   }
 
   final class Order private (val value: Int) extends AnyVal with IntTinyType
-  implicit object Order extends TinyTypeFactory[Order](new Order(_)) with PositiveInt
+  implicit object Order extends TinyTypeFactory[Order](new Order(_)) with PositiveInt with TinyTypeJsonLDOps[Order]
 }

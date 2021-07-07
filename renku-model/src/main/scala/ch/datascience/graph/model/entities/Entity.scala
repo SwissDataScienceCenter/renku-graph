@@ -41,14 +41,13 @@ object Entity {
 
   import io.renku.jsonld.JsonLDEncoder
 
-  private val fileEntityTypes: EntityTypes = EntityTypes of (prov / "Entity", wfprov / "Artifact")
-  private val folderEntityTypes = EntityTypes of (prov / "Entity", wfprov / "Artifact", prov / "Collection")
+  val fileEntityTypes:   EntityTypes = EntityTypes of (prov / "Entity", wfprov / "Artifact")
+  val folderEntityTypes: EntityTypes = EntityTypes of (prov / "Entity", wfprov / "Artifact", prov / "Collection")
 
   implicit def encoder[E <: Entity]: JsonLDEncoder[E] = {
     import ch.datascience.graph.model.Schemas._
-    import ch.datascience.graph.model.views.TinyTypeJsonLDEncoders._
     import io.renku.jsonld.syntax._
-    import io.renku.jsonld.{JsonLD, JsonLDEncoder}
+    import io.renku.jsonld._
 
     lazy val toEntityTypes: Entity => EntityTypes = { entity =>
       entity.location match {
@@ -76,38 +75,29 @@ object Entity {
     }
   }
 
-  import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
+  import io.renku.jsonld.JsonLDDecoder.decodeOption
 
-  implicit lazy val inputEntityDecoder: JsonLDDecoder[InputEntity] =
+  implicit lazy val entityDecoder: JsonLDDecoder[Entity] =
     JsonLDDecoder.entity(fileEntityTypes) { cursor =>
       for {
         resourceId  <- cursor.downEntityId.as[ResourceId]
         entityTypes <- cursor.getEntityTypes
         location    <- cursor.downField(prov / "atLocation").as[Location](locationDecoder(entityTypes))
         checksum    <- cursor.downField(renku / "checksum").as[Checksum]
-      } yield InputEntity(resourceId, location, checksum)
+        maybeGenerationId <-
+          cursor.downField(prov / "qualifiedGeneration").downEntityId.as(decodeOption[generations.ResourceId])
+      } yield maybeGenerationId match {
+        case Some(generationId) => OutputEntity(resourceId, location, checksum, generationId)
+        case None               => InputEntity(resourceId, location, checksum)
+      }
     }
-
-  implicit lazy val outputEntityDecoder: JsonLDDecoder[OutputEntity] =
-    JsonLDDecoder.entity(fileEntityTypes) { cursor =>
-      for {
-        resourceId            <- cursor.downEntityId.as[ResourceId]
-        entityTypes           <- cursor.getEntityTypes
-        location              <- cursor.downField(prov / "atLocation").as[Location](locationDecoder(entityTypes))
-        checksum              <- cursor.downField(renku / "checksum").as[Checksum]
-        qualifiedGenerationId <- cursor.downField(prov / "qualifiedGeneration").as[generations.ResourceId]
-      } yield OutputEntity(resourceId, location, checksum, qualifiedGenerationId)
-    }
-
-  implicit lazy val entityDecoder: JsonLDDecoder[Entity] =
-    cursor => inputEntityDecoder(cursor) orElse outputEntityDecoder(cursor)
 
   private def locationDecoder(entityTypes: EntityTypes): JsonLDDecoder[Location] =
     JsonLDDecoder.decodeString.emap { value =>
       entityTypes match {
-        case `fileEntityTypes`   => Location.File.from(value).leftMap(_.getMessage)
-        case `folderEntityTypes` => Location.Folder.from(value).leftMap(_.getMessage)
-        case other               => s"Entity with unknown $other types".asLeft
+        case types if types contains folderEntityTypes => Location.Folder.from(value).leftMap(_.getMessage)
+        case types if types contains fileEntityTypes   => Location.File.from(value).leftMap(_.getMessage)
+        case types                                     => s"Entity with unknown $types types".asLeft
       }
     }
 }

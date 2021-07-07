@@ -22,6 +22,9 @@ import ch.datascience.events.consumers.ConsumersModelGenerators._
 import ch.datascience.generators.Generators.{exceptions, nonEmptyStrings}
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators.projectSchemaVersions
+import ch.datascience.graph.model.entities
+import ch.datascience.graph.model.projects.ForksCount
+import ch.datascience.graph.model.testentities._
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
 import io.renku.jsonld.generators.JsonLDGenerators.jsonLDEntities
 import org.scalacheck.Gen
@@ -40,5 +43,7 @@ private object TriplesGeneratedGenerators {
     schemaVersion <- projectSchemaVersions
   } yield TriplesGeneratedEvent(eventId, project, entities, schemaVersion)
 
-  lazy val projectMetadatas: Gen[ProjectMetadata] = Gen.const(ProjectMetadata(Set.empty, Nil, Nil))
+  lazy val projectMetadatas: Gen[ProjectMetadata] = for {
+    project <- projectEntities[ForksCount](visibilityAny)(anyForksCount).map(_.to[entities.Project])
+  } yield ProjectMetadata(project, Nil, Nil)
 }

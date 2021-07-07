@@ -90,6 +90,9 @@ final case class ExecutionPlanner(runPlan:                  RunPlan,
     )
   }
 
+  def buildProvenanceUnsafe(): Activity =
+    buildProvenanceGraph.fold(errors => throw new Exception(errors.intercalate("\n")), identity)
+
   private lazy val validateParameterValueOverride = runPlan.parameters.traverse { parameter =>
     parametersValueOverrides
       .foldMapK {

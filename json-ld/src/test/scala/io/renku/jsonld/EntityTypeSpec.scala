@@ -43,6 +43,7 @@ class EntityTypeSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
       forAll { t: EntityTypes => t.show shouldBe t.list.map(_.value).nonEmptyIntercalate("; ") }
     }
   }
+
   "EntityTypes.equals" should {
     "return true if the types are identical regardless of the order" in {
       forAll { t: EntityTypes =>
@@ -56,6 +57,20 @@ class EntityTypeSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
       forAll { (t1: EntityTypes, t2: EntityTypes) =>
         t1            should not be t2
         t1.hashCode() should not be t2.hashCode()
+      }
+    }
+  }
+
+  "contains" should {
+    "return true for exact match although in different order" in {
+      forAll { entityTypes: EntityTypes =>
+        val shuffledTypes = Random.shuffle(entityTypes.toList)
+        (entityTypes contains EntityTypes.of(shuffledTypes.head, shuffledTypes.tail: _*)) shouldBe true
+      }
+    }
+    "return true if there are at least the searched types" in {
+      forAll { (type1: EntityType, type2: EntityType, type3: EntityType) =>
+        EntityTypes.of(type1, type2, type3).contains(type2, type1) shouldBe true
       }
     }
   }

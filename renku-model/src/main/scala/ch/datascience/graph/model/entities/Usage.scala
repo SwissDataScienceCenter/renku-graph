@@ -27,7 +27,7 @@ final case class Usage(resourceId: ResourceId, entity: Entity)
 
 object Usage {
 
-  private val entityTypes = EntityTypes of (prov / "Usage")
+  val entityTypes: EntityTypes = EntityTypes of (prov / "Usage")
 
   implicit lazy val encoder: JsonLDEncoder[Usage] =
     JsonLDEncoder.instance { case Usage(resourceId, entity) =>
@@ -39,7 +39,6 @@ object Usage {
     }
 
   implicit lazy val decoder: JsonLDDecoder[Usage] = JsonLDDecoder.entity(entityTypes) { cursor =>
-    import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
     for {
       resourceId <- cursor.downEntityId.as[ResourceId]
       entity     <- cursor.downField(prov / "entity").as[Entity]

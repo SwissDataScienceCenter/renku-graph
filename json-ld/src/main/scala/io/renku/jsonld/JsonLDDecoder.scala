@@ -36,7 +36,44 @@ trait JsonLDDecoder[A] extends (Cursor => Result[A]) with Serializable {
 }
 
 abstract class JsonLDEntityDecoder[A](val entityTypes: EntityTypes) extends JsonLDDecoder[A] {
+  self =>
+
   def apply(cursor: Cursor): Result[A]
+
+  lazy val allowedEntityTypes: Set[EntityTypes] = Set(entityTypes)
+
+  def widen[B >: A]: JsonLDEntityDecoder[B] = this.asInstanceOf[JsonLDEntityDecoder[B]]
+
+  def orElse[B >: A](alternative: JsonLDEntityDecoder[B]): JsonLDEntityDecoder[B] =
+    new JsonLDEntityDecoder[B](entityTypes) {
+      override def apply(cursor: Cursor): Result[B] = cursor match {
+        case flattenedCursor: FlattenedJsonCursor =>
+          self
+            .tryDecode(flattenedCursor)
+            .orElse(alternative.tryDecode(flattenedCursor))
+            .getOrElse {
+              DecodingFailure(
+                s"Cannot find neither an entity of type(s) ${self.entityTypes.list
+                  .map(_.show)
+                  .nonEmptyIntercalate("; ")} nor ${alternative.entityTypes.list.map(_.show).nonEmptyIntercalate("; ")}",
+                Nil
+              ).asLeft
+            }
+        case _ => goDownType(cursor)
+      }
+
+      override lazy val allowedEntityTypes: Set[EntityTypes] =
+        self.allowedEntityTypes ++ alternative.allowedEntityTypes
+
+      protected override def goDownType(cursor: Cursor) =
+        self.goDownType(cursor) orElse alternative.goDownType(cursor)
+    }
+
+  protected def tryDecode(flattenedCursor: FlattenedJsonCursor): Option[Result[A]] = flattenedCursor
+    .findEntity(entityTypes)
+    .map(entityJson => goDownType(new FlattenedJsonCursor(flattenedCursor, entityJson, flattenedCursor.allEntities)))
+
+  protected def goDownType(cursor: Cursor): Result[A]
 }
 
 object JsonLDDecoder {
@@ -47,22 +84,20 @@ object JsonLDDecoder {
 
   final def instance[A](f: Cursor => Result[A]): JsonLDDecoder[A] = (c: Cursor) => f(c)
 
-  final def entity[A](entityTypes: EntityTypes)(f: Cursor => Result[A]): JsonLDDecoder[A] =
+  final def entity[A](entityTypes: EntityTypes)(f: Cursor => Result[A]): JsonLDEntityDecoder[A] =
     new JsonLDEntityDecoder[A](entityTypes) {
       override def apply(cursor: Cursor): Result[A] = cursor match {
-        case c: FlattenedJsonCursor =>
-          c.findEntity(entityTypes)
-            .map(entityJson => goDownType(new FlattenedJsonCursor(c, entityJson, c.allEntities)))
-            .getOrElse {
-              DecodingFailure(
-                s"Cannot find an entity of type(s) ${entityTypes.list.map(_.show).nonEmptyIntercalate("; ")}",
-                Nil
-              ).asLeft
-            }
+        case flattenedCursor: FlattenedJsonCursor =>
+          tryDecode(flattenedCursor) getOrElse {
+            DecodingFailure(
+              s"Cannot find an entity of type(s) ${entityTypes.list.map(_.show).nonEmptyIntercalate("; ")}",
+              Nil
+            ).asLeft
+          }
         case _ => goDownType(cursor)
       }
 
-      private def goDownType(cursor: Cursor) = cursor.downType(entityTypes.list.toList: _*) match {
+      protected override def goDownType(cursor: Cursor) = cursor.downType(entityTypes.list.toList: _*) match {
         case Cursor.Empty =>
           DecodingFailure(
             s"Cannot decode to an entity of type(s) ${entityTypes.list.map(_.show).nonEmptyIntercalate("; ")}",
@@ -133,12 +168,14 @@ object JsonLDDecoder {
               arrayEntityIds
                 .map(id => Either.fromOption(allEntities.get(id), DecodingFailure(s"No entity found with id $id", Nil)))
                 .sequence
-            validEntities <- entities
-                               .filter(_.cursor.downType(itemDecoder.entityTypes.list.toList: _*) != Cursor.Empty)
-                               .map(t => itemDecoder(new FlattenedJsonCursor(cursor, t, allEntities)))
-                               .sequence
+            validEntities <-
+              entities
+                .filter(entity =>
+                  itemDecoder.allowedEntityTypes.exists(allowed => entity.entityTypes.exists(_.contains(allowed)))
+                )
+                .map(t => itemDecoder(new FlattenedJsonCursor(cursor, t, allEntities)))
+                .sequence
           } yield validEntities
-
         case itemDecoder: JsonLDDecoder[I] =>
           cursor.jsonLD.jsons.toList.map(v => itemDecoder(new ListItemCursor(cursor, v))).sequence
       }
@@ -150,11 +187,12 @@ object JsonLDDecoder {
           itemDecoder match {
             case itemDecoder: JsonLDEntityDecoder[I] =>
               val allEntitiesMap = jsons.toList.flatMap(json => json.cursor.as[(EntityId, JsonLDEntity)].toList)
-              val validEntities =
-                allEntitiesMap.filter(_._2.cursor.downType(itemDecoder.entityTypes.list.toList: _*) != Cursor.Empty)
+              val validEntities = allEntitiesMap.filter { case (_, entity) =>
+                itemDecoder.allowedEntityTypes.exists(allowed => entity.entityTypes.exists(_.contains(allowed)))
+              }
               validEntities.map(t => itemDecoder(new FlattenedJsonCursor(cursor, t._2, allEntitiesMap.toMap))).sequence
             case itemDecoder: JsonLDDecoder[I] =>
-              jsons.toList.map(v => itemDecoder(new ListItemCursor(cursor, v))).sequence
+              jsons.toList.map(json => itemDecoder(new ListItemCursor(cursor, json))).sequence
           }
         case entity @ JsonLDEntity(_, _, _, _) => entity.cursor.as[I].map(List(_))
         case json                              => DecodingFailure(s"Cannot decode $json to List", Nil).asLeft

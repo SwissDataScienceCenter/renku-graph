@@ -18,8 +18,9 @@
 
 package ch.datascience.graph.model.testentities
 
-import ch.datascience.graph.model.RenkuBaseUrl
+import ch.datascience.graph.model.{RenkuBaseUrl, entities, publicationEvents}
 import ch.datascience.graph.model.publicationEvents._
+import cats.syntax.all._
 
 final case class PublicationEvent(about:            AboutEvent,
                                   maybeDescription: Option[Description],
@@ -32,6 +33,16 @@ object PublicationEvent {
 
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
+
+  implicit lazy val toEntitiesPublicationEvent: PublicationEvent => entities.PublicationEvent = publicationEvent =>
+    entities.PublicationEvent(
+      publicationEvents.ResourceId(publicationEvent.asEntityId.show),
+      publicationEvent.about,
+      publicationEvent.maybeDescription,
+      publicationEvent.location,
+      publicationEvent.name,
+      publicationEvent.startDate
+    )
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[PublicationEvent] =
     JsonLDEncoder.instance { case event @ PublicationEvent(about, maybeDescription, location, name, startDate) =>

@@ -18,7 +18,8 @@
 
 package ch.datascience.graph.model.testentities
 
-import ch.datascience.graph.model.CliVersion
+import cats.syntax.all._
+import ch.datascience.graph.model.{CliVersion, agents, entities}
 
 final case class Agent(cliVersion: CliVersion)
 
@@ -28,6 +29,9 @@ object Agent {
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
+  implicit lazy val toEntitiesAgent: Agent => entities.Agent = agent =>
+    entities.Agent(agents.ResourceId(agent.asEntityId.show), toLabel(agent.cliVersion))
+
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[Agent] = JsonLDEncoder.instance { entity =>
     JsonLD.entity(
       EntityId of s"https://github.com/swissdatasciencecenter/renku-python/tree/v${entity.cliVersion}",
@@ -35,7 +39,14 @@ object Agent {
         prov / "SoftwareAgent",
         wfprov / "WorkflowEngine"
       ),
-      rdfs / "label" -> s"renku ${entity.cliVersion}".asJsonLD
+      rdfs / "label" -> toLabel(entity.cliVersion).asJsonLD
     )
   }
+
+  private def toLabel(cliVersion: CliVersion): agents.Label = s"renku $cliVersion"
+
+  implicit lazy val entityIdEncoder: EntityIdEncoder[Agent] =
+    EntityIdEncoder.instance(entity =>
+      EntityId of s"https://github.com/swissdatasciencecenter/renku-python/tree/v${entity.cliVersion}"
+    )
 }

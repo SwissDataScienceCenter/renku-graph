@@ -78,7 +78,7 @@ abstract class Cursor {
               case cursor: FlattenedJsonCursor => FlattenedArrayCursor(cursor, entities, cursor.allEntities)
               case cursor => new ArrayCursor(cursor, entities)
             }
-          case _ => throw new UnsupportedOperationException("needs implementation")
+          case _ => Empty
         }
     case array @ JsonLDArray(_) =>
       this match {

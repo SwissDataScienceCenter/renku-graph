@@ -45,7 +45,7 @@ class KGProjectFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
     }
 
     "return details of the project with the given path if it has a parent project" in new TestCase {
-      forAll(projectWitParentEntities(visibilityAny)) { project =>
+      forAll(projectWithParentEntities(visibilityAny)) { project =>
         loadToStore(project)
 
         metadataFinder.findProject(project.path).unsafeRunSync() shouldBe Some(project.to[KGProject])

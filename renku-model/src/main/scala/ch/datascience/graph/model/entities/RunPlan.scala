@@ -52,7 +52,6 @@ sealed trait RunPlanOps {
 }
 
 object RunPlan {
-  import ch.datascience.graph.model.views.TinyTypeJsonLDEncoders._
   import io.renku.jsonld.syntax._
   import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 
@@ -77,7 +76,6 @@ object RunPlan {
   }
 
   implicit lazy val decoder: JsonLDDecoder[RunPlan] = JsonLDDecoder.entity(entityTypes) { cursor =>
-    import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
     for {
       resourceId            <- cursor.downEntityId.as[ResourceId]
       name                  <- cursor.downField(schema / "name").as[Name]

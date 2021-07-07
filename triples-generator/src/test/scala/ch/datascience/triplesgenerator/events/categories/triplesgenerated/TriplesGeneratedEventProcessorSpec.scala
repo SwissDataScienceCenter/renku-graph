@@ -310,7 +310,7 @@ class TriplesGeneratedEventProcessorSpec
     val context               = MonadError[Try, Throwable]
     val triplesGeneratedEvent = triplesGeneratedEvents.generateOne
 
-    val maybeAccessToken = Gen.option(accessTokens).generateOne
+    implicit val maybeAccessToken: Option[AccessToken] = Gen.option(accessTokens).generateOne
 
     val accessTokenFinder     = mock[AccessTokenFinder[Try]]
     val triplesTransformer    = mock[TriplesTransformer[Try]]
@@ -349,8 +349,10 @@ class TriplesGeneratedEventProcessorSpec
 
     def givenDeserialization(event:     TriplesGeneratedEvent,
                              returning: EitherT[Try, ProcessingRecoverableError, ProjectMetadata]
-    ) =
-      (jsonLDDeserializer.deserializeToModel _).expects(event).returning(returning)
+    ) = (jsonLDDeserializer
+      .deserializeToModel(_: TriplesGeneratedEvent)(_: Option[AccessToken]))
+      .expects(event, maybeAccessToken)
+      .returning(returning)
 
     def expectEventMarkedAsRecoverableFailure(event: TriplesGeneratedEvent, exception: Throwable) =
       (eventStatusUpdater.toFailure _)

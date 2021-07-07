@@ -18,20 +18,21 @@
 
 package ch.datascience.graph.model
 
+import ch.datascience.graph.model.views.TinyTypeJsonLDOps
 import ch.datascience.tinytypes.constraints.BoundedInstant
 import ch.datascience.tinytypes.{InstantTinyType, TinyTypeFactory}
 
 import java.time.Instant
 
 final class InvalidationTime private (val value: Instant) extends AnyVal with InstantTinyType
-object InvalidationTime extends TinyTypeFactory[InvalidationTime](new InvalidationTime(_)) with BoundedInstant {
+object InvalidationTime
+    extends TinyTypeFactory[InvalidationTime](new InvalidationTime(_))
+    with BoundedInstant
+    with TinyTypeJsonLDOps[InvalidationTime] {
+
   import cats.syntax.all._
-  import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders
-  import io.renku.jsonld.JsonLDDecoder
 
   import java.time.temporal.ChronoUnit.HOURS
 
   protected[this] override def maybeMax: Option[Instant] = now.plus(2, HOURS).some
-
-  implicit lazy val jsonLDDecoder: JsonLDDecoder[InvalidationTime] = TinyTypeJsonLDDecoders.instantDecoder(this)
 }

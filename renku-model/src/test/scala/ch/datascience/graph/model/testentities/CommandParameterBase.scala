@@ -18,13 +18,14 @@
 
 package ch.datascience.graph.model.testentities
 
-import ch.datascience.graph.model.RenkuBaseUrl
+import ch.datascience.graph.model.{RenkuBaseUrl, commandParameters, entities}
 import ch.datascience.graph.model.commandParameters.IOStream.{StdErr, StdIn, StdOut}
 import ch.datascience.graph.model.commandParameters._
 import ch.datascience.graph.model.entityModel.Location
 import eu.timepit.refined.auto._
 import io.renku.jsonld.JsonLDEncoder._
 import io.renku.jsonld._
+import cats.syntax.all._
 import io.renku.jsonld.syntax._
 
 sealed trait CommandParameterBase {
@@ -62,6 +63,17 @@ object CommandParameterBase {
                            defaultValue = value,
                            runPlan
           )
+
+    implicit lazy val toEntitiesCommandParameter: CommandParameter => entities.CommandParameterBase.CommandParameter =
+      parameter =>
+        entities.CommandParameterBase.CommandParameter(
+          commandParameters.ResourceId(parameter.asEntityId.show),
+          parameter.position,
+          parameter.name,
+          parameter.maybeDescription,
+          parameter.maybePrefix,
+          parameter.defaultValue
+        )
 
     implicit def commandParameterEncoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[CommandParameter] =
       JsonLDEncoder.instance {
@@ -149,6 +161,32 @@ object CommandParameterBase {
     )(implicit renkuBaseUrl:                                 RenkuBaseUrl)
         extends CommandInput {
       val mappedTo: IOStream.In = IOStream.StdIn(IOStream.ResourceId((renkuBaseUrl / "iostreams" / StdIn.name).value))
+    }
+
+    implicit lazy val toEntitiesCommandInput: CommandInput => entities.CommandParameterBase.CommandInput = {
+      case parameter: LocationCommandInput =>
+        entities.CommandParameterBase.LocationCommandInput(
+          commandParameters.ResourceId(parameter.asEntityId.show),
+          parameter.position,
+          parameter.name,
+          parameter.maybeDescription,
+          parameter.maybePrefix,
+          parameter.defaultValue,
+          parameter.temporary,
+          parameter.maybeEncodingFormat
+        )
+      case parameter: MappedCommandInput =>
+        entities.CommandParameterBase.MappedCommandInput(
+          commandParameters.ResourceId(parameter.asEntityId.show),
+          parameter.position,
+          parameter.name,
+          parameter.maybeDescription,
+          parameter.maybePrefix,
+          parameter.defaultValue,
+          parameter.temporary,
+          parameter.maybeEncodingFormat,
+          parameter.mappedTo
+        )
     }
 
     implicit def commandInputEncoder[I <: CommandInput](implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[I] =
@@ -278,6 +316,34 @@ object CommandParameterBase {
                                          mappedTo:            IOStream.Out,
                                          runPlan:             RunPlan
     ) extends CommandOutput
+
+    implicit lazy val toEntitiesCommandOutput: CommandOutput => entities.CommandParameterBase.CommandOutput = {
+      case parameter: LocationCommandOutput =>
+        entities.CommandParameterBase.LocationCommandOutput(
+          commandParameters.ResourceId(parameter.asEntityId.show),
+          parameter.position,
+          parameter.name,
+          parameter.maybeDescription,
+          parameter.maybePrefix,
+          parameter.defaultValue,
+          parameter.folderCreation,
+          parameter.temporary,
+          parameter.maybeEncodingFormat
+        )
+      case parameter: MappedCommandOutput =>
+        entities.CommandParameterBase.MappedCommandOutput(
+          commandParameters.ResourceId(parameter.asEntityId.show),
+          parameter.position,
+          parameter.name,
+          parameter.maybeDescription,
+          parameter.maybePrefix,
+          parameter.defaultValue,
+          parameter.folderCreation,
+          parameter.temporary,
+          parameter.maybeEncodingFormat,
+          parameter.mappedTo
+        )
+    }
 
     implicit def commandOutputEncoder[O <: CommandOutput](implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[O] =
       JsonLDEncoder.instance {

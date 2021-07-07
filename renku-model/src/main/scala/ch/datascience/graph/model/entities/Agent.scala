@@ -26,11 +26,10 @@ final case class Agent(resourceId: ResourceId, label: Label)
 
 object Agent {
 
-  private val entityTypes = EntityTypes.of(prov / "SoftwareAgent", wfprov / "WorkflowEngine")
+  val entityTypes: EntityTypes = EntityTypes.of(prov / "SoftwareAgent", wfprov / "WorkflowEngine")
 
   implicit lazy val encoder: JsonLDEncoder[Agent] = JsonLDEncoder.instance { agent =>
     import ch.datascience.graph.model.Schemas._
-    import ch.datascience.graph.model.views.TinyTypeJsonLDEncoders._
     import io.renku.jsonld.syntax._
 
     JsonLD.entity(
@@ -41,7 +40,6 @@ object Agent {
   }
 
   implicit lazy val decoder: JsonLDDecoder[Agent] = JsonLDDecoder.entity(entityTypes) { cursor =>
-    import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
     for {
       resourceId <- cursor.downEntityId.as[ResourceId]
       label      <- cursor.downField(rdfs / "label").as[Label]

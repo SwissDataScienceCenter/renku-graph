@@ -26,7 +26,7 @@ import ch.datascience.graph.model.entities.CommandParameterBase._
 import ch.datascience.graph.model.entityModel.{Location, LocationLike}
 import ch.datascience.graph.model.parameterValues._
 import io.circe.DecodingFailure
-import io.renku.jsonld.JsonLDDecoder
+import io.renku.jsonld.{JsonLDDecoder, JsonLDEntityDecoder}
 
 sealed trait ParameterValue {
   type ValueReference <: CommandParameterBase
@@ -68,7 +68,7 @@ object ParameterValue {
     type ValueReference = CommandOutput
   }
 
-  import ch.datascience.graph.model.views.TinyTypeJsonLDEncoders._
+  import io.renku.jsonld.JsonLDEncoder._
   import io.renku.jsonld.syntax._
   import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 
@@ -103,12 +103,12 @@ object ParameterValue {
         )
     }
 
-  def decoder(runPlan: RunPlan): JsonLDDecoder[ParameterValue] = cursor =>
-    pathParameterDecoder(runPlan)(cursor) orElse variableParameterDecoder(runPlan)(cursor)
+  def decoder(runPlan: RunPlan): JsonLDDecoder[ParameterValue] =
+    variableParameterDecoder(runPlan)
+      .orElse(pathParameterDecoder(runPlan).widen[ParameterValue])
 
-  private def pathParameterDecoder(runPlan: RunPlan): JsonLDDecoder[PathParameterValue] =
+  private def pathParameterDecoder(runPlan: RunPlan): JsonLDEntityDecoder[PathParameterValue] =
     JsonLDDecoder.entity(pathParameterTypes) { cursor =>
-      import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
       for {
         resourceId       <- cursor.downEntityId.as[ResourceId]
         name             <- cursor.downField(schema / "name").as[Name]
@@ -129,9 +129,8 @@ object ParameterValue {
       } yield parameterValue
     }
 
-  private def variableParameterDecoder(runPlan: RunPlan): JsonLDDecoder[VariableParameterValue] =
+  private def variableParameterDecoder(runPlan: RunPlan): JsonLDEntityDecoder[VariableParameterValue] =
     JsonLDDecoder.entity(variableParameterTypes) { cursor =>
-      import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
       for {
         resourceId       <- cursor.downEntityId.as[ResourceId]
         name             <- cursor.downField(schema / "name").as[Name]

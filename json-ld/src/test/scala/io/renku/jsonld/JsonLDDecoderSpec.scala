@@ -39,6 +39,7 @@ class JsonLDDecoderSpec
     with TableDrivenPropertyChecks {
 
   "emap" should {
+
     "use the given function to map the result" in {
       forAll { value: String =>
         val decoder = decodeString.emap(_.length.asRight[String])
@@ -189,19 +190,70 @@ class JsonLDDecoderSpec
         .cursor
         .as[List[ContainerHList]] shouldBe List(containerHList).asRight
     }
+
+    "encode an entity with fallback - case when fallback has the same types" in {
+      lazy val childTraitDecoder = childADecoder orElse childDecoder.widen[ChildTrait]
+
+      val childA = ChildA
+
+      val Right(actual) = childA.asJsonLD.cursor.as(childTraitDecoder)
+      actual shouldBe childA
+      actual shouldBe a[ChildA.type]
+
+      val Right(List(actualChild)) = JsonLD
+        .arr(childA.asJsonLD, ValuesContainer("container", List("1", "2")).asJsonLD)
+        .flatten
+        .fold(throw _, identity)
+        .cursor
+        .as(decodeList(childTraitDecoder))
+
+      actualChild shouldBe childA
+      actualChild shouldBe a[ChildA.type]
+
+      val childB              = Child("b")
+      val Right(actualChildB) = childB.asJsonLD.cursor.as(childTraitDecoder)
+      actualChildB shouldBe childB
+      actualChildB shouldBe a[Child]
+    }
+
+    "encode an entity with fallback - case when fallback has different types in" in {
+      lazy val decoder = valuesDecoder orElse childDecoder.widen[Entity]
+
+      val child = Child("b")
+      child.asJsonLD.cursor.as(decoder) shouldBe child.asRight
+
+      val values = ValuesContainer("container", List("1", "2"))
+      JsonLD
+        .arr(child.asJsonLD, values.asJsonLD)
+        .flatten
+        .fold(throw _, identity)
+        .cursor
+        .as(decodeList(decoder))
+        .map(_.toSet) shouldBe Set(child, values).asRight
+
+      JsonLD
+        .arr(child.asJsonLD)
+        .flatten
+        .fold(throw _, identity)
+        .cursor
+        .as(decodeList(decoder)) shouldBe List(child).asRight
+    }
   }
 
   private lazy val schema = Schema.from("http://io.renku")
 
-  private case class Parent(id: EntityId, types: EntityTypes, name: String, child: Child)
+  private sealed trait Entity
+  private case class Parent(id: EntityId, types: EntityTypes, name: String, child: Child) extends Entity
   private object Parent {
     val entityTypes: EntityTypes = EntityTypes.of(schema / "Parent")
 
     def apply(name: String, child: Child): Parent =
       Parent(EntityId.of(s"parent/$name"), entityTypes, name, child)
   }
-  private case class Child(name: String)
-  private case class ValuesContainer(name: String, tags: List[String])
+  private sealed trait ChildTrait extends Entity
+  private case class Child(name: String) extends ChildTrait
+  private object ChildA extends Child("a")
+  private case class ValuesContainer(name: String, tags: List[String]) extends Entity
   private case class ParentsContainer(name: String, parents: List[Parent])
   private case class ListOfList(name: String, list: List[List[String]])
   private case class ContainerHList(name: String, parent: Parent, child: Child)
@@ -216,6 +268,13 @@ class JsonLDDecoderSpec
   private implicit lazy val childEncoder: JsonLDEncoder[Child] = JsonLDEncoder.instance(child =>
     JsonLD.entity(EntityId.of(s"child/${child.name}"),
                   EntityTypes.of(schema / "Child"),
+                  schema / "name" -> child.name.asJsonLD
+    )
+  )
+
+  private implicit lazy val childAEncoder: JsonLDEncoder[ChildA.type] = JsonLDEncoder.instance(child =>
+    JsonLD.entity(EntityId.of(s"child/${child.name}"),
+                  EntityTypes.of(schema / "Child", schema / "ChildA"),
                   schema / "name" -> child.name.asJsonLD
     )
   )
@@ -258,7 +317,7 @@ class JsonLDDecoderSpec
       )
     )
 
-  private implicit lazy val parentDecoder: JsonLDDecoder[Parent] =
+  private implicit lazy val parentDecoder: JsonLDEntityDecoder[Parent] =
     JsonLDDecoder.entity(EntityTypes.of(schema / "Parent")) { cursor =>
       for {
         id    <- cursor.downEntityId.as[EntityId]
@@ -268,12 +327,20 @@ class JsonLDDecoderSpec
       } yield Parent(id, types, name, child)
     }
 
-  private implicit lazy val childDecoder: JsonLDDecoder[Child] =
+  private implicit lazy val childDecoder: JsonLDEntityDecoder[Child] =
     JsonLDDecoder.entity(EntityTypes.of(schema / "Child")) { cursor =>
       cursor.downField(schema / "name").as[String] map Child.apply
     }
 
-  private implicit lazy val valuesDecoder: JsonLDDecoder[ValuesContainer] =
+  private lazy val childADecoder: JsonLDEntityDecoder[ChildA.type] =
+    JsonLDDecoder.entity(EntityTypes.of(schema / "Child")) { cursor =>
+      cursor.downField(schema / "name").as[String] >>= {
+        case "a" => Right(ChildA)
+        case _   => Left(DecodingFailure("This is not a ChildA", Nil))
+      }
+    }
+
+  private implicit lazy val valuesDecoder: JsonLDEntityDecoder[ValuesContainer] =
     JsonLDDecoder.entity(EntityTypes.of(schema / "ValuesContainer")) { cursor =>
       for {
         name <- cursor.downField(schema / "name").as[String]

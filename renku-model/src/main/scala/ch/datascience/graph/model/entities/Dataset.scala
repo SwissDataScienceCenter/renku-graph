@@ -18,11 +18,14 @@
 
 package ch.datascience.graph.model.entities
 
-import Dataset._
+import cats.data.ValidatedNel
 import cats.syntax.all._
 import ch.datascience.graph.model.datasets._
+import ch.datascience.graph.model.entities.Dataset.{Provenance, _}
 import ch.datascience.graph.model.{GitLabApiUrl, InvalidationTime, projects}
 import io.circe.DecodingFailure
+
+import java.time.Instant
 
 final case class Dataset[+P <: Provenance](identification:        Identification,
                                            provenance:            P,
@@ -38,12 +41,55 @@ final case class Dataset[+P <: Provenance](identification:        Identification
 object Dataset {
 
   import ch.datascience.graph.model.Schemas._
-  import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
-  import ch.datascience.graph.model.views.TinyTypeJsonLDEncoders._
   import io.renku.jsonld.JsonLDDecoder._
   import io.renku.jsonld.JsonLDEncoder._
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
+
+  def from[P <: Provenance](identification:        Identification,
+                            provenance:            P,
+                            additionalInfo:        AdditionalInfo,
+                            publishing:            Publishing,
+                            parts:                 List[DatasetPart],
+                            projectResourceId:     projects.ResourceId,
+                            maybeInvalidationTime: Option[InvalidationTime]
+  ): ValidatedNel[String, Dataset[P]] = List(
+    validateDates(parts, identification)(provenance),
+    validate(maybeInvalidationTime, identification)(provenance)
+  ).sequence.map { _ =>
+    Dataset(identification, provenance, additionalInfo, publishing, parts, projectResourceId, maybeInvalidationTime)
+  }
+
+  private def validateDates[P <: Provenance](parts:          List[DatasetPart],
+                                             identification: Identification
+  ): P => ValidatedNel[String, Unit] = {
+    case p: Provenance.Internal                         => verifyDate(parts, identification, p.date.value)
+    case p: Provenance.ImportedExternal                 => verifyDate(parts, identification, p.date.instant)
+    case p: Provenance.ImportedInternalAncestorExternal => verifyDate(parts, identification, p.date.instant)
+    case _ => ().validNel[String]
+  }
+
+  private def verifyDate(parts:          List[DatasetPart],
+                         identification: Identification,
+                         datasetDate:    Instant
+  ): ValidatedNel[String, Unit] = parts
+    .map { part =>
+      if ((part.dateCreated.value compareTo datasetDate) >= 0) ().validNel[String]
+      else
+        s"Dataset ${identification.identifier} Part ${part.entity.location} startTime ${part.dateCreated} is older than Dataset $datasetDate".invalidNel
+    }
+    .sequence
+    .void
+
+  private def validate[P <: Provenance](
+      maybeInvalidationTime: Option[InvalidationTime],
+      identification:        Identification
+  ): P => ValidatedNel[String, Unit] = provenance =>
+    maybeInvalidationTime match {
+      case Some(time) if (time.value compareTo provenance.date.instant) < 0 =>
+        s"Dataset ${identification.identifier} invalidationTime $time is older than Dataset ${provenance.date}".invalidNel
+      case _ => ().validNel[String]
+    }
 
   final case class Identification(
       resourceId: ResourceId,
@@ -230,11 +276,11 @@ object Dataset {
                                                                                           Option[DerivedFrom],
                                                                                           Option[InitialVersion]
     ) => Result[Provenance] = {
-      case (Some(dateCreated), None, None, None, None, None) =>
+      case (Some(dateCreated), None, None, None, None, _) =>
         Internal(identification.resourceId, identification.identifier, dateCreated, creators).asRight
-      case (None, Some(datePublished), None, Some(sameAs), None, None) =>
+      case (None, Some(datePublished), None, Some(sameAs), None, _) =>
         ImportedExternal(identification.resourceId, identification.identifier, sameAs, datePublished, creators).asRight
-      case (Some(dateCreated), None, Some(sameAs), None, None, None) =>
+      case (Some(dateCreated), None, Some(sameAs), None, None, _) =>
         ImportedInternalAncestorInternal(identification.resourceId,
                                          identification.identifier,
                                          sameAs,
@@ -242,7 +288,7 @@ object Dataset {
                                          dateCreated,
                                          creators
         ).asRight
-      case (None, Some(datePublished), Some(sameAs), None, None, None) =>
+      case (None, Some(datePublished), Some(sameAs), None, None, _) =>
         ImportedInternalAncestorExternal(identification.resourceId,
                                          identification.identifier,
                                          sameAs,
@@ -360,7 +406,7 @@ object Dataset {
     }
   }
 
-  private val entityTypes = EntityTypes of (schema / "Dataset", prov / "Entity")
+  val entityTypes: EntityTypes = EntityTypes of (schema / "Dataset", prov / "Entity")
 
   implicit def encoder[P <: Provenance](implicit gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Dataset[P]] = {
     implicit class SerializationOps[T](obj: T) {
@@ -394,13 +440,11 @@ object Dataset {
       parts                 <- cursor.downField(schema / "hasPart").as[List[DatasetPart]]
       projectResourceId     <- cursor.downField(schema / "isPartOf").downEntityId.as[projects.ResourceId]
       maybeInvalidationTime <- cursor.downField(prov / "invalidatedAtTime").as[Option[InvalidationTime]]
-    } yield Dataset(identification,
-                    provenance,
-                    additionalInfo,
-                    publishing,
-                    parts,
-                    projectResourceId,
-                    maybeInvalidationTime
-    )
+      dataset <-
+        Dataset
+          .from(identification, provenance, additionalInfo, publishing, parts, projectResourceId, maybeInvalidationTime)
+          .toEither
+          .leftMap(errors => DecodingFailure(errors.intercalate("; "), Nil))
+    } yield dataset
   }
 }

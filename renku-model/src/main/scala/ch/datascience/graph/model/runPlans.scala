@@ -18,7 +18,7 @@
 
 package ch.datascience.graph.model
 
-import ch.datascience.graph.model.views.EntityIdJsonLdOps
+import ch.datascience.graph.model.views.{EntityIdJsonLdOps, TinyTypeJsonLDOps}
 import ch.datascience.tinytypes.{IntTinyType, StringTinyType, TinyTypeFactory}
 import ch.datascience.tinytypes.constraints.{NonBlank, NonNegativeInt, Url}
 
@@ -31,22 +31,29 @@ object runPlans {
       with EntityIdJsonLdOps[ResourceId]
 
   final class Name private (val value: String) extends AnyVal with StringTinyType
-  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank
+  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank with TinyTypeJsonLDOps[Name]
 
   final class Description private (val value: String) extends AnyVal with StringTinyType
-  implicit object Description extends TinyTypeFactory[Description](new Description(_)) with NonBlank
+  implicit object Description
+      extends TinyTypeFactory[Description](new Description(_))
+      with NonBlank
+      with TinyTypeJsonLDOps[Description]
 
   final class Command private (val value: String) extends AnyVal with StringTinyType
-  implicit object Command extends TinyTypeFactory[Command](new Command(_)) with NonBlank
+  implicit object Command extends TinyTypeFactory[Command](new Command(_)) with NonBlank with TinyTypeJsonLDOps[Command]
 
   final class Keyword private (val value: String) extends AnyVal with StringTinyType
-  implicit object Keyword extends TinyTypeFactory[Keyword](new Keyword(_)) with NonBlank
+  implicit object Keyword extends TinyTypeFactory[Keyword](new Keyword(_)) with NonBlank with TinyTypeJsonLDOps[Keyword]
 
   final class ProgrammingLanguage private (val value: String) extends AnyVal with StringTinyType
   implicit object ProgrammingLanguage
       extends TinyTypeFactory[ProgrammingLanguage](new ProgrammingLanguage(_))
       with NonBlank
+      with TinyTypeJsonLDOps[ProgrammingLanguage]
 
   final class SuccessCode private (val value: Int) extends AnyVal with IntTinyType
-  implicit object SuccessCode extends TinyTypeFactory[SuccessCode](new SuccessCode(_)) with NonNegativeInt
+  implicit object SuccessCode
+      extends TinyTypeFactory[SuccessCode](new SuccessCode(_))
+      with NonNegativeInt
+      with TinyTypeJsonLDOps[SuccessCode]
 }

@@ -18,8 +18,11 @@
 
 package ch.datascience.graph.model.entities
 
+import cats.data.ValidatedNel
+import cats.syntax.all._
 import ch.datascience.graph.model.InvalidationTime
 import ch.datascience.graph.model.datasets.{DateCreated, PartExternal, PartResourceId, PartSource, Url}
+import io.circe.DecodingFailure
 
 final case class DatasetPart(
     resourceId:            PartResourceId,
@@ -33,8 +36,30 @@ final case class DatasetPart(
 
 object DatasetPart {
 
+  def from(resourceId:            PartResourceId,
+           external:              PartExternal,
+           entity:                Entity,
+           dateCreated:           DateCreated,
+           maybeUrl:              Option[Url],
+           maybeSource:           Option[PartSource],
+           maybeInvalidationTime: Option[InvalidationTime]
+  ): ValidatedNel[String, DatasetPart] =
+    validate(maybeInvalidationTime, entity, dateCreated).map { _ =>
+      DatasetPart(resourceId, external, entity, dateCreated, maybeUrl, maybeSource, maybeInvalidationTime)
+    }
+
+  private def validate(
+      maybeInvalidationTime: Option[InvalidationTime],
+      entity:                Entity,
+      dateCreated:           DateCreated
+  ): ValidatedNel[String, Unit] =
+    maybeInvalidationTime match {
+      case Some(time) if (time.value compareTo dateCreated.value) < 0 =>
+        s"DatasetPart ${entity.location} invalidationTime $time is older than DatasetPart ${dateCreated.value}".invalidNel
+      case _ => ().validNel[String]
+    }
+
   import ch.datascience.graph.model.Schemas._
-  import ch.datascience.graph.model.views.TinyTypeJsonLDEncoders._
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
@@ -54,7 +79,6 @@ object DatasetPart {
   }
 
   implicit lazy val decoder: JsonLDDecoder[DatasetPart] = JsonLDDecoder.entity(entityTypes) { cursor =>
-    import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
     for {
       resourceId            <- cursor.downEntityId.as[PartResourceId]
       external              <- cursor.downField(renku / "external").as[PartExternal]
@@ -63,6 +87,10 @@ object DatasetPart {
       maybeUrl              <- cursor.downField(schema / "url").as[Option[Url]]
       maybeSource           <- cursor.downField(renku / "source").as[Option[PartSource]]
       maybeInvalidationTime <- cursor.downField(prov / "invalidatedAtTime").as[Option[InvalidationTime]]
-    } yield DatasetPart(resourceId, external, entity, dateCreated, maybeUrl, maybeSource, maybeInvalidationTime)
+      part <- DatasetPart
+                .from(resourceId, external, entity, dateCreated, maybeUrl, maybeSource, maybeInvalidationTime)
+                .toEither
+                .leftMap(errors => DecodingFailure(errors.intercalate("; "), Nil))
+    } yield part
   }
 }

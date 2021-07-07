@@ -18,8 +18,9 @@
 
 package ch.datascience.graph.model
 
-import ch.datascience.graph.model.views.UrlResourceRenderer
+import ch.datascience.graph.model.views.{TinyTypeJsonLDOps, UrlResourceRenderer}
 import ch.datascience.tinytypes.constraints.{NonBlank, Url, UrlOps}
+import ch.datascience.tinytypes.json.TinyTypeDecoders
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
@@ -46,12 +47,11 @@ object GitLabApiUrl
 }
 
 final class CliVersion private (val value: String) extends AnyVal with StringTinyType
-object CliVersion extends TinyTypeFactory[CliVersion](new CliVersion(_)) with NonBlank {
-  import ch.datascience.tinytypes.json.TinyTypeDecoders
-  import io.circe.Decoder
-
-  implicit val jsonDecoder: Decoder[CliVersion]         = TinyTypeDecoders.stringDecoder(this)
-  implicit val factory:     TinyTypeFactory[CliVersion] = CliVersion
+object CliVersion
+    extends TinyTypeFactory[CliVersion](new CliVersion(_))
+    with NonBlank
+    with TinyTypeJsonLDOps[CliVersion] {
+  implicit val jsonDecoder: Decoder[CliVersion] = TinyTypeDecoders.stringDecoder(this)
 }
 
 final case class RenkuVersionPair(cliVersion: CliVersion, schemaVersion: SchemaVersion)
@@ -71,8 +71,9 @@ object RenkuVersionPair {
 }
 
 final class SchemaVersion private (val value: String) extends AnyVal with StringTinyType
-object SchemaVersion extends TinyTypeFactory[SchemaVersion](new SchemaVersion(_)) with NonBlank {
-  import ch.datascience.tinytypes.json.TinyTypeDecoders._
-  implicit val decoder: Decoder[SchemaVersion]         = stringDecoder(SchemaVersion)
-  implicit val factory: TinyTypeFactory[SchemaVersion] = SchemaVersion
+object SchemaVersion
+    extends TinyTypeFactory[SchemaVersion](new SchemaVersion(_))
+    with NonBlank
+    with TinyTypeJsonLDOps[SchemaVersion] {
+  implicit val jsonDecoder: Decoder[SchemaVersion] = TinyTypeDecoders.stringDecoder(SchemaVersion)
 }

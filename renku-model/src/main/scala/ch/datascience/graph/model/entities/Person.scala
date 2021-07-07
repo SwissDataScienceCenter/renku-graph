@@ -22,7 +22,6 @@ import cats.syntax.all._
 import ch.datascience.graph.model.GitLabApiUrl
 import ch.datascience.graph.model.users.{Affiliation, Email, GitLabId, Name, ResourceId}
 import io.circe.DecodingFailure
-import io.renku.jsonld.JsonLDEncoder.encodeOption
 import io.renku.jsonld._
 
 final case class Person(
@@ -36,10 +35,11 @@ final case class Person(
 object Person {
 
   import ch.datascience.graph.model.Schemas._
-  import ch.datascience.graph.model.views.TinyTypeJsonLDEncoders._
+  import io.renku.jsonld.JsonLDDecoder.decodeOption
+  import io.renku.jsonld.JsonLDEncoder.encodeOption
   import io.renku.jsonld.syntax._
 
-  private val entityTypes = EntityTypes.of(prov / "Person", schema / "Person")
+  val entityTypes: EntityTypes = EntityTypes.of(prov / "Person", schema / "Person")
 
   implicit def encoder(implicit gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Person] =
     JsonLDEncoder.instance { person =>
@@ -67,17 +67,14 @@ object Person {
       )
   }
 
-  import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
-  import io.renku.jsonld.JsonLDDecoder._
-
   implicit lazy val decoder: JsonLDDecoder[Person] = JsonLDDecoder.entity(entityTypes) { cursor =>
     for {
       resourceId       <- cursor.downEntityId.as[ResourceId]
       name             <- cursor.downField(schema / "name").as[Name]
-      maybeEmail       <- cursor.downField(schema / "email").as[Option[Email]]
+      emailsList       <- cursor.downField(schema / "email").as[List[Email]]
       maybeAffiliation <- cursor.downField(schema / "affiliation").as[Option[Affiliation]]
       maybeGitLabId    <- cursor.downField(schema / "sameAs").as[Option[GitLabId]](decodeOption(gitLabIdDecoder))
-    } yield Person(resourceId, name, maybeEmail, maybeAffiliation, maybeGitLabId)
+    } yield Person(resourceId, name, emailsList.headOption, maybeAffiliation, maybeGitLabId)
   }
 
   private lazy val gitLabIdDecoder: JsonLDDecoder[GitLabId] = JsonLDDecoder.entity(gitLabSameAsTypes) { cursor =>

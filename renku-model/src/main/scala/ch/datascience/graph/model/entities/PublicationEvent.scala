@@ -30,7 +30,6 @@ final case class PublicationEvent(resourceId:       ResourceId,
 
 object PublicationEvent {
   import ch.datascience.graph.model.Schemas._
-  import ch.datascience.graph.model.views.TinyTypeJsonLDEncoders._
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
@@ -50,7 +49,6 @@ object PublicationEvent {
     }
 
   implicit lazy val decoder: JsonLDDecoder[PublicationEvent] = JsonLDDecoder.entity(entityTypes) { cursor =>
-    import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
     for {
       resourceId       <- cursor.downEntityId.as[ResourceId]
       about            <- cursor.downField(schema / "about").as[AboutEvent]

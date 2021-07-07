@@ -21,8 +21,7 @@ package ch.datascience.graph.model
 import cats.syntax.all._
 import ch.datascience.graph.model.Schemas.renku
 import ch.datascience.graph.model.entityModel.{Location, LocationLike}
-import ch.datascience.graph.model.views.EntityIdJsonLdOps
-import ch.datascience.graph.model.views.TinyTypeJsonLDEncoders._
+import ch.datascience.graph.model.views.{EntityIdJsonLdOps, TinyTypeJsonLDOps}
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints.{NonBlank, PositiveInt, Url}
 import eu.timepit.refined.api.Refined
@@ -41,33 +40,42 @@ object commandParameters {
       with EntityIdJsonLdOps[ResourceId]
 
   final class Name private (val value: String) extends AnyVal with StringTinyType
-  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank
+  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank with TinyTypeJsonLDOps[Name]
 
   final class Position private (val value: Int) extends AnyVal with IntTinyType
-  implicit object Position extends TinyTypeFactory[Position](new Position(_)) with PositiveInt {
+  implicit object Position
+      extends TinyTypeFactory[Position](new Position(_))
+      with PositiveInt
+      with TinyTypeJsonLDOps[Position] {
     val first:  Position = Position(1)
     val second: Position = Position(2)
     val third:  Position = Position(3)
   }
 
   final class Description private (val value: String) extends AnyVal with StringTinyType
-  implicit object Description extends TinyTypeFactory[Description](new Description(_)) with NonBlank
+  implicit object Description
+      extends TinyTypeFactory[Description](new Description(_))
+      with NonBlank
+      with TinyTypeJsonLDOps[Description]
 
   final class EncodingFormat private (val value: String) extends AnyVal with StringTinyType
-  implicit object EncodingFormat extends TinyTypeFactory[EncodingFormat](new EncodingFormat(_)) with NonBlank
+  implicit object EncodingFormat
+      extends TinyTypeFactory[EncodingFormat](new EncodingFormat(_))
+      with NonBlank
+      with TinyTypeJsonLDOps[EncodingFormat]
 
   final class Temporary private (val value: Boolean) extends AnyVal with BooleanTinyType
-  implicit object Temporary extends TinyTypeFactory[Temporary](new Temporary(_)) {
+  implicit object Temporary extends TinyTypeFactory[Temporary](new Temporary(_)) with TinyTypeJsonLDOps[Temporary] {
     val temporary:    Temporary = Temporary(true)
     val nonTemporary: Temporary = Temporary(false)
   }
 
   final class Prefix private (val value: String) extends AnyVal with StringTinyType
-  implicit object Prefix extends TinyTypeFactory[Prefix](new Prefix(_)) with NonBlank
+  implicit object Prefix extends TinyTypeFactory[Prefix](new Prefix(_)) with NonBlank with TinyTypeJsonLDOps[Prefix]
 
   final case class InputDefaultValue(value: LocationLike) extends TinyType { type V = LocationLike }
   object InputDefaultValue {
-    implicit val jsonLDEncoder: JsonLDEncoder[InputDefaultValue] = JsonLDEncoder[LocationLike].contramap(_.value)
+    implicit val jsonLDEncoder: JsonLDEncoder[InputDefaultValue] = JsonLDEncoder.encodeString.contramap(_.value.value)
 
     implicit val jsonLDDecoder: JsonLDDecoder[InputDefaultValue] =
       JsonLDDecoder[Location.FileOrFolder].emap(InputDefaultValue(_).asRight[String])
@@ -75,14 +83,16 @@ object commandParameters {
 
   final case class OutputDefaultValue(value: LocationLike) extends TinyType { type V = LocationLike }
   implicit object OutputDefaultValue {
-    implicit val jsonLDEncoder: JsonLDEncoder[OutputDefaultValue] = JsonLDEncoder[LocationLike].contramap(_.value)
+    implicit val jsonLDEncoder: JsonLDEncoder[OutputDefaultValue] = JsonLDEncoder.encodeString.contramap(_.value.value)
 
     implicit val jsonLDDecoder: JsonLDDecoder[OutputDefaultValue] =
       JsonLDDecoder[Location.FileOrFolder].emap(OutputDefaultValue(_).asRight[String])
   }
 
   final class FolderCreation private (val value: Boolean) extends AnyVal with BooleanTinyType
-  implicit object FolderCreation extends TinyTypeFactory[FolderCreation](new FolderCreation(_)) {
+  implicit object FolderCreation
+      extends TinyTypeFactory[FolderCreation](new FolderCreation(_))
+      with TinyTypeJsonLDOps[FolderCreation] {
     val no:  FolderCreation = FolderCreation(false)
     val yes: FolderCreation = FolderCreation(true)
   }
@@ -91,6 +101,7 @@ object commandParameters {
   implicit object ParameterDefaultValue
       extends TinyTypeFactory[ParameterDefaultValue](new ParameterDefaultValue(_))
       with NonBlank
+      with TinyTypeJsonLDOps[ParameterDefaultValue]
 
   sealed abstract class IOStream(val resourceId: IOStream.ResourceId, val name: String Refined NonEmpty) {
     override lazy val toString: String = name.toString()
@@ -127,7 +138,6 @@ object commandParameters {
 
     implicit lazy val stdInDecoder: JsonLDDecoder[IOStream.In] =
       JsonLDDecoder.entity(entityTypes) { cursor =>
-        import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
         for {
           resourceId <- cursor.downEntityId.as[ResourceId]
           _ <- cursor.downField(renku / "streamType").as[String] >>= {
@@ -139,7 +149,6 @@ object commandParameters {
 
     implicit lazy val stdOutDecoder: JsonLDDecoder[IOStream.Out] =
       JsonLDDecoder.entity(entityTypes) { cursor =>
-        import ch.datascience.graph.model.views.TinyTypeJsonLDDecoders._
         for {
           resourceId <- cursor.downEntityId.as[ResourceId]
           stdOut <- cursor.downField(renku / "streamType").as[String] >>= {

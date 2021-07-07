@@ -20,11 +20,10 @@ package ch.datascience.graph.model
 
 import cats.kernel.Semigroup
 import ch.datascience.graph.model.datasets.SameAs
-import ch.datascience.graph.model.views.TinyTypeJsonLDEncoders
 import ch.datascience.tinytypes.constraints._
 import io.renku.jsonld._
 
-package object testentities extends Schemas with EntitiesGenerators with ModelOps with TinyTypeJsonLDEncoders {
+package object testentities extends Schemas with EntitiesGenerators with ModelOps {
 
   implicit val renkuBaseUrlToEntityId: RenkuBaseUrl => EntityId = url => EntityId of url.value
 

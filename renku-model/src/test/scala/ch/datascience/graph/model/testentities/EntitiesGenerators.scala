@@ -28,11 +28,12 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model._
 import ch.datascience.graph.model.commandParameters.ParameterDefaultValue
 import ch.datascience.graph.model.datasets.{Date, DerivedFrom, ExternalSameAs, Identifier, InitialVersion, PartId, TopmostSameAs}
+import ch.datascience.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import ch.datascience.graph.model.entityModel.{Checksum, Location}
 import ch.datascience.graph.model.parameterValues.ValueOverride
 import ch.datascience.graph.model.projects.{ForksCount, Visibility}
 import ch.datascience.graph.model.publicationEvents.AboutEvent
-import ch.datascience.graph.model.testentities.Entity.InputEntity
+import ch.datascience.graph.model.testentities.Entity.{InputEntity, OutputEntity}
 import ch.datascience.graph.model.users.{Email, GitLabId}
 import ch.datascience.tinytypes.InstantTinyType
 import eu.timepit.refined.api.Refined
@@ -40,6 +41,7 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import org.scalacheck.Gen
 
+import java.nio.charset.StandardCharsets._
 import java.time.Instant
 
 object EntitiesGenerators extends EntitiesGenerators
@@ -75,15 +77,25 @@ trait EntitiesGenerators {
   implicit val runPlanCommands: Gen[runPlans.Command] = nonBlankStrings().map(_.value).generateAs[runPlans.Command]
   implicit val runPlanProgrammingLanguages: Gen[runPlans.ProgrammingLanguage] =
     nonBlankStrings().map(_.value).generateAs[runPlans.ProgrammingLanguage]
+  implicit val runPlanSuccessCodes: Gen[runPlans.SuccessCode] =
+    positiveInts().map(_.value).generateAs[runPlans.SuccessCode]
 
   implicit val commandParameterNames: Gen[commandParameters.Name] =
     nonBlankStrings().map(_.value).generateAs[commandParameters.Name]
+  implicit val commandParameterTemporaries: Gen[commandParameters.Temporary] =
+    Gen.oneOf(commandParameters.Temporary.temporary, commandParameters.Temporary.nonTemporary)
+  implicit val commandParameterEncodingFormats: Gen[commandParameters.EncodingFormat] =
+    Gen
+      .oneOf(UTF_8.name(), US_ASCII.name(), ISO_8859_1.name, UTF_16.name(), nonEmptyStrings().generateOne)
+      .map(commandParameters.EncodingFormat(_))
+  implicit val commandParameterFolderCreation: Gen[commandParameters.FolderCreation] =
+    Gen.oneOf(commandParameters.FolderCreation.yes, commandParameters.FolderCreation.no)
 
   lazy val visibilityPublic:    Gen[Visibility] = fixed(Visibility.Public)
   lazy val visibilityNonPublic: Gen[Visibility] = Gen.oneOf(Visibility.Internal, Visibility.Private)
   lazy val visibilityAny:       Gen[Visibility] = projectVisibilities
 
-  def projectWitParentEntities(
+  def projectWithParentEntities(
       visibilityGen:  Gen[Visibility],
       minDateCreated: projects.DateCreated = projects.DateCreated(Instant.EPOCH)
   ): Gen[ProjectWithParent[ForksCount.Zero]] =
@@ -118,6 +130,22 @@ trait EntitiesGenerators {
     positiveInts(max = 100) map ForksCount.apply
   val anyForksCount: Gen[ForksCount] = Gen.oneOf(zeroForksProject, nonZeroForksProject)
   def fixedForksCount(count: Int Refined Positive): Gen[ForksCount.NonZero] = ForksCount(count)
+
+  implicit lazy val gitLabProjectInfos: Gen[GitLabProjectInfo] = for {
+    name            <- projectNames
+    path            <- projectPaths
+    dateCreated     <- projectCreatedDates()
+    maybeCreator    <- gitLabProjectMemberObjects.toGeneratorOfOptions
+    members         <- gitLabProjectMemberObjects.toGeneratorOfSet()
+    visibility      <- projectVisibilities
+    maybeParentPath <- projectPaths.toGeneratorOfOptions
+  } yield GitLabProjectInfo(name, path, dateCreated, maybeCreator, members, visibility, maybeParentPath)
+
+  implicit lazy val gitLabProjectMemberObjects: Gen[ProjectMember] = for {
+    name     <- userNames
+    username <- usernames
+    gitLabId <- userGitLabIds
+  } yield ProjectMember(name, username, gitLabId)
 
   val datasetIdentifications: Gen[Dataset.Identification] = for {
     identifier <- datasetIdentifiers
@@ -323,10 +351,15 @@ trait EntitiesGenerators {
     startDate        <- timestamps(minDateCreated, max = Instant.now()) map publicationEvents.StartDate.apply
   } yield PublicationEvent(about, maybeDescription, location, name, startDate)
 
-  lazy val inputEntities: Gen[Entity] = for {
+  lazy val inputEntities: Gen[InputEntity] = for {
     location <- entityLocations
     checksum <- entityChecksums
   } yield InputEntity(location, checksum)
+
+  lazy val outputEntityFactories: Gen[Generation => OutputEntity] = for {
+    location <- entityLocations
+    checksum <- entityChecksums
+  } yield (generation: Generation) => OutputEntity(location, checksum, generation)
 
   implicit val agentEntities: Gen[Agent] = cliVersions map Agent.apply
 

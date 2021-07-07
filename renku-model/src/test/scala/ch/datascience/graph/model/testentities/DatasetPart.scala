@@ -18,7 +18,9 @@
 
 package ch.datascience.graph.model.testentities
 
+import cats.syntax.all._
 import ch.datascience.graph.model.datasets.{DateCreated, PartExternal, PartId, PartSource, Url}
+import ch.datascience.graph.model.{datasets, entities}
 
 case class DatasetPart(
     id:          PartId,
@@ -34,6 +36,29 @@ object DatasetPart {
   import ch.datascience.graph.model.RenkuBaseUrl
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
+
+  implicit lazy val toEntitiesDatasetPart: DatasetPart => entities.DatasetPart = {
+    case datasetPart: DatasetPart with HavingInvalidationTime =>
+      entities.DatasetPart(
+        datasets.PartResourceId(datasetPart.asEntityId.show),
+        datasetPart.external,
+        datasetPart.entity.to[entities.Entity],
+        datasetPart.dateCreated,
+        datasetPart.maybeUrl,
+        datasetPart.maybeSource,
+        datasetPart.invalidationTime.some
+      )
+    case datasetPart =>
+      entities.DatasetPart(
+        datasets.PartResourceId(datasetPart.asEntityId.show),
+        datasetPart.external,
+        datasetPart.entity.to[entities.Entity],
+        datasetPart.dateCreated,
+        datasetPart.maybeUrl,
+        datasetPart.maybeSource,
+        None
+      )
+  }
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[DatasetPart] =
     JsonLDEncoder.instance {
