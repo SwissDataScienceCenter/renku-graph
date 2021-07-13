@@ -20,6 +20,7 @@ package ch.datascience.commiteventservice.events.categories.globalcommitsync.eve
 
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.all._
+import ch.datascience.commiteventservice.events.categories.common.CommitInfo
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.{GitLabApiUrl, GitLabUrl}
@@ -93,7 +94,7 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[Interpretation[_]: Concu
   ): Interpretation[List[CommitId]] =
     for {
       pagePart     <- maybePage.map(page => s"?page=$page").getOrElse("").pure[Interpretation]
-      uri          <- validateUri(s"uriWithoutPage$pagePart")
+      uri          <- validateUri(s"$uriWithoutPage$pagePart")
       responsePair <- send(request(GET, uri, maybeAccessToken))(mapCommitResponse)
       allCommitIds <- addNextPage(uriWithoutPage,
                                   previouslyFetchedCommits,
@@ -121,7 +122,7 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[Interpretation[_]: Concu
   }
 
   private implicit val commitIdDecoder: EntityDecoder[Interpretation, List[CommitId]] =
-    jsonOf[Interpretation, List[CommitId]]
+    jsonOf[Interpretation, List[CommitInfo]].map((_.map(_.id)))
 
   private def addNextPage(
       baseUriString:            String,
