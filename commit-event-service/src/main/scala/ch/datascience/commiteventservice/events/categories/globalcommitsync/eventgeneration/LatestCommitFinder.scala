@@ -28,9 +28,8 @@ import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.{AccessToken, RestClient}
-import ch.datascience.tinytypes.json.TinyTypeDecoders._
-import io.circe.Decoder.{decodeList, decodeString}
-import io.circe.{Decoder, HCursor}
+import io.circe.Decoder
+import io.circe.Decoder.decodeList
 import org.http4s.circe.jsonOf
 import org.http4s.{EntityDecoder, Status}
 import org.typelevel.log4cats.Logger

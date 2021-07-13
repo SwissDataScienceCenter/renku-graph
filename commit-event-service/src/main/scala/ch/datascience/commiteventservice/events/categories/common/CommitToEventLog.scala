@@ -31,22 +31,23 @@ import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 private[categories] trait CommitToEventLog[Interpretation[_]] {
-  def storeCommitsInEventLog(project:     Project,
-                             startCommit: CommitInfo,
-                             batchDate:   BatchDate
+  def storeCommitInEventLog(project:     Project,
+                            startCommit: CommitInfo,
+                            batchDate:   BatchDate
   ): Interpretation[UpdateResult]
 }
 
 private[categories] class CommitToEventLogImpl[Interpretation[_]: MonadThrow](
-    commitEventSender: CommitEventSender[Interpretation] //TODO fix up tests
+    commitEventSender: CommitEventSender[Interpretation]
 ) extends CommitToEventLog[Interpretation] {
 
   import commitEventSender._
 
-  def storeCommitsInEventLog(project:     Project,
-                             startCommit: CommitInfo,
-                             batchDate:   BatchDate
+  def storeCommitInEventLog(project:     Project,
+                            startCommit: CommitInfo,
+                            batchDate:   BatchDate
   ): Interpretation[UpdateResult] = {
+    println(s"STORING: $startCommit")
     val commitEvent = toCommitEvent(project, batchDate)(startCommit)
     send(commitEvent).map(_ => Created).widen[UpdateResult] recover { case NonFatal(exception) =>
       Failed(failureMessageFor(commitEvent), exception)

@@ -16,14 +16,13 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.events.categories.commitsync
-package eventgeneration
-package historytraversal
+package ch.datascience.commiteventservice.events.categories.common
 
 import cats.syntax.all._
+import ch.datascience.commiteventservice.events.categories.commitsync.categoryName
 import ch.datascience.commiteventservice.events.categories.common.CommitEvent._
 import ch.datascience.commiteventservice.events.categories.common.Generators._
-import ch.datascience.commiteventservice.events.categories.common.{CommitEvent, CommitEventSender, CommitInfo, CommitToEventLogImpl}
+import ch.datascience.commiteventservice.events.categories.common.UpdateResult._
 import ch.datascience.events.consumers.Project
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -33,7 +32,6 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import ch.datascience.commiteventservice.events.categories.common.UpdateResult._
 
 import java.time.Instant
 import scala.util._
@@ -51,7 +49,7 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
         .expects(commitEvent)
         .returning(().pure[Try])
 
-      commitToEventLog.storeCommitsInEventLog(project, startCommit, batchDate) shouldBe Success(
+      commitToEventLog.storeCommitInEventLog(project, startCommit, batchDate) shouldBe Success(
         Created
       )
     }
@@ -67,7 +65,7 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
         .expects(commitEvent)
         .returning(().pure[Try])
 
-      commitToEventLog.storeCommitsInEventLog(project, skippedCommit, batchDate) shouldBe Success(
+      commitToEventLog.storeCommitInEventLog(project, skippedCommit, batchDate) shouldBe Success(
         Created
       )
     }
@@ -82,7 +80,7 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
         .expects(commitEvent)
         .returning(exception.raiseError[Try, Unit])
 
-      commitToEventLog.storeCommitsInEventLog(project, startCommit, batchDate) shouldBe
+      commitToEventLog.storeCommitInEventLog(project, startCommit, batchDate) shouldBe
         Failed(failedStoring(startCommit, project), exception).pure[Try]
     }
   }

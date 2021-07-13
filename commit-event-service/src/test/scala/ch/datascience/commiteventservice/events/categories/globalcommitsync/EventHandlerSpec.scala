@@ -1,8 +1,26 @@
+/*
+ * Copyright 2021 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ch.datascience.commiteventservice.events.categories.globalcommitsync
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.commiteventservice.events.categories.globalcommitsync.Generators.{globalCommitSyncEvents, globalCommitSyncEventsNonZero}
+import ch.datascience.commiteventservice.events.categories.globalcommitsync.Generators.globalCommitSyncEventsNonZero
 import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.GlobalCommitEventSynchronizer
 import ch.datascience.events.consumers.EventRequestContent
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
@@ -10,6 +28,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{exceptions, jsons}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
+import ch.datascience.tinytypes.json.TinyTypeEncoders._
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
@@ -38,7 +57,6 @@ class EventHandlerSpec
         (commitEventSynchronizer.synchronizeEvents _)
           .expects(event)
           .returning(().pure[IO])
-
         handler.handle(requestContent(event.asJson)).unsafeRunSync() shouldBe Accepted
 
         logger.loggedOnly(Info(s"${logMessageCommon(event)} -> $Accepted"))
@@ -118,8 +136,7 @@ class EventHandlerSpec
           "path":       ${project.path.value}
         },
         "lastSynced":   ${lastSynced.value},
-        "commitIds":    [${commitIds.mkString(", ")}]
+        "commitIds":    ${Json.arr(commitIds.map(_.asJson): _*)}
       }"""
   }
-
 }

@@ -20,7 +20,6 @@ package ch.datascience.commiteventservice.events.categories.commitsync
 
 import ch.datascience.events.consumers.Project
 import ch.datascience.graph.model.events.{CommitId, LastSyncedDate}
-import ch.datascience.graph.model.projects.{Id, Path, Visibility}
 
 private sealed trait CommitSyncEvent { val project: Project }
 
