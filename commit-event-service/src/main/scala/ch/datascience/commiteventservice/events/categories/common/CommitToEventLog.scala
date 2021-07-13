@@ -47,7 +47,6 @@ private[categories] class CommitToEventLogImpl[Interpretation[_]: MonadThrow](
                             startCommit: CommitInfo,
                             batchDate:   BatchDate
   ): Interpretation[UpdateResult] = {
-    println(s"STORING: $startCommit")
     val commitEvent = toCommitEvent(project, batchDate)(startCommit)
     send(commitEvent).map(_ => Created).widen[UpdateResult] recover { case NonFatal(exception) =>
       Failed(failureMessageFor(commitEvent), exception)

@@ -79,19 +79,6 @@ private class LatestCommitFinderImpl[Interpretation[_]: ConcurrentEffect: Timer]
     implicit val infosDecoder: Decoder[List[CommitInfo]] = decodeList[CommitInfo]
     jsonOf[Interpretation, List[CommitInfo]]
   }
-
-  // TODO: make this work
-//  private implicit val commitIdDecoder: Decoder[CommitId] = (cursor: HCursor) => {
-//    for {
-//      id <- cursor.downField("id").as[CommitId]
-//    } yield id
-//  }
-//
-//  private implicit val commitIdEntityDecoder: EntityDecoder[Interpretation, List[CommitId]] = {
-//    implicit val idDecoder: Decoder[List[CommitId]] = decodeList[CommitId](commitIdDecoder)
-//    jsonOf[Interpretation, List[CommitId]]
-//  }
-
 }
 
 private object LatestCommitFinder {
