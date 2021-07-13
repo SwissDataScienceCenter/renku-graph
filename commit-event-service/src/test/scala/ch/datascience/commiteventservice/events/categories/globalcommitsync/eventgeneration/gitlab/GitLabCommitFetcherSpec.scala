@@ -28,10 +28,9 @@ import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.http.client.RestClientError.UnauthorizedException
-import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
-import com.github.tomakehurst.wiremock.client.WireMock.{badRequest, equalTo, get, notFound, okJson, stubFor, unauthorized}
+import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Json
 import io.circe.literal._
 import org.http4s.Status
