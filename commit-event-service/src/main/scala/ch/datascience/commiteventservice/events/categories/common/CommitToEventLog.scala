@@ -16,15 +16,13 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.events.categories.commitsync
-package eventgeneration.historytraversal
+package ch.datascience.commiteventservice.events.categories.common
 
 import cats.effect._
 import cats.syntax.all._
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.UpdateResult
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.UpdateResult._
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.{CommitEvent, CommitInfo}
+import ch.datascience.commiteventservice.events.categories.commitsync.categoryName
+import ch.datascience.commiteventservice.events.categories.common.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
+import ch.datascience.commiteventservice.events.categories.common.UpdateResult._
 import ch.datascience.events.consumers.Project
 import ch.datascience.graph.model.events.BatchDate
 import org.typelevel.log4cats.Logger
@@ -32,22 +30,22 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-private[eventgeneration] trait CommitToEventLog[Interpretation[_]] {
-  def storeCommitsInEventLog(project:     Project,
-                             startCommit: CommitInfo,
-                             batchDate:   BatchDate
+private[categories] trait CommitToEventLog[Interpretation[_]] {
+  def storeCommitInEventLog(project:     Project,
+                            startCommit: CommitInfo,
+                            batchDate:   BatchDate
   ): Interpretation[UpdateResult]
 }
 
-private class CommitToEventLogImpl[Interpretation[_]: MonadThrow](
+private[categories] class CommitToEventLogImpl[Interpretation[_]: MonadThrow](
     commitEventSender: CommitEventSender[Interpretation]
 ) extends CommitToEventLog[Interpretation] {
 
   import commitEventSender._
 
-  def storeCommitsInEventLog(project:     Project,
-                             startCommit: CommitInfo,
-                             batchDate:   BatchDate
+  def storeCommitInEventLog(project:     Project,
+                            startCommit: CommitInfo,
+                            batchDate:   BatchDate
   ): Interpretation[UpdateResult] = {
     val commitEvent = toCommitEvent(project, batchDate)(startCommit)
     send(commitEvent).map(_ => Created).widen[UpdateResult] recover { case NonFatal(exception) =>
@@ -88,7 +86,7 @@ private class CommitToEventLogImpl[Interpretation[_]: MonadThrow](
 
 }
 
-private[eventgeneration] object CommitToEventLog {
+private[categories] object CommitToEventLog {
   def apply(
       logger: Logger[IO]
   )(implicit

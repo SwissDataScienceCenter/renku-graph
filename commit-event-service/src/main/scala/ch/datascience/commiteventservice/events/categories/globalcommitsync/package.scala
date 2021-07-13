@@ -16,19 +16,16 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.events.categories.commitsync
+package ch.datascience.commiteventservice.events.categories
 
-import ch.datascience.events.consumers.Project
-import ch.datascience.graph.model.events.{CommitId, LastSyncedDate}
+import ch.datascience.graph.model.events.CategoryName
 
-private sealed trait CommitSyncEvent { val project: Project }
+package object globalcommitsync {
+  val categoryName: CategoryName = CategoryName("GLOBAL_COMMIT_SYNC")
 
-private final case class FullCommitSyncEvent(id: CommitId, override val project: Project, lastSynced: LastSyncedDate)
-    extends CommitSyncEvent {
-  override lazy val toString: String =
-    s"id = $id, projectId = ${project.id}, projectPath = ${project.path}, lastSynced = $lastSynced"
-}
-private final case class MinimalCommitSyncEvent(override val project: Project) extends CommitSyncEvent {
-  override lazy val toString: String =
-    s"projectId = ${project.id}, projectPath = ${project.path}"
+  private[globalcommitsync] val logMessageCommon: GlobalCommitSyncEvent => String = {
+    case GlobalCommitSyncEvent(project, lastSynced, commits) =>
+      s"$categoryName: projectId = ${project.id}, projectPath = ${project.path}, lastSynced = $lastSynced, numberOfCommits = ${commits.length}"
+  }
+
 }

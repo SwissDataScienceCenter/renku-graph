@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.events
+package ch.datascience.commiteventservice.events.categories.common
 
 import cats.MonadThrow
 import cats.effect.{ConcurrentEffect, IO, Timer}
@@ -34,11 +34,11 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private trait EventStatusPatcher[Interpretation[_]] {
+private[categories] trait EventStatusPatcher[Interpretation[_]] {
   def sendDeletionStatus(projectId: projects.Id, eventId: CommitId): Interpretation[Unit]
 }
 
-private class EventStatusPatcherImpl[Interpretation[_]: MonadThrow: ConcurrentEffect: Timer](
+private[categories] class EventStatusPatcherImpl[Interpretation[_]: MonadThrow: ConcurrentEffect: Timer](
     logger:                  Logger[Interpretation],
     eventLogUrl:             EventLogUrl
 )(implicit executionContext: ExecutionContext)
@@ -60,7 +60,7 @@ private class EventStatusPatcherImpl[Interpretation[_]: MonadThrow: ConcurrentEf
 
 }
 
-private object EventStatusPatcher {
+private[categories] object EventStatusPatcher {
   def apply(logger:     Logger[IO])(implicit
       executionContext: ExecutionContext,
       concurrentEffect: ConcurrentEffect[IO],
