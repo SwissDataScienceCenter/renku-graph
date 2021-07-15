@@ -48,12 +48,12 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
 
       findMembers(project.path) shouldBe allMembers.flatMap(_.maybeGitLabId)
 
-      val query = updatesCreator.removal(
+      val queries = updatesCreator.removal(
         project.path,
         Set(memberToRemove0, memberToRemove1).toKGProjectMembers + kgProjectMembers.generateOne
       )
 
-      runUpdate(query).unsafeRunSync()
+      queries.map(runUpdate).sequence.unsafeRunSync()
 
       findMembers(project.path) shouldBe Set(memberToStay.maybeGitLabId).flatten
     }

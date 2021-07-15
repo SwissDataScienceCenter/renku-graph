@@ -79,13 +79,13 @@ class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.M
           .expects(projectPath, missingMembersWithIds)
           .returning(insertionQueries)
 
-        val removalQuery    = sparqlQueries.generateOne
+        val removalQueries  = sparqlQueries.generateNonEmptyList().toList
         val membersToRemove = Set(kgMemberMissingInGitLab)
         (updatesCreator.removal _)
           .expects(projectPath, membersToRemove)
-          .returning(removalQuery)
+          .returning(removalQueries)
 
-        (removalQuery +: insertionQueries).foreach { query =>
+        (removalQueries ::: insertionQueries).foreach { query =>
           (querySender.send _)
             .expects(query)
             .returning(().pure[Try])
