@@ -18,16 +18,15 @@
 
 package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration
 
-import cats.{Applicative, MonadThrow}
 import cats.data.StateT
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
+import cats.{Applicative, MonadThrow}
 import ch.datascience.commiteventservice.events.categories.commitsync._
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.SynchronizationSummary
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.SynchronizationSummary.{SummaryKey, SummaryState, add}
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.EventDetailsFinder
 import ch.datascience.commiteventservice.events.categories.common.UpdateResult._
-import ch.datascience.commiteventservice.events.categories.common.{CommitInfo, CommitInfoFinder, CommitToEventLog, CommitWithParents, EventStatusPatcher, UpdateResult}
+import ch.datascience.commiteventservice.events.categories.common._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.events.consumers.Project
@@ -106,19 +105,16 @@ private[commitsync] class CommitEventSynchronizerImpl[Interpretation[_]: MonadTh
             measureExecutionTime(
               getInfoFromELandGL(commitId, project)
                 .flatMap {
-                  case (_, Some(CommitInfo(DontCareCommitId, _, _, _, _, _))) =>
+                  case (None, Some(CommitInfo(DontCareCommitId, _, _, _, _, _))) =>
                     collectResult(Skipped, commitId, commitIds)
-                  case (Some(_), Some(_)) =>
-                    collectResult(Existed, commitId, commitIds)
+                  case (Some(commitFromEL), Some(CommitInfo(DontCareCommitId, _, _, _, _, _)) | None) =>
+                    sendDeletionStatusAndRecover(project.id, commitFromEL)
+                      .map((_, commitFromEL.id, commitFromEL.parents.filterNot(_ == DontCareCommitId) ::: commitIds))
+                  case (Some(_), Some(_)) => collectResult(Existed, commitId, Nil)
                   case (None, Some(commitFromGL)) =>
                     storeCommitInEventLog(project, commitFromGL, batchDate)
-                      .map(result =>
-                        (result, commitId, commitIds ++: commitFromGL.parents.filterNot(_ == DontCareCommitId))
-                      )
-                  case (Some(commitFromEL), None) =>
-                    sendDeletionStatusAndRecover(project.id, commitFromEL, commitId, commitIds)
-                  case _ =>
-                    collectResult(Skipped, commitId, commitIds)
+                      .map((_, commitId, commitFromGL.parents.filterNot(_ == DontCareCommitId) ::: commitIds))
+                  case _ => collectResult(Skipped, commitId, Nil)
                 }
                 .recoverWith { case NonFatal(error) =>
                   collectResult(Failed(s"Synchronization failed", error), commitId, commitIds)
@@ -142,15 +138,13 @@ private[commitsync] class CommitEventSynchronizerImpl[Interpretation[_]: MonadTh
   ): Interpretation[(UpdateResult, CommitId, List[CommitId])] = (result, commitId, commitIds).pure[Interpretation]
 
   private def sendDeletionStatusAndRecover(projectId:    projects.Id,
-                                           commitFromEL: CommitWithParents,
-                                           commitId:     CommitId,
-                                           commitIds:    List[CommitId]
-  ): Interpretation[(UpdateResult, CommitId, List[CommitId])] =
-    (sendDeletionStatus(projectId, commitFromEL.id).map(_ => Deleted: UpdateResult) recoverWith { case NonFatal(e) =>
+                                           commitFromEL: CommitWithParents
+  ): Interpretation[UpdateResult] =
+    sendDeletionStatus(projectId, commitFromEL.id).map(_ => Deleted: UpdateResult) recoverWith { case NonFatal(e) =>
       Failed(s"$categoryName - Commit Remover failed to send commit deletion status", e)
         .pure[Interpretation]
         .widen[UpdateResult]
-    }).map((_, commitId, commitIds ++: commitFromEL.parents.filterNot(_ == DontCareCommitId)))
+    }
 
   private def getInfoFromELandGL(commitId: CommitId, project: Project)(implicit
       maybeAccessToken:                    Option[AccessToken]
