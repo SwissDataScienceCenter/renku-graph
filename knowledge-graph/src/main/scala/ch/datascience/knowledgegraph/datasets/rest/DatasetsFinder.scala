@@ -148,7 +148,7 @@ private class DatasetsFinderImpl(
         |              WHERE { ?id text:query (schema:name schema:description schema:alternateName schema:keywords '$phrase') }
         |            } {
         |              ?id rdf:type <http://schema.org/Dataset>;
-        |              	renku:topmostSameAs ?sameAs.
+        |              	   renku:topmostSameAs ?sameAs.
         |            } UNION {
         |              ?id rdf:type <http://schema.org/Person>.
         |              ?luceneDsId schema:creator ?id;
@@ -161,6 +161,7 @@ private class DatasetsFinderImpl(
         |                renku:topmostSameAs ?sameAs;
         |                schema:isPartOf ?projectId ;
         |                prov:atLocation ?location .
+        |          ${projectMemberFilterQuery(maybeUser)}
         |          BIND(CONCAT(?location, "/metadata.yml") AS ?metaDataLocation).
         |          FILTER NOT EXISTS {
         |              # Removing dataset that have an activity that invalidates them
@@ -170,10 +171,9 @@ private class DatasetsFinderImpl(
         |                                 schema:isPartOf ?projectId .
         |          }
         |          FILTER NOT EXISTS {
-        |              ?someId prov:wasDerivedFrom/schema:url ?dsId.
-        |              ?someId schema:isPartOf ?projectId.
+        |              ?someId schema:isPartOf ?projectId; 
+        |                      prov:wasDerivedFrom/schema:url ?dsId.
         |          }
-        |          ${projectMemberFilterQuery(maybeUser)}
         |        }
         |      }
         |      GROUP BY ?sameAs
