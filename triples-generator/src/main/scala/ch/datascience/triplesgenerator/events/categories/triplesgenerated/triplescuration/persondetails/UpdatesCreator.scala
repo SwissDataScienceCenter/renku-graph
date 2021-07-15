@@ -61,9 +61,9 @@ private class UpdatesCreator(gitLabApiUrl: GitLabApiUrl) {
         s"""|DELETE { ?id ?property ?personId }
             |INSERT { ?id ?property $resource }
             |WHERE {
-            |  ?personId schema:sameAs ?maybeSameAsId.
             |  ?maybeSameAsId schema:additionalType 'GitLab';
-            |                 schema:identifier $gitLabId.
+            |                 schema:identifier $gitLabId ;
+            |                 ^schema:sameAs ?personId .
             |  ?id ?property ?personId
             |}
             |""".stripMargin
@@ -125,16 +125,16 @@ private class UpdatesCreator(gitLabApiUrl: GitLabApiUrl) {
           Prefixes.of(schema -> "schema", rdf -> "rdf"),
           s"""|DELETE { 
               |  $resource schema:sameAs ?sameAsId.
-              |  ?sameAsId rdf:type schema:URL.
-              |  ?sameAsId schema:identifier ?gitLabId.
-              |  ?sameAsId schema:additionalType 'GitLab'.
+              |  ?sameAsId rdf:type schema:URL ;
+              |            schema:identifier ?gitLabId ;
+              |            schema:additionalType 'GitLab' .
               |}
               |${INSERT(resource, gitLabId)}
               |WHERE  { 
               |  OPTIONAL { 
-              |    $resource schema:sameAs ?maybeSameAsId.
               |    ?maybeSameAsId schema:additionalType 'GitLab';
-              |                   schema:identifier ?gitLabId.
+              |                   schema:identifier ?gitLabId ;
+              |                   ^schema:sameAs $resource .
               |  }
               |  BIND (IF(BOUND(?maybeSameAsId), ?maybeSameAsId, "nonexisting") AS ?sameAsId)
               |}
@@ -146,15 +146,15 @@ private class UpdatesCreator(gitLabApiUrl: GitLabApiUrl) {
           Prefixes.of(schema -> "schema", rdf -> "rdf"),
           s"""|DELETE { 
               |  $resource schema:sameAs ?sameAsId.
-              |  ?sameAsId rdf:type schema:URL.
-              |  ?sameAsId schema:identifier ?gitLabId.
-              |  ?sameAsId schema:additionalType 'GitLab'.
+              |  ?sameAsId rdf:type schema:URL ;
+              |            schema:identifier ?gitLabId ;
+              |            schema:additionalType 'GitLab'.
               |}
               |WHERE  { 
               |  OPTIONAL { 
-              |    $resource schema:sameAs ?maybeSameAsId.
               |    ?maybeSameAsId schema:additionalType 'GitLab';
-              |                   schema:identifier ?gitLabId.
+              |                   schema:identifier ?gitLabId ; 
+              |                   ^schema:sameAs $resource .
               |  }
               |  BIND (IF(BOUND(?maybeSameAsId), ?maybeSameAsId, "nonexisting") AS ?sameAsId)
               |}
@@ -182,9 +182,9 @@ private class UpdatesCreator(gitLabApiUrl: GitLabApiUrl) {
         Prefixes.of(schema -> "schema"),
         s"""|DELETE { ?personId ?property ?value }
             |WHERE {
-            |  ?personId schema:sameAs ?maybeSameAsId.
             |  ?maybeSameAsId schema:additionalType 'GitLab';
-            |                 schema:identifier $gitLabId.
+            |                 schema:identifier $gitLabId ;
+            |                 ^schema:sameAs ?personId .
             |  FILTER (?personId != $resource)
             |  ?personId ?property ?value
             |}
