@@ -71,13 +71,10 @@ private class KGProjectMembersFinderImpl(
     s"""|SELECT DISTINCT ?memberId ?gitLabId
         |WHERE {
         |  ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]} rdf:type      <http://schema.org/Project>;
-        |                                                        schema:member ?memberId.
-        |                                                        
-        |  ?memberId  rdf:type      schema:Person;
-        |             schema:sameAs ?sameAsId.
-        |             
+        |                                                        schema:member ?memberId.                                                     
         |  ?sameAsId  schema:additionalType  'GitLab';
-        |             schema:identifier      ?gitLabId.
+        |             schema:identifier      ?gitLabId ;
+        |             ^schema:sameAs         ?memberId .
         |}
         |""".stripMargin
   )
