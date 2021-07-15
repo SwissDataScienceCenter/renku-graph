@@ -22,7 +22,6 @@ import cats.data.OptionT
 import cats.syntax.all._
 import ch.datascience.commiteventservice.events.categories.commitsync.Generators._
 import ch.datascience.commiteventservice.events.categories.common.Generators.commitInfos
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.EventDetailsFinder
 import ch.datascience.commiteventservice.events.categories.commitsync.{categoryName, logMessageCommon}
 import ch.datascience.commiteventservice.events.categories.common.{CommitInfo, CommitInfoFinder, CommitToEventLog, CommitWithParents, EventStatusPatcher}
 import ch.datascience.commiteventservice.events.categories.common.UpdateResult._
@@ -30,7 +29,7 @@ import ch.datascience.events.consumers.Project
 import ch.datascience.generators.CommonGraphGenerators.personalAccessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators.batchDates
+import ch.datascience.graph.model.EventsGenerators.{batchDates, commitIds}
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
@@ -46,6 +45,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.{Clock, ZoneId, ZoneOffset}
 import scala.util.{Failure, Success, Try}
+import eu.timepit.refined.auto._
 
 class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with MockFactory {
 
@@ -71,14 +71,14 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
     "succeed if the latest event in the Event Log  is already in EventLog and log the event as Existed" in new TestCase {
 
       val event            = fullCommitSyncEvents.generateOne
-      val latestCommitInfo = commitInfos.generateOne.copy(parents = List.empty[CommitId])
+      val latestCommitInfo = commitInfos.generateOne.copy(parents = commitIds.generateNonEmptyList().toList)
 
       givenAccessTokenIsFound(event.project.id)
 
       givenLatestCommitIsFound(latestCommitInfo, event.project.id)
 
       givenEventIsInEL(latestCommitInfo.id, event.project.id)(
-        CommitWithParents(latestCommitInfo.id, event.project.id, parents = List.empty[CommitId])
+        CommitWithParents(latestCommitInfo.id, event.project.id, parents = commitIds.generateNonEmptyList().toList)
       )
 
       givenCommitIsInGL(latestCommitInfo, event.project.id)
@@ -115,6 +115,37 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
         )
 
       }
+
+    "succeed if there is a new commit and the creation succeeds for the first commit and stops once ids are on both gitlab and EL" in new TestCase {
+      val event            = fullCommitSyncEvents.generateOne
+      val parentCommit     = commitInfos.generateOne
+      val latestCommitInfo = commitInfos.generateOne.copy(parents = List(parentCommit.id, commitIds.generateOne))
+
+      givenAccessTokenIsFound(event.project.id)
+
+      givenLatestCommitIsFound(latestCommitInfo, event.project.id)
+
+      givenEventIsNotInEL(latestCommitInfo, event.project.id)
+      givenCommitIsInGL(latestCommitInfo, event.project.id)
+
+      (commitToEventLog.storeCommitInEventLog _)
+        .expects(event.project, latestCommitInfo, batchDate)
+        .returning(Success(Created))
+
+      givenEventIsInEL(parentCommit.id, event.project.id)(
+        CommitWithParents(parentCommit.id, event.project.id, parentCommit.parents)
+      )
+      givenCommitIsInGL(parentCommit, event.project.id)
+
+      commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
+
+      logger.loggedOnly(
+        logNewEventFound(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime),
+        logNoNewEvents(parentCommit.id, event.project, executionTimeRecorder.elapsedTime),
+        logSummary(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime, created = 1, existed = 1)
+      )
+
+    }
 
     "succeed if there is a new commit and the creation succeeds for the commit and its parents" in new TestCase {
       val event            = fullCommitSyncEvents.generateOne
