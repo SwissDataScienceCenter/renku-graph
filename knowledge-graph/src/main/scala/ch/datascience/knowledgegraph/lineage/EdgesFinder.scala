@@ -72,32 +72,25 @@ private class EdgesFinderImpl(
   private def query(path: Path, maybeUser: Option[AuthUser]) = SparqlQuery.of(
     name = "lineage - edges",
     Prefixes.of(prov -> "prov", renku -> "renku", wfprov -> "wfprov", schema -> "schema"),
-    s"""|SELECT DISTINCT ?runPlan ?date ?sourceEntityLocation ?targetEntityLocation
-        |WHERE {
-        |  {
-        |    ${projectMemberFilterQuery(ResourceId(renkuBaseUrl, path).showAs[RdfResource])(maybeUser)}
-        |    ?sourceEntity schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
-        |                  prov:atLocation ?sourceEntityLocation.
-        |    ?runPlan schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
-        |             renku:hasInputs/renku:consumes ?sourceEntity.
-        |    ?activity schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
-        |              prov:qualifiedAssociation/prov:hadPlan ?runPlan;
-        |              prov:startedAtTime ?date.
-        |    FILTER NOT EXISTS {?activity a wfprov:WorkflowRun}
-        |  } UNION {
-        |    ${projectMemberFilterQuery(ResourceId(renkuBaseUrl, path).showAs[RdfResource])(maybeUser)}
-        |    ?targetEntity schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
-        |                  prov:atLocation ?targetEntityLocation.
-        |    ?runPlan schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
-        |             renku:hasOutputs/renku:produces ?targetEntity.
-        |    ?activity schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
-        |              prov:qualifiedAssociation/prov:hadPlan ?runPlan;
-        |              prov:startedAtTime ?date.
-        |    FILTER NOT EXISTS {?activity a wfprov:WorkflowRun}
-        |  }
-        |}
-        |ORDER BY ASC(?date)
-        |""".stripMargin
+    s"""SELECT DISTINCT ?runPlan ?date ?sourceEntityLocation ?targetEntityLocation
+       |WHERE {
+       |  {
+       |  ${projectMemberFilterQuery(ResourceId(renkuBaseUrl, path).showAs[RdfResource])(maybeUser)}
+       |    ?runPlan schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
+       |             renku:hasInputs/renku:consumes/prov:atLocation ?sourceEntityLocation;
+       |             ^(prov:qualifiedAssociation/prov:hadPlan) ?activity.
+       |    ?activity prov:startedAtTime ?date.
+       |    FILTER NOT EXISTS {?activity a wfprov:WorkflowRun}
+       |  } UNION {
+       |  ${projectMemberFilterQuery(ResourceId(renkuBaseUrl, path).showAs[RdfResource])(maybeUser)}
+       |    ?runPlan schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
+       |             renku:hasOutputs/renku:produces/prov:atLocation ?targetEntityLocation;
+       |             ^(prov:qualifiedAssociation/prov:hadPlan) ?activity.
+       |    ?activity prov:startedAtTime ?date.
+       |    FILTER NOT EXISTS {?activity a wfprov:WorkflowRun}
+       |  }
+       |}
+       |ORDER BY ASC(?date)""".stripMargin
   )
 
   import io.circe.Decoder
