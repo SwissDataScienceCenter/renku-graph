@@ -37,40 +37,56 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApi
       projectPath: projects.Path,
       members:     Set[(GitLabProjectMember, Option[users.ResourceId])]
   ): List[SparqlQuery] = {
-    val (queryForNewPersons, queryForExistingPersons) =
+    val (queriesForNewPersons, queriesForExistingPersons) =
       (separateUsersNotYetInKG.pure[List] ap members.toList).separate
         .bimap(createPersonsAndMemberLinks(projectPath, _), createMemberLinks(projectPath, _))
-    List(queryForNewPersons, queryForExistingPersons)
+    queriesForNewPersons ::: queriesForExistingPersons
   }
 
-  def removal(projectPath: projects.Path, members: Set[KGProjectMember]): SparqlQuery = {
-    val linkTriples = members.map(member => generateLinkTriple(projectPath, member.resourceId)).mkString("\n")
-
-    SparqlQuery.of(
-      name = "unlink project members",
-      Prefixes.of(schema -> "schema", rdf -> "rdf"),
-      s"""|DELETE DATA { 
-          |  $linkTriples
-          |}
-          |""".stripMargin
-    )
-  }
+  def removal(projectPath: projects.Path, members: Set[KGProjectMember]): List[SparqlQuery] =
+    members
+      .map(member => generateLinkTriple(projectPath, member.resourceId))
+      .map { linkTriple =>
+        SparqlQuery
+          .of(
+            name = "unlink project member",
+            Prefixes.of(schema -> "schema", rdf -> "rdf"),
+            s"""|DELETE DATA { 
+                |  $linkTriple
+                |}
+                |""".stripMargin
+          )
+      }
+      .toList
 
   private def createPersonsAndMemberLinks(projectPath:       projects.Path,
                                           membersNotYetInKG: List[GitLabProjectMember]
-  ): SparqlQuery = {
+  ): List[SparqlQuery] = {
     val resourceIdsAndMembers = membersNotYetInKG.map(member => (generateResourceId(member.gitLabId), member))
-    val linkTriples =
-      resourceIdsAndMembers.map { case (resourceId, _) => generateLinkTriple(projectPath, resourceId) }.mkString("\n")
-    SparqlQuery.of(
-      name = "link project members",
-      Prefixes.of(schema -> "schema", rdf -> "rdf"),
-      s"""|INSERT DATA { 
-          |  ${resourceIdsAndMembers.map(generatePersonTriples).mkString("\n")}
-          |  $linkTriples
-          |}
-          |  """.stripMargin
-    )
+    val membersCreations = resourceIdsAndMembers.map { resourceIdsAndMember =>
+      SparqlQuery.of(
+        name = "create project member",
+        Prefixes.of(schema -> "schema", rdf -> "rdf"),
+        s"""|INSERT DATA { 
+            |  ${generatePersonTriples(resourceIdsAndMember)}
+            |}
+            |  """.stripMargin
+      )
+    }
+    val linksCreations =
+      resourceIdsAndMembers
+        .map { case (resourceId, _) => generateLinkTriple(projectPath, resourceId) }
+        .map { linkTriple =>
+          SparqlQuery.of(
+            name = "link project member",
+            Prefixes.of(schema -> "schema", rdf -> "rdf"),
+            s"""|INSERT DATA { 
+                |  $linkTriple
+                |}
+                |  """.stripMargin
+          )
+        }
+    membersCreations ::: linksCreations
   }
 
   private def generateResourceId(gitLabId: GitLabId): users.ResourceId = users.ResourceId(
@@ -79,18 +95,17 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApi
 
   private def createMemberLinks(projectPath:        projects.Path,
                                 membersAlreadyInKG: List[(GitLabProjectMember, users.ResourceId)]
-  ): SparqlQuery = {
-    val linkTriples =
-      membersAlreadyInKG.map { case (_, resourceId) => generateLinkTriple(projectPath, resourceId) }.mkString("\n")
-    SparqlQuery.of(
-      name = "link project members",
-      Prefixes.of(schema -> "schema", rdf -> "rdf"),
-      s"""|INSERT DATA {
-          |  $linkTriples
-          |}
-          |""".stripMargin
-    )
-  }
+  ): List[SparqlQuery] =
+    membersAlreadyInKG.map { case (_, resourceId) => generateLinkTriple(projectPath, resourceId) }.map { linkTriple =>
+      SparqlQuery.of(
+        name = "link project member",
+        Prefixes.of(schema -> "schema", rdf -> "rdf"),
+        s"""|INSERT DATA {
+            |  $linkTriple
+            |}
+            |""".stripMargin
+      )
+    }
 
   private def generateLinkTriple(projectPath: projects.Path, memberResourceId: users.ResourceId) =
     s"${ResourceId(renkuBaseUrl, projectPath).showAs[RdfResource]} schema:member ${memberResourceId.showAs[RdfResource]}."

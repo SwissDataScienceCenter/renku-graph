@@ -18,7 +18,7 @@
 
 package ch.datascience.triplesgenerator.events.categories.membersync
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.config.GitLab
@@ -37,7 +37,7 @@ private trait MembersSynchronizer[Interpretation[_]] {
   def synchronizeMembers(projectPath: projects.Path): Interpretation[Unit]
 }
 
-private class MembersSynchronizerImpl[Interpretation[_]](
+private class MembersSynchronizerImpl[Interpretation[_]: MonadThrow](
     accessTokenFinder:          AccessTokenFinder[Interpretation],
     gitLabProjectMembersFinder: GitLabProjectMembersFinder[Interpretation],
     kGProjectMembersFinder:     KGProjectMembersFinder[Interpretation],
@@ -46,8 +46,7 @@ private class MembersSynchronizerImpl[Interpretation[_]](
     querySender:                QuerySender[Interpretation],
     logger:                     Logger[Interpretation],
     executionTimeRecorder:      ExecutionTimeRecorder[Interpretation]
-)(implicit ME:                  MonadError[Interpretation, Throwable])
-    extends MembersSynchronizer[Interpretation] {
+) extends MembersSynchronizer[Interpretation] {
 
   import ch.datascience.graph.tokenrepository.AccessTokenFinder._
   import executionTimeRecorder._
@@ -62,7 +61,7 @@ private class MembersSynchronizerImpl[Interpretation[_]](
       insertionUpdates = updatesCreator.insertion(projectPath, membersToAddWithIds)
       membersToRemove  = findMembersToRemove(membersInGitLab, membersInKG)
       removalUpdates   = updatesCreator.removal(projectPath, membersToRemove)
-      _ <- (insertionUpdates :+ removalUpdates).map(querySender.send).sequence
+      _ <- (insertionUpdates ::: removalUpdates).map(querySender.send).sequence
     } yield SyncSummary(projectPath, membersAdded = membersToAdd.size, membersRemoved = membersToRemove.size)
   } flatMap logSummary recoverWith { case NonFatal(exception) =>
     logger.error(exception)(s"$categoryName: Members synchronized for project $projectPath FAILED")
