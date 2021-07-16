@@ -27,12 +27,21 @@ import io.renku.jsonld._
 final case class Person(
     resourceId:       ResourceId,
     name:             Name,
-    maybeEmail:       Option[Email] = None,
-    maybeAffiliation: Option[Affiliation] = None,
-    maybeGitLabId:    Option[GitLabId] = None
+    alternateNames:   List[Name],
+    maybeEmail:       Option[Email],
+    maybeAffiliation: Option[Affiliation],
+    maybeGitLabId:    Option[GitLabId]
 )
 
 object Person {
+
+  def apply(
+      resourceId:       ResourceId,
+      name:             Name,
+      maybeEmail:       Option[Email] = None,
+      maybeAffiliation: Option[Affiliation] = None,
+      maybeGitLabId:    Option[GitLabId] = None
+  ): Person = Person(resourceId, name, alternateNames = List(name), maybeEmail, maybeAffiliation, maybeGitLabId)
 
   import ch.datascience.graph.model.Schemas._
   import io.renku.jsonld.JsonLDDecoder.decodeOption
@@ -70,11 +79,13 @@ object Person {
   implicit lazy val decoder: JsonLDDecoder[Person] = JsonLDDecoder.entity(entityTypes) { cursor =>
     for {
       resourceId       <- cursor.downEntityId.as[ResourceId]
-      name             <- cursor.downField(schema / "name").as[Name]
-      emailsList       <- cursor.downField(schema / "email").as[List[Email]]
+      names            <- cursor.downField(schema / "name").as[List[Name]]
+      maybeEmail       <- cursor.downField(schema / "email").as[Option[Email]]
       maybeAffiliation <- cursor.downField(schema / "affiliation").as[Option[Affiliation]]
       maybeGitLabId    <- cursor.downField(schema / "sameAs").as[Option[GitLabId]](decodeOption(gitLabIdDecoder))
-    } yield Person(resourceId, name, emailsList.headOption, maybeAffiliation, maybeGitLabId)
+      name <- if (names.isEmpty) DecodingFailure(s"No name on Person $resourceId", Nil).asLeft
+              else names.reverse.head.asRight
+    } yield Person(resourceId, name, alternateNames = names, maybeEmail, maybeAffiliation, maybeGitLabId)
   }
 
   private lazy val gitLabIdDecoder: JsonLDDecoder[GitLabId] = JsonLDDecoder.entity(gitLabSameAsTypes) { cursor =>

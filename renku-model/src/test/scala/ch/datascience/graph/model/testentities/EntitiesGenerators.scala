@@ -135,13 +135,13 @@ trait EntitiesGenerators {
     name            <- projectNames
     path            <- projectPaths
     dateCreated     <- projectCreatedDates()
-    maybeCreator    <- gitLabProjectMemberObjects.toGeneratorOfOptions
-    members         <- gitLabProjectMemberObjects.toGeneratorOfSet()
+    maybeCreator    <- projectMemberObjects.toGeneratorOfOptions
+    members         <- projectMemberObjects.toGeneratorOfSet()
     visibility      <- projectVisibilities
     maybeParentPath <- projectPaths.toGeneratorOfOptions
   } yield GitLabProjectInfo(name, path, dateCreated, maybeCreator, members, visibility, maybeParentPath)
 
-  implicit lazy val gitLabProjectMemberObjects: Gen[ProjectMember] = for {
+  implicit lazy val projectMemberObjects: Gen[ProjectMember] = for {
     name     <- userNames
     username <- usernames
     gitLabId <- userGitLabIds
@@ -366,6 +366,7 @@ trait EntitiesGenerators {
   lazy val withGitLabId:    Gen[Option[GitLabId]] = userGitLabIds.toGeneratorOfSomes
   lazy val withoutGitLabId: Gen[Option[GitLabId]] = fixed(Option.empty[GitLabId])
   lazy val withEmail:       Gen[Option[Email]]    = userEmails.toGeneratorOfSomes
+  lazy val withoutEmail:    Gen[Option[Email]]    = userEmails.toGeneratorOfNones
 
   implicit lazy val personEntities: Gen[Person] = personEntities()
 

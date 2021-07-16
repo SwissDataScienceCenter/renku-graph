@@ -20,11 +20,12 @@ package ch.datascience.graph.model.entities
 
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators.userEmails
+import ch.datascience.graph.model.GraphModelGenerators.userNames
 import ch.datascience.graph.model.Schemas.schema
 import ch.datascience.graph.model.entities
 import ch.datascience.graph.model.entities.Person.entityTypes
 import ch.datascience.graph.model.testentities._
+import io.circe.DecodingFailure
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.JsonLDEncoder.encodeOption
 import io.renku.jsonld.syntax._
@@ -42,19 +43,31 @@ class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
       }
     }
 
-    "turn JsonLD Person entity with multiple emails into the Person object with a single email" in {
-      val person = personEntities(maybeEmails = withEmail).generateOne.to[entities.Person]
-
-      val secondEmail = userEmails.generateOne.asJsonLD
+    "turn JsonLD Person entity with multiple names" in {
+      val person     = personEntities().generateOne.to[entities.Person]
+      val secondName = userNames.generateOne
       val jsonLDPerson = JsonLD.entity(
         person.resourceId.asEntityId,
         entityTypes,
-        schema / "email" -> JsonLD.arr(person.maybeEmail.asJsonLD, secondEmail),
-        schema / "name"  -> person.name.asJsonLD
+        schema / "name" -> JsonLD.arr(person.name.asJsonLD, secondName.asJsonLD)
       )
 
-      val Right(personWithSingleEmail) = jsonLDPerson.cursor.as[entities.Person]
-      personWithSingleEmail.maybeEmail should (be(person.maybeEmail) or be(secondEmail.some))
+      val Right(personWithSingleName) = jsonLDPerson.cursor.as[entities.Person]
+      personWithSingleName.name           should (be(person.name) or be(secondName))
+      personWithSingleName.alternateNames should contain theSameElementsAs List(person.name, secondName)
+    }
+
+    "fail if there's no name for a Person" in {
+      val person = personEntities().generateOne.to[entities.Person]
+      val jsonLDPerson = JsonLD.entity(
+        person.resourceId.asEntityId,
+        entityTypes,
+        schema / "email" -> person.maybeEmail.asJsonLD
+      )
+
+      val Left(failure) = jsonLDPerson.cursor.as[entities.Person]
+      failure         shouldBe a[DecodingFailure]
+      failure.message shouldBe s"No name on Person ${person.resourceId}"
     }
   }
 }
