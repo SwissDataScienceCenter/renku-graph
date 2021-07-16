@@ -53,6 +53,36 @@ class ProjectMetadataSpec extends AnyWordSpec with should.Matchers with ScalaChe
       maybeMetadata.map(_.datasets)   shouldBe datasets.validNel[String]
     }
 
+    "align project's person entities across activities and datasets" in {
+      val onlyGLMember  = personEntities(withGitLabId, withoutEmail).generateOne
+      val gLAndKGMember = personEntities(withGitLabId, withEmail).generateOne
+      val creator       = personEntities(withGitLabId, withEmail).generateOne
+      val project = projectEntities[ForksCount](visibilityAny)(anyForksCount).generateOne
+        .copy(maybeCreator = Some(creator), members = Set(onlyGLMember, gLAndKGMember))
+
+      val activity = activityEntities(fixed(project)).generateOne
+        .copy(author = creator.copy(maybeGitLabId = None))
+        .to[entities.Activity]
+
+      val dataset = {
+        val d = datasetEntities(datasetProvenanceInternal, fixed(project)).generateOne
+        d.copy(provenance = d.provenance.copy(creators = Set(gLAndKGMember.copy(maybeGitLabId = None))))
+      }.to[entities.Dataset[entities.Dataset.Provenance]]
+
+      val maybeMetadata = ProjectMetadata.from(project.to[entities.Project], List(activity), List(dataset))
+
+      maybeMetadata.map(_.project.maybeCreator) shouldBe creator.to[entities.Person].some.validNel[String]
+      maybeMetadata.map(_.project.members) shouldBe Set(onlyGLMember, gLAndKGMember)
+        .map(_.to[entities.Person])
+        .validNel[String]
+      maybeMetadata.map(_.activities.map(_.author)) shouldBe List(creator.to[entities.Person]).validNel[String]
+      maybeMetadata.map(
+        _.datasets.toSet.flatMap((d: entities.Dataset[entities.Dataset.Provenance]) => d.provenance.creators)
+      ) shouldBe Set(
+        gLAndKGMember.to[entities.Person]
+      ).validNel[String]
+    }
+
     "return a failure if activity or dataset points to a different project" in {
       val project = projectEntities[ForksCount](visibilityAny)(anyForksCount).generateOne
       val otherProject = projectEntities[ForksCount](visibilityAny)(anyForksCount).generateOne
@@ -135,7 +165,6 @@ class ProjectMetadataSpec extends AnyWordSpec with should.Matchers with ScalaChe
           ProjectMetadata.from(project.to[entities.Project], activities = Nil, datasets = List(validDataset))
         maybeMetadata.map(_.datasets) shouldBe List(validDataset).validNel[String]
       }
-
     }
   }
 

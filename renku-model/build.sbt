@@ -19,3 +19,6 @@
 organization := "io.renku"
 name := "renku-model"
 scalaVersion := "2.13.6"
+
+val monocleVersion = "3.0.0"
+libraryDependencies += "dev.optics" %% "monocle-core" % "3.0.0"

@@ -18,11 +18,12 @@
 
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 
-import cats.syntax.all._
 import cats.data.ValidatedNel
+import cats.syntax.all._
+import ch.datascience.graph.model
 import ch.datascience.graph.model.entities.Dataset.Provenance
 import ch.datascience.graph.model.entities._
-import ch.datascience.graph.model
+import monocle.{Lens, Traversal}
 
 private case class ProjectMetadata(project: Project, activities: List[Activity], datasets: List[Dataset[Provenance]])
 
@@ -34,7 +35,9 @@ private object ProjectMetadata {
   ): ValidatedNel[String, ProjectMetadata] = List(
     validateProjectRefs(project, activities, datasets),
     validateDates(project, activities, datasets)
-  ).sequence.void.map(_ => ProjectMetadata(project, activities, datasets))
+  ).sequence.void.map { _ =>
+    (ProjectMetadata.apply _).tupled(alignPersons(project, activities, datasets))
+  }
 
   private def validateProjectRefs(project:    Project,
                                   activities: List[Activity],
@@ -83,4 +86,52 @@ private object ProjectMetadata {
         .sequence
         .void
   }
+
+  private def alignPersons(project:    Project,
+                           activities: List[Activity],
+                           datasets:   List[Dataset[Provenance]]
+  ): (Project, List[Activity], List[Dataset[Provenance]]) = {
+    val projectPersons = collectPersons(project)
+    (project, activities.updateAuthors(from = projectPersons), datasets.updateCreators(from = projectPersons))
+  }
+
+  private implicit class ActivitiesOps(activities: List[Activity]) {
+    private val activitiesLens     = Traversal.fromTraverse[List, Activity]
+    private val activityAuthorLens = Lens[Activity, Person](_.author)(p => a => a.copy(author = p))
+
+    def updateAuthors(from: Set[Person]): List[Activity] =
+      activitiesLens.modify { activity =>
+        from
+          .find(_.resourceId == activity.author.resourceId)
+          .map(activityAuthorLens.set(_)(activity))
+          .getOrElse(activity)
+      }(activities)
+  }
+
+  private implicit class DatasetsOps(datasets: List[Dataset[Provenance]]) {
+
+    private val datasetsLens   = Traversal.fromTraverse[List, Dataset[Provenance]]
+    private val provenanceLens = Lens[Dataset[Provenance], Provenance](_.provenance)(p => d => d.copy(provenance = p))
+    private val creatorsLens   = Traversal.fromTraverse[List, Person]
+    private val provCreatorsLens = Lens[Provenance, List[Person]](_.creators.toList) { crts =>
+      {
+        case p: Provenance.Internal                         => p.copy(creators = crts.toSet)
+        case p: Provenance.ImportedExternal                 => p.copy(creators = crts.toSet)
+        case p: Provenance.ImportedInternalAncestorExternal => p.copy(creators = crts.toSet)
+        case p: Provenance.ImportedInternalAncestorInternal => p.copy(creators = crts.toSet)
+        case p: Provenance.Modified                         => p.copy(creators = crts.toSet)
+      }
+    }
+
+    def updateCreators(from: Set[Person]): List[Dataset[Provenance]] = {
+      val creatorsUpdate = creatorsLens.modify { person =>
+        from.find(_.resourceId == person.resourceId).getOrElse(person)
+      }
+      datasetsLens.modify(
+        provenanceLens.modify(provCreatorsLens.modify(creatorsUpdate))
+      )(datasets)
+    }
+  }
+
+  private def collectPersons(project: Project): Set[Person] = project.members ++ project.maybeCreator
 }
