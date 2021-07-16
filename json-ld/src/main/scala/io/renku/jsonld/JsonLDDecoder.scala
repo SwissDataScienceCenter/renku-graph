@@ -195,6 +195,8 @@ object JsonLDDecoder {
               jsons.toList.map(json => itemDecoder(new ListItemCursor(cursor, json))).sequence
           }
         case entity @ JsonLDEntity(_, _, _, _) => entity.cursor.as[I].map(List(_))
+        case value @ JsonLDValue(_, _)         => value.cursor.as[I].map(List(_))
+        case JsonLDNull                        => List.empty[I].asRight
         case json                              => DecodingFailure(s"Cannot decode $json to List", Nil).asLeft
       }
   }
