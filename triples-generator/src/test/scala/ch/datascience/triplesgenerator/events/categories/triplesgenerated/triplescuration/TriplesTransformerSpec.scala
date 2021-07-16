@@ -26,13 +26,13 @@ import ch.datascience.generators.Generators._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedEvent
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CurationGenerators._
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.CurationRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.DatasetInfoEnricher
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails.PersonDetailsUpdater
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects.ProjectInfoUpdater
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.{CuratedTriples, TriplesGeneratedEvent}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -48,7 +48,10 @@ class TriplesTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       val triplesWithPersonDetails = curatedTriplesObjects[Try].generateOne
       (personDetailsUpdater.updatePersonDetails _)
         .expects(
-          CuratedTriples[Try](JsonLDTriples(triplesGeneratedEvent.triples.toJson), updatesGroups = Nil),
+          CuratedTriples[Try](JsonLDTriples(triplesGeneratedEvent.triples.toJson),
+                              projectMetadata,
+                              updatesGroups = Nil
+          ),
           triplesGeneratedEvent.project,
           triplesGeneratedEvent.eventId
         )
@@ -65,7 +68,8 @@ class TriplesTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         .expects(triplesWithForkInfo)
         .returning(triplesWithEnrichedDataset.toRightT)
 
-      curator.transform(triplesGeneratedEvent).value shouldBe Right(triplesWithEnrichedDataset).pure[Try]
+      curator.transform(triplesGeneratedEvent, projectMetadata).value shouldBe Right(triplesWithEnrichedDataset)
+        .pure[Try]
     }
 
     "fail with the failure from the person details update" in new TestCase {
@@ -73,13 +77,17 @@ class TriplesTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       val exception = exceptions.generateOne
       (personDetailsUpdater.updatePersonDetails _)
         .expects(
-          CuratedTriples[Try](JsonLDTriples(triplesGeneratedEvent.triples.toJson), updatesGroups = Nil),
+          CuratedTriples[Try](JsonLDTriples(triplesGeneratedEvent.triples.toJson),
+                              projectMetadata,
+                              updatesGroups = Nil
+          ),
           triplesGeneratedEvent.project,
           triplesGeneratedEvent.eventId
         )
         .returning(exception.toEitherTError)
 
-      curator.transform(triplesGeneratedEvent).value shouldBe exception.raiseError[Try, CuratedTriples[Try]]
+      curator.transform(triplesGeneratedEvent, projectMetadata).value shouldBe exception
+        .raiseError[Try, CuratedTriples[Try]]
     }
 
     "fail with the failure from the fork info update" in new TestCase {
@@ -87,7 +95,10 @@ class TriplesTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       val triplesWithPersonDetails = curatedTriplesObjects[Try].generateOne
       (personDetailsUpdater.updatePersonDetails _)
         .expects(
-          CuratedTriples[Try](JsonLDTriples(triplesGeneratedEvent.triples.toJson), updatesGroups = Nil),
+          CuratedTriples[Try](JsonLDTriples(triplesGeneratedEvent.triples.toJson),
+                              projectMetadata,
+                              updatesGroups = Nil
+          ),
           triplesGeneratedEvent.project,
           triplesGeneratedEvent.eventId
         )
@@ -99,7 +110,8 @@ class TriplesTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         .expects(triplesGeneratedEvent, triplesWithPersonDetails, maybeAccessToken)
         .returning(exception.toEitherTError)
 
-      curator.transform(triplesGeneratedEvent).value shouldBe exception.raiseError[Try, CuratedTriples[Try]]
+      curator.transform(triplesGeneratedEvent, projectMetadata).value shouldBe exception
+        .raiseError[Try, CuratedTriples[Try]]
     }
 
     "fail with the failure from the dataset enricher update" in new TestCase {
@@ -107,7 +119,10 @@ class TriplesTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       val triplesWithPersonDetails = curatedTriplesObjects[Try].generateOne
       (personDetailsUpdater.updatePersonDetails _)
         .expects(
-          CuratedTriples[Try](JsonLDTriples(triplesGeneratedEvent.triples.toJson), updatesGroups = Nil),
+          CuratedTriples[Try](JsonLDTriples(triplesGeneratedEvent.triples.toJson),
+                              projectMetadata,
+                              updatesGroups = Nil
+          ),
           triplesGeneratedEvent.project,
           triplesGeneratedEvent.eventId
         )
@@ -124,7 +139,8 @@ class TriplesTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         .expects(triplesWithForkInfo)
         .returning(exception.toEitherTError)
 
-      curator.transform(triplesGeneratedEvent).value shouldBe exception.raiseError[Try, CuratedTriples[Try]]
+      curator.transform(triplesGeneratedEvent, projectMetadata).value shouldBe exception
+        .raiseError[Try, CuratedTriples[Try]]
     }
 
     s"return $CurationRecoverableError if personDetailsUpdater returns one" in new TestCase {
@@ -132,13 +148,16 @@ class TriplesTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       val exception = CurationRecoverableError(nonBlankStrings().generateOne.value, exceptions.generateOne)
       (personDetailsUpdater.updatePersonDetails _)
         .expects(
-          CuratedTriples[Try](JsonLDTriples(triplesGeneratedEvent.triples.toJson), updatesGroups = Nil),
+          CuratedTriples[Try](JsonLDTriples(triplesGeneratedEvent.triples.toJson),
+                              projectMetadata,
+                              updatesGroups = Nil
+          ),
           triplesGeneratedEvent.project,
           triplesGeneratedEvent.eventId
         )
         .returning(exception.toLeftT)
 
-      curator.transform(triplesGeneratedEvent).value shouldBe Left(exception).pure[Try]
+      curator.transform(triplesGeneratedEvent, projectMetadata).value shouldBe Left(exception).pure[Try]
     }
 
     s"return $CurationRecoverableError if forkInfoUpdater returns one" in new TestCase {
@@ -146,7 +165,10 @@ class TriplesTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       val triplesWithPersonDetails = curatedTriplesObjects[Try].generateOne
       (personDetailsUpdater.updatePersonDetails _)
         .expects(
-          CuratedTriples[Try](JsonLDTriples(triplesGeneratedEvent.triples.toJson), updatesGroups = Nil),
+          CuratedTriples[Try](JsonLDTriples(triplesGeneratedEvent.triples.toJson),
+                              projectMetadata,
+                              updatesGroups = Nil
+          ),
           triplesGeneratedEvent.project,
           triplesGeneratedEvent.eventId
         )
@@ -158,13 +180,14 @@ class TriplesTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         .expects(triplesGeneratedEvent, triplesWithPersonDetails, maybeAccessToken)
         .returning(exception.toLeftT)
 
-      curator.transform(triplesGeneratedEvent).value shouldBe Left(exception).pure[Try]
+      curator.transform(triplesGeneratedEvent, projectMetadata).value shouldBe Left(exception).pure[Try]
     }
   }
 
   private trait TestCase {
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
     val triplesGeneratedEvent = triplesGeneratedEvents.generateOne
+    val projectMetadata       = projectMetadatas.generateOne
 
     val personDetailsUpdater = mock[PersonDetailsUpdater[Try]]
     val projectInfoUpdater   = mock[ProjectInfoUpdater[Try]]

@@ -26,7 +26,7 @@ import ch.datascience.graph.model.datasets.{Identifier, TopmostDerivedFrom, Topm
 import ch.datascience.graph.model.testentities.Dataset._
 import ch.datascience.graph.model.testentities._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQuery}
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CuratedTriples
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.CuratedTriples
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CurationGenerators.curatedTriplesObjects
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.TopmostDataFinder.TopmostData
 import io.renku.jsonld.generators.JsonLDGenerators.entityIds

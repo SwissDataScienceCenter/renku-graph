@@ -22,8 +22,8 @@ import cats.MonadError
 import cats.effect.{ConcurrentEffect, Timer}
 import cats.syntax.all._
 import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CuratedTriples
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CuratedTriples.CurationUpdatesGroup
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.CuratedTriples
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.CuratedTriples.CurationUpdatesGroup
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext

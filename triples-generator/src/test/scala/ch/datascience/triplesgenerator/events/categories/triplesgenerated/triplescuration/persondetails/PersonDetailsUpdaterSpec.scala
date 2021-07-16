@@ -34,9 +34,10 @@ import ch.datascience.graph.tokenrepository.AccessTokenFinder.projectPathToPath
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CuratedTriples.CurationUpdatesGroup
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.CuratedTriples
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.CuratedTriples.CurationUpdatesGroup
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CurationGenerators._
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.CurationRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails.PersonDetailsGenerators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -82,7 +83,7 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
         acc :+ updatesGroup
       }
 
-      val Success(Right(CuratedTriples(actualTriples, actualUpdates))) =
+      val Success(Right(CuratedTriples(actualTriples, _, actualUpdates))) =
         updater.updatePersonDetails(curatedTriples, project, eventId).value
 
       actualTriples                                           shouldBe triplesWithoutPersonDetails

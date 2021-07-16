@@ -22,12 +22,14 @@ import cats.MonadThrow
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators._
 import ch.datascience.rdfstore.JsonLDTriples
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CuratedTriples.CurationUpdatesGroup
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.CuratedTriples
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.CuratedTriples.CurationUpdatesGroup
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators.projectMetadatas
 import eu.timepit.refined.auto._
 import io.renku.jsonld.JsonLD
 import org.scalacheck.Gen
 
-object CurationGenerators {
+private[triplesgenerated] object CurationGenerators {
 
   implicit def curatedTriplesObjects[Interpretation[_]: MonadThrow]: Gen[CuratedTriples[Interpretation]] =
     curatedTriplesObjects[Interpretation](
@@ -37,14 +39,16 @@ object CurationGenerators {
   def curatedTriplesObjects[Interpretation[_]: MonadThrow](
       updatesGenerator: Gen[List[CurationUpdatesGroup[Interpretation]]]
   ): Gen[CuratedTriples[Interpretation]] = for {
-    triples <- jsonLDTriples
-    updates <- updatesGenerator
-  } yield CuratedTriples[Interpretation](triples, updates)
+    triples  <- jsonLDTriples
+    metadata <- projectMetadatas
+    updates  <- updatesGenerator
+  } yield CuratedTriples[Interpretation](triples, metadata, updates)
 
   def curatedTriplesObjects[Interpretation[_]: MonadThrow](triples: JsonLD): Gen[CuratedTriples[Interpretation]] =
     for {
-      updates <- nonEmptyList(curationUpdatesGroups[Interpretation])
-    } yield CuratedTriples(JsonLDTriples(triples.flatten.fold(throw _, identity).toJson), updates.toList)
+      updates  <- nonEmptyList(curationUpdatesGroups[Interpretation])
+      metadata <- projectMetadatas
+    } yield CuratedTriples(JsonLDTriples(triples.flatten.fold(throw _, identity).toJson), metadata, updates.toList)
 
   implicit def curationUpdatesGroups[Interpretation[_]: MonadThrow]: Gen[CurationUpdatesGroup[Interpretation]] =
     for {

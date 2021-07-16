@@ -19,9 +19,8 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration
 
 import CurationGenerators._
-
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CuratedTriples.CurationUpdatesGroup
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.CuratedTriples.CurationUpdatesGroup
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

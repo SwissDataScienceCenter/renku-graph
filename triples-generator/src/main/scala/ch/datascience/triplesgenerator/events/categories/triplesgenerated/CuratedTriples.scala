@@ -16,21 +16,22 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration
+package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 
-import cats.MonadError
+import CuratedTriples._
+import cats.MonadThrow
 import cats.data.EitherT
 import ch.datascience.rdfstore.{JsonLDTriples, SparqlQuery}
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CuratedTriples.CurationUpdatesGroup
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 
-final case class CuratedTriples[Interpretation[_]](triples:       JsonLDTriples,
-                                                   updatesGroups: List[CurationUpdatesGroup[Interpretation]]
+private final case class CuratedTriples[Interpretation[_]](triples:         JsonLDTriples,
+                                                           projectMetadata: ProjectMetadata,
+                                                           updatesGroups:   List[CurationUpdatesGroup[Interpretation]]
 )
 
-object CuratedTriples {
+private object CuratedTriples {
   private[triplesgenerated] type GeneratedQueries[Interpretation[_]] =
     EitherT[Interpretation, ProcessingRecoverableError, List[SparqlQuery]]
 
@@ -42,15 +43,12 @@ object CuratedTriples {
   }
 
   object CurationUpdatesGroup {
-    def apply[Interpretation[_]](
+    def apply[Interpretation[_]: MonadThrow](
         name:          String Refined NonEmpty,
         sparqlQueries: SparqlQuery*
-    )(implicit ME:     MonadError[Interpretation, Throwable]): CurationUpdatesGroup[Interpretation] =
-      CurationUpdatesGroup[Interpretation](
-        name,
-        () => EitherT.rightT[Interpretation, ProcessingRecoverableError](sparqlQueries.toList)
-      )
-
+    ): CurationUpdatesGroup[Interpretation] = CurationUpdatesGroup[Interpretation](
+      name,
+      () => EitherT.rightT[Interpretation, ProcessingRecoverableError](sparqlQueries.toList)
+    )
   }
-
 }

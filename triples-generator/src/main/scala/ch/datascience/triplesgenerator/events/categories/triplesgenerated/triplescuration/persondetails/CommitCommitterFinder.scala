@@ -28,7 +28,7 @@ import ch.datascience.graph.model.{GitLabApiUrl, projects}
 import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException}
 import ch.datascience.http.client.{AccessToken, RestClient}
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.CurationRecoverableError
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import org.http4s.Method.GET

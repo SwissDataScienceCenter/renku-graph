@@ -29,6 +29,7 @@ import ch.datascience.graph.config.GitLabUrlLoader
 import ch.datascience.graph.model.events.EventId
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.CuratedTriples
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -58,17 +59,18 @@ private class PersonDetailsUpdaterImpl[Interpretation[_]: Monad](
   def updatePersonDetails(curatedTriples: CuratedTriples[Interpretation],
                           project:        Project,
                           eventId:        EventId
-  ): CurationResults[Interpretation] =
-    for {
-      maybeAccessToken <- findAccessToken(project.path).toRightT
-      triplesAndPersons <-
-        personTrimmer
-          .getTriplesAndTrimmedPersons(curatedTriples.triples, project.id, eventId, maybeAccessToken)
-      (updatedTriples, trimmedPersons) = triplesAndPersons
-      projectMembers <- findProjectMembers(project.path)(maybeAccessToken)
-      personsWithGitlabIds = merge(trimmedPersons, projectMembers)
-      newUpdatesGroups     = personsWithGitlabIds map prepareUpdates[Interpretation]
-    } yield CuratedTriples(updatedTriples, curatedTriples.updatesGroups ++ newUpdatesGroups)
+  ): CurationResults[Interpretation] = for {
+    maybeAccessToken <- findAccessToken(project.path).toRightT
+    triplesAndPersons <-
+      personTrimmer.getTriplesAndTrimmedPersons(curatedTriples.triples, project.id, eventId, maybeAccessToken)
+    (updatedTriples, trimmedPersons) = triplesAndPersons
+    projectMembers <- findProjectMembers(project.path)(maybeAccessToken)
+    personsWithGitlabIds = merge(trimmedPersons, projectMembers)
+    newUpdatesGroups     = personsWithGitlabIds map prepareUpdates[Interpretation]
+  } yield CuratedTriples(updatedTriples,
+                         curatedTriples.projectMetadata,
+                         curatedTriples.updatesGroups ++ newUpdatesGroups
+  )
 
   private implicit class ResultOps[T](out: Interpretation[T]) {
     lazy val toRightT: EitherT[Interpretation, ProcessingRecoverableError, T] =

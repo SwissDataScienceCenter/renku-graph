@@ -27,9 +27,8 @@ import ch.datascience.generators.Generators._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedEvent
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.{CuratedTriples, TriplesGeneratedEvent}
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CurationGenerators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -57,6 +56,7 @@ class ProjectInfoUpdaterSpec extends AnyWordSpec with MockFactory with should.Ma
         .value
         .unsafeRunSync() shouldBe Right(
         CuratedTriples[IO](triples = transformedTriples,
+                           projectMetadata = givenCuratedTriples.projectMetadata,
                            updatesGroups = givenCuratedTriples.updatesGroups :+ updateGroup
         )
       )

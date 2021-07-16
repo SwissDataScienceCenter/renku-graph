@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated.tripl
 package datasets
 
 import CurationGenerators._
-import IOTriplesCurator.CurationRecoverableError
+import TriplesCurator.CurationRecoverableError
 import cats.MonadError
 import cats.data.EitherT
 import cats.syntax.all._
@@ -30,6 +30,7 @@ import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.http.client.RestClientError.UnexpectedResponseException
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.CuratedTriples
 import datasets.DatasetInfoFinder.DatasetInfo
 import datasets.TopmostDataFinder.TopmostData
 import io.renku.jsonld.generators.JsonLDGenerators._

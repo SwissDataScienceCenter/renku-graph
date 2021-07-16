@@ -22,6 +22,7 @@ package datasets
 import cats.syntax.all._
 import ch.datascience.graph.model.Schemas._
 import ch.datascience.rdfstore.JsonLDTriples
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.CuratedTriples
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.TopmostDataFinder.TopmostData
 import io.circe.Json
 import io.circe.optics.JsonOptics._

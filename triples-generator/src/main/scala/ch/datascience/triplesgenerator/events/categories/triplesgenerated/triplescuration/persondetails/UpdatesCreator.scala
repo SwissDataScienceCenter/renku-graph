@@ -28,7 +28,7 @@ import ch.datascience.graph.model.views.SparqlValueEncoder.sparqlEncode
 import ch.datascience.rdfstore.SparqlQuery
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.tinytypes.TinyType
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CuratedTriples.CurationUpdatesGroup
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.CuratedTriples.CurationUpdatesGroup
 import eu.timepit.refined.auto._
 
 private class UpdatesCreator(gitLabApiUrl: GitLabApiUrl) {

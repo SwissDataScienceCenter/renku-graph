@@ -27,10 +27,10 @@ import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.{SchemaVersion, projects}
 import ch.datascience.graph.model.events.EventStatus.{TransformationNonRecoverableFailure, TransformationRecoverableFailure, TriplesGenerated}
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects.Path
+import ch.datascience.graph.model.{SchemaVersion, projects}
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
@@ -44,8 +44,8 @@ import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.IOTriplesGeneratedEventProcessor.eventsProcessingTimesBuilder
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CurationGenerators.curatedTriplesObjects
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.{CuratedTriples, TriplesTransformer}
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.CurationRecoverableError
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesTransformer
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult._
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplesuploading.Uploader
 import io.prometheus.client.Histogram
@@ -78,9 +78,10 @@ class TriplesGeneratedEventProcessorSpec
       givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
         .returning(context.pure(maybeAccessToken))
 
-      givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(projectMetadatas.generateOne))
+      val projectMetadata = projectMetadatas.generateOne
+      givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(projectMetadata))
 
-      successfulTriplesCurationAndUpload(triplesGeneratedEvent)
+      successfulTriplesCurationAndUpload(triplesGeneratedEvent, projectMetadata)
 
       expectEventMarkedAsDone(triplesGeneratedEvent.compoundEventId, triplesGeneratedEvent.project.path)
 
@@ -132,13 +133,14 @@ class TriplesGeneratedEventProcessorSpec
       givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
         .returning(context.pure(maybeAccessToken))
 
-      givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(projectMetadatas.generateOne))
+      val projectMetadata = projectMetadatas.generateOne
+      givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(projectMetadata))
 
       val exeption          = exceptions.generateOne
       val curationException = CurationRecoverableError(nonBlankStrings().generateOne.value, exeption)
       (triplesTransformer
-        .transform(_: TriplesGeneratedEvent)(_: Option[AccessToken]))
-        .expects(triplesGeneratedEvent, maybeAccessToken)
+        .transform(_: TriplesGeneratedEvent, _: ProjectMetadata)(_: Option[AccessToken]))
+        .expects(triplesGeneratedEvent, projectMetadata, maybeAccessToken)
         .returning(leftT[Try, CuratedTriples[Try]](curationException))
 
       expectEventMarkedAsRecoverableFailure(triplesGeneratedEvent, curationException)
@@ -154,12 +156,13 @@ class TriplesGeneratedEventProcessorSpec
       givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
         .returning(context.pure(maybeAccessToken))
 
-      givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(projectMetadatas.generateOne))
+      val projectMetadata = projectMetadatas.generateOne
+      givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(projectMetadata))
 
       val exception = exceptions.generateOne
       (triplesTransformer
-        .transform(_: TriplesGeneratedEvent)(_: Option[AccessToken]))
-        .expects(triplesGeneratedEvent, maybeAccessToken)
+        .transform(_: TriplesGeneratedEvent, _: ProjectMetadata)(_: Option[AccessToken]))
+        .expects(triplesGeneratedEvent, projectMetadata, maybeAccessToken)
         .returning(EitherT.liftF[Try, ProcessingRecoverableError, CuratedTriples[Try]](context.raiseError(exception)))
 
       expectEventMarkedAsNonRecoverableFailure(triplesGeneratedEvent, exception)
@@ -176,12 +179,13 @@ class TriplesGeneratedEventProcessorSpec
         givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
           .returning(context.pure(maybeAccessToken))
 
-        givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(projectMetadatas.generateOne))
+        val projectMetadata = projectMetadatas.generateOne
+        givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(projectMetadata))
 
         val curatedTriples = curatedTriplesObjects[Try].generateOne
         (triplesTransformer
-          .transform(_: TriplesGeneratedEvent)(_: Option[AccessToken]))
-          .expects(triplesGeneratedEvent, maybeAccessToken)
+          .transform(_: TriplesGeneratedEvent, _: ProjectMetadata)(_: Option[AccessToken]))
+          .expects(triplesGeneratedEvent, projectMetadata, maybeAccessToken)
           .returning(rightT[Try, ProcessingRecoverableError](curatedTriples))
 
         val uploadingError = nonEmptyStrings().map(RecoverableFailure.apply).generateOne
@@ -205,12 +209,13 @@ class TriplesGeneratedEventProcessorSpec
           givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
             .returning(context.pure(maybeAccessToken))
 
-          givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(projectMetadatas.generateOne))
+          val projectMetadata = projectMetadatas.generateOne
+          givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(projectMetadata))
 
           val curatedTriples = curatedTriplesObjects[Try].generateOne
           (triplesTransformer
-            .transform(_: TriplesGeneratedEvent)(_: Option[AccessToken]))
-            .expects(triplesGeneratedEvent, maybeAccessToken)
+            .transform(_: TriplesGeneratedEvent, _: ProjectMetadata)(_: Option[AccessToken]))
+            .expects(triplesGeneratedEvent, projectMetadata, maybeAccessToken)
             .returning(rightT[Try, ProcessingRecoverableError](curatedTriples))
 
           (triplesUploader
@@ -233,9 +238,10 @@ class TriplesGeneratedEventProcessorSpec
       givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
         .returning(context.pure(maybeAccessToken))
 
-      givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(projectMetadatas.generateOne))
+      val projectMetadata = projectMetadatas.generateOne
+      givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(projectMetadata))
 
-      successfulTriplesCurationAndUpload(triplesGeneratedEvent)
+      successfulTriplesCurationAndUpload(triplesGeneratedEvent, projectMetadata)
 
       val exception = exceptions.generateOne
       (eventStatusUpdater
@@ -334,11 +340,14 @@ class TriplesGeneratedEventProcessorSpec
         .findAccessToken(_: Path)(_: Path => String))
         .expects(forProjectPath, projectPathToPath)
 
-    def successfulTriplesCurationAndUpload(triplesGeneratedEvent: TriplesGeneratedEvent) = {
-      val curatedTriples = CuratedTriples[Try](JsonLDTriples(triplesGeneratedEvent.triples.toJson), Nil)
+    def successfulTriplesCurationAndUpload(triplesGeneratedEvent: TriplesGeneratedEvent,
+                                           projectMetadata:       ProjectMetadata
+    ) = {
+      val curatedTriples =
+        CuratedTriples[Try](JsonLDTriples(triplesGeneratedEvent.triples.toJson), projectMetadata, Nil)
       (triplesTransformer
-        .transform(_: TriplesGeneratedEvent)(_: Option[AccessToken]))
-        .expects(triplesGeneratedEvent, maybeAccessToken)
+        .transform(_: TriplesGeneratedEvent, _: ProjectMetadata)(_: Option[AccessToken]))
+        .expects(triplesGeneratedEvent, projectMetadata, maybeAccessToken)
         .returning(rightT[Try, ProcessingRecoverableError](curatedTriples))
 
       (triplesUploader

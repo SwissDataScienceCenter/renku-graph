@@ -25,7 +25,7 @@ import ch.datascience.graph.model.GraphModelGenerators.projectSchemaVersions
 import ch.datascience.graph.model.entities
 import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.testentities._
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.CurationRecoverableError
 import io.renku.jsonld.generators.JsonLDGenerators.jsonLDEntities
 import org.scalacheck.Gen
 

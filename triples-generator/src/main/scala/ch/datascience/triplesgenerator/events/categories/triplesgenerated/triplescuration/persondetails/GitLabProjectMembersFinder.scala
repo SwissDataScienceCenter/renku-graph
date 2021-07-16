@@ -32,7 +32,7 @@ import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.http.client.{AccessToken, RestClient}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.CurationRecoverableError
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.circe.Decoder

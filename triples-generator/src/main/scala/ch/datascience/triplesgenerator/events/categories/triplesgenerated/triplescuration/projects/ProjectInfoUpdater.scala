@@ -24,8 +24,8 @@ import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedEvent
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.{CuratedTriples, CurationResults}
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CurationResults
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.{CuratedTriples, TriplesGeneratedEvent}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -49,7 +49,10 @@ class ProjectInfoUpdaterImpl(
     payloadTransformer
       .transform(event, curatedTriples)
       .map { transformedTriples =>
-        CuratedTriples(transformedTriples, curatedTriples.updatesGroups :+ updateFunctionsCreator.create(event))
+        CuratedTriples(transformedTriples,
+                       curatedTriples.projectMetadata,
+                       curatedTriples.updatesGroups :+ updateFunctionsCreator.create(event)
+        )
       }
 }
 

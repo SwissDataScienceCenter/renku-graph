@@ -33,7 +33,7 @@ import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater
 import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater._
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.{IOTriplesCurator, TriplesTransformer}
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.{TriplesCurator, TriplesTransformer}
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult._
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplesuploading.{IOUploader, TriplesUploadResult, Uploader}
 import io.prometheus.client.Histogram
@@ -88,9 +88,9 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]: MonadThrow](
       event:                   TriplesGeneratedEvent
   )(implicit maybeAccessToken: Option[AccessToken]): Interpretation[UploadingResult] = {
     for {
-      _              <- deserializeToModel(event).leftSemiflatMap(toUploadingError(event))
-      curatedTriples <- transform(event).leftSemiflatMap(toUploadingError(event))
-      result         <- right[UploadingResult](upload(curatedTriples) >>= (toUploadingResult(event, _)))
+      projectMetadata <- deserializeToModel(event) leftSemiflatMap toUploadingError(event)
+      curatedTriples  <- transform(event, projectMetadata) leftSemiflatMap toUploadingError(event)
+      result          <- right[UploadingResult](upload(curatedTriples) >>= (toUploadingResult(event, _)))
     } yield result
   }.merge recoverWith nonRecoverableFailure(event)
 
@@ -226,7 +226,7 @@ private object IOTriplesGeneratedEventProcessor {
   ): IO[TriplesGeneratedEventProcessor[IO]] = for {
     uploader              <- IOUploader(logger, timeRecorder)
     accessTokenFinder     <- AccessTokenFinder(logger)
-    triplesCurator        <- IOTriplesCurator(gitLabThrottler, logger, timeRecorder)
+    triplesCurator        <- TriplesCurator(gitLabThrottler, logger, timeRecorder)
     eventStatusUpdater    <- EventStatusUpdater(categoryName, logger)
     eventsProcessingTimes <- metricsRegistry.register[Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
     executionTimeRecorder <- ExecutionTimeRecorder[IO](logger, maybeHistogram = Some(eventsProcessingTimes))
