@@ -26,15 +26,15 @@ import cats.syntax.all._
 import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.CuratedTriples
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.CurationRecoverableError
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TransformationData
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.TopmostDataFinder.TopmostData
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
 private[triplescuration] trait DatasetInfoEnricher[Interpretation[_]] {
-  def enrichDatasetInfo(curatedTriples: CuratedTriples[Interpretation]): CurationResults[Interpretation]
+  def enrichDatasetInfo(transformationData: TransformationData[Interpretation]): TransformationResults[Interpretation]
 }
 
 private[triplescuration] class DatasetInfoEnricherImpl[Interpretation[_]: MonadThrow](
@@ -48,24 +48,25 @@ private[triplescuration] class DatasetInfoEnricherImpl[Interpretation[_]: MonadT
   import topmostDataFinder._
   import triplesUpdater._
 
-  def enrichDatasetInfo(curatedTriples: CuratedTriples[Interpretation]): CurationResults[Interpretation] = for {
-    datasetInfos <- findDatasetsInfo(curatedTriples.triples).asRightT
-    topmostInfos <- EitherT(
-                      datasetInfos
-                        .map(findTopmostData)
-                        .toList
-                        .sequence
-                        .map(_.asRight[ProcessingRecoverableError])
-                        .recover(maybeToRecoverableError)
-                    )
-    updatedTriples = topmostInfos.foldLeft(curatedTriples)(mergeTopmostDataIntoTriples)
-  } yield topmostInfos.foldLeft(updatedTriples)(descendantsUpdater.prepareUpdates[Interpretation])
+  def enrichDatasetInfo(transformationData: TransformationData[Interpretation]): TransformationResults[Interpretation] =
+    for {
+      datasetInfos <- findDatasetsInfo(transformationData.triples).asRightT
+      topmostInfos <- EitherT(
+                        datasetInfos
+                          .map(findTopmostData)
+                          .toList
+                          .sequence
+                          .map(_.asRight[ProcessingRecoverableError])
+                          .recover(maybeToRecoverableError)
+                      )
+      updatedTriples = topmostInfos.foldLeft(transformationData)(mergeTopmostDataIntoTriples)
+    } yield topmostInfos.foldLeft(updatedTriples)(descendantsUpdater.prepareUpdates[Interpretation])
 
   private lazy val maybeToRecoverableError
       : PartialFunction[Throwable, Either[ProcessingRecoverableError, List[TopmostData]]] = {
     case e @ (_: UnexpectedResponseException | _: ConnectivityException | _: ClientException) =>
       Left[ProcessingRecoverableError, List[TopmostData]](
-        CurationRecoverableError("Problem with finding top most data", e)
+        TransformationRecoverableError("Problem with finding top most data", e)
       )
   }
 

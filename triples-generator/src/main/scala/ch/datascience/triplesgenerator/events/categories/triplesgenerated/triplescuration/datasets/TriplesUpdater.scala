@@ -22,7 +22,7 @@ package datasets
 import cats.syntax.all._
 import ch.datascience.graph.model.Schemas._
 import ch.datascience.rdfstore.JsonLDTriples
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.CuratedTriples
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TransformationData
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.TopmostDataFinder.TopmostData
 import io.circe.Json
 import io.circe.optics.JsonOptics._
@@ -34,10 +34,10 @@ import monocle.function.Plated
 private class TriplesUpdater {
 
   def mergeTopmostDataIntoTriples[Interpretation[_]](
-      curatedTriples: CuratedTriples[Interpretation],
-      topmostData:    TopmostData
-  ): CuratedTriples[Interpretation] = curatedTriples.copy(
-    triples = JsonLDTriples(Plated.transform(updateDataset(topmostData))(curatedTriples.triples.value))
+      transformationData: TransformationData[Interpretation],
+      topmostData:        TopmostData
+  ): TransformationData[Interpretation] = transformationData.copy(
+    triples = JsonLDTriples(Plated.transform(updateDataset(topmostData))(transformationData.triples.value))
   )
 
   private def updateDataset(topmostData: TopmostData): Json => Json = { json =>

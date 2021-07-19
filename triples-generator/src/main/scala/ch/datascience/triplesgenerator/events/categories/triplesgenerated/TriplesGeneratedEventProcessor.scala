@@ -35,7 +35,7 @@ import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater
 import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater._
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.{TriplesCurator, TriplesTransformer}
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult._
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplesuploading.{IOUploader, TriplesUploadResult, Uploader}
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplesuploading.{TriplesUploadResult, Uploader}
 import io.prometheus.client.Histogram
 import org.typelevel.log4cats.Logger
 
@@ -67,15 +67,14 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]: MonadThrow](
   import triplesCurator._
   import uploader._
 
-  def process(triplesGeneratedEvent: TriplesGeneratedEvent): Interpretation[Unit] = {
+  def process(event: TriplesGeneratedEvent): Interpretation[Unit] = {
     for {
-      maybeAccessToken <- findAccessToken(triplesGeneratedEvent.project.path)
-                            .recoverWith(rollback(triplesGeneratedEvent))
-      results <- measureExecutionTime(transformAndUpload(triplesGeneratedEvent)(maybeAccessToken))
-      _       <- updateEventLog(results)
-      _       <- logSummary(triplesGeneratedEvent)(results)
+      maybeAccessToken <- findAccessToken(event.project.path).recoverWith(rollback(event))
+      results          <- measureExecutionTime(transformAndUpload(event)(maybeAccessToken))
+      _                <- updateEventLog(results)
+      _                <- logSummary(event)(results)
     } yield ()
-  } recoverWith logError(triplesGeneratedEvent)
+  } recoverWith logError(event)
 
   private def logError(event: TriplesGeneratedEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
     case NonFatal(exception) =>
@@ -89,8 +88,8 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]: MonadThrow](
   )(implicit maybeAccessToken: Option[AccessToken]): Interpretation[UploadingResult] = {
     for {
       projectMetadata <- deserializeToModel(event) leftSemiflatMap toUploadingError(event)
-      curatedTriples  <- transform(event, projectMetadata) leftSemiflatMap toUploadingError(event)
-      result          <- right[UploadingResult](upload(curatedTriples) >>= (toUploadingResult(event, _)))
+      transformed     <- transform(event, projectMetadata) leftSemiflatMap toUploadingError(event)
+      result          <- right[UploadingResult](upload(transformed) >>= (toUploadingResult(event, _)))
     } yield result
   }.merge recoverWith nonRecoverableFailure(event)
 
@@ -224,7 +223,7 @@ private object IOTriplesGeneratedEventProcessor {
       executionContext: ExecutionContext,
       timer:            Timer[IO]
   ): IO[TriplesGeneratedEventProcessor[IO]] = for {
-    uploader              <- IOUploader(logger, timeRecorder)
+    uploader              <- Uploader(logger, timeRecorder)
     accessTokenFinder     <- AccessTokenFinder(logger)
     triplesCurator        <- TriplesCurator(gitLabThrottler, logger, timeRecorder)
     eventStatusUpdater    <- EventStatusUpdater(categoryName, logger)

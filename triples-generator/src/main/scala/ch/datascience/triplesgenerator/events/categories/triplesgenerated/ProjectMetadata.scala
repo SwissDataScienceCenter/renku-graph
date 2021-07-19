@@ -26,6 +26,7 @@ import ch.datascience.graph.model.entities._
 import monocle.{Lens, Traversal}
 
 private case class ProjectMetadata(project: Project, activities: List[Activity], datasets: List[Dataset[Provenance]])
+    extends ProjectMetadataOps
 
 private object ProjectMetadata {
 
@@ -134,4 +135,13 @@ private object ProjectMetadata {
   }
 
   private def collectPersons(project: Project): Set[Person] = project.members ++ project.maybeCreator
+}
+
+private sealed trait ProjectMetadataOps {
+  self: ProjectMetadata =>
+
+  lazy val findAllPersons: Set[Person] =
+    project.members ++ project.maybeCreator ++ activities.map(_.author) ++ datasets.flatMap(_.provenance.creators)
+
+  def update(oldPerson: Person, newPerson: Person): ProjectMetadata = ???
 }

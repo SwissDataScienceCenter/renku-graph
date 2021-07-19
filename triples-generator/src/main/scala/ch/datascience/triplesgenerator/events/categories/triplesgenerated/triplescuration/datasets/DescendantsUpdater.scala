@@ -19,12 +19,14 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets
 
 import cats.MonadThrow
+import cats.data.EitherT
 import ch.datascience.graph.model.Schemas._
 import ch.datascience.graph.model.datasets.{TopmostDerivedFrom, TopmostSameAs}
 import ch.datascience.rdfstore.SparqlQuery
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.CuratedTriples
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.CuratedTriples.CurationUpdatesGroup
+import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.{ProjectMetadata, TransformationData}
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TransformationData.{ResultData, TransformationStep}
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.TopmostDataFinder.TopmostData
 import eu.timepit.refined.auto._
 import io.renku.jsonld.EntityId
@@ -32,13 +34,19 @@ import io.renku.jsonld.EntityId
 private class DescendantsUpdater {
 
   def prepareUpdates[Interpretation[_]: MonadThrow](
-      curatedTriples: CuratedTriples[Interpretation],
-      topmostData:    TopmostData
-  ): CuratedTriples[Interpretation] = curatedTriples.copy(
-    updatesGroups = curatedTriples.updatesGroups ::: CurationUpdatesGroup(
+      transformationData: TransformationData[Interpretation],
+      topmostData:        TopmostData
+  ): TransformationData[Interpretation] = transformationData.copy(
+    steps = transformationData.steps ::: TransformationStep[Interpretation](
       name = "Dataset descendants updates",
-      prepareSameAsUpdate(topmostData.datasetId, topmostData.topmostSameAs),
-      prepareDerivedFromUpdate(topmostData.datasetId, topmostData.topmostDerivedFrom)
+      transformation = (metadata: ProjectMetadata) => {
+        println(topmostData)
+        EitherT.rightT[Interpretation, ProcessingRecoverableError](ResultData(metadata, Nil))
+      }
+//      (metadata: ProjectMetadata) =>
+//        metadata -> List(prepareSameAsUpdate(topmostData.datasetId, topmostData.topmostSameAs),
+//                         prepareDerivedFromUpdate(topmostData.datasetId, topmostData.topmostDerivedFrom)
+//        )
     ) :: Nil
   )
 

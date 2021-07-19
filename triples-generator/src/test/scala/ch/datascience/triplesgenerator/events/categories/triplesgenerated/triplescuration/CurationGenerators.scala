@@ -19,11 +19,13 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration
 
 import cats.MonadThrow
+import cats.data.EitherT
 import ch.datascience.generators.CommonGraphGenerators._
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.rdfstore.JsonLDTriples
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.CuratedTriples
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.CuratedTriples.CurationUpdatesGroup
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TransformationData
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TransformationData.{ResultData, TransformationStep}
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators.projectMetadatas
 import eu.timepit.refined.auto._
 import io.renku.jsonld.JsonLD
@@ -31,28 +33,30 @@ import org.scalacheck.Gen
 
 private[triplesgenerated] object CurationGenerators {
 
-  implicit def curatedTriplesObjects[Interpretation[_]: MonadThrow]: Gen[CuratedTriples[Interpretation]] =
-    curatedTriplesObjects[Interpretation](
-      nonEmptyList(curationUpdatesGroups[Interpretation]).map(_.toList)
+  implicit def transformationDataObjects[Interpretation[_]: MonadThrow]: Gen[TransformationData[Interpretation]] =
+    transformationDataObjects[Interpretation](
+      transformationSteps[Interpretation].generateNonEmptyList().toList
     )
 
-  def curatedTriplesObjects[Interpretation[_]: MonadThrow](
-      updatesGenerator: Gen[List[CurationUpdatesGroup[Interpretation]]]
-  ): Gen[CuratedTriples[Interpretation]] = for {
+  def transformationDataObjects[Interpretation[_]: MonadThrow](
+      transformationStepsGenerator: Gen[List[TransformationStep[Interpretation]]]
+  ): Gen[TransformationData[Interpretation]] = for {
     triples  <- jsonLDTriples
     metadata <- projectMetadatas
-    updates  <- updatesGenerator
-  } yield CuratedTriples[Interpretation](triples, metadata, updates)
+    updates  <- transformationStepsGenerator
+  } yield TransformationData[Interpretation](triples, metadata, updates)
 
-  def curatedTriplesObjects[Interpretation[_]: MonadThrow](triples: JsonLD): Gen[CuratedTriples[Interpretation]] =
+  def curatedTriplesObjects[Interpretation[_]: MonadThrow](triples: JsonLD): Gen[TransformationData[Interpretation]] =
     for {
-      updates  <- nonEmptyList(curationUpdatesGroups[Interpretation])
+      updates  <- nonEmptyList(transformationSteps[Interpretation])
       metadata <- projectMetadatas
-    } yield CuratedTriples(JsonLDTriples(triples.flatten.fold(throw _, identity).toJson), metadata, updates.toList)
+    } yield TransformationData(JsonLDTriples(triples.flatten.fold(throw _, identity).toJson), metadata, updates.toList)
 
-  implicit def curationUpdatesGroups[Interpretation[_]: MonadThrow]: Gen[CurationUpdatesGroup[Interpretation]] =
-    for {
-      name        <- nonBlankStrings(minLength = 5)
-      sparqlQuery <- sparqlQueries
-    } yield CurationUpdatesGroup[Interpretation](name, sparqlQuery)
+  implicit def transformationSteps[Interpretation[_]: MonadThrow]: Gen[TransformationStep[Interpretation]] = for {
+    name          <- nonBlankStrings(minLength = 5)
+    sparqlQueries <- sparqlQueries.toGeneratorOfList()
+  } yield TransformationStep[Interpretation](
+    name,
+    projectMetadata => EitherT.rightT(ResultData(projectMetadata, sparqlQueries))
+  )
 }

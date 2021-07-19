@@ -137,7 +137,7 @@ class ProjectInfoFinderSpec
     }
 
     "collect members from all the pages" in new TestCase {
-      val allMembers  = gitLabProjectMemberObjects.generateFixedSizeList(4)
+      val allMembers  = projectMemberObjects.generateFixedSizeList(4)
       val projectInfo = gitLabProjectInfos.generateOne.copy(members = allMembers.toSet)
 
       `/api/v4/projects`(projectInfo.path) returning okJson(projectInfo.asJson.noSpaces)
@@ -173,7 +173,7 @@ class ProjectInfoFinderSpec
       }
 
       s"return a Recoverable Failure for $problemName when fetching creator" in new TestCase {
-        val creator     = gitLabProjectMemberObjects.generateOne
+        val creator     = projectMemberObjects.generateOne
         val projectInfo = gitLabProjectInfos.generateOne.copy(maybeCreator = creator.some)
 
         `/api/v4/projects`(projectInfo.path) returning okJson(projectInfo.asJson.noSpaces)

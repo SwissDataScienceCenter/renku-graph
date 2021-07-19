@@ -18,37 +18,37 @@
 
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 
-import CuratedTriples._
-import cats.MonadThrow
+import TransformationData._
 import cats.data.EitherT
 import ch.datascience.rdfstore.{JsonLDTriples, SparqlQuery}
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 
-private final case class CuratedTriples[Interpretation[_]](triples:         JsonLDTriples,
-                                                           projectMetadata: ProjectMetadata,
-                                                           updatesGroups:   List[CurationUpdatesGroup[Interpretation]]
+private final case class TransformationData[Interpretation[_]](
+    triples:         JsonLDTriples,
+    projectMetadata: ProjectMetadata,
+    steps:           List[TransformationStep[Interpretation]]
 )
 
-private object CuratedTriples {
-  private[triplesgenerated] type GeneratedQueries[Interpretation[_]] =
-    EitherT[Interpretation, ProcessingRecoverableError, List[SparqlQuery]]
+private object TransformationData {
 
-  final case class CurationUpdatesGroup[Interpretation[_]](
+  private[triplesgenerated] final case class TransformationStep[Interpretation[_]](
       name:           String Refined NonEmpty,
-      queryGenerator: () => GeneratedQueries[Interpretation]
+      transformation: Transformation[Interpretation]
   ) {
-    def generateUpdates(): GeneratedQueries[Interpretation] = queryGenerator()
+    def run(projectMetadata: ProjectMetadata): TransformationStepResult[Interpretation] =
+      transformation(projectMetadata)
   }
 
-  object CurationUpdatesGroup {
-    def apply[Interpretation[_]: MonadThrow](
-        name:          String Refined NonEmpty,
-        sparqlQueries: SparqlQuery*
-    ): CurationUpdatesGroup[Interpretation] = CurationUpdatesGroup[Interpretation](
-      name,
-      () => EitherT.rightT[Interpretation, ProcessingRecoverableError](sparqlQueries.toList)
-    )
-  }
+  private[triplesgenerated] type Transformation[Interpretation[_]] =
+    ProjectMetadata => TransformationStepResult[Interpretation]
+
+  private[triplesgenerated] type TransformationStepResult[Interpretation[_]] =
+    EitherT[Interpretation, ProcessingRecoverableError, ResultData[Interpretation]]
+
+  private[triplesgenerated] final case class ResultData[Interpretation[_]](
+      projectMetadata: ProjectMetadata,
+      queries:         List[SparqlQuery]
+  )
 }

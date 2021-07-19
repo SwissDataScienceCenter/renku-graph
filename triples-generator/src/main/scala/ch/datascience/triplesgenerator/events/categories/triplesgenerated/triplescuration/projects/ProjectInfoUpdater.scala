@@ -24,8 +24,8 @@ import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CurationResults
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.{CuratedTriples, TriplesGeneratedEvent}
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.{TransformationData, TriplesGeneratedEvent}
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TransformationResults
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -33,8 +33,8 @@ import scala.concurrent.ExecutionContext
 trait ProjectInfoUpdater[Interpretation[_]] {
   def updateProjectInfo(
       event:                   TriplesGeneratedEvent,
-      givenCuratedTriples:     CuratedTriples[Interpretation]
-  )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation]
+      transformationData:      TransformationData[Interpretation]
+  )(implicit maybeAccessToken: Option[AccessToken]): TransformationResults[Interpretation]
 }
 
 class ProjectInfoUpdaterImpl(
@@ -44,14 +44,14 @@ class ProjectInfoUpdaterImpl(
 
   override def updateProjectInfo(
       event:                   TriplesGeneratedEvent,
-      curatedTriples:          CuratedTriples[IO]
-  )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[IO] =
+      transformationData:      TransformationData[IO]
+  )(implicit maybeAccessToken: Option[AccessToken]): TransformationResults[IO] =
     payloadTransformer
-      .transform(event, curatedTriples)
+      .transform(event, transformationData)
       .map { transformedTriples =>
-        CuratedTriples(transformedTriples,
-                       curatedTriples.projectMetadata,
-                       curatedTriples.updatesGroups :+ updateFunctionsCreator.create(event)
+        TransformationData(transformedTriples,
+                           transformationData.projectMetadata,
+                           transformationData.steps :+ updateFunctionsCreator.create(event)
         )
       }
 }

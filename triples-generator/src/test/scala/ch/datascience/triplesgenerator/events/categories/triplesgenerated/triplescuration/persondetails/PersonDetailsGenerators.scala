@@ -26,12 +26,6 @@ import org.scalacheck.Gen
 
 private object PersonDetailsGenerators {
 
-  implicit val gitLabProjectMembers: Gen[GitLabProjectMember] = for {
-    id       <- userGitLabIds
-    username <- usernames
-    name     <- userNames
-  } yield GitLabProjectMember(id, username, name)
-
   implicit lazy val commitPersons: Gen[CommitPerson] = for {
     userName  <- userNames
     userEmail <- userEmails

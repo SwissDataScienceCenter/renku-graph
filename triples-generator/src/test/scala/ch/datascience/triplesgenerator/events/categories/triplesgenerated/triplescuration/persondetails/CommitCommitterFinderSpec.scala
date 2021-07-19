@@ -32,7 +32,7 @@ import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.CurationRecoverableError
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails.PersonDetailsGenerators._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER
@@ -80,7 +80,7 @@ class CommitCommitterFinderSpec extends AnyWordSpec with ExternalServiceStubbing
         .findCommitPeople(projectId, commitId, maybeAccessToken = None)
         .value
         .unsafeRunSync() shouldBe Either.left[ProcessingRecoverableError, CommitPersonsInfo](
-        CurationRecoverableError("Access token not valid to fetch project commit info")
+        TransformationRecoverableError("Access token not valid to fetch project commit info")
       )
     }
 
@@ -95,7 +95,7 @@ class CommitCommitterFinderSpec extends AnyWordSpec with ExternalServiceStubbing
         .findCommitPeople(projectId, commitId, maybeAccessToken = None)
         .value
         .unsafeRunSync() shouldBe Either.left[ProcessingRecoverableError, CommitPersonsInfo](
-        CurationRecoverableError("Service unavailable")
+        TransformationRecoverableError("Service unavailable")
       )
     }
 
@@ -111,7 +111,7 @@ class CommitCommitterFinderSpec extends AnyWordSpec with ExternalServiceStubbing
         .value
         .unsafeRunSync()
 
-      error shouldBe a[CurationRecoverableError]
+      error shouldBe a[TransformationRecoverableError]
     }
 
     "return an CurationRecoverableError if there's other client error" in new TestCase {
@@ -126,7 +126,7 @@ class CommitCommitterFinderSpec extends AnyWordSpec with ExternalServiceStubbing
         .value
         .unsafeRunSync()
 
-      error shouldBe a[CurationRecoverableError]
+      error shouldBe a[TransformationRecoverableError]
     }
 
     "return an Error if remote client responds with invalid json" in new TestCase {

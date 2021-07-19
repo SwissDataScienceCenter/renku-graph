@@ -25,8 +25,8 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.CurationRecoverableError
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.{CuratedTriples, TriplesGeneratedEvent}
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.{TransformationData, TriplesGeneratedEvent}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -34,7 +34,7 @@ import scala.concurrent.ExecutionContext
 private trait PayloadTransformer[Interpretation[_]] {
   def transform(
       event:                   TriplesGeneratedEvent,
-      curatedTriples:          CuratedTriples[Interpretation]
+      transformationData:      TransformationData[Interpretation]
   )(implicit maybeAccessToken: Option[AccessToken]): EitherT[Interpretation, ProcessingRecoverableError, JsonLDTriples]
 }
 
@@ -45,13 +45,13 @@ private class PayloadTransformerImpl(
 
   override def transform(
       event:                   TriplesGeneratedEvent,
-      curatedTriples:          CuratedTriples[IO]
+      transformationData:      TransformationData[IO]
   )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] = EitherT {
     gitLab
       .findProject(event.project.path)
       .map {
-        case None => curatedTriples.triples.pure[IO]
-        case _    => projectPropertiesRemover(curatedTriples.triples).pure[IO]
+        case None => transformationData.triples.pure[IO]
+        case _    => projectPropertiesRemover(transformationData.triples).pure[IO]
       }
       .flatten
       .map(_.asRight[ProcessingRecoverableError])
@@ -62,7 +62,7 @@ private class PayloadTransformerImpl(
       : PartialFunction[Throwable, Either[ProcessingRecoverableError, JsonLDTriples]] = {
     case e @ (_: UnexpectedResponseException | _: ConnectivityException | _: ClientException) =>
       Left[ProcessingRecoverableError, JsonLDTriples](
-        CurationRecoverableError("Problem with finding fork info", e)
+        TransformationRecoverableError("Problem with finding fork info", e)
       )
   }
 }

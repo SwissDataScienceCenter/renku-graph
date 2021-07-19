@@ -18,18 +18,19 @@
 
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails
 
-import PersonDetailsGenerators._
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GitLabUrl
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import ch.datascience.graph.model.entities.Project.ProjectMember
+import ch.datascience.graph.model.testentities.EntitiesGenerators.projectMemberObjects
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.CurationRecoverableError
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER
 import eu.timepit.refined.auto._
@@ -55,7 +56,7 @@ class GitLabProjectMembersFinderSpec
 
     "return a set of project members and users" in new TestCase {
 
-      forAll { (gitLabProjectUsers: List[GitLabProjectMember], gitLabProjectMembers: List[GitLabProjectMember]) =>
+      forAll { (gitLabProjectUsers: List[ProjectMember], gitLabProjectMembers: List[ProjectMember]) =>
         stubFor {
           get(s"/api/v4/projects/${urlEncode(path.toString)}/users")
             .willReturn(okJson(gitLabProjectUsers.asJson.noSpaces))
@@ -73,8 +74,8 @@ class GitLabProjectMembersFinderSpec
     }
 
     "collect users from paged results" in new TestCase {
-      val projectUsers   = gitLabProjectMembers.generateNonEmptyList(minElements = 2).toList
-      val projectMembers = gitLabProjectMembers.generateNonEmptyList(minElements = 2).toList
+      val projectUsers   = projectMemberObjects.generateNonEmptyList(minElements = 2).toList
+      val projectMembers = projectMemberObjects.generateNonEmptyList(minElements = 2).toList
 
       stubFor {
         get(s"/api/v4/projects/${urlEncode(path.toString)}/users")
@@ -122,7 +123,7 @@ class GitLabProjectMembersFinderSpec
 
         val Left(error) = finder.findProjectMembers(path).value.unsafeRunSync()
 
-        error shouldBe a[CurationRecoverableError]
+        error shouldBe a[TransformationRecoverableError]
       }
     }
 
@@ -139,7 +140,7 @@ class GitLabProjectMembersFinderSpec
 
         val Left(error) = finder.findProjectMembers(path).value.unsafeRunSync()
 
-        error shouldBe a[CurationRecoverableError]
+        error shouldBe a[TransformationRecoverableError]
       }
     }
   }
@@ -163,12 +164,11 @@ class GitLabProjectMembersFinderSpec
     )
   }
 
-  private implicit val projectMemberEncoder: Encoder[GitLabProjectMember] = Encoder.instance[GitLabProjectMember] {
-    member =>
-      json"""{
-              "id":        ${member.id.value},
-              "username":  ${member.username.value},
-              "name":      ${member.name.value}
-             }"""
+  private implicit val projectMemberEncoder: Encoder[ProjectMember] = Encoder.instance[ProjectMember] { member =>
+    json"""{
+      "id":       ${member.gitLabId.value},
+      "username": ${member.username.value},
+      "name":     ${member.name.value}
+    }"""
   }
 }

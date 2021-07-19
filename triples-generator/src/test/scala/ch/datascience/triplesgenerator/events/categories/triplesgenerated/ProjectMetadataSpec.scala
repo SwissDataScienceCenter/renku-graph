@@ -26,6 +26,7 @@ import ch.datascience.graph.model.entities.Dataset.Provenance
 import ch.datascience.graph.model.{activities, datasets, entities, projects}
 import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.testentities._
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators.projectMetadatas
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -165,6 +166,14 @@ class ProjectMetadataSpec extends AnyWordSpec with should.Matchers with ScalaChe
           ProjectMetadata.from(project.to[entities.Project], activities = Nil, datasets = List(validDataset))
         maybeMetadata.map(_.datasets) shouldBe List(validDataset).validNel[String]
       }
+    }
+  }
+
+  "findAllPersons" should {
+    "collect project members, project creator, activities' authors and datasets' creators" in {
+      val metadata = projectMetadatas.generateOne
+      metadata.findAllPersons shouldBe metadata.project.members ++ metadata.project.maybeCreator ++ metadata.activities
+        .map(_.author) ++ metadata.datasets.flatMap(_.provenance.creators)
     }
   }
 

@@ -19,58 +19,49 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration
 package persondetails
 
+import cats.MonadThrow
 import cats.data.EitherT
 import cats.effect.{ContextShift, Timer}
-import cats.{Monad, MonadError}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.events.consumers.Project
-import ch.datascience.graph.config.GitLabUrlLoader
-import ch.datascience.graph.model.events.EventId
-import ch.datascience.graph.tokenrepository.AccessTokenFinder
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.ProjectMetadata
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TransformationData.TransformationStep
+//import ch.datascience.events.consumers.Project
+//import ch.datascience.graph.model.events.EventId
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.CuratedTriples
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TransformationData
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
 private[triplescuration] trait PersonDetailsUpdater[Interpretation[_]] {
-  def updatePersonDetails(curatedTriples: CuratedTriples[Interpretation],
-                          project:        Project,
-                          eventId:        EventId
-  ): CurationResults[Interpretation]
+  def updatePersonDetails: List[TransformationStep[Interpretation]]
 }
 
-private class PersonDetailsUpdaterImpl[Interpretation[_]: Monad](
-    personTrimmer:                   PersonTrimmer[Interpretation],
-    accessTokenFinder:               AccessTokenFinder[Interpretation],
-    projectMembersFinder:            GitLabProjectMembersFinder[Interpretation],
-    personsAndProjectMembersMatcher: PersonsAndProjectMembersMatcher,
-    updatesCreator:                  UpdatesCreator
-)(implicit ME:                       MonadError[Interpretation, Throwable])
-    extends PersonDetailsUpdater[Interpretation] {
+private class PersonDetailsUpdaterImpl[Interpretation[_]: MonadThrow](
+//    personTrimmer:        PersonTrimmer[Interpretation],
+//    projectMembersFinder: GitLabProjectMembersFinder[Interpretation]
+//    personsAndProjectMembersMatcher: PersonsAndProjectMembersMatcher,
+//    updatesCreator:                  UpdatesCreator
+) extends PersonDetailsUpdater[Interpretation] {
 
-  import AccessTokenFinder._
-  import accessTokenFinder._
-  import personsAndProjectMembersMatcher._
-  import projectMembersFinder._
-  import updatesCreator._
+//  import personsAndProjectMembersMatcher._
+//  import projectMembersFinder._
+//  import updatesCreator._
 
-  def updatePersonDetails(curatedTriples: CuratedTriples[Interpretation],
-                          project:        Project,
-                          eventId:        EventId
-  ): CurationResults[Interpretation] = for {
-    maybeAccessToken <- findAccessToken(project.path).toRightT
-    triplesAndPersons <-
-      personTrimmer.getTriplesAndTrimmedPersons(curatedTriples.triples, project.id, eventId, maybeAccessToken)
-    (updatedTriples, trimmedPersons) = triplesAndPersons
-    projectMembers <- findProjectMembers(project.path)(maybeAccessToken)
-    personsWithGitlabIds = merge(trimmedPersons, projectMembers)
-    newUpdatesGroups     = personsWithGitlabIds map prepareUpdates[Interpretation]
-  } yield CuratedTriples(updatedTriples,
-                         curatedTriples.projectMetadata,
-                         curatedTriples.updatesGroups ++ newUpdatesGroups
-  )
+  def updatePersonDetails(
+      transformationData: TransformationData[Interpretation]
+  ): TransformationResults[Interpretation] = ??? //for {
+//    triplesAndPersons <-
+//      personTrimmer.getTriplesAndTrimmedPersons(transformationData.projectMetadata, eventId)
+//    (updatedTriples, trimmedPersons) = triplesAndPersons
+//    _ <- findProjectMembers(project.path)(maybeAccessToken)
+//    personsWithGitlabIds = merge(trimmedPersons, projectMembers)
+//    newUpdatesGroups     = personsWithGitlabIds map prepareUpdates[Interpretation]
+//  } yield TransformationData(updatedTriples,
+//                             transformationData.projectMetadata,
+//                             transformationData.steps //++ newUpdatesGroups
+//  )
 
   private implicit class ResultOps[T](out: Interpretation[T]) {
     lazy val toRightT: EitherT[Interpretation, ProcessingRecoverableError, T] =
@@ -89,16 +80,14 @@ private[triplescuration] object PersonDetailsUpdater {
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[PersonDetailsUpdater[IO]] = for {
-    projectMembersFinder <- IOGitLabProjectMembersFinder(gitLabThrottler, logger)
-    accessTokenFinder    <- AccessTokenFinder(logger)
-    gitLabUrl            <- GitLabUrlLoader[IO]()
-    personTrimmer        <- IOPersonTrimmer(gitLabThrottler, logger)
-  } yield new PersonDetailsUpdaterImpl[IO](
-    personTrimmer,
-    accessTokenFinder,
-    projectMembersFinder,
-    new PersonsAndProjectMembersMatcher(),
-    new UpdatesCreator(gitLabUrl.apiV4)
-  )
+  ): IO[PersonDetailsUpdater[IO]] = ??? //for {
+//    projectMembersFinder <- IOGitLabProjectMembersFinder(gitLabThrottler, logger)
+//    gitLabUrl            <- GitLabUrlLoader[IO]()
+//    personTrimmer <- IOPersonTrimmer(gitLabThrottler, logger)
+//  } yield new PersonDetailsUpdaterImpl[IO](
+//    personTrimmer,
+//    projectMembersFinder
+//    new PersonsAndProjectMembersMatcher(),
+//    new UpdatesCreator(gitLabUrl.apiV4)
+//  )
 }

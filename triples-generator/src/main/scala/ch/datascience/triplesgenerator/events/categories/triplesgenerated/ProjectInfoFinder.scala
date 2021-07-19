@@ -30,7 +30,7 @@ import ch.datascience.http.client.RestClientError.{ClientException, Connectivity
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.http.client.{AccessToken, RestClient}
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.CurationRecoverableError
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.circe.Decoder
@@ -197,8 +197,8 @@ private class ProjectInfoFinderImpl(
   private lazy val maybeRecoverableError
       : PartialFunction[Throwable, IO[Either[ProcessingRecoverableError, Option[GitLabProjectInfo]]]] = {
     case exception @ (_: ConnectivityException | _: ClientException) =>
-      Either.left(CurationRecoverableError(exception.getMessage, exception.getCause)).pure[IO]
+      Either.left(TransformationRecoverableError(exception.getMessage, exception.getCause)).pure[IO]
     case exception @ UnexpectedResponseException(ServiceUnavailable | Forbidden | Unauthorized, _) =>
-      Either.left(CurationRecoverableError(exception.getMessage, exception.getCause)).pure[IO]
+      Either.left(TransformationRecoverableError(exception.getMessage, exception.getCause)).pure[IO]
   }
 }

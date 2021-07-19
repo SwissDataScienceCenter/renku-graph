@@ -22,10 +22,10 @@ import cats.MonadThrow
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.{CuratedTriples, ProjectMetadata, TriplesGeneratedEvent}
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.DatasetInfoEnricher
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails.PersonDetailsUpdater
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects.{IOProjectInfoUpdater, ProjectInfoUpdater}
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.{ProjectMetadata, TransformationData, TriplesGeneratedEvent}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -34,7 +34,7 @@ private[triplesgenerated] trait TriplesTransformer[Interpretation[_]] {
   def transform(
       triplesGeneratedEvent:   TriplesGeneratedEvent,
       projectMetadata:         ProjectMetadata
-  )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation]
+  )(implicit maybeAccessToken: Option[AccessToken]): TransformationResults[Interpretation]
 }
 
 private[triplesgenerated] class TriplesTransformerImpl[Interpretation[_]: MonadThrow](
@@ -49,12 +49,10 @@ private[triplesgenerated] class TriplesTransformerImpl[Interpretation[_]: MonadT
   override def transform(
       triplesGeneratedEvent:   TriplesGeneratedEvent,
       projectMetadata:         ProjectMetadata
-  )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation] = for {
+  )(implicit maybeAccessToken: Option[AccessToken]): TransformationResults[Interpretation] = for {
     triplesWithPersonDetails <-
       updatePersonDetails(
-        CuratedTriples(JsonLDTriples(triplesGeneratedEvent.triples.toJson), projectMetadata, updatesGroups = Nil),
-        triplesGeneratedEvent.project,
-        triplesGeneratedEvent.eventId
+        TransformationData(JsonLDTriples(triplesGeneratedEvent.triples.toJson), projectMetadata, steps = Nil)
       )
     triplesWithForkInfo         <- updateProjectInfo(triplesGeneratedEvent, triplesWithPersonDetails)
     triplesWithEnrichedDatasets <- datasetInfoEnricher.enrichDatasetInfo(triplesWithForkInfo)
@@ -67,12 +65,12 @@ private[triplesgenerated] object TriplesCurator {
   import ch.datascience.config.GitLab
   import ch.datascience.control.Throttler
 
-  final case class CurationRecoverableError(message: String, cause: Throwable)
+  final case class TransformationRecoverableError(message: String, cause: Throwable)
       extends Exception(message, cause)
       with ProcessingRecoverableError
 
-  object CurationRecoverableError {
-    def apply(message: String): CurationRecoverableError = CurationRecoverableError(message, null)
+  object TransformationRecoverableError {
+    def apply(message: String): TransformationRecoverableError = TransformationRecoverableError(message, null)
   }
 
   def apply(

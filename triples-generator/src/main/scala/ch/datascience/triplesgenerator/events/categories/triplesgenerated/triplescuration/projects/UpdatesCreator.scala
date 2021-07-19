@@ -20,18 +20,18 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 package triplescuration.projects
 
 import cats.MonadError
-import cats.data.{EitherT, OptionT}
+//import cats.data.{EitherT, OptionT}
 import cats.effect.{ContextShift, IO}
-import cats.syntax.all._
+//import cats.syntax.all._
 import ch.datascience.graph.config.{GitLabUrlLoader, RenkuBaseUrlLoader}
-import ch.datascience.graph.model.users
+//import ch.datascience.graph.model.users
 import ch.datascience.http.client.AccessToken
-import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
-import ch.datascience.rdfstore.{SparqlQuery, SparqlQueryTimeRecorder}
-import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.CuratedTriples.CurationUpdatesGroup
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.CurationRecoverableError
-import eu.timepit.refined.auto._
+//import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
+import ch.datascience.rdfstore.{SparqlQueryTimeRecorder}
+//import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TransformationData.TransformationStep
+//import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
+//import eu.timepit.refined.auto._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -39,7 +39,7 @@ import scala.concurrent.ExecutionContext
 private trait UpdatesCreator[Interpretation[_]] {
   def create(event:     TriplesGeneratedEvent)(implicit
       maybeAccessToken: Option[AccessToken]
-  ): CurationUpdatesGroup[Interpretation]
+  ): TransformationStep[Interpretation]
 }
 
 private class UpdatesCreatorImpl(
@@ -49,76 +49,78 @@ private class UpdatesCreatorImpl(
 )(implicit ME:           MonadError[IO, Throwable], cs: ContextShift[IO])
     extends UpdatesCreator[IO] {
 
-  import updatesQueryCreator._
+//  import updatesQueryCreator._
+
+  println(s"$gitLab $kg, $updatesQueryCreator")
 
   override def create(
       event:                   TriplesGeneratedEvent
-  )(implicit maybeAccessToken: Option[AccessToken]): CurationUpdatesGroup[IO] =
-    CurationUpdatesGroup[IO](
-      "Fork info updates",
-      () =>
-        EitherT {
-          gitLab
-            .findProject(event.project.path)
-            .flatMap(forkInfoUpdates)
-            .map(_.asRight[ProcessingRecoverableError])
-            .recover(maybeToRecoverableError)
-        }
-    )
-
-  private lazy val forkInfoUpdates: Option[GitLabProject] => IO[List[SparqlQuery]] = {
-    case `when project has a creator`(creator, gitLabProject) =>
-      OptionT(kg.findCreatorId(creator.gitLabId))
-        .map(existingUserResource => updateProjectAndSwapCreator(gitLabProject, existingUserResource))
-        .getOrElse(updateProjectAndAddCreator(gitLabProject, creator))
-    case `when project has no creator`(gitLabProject) =>
-      updateProjectAndUnlinkCreator(gitLabProject).pure[IO]
-    case _ =>
-      List.empty[SparqlQuery].pure[IO]
-  }
-
-  private object `when project has a creator` {
-    def unapply(maybeProject: Option[GitLabProject]): Option[(GitLabCreator, GitLabProject)] = maybeProject match {
-      case Some(project @ GitLabProject(_, _, _, _, _, Some(creator))) => (creator -> project).some
-      case _                                                           => None
-    }
-  }
-
-  private object `when project has no creator` {
-    def unapply(maybeProject: Option[GitLabProject]): Option[GitLabProject] = maybeProject match {
-      case Some(project @ GitLabProject(_, _, _, _, _, None)) => project.some
-      case _                                                  => None
-    }
-  }
-
-  private def updateProjectAndSwapCreator(gitLabProject: GitLabProject, existingUserResource: users.ResourceId) =
-    upsertName(gitLabProject.path, gitLabProject.name) ++
-      updateWasDerivedFrom(gitLabProject.path, gitLabProject.maybeParentPath) ++
-      swapCreator(gitLabProject.path, existingUserResource) ++
-      updateDateCreated(gitLabProject.path, gitLabProject.dateCreated) ++
-      upsertVisibility(gitLabProject.path, gitLabProject.visibility)
-
-  private def updateProjectAndAddCreator(gitLabProject: GitLabProject, creator: GitLabCreator) =
-    upsertName(gitLabProject.path, gitLabProject.name) ++
-      updateWasDerivedFrom(gitLabProject.path, gitLabProject.maybeParentPath) ++
-      addNewCreator(gitLabProject.path, creator) ++
-      updateDateCreated(gitLabProject.path, gitLabProject.dateCreated) ++
-      upsertVisibility(gitLabProject.path, gitLabProject.visibility)
-
-  private def updateProjectAndUnlinkCreator(gitLabProject: GitLabProject) =
-    upsertName(gitLabProject.path, gitLabProject.name) ++
-      updateWasDerivedFrom(gitLabProject.path, gitLabProject.maybeParentPath) ++
-      unlinkCreator(gitLabProject.path) ++
-      updateDateCreated(gitLabProject.path, gitLabProject.dateCreated) ++
-      upsertVisibility(gitLabProject.path, gitLabProject.visibility)
-
-  private lazy val maybeToRecoverableError
-      : PartialFunction[Throwable, Either[ProcessingRecoverableError, List[SparqlQuery]]] = {
-    case e @ (_: UnexpectedResponseException | _: ConnectivityException | _: ClientException) =>
-      Left[ProcessingRecoverableError, List[SparqlQuery]](
-        CurationRecoverableError("Problem with finding fork info", e)
-      )
-  }
+  )(implicit maybeAccessToken: Option[AccessToken]): TransformationStep[IO] = ???
+//    TransformationStep[IO](
+//      "Fork info updates",
+//      () =>
+//        EitherT {
+//          gitLab
+//            .findProject(event.project.path)
+//            .flatMap(forkInfoUpdates)
+//            .map(_.asRight[ProcessingRecoverableError])
+//            .recover(maybeToRecoverableError)
+//        }
+//    )
+//
+//  private lazy val forkInfoUpdates: Option[GitLabProject] => IO[List[SparqlQuery]] = {
+//    case `when project has a creator`(creator, gitLabProject) =>
+//      OptionT(kg.findCreatorId(creator.gitLabId))
+//        .map(existingUserResource => updateProjectAndSwapCreator(gitLabProject, existingUserResource))
+//        .getOrElse(updateProjectAndAddCreator(gitLabProject, creator))
+//    case `when project has no creator`(gitLabProject) =>
+//      updateProjectAndUnlinkCreator(gitLabProject).pure[IO]
+//    case _ =>
+//      List.empty[SparqlQuery].pure[IO]
+//  }
+//
+//  private object `when project has a creator` {
+//    def unapply(maybeProject: Option[GitLabProject]): Option[(GitLabCreator, GitLabProject)] = maybeProject match {
+//      case Some(project @ GitLabProject(_, _, _, _, _, Some(creator))) => (creator -> project).some
+//      case _                                                           => None
+//    }
+//  }
+//
+//  private object `when project has no creator` {
+//    def unapply(maybeProject: Option[GitLabProject]): Option[GitLabProject] = maybeProject match {
+//      case Some(project @ GitLabProject(_, _, _, _, _, None)) => project.some
+//      case _                                                  => None
+//    }
+//  }
+//
+//  private def updateProjectAndSwapCreator(gitLabProject: GitLabProject, existingUserResource: users.ResourceId) =
+//    upsertName(gitLabProject.path, gitLabProject.name) ++
+//      updateWasDerivedFrom(gitLabProject.path, gitLabProject.maybeParentPath) ++
+//      swapCreator(gitLabProject.path, existingUserResource) ++
+//      updateDateCreated(gitLabProject.path, gitLabProject.dateCreated) ++
+//      upsertVisibility(gitLabProject.path, gitLabProject.visibility)
+//
+//  private def updateProjectAndAddCreator(gitLabProject: GitLabProject, creator: GitLabCreator) =
+//    upsertName(gitLabProject.path, gitLabProject.name) ++
+//      updateWasDerivedFrom(gitLabProject.path, gitLabProject.maybeParentPath) ++
+//      addNewCreator(gitLabProject.path, creator) ++
+//      updateDateCreated(gitLabProject.path, gitLabProject.dateCreated) ++
+//      upsertVisibility(gitLabProject.path, gitLabProject.visibility)
+//
+//  private def updateProjectAndUnlinkCreator(gitLabProject: GitLabProject) =
+//    upsertName(gitLabProject.path, gitLabProject.name) ++
+//      updateWasDerivedFrom(gitLabProject.path, gitLabProject.maybeParentPath) ++
+//      unlinkCreator(gitLabProject.path) ++
+//      updateDateCreated(gitLabProject.path, gitLabProject.dateCreated) ++
+//      upsertVisibility(gitLabProject.path, gitLabProject.visibility)
+//
+//  private lazy val maybeToRecoverableError
+//      : PartialFunction[Throwable, Either[ProcessingRecoverableError, List[SparqlQuery]]] = {
+//    case e @ (_: UnexpectedResponseException | _: ConnectivityException | _: ClientException) =>
+//      Left[ProcessingRecoverableError, List[SparqlQuery]](
+//        TransformationRecoverableError("Problem with finding fork info", e)
+//      )
+//  }
 }
 
 private object IOUpdateFunctionsCreator {

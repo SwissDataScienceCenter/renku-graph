@@ -25,6 +25,7 @@ import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrlLoader
 import ch.datascience.graph.model.GitLabApiUrl
+import ch.datascience.graph.model.entities.Project.ProjectMember
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.model.users.GitLabId
 import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException}
@@ -32,7 +33,7 @@ import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.http.client.{AccessToken, RestClient}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.CurationRecoverableError
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.circe.Decoder
@@ -49,7 +50,7 @@ import scala.concurrent.duration.{Duration, FiniteDuration}
 private trait GitLabProjectMembersFinder[Interpretation[_]] {
   def findProjectMembers(path: Path)(implicit
       maybeAccessToken:        Option[AccessToken]
-  ): EitherT[Interpretation, ProcessingRecoverableError, Set[GitLabProjectMember]]
+  ): EitherT[Interpretation, ProcessingRecoverableError, Set[ProjectMember]]
 }
 
 private class IOGitLabProjectMembersFinder(
@@ -73,7 +74,7 @@ private class IOGitLabProjectMembersFinder(
 
   override def findProjectMembers(
       path:                    Path
-  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, Set[GitLabProjectMember]] =
+  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, Set[ProjectMember]] =
     for {
       users   <- fetch(s"$gitLabApiUrl/projects/${urlEncode(path.value)}/users")
       members <- fetch(s"$gitLabApiUrl/projects/${urlEncode(path.value)}/members")
@@ -82,10 +83,10 @@ private class IOGitLabProjectMembersFinder(
   private def fetch(
       url:       String,
       maybePage: Option[Int] = None,
-      allUsers:  Set[GitLabProjectMember] = Set.empty
+      allUsers:  Set[ProjectMember] = Set.empty
   )(implicit
       maybeAccessToken: Option[AccessToken]
-  ): EitherT[IO, ProcessingRecoverableError, Set[GitLabProjectMember]] = for {
+  ): EitherT[IO, ProcessingRecoverableError, Set[ProjectMember]] = for {
     uri <- validateUri(merge(url, maybePage)).toRightT
     fetchedUsersAndNextPage <-
       EitherT(send(request(GET, uri, maybeAccessToken))(mapResponse) recoverWith maybeRecoverableError)
@@ -96,25 +97,25 @@ private class IOGitLabProjectMembersFinder(
     maybePage map (page => s"$url?page=$page") getOrElse url
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[
-    Either[ProcessingRecoverableError, (Set[GitLabProjectMember], Option[Int])]
+    Either[ProcessingRecoverableError, (Set[ProjectMember], Option[Int])]
   ]] = {
     case (Ok, _, response) =>
       response
-        .as[List[GitLabProjectMember]]
+        .as[List[ProjectMember]]
         .map(members => Right(members.toSet -> maybeNextPage(response)))
     case (NotFound, _, _) =>
-      Right(Set.empty[GitLabProjectMember] -> Option.empty[Int]).pure[IO]
+      Right(Set.empty[ProjectMember] -> Option.empty[Int]).pure[IO]
     case (ServiceUnavailable, _, _) =>
-      Left(CurationRecoverableError("Service unavailable")).pure[IO]
+      Left(TransformationRecoverableError("Service unavailable")).pure[IO]
     case (Forbidden | Unauthorized, _, _) =>
-      Left(CurationRecoverableError("Access token not valid to fetch project members")).pure[IO]
+      Left(TransformationRecoverableError("Access token not valid to fetch project members")).pure[IO]
   }
 
   private def addNextPage(
       url:                          String,
-      allUsers:                     Set[GitLabProjectMember],
-      fetchedUsersAndMaybeNextPage: (Set[GitLabProjectMember], Option[Int])
-  )(implicit maybeAccessToken:      Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, Set[GitLabProjectMember]] =
+      allUsers:                     Set[ProjectMember],
+      fetchedUsersAndMaybeNextPage: (Set[ProjectMember], Option[Int])
+  )(implicit maybeAccessToken:      Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, Set[ProjectMember]] =
     fetchedUsersAndMaybeNextPage match {
       case (fetchedUsers, maybeNextPage @ Some(_)) => fetch(url, maybeNextPage, allUsers ++ fetchedUsers)
       case (fetchedUsers, None)                    => (allUsers ++ fetchedUsers).pure[IO].toRightT
@@ -123,24 +124,24 @@ private class IOGitLabProjectMembersFinder(
   private def maybeNextPage(response: Response[IO]): Option[Int] =
     response.headers.get(CaseInsensitiveString("X-Next-Page")).flatMap(_.value.toIntOption)
 
-  private implicit lazy val projectDecoder: EntityDecoder[IO, List[GitLabProjectMember]] = {
+  private implicit lazy val projectDecoder: EntityDecoder[IO, List[ProjectMember]] = {
     import ch.datascience.graph.model.users
 
-    implicit val decoder: Decoder[GitLabProjectMember] = { cursor =>
+    implicit val decoder: Decoder[ProjectMember] = { cursor =>
       for {
         id       <- cursor.downField("id").as[GitLabId]
         username <- cursor.downField("username").as[users.Username]
         name     <- cursor.downField("name").as[users.Name]
-      } yield GitLabProjectMember(id, username, name)
+      } yield ProjectMember(name, username, id)
     }
 
-    jsonOf[IO, List[GitLabProjectMember]]
+    jsonOf[IO, List[ProjectMember]]
   }
 
   private lazy val maybeRecoverableError
-      : PartialFunction[Throwable, IO[Either[ProcessingRecoverableError, (Set[GitLabProjectMember], Option[Int])]]] = {
+      : PartialFunction[Throwable, IO[Either[ProcessingRecoverableError, (Set[ProjectMember], Option[Int])]]] = {
     case exception @ (_: ConnectivityException | _: ClientException) =>
-      Either.left(CurationRecoverableError(exception.getMessage, exception.getCause)).pure[IO]
+      Either.left(TransformationRecoverableError(exception.getMessage, exception.getCause)).pure[IO]
   }
 
   private implicit class ResultOps[T](out: IO[T]) {

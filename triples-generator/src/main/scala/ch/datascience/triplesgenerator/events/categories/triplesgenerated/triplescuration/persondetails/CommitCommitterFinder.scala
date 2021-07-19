@@ -28,7 +28,7 @@ import ch.datascience.graph.model.{GitLabApiUrl, projects}
 import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException}
 import ch.datascience.http.client.{AccessToken, RestClient}
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.CurationRecoverableError
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import org.http4s.Method.GET
@@ -82,9 +82,9 @@ private class CommitCommitterFinderImpl(
   ]] = {
     case (Ok, _, response) => response.as[CommitPersonsInfo].map(info => Right(info))
     case (ServiceUnavailable, _, _) =>
-      Left(CurationRecoverableError("Service unavailable")).pure[IO]
+      Left(TransformationRecoverableError("Service unavailable")).pure[IO]
     case (Unauthorized, _, _) =>
-      Left(CurationRecoverableError("Access token not valid to fetch project commit info")).pure[IO]
+      Left(TransformationRecoverableError("Access token not valid to fetch project commit info")).pure[IO]
   }
 
   private implicit val commitPersonInfoEntityDecoder: EntityDecoder[IO, CommitPersonsInfo] =
@@ -93,7 +93,7 @@ private class CommitCommitterFinderImpl(
   private lazy val maybeRecoverableError
       : PartialFunction[Throwable, IO[Either[ProcessingRecoverableError, CommitPersonsInfo]]] = {
     case exception @ (_: ConnectivityException | _: ClientException) =>
-      Either.left(CurationRecoverableError(exception.getMessage, exception.getCause)).pure[IO]
+      Either.left(TransformationRecoverableError(exception.getMessage, exception.getCause)).pure[IO]
   }
 
   private implicit class ResultOps[T](out: IO[T]) {

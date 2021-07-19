@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated.tripl
 package datasets
 
 import CurationGenerators._
-import TriplesCurator.CurationRecoverableError
+import TriplesCurator.TransformationRecoverableError
 import cats.MonadError
 import cats.data.EitherT
 import cats.syntax.all._
@@ -30,7 +30,7 @@ import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.http.client.RestClientError.UnexpectedResponseException
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.CuratedTriples
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TransformationData
 import datasets.DatasetInfoFinder.DatasetInfo
 import datasets.TopmostDataFinder.TopmostData
 import io.renku.jsonld.generators.JsonLDGenerators._
@@ -69,7 +69,7 @@ class DatasetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.M
       }
 
       val updatedCuratedTriples = topmostDatas.foldLeft(curatedTriples) { (triples, _) =>
-        val updatedTriples = curatedTriplesObjects[Try].generateOne
+        val updatedTriples = transformationDataObjects[Try].generateOne
         (triplesUpdater.mergeTopmostDataIntoTriples[Try] _)
           .expects(triples, *)
           .returning(updatedTriples)
@@ -77,10 +77,10 @@ class DatasetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.M
       }
 
       val curatedTriplesWithUpdates = topmostDatas.foldLeft(updatedCuratedTriples) { (triples, _) =>
-        val triplesWithUpdates = curatedTriplesObjects[Try].generateOne
+        val triplesWithUpdates = transformationDataObjects[Try].generateOne
         (descendantsUpdater
           .prepareUpdates[Try](
-            _: CuratedTriples[Try],
+            _: TransformationData[Try],
             _: TopmostData
           )(_: MonadError[Try, Throwable]))
           .expects(triples, *, *)
@@ -104,7 +104,7 @@ class DatasetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.M
         }
 
         enricher.enrichDatasetInfo(curatedTriples).value shouldBe Success(
-          Left(CurationRecoverableError("Problem with finding top most data", exception))
+          Left(TransformationRecoverableError("Problem with finding top most data", exception))
         )
       }
     }
@@ -122,7 +122,7 @@ class DatasetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.M
       }
 
       enricher.enrichDatasetInfo(curatedTriples).value shouldBe Success(
-        Left(CurationRecoverableError("Problem with finding top most data", exception))
+        Left(TransformationRecoverableError("Problem with finding top most data", exception))
       )
     }
 
@@ -158,7 +158,7 @@ class DatasetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.M
       }
 
       val updatedCuratedTriples = topmostDatas.foldLeft(curatedTriples) { (triples, _) =>
-        val updatedTriples = curatedTriplesObjects[Try].generateOne
+        val updatedTriples = transformationDataObjects[Try].generateOne
         (triplesUpdater.mergeTopmostDataIntoTriples[Try] _)
           .expects(triples, *)
           .returning(updatedTriples)
@@ -169,7 +169,7 @@ class DatasetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.M
 
       (descendantsUpdater
         .prepareUpdates[Try](
-          _: CuratedTriples[Try],
+          _: TransformationData[Try],
           _: TopmostData
         )(_: MonadError[Try, Throwable]))
         .expects(updatedCuratedTriples, *, *)
@@ -180,7 +180,7 @@ class DatasetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.M
   }
 
   private trait TestCase {
-    val curatedTriples = curatedTriplesObjects[Try].generateOne
+    val curatedTriples = transformationDataObjects[Try].generateOne
 
     val infoFinder         = mock[DatasetInfoFinder[Try]]
     val triplesUpdater     = mock[TriplesUpdater]

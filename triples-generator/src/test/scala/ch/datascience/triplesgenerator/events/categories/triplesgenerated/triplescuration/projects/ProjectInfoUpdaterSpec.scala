@@ -27,7 +27,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.{CuratedTriples, TriplesGeneratedEvent}
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.{TransformationData, TriplesGeneratedEvent}
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CurationGenerators._
 import org.scalamock.scalatest.MockFactory
@@ -41,11 +41,11 @@ class ProjectInfoUpdaterSpec extends AnyWordSpec with MockFactory with should.Ma
     "do the payload transformation and prepare update group" in new TestCase {
       val transformedTriples = jsonLDTriples.generateOne
       (payloadTransformer
-        .transform(_: TriplesGeneratedEvent, _: CuratedTriples[IO])(_: Option[AccessToken]))
+        .transform(_: TriplesGeneratedEvent, _: TransformationData[IO])(_: Option[AccessToken]))
         .expects(event, givenCuratedTriples, maybeAccessToken)
         .returning(rightT[IO, ProcessingRecoverableError](transformedTriples))
 
-      val updateGroup = curationUpdatesGroups[IO].generateOne
+      val updateGroup = transformationSteps[IO].generateOne
       (updatesCreator
         .create(_: TriplesGeneratedEvent)(_: Option[AccessToken]))
         .expects(event, maybeAccessToken)
@@ -55,17 +55,17 @@ class ProjectInfoUpdaterSpec extends AnyWordSpec with MockFactory with should.Ma
         .updateProjectInfo(event, givenCuratedTriples)
         .value
         .unsafeRunSync() shouldBe Right(
-        CuratedTriples[IO](triples = transformedTriples,
-                           projectMetadata = givenCuratedTriples.projectMetadata,
-                           updatesGroups = givenCuratedTriples.updatesGroups :+ updateGroup
+        TransformationData[IO](triples = transformedTriples,
+                               projectMetadata = givenCuratedTriples.projectMetadata,
+                               steps = givenCuratedTriples.steps :+ updateGroup
         )
       )
     }
 
     "return a ProcessingRecoverableError if the triple transformation fails" in new TestCase {
-      val error = curationRecoverableErrors.generateOne
+      val error = transformationRecoverableErrors.generateOne
       (payloadTransformer
-        .transform(_: TriplesGeneratedEvent, _: CuratedTriples[IO])(_: Option[AccessToken]))
+        .transform(_: TriplesGeneratedEvent, _: TransformationData[IO])(_: Option[AccessToken]))
         .expects(event, givenCuratedTriples, maybeAccessToken)
         .returning(leftT[IO, JsonLDTriples](error))
 
@@ -77,7 +77,7 @@ class ProjectInfoUpdaterSpec extends AnyWordSpec with MockFactory with should.Ma
       val exception = exceptions.generateOne
 
       (payloadTransformer
-        .transform(_: TriplesGeneratedEvent, _: CuratedTriples[IO])(_: Option[AccessToken]))
+        .transform(_: TriplesGeneratedEvent, _: TransformationData[IO])(_: Option[AccessToken]))
         .expects(event, givenCuratedTriples, maybeAccessToken)
         .returning(EitherT(exception.raiseError[IO, Either[ProcessingRecoverableError, JsonLDTriples]]))
 
@@ -89,7 +89,7 @@ class ProjectInfoUpdaterSpec extends AnyWordSpec with MockFactory with should.Ma
   private trait TestCase {
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
     val event               = triplesGeneratedEvents.generateOne
-    val givenCuratedTriples = curatedTriplesObjects[IO].generateOne
+    val givenCuratedTriples = transformationDataObjects[IO].generateOne
 
     val payloadTransformer = mock[PayloadTransformer[IO]]
     val updatesCreator     = mock[UpdatesCreator[IO]]

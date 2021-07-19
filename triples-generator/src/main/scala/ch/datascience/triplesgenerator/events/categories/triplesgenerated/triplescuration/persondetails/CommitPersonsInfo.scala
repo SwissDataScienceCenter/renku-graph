@@ -27,6 +27,8 @@ private final case class CommitPersonsInfo(
     committers: NonEmptyList[CommitPerson]
 )
 
+private final case class CommitPerson(name: Name, email: Email)
+
 private object CommitPersonsInfo {
 
   import cats.syntax.all._

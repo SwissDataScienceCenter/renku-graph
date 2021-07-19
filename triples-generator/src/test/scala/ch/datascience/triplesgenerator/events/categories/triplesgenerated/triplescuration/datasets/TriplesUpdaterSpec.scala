@@ -24,7 +24,7 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.testentities.Dataset._
 import ch.datascience.graph.model.testentities._
 import ch.datascience.rdfstore.{FusekiBaseUrl, JsonLDTriples}
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CurationGenerators.curatedTriplesObjects
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CurationGenerators.transformationDataObjects
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.TopmostDataFinder.TopmostData
 import io.circe.Json
 import io.circe.optics.JsonPath.root
@@ -57,14 +57,14 @@ class TriplesUpdaterSpec extends AnyWordSpec with should.Matchers {
       findTopmostSameAs(updatedDataset)      shouldBe Some(topmostData.topmostSameAs.toString)
       findTopmostDerivedFrom(updatedDataset) shouldBe Some(topmostData.topmostDerivedFrom.toString)
 
-      updatedTriples.updatesGroups shouldBe curatedTriples.updatesGroups
+      updatedTriples.steps shouldBe curatedTriples.steps
     }
   }
 
   private implicit val fusekiBaseUrl: FusekiBaseUrl = fusekiBaseUrls.generateOne
 
   private trait TestCase {
-    val curatedTriples = curatedTriplesObjects[Try].generateOne
+    val curatedTriples = transformationDataObjects[Try].generateOne
 
     val updater = new TriplesUpdater()
   }

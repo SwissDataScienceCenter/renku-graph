@@ -30,8 +30,8 @@ import io.renku.jsonld.{EntityId, Property}
 
 package object triplescuration {
 
-  private[triplesgenerated] type CurationResults[Interpretation[_]] =
-    EitherT[Interpretation, ProcessingRecoverableError, CuratedTriples[Interpretation]]
+  private[triplesgenerated] type TransformationResults[Interpretation[_]] =
+    EitherT[Interpretation, ProcessingRecoverableError, TransformationData[Interpretation]]
 
   def `INSERT DATA`[TT <: TinyType { type V = String }](resource: String, property: String, value: TT): String =
     s"INSERT DATA { $resource $property '${sparqlEncode(value.value)}'}"

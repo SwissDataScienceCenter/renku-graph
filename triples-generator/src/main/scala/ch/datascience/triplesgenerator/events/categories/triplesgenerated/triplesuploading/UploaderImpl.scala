@@ -18,82 +18,80 @@
 
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplesuploading
 
-import cats.MonadError
+import cats.MonadThrow
+import cats.data.EitherT
 import cats.effect.{ConcurrentEffect, Timer}
 import cats.syntax.all._
-import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.CuratedTriples
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.CuratedTriples.CurationUpdatesGroup
+import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
+import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TransformationData.TransformationStep
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.{ProjectMetadata, TransformationData}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-trait Uploader[Interpretation[_]] {
-  def upload(curatedTriples: CuratedTriples[Interpretation]): Interpretation[TriplesUploadResult]
+private[triplesgenerated] trait Uploader[Interpretation[_]] {
+  def upload(transformationData: TransformationData[Interpretation]): Interpretation[TriplesUploadResult]
 }
 
-class UploaderImpl[Interpretation[_]](triplesUploader: TriplesUploader[Interpretation],
-                                      updatesUploader: UpdatesUploader[Interpretation]
-)(implicit ME:                                         MonadError[Interpretation, Throwable])
-    extends Uploader[Interpretation] {
+private[triplesgenerated] class UploaderImpl[Interpretation[_]: MonadThrow](
+    triplesUploader: TriplesUploader[Interpretation],
+    updatesUploader: UpdatesUploader[Interpretation]
+) extends Uploader[Interpretation] {
 
   import TriplesUploadResult._
 
-  def upload(curatedTriples: CuratedTriples[Interpretation]): Interpretation[TriplesUploadResult] =
-    for {
-      triplesUploadingResult    <- triplesUploader upload curatedTriples.triples
-      maybeUpdatesSendingResult <- prepareAndRun(curatedTriples.updatesGroups, when = triplesUploadingResult.failure)
-    } yield merge(triplesUploadingResult, maybeUpdatesSendingResult)
-
-  private def prepareAndRun(
-      updatesGroups: List[CurationUpdatesGroup[Interpretation]],
-      when:          Boolean
-  ): Interpretation[Option[TriplesUploadResult]] =
-    if (when) Option.empty[TriplesUploadResult].pure[Interpretation]
-    else
-      updatesGroups
-        .map(createUpdatesAndSend)
-        .flatSequence
-        .map(mergeResults) map Option.apply
-
-  private def createUpdatesAndSend(
-      updatesGroup: CurationUpdatesGroup[Interpretation]
-  ): Interpretation[List[TriplesUploadResult]] =
-    updatesGroup
-      .generateUpdates()
-      .foldF(
-        recoverableError =>
-          List(RecoverableFailure(recoverableError.getMessage): TriplesUploadResult).pure[Interpretation],
-        queries => (queries map updatesUploader.send).sequence
-      ) recoverWith invalidUpdatesFailure
-
-  private lazy val invalidUpdatesFailure: PartialFunction[Throwable, Interpretation[List[TriplesUploadResult]]] = {
-    case NonFatal(exception) =>
-      List(InvalidUpdatesFailure(exception.getMessage): TriplesUploadResult).pure[Interpretation]
-  }
-
-  private lazy val merge: (TriplesUploadResult, Option[TriplesUploadResult]) => TriplesUploadResult = {
-    case (DeliverySuccess, Some(DeliverySuccess)) => DeliverySuccess
-    case (DeliverySuccess, Some(updatesFailure))  => updatesFailure
-    case (triplesFailure, _)                      => triplesFailure
-  }
-
-  private def mergeResults(results: List[TriplesUploadResult]): TriplesUploadResult =
-    results.filterNot(_ == DeliverySuccess) match {
-      case Nil => DeliverySuccess
-      case failures =>
-        failures.find {
-          case _: RecoverableFailure => true
-          case _ => false
-        } match {
-          case Some(recoverableFailure) => recoverableFailure
-          case _                        => InvalidUpdatesFailure(failures.map(_.message).mkString("; "))
-        }
+  def upload(transformationData: TransformationData[Interpretation]): Interpretation[TriplesUploadResult] =
+    runAllSteps(transformationData) >>= {
+      case (_, _: DeliverySuccess) => triplesUploader upload transformationData.triples
+      case (_, failure) => failure.pure[Interpretation]
     }
+
+  private def runAllSteps(
+      transformationData: TransformationData[Interpretation]
+  ): Interpretation[(ProjectMetadata, TriplesUploadResult)] =
+    transformationData.steps.foldLeft(
+      (transformationData.projectMetadata, DeliverySuccess: TriplesUploadResult).pure[Interpretation]
+    )((lastStepResults, nextStep) =>
+      lastStepResults >>= {
+        case (_, _: TriplesUploadFailure) => lastStepResults
+        case (previousMetadata, _) => runSingleStep(nextStep, previousMetadata)
+      }
+    )
+
+  private def runSingleStep(nextStep: TransformationStep[Interpretation], previousMetadata: ProjectMetadata) = {
+    for {
+      stepResults    <- nextStep run previousMetadata
+      sendingResults <- EitherT.right[ProcessingRecoverableError](execute(stepResults.queries))
+    } yield stepResults.projectMetadata -> sendingResults
+  }
+    .leftMap(recoverableFailure =>
+      previousMetadata -> (RecoverableFailure(recoverableFailure.getMessage): TriplesUploadResult)
+    )
+    .merge
+    .recoverWith(transformationFailure(previousMetadata, nextStep))
+
+  private def execute(queries: List[SparqlQuery]) =
+    queries
+      .foldLeft((DeliverySuccess: TriplesUploadResult).pure[Interpretation]) { (lastResult, query) =>
+        lastResult >>= {
+          case _: DeliverySuccess => updatesUploader send query
+          case _ => lastResult
+        }
+      }
+
+  private def transformationFailure(
+      metadata:           ProjectMetadata,
+      transformationStep: TransformationStep[Interpretation]
+  ): PartialFunction[Throwable, Interpretation[(ProjectMetadata, TriplesUploadResult)]] = { case NonFatal(exception) =>
+    (metadata,
+     InvalidUpdatesFailure(s"${transformationStep.name} transformation step failed: $exception"): TriplesUploadResult
+    ).pure[Interpretation]
+  }
 }
 
-private[events] object IOUploader {
+private[triplesgenerated] object Uploader {
 
   import cats.effect.IO
 
@@ -104,37 +102,27 @@ private[events] object IOUploader {
       executionContext: ExecutionContext,
       concurrentEffect: ConcurrentEffect[IO],
       timer:            Timer[IO]
-  ): IO[UploaderImpl[IO]] =
-    for {
-      rdfStoreConfig <- RdfStoreConfig[IO]()
-    } yield new UploaderImpl[IO](
-      new TriplesUploaderImpl[IO](rdfStoreConfig, logger, timeRecorder),
-      new UpdatesUploaderImpl(rdfStoreConfig, logger, timeRecorder)
-    )
+  ): IO[UploaderImpl[IO]] = for {
+    rdfStoreConfig <- RdfStoreConfig[IO]()
+  } yield new UploaderImpl[IO](
+    new TriplesUploaderImpl[IO](rdfStoreConfig, logger, timeRecorder),
+    new UpdatesUploaderImpl(rdfStoreConfig, logger, timeRecorder)
+  )
 }
 
 sealed trait TriplesUploadResult extends Product with Serializable {
-  val failure: Boolean
   val message: String
 }
 
 private[triplesgenerated] object TriplesUploadResult {
 
-  final case object DeliverySuccess extends TriplesUploadResult {
-    val failure: Boolean = false
-    val message: String  = "Delivery success"
-  }
-
   type DeliverySuccess = DeliverySuccess.type
-
-  sealed trait TriplesUploadFailure extends TriplesUploadResult {
-    val failure: Boolean = true
+  final case object DeliverySuccess extends TriplesUploadResult {
+    val message: String = "Delivery success"
   }
 
+  sealed trait TriplesUploadFailure extends TriplesUploadResult
   final case class RecoverableFailure(message: String) extends Exception(message) with TriplesUploadFailure
-
   final case class InvalidTriplesFailure(message: String) extends Exception(message) with TriplesUploadFailure
-
   final case class InvalidUpdatesFailure(message: String) extends Exception(message) with TriplesUploadFailure
-
 }
