@@ -22,12 +22,12 @@ import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.Schemas.{prov, schema}
+import ch.datascience.graph.model._
 import ch.datascience.graph.model.entities.Project.ProjectMember
 import ch.datascience.graph.model.testentities._
-import ch.datascience.graph.model._
 import io.circe.DecodingFailure
-import io.renku.jsonld.syntax._
 import io.renku.jsonld.JsonLDDecoder._
+import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityTypes, JsonLD}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -162,25 +162,40 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     person.copy(maybeGitLabId = from.map(_.gitLabId))
 
   private def copyGitLabId(fromMatching: Set[ProjectMember])(person: entities.Person): entities.Person =
-    person.copy(maybeGitLabId =
-      fromMatching
+    person.copy(
+      maybeGitLabId = fromMatching
         .find(byNameOrUsername(person))
         .map(_.gitLabId)
     )
 
   private def byNameOrUsername(person: entities.Person): ProjectMember => Boolean =
-    m => m.name == person.name || m.username.value == person.name.value
+    member => member.hasNameOrUsername(person.name) || person.alternativeNames.exists(member.hasNameOrUsername)
 
   private implicit class ProjectMemberOps(gitLabPerson: ProjectMember) {
 
-    def toPayloadPerson: entities.Person = personEntities.generateOne
-      .copy(
-        name =
-          if (Random.nextBoolean()) gitLabPerson.name
-          else users.Name(gitLabPerson.username.value),
-        maybeGitLabId = None
-      )
-      .to[entities.Person]
+    def hasNameOrUsername(name: users.Name): Boolean =
+      gitLabPerson.name == name || gitLabPerson.username.value == name.value
+
+    def toPayloadPerson: entities.Person =
+      if (Random.nextBoolean())
+        personEntities.generateOne
+          .copy(
+            name = nameFromUsernameOrName(gitLabPerson),
+            maybeGitLabId = None
+          )
+          .to[entities.Person]
+      else
+        personEntities.generateOne
+          .copy(
+            name = userNames.generateOne,
+            maybeGitLabId = None
+          )
+          .to[entities.Person]
+          .copy(alternativeNames = List(nameFromUsernameOrName(gitLabPerson)))
+
+    private def nameFromUsernameOrName(gitLabPerson: ProjectMember) =
+      if (Random.nextBoolean()) gitLabPerson.name
+      else users.Name(gitLabPerson.username.value)
 
     def toPerson: entities.Person = entities
       .Person(

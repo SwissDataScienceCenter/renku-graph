@@ -98,11 +98,17 @@ object Project {
         )
     }
 
-  implicit def decoder(gitLabInfo: GitLabProjectInfo, potentialMembers: Set[Person])(implicit
-      renkuBaseUrl:                RenkuBaseUrl
-  ): JsonLDDecoder[Project] = JsonLDDecoder.entity(entityTypes) { cursor =>
-    def byName(member: ProjectMember): Person => Boolean =
-      person => person.name == member.name || person.name.value == member.username.value
+  implicit def decoder(
+      gitLabInfo:          GitLabProjectInfo,
+      potentialMembers:    Set[Person]
+  )(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDDecoder[Project] = JsonLDDecoder.entity(entityTypes) { cursor =>
+    def matchByNameOrUsername(member: ProjectMember): users.Name => Boolean =
+      name => name == member.name || name.value == member.username.value
+
+    def byNameUsernameOrAlternateName(member: ProjectMember): Person => Boolean =
+      person =>
+        matchByNameOrUsername(member)(person.name) ||
+          person.alternativeNames.exists(matchByNameOrUsername(member))
 
     def toPerson(projectMember: ProjectMember): Person = Person(
       users.ResourceId((renkuBaseUrl / "persons" / projectMember.name).show),
@@ -114,16 +120,16 @@ object Project {
 
     val maybeCreator: Option[Person] = gitLabInfo.maybeCreator.map(creator =>
       potentialMembers
-        .find(byName(creator))
+        .find(byNameUsernameOrAlternateName(creator))
         .map(_.copy(maybeGitLabId = Some(creator.gitLabId)))
         .getOrElse(toPerson(creator))
     )
 
-    val members: Set[Person] = gitLabInfo.members.map(projectMember =>
+    val members: Set[Person] = gitLabInfo.members.map(member =>
       potentialMembers
-        .find(byName(projectMember))
-        .map(_.copy(maybeGitLabId = Some(projectMember.gitLabId)))
-        .getOrElse(toPerson(projectMember))
+        .find(byNameUsernameOrAlternateName(member))
+        .map(_.copy(maybeGitLabId = Some(member.gitLabId)))
+        .getOrElse(toPerson(member))
     )
 
     def checkProjectsMatching(resourceId: ResourceId) = resourceId

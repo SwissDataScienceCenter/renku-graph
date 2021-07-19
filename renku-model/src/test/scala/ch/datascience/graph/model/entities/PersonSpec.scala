@@ -53,8 +53,8 @@ class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
       )
 
       val Right(personWithSingleName) = jsonLDPerson.cursor.as[entities.Person]
-      personWithSingleName.name           should (be(person.name) or be(secondName))
-      personWithSingleName.alternateNames should contain theSameElementsAs List(person.name, secondName)
+      personWithSingleName.name             should (be(person.name) or be(secondName))
+      personWithSingleName.alternativeNames should contain theSameElementsAs List(person.name, secondName)
     }
 
     "fail if there's no name for a Person" in {
