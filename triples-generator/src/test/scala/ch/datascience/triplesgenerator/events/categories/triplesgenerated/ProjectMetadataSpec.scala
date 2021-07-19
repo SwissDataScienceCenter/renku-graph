@@ -23,9 +23,10 @@ import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.entities.Dataset.Provenance
-import ch.datascience.graph.model.{activities, datasets, entities, projects}
+import ch.datascience.graph.model.{InvalidationTime, activities, datasets, entities, projects}
 import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.testentities._
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators.projectMetadatas
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -67,7 +68,7 @@ class ProjectMetadataSpec extends AnyWordSpec with should.Matchers with ScalaChe
       val dataset = {
         val d = datasetEntities(datasetProvenanceInternal, fixed(project)).generateOne
         d.copy(provenance = d.provenance.copy(creators = Set(gLAndKGMember.copy(maybeGitLabId = None))))
-      }.to[entities.Dataset[entities.Dataset.Provenance]]
+      }.to[entities.Dataset[entities.Dataset.Provenance.Internal]]
 
       val maybeMetadata = ProjectMetadata.from(project.to[entities.Project], List(activity), List(dataset))
 
@@ -165,6 +166,241 @@ class ProjectMetadataSpec extends AnyWordSpec with should.Matchers with ScalaChe
           ProjectMetadata.from(project.to[entities.Project], activities = Nil, datasets = List(validDataset))
         maybeMetadata.map(_.datasets) shouldBe List(validDataset).validNel[String]
       }
+    }
+  }
+
+  "findAllPersons" should {
+    "collect project members, project creator, activities' authors and datasets' creators" in {
+      val metadata = projectMetadatas.generateOne
+      metadata.findAllPersons shouldBe metadata.project.members ++ metadata.project.maybeCreator ++ metadata.activities
+        .map(_.author) ++ metadata.datasets.flatMap(_.provenance.creators)
+    }
+  }
+
+  "update - person" should {
+    val oldPerson = personEntities().generateOne.to[entities.Person]
+    val project   = projectEntities[ForksCount](visibilityAny)(anyForksCount).generateOne
+
+    "replace the old person with the new on project" in {
+      val entitiesProject = project.to[entities.Project] match {
+        case p: entities.ProjectWithoutParent =>
+          p.copy(maybeCreator = Some(oldPerson),
+                 members = Set(oldPerson, personEntities.generateOne.to[entities.Person])
+          )
+        case p: entities.ProjectWithParent =>
+          p.copy(maybeCreator = Some(oldPerson),
+                 members = Set(oldPerson, personEntities.generateOne.to[entities.Person])
+          )
+      }
+
+      val metadata = ProjectMetadata
+        .from(entitiesProject, activities = Nil, datasets = Nil)
+        .fold(errors => fail(errors.intercalate("; ")), identity)
+
+      val newPerson = personEntities().generateOne.to[entities.Person]
+
+      val updatedMetadata = metadata.update(oldPerson, newPerson)
+
+      updatedMetadata.project.members      shouldBe entitiesProject.members - oldPerson + newPerson
+      updatedMetadata.project.maybeCreator shouldBe Some(newPerson)
+    }
+
+    "replace the old person with the new on all activities" in {
+      val activity1 = activityEntities(fixed(project)).generateOne
+        .to[entities.Activity]
+        .copy(author = oldPerson)
+      val activity2 = activityEntities(fixed(project)).generateOne.to[entities.Activity]
+
+      val metadata = ProjectMetadata
+        .from(project.to[entities.Project], List(activity1, activity2), datasets = Nil)
+        .fold(errors => fail(errors.intercalate("; ")), identity)
+
+      val newPerson = personEntities().generateOne.to[entities.Person]
+
+      metadata.update(oldPerson, newPerson).activities shouldBe List(activity1.copy(author = newPerson), activity2)
+    }
+
+    "replace the old person with the new on all datasets" in {
+      val dataset1 = {
+        val d = datasetEntities(datasetProvenanceInternal, fixed(project)).generateOne
+          .to[entities.Dataset[entities.Dataset.Provenance.Internal]]
+        d.copy(provenance =
+          d.provenance.copy(creators = Set(oldPerson, personEntities.generateOne.to[entities.Person]))
+        )
+      }
+
+      val dataset2 = datasetEntities(ofAnyProvenance, fixed(project)).generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance]]
+
+      val metadata = ProjectMetadata
+        .from(project.to[entities.Project], activities = Nil, datasets = List(dataset1, dataset2))
+        .fold(errors => fail(errors.intercalate("; ")), identity)
+
+      val newPerson = personEntities().generateOne.to[entities.Person]
+
+      metadata.update(oldPerson, newPerson).datasets shouldBe List(
+        dataset1.copy(provenance =
+          dataset1.provenance.copy(creators = dataset1.provenance.creators - oldPerson + newPerson)
+        ),
+        dataset2
+      )
+    }
+  }
+
+  "update - dataset" should {
+
+    "replace the old dataset with the new one" in {
+      val project = projectEntities[ForksCount](visibilityAny)(anyForksCount).generateOne
+
+      val dataset1 = datasetEntities(ofAnyProvenance, fixed(project)).generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance]]
+      val dataset2Old = datasetEntities(ofAnyProvenance, fixed(project)).generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance]]
+      val dataset2New = datasetEntities(ofAnyProvenance, fixed(project)).generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance]]
+
+      val metadata = ProjectMetadata
+        .from(project.to[entities.Project], activities = Nil, datasets = List(dataset1, dataset2Old))
+        .fold(errors => fail(errors.intercalate("; ")), identity)
+
+      metadata.update(dataset2Old, dataset2New).datasets should contain theSameElementsAs List(dataset1, dataset2New)
+    }
+  }
+
+  "findInternallyImportedDatasets" should {
+
+    "return all datasets with ImportedInternalAncestorExternal or ImportedInternalAncestorInternal provenance" +
+      "which are not invalidated" in {
+        val project = projectEntities(visibilityAny)(anyForksCount).generateOne
+
+        val internal = datasetEntities(datasetProvenanceInternal, fixed(project)).generateOne
+          .to[entities.Dataset[entities.Dataset.Provenance.Internal]]
+        val importedExternal = datasetEntities(datasetProvenanceImportedExternal, fixed(project)).generateOne
+          .to[entities.Dataset[entities.Dataset.Provenance.ImportedExternal]]
+        val importedInternalAncestorInternalInvalidated =
+          datasetEntities(datasetProvenanceImportedInternalAncestorInternal, fixed(project)).generateOne
+            .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
+            .copy(maybeInvalidationTime = InvalidationTime(Instant.now).some)
+        val importedInternalAncestorInternal =
+          datasetEntities(datasetProvenanceImportedInternalAncestorInternal, fixed(project)).generateOne
+            .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
+        val importedInternalAncestorExternal =
+          datasetEntities(datasetProvenanceImportedInternalAncestorExternal, fixed(project)).generateOne
+            .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorExternal]]
+        val modified = datasetEntities(datasetProvenanceModified, fixed(project)).generateOne
+          .to[entities.Dataset[entities.Dataset.Provenance.Modified]]
+
+        val metadata = ProjectMetadata
+          .from(
+            project.to[entities.Project],
+            activities = Nil,
+            datasets = List(
+              internal,
+              importedExternal,
+              importedInternalAncestorInternal,
+              importedInternalAncestorInternalInvalidated,
+              importedInternalAncestorExternal,
+              modified
+            )
+          )
+          .fold(errors => fail(errors.intercalate(", ")), identity)
+
+        metadata.findInternallyImportedDatasets should contain theSameElementsAs List(importedInternalAncestorInternal,
+                                                                                      importedInternalAncestorExternal
+        )
+      }
+  }
+
+  "findModifiedDatasets" should {
+    "return all datasets with Provenence.Modified which are not invalidated" in {
+      val project = projectEntities(visibilityAny)(anyForksCount).generateOne
+
+      val internal = datasetEntities(datasetProvenanceInternal, fixed(project)).generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance.Internal]]
+      val importedExternal = datasetEntities(datasetProvenanceImportedExternal, fixed(project)).generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance.ImportedExternal]]
+      val importedInternalAncestorInternal =
+        datasetEntities(datasetProvenanceImportedInternalAncestorInternal, fixed(project)).generateOne
+          .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
+      val importedInternalAncestorExternal =
+        datasetEntities(datasetProvenanceImportedInternalAncestorExternal, fixed(project)).generateOne
+          .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorExternal]]
+      val modified = datasetEntities(datasetProvenanceModified, fixed(project)).generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance.Modified]]
+      val modifiedInvalidated = datasetEntities(datasetProvenanceModified, fixed(project)).generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance.Modified]]
+        .copy(maybeInvalidationTime = InvalidationTime(Instant.now).some)
+
+      val metadata = ProjectMetadata
+        .from(
+          project.to[entities.Project],
+          activities = Nil,
+          datasets = List(
+            internal,
+            importedExternal,
+            importedInternalAncestorInternal,
+            modifiedInvalidated,
+            importedInternalAncestorExternal,
+            modified
+          )
+        )
+        .fold(errors => fail(errors.intercalate(", ")), identity)
+
+      metadata.findModifiedDatasets should contain theSameElementsAs List(modified)
+    }
+  }
+
+  "findInvalidatedDatasets" should {
+    "find all invalidated datasets and not valid datasets" in {
+      val project = projectEntities(visibilityAny)(anyForksCount).generateOne
+
+      val internal = datasetEntities(datasetProvenanceInternal, fixed(project)).generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance.Internal]]
+        .copy(maybeInvalidationTime = InvalidationTime(Instant.now).some)
+
+      val importedExternal = datasetEntities(datasetProvenanceImportedExternal, fixed(project)).generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance.ImportedExternal]]
+        .copy(maybeInvalidationTime = InvalidationTime(Instant.now).some)
+
+      val importedInternalAncestorInternal =
+        datasetEntities(datasetProvenanceImportedInternalAncestorInternal, fixed(project)).generateOne
+          .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
+          .copy(maybeInvalidationTime = InvalidationTime(Instant.now).some)
+
+      val importedInternalAncestorExternal =
+        datasetEntities(datasetProvenanceImportedInternalAncestorExternal, fixed(project)).generateOne
+          .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorExternal]]
+          .copy(maybeInvalidationTime = InvalidationTime(Instant.now).some)
+
+      val modified = datasetEntities(datasetProvenanceModified, fixed(project)).generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance.Modified]]
+        .copy(maybeInvalidationTime = InvalidationTime(Instant.now).some)
+
+      val modifiedValid = datasetEntities(datasetProvenanceModified, fixed(project)).generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance.Modified]]
+
+      val metadata = ProjectMetadata
+        .from(
+          project.to[entities.Project],
+          activities = Nil,
+          datasets = List(
+            internal,
+            importedExternal,
+            importedInternalAncestorInternal,
+            modifiedValid,
+            importedInternalAncestorExternal,
+            modified
+          )
+        )
+        .fold(errors => fail(errors.intercalate(", ")), identity)
+
+      metadata.findInvalidatedDatasets should contain theSameElementsAs List(internal,
+                                                                             importedExternal,
+                                                                             importedInternalAncestorInternal,
+                                                                             importedInternalAncestorExternal,
+                                                                             modified
+      )
+
     }
   }
 

@@ -29,6 +29,7 @@ import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.auto._
+import io.renku.jsonld.generators.JsonLDGenerators._
 import org.http4s.Status._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -48,7 +49,7 @@ class TriplesUploaderSpec extends AnyWordSpec with MockFactory with ExternalServ
         post(s"/${rdfStoreConfig.datasetName}/data")
           .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
           .withHeader("content-type", equalTo("application/ld+json"))
-          .withRequestBody(equalToJson(triples.value.toString()))
+          .withRequestBody(equalToJson(triples.toJson.toString()))
           .willReturn(ok())
       }
 
@@ -63,7 +64,7 @@ class TriplesUploaderSpec extends AnyWordSpec with MockFactory with ExternalServ
           post(s"/${rdfStoreConfig.datasetName}/data")
             .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
             .withHeader("content-type", equalTo("application/ld+json"))
-            .withRequestBody(equalToJson(triples.value.toString()))
+            .withRequestBody(equalToJson(triples.toJson.toString()))
             .willReturn(badRequest().withBody(errorMessage))
         }
 
@@ -79,7 +80,7 @@ class TriplesUploaderSpec extends AnyWordSpec with MockFactory with ExternalServ
         post(s"/${rdfStoreConfig.datasetName}/data")
           .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
           .withHeader("content-type", equalTo("application/ld+json"))
-          .withRequestBody(equalToJson(triples.value.toString()))
+          .withRequestBody(equalToJson(triples.toJson.toString()))
           .willReturn(unauthorized().withBody(errorMessage))
       }
 
@@ -110,7 +111,7 @@ class TriplesUploaderSpec extends AnyWordSpec with MockFactory with ExternalServ
 
   private trait TestCase {
 
-    val triples = jsonLDTriples.generateOne
+    val triples = jsonLDEntities.generateOne
 
     val logger               = TestLogger[IO]()
     private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))

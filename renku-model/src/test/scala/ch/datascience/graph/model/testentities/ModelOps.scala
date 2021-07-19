@@ -34,7 +34,7 @@ import eu.timepit.refined.numeric.Positive
 import io.renku.jsonld.EntityId
 import io.renku.jsonld.syntax._
 
-trait ModelOps {
+trait ModelOps extends Dataset.ProvenanceOps {
 
   implicit class PersonOps(person: Person) {
     lazy val resourceId: users.ResourceId = users.ResourceId(person.asEntityId)
@@ -90,6 +90,8 @@ trait ModelOps {
     lazy val identifier: datasets.Identifier = dataset.identification.identifier
 
     def to[T](implicit convert: Dataset[P] => T): T = convert(dataset)
+
+    def widen[T <: Dataset.Provenance](implicit ev: P <:< T): Dataset[T] = dataset.asInstanceOf[Dataset[T]]
 
     def forkProject(): DatasetForkingResult[P] = {
       val (updatedOriginalProject, forkProject) = dataset.project.forkOnce()
@@ -231,6 +233,27 @@ trait ModelOps {
 
   type ProvenanceImportFactory[OldProvenance <: Dataset.Provenance, NewProvenance <: Dataset.Provenance] =
     (EntityId, InternalSameAs, OldProvenance, InitialVersion) => NewProvenance
+
+  lazy val importedInternal: ProvenanceImportFactory[Dataset.Provenance, Dataset.Provenance.ImportedInternal] = {
+    case (newEntityId, sameAs, oldProvenance: Dataset.Provenance.Internal, initialVersion) =>
+      fromInternalToImportedInternalAncestorInternal(newEntityId, sameAs, oldProvenance, initialVersion)
+    case (newEntityId, sameAs, oldProvenance: Dataset.Provenance.ImportedExternal, initialVersion) =>
+      fromImportedExternalToImportedInternalAncestorExternal(newEntityId, sameAs, oldProvenance, initialVersion)
+    case (newEntityId, sameAs, oldProvenance: Dataset.Provenance.ImportedInternalAncestorInternal, initialVersion) =>
+      fromImportedInternalAncestorInternalToImportedInternalAncestorInternal(newEntityId,
+                                                                             sameAs,
+                                                                             oldProvenance,
+                                                                             initialVersion
+      )
+    case (newEntityId, sameAs, oldProvenance: Dataset.Provenance.ImportedInternalAncestorExternal, initialVersion) =>
+      fromImportedInternalAncestorExternalToImportedInternalAncestorExternal(newEntityId,
+                                                                             sameAs,
+                                                                             oldProvenance,
+                                                                             initialVersion
+      )
+    case (newEntityId, sameAs, oldProvenance: Dataset.Provenance.Modified, initialVersion) =>
+      importFromModifiedToImportedInternalAncestorInternal(newEntityId, sameAs, oldProvenance, initialVersion)
+  }
 
   implicit lazy val fromInternalToImportedInternalAncestorInternal
       : ProvenanceImportFactory[Dataset.Provenance.Internal, Dataset.Provenance.ImportedInternalAncestorInternal] =
@@ -401,10 +424,9 @@ trait ModelOps {
     def to[T](implicit convert: PublicationEvent => T): T = convert(publicationEvent)
   }
 
-  implicit class ProvenanceOps(provenance: Dataset.Provenance) {
-    def to[T](implicit convert: Dataset.Provenance => T): T = convert(provenance)
+  implicit class ProvenanceOps[P <: Dataset.Provenance](provenance: P) {
+    def to[T](implicit convert: P => T): T = convert(provenance)
   }
-
 }
 
 object ModelOps extends ModelOps {

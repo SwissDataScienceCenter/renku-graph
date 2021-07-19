@@ -23,10 +23,11 @@ import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
 import ch.datascience.http.client.{HttpRequest, RestClient}
-import ch.datascience.rdfstore.{JsonLDTriples, RdfStoreConfig, SparqlQueryTimeRecorder}
+import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.NonNegative
+import io.renku.jsonld.JsonLD
 import org.http4s.Uri
 import org.typelevel.log4cats.Logger
 
@@ -36,7 +37,7 @@ import scala.language.postfixOps
 import scala.util.control.NonFatal
 
 private trait TriplesUploader[Interpretation[_]] {
-  def upload(triples: JsonLDTriples): Interpretation[TriplesUploadResult]
+  def upload(triples: JsonLD): Interpretation[TriplesUploadResult]
 }
 
 private class TriplesUploaderImpl[Interpretation[_]: ConcurrentEffect: Timer](
@@ -68,17 +69,17 @@ private class TriplesUploaderImpl[Interpretation[_]: ConcurrentEffect: Timer](
 
   private lazy val dataUploadUrl = rdfStoreConfig.fusekiBaseUrl / rdfStoreConfig.datasetName / "data"
 
-  def upload(triples: JsonLDTriples): Interpretation[TriplesUploadResult] = {
+  override def upload(triples: JsonLD): Interpretation[TriplesUploadResult] = {
     for {
       uri          <- validateUri(dataUploadUrl.value)
       uploadResult <- send(uploadRequest(uri, triples))(mapResponse)
     } yield uploadResult
   } recover withUploadingError
 
-  private def uploadRequest(uploadUri: Uri, triples: JsonLDTriples) =
+  private def uploadRequest(uploadUri: Uri, triples: JsonLD) =
     HttpRequest(
       request(POST, uploadUri, rdfStoreConfig.authCredentials)
-        .withEntity(triples.value)
+        .withEntity(triples.toJson)
         .putHeaders(`Content-Type`(`ld+json`)),
       name = "json-ld upload"
     )

@@ -21,8 +21,6 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 import cats.data.{EitherT, OptionT}
 import cats.syntax.all._
 import cats.{MonadError, MonadThrow}
-import ch.datascience.graph.model.views.SparqlValueEncoder.sparqlEncode
-import ch.datascience.tinytypes.TinyType
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.circe.Decoder.decodeString
 import io.circe.{Decoder, Json}
@@ -30,11 +28,8 @@ import io.renku.jsonld.{EntityId, Property}
 
 package object triplescuration {
 
-  private[triplesgenerated] type CurationResults[Interpretation[_]] =
-    EitherT[Interpretation, ProcessingRecoverableError, CuratedTriples[Interpretation]]
-
-  def `INSERT DATA`[TT <: TinyType { type V = String }](resource: String, property: String, value: TT): String =
-    s"INSERT DATA { $resource $property '${sparqlEncode(value.value)}'}"
+  private[triplesgenerated] type TransformationResults[Interpretation[_]] =
+    EitherT[Interpretation, ProcessingRecoverableError, ProjectMetadata]
 
   implicit class JsonOps(json: Json) {
 

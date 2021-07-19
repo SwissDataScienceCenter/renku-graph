@@ -21,8 +21,11 @@ package ch.datascience.graph.model.entities
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{timestamps, timestampsNotInTheFuture}
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model._
+import ch.datascience.graph.model.datasets.TopmostSameAs
 import ch.datascience.graph.model.entities.Dataset.Provenance
+import ch.datascience.graph.model.entities.Dataset.Provenance.{ImportedInternalAncestorExternal, ImportedInternalAncestorInternal}
 import ch.datascience.graph.model.testentities._
 import io.circe.DecodingFailure
 import io.renku.jsonld.syntax._
@@ -36,7 +39,15 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
 
     "turn JsonLD Dataset entity into the Dataset object" in {
       forAll(datasetEntities(ofAnyProvenance)) { dataset =>
-        dataset.asJsonLD.cursor.as[entities.Dataset[entities.Dataset.Provenance]] shouldBe dataset
+        val cliDataset = dataset.provenance match {
+          case p: testentities.Dataset.Provenance.ImportedInternalAncestorInternal =>
+            dataset.copy(provenance = p.copy(topmostSameAs = TopmostSameAs(p.sameAs)))
+          case p: testentities.Dataset.Provenance.ImportedInternalAncestorExternal =>
+            dataset.copy(provenance = p.copy(topmostSameAs = TopmostSameAs(p.sameAs)))
+          case _ => dataset
+        }
+
+        cliDataset.asJsonLD.cursor.as[entities.Dataset[entities.Dataset.Provenance]] shouldBe cliDataset
           .to[entities.Dataset[entities.Dataset.Provenance]]
           .asRight
       }
@@ -65,7 +76,9 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     "succeed if dataset parts are older than the modified or imported internal dataset" in {
       List(
         datasetEntities(datasetProvenanceModified),
-        datasetEntities(datasetProvenanceImportedInternalAncestorInternal)
+        datasetEntities(datasetProvenanceImportedInternalAncestorInternal).map(ds =>
+          ds.copy(provenance = ds.provenance.copy(topmostSameAs = TopmostSameAs(ds.provenance.sameAs)))
+        )
       ).foreach { datasetGen =>
         val dataset = datasetGen.generateOne.to[entities.Dataset[entities.Dataset.Provenance]]
         val olderPart = updatePartDateAfter(
@@ -89,6 +102,40 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       error shouldBe a[DecodingFailure]
       error.getMessage shouldBe s"Dataset ${invalidatedDataset.identification.identifier} " +
         s"invalidationTime $invalidationTime is older than Dataset ${invalidatedDataset.provenance.date}"
+    }
+  }
+
+  "update" should {
+
+    "replace the topmostSameAs " in {
+      List(
+        datasetEntities(
+          datasetProvenanceImportedInternalAncestorExternal
+            .asInstanceOf[ProvenanceGen[Dataset.Provenance.ImportedInternal]]
+        ).generateOne.to[entities.Dataset[Provenance.ImportedInternal]],
+        datasetEntities(
+          datasetProvenanceImportedInternalAncestorInternal
+            .asInstanceOf[ProvenanceGen[Dataset.Provenance.ImportedInternal]]
+        ).generateOne.to[entities.Dataset[Provenance.ImportedInternal]]
+      ).foreach { dataset =>
+        val newTopmostSameAs = datasetTopmostSameAs.generateOne
+        val provenance = dataset.provenance match {
+          case p: ImportedInternalAncestorExternal => p.copy(topmostSameAs = newTopmostSameAs)
+          case p: ImportedInternalAncestorInternal => p.copy(topmostSameAs = newTopmostSameAs)
+          case _ => fail("Cannot update topmostSameAs")
+        }
+        dataset.update(newTopmostSameAs) shouldBe dataset.copy(provenance = provenance)
+      }
+    }
+
+    "replace the topmostDerivedFrom " in {
+      val dataset = datasetEntities(datasetProvenanceModified).generateOne.to[entities.Dataset[Provenance.Modified]]
+
+      val newTopmostDerivedFrom = datasetTopmostDerivedFroms.generateOne
+
+      dataset.update(newTopmostDerivedFrom) shouldBe dataset.copy(
+        provenance = dataset.provenance.copy(topmostDerivedFrom = newTopmostDerivedFrom)
+      )
     }
   }
 

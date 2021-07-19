@@ -21,6 +21,7 @@ package ch.datascience.graph.model.entities
 import cats.data.ValidatedNel
 import cats.syntax.all._
 import ch.datascience.graph.model.datasets._
+import ch.datascience.graph.model.entities.Dataset.Provenance.{ImportedInternal, ImportedInternalAncestorExternal, ImportedInternalAncestorInternal, Modified}
 import ch.datascience.graph.model.entities.Dataset.{Provenance, _}
 import ch.datascience.graph.model.{GitLabApiUrl, InvalidationTime, projects}
 import io.circe.DecodingFailure
@@ -34,9 +35,7 @@ final case class Dataset[+P <: Provenance](identification:        Identification
                                            parts:                 List[DatasetPart],
                                            projectResourceId:     projects.ResourceId,
                                            maybeInvalidationTime: Option[InvalidationTime]
-) {
-  val resourceId: ResourceId = identification.resourceId
-}
+) extends DatasetOps[P]
 
 object Dataset {
 
@@ -130,6 +129,7 @@ object Dataset {
 
   object Provenance {
 
+    implicit object Internal
     final case class Internal(resourceId: ResourceId, identifier: Identifier, date: DateCreated, creators: Set[Person])
         extends Provenance {
       override type D = DateCreated
@@ -138,6 +138,7 @@ object Dataset {
       override lazy val topmostDerivedFrom: TopmostDerivedFrom = TopmostDerivedFrom(resourceId.asEntityId)
     }
 
+    implicit object ImportedExternal
     final case class ImportedExternal(resourceId: ResourceId,
                                       identifier: Identifier,
                                       sameAs:     ExternalSameAs,
@@ -150,6 +151,7 @@ object Dataset {
       override lazy val topmostDerivedFrom: TopmostDerivedFrom = TopmostDerivedFrom(resourceId.asEntityId)
     }
 
+    implicit object ImportedInternal
     sealed trait ImportedInternal extends Provenance {
       val resourceId:    ResourceId
       val identifier:    Identifier
@@ -447,4 +449,27 @@ object Dataset {
           .leftMap(errors => DecodingFailure(errors.intercalate("; "), Nil))
     } yield dataset
   }
+}
+
+trait DatasetOps[+P <: Provenance] {
+  self: Dataset[P] =>
+
+  val resourceId: ResourceId = identification.resourceId
+
+  def update(
+      topmostSameAs:   TopmostSameAs
+  )(implicit evidence: P <:< ImportedInternal, factoryEvidence: TopmostSameAs.type): Dataset[P] =
+    provenance match {
+      case p: ImportedInternalAncestorInternal =>
+        copy(provenance = p.copy(topmostSameAs = topmostSameAs)).asInstanceOf[Dataset[P]]
+      case p: ImportedInternalAncestorExternal =>
+        copy(provenance = p.copy(topmostSameAs = topmostSameAs)).asInstanceOf[Dataset[P]]
+    }
+
+  def update(
+      topmostDerivedFrom: TopmostDerivedFrom
+  )(implicit evidence:    P <:< Modified, factoryEvidence: TopmostDerivedFrom.type): Dataset[P] =
+    provenance match {
+      case p: Modified => copy(provenance = p.copy(topmostDerivedFrom = topmostDerivedFrom)).asInstanceOf[Dataset[P]]
+    }
 }

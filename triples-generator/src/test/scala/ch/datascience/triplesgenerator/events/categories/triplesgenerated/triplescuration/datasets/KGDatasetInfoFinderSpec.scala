@@ -19,11 +19,13 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets
 
 import cats.effect.IO
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{DerivedFrom, SameAs, TopmostDerivedFrom}
 import ch.datascience.graph.model.testentities.Dataset._
 import ch.datascience.graph.model.testentities._
+import ch.datascience.graph.model.entities
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
@@ -37,10 +39,40 @@ import org.scalatest.wordspec.AnyWordSpec
 class KGDatasetInfoFinderSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers {
 
   "findTopmostSameAs" should {
+    "return None if there is no dataset with that id" in new TestCase {
+      kgDatasetInfoFinder.findTopmostSameAs(datasetResourceIds.generateOne).unsafeRunSync() shouldBe None
+    }
+    "return topmostSameAs for the given id" in new TestCase {
+      val dataset = datasetEntities(ofAnyProvenance).generateOne.to[entities.Dataset[entities.Dataset.Provenance]]
+
+      loadToStore(dataset)
+
+      kgDatasetInfoFinder
+        .findTopmostSameAs(dataset.resourceId)
+        .unsafeRunSync() shouldBe dataset.provenance.topmostSameAs.some
+    }
+  }
+
+  "findTopmostDerivedFrom" should {
+    "return None if there is no dataset with that id" in new TestCase {
+      kgDatasetInfoFinder.findTopmostDerivedFrom(datasetResourceIds.generateOne).unsafeRunSync() shouldBe None
+    }
+    "return topmostSameAs for the given id" in new TestCase {
+      val dataset = datasetEntities(ofAnyProvenance).generateOne.to[entities.Dataset[entities.Dataset.Provenance]]
+
+      loadToStore(dataset)
+
+      kgDatasetInfoFinder
+        .findTopmostDerivedFrom(dataset.resourceId)
+        .unsafeRunSync() shouldBe dataset.provenance.topmostDerivedFrom.some
+    }
+  }
+
+  "findParentTopmostSameAs" should {
 
     "return None if there's no dataset with the given id" in new TestCase {
       val sameAs = datasetInternalSameAs.generateOne
-      kgDatasetInfoFinder.findTopmostSameAs(sameAs).unsafeRunSync() shouldBe Option.empty[SameAs]
+      kgDatasetInfoFinder.findParentTopmostSameAs(sameAs).unsafeRunSync() shouldBe Option.empty[SameAs]
     }
 
     "return the dataset's topmostSameAs if this dataset has one" in new TestCase {
@@ -50,7 +82,7 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with InMemoryRdfStore with sho
 
       val sameAs = SameAs(dataset.entityId)
 
-      kgDatasetInfoFinder.findTopmostSameAs(sameAs).unsafeRunSync() shouldBe Some(
+      kgDatasetInfoFinder.findParentTopmostSameAs(sameAs).unsafeRunSync() shouldBe Some(
         dataset.provenance.topmostSameAs
       )
     }
@@ -64,15 +96,16 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with InMemoryRdfStore with sho
 
       val sameAs = SameAs(dataset.entityId)
 
-      kgDatasetInfoFinder.findTopmostSameAs(sameAs).unsafeRunSync() shouldBe None
+      kgDatasetInfoFinder.findParentTopmostSameAs(sameAs).unsafeRunSync() shouldBe None
     }
   }
 
-  "findTopmostDerivedFrom" should {
+  "findParentTopmostDerivedFrom" should {
 
     "return None if there's no dataset with the given id" in new TestCase {
       val derivedFrom = datasetDerivedFroms.generateOne
-      kgDatasetInfoFinder.findTopmostDerivedFrom(derivedFrom).unsafeRunSync() shouldBe Option.empty[TopmostDerivedFrom]
+      kgDatasetInfoFinder.findParentTopmostDerivedFrom(derivedFrom).unsafeRunSync() shouldBe Option
+        .empty[TopmostDerivedFrom]
     }
 
     "return the dataset's topmostDerivedFrom if this dataset has one" in new TestCase {
@@ -82,7 +115,7 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with InMemoryRdfStore with sho
 
       val derivedFrom = DerivedFrom(dataset.entityId)
 
-      kgDatasetInfoFinder.findTopmostDerivedFrom(derivedFrom).unsafeRunSync() shouldBe Some(
+      kgDatasetInfoFinder.findParentTopmostDerivedFrom(derivedFrom).unsafeRunSync() shouldBe Some(
         dataset.provenance.topmostDerivedFrom
       )
     }
@@ -96,7 +129,7 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with InMemoryRdfStore with sho
 
       val derivedFrom = DerivedFrom(dataset.entityId)
 
-      kgDatasetInfoFinder.findTopmostDerivedFrom(derivedFrom).unsafeRunSync() shouldBe None
+      kgDatasetInfoFinder.findParentTopmostDerivedFrom(derivedFrom).unsafeRunSync() shouldBe None
     }
   }
 

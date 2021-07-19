@@ -113,7 +113,7 @@ private object IOEventsProcessingRunner {
       timer:            Timer[IO]
   ): IO[EventsProcessingRunner[IO]] =
     for {
-      eventProcessor      <- IOTriplesGeneratedEventProcessor(metricsRegistry, gitLabThrottler, timeRecorder, logger)
+      eventProcessor      <- EventProcessor(metricsRegistry, gitLabThrottler, timeRecorder, logger)
       generationProcesses <- find[IO, Long Refined Positive]("transformation-processes-number", config)
       semaphore           <- Semaphore(generationProcesses.value)
     } yield new EventsProcessingRunnerImpl(eventProcessor,

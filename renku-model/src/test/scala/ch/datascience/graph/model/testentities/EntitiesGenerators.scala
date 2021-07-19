@@ -43,6 +43,7 @@ import org.scalacheck.Gen
 
 import java.nio.charset.StandardCharsets._
 import java.time.Instant
+import scala.util.Random
 
 object EntitiesGenerators extends EntitiesGenerators
 
@@ -94,6 +95,11 @@ trait EntitiesGenerators {
   lazy val visibilityPublic:    Gen[Visibility] = fixed(Visibility.Public)
   lazy val visibilityNonPublic: Gen[Visibility] = Gen.oneOf(Visibility.Internal, Visibility.Private)
   lazy val visibilityAny:       Gen[Visibility] = projectVisibilities
+
+  lazy val anyProjectEntities: Gen[Project[ForksCount]] = Gen.oneOf(
+    projectEntities(visibilityAny)(anyForksCount),
+    projectWithParentEntities(visibilityAny)
+  )
 
   def projectWithParentEntities(
       visibilityGen:  Gen[Visibility],
@@ -153,7 +159,7 @@ trait EntitiesGenerators {
     name       <- datasetNames
   } yield Dataset.Identification(identifier, title, name)
 
-  type ProvenanceGen[P <: Provenance] = (Identifier, projects.DateCreated) => RenkuBaseUrl => Gen[P]
+  type ProvenanceGen[+P <: Provenance] = (Identifier, projects.DateCreated) => RenkuBaseUrl => Gen[P]
 
   val datasetProvenanceInternal: ProvenanceGen[Dataset.Provenance.Internal] = (identifier, projectDateCreated) =>
     implicit renkuBaseUrl =>
@@ -212,6 +218,15 @@ trait EntitiesGenerators {
                                                                   date,
                                                                   creators
       )
+
+  val datasetProvenanceImportedInternal: ProvenanceGen[Dataset.Provenance.ImportedInternal] = Random.shuffle {
+    List(
+      datasetProvenanceImportedInternalAncestorExternal
+        .asInstanceOf[ProvenanceGen[Dataset.Provenance.ImportedInternal]],
+      datasetProvenanceImportedInternalAncestorInternal
+        .asInstanceOf[ProvenanceGen[Dataset.Provenance.ImportedInternal]]
+    )
+  }.head
 
   val datasetProvenanceModified: ProvenanceGen[Dataset.Provenance.Modified] = (identifier, projectDateCreated) =>
     implicit renkuBaseUrl =>

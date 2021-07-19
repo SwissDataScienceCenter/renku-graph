@@ -100,7 +100,7 @@ object Project {
 
   implicit def decoder(
       gitLabInfo:          GitLabProjectInfo,
-      potentialMembers:    Set[Person]
+      allJsonLdPersons:    Set[Person]
   )(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDDecoder[Project] = JsonLDDecoder.entity(entityTypes) { cursor =>
     def matchByNameOrUsername(member: ProjectMember): users.Name => Boolean =
       name => name == member.name || name.value == member.username.value
@@ -119,14 +119,14 @@ object Project {
     )
 
     val maybeCreator: Option[Person] = gitLabInfo.maybeCreator.map(creator =>
-      potentialMembers
+      allJsonLdPersons
         .find(byNameUsernameOrAlternateName(creator))
         .map(_.copy(maybeGitLabId = Some(creator.gitLabId)))
         .getOrElse(toPerson(creator))
     )
 
     val members: Set[Person] = gitLabInfo.members.map(member =>
-      potentialMembers
+      allJsonLdPersons
         .find(byNameUsernameOrAlternateName(member))
         .map(_.copy(maybeGitLabId = Some(member.gitLabId)))
         .getOrElse(toPerson(member))

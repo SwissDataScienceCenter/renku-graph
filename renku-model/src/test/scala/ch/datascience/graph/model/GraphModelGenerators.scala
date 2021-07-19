@@ -26,7 +26,7 @@ import ch.datascience.graph.model.users.{Affiliation, Email, Name, Username}
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 import org.scalacheck.Gen.{alphaChar, choose, const, frequency, numChar, oneOf, uuid}
-
+import cats.syntax.all._
 import java.time.{Instant, LocalDate, ZoneOffset}
 import java.util.UUID
 
@@ -136,6 +136,8 @@ object GraphModelGenerators {
   implicit val datasetTopmostSameAs:       Gen[TopmostSameAs]      = datasetSameAs.map(TopmostSameAs.apply)
   implicit val datasetDerivedFroms:        Gen[DerivedFrom]        = validatedUrls map (_.value) map DerivedFrom.apply
   implicit val datasetTopmostDerivedFroms: Gen[TopmostDerivedFrom] = datasetDerivedFroms.map(TopmostDerivedFrom.apply)
+  implicit val datasetResourceIds: Gen[datasets.ResourceId] =
+    datasetIdentifiers.map(id => datasets.ResourceId((renkuBaseUrls.generateOne / "datasets" / id).show))
 
   def datasetPublishedDates(min: DatePublished = LocalDate.EPOCH): Gen[DatePublished] =
     timestamps(min.value.atStartOfDay().toInstant(ZoneOffset.UTC), max = Instant.now())

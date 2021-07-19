@@ -19,22 +19,24 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 
 import ch.datascience.events.consumers.ConsumersModelGenerators._
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{exceptions, nonEmptyStrings}
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators.projectSchemaVersions
 import ch.datascience.graph.model.entities
 import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.testentities._
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.CurationRecoverableError
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
 import io.renku.jsonld.generators.JsonLDGenerators.jsonLDEntities
 import org.scalacheck.Gen
+import cats.syntax.all._
 
 private object TriplesGeneratedGenerators {
 
-  lazy val curationRecoverableErrors: Gen[CurationRecoverableError] = for {
+  lazy val transformationRecoverableErrors: Gen[TransformationRecoverableError] = for {
     message   <- nonEmptyStrings()
     exception <- exceptions
-  } yield CurationRecoverableError(message, exception)
+  } yield TransformationRecoverableError(message, exception)
 
   implicit val triplesGeneratedEvents: Gen[TriplesGeneratedEvent] = for {
     eventId       <- eventIds
@@ -44,6 +46,17 @@ private object TriplesGeneratedGenerators {
   } yield TriplesGeneratedEvent(eventId, project, entities, schemaVersion)
 
   lazy val projectMetadatas: Gen[ProjectMetadata] = for {
-    project <- projectEntities[ForksCount](visibilityAny)(anyForksCount).map(_.to[entities.Project])
-  } yield ProjectMetadata(project, Nil, Nil)
+    project <- projectEntities[ForksCount](visibilityAny)(anyForksCount)
+    activities <-
+      executionPlanners(runPlanEntities(), fixed(project)).map(_.buildProvenanceUnsafe()).toGeneratorOfList()
+    datasets <- datasetEntities(ofAnyProvenance, fixed(project)).toGeneratorOfList()
+  } yield ProjectMetadata
+    .from(
+      project.to[entities.Project],
+      activities.map(_.to[entities.Activity]),
+      datasets
+        .map(_.to[entities.Dataset[entities.Dataset.Provenance]])
+    )
+    .fold(errors => throw new IllegalStateException(errors.intercalate("; ")), identity)
+
 }

@@ -191,7 +191,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
             maybeGitLabId = None
           )
           .to[entities.Person]
-          .copy(alternativeNames = List(nameFromUsernameOrName(gitLabPerson)))
+          .copy(alternativeNames = Set(nameFromUsernameOrName(gitLabPerson)))
 
     private def nameFromUsernameOrName(gitLabPerson: ProjectMember) =
       if (Random.nextBoolean()) gitLabPerson.name

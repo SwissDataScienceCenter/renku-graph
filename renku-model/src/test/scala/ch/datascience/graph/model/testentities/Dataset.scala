@@ -21,9 +21,10 @@ package ch.datascience.graph.model.testentities
 import Dataset._
 import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
-import ch.datascience.graph.model.{GitLabApiUrl, RenkuBaseUrl, entities, projects}
 import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.projects.ForksCount
+import ch.datascience.graph.model.testentities.Dataset.Provenance.{ImportedExternal, ImportedInternal, ImportedInternalAncestorExternal, ImportedInternalAncestorInternal, Internal, Modified}
+import ch.datascience.graph.model._
 import io.renku.jsonld.JsonLDEncoder.encodeList
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, JsonLD, Property}
@@ -72,7 +73,7 @@ object Dataset {
     val creators:           Set[Person]
   }
 
-  object Provenance {
+  object Provenance extends ProvenanceOps {
 
     final case class Internal(entityId:       EntityId,
                               initialVersion: InitialVersion,
@@ -95,7 +96,7 @@ object Dataset {
       override lazy val topmostDerivedFrom: TopmostDerivedFrom = TopmostDerivedFrom(entityId)
     }
 
-    sealed trait ImportedInternal extends Provenance {
+    sealed trait ImportedInternal extends Provenance with Product with Serializable {
       val entityId:      EntityId
       val sameAs:        InternalSameAs
       val topmostSameAs: TopmostSameAs
@@ -134,48 +135,6 @@ object Dataset {
     }
 
     import ch.datascience.graph.model.datasets.DerivedFrom._
-
-    private[Dataset] implicit def toEntitiesProvenance(
-        identification: entities.Dataset.Identification
-    ): Provenance => entities.Dataset.Provenance = {
-      case Internal(_, _, date, creators) =>
-        entities.Dataset.Provenance.Internal(identification.resourceId,
-                                             identification.identifier,
-                                             date,
-                                             creators.map(_.to[entities.Person])
-        )
-      case ImportedExternal(_, sameAs, _, date, creators) =>
-        entities.Dataset.Provenance.ImportedExternal(identification.resourceId,
-                                                     identification.identifier,
-                                                     sameAs,
-                                                     date,
-                                                     creators.map(_.to[entities.Person])
-        )
-      case Modified(_, derivedFrom, _, initialVersion, date, creators) =>
-        entities.Dataset.Provenance.Modified(identification.resourceId,
-                                             derivedFrom,
-                                             TopmostDerivedFrom(derivedFrom),
-                                             initialVersion,
-                                             date,
-                                             creators.map(_.to[entities.Person])
-        )
-      case ImportedInternalAncestorExternal(_, sameAs, _, _, date, creators) =>
-        entities.Dataset.Provenance.ImportedInternalAncestorExternal(identification.resourceId,
-                                                                     identification.identifier,
-                                                                     sameAs,
-                                                                     TopmostSameAs(sameAs),
-                                                                     date,
-                                                                     creators.map(_.to[entities.Person])
-        )
-      case ImportedInternalAncestorInternal(_, sameAs, _, _, date, creators) =>
-        entities.Dataset.Provenance.ImportedInternalAncestorInternal(identification.resourceId,
-                                                                     identification.identifier,
-                                                                     sameAs,
-                                                                     TopmostSameAs(sameAs),
-                                                                     date,
-                                                                     creators.map(_.to[entities.Person])
-        )
-    }
 
     private[Dataset] implicit def encoder(implicit
         renkuBaseUrl: RenkuBaseUrl,
@@ -228,6 +187,83 @@ object Dataset {
     }
 
     private implicit lazy val creatorsOrdering: Ordering[Person] = Ordering.by((p: Person) => p.name.value)
+  }
+
+  trait ProvenanceOps {
+
+    implicit lazy val toEntitiesProvenance
+        : entities.Dataset.Identification => Provenance => entities.Dataset.Provenance =
+      identification => {
+        case p: Internal                         => toEntitiesInternal(identification)(p)
+        case p: ImportedExternal                 => toEntitiesImportedExternal(identification)(p)
+        case p: ImportedInternalAncestorExternal => toEntitiesImportedInternalAncestorExternal(identification)(p)
+        case p: ImportedInternalAncestorInternal => toEntitiesImportedInternalAncestorInternal(identification)(p)
+        case p: Modified                         => toEntitiesModified(identification)(p)
+      }
+
+    implicit lazy val toEntitiesImportedInternal
+        : entities.Dataset.Identification => ImportedInternal => entities.Dataset.Provenance.ImportedInternal =
+      identification => {
+        case p: ImportedInternalAncestorExternal => toEntitiesImportedInternalAncestorExternal(identification)(p)
+        case p: ImportedInternalAncestorInternal => toEntitiesImportedInternalAncestorInternal(identification)(p)
+      }
+
+    implicit lazy val toEntitiesInternal
+        : entities.Dataset.Identification => Provenance.Internal => entities.Dataset.Provenance.Internal =
+      identification => { case Internal(_, _, date, creators) =>
+        entities.Dataset.Provenance.Internal(identification.resourceId,
+                                             identification.identifier,
+                                             date,
+                                             creators.map(_.to[entities.Person])
+        )
+      }
+
+    implicit lazy val toEntitiesImportedExternal
+        : entities.Dataset.Identification => Provenance.ImportedExternal => entities.Dataset.Provenance.ImportedExternal =
+      identification => { case ImportedExternal(_, sameAs, _, date, creators) =>
+        entities.Dataset.Provenance.ImportedExternal(identification.resourceId,
+                                                     identification.identifier,
+                                                     sameAs,
+                                                     date,
+                                                     creators.map(_.to[entities.Person])
+        )
+      }
+
+    implicit lazy val toEntitiesImportedInternalAncestorExternal
+        : entities.Dataset.Identification => ImportedInternalAncestorExternal => entities.Dataset.Provenance.ImportedInternalAncestorExternal =
+      identification => { case ImportedInternalAncestorExternal(_, sameAs, topmostSameAs, _, date, creators) =>
+        entities.Dataset.Provenance.ImportedInternalAncestorExternal(identification.resourceId,
+                                                                     identification.identifier,
+                                                                     sameAs,
+                                                                     topmostSameAs,
+                                                                     date,
+                                                                     creators.map(_.to[entities.Person])
+        )
+      }
+
+    implicit lazy val toEntitiesImportedInternalAncestorInternal
+        : entities.Dataset.Identification => ImportedInternalAncestorInternal => entities.Dataset.Provenance.ImportedInternalAncestorInternal =
+      identification => { case ImportedInternalAncestorInternal(_, sameAs, topmostSameAs, _, date, creators) =>
+        entities.Dataset.Provenance.ImportedInternalAncestorInternal(identification.resourceId,
+                                                                     identification.identifier,
+                                                                     sameAs,
+                                                                     topmostSameAs,
+                                                                     date,
+                                                                     creators.map(_.to[entities.Person])
+        )
+      }
+
+    implicit lazy val toEntitiesModified
+        : entities.Dataset.Identification => Provenance.Modified => entities.Dataset.Provenance.Modified =
+      identification => { case Modified(_, derivedFrom, _, initialVersion, date, creators) =>
+        entities.Dataset.Provenance.Modified(identification.resourceId,
+                                             derivedFrom,
+                                             TopmostDerivedFrom(derivedFrom),
+                                             initialVersion,
+                                             date,
+                                             creators.map(_.to[entities.Person])
+        )
+      }
   }
 
   final case class Publishing(
@@ -358,41 +394,42 @@ object Dataset {
     }.combineAll
   }.getOrElse(Validated.validNel(()))
 
-  implicit lazy val toEntitiesDataset: Dataset[Provenance] => entities.Dataset[entities.Dataset.Provenance] = {
-    dataset: Dataset[Provenance] =>
-      val maybeInvalidationTime = dataset match {
-        case d: Dataset[Provenance] with HavingInvalidationTime => d.invalidationTime.some
-        case _ => None
-      }
-      val identification = entities.Dataset.Identification(ResourceId((dataset: Dataset[Provenance]).asEntityId.show),
-                                                           dataset.identification.identifier,
-                                                           dataset.identification.title,
-                                                           dataset.identification.name
-      )
-      entities.Dataset(
-        identification,
-        dataset.provenance.to[entities.Dataset.Provenance](Provenance.toEntitiesProvenance(identification)),
-        entities.Dataset.AdditionalInfo(
-          dataset.additionalInfo.url,
-          dataset.additionalInfo.maybeDescription,
-          dataset.additionalInfo.keywords.sorted,
-          dataset.additionalInfo.images.zipWithIndex.map { case (url, idx) =>
-            val imagePosition = ImagePosition(idx)
-            entities.Dataset.Image(
-              ImageResourceId(imageEntityId((dataset: Dataset[Provenance]).asEntityId, imagePosition).show),
-              url,
-              imagePosition
-            )
-          },
-          dataset.additionalInfo.maybeLicense
-        ),
-        entities.Dataset.Publishing(dataset.publishing.publicationEvents.map(_.to[entities.PublicationEvent]),
-                                    dataset.publishing.maybeVersion
-        ),
-        dataset.parts.map(_.to[entities.DatasetPart]),
-        projects.ResourceId(dataset.project.asEntityId.show),
-        maybeInvalidationTime
-      )
+  implicit def toEntitiesDataset[TP <: Provenance, EP <: entities.Dataset.Provenance](implicit
+      convert: entities.Dataset.Identification => TP => EP
+  ): Dataset[TP] => entities.Dataset[EP] = { dataset: Dataset[TP] =>
+    val maybeInvalidationTime = dataset match {
+      case d: Dataset[TP] with HavingInvalidationTime => d.invalidationTime.some
+      case _ => None
+    }
+    val identification = entities.Dataset.Identification(ResourceId((dataset: Dataset[Provenance]).asEntityId.show),
+                                                         dataset.identification.identifier,
+                                                         dataset.identification.title,
+                                                         dataset.identification.name
+    )
+    entities.Dataset(
+      identification,
+      dataset.provenance.to(convert(identification)),
+      entities.Dataset.AdditionalInfo(
+        dataset.additionalInfo.url,
+        dataset.additionalInfo.maybeDescription,
+        dataset.additionalInfo.keywords.sorted,
+        dataset.additionalInfo.images.zipWithIndex.map { case (url, idx) =>
+          val imagePosition = ImagePosition(idx)
+          entities.Dataset.Image(
+            ImageResourceId(imageEntityId((dataset: Dataset[Provenance]).asEntityId, imagePosition).show),
+            url,
+            imagePosition
+          )
+        },
+        dataset.additionalInfo.maybeLicense
+      ),
+      entities.Dataset.Publishing(dataset.publishing.publicationEvents.map(_.to[entities.PublicationEvent]),
+                                  dataset.publishing.maybeVersion
+      ),
+      dataset.parts.map(_.to[entities.DatasetPart]),
+      projects.ResourceId(dataset.project.asEntityId.show),
+      maybeInvalidationTime
+    )
   }
 
   import io.renku.jsonld.JsonLDEncoder._
