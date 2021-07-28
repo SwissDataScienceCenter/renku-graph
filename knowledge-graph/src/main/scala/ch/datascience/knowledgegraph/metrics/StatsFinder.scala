@@ -63,8 +63,8 @@ private class StatsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer](
         |    SELECT (prov:Activity AS ?type) (COUNT(DISTINCT ?id) AS ?count)
         |    WHERE { ?id a prov:Activity }
         |  } UNION {
-        |    SELECT (renku:Run AS ?type) (COUNT(DISTINCT ?id) AS ?count)
-        |    WHERE { ?id a renku:Run }
+        |    SELECT (renku:Plan AS ?type) (COUNT(DISTINCT ?id) AS ?count)
+        |    WHERE { ?id a renku:Plan }
         |  } UNION {
         |    SELECT (schema:Person AS ?type) (COUNT(DISTINCT ?id) AS ?count)
         |    WHERE { 

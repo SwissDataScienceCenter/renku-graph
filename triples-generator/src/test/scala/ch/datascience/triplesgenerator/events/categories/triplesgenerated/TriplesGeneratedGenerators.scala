@@ -48,7 +48,7 @@ private object TriplesGeneratedGenerators {
   lazy val projectMetadatas: Gen[ProjectMetadata] = for {
     project <- projectEntities[ForksCount](visibilityAny)(anyForksCount)
     activities <-
-      executionPlanners(runPlanEntities(), fixed(project)).map(_.buildProvenanceUnsafe()).toGeneratorOfList()
+      executionPlanners(planEntities(), fixed(project)).map(_.buildProvenanceUnsafe()).toGeneratorOfList()
     datasets <- datasetEntities(ofAnyProvenance, fixed(project)).toGeneratorOfList()
   } yield ProjectMetadata
     .from(

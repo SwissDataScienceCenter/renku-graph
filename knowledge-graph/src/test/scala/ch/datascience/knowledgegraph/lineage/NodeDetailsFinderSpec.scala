@@ -51,7 +51,7 @@ class NodeDetailsFinderSpec
       val input  = entityLocations.generateOne
       val output = entityLocations.generateOne
       val activity = executionPlanners(
-        runPlanEntities(
+        planEntities(
           CommandInput.fromLocation(input),
           CommandOutput.fromLocation(output)
         )
@@ -60,7 +60,7 @@ class NodeDetailsFinderSpec
         .buildProvenanceGraph
         .fold(errors => throw new Exception(errors.toList.mkString), identity)
 
-      loadToStore(activity.runPlan.asJsonLD, activity.asJsonLD)
+      loadToStore(activity.plan.asJsonLD, activity.asJsonLD)
 
       val inputEntityNode  = NodeDef(activity, input).toNode
       val outputEntityNode = NodeDef(activity, output).toNode
@@ -81,7 +81,7 @@ class NodeDetailsFinderSpec
       val input  = entityLocations.generateOne
       val output = entityLocations.generateOne
       val activity = executionPlanners(
-        runPlanEntities(
+        planEntities(
           CommandInput.fromLocation(input),
           CommandOutput.fromLocation(output)
         )
@@ -90,7 +90,7 @@ class NodeDetailsFinderSpec
         .buildProvenanceGraph
         .fold(errors => throw new Exception(errors.toList.mkString), identity)
 
-      loadToStore(activity.runPlan.asJsonLD, activity.asJsonLD)
+      loadToStore(activity.plan.asJsonLD, activity.asJsonLD)
 
       val missingLocation = nodeLocations.generateOne
 
@@ -105,16 +105,16 @@ class NodeDetailsFinderSpec
     }
   }
 
-  "findDetails - runPlanIds" should {
+  "findDetails - planIds" should {
 
     import io.renku.jsonld.generators.JsonLDGenerators._
 
-    "find details of all RunPlans with the given ids" in new TestCase {
+    "find details of all Plans with the given ids" in new TestCase {
 
       val input  = entityLocations.generateOne
       val output = entityLocations.generateOne
       val activity1 = executionPlanners(
-        runPlanEntities(
+        planEntities(
           CommandInput.fromLocation(input),
           CommandOutput.fromLocation(output)
         )
@@ -123,7 +123,7 @@ class NodeDetailsFinderSpec
         .buildProvenanceGraph
         .fold(errors => throw new Exception(errors.toList.mkString), identity)
       val activity2 = executionPlanners(
-        runPlanEntities(CommandInput.fromLocation(output)),
+        planEntities(CommandInput.fromLocation(output)),
         fixed(activity1.project)
       ).generateOne
         .planInputParameterValuesFromChecksum(
@@ -134,7 +134,7 @@ class NodeDetailsFinderSpec
         .buildProvenanceGraph
         .fold(errors => throw new Exception(errors.toList.mkString), identity)
 
-      loadToStore(activity1.runPlan.asJsonLD, activity1.asJsonLD, activity2.runPlan.asJsonLD, activity2.asJsonLD)
+      loadToStore(activity1.plan.asJsonLD, activity1.asJsonLD, activity2.plan.asJsonLD, activity2.asJsonLD)
 
       val activity1Node = NodeDef(activity1).toNode
       val activity2Node = NodeDef(activity2).toNode
@@ -150,11 +150,11 @@ class NodeDetailsFinderSpec
         .unsafeRunSync() shouldBe Set(activity1Node, activity2Node)
     }
 
-    "find details of a RunPlan with mapped command parameters" in new TestCase {
+    "find details of a Plan with mapped command parameters" in new TestCase {
       val input +: output +: errOutput +: Nil =
         entityLocations.generateNonEmptyList(minElements = 3, maxElements = 3).toList
       val activity = executionPlanners(
-        runPlanEntities(
+        planEntities(
           CommandInput.streamedFromLocation(input),
           CommandOutput.streamedFromLocation(output, CommandOutput.stdOut),
           CommandOutput.streamedFromLocation(errOutput, CommandOutput.stdErr)
@@ -164,7 +164,7 @@ class NodeDetailsFinderSpec
         .buildProvenanceGraph
         .fold(errors => throw new Exception(errors.toList.mkString), identity)
 
-      loadToStore(activity.runPlan.asJsonLD, activity.asJsonLD)
+      loadToStore(activity.plan.asJsonLD, activity.asJsonLD)
 
       nodeDetailsFinder
         .findDetails(
@@ -182,19 +182,19 @@ class NodeDetailsFinderSpec
 
     "fail if details of the given location cannot be found" in new TestCase {
 
-      val missingRunPlan = entityIds.generateOne
+      val missingPlan = entityIds.generateOne
 
       val exception = intercept[Exception] {
         nodeDetailsFinder
           .findDetails(
-            Set(RunInfo(missingRunPlan, timestampsNotInTheFuture.generateOne)),
+            Set(RunInfo(missingPlan, timestampsNotInTheFuture.generateOne)),
             projectPaths.generateOne
           )
           .unsafeRunSync()
       }
 
       exception            shouldBe an[IllegalArgumentException]
-      exception.getMessage shouldBe s"No runPlan with $missingRunPlan"
+      exception.getMessage shouldBe s"No plan with $missingPlan"
     }
   }
 

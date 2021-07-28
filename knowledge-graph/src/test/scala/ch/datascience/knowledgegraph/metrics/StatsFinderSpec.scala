@@ -46,7 +46,7 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
         EntityLabel((schema / "Dataset").show)              -> Count(0L),
         EntityLabel((schema / "Project").show)              -> Count(0L),
         EntityLabel((prov / "Activity").show)               -> Count(0L),
-        EntityLabel((renku / "Run").show)                   -> Count(0L),
+        EntityLabel((renku / "Plan").show)                  -> Count(0L),
         EntityLabel((schema / "Person").show)               -> Count(0L),
         EntityLabel((schema / "Person with GitLabId").show) -> Count(0L)
       )
@@ -63,14 +63,14 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
         .update(schema / "Dataset", datasets.size)
         .update(schema / "Project", activities.size + datasets.size)
         .update(prov / "Activity", activities.size)
-        .update(renku / "Run", activities.map(_.association.runPlan).size)
+        .update(renku / "Plan", activities.map(_.association.plan).size)
         .update(schema / "Person", persons.size)
         .update(schema / "Person with GitLabId", persons.toList.count(_.maybeGitLabId.isDefined))
 
       loadToStore(
         datasets.toList.map(_.asJsonLD) :::
           activities.toList.map(_.asJsonLD) :::
-          activities.toList.map(_.association.runPlan.asJsonLD): _*
+          activities.toList.map(_.association.plan.asJsonLD): _*
       )
 
       stats.entitiesCount().unsafeRunSync() shouldBe entitiesWithActivities
@@ -87,14 +87,14 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
   }
 
   private lazy val activityEntities: Gen[Activity] = for {
-    name       <- runPlanNames
-    command    <- runPlanCommands
+    name       <- planNames
+    command    <- planCommands
     author     <- personEntities
     cliVersion <- cliVersions
     project    <- projectEntities[ForksCount.Zero](visibilityPublic)
     startTime  <- activityStartTimes(project.dateCreated)
   } yield ExecutionPlanner
-    .of(RunPlan(name, command, commandParameterFactories = Nil, project), startTime, author, cliVersion)
+    .of(Plan(name, command, commandParameterFactories = Nil, project), startTime, author, cliVersion)
     .buildProvenanceGraph
     .fold(errors => fail(errors.intercalate("\n")), identity)
 

@@ -103,7 +103,7 @@ private class NodeDetailsFinderImpl(
         case location: Node.Location =>
           new IllegalArgumentException(s"No entity with $location").raiseError[IO, Node]
         case runInfo: RunInfo =>
-          new IllegalArgumentException(s"No runPlan with ${runInfo.entityId}").raiseError[IO, Node]
+          new IllegalArgumentException(s"No plan with ${runInfo.entityId}").raiseError[IO, Node]
         case other =>
           new IllegalArgumentException(s"Entity $other not recognisable").raiseError[IO, Node]
       }
@@ -146,7 +146,7 @@ private object NodeDetailsFinder {
 
   implicit val runIdQuery: (RunInfo, ResourceId) => SparqlQuery = { case (RunInfo(runId, _), _) =>
     SparqlQuery.of(
-      name = "lineage - runPlan details",
+      name = "lineage - plan details",
       Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema"),
       s"""|SELECT DISTINCT  ?type (CONCAT(STR(?command), STR(' '), (GROUP_CONCAT(?commandParameter; separator=' '))) AS ?label) ?location
           |WHERE {

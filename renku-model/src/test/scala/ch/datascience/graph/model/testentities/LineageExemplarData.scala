@@ -24,15 +24,15 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.commandParameters.IOStream
 import ch.datascience.graph.model.entityModel.{Location, LocationLike}
 import ch.datascience.graph.model.projects.ForksCount
-import ch.datascience.graph.model.runPlans.Command
+import ch.datascience.graph.model.plans.Command
 import ch.datascience.graph.model.testentities.CommandParameterBase.CommandInput._
 import ch.datascience.graph.model.testentities.CommandParameterBase.CommandOutput.{LocationCommandOutput, MappedCommandOutput}
 import ch.datascience.graph.model.testentities.CommandParameterBase._
 import ch.datascience.graph.model.testentities.Entity.InputEntity
 import ch.datascience.graph.model.testentities.ParameterValue.PathParameterValue.{InputParameterValue, OutputParameterValue}
 import ch.datascience.graph.model.testentities.ParameterValue.VariableParameterValue
-import ch.datascience.graph.model.testentities.RunPlan.CommandParameters
-import ch.datascience.graph.model.{RenkuBaseUrl, activities, datasets, parameterValues, runPlans}
+import ch.datascience.graph.model.testentities.Plan.CommandParameters
+import ch.datascience.graph.model.{RenkuBaseUrl, activities, datasets, parameterValues, plans}
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax.JsonEncoderOps
 
@@ -94,8 +94,8 @@ object LineageExemplarData {
       )
     }
 
-    val runPlan1 = RunPlan(
-      runPlans.Name("runPlan1"),
+    val plan1 = Plan(
+      plans.Name("plan1"),
       Command("python"),
       CommandParameters.of(CommandInput.fromLocation(cleanData),
                            CommandInput.fromLocation(zhbikesFolder),
@@ -104,12 +104,8 @@ object LineageExemplarData {
       project
     )
 
-    val activity1RunPlan1 = ExecutionPlanner
-      .of(runPlan1,
-          activityStartTimes(after = project.dateCreated).generateOne,
-          personEntities.generateOne,
-          project.agent
-      )
+    val activity1Plan1 = ExecutionPlanner
+      .of(plan1, activityStartTimes(after = project.dateCreated).generateOne, personEntities.generateOne, project.agent)
       .planInputParameterValuesFromChecksum(
         cleanData     -> entityChecksums.generateOne,
         zhbikesFolder -> entityChecksums.generateOne
@@ -117,8 +113,8 @@ object LineageExemplarData {
       .buildProvenanceGraph
       .fold(errors => throw new Exception(errors.toList.mkString), identity)
 
-    val runPlan2 = RunPlan(
-      runPlans.Name("runPlan2"),
+    val plan2 = Plan(
+      plans.Name("plan2"),
       Command("python"),
       CommandParameters.of(
         CommandInput.fromLocation(plotData),
@@ -129,9 +125,9 @@ object LineageExemplarData {
       project
     )
 
-    val activity2RunPlan2 = ExecutionPlanner
-      .of(runPlan2,
-          activityStartTimes(after = activity1RunPlan1.startTime).generateOne,
+    val activity2Plan2 = ExecutionPlanner
+      .of(plan2,
+          activityStartTimes(after = activity1Plan1.startTime).generateOne,
           personEntities.generateOne,
           project.agent
       )
@@ -139,21 +135,21 @@ object LineageExemplarData {
         plotData -> entityChecksums.generateOne
       )
       .planInputParameterValuesFromEntity(
-        bikesParquet -> activity1RunPlan1
+        bikesParquet -> activity1Plan1
           .findGenerationEntity(bikesParquet)
           .getOrElse(throw new Exception(s"No generation for $bikesParquet"))
       )
       .buildProvenanceGraph
       .fold(errors => throw new Exception(errors.toList.mkString), identity)
 
-    val activity3RunPlan1 = ExecutionPlanner
-      .of(runPlan1,
-          activityStartTimes(after = activity2RunPlan2.startTime).generateOne,
+    val activity3Plan1 = ExecutionPlanner
+      .of(plan1,
+          activityStartTimes(after = activity2Plan2.startTime).generateOne,
           personEntities.generateOne,
           project.agent
       )
       .planInputParameterValuesFromChecksum(
-        cleanData -> activity1RunPlan1
+        cleanData -> activity1Plan1
           .findUsagesChecksum(cleanData)
           .getOrElse(throw new Exception(s"No usage for $cleanData")),
         zhbikesFolder -> entityChecksums.generateOne
@@ -161,19 +157,19 @@ object LineageExemplarData {
       .buildProvenanceGraph
       .fold(errors => throw new Exception(errors.toList.mkString), identity)
 
-    val activity4RunPlan2 = ExecutionPlanner
-      .of(runPlan2,
-          activityStartTimes(after = activity3RunPlan1.startTime).generateOne,
+    val activity4Plan2 = ExecutionPlanner
+      .of(plan2,
+          activityStartTimes(after = activity3Plan1.startTime).generateOne,
           personEntities.generateOne,
           project.agent
       )
       .planInputParameterValuesFromChecksum(
-        plotData -> activity2RunPlan2
+        plotData -> activity2Plan2
           .findUsagesChecksum(plotData)
           .getOrElse(throw new Exception(s"No usage found for $plotData"))
       )
       .planInputParameterValuesFromEntity(
-        bikesParquet -> activity3RunPlan1
+        bikesParquet -> activity3Plan1
           .findGenerationEntity(bikesParquet)
           .getOrElse(throw new Exception(s"No generation for $bikesParquet"))
       )
@@ -182,24 +178,24 @@ object LineageExemplarData {
 
     List(
       zhbikesDataset.asJsonLD,
-      runPlan1.asJsonLD,
-      runPlan2.asJsonLD,
-      activity1RunPlan1.asJsonLD,
-      activity2RunPlan2.asJsonLD,
-      activity3RunPlan1.asJsonLD,
-      activity4RunPlan2.asJsonLD
+      plan1.asJsonLD,
+      plan2.asJsonLD,
+      activity1Plan1.asJsonLD,
+      activity2Plan2.asJsonLD,
+      activity3Plan1.asJsonLD,
+      activity4Plan2.asJsonLD
     ) -> ExemplarData(
       project,
-      NodeDef(activity3RunPlan1, zhbikesFolder),
-      NodeDef(activity3RunPlan1, cleanData),
-      NodeDef(activity3RunPlan1, bikesParquet),
-      NodeDef(activity4RunPlan2, plotData),
-      NodeDef(activity4RunPlan2, gridPlot),
-      NodeDef(activity4RunPlan2, cumulative),
-      NodeDef(activity3RunPlan1),
-      activity3RunPlan1.startTime,
-      NodeDef(activity4RunPlan2),
-      activity4RunPlan2.startTime
+      NodeDef(activity3Plan1, zhbikesFolder),
+      NodeDef(activity3Plan1, cleanData),
+      NodeDef(activity3Plan1, bikesParquet),
+      NodeDef(activity4Plan2, plotData),
+      NodeDef(activity4Plan2, gridPlot),
+      NodeDef(activity4Plan2, cumulative),
+      NodeDef(activity3Plan1),
+      activity3Plan1.startTime,
+      NodeDef(activity4Plan2),
+      activity4Plan2.startTime
     )
   }
 }
@@ -223,13 +219,13 @@ object NodeDef {
       }
       .getOrElse(
         throw new Exception(
-          s"No entity with $location on activity associated with ${activity.association.runPlan.name} plan"
+          s"No entity with $location on activity associated with ${activity.association.plan.name} plan"
         )
       )
 
   def apply(activity: Activity)(implicit renkuBaseUrl: RenkuBaseUrl): NodeDef =
     NodeDef(
-      activity.association.runPlan.asJsonLD.entityId
+      activity.association.plan.asJsonLD.entityId
         .getOrElse(throw new Exception("Non entity id found for Activity"))
         .toString,
       activity.show,
@@ -243,7 +239,7 @@ object NodeDef {
     activity.parameters
       .sortBy(_.valueReference.position)
       .map(_.show)
-      .mkString(s"${activity.association.runPlan.command} ", " ", "")
+      .mkString(s"${activity.association.plan.command} ", " ", "")
   }
 
   private implicit lazy val parameterValueShow: Show[ParameterValue] = Show.show {

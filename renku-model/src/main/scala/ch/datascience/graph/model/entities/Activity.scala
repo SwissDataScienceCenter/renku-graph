@@ -145,7 +145,7 @@ object Activity {
       usages      <- cursor.downField(prov / "qualifiedUsage").as[List[Usage]]
       parameters <- cursor
                       .downField(renku / "parameter")
-                      .as[List[ParameterValue]](decodeList(ParameterValue.decoder(association.runPlan)))
+                      .as[List[ParameterValue]](decodeList(ParameterValue.decoder(association.plan)))
       activity <- Activity
                     .from(resourceId,
                           startedAtTime,

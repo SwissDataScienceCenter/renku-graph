@@ -307,7 +307,7 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
     val input      = entityLocations.generateOne
     val output     = entityLocations.generateOne
     executionPlanners(
-      runPlanEntities(
+      planEntities(
         CommandParameter.from(paramValue),
         CommandInput.fromLocation(input),
         CommandOutput.fromLocation(output)

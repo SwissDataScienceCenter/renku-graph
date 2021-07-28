@@ -27,7 +27,7 @@ import ch.datascience.graph.model
 import ch.datascience.graph.model._
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.testentities.EntitiesGenerators._
-import ch.datascience.graph.model.testentities.{ExecutionPlanner, Person, RunPlan}
+import ch.datascience.graph.model.testentities.{ExecutionPlanner, Person, Plan}
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.client.{MappingBuilder, WireMock}
@@ -57,11 +57,7 @@ object RemoteTriplesGenerator {
       project,
       commitId,
       ExecutionPlanner(
-        RunPlan(runPlanNames.generateOne,
-                runPlanCommands.generateOne,
-                commandParameterFactories = Nil,
-                project.entitiesProject
-        ),
+        Plan(planNames.generateOne, planCommands.generateOne, commandParameterFactories = Nil, project.entitiesProject),
         (activities.StartTime(project.entitiesProject.dateCreated.value), author, cliVersion),
         parametersValueOverrides = Nil,
         inputsValueOverrides = Nil,

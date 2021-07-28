@@ -405,7 +405,7 @@ class ProjectMetadataSpec extends AnyWordSpec with should.Matchers with ScalaChe
   }
 
   private def activityEntities(projectsGen: Gen[Project[ForksCount]]): Gen[Activity] = for {
-    executionPlanner <- executionPlanners(runPlanEntities(), projectsGen)
+    executionPlanner <- executionPlanners(planEntities(), projectsGen)
   } yield executionPlanner.buildProvenanceUnsafe()
 
   private def updateProvenanceDateAfter(

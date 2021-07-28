@@ -37,7 +37,7 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
   "Activity.decode" should {
 
     "turn JsonLD Activity entity into the Activity object" in {
-      forAll(executionPlanners(runPlanEntities(), projectEntities(visibilityAny)(anyForksCount))) { executionPlanner =>
+      forAll(executionPlanners(planEntities(), projectEntities(visibilityAny)(anyForksCount))) { executionPlanner =>
         val activity = executionPlanner.buildProvenanceUnsafe()
         activity.asJsonLD.flatten
           .fold(throw _, identity)
@@ -49,7 +49,7 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
     "fail if there are Input Parameter Values for non-existing Usage Entities" in {
       val location = entityLocations.generateOne
       val activity = executionPlanners(
-        runPlanEntities(CommandInput.fromLocation(location)),
+        planEntities(CommandInput.fromLocation(location)),
         projectEntities(visibilityAny)(anyForksCount)
       ).generateOne
         .planInputParameterValuesFromChecksum(location -> entityChecksums.generateOne)
@@ -81,7 +81,7 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
     "fail if there are Output Parameter Values for non-existing Generation Entities" in {
       val location = entityLocations.generateOne
       val activity = executionPlanners(
-        runPlanEntities(CommandOutput.fromLocation(location)),
+        planEntities(CommandOutput.fromLocation(location)),
         projectEntities(visibilityAny)(anyForksCount)
       ).generateOne
         .buildProvenanceUnsafe()
@@ -111,7 +111,7 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
 
     "fail if there is no Agent entity" in {
       val activity = executionPlanners(
-        runPlanEntities(),
+        planEntities(),
         projectEntities(visibilityAny)(anyForksCount)
       ).generateOne
         .buildProvenanceUnsafe()
@@ -145,7 +145,7 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
 
     "fail if there is no Author entity" in {
       val activity = executionPlanners(
-        runPlanEntities(),
+        planEntities(),
         projectEntities(visibilityAny)(anyForksCount)
       ).generateOne
         .buildProvenanceUnsafe()

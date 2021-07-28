@@ -20,26 +20,26 @@ package ch.datascience.graph.model.entities
 
 import ch.datascience.graph.model.Schemas._
 import ch.datascience.graph.model.entities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
-import ch.datascience.graph.model.runPlans._
+import ch.datascience.graph.model.plans._
 import ch.datascience.graph.model.{InvalidationTime, commandParameters, projects}
 import io.renku.jsonld.JsonLDDecoder
 
-final case class RunPlan(resourceId:               ResourceId,
-                         name:                     Name,
-                         maybeDescription:         Option[Description],
-                         command:                  Command,
-                         maybeProgrammingLanguage: Option[ProgrammingLanguage],
-                         keywords:                 List[Keyword],
-                         parameters:               List[CommandParameter],
-                         inputs:                   List[CommandInput],
-                         outputs:                  List[CommandOutput],
-                         successCodes:             List[SuccessCode],
-                         projectResourceId:        projects.ResourceId,
-                         maybeInvalidationTime:    Option[InvalidationTime]
-) extends RunPlanOps
+final case class Plan(resourceId:               ResourceId,
+                      name:                     Name,
+                      maybeDescription:         Option[Description],
+                      command:                  Command,
+                      maybeProgrammingLanguage: Option[ProgrammingLanguage],
+                      keywords:                 List[Keyword],
+                      parameters:               List[CommandParameter],
+                      inputs:                   List[CommandInput],
+                      outputs:                  List[CommandOutput],
+                      successCodes:             List[SuccessCode],
+                      projectResourceId:        projects.ResourceId,
+                      maybeInvalidationTime:    Option[InvalidationTime]
+) extends PlanOps
 
-sealed trait RunPlanOps {
-  self: RunPlan =>
+sealed trait PlanOps {
+  self: Plan =>
 
   def findParameter(parameterId: commandParameters.ResourceId): Option[CommandParameter] =
     parameters.find(_.resourceId == parameterId)
@@ -51,13 +51,13 @@ sealed trait RunPlanOps {
     outputs.find(_.resourceId == parameterId)
 }
 
-object RunPlan {
+object Plan {
   import io.renku.jsonld.syntax._
   import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 
-  private val entityTypes = EntityTypes.of(prov / "Plan", renku / "Run")
+  private val entityTypes = EntityTypes.of(prov / "Plan", renku / "Plan")
 
-  implicit lazy val encoder: JsonLDEncoder[RunPlan] = JsonLDEncoder.instance { plan =>
+  implicit lazy val encoder: JsonLDEncoder[Plan] = JsonLDEncoder.instance { plan =>
     JsonLD.entity(
       plan.resourceId.asEntityId,
       entityTypes,
@@ -75,7 +75,7 @@ object RunPlan {
     )
   }
 
-  implicit lazy val decoder: JsonLDDecoder[RunPlan] = JsonLDDecoder.entity(entityTypes) { cursor =>
+  implicit lazy val decoder: JsonLDDecoder[Plan] = JsonLDDecoder.entity(entityTypes) { cursor =>
     for {
       resourceId            <- cursor.downEntityId.as[ResourceId]
       name                  <- cursor.downField(schema / "name").as[Name]
@@ -89,18 +89,18 @@ object RunPlan {
       successCodes          <- cursor.downField(renku / "successCodes").as[List[SuccessCode]]
       projectId             <- cursor.downField(schema / "isPartOf").downEntityId.as[projects.ResourceId]
       maybeInvalidationTime <- cursor.downField(prov / "invalidatedAtTime").as[Option[InvalidationTime]]
-    } yield RunPlan(resourceId,
-                    name,
-                    maybeDescription,
-                    command,
-                    maybeProgrammingLang,
-                    keywords,
-                    parameters,
-                    inputs,
-                    outputs,
-                    successCodes,
-                    projectId,
-                    maybeInvalidationTime
+    } yield Plan(resourceId,
+                 name,
+                 maybeDescription,
+                 command,
+                 maybeProgrammingLang,
+                 keywords,
+                 parameters,
+                 inputs,
+                 outputs,
+                 successCodes,
+                 projectId,
+                 maybeInvalidationTime
     )
   }
 }

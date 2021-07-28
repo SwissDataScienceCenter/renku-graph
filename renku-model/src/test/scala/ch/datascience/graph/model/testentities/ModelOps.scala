@@ -365,26 +365,26 @@ trait ModelOps extends Dataset.ProvenanceOps {
       )
   }
 
-  implicit class RunPlanOps(runPlan: RunPlan) {
+  implicit class PlanOps(plan: Plan) {
 
-    def to[T](implicit convert: RunPlan => T): T = convert(runPlan)
+    def to[T](implicit convert: Plan => T): T = convert(plan)
 
-    def invalidate(time: InvalidationTime): ValidatedNel[String, RunPlan with HavingInvalidationTime] =
+    def invalidate(time: InvalidationTime): ValidatedNel[String, Plan with HavingInvalidationTime] =
       Validated.condNel(
-        test = (time.value compareTo runPlan.project.dateCreated.value) >= 0,
-        new RunPlan(runPlan.id,
-                    runPlan.name,
-                    runPlan.maybeDescription,
-                    runPlan.command,
-                    runPlan.maybeProgrammingLanguage,
-                    runPlan.keywords,
-                    runPlan.commandParameterFactories,
-                    runPlan.successCodes,
-                    runPlan.project
+        test = (time.value compareTo plan.project.dateCreated.value) >= 0,
+        new Plan(plan.id,
+                 plan.name,
+                 plan.maybeDescription,
+                 plan.command,
+                 plan.maybeProgrammingLanguage,
+                 plan.keywords,
+                 plan.commandParameterFactories,
+                 plan.successCodes,
+                 plan.project
         ) with HavingInvalidationTime {
           override val invalidationTime: InvalidationTime = time
         },
-        s"Invalidation time $time on RunPlan with name: ${runPlan.name} is older than project date"
+        s"Invalidation time $time on Plan with name: ${plan.name} is older than project date"
       )
   }
 

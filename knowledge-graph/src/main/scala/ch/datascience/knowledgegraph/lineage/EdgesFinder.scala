@@ -73,15 +73,15 @@ private class EdgesFinderImpl(
   private def query(path: Path, maybeUser: Option[AuthUser]) = SparqlQuery.of(
     name = "lineage - edges",
     Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema"),
-    s"""|SELECT DISTINCT ?runPlan ?date ?sourceEntityLocation ?targetEntityLocation
+    s"""|SELECT DISTINCT ?plan ?date ?sourceEntityLocation ?targetEntityLocation
         |WHERE {
         |  {
         |    ${projectMemberFilterQuery(ResourceId(renkuBaseUrl, path).showAs[RdfResource])(maybeUser)}
         |    ?activity schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
         |              a prov:Activity;
-        |              prov:qualifiedAssociation/prov:hadPlan ?runPlan;
+        |              prov:qualifiedAssociation/prov:hadPlan ?plan;
         |              prov:startedAtTime ?date.
-        |    ?runPlan renku:hasInputs ?input.
+        |    ?plan renku:hasInputs ?input.
         |    ?paramValue a renku:PathParameterValue;
         |                schema:valueReference ?input.
         |    ?paramValue prov:atLocation ?sourceEntityLocation.
@@ -89,9 +89,9 @@ private class EdgesFinderImpl(
         |    ${projectMemberFilterQuery(ResourceId(renkuBaseUrl, path).showAs[RdfResource])(maybeUser)}
         |    ?activity schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
         |              a prov:Activity;
-        |              prov:qualifiedAssociation/prov:hadPlan ?runPlan;
+        |              prov:qualifiedAssociation/prov:hadPlan ?plan;
         |              prov:startedAtTime ?date.
-        |    ?runPlan renku:hasOutputs ?output.
+        |    ?plan renku:hasOutputs ?output.
         |    ?paramValue a renku:PathParameterValue;
         |                schema:valueReference ?output.
         |    ?paramValue prov:atLocation ?targetEntityLocation.
@@ -110,11 +110,11 @@ private class EdgesFinderImpl(
 
     implicit lazy val edgeDecoder: Decoder[EdgeData] = { cursor =>
       for {
-        runPlanId      <- cursor.downField("runPlan").downField("value").as[EntityId]
+        planId         <- cursor.downField("plan").downField("value").as[EntityId]
         date           <- cursor.downField("date").downField("value").as[RunDate]
         sourceLocation <- cursor.downField("sourceEntityLocation").downField("value").as[Option[Node.Location]]
         targetLocation <- cursor.downField("targetEntityLocation").downField("value").as[Option[Node.Location]]
-      } yield (RunInfo(runPlanId, date), sourceLocation, targetLocation)
+      } yield (RunInfo(planId, date), sourceLocation, targetLocation)
     }
 
     _.downField("results").downField("bindings").as[List[EdgeData]].map(_.toSet)

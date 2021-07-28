@@ -30,15 +30,15 @@ import org.scalacheck.Gen
 
 private object Generators {
 
-  implicit lazy val commandParameterObjects: Gen[Position => RunPlan => CommandParameter] = for {
+  implicit lazy val commandParameterObjects: Gen[Position => Plan => CommandParameter] = for {
     name             <- commandParameterNames
     maybeDescription <- nonEmptyStrings().toGeneratorOf(Description).toGeneratorOfOptions
     maybePrefix      <- nonEmptyStrings().toGeneratorOf(Prefix).toGeneratorOfOptions
     defaultValue     <- nonEmptyStrings().toGeneratorOf(ParameterDefaultValue)
   } yield (position: Position) =>
-    (runPlan: RunPlan) => CommandParameter(position, name, maybeDescription, maybePrefix, defaultValue, runPlan)
+    (plan: Plan) => CommandParameter(position, name, maybeDescription, maybePrefix, defaultValue, plan)
 
-  implicit lazy val locationCommandInputObjects: Gen[Position => RunPlan => LocationCommandInput] = for {
+  implicit lazy val locationCommandInputObjects: Gen[Position => Plan => LocationCommandInput] = for {
     name                <- commandParameterNames
     maybeDescription    <- nonEmptyStrings().toGeneratorOf(Description).toGeneratorOfOptions
     maybePrefix         <- nonEmptyStrings().toGeneratorOf(Prefix).toGeneratorOfOptions
@@ -46,7 +46,7 @@ private object Generators {
     temporary           <- commandParameterTemporaries
     maybeEncodingFormat <- commandParameterEncodingFormats.toGeneratorOfOptions
   } yield (position: Position) =>
-    (runPlan: RunPlan) =>
+    (plan: Plan) =>
       LocationCommandInput(position,
                            name,
                            maybeDescription,
@@ -54,10 +54,10 @@ private object Generators {
                            defaultValue,
                            temporary,
                            maybeEncodingFormat,
-                           runPlan
+                           plan
       )
 
-  implicit lazy val mappedCommandInputObjects: Gen[Position => RunPlan => MappedCommandInput] = for {
+  implicit lazy val mappedCommandInputObjects: Gen[Position => Plan => MappedCommandInput] = for {
     name                <- commandParameterNames
     maybeDescription    <- nonEmptyStrings().toGeneratorOf(Description).toGeneratorOfOptions
     maybePrefix         <- nonEmptyStrings().toGeneratorOf(Prefix).toGeneratorOfOptions
@@ -65,7 +65,7 @@ private object Generators {
     temporary           <- commandParameterTemporaries
     maybeEncodingFormat <- commandParameterEncodingFormats.toGeneratorOfOptions
   } yield (position: Position) =>
-    (runPlan: RunPlan) =>
+    (plan: Plan) =>
       MappedCommandInput(position,
                          name,
                          maybeDescription,
@@ -73,10 +73,10 @@ private object Generators {
                          defaultValue,
                          temporary,
                          maybeEncodingFormat,
-                         runPlan
+                         plan
       )
 
-  implicit lazy val locationCommandOutputObjects: Gen[Position => RunPlan => LocationCommandOutput] = for {
+  implicit lazy val locationCommandOutputObjects: Gen[Position => Plan => LocationCommandOutput] = for {
     name                <- commandParameterNames
     maybeDescription    <- nonEmptyStrings().toGeneratorOf(Description).toGeneratorOfOptions
     maybePrefix         <- nonEmptyStrings().toGeneratorOf(Prefix).toGeneratorOfOptions
@@ -85,7 +85,7 @@ private object Generators {
     temporary           <- commandParameterTemporaries
     maybeEncodingFormat <- commandParameterEncodingFormats.toGeneratorOfOptions
   } yield (position: Position) =>
-    (runPlan: RunPlan) =>
+    (plan: Plan) =>
       LocationCommandOutput(position,
                             name,
                             maybeDescription,
@@ -94,10 +94,10 @@ private object Generators {
                             folderCreation,
                             temporary,
                             maybeEncodingFormat,
-                            runPlan
+                            plan
       )
 
-  implicit lazy val mappedCommandOutputObjects: Gen[Position => RunPlan => MappedCommandOutput] = for {
+  implicit lazy val mappedCommandOutputObjects: Gen[Position => Plan => MappedCommandOutput] = for {
     name                <- commandParameterNames
     maybeDescription    <- nonEmptyStrings().toGeneratorOf(Description).toGeneratorOfOptions
     maybePrefix         <- nonEmptyStrings().toGeneratorOf(Prefix).toGeneratorOfOptions
@@ -107,7 +107,7 @@ private object Generators {
     maybeEncodingFormat <- commandParameterEncodingFormats.toGeneratorOfOptions
     mappedTo            <- ioStreamOuts
   } yield (position: Position) =>
-    (runPlan: RunPlan) =>
+    (plan: Plan) =>
       MappedCommandOutput(position,
                           name,
                           maybeDescription,
@@ -117,7 +117,7 @@ private object Generators {
                           temporary,
                           maybeEncodingFormat,
                           mappedTo,
-                          runPlan
+                          plan
       )
 
   implicit val ioStreamOuts: Gen[IOStream.Out] = Gen.oneOf(

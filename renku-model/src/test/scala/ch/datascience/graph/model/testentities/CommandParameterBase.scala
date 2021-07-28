@@ -36,7 +36,7 @@ sealed trait CommandParameterBase {
   val maybeDescription: Option[Description]
   val maybePrefix:      Option[Prefix]
   val defaultValue:     DefaultValue
-  val runPlan:          RunPlan
+  val plan:             Plan
 }
 
 object CommandParameterBase {
@@ -46,22 +46,22 @@ object CommandParameterBase {
                                     maybeDescription: Option[Description],
                                     maybePrefix:      Option[Prefix],
                                     defaultValue:     ParameterDefaultValue,
-                                    runPlan:          RunPlan
+                                    plan:             Plan
   ) extends CommandParameterBase {
     override type DefaultValue = ParameterDefaultValue
   }
 
   object CommandParameter {
 
-    def from(value: ParameterDefaultValue): Position => RunPlan => CommandParameter =
+    def from(value: ParameterDefaultValue): Position => Plan => CommandParameter =
       position =>
-        runPlan =>
+        plan =>
           CommandParameter(position,
                            Name(s"parameter_$position"),
                            maybeDescription = None,
                            maybePrefix = None,
                            defaultValue = value,
-                           runPlan
+                           plan
           )
 
     implicit lazy val toEntitiesCommandParameter: CommandParameter => entities.CommandParameterBase.CommandParameter =
@@ -91,9 +91,7 @@ object CommandParameterBase {
       }
 
     implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[CommandParameter] =
-      EntityIdEncoder.instance(parameter =>
-        parameter.runPlan.asEntityId.asUrlEntityId / "parameters" / parameter.position
-      )
+      EntityIdEncoder.instance(parameter => parameter.plan.asEntityId.asUrlEntityId / "parameters" / parameter.position)
   }
 
   sealed trait CommandInputOrOutput extends CommandParameterBase
@@ -106,15 +104,15 @@ object CommandParameterBase {
 
   object CommandInput {
 
-    def fromLocation(defaultValue: Location): Position => RunPlan => CommandInput =
+    def fromLocation(defaultValue: Location): Position => Plan => CommandInput =
       from(InputDefaultValue(defaultValue))
 
-    def streamedFromLocation(defaultValue: Location): Position => RunPlan => CommandInput =
+    def streamedFromLocation(defaultValue: Location): Position => Plan => CommandInput =
       streamedFrom(InputDefaultValue(defaultValue))
 
-    def from(defaultValue: InputDefaultValue): Position => RunPlan => LocationCommandInput =
+    def from(defaultValue: InputDefaultValue): Position => Plan => LocationCommandInput =
       position =>
-        runPlan =>
+        plan =>
           LocationCommandInput(
             position,
             Name(s"input_$position"),
@@ -123,12 +121,12 @@ object CommandParameterBase {
             defaultValue,
             Temporary.nonTemporary,
             maybeEncodingFormat = None,
-            runPlan
+            plan
           )
 
-    def streamedFrom(defaultValue: InputDefaultValue): Position => RunPlan => MappedCommandInput =
+    def streamedFrom(defaultValue: InputDefaultValue): Position => Plan => MappedCommandInput =
       position =>
-        runPlan =>
+        plan =>
           MappedCommandInput(
             position,
             Name(s"input_$position"),
@@ -137,7 +135,7 @@ object CommandParameterBase {
             defaultValue,
             Temporary.nonTemporary,
             maybeEncodingFormat = None,
-            runPlan
+            plan
           )
 
     final case class LocationCommandInput(position:            Position,
@@ -147,7 +145,7 @@ object CommandParameterBase {
                                           defaultValue:        InputDefaultValue,
                                           temporary:           Temporary,
                                           maybeEncodingFormat: Option[EncodingFormat],
-                                          runPlan:             RunPlan
+                                          plan:                Plan
     ) extends CommandInput
 
     final case class MappedCommandInput(position:            Position,
@@ -157,7 +155,7 @@ object CommandParameterBase {
                                         defaultValue:        InputDefaultValue,
                                         temporary:           Temporary,
                                         maybeEncodingFormat: Option[EncodingFormat],
-                                        runPlan:             RunPlan
+                                        plan:                Plan
     )(implicit renkuBaseUrl:                                 RenkuBaseUrl)
         extends CommandInput {
       val mappedTo: IOStream.In = IOStream.StdIn(IOStream.ResourceId((renkuBaseUrl / "iostreams" / StdIn.name).value))
@@ -237,7 +235,7 @@ object CommandParameterBase {
       }
 
     implicit def entityIdEncoder[I <: CommandInput](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[I] =
-      EntityIdEncoder.instance(input => input.runPlan.asEntityId.asUrlEntityId / "inputs" / input.position)
+      EntityIdEncoder.instance(input => input.plan.asEntityId.asUrlEntityId / "inputs" / input.position)
   }
 
   sealed trait CommandOutput extends CommandInputOrOutput {
@@ -249,12 +247,12 @@ object CommandParameterBase {
 
   object CommandOutput {
 
-    def fromLocation(defaultValue: Location): Position => RunPlan => LocationCommandOutput =
+    def fromLocation(defaultValue: Location): Position => Plan => LocationCommandOutput =
       from(OutputDefaultValue(defaultValue))
 
-    def from(defaultValue: OutputDefaultValue): Position => RunPlan => LocationCommandOutput =
+    def from(defaultValue: OutputDefaultValue): Position => Plan => LocationCommandOutput =
       position =>
-        runPlan =>
+        plan =>
           LocationCommandOutput(
             position,
             Name(s"output_$position"),
@@ -264,10 +262,10 @@ object CommandParameterBase {
             FolderCreation.no,
             Temporary.nonTemporary,
             maybeEncodingFormat = None,
-            runPlan
+            plan
           )
 
-    def streamedFromLocation(defaultValue: Location, stream: IOStream.Out): Position => RunPlan => MappedCommandOutput =
+    def streamedFromLocation(defaultValue: Location, stream: IOStream.Out): Position => Plan => MappedCommandOutput =
       streamedFrom(OutputDefaultValue(defaultValue), stream)
 
     def stdOut(implicit renkuBaseUrl: RenkuBaseUrl): IOStream.StdOut =
@@ -276,11 +274,9 @@ object CommandParameterBase {
     def stdErr(implicit renkuBaseUrl: RenkuBaseUrl): IOStream.StdErr =
       IOStream.StdErr(IOStream.ResourceId((renkuBaseUrl / "iostreams" / StdErr.name).value))
 
-    def streamedFrom(defaultValue: OutputDefaultValue,
-                     stream:       IOStream.Out
-    ): Position => RunPlan => MappedCommandOutput =
+    def streamedFrom(defaultValue: OutputDefaultValue, stream: IOStream.Out): Position => Plan => MappedCommandOutput =
       position =>
-        runPlan =>
+        plan =>
           MappedCommandOutput(
             position,
             Name(s"output_$position"),
@@ -291,7 +287,7 @@ object CommandParameterBase {
             Temporary.nonTemporary,
             maybeEncodingFormat = None,
             mappedTo = stream,
-            runPlan
+            plan
           )
 
     final case class LocationCommandOutput(position:            Position,
@@ -302,7 +298,7 @@ object CommandParameterBase {
                                            folderCreation:      FolderCreation,
                                            temporary:           Temporary,
                                            maybeEncodingFormat: Option[EncodingFormat],
-                                           runPlan:             RunPlan
+                                           plan:                Plan
     ) extends CommandOutput
 
     final case class MappedCommandOutput(position:            Position,
@@ -314,7 +310,7 @@ object CommandParameterBase {
                                          temporary:           Temporary,
                                          maybeEncodingFormat: Option[EncodingFormat],
                                          mappedTo:            IOStream.Out,
-                                         runPlan:             RunPlan
+                                         plan:                Plan
     ) extends CommandOutput
 
     implicit lazy val toEntitiesCommandOutput: CommandOutput => entities.CommandParameterBase.CommandOutput = {
@@ -398,7 +394,7 @@ object CommandParameterBase {
       }
 
     implicit def entityIdEncoder[O <: CommandOutput](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[O] =
-      EntityIdEncoder.instance(output => output.runPlan.asEntityId.asUrlEntityId / "outputs" / output.position)
+      EntityIdEncoder.instance(output => output.plan.asEntityId.asUrlEntityId / "outputs" / output.position)
   }
 
 }

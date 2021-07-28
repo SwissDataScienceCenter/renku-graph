@@ -21,12 +21,12 @@ package ch.datascience.graph.model.entities
 import cats.syntax.all._
 import ch.datascience.graph.model.Schemas.prov
 import ch.datascience.graph.model.associations.ResourceId
-import ch.datascience.graph.model.{agents, runPlans}
+import ch.datascience.graph.model.{agents, plans}
 import io.circe.DecodingFailure
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 
-final case class Association(resourceId: ResourceId, agent: Agent, runPlan: RunPlan)
+final case class Association(resourceId: ResourceId, agent: Agent, plan: Plan)
 
 object Association {
 
@@ -37,7 +37,7 @@ object Association {
       entity.resourceId.asEntityId,
       entityTypes,
       prov / "agent"   -> entity.agent.asJsonLD,
-      prov / "hadPlan" -> entity.runPlan.resourceId.asEntityId.asJsonLD
+      prov / "hadPlan" -> entity.plan.resourceId.asEntityId.asJsonLD
     )
   }
 
@@ -55,11 +55,11 @@ object Association {
                  .flatMap(_.sequence)
                  .getOrElse(DecodingFailure(s"Association $resourceId without or with multiple Agents", Nil).asLeft)
 
-      planResourceId <- cursor.downField(prov / "hadPlan").downEntityId.as[runPlans.ResourceId]
+      planResourceId <- cursor.downField(prov / "hadPlan").downEntityId.as[plans.ResourceId]
       plan <- cursor.top
-                .map(_.cursor.as[List[RunPlan]].map(_.filter(_.resourceId == planResourceId)).flatMap(multipleToNone))
+                .map(_.cursor.as[List[Plan]].map(_.filter(_.resourceId == planResourceId)).flatMap(multipleToNone))
                 .flatMap(_.sequence)
-                .getOrElse(DecodingFailure(s"Association $resourceId without or with multiple RunPlans", Nil).asLeft)
+                .getOrElse(DecodingFailure(s"Association $resourceId without or with multiple Plans", Nil).asLeft)
     } yield Association(resourceId, agent, plan)
   }
 }

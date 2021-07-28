@@ -19,25 +19,25 @@
 package ch.datascience.graph.model.testentities
 
 import CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
-import RunPlan._
+import Plan._
 import cats.syntax.all._
 import ch.datascience.graph.model.commandParameters.Position
 import ch.datascience.graph.model.entityModel.Location
 import ch.datascience.graph.model.projects.ForksCount
-import ch.datascience.graph.model.runPlans._
+import ch.datascience.graph.model.plans._
 import ch.datascience.graph.model._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
 
-case class RunPlan(id:                        Id,
-                   name:                      Name,
-                   maybeDescription:          Option[Description],
-                   command:                   Command,
-                   maybeProgrammingLanguage:  Option[ProgrammingLanguage],
-                   keywords:                  List[Keyword],
-                   commandParameterFactories: List[RunPlan => CommandParameterBase],
-                   successCodes:              List[SuccessCode],
-                   project:                   Project[ForksCount]
+case class Plan(id:                        Id,
+                name:                      Name,
+                maybeDescription:          Option[Description],
+                command:                   Command,
+                maybeProgrammingLanguage:  Option[ProgrammingLanguage],
+                keywords:                  List[Keyword],
+                commandParameterFactories: List[Plan => CommandParameterBase],
+                successCodes:              List[SuccessCode],
+                project:                   Project[ForksCount]
 ) {
   private lazy val commandParameters: List[CommandParameterBase] = commandParameterFactories.map(_.apply(this))
   lazy val parameters:                List[CommandParameter]     = commandParameters.collect { case param: CommandParameter => param }
@@ -47,7 +47,7 @@ case class RunPlan(id:                        Id,
   def getInput(location: Location): Option[CommandInput] = inputs.find(_.defaultValue.value == location)
 }
 
-object RunPlan {
+object Plan {
 
   import io.renku.jsonld._
   import JsonLDEncoder._
@@ -56,9 +56,9 @@ object RunPlan {
   def apply(
       name:                      Name,
       command:                   Command,
-      commandParameterFactories: List[Position => RunPlan => CommandParameterBase],
+      commandParameterFactories: List[Position => Plan => CommandParameterBase],
       project:                   Project[ForksCount]
-  ): RunPlan = RunPlan(
+  ): Plan = Plan(
     Id.generate,
     name,
     maybeDescription = None,
@@ -74,39 +74,39 @@ object RunPlan {
 
   object CommandParameters {
 
-    type CommandParameterFactory = Position => RunPlan => CommandParameterBase
+    type CommandParameterFactory = Position => Plan => CommandParameterBase
 
     def of(parameters: CommandParameterFactory*): List[CommandParameterFactory] = parameters.toList
   }
 
-  implicit lazy val toEntitiesRunPlan: RunPlan => entities.RunPlan =
-    runPlan => {
-      val maybeInvalidationTime = runPlan match {
-        case plan: RunPlan with HavingInvalidationTime => plan.invalidationTime.some
+  implicit lazy val toEntitiesPlan: Plan => entities.Plan =
+    plan => {
+      val maybeInvalidationTime = plan match {
+        case plan: Plan with HavingInvalidationTime => plan.invalidationTime.some
         case _ => None
       }
 
-      entities.RunPlan(
-        runPlans.ResourceId(runPlan.asEntityId.show),
-        runPlan.name,
-        runPlan.maybeDescription,
-        runPlan.command,
-        runPlan.maybeProgrammingLanguage,
-        runPlan.keywords,
-        runPlan.parameters.map(_.to[entities.CommandParameterBase.CommandParameter]),
-        runPlan.inputs.map(_.to[entities.CommandParameterBase.CommandInput]),
-        runPlan.outputs.map(_.to[entities.CommandParameterBase.CommandOutput]),
-        runPlan.successCodes,
-        projects.ResourceId(runPlan.project.asEntityId),
+      entities.Plan(
+        plans.ResourceId(plan.asEntityId.show),
+        plan.name,
+        plan.maybeDescription,
+        plan.command,
+        plan.maybeProgrammingLanguage,
+        plan.keywords,
+        plan.parameters.map(_.to[entities.CommandParameterBase.CommandParameter]),
+        plan.inputs.map(_.to[entities.CommandParameterBase.CommandInput]),
+        plan.outputs.map(_.to[entities.CommandParameterBase.CommandOutput]),
+        plan.successCodes,
+        projects.ResourceId(plan.project.asEntityId),
         maybeInvalidationTime
       )
     }
 
-  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[RunPlan] = JsonLDEncoder.instance {
-    case plan: RunPlan with HavingInvalidationTime =>
+  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[Plan] = JsonLDEncoder.instance {
+    case plan: Plan with HavingInvalidationTime =>
       JsonLD.entity(
         plan.asEntityId,
-        EntityTypes.of(prov / "Plan", renku / "Run"),
+        EntityTypes.of(prov / "Plan", renku / "Plan"),
         schema / "name"                -> plan.name.asJsonLD,
         schema / "description"         -> plan.maybeDescription.asJsonLD,
         renku / "command"              -> plan.command.asJsonLD,
@@ -119,10 +119,10 @@ object RunPlan {
         schema / "isPartOf"            -> plan.project.asEntityId.asJsonLD,
         prov / "invalidatedAtTime"     -> plan.invalidationTime.asJsonLD
       )
-    case plan: RunPlan =>
+    case plan: Plan =>
       JsonLD.entity(
         plan.asEntityId,
-        EntityTypes.of(prov / "Plan", renku / "Run"),
+        EntityTypes.of(prov / "Plan", renku / "Plan"),
         schema / "name"                -> plan.name.asJsonLD,
         schema / "description"         -> plan.maybeDescription.asJsonLD,
         renku / "command"              -> plan.command.asJsonLD,
@@ -136,7 +136,7 @@ object RunPlan {
       )
   }
 
-  implicit def entityIdEncoder[R <: RunPlan](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[R] =
+  implicit def entityIdEncoder[R <: Plan](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[R] =
     EntityIdEncoder.instance(plan => EntityId of renkuBaseUrl / "plans" / plan.id)
 
   final class Id private (val value: String) extends AnyVal with StringTinyType

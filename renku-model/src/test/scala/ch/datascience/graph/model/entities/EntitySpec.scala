@@ -41,7 +41,7 @@ class EntitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
 
     "turn JsonLD Output entity into the Entity object " in {
       forAll(locationCommandOutputObjects) { commandOutput =>
-        val activity = executionPlanners(runPlanEntities(commandOutput)).generateOne.buildProvenanceUnsafe()
+        val activity = executionPlanners(planEntities(commandOutput)).generateOne.buildProvenanceUnsafe()
 
         activity.asJsonLD.flatten
           .fold(throw _, identity)

@@ -32,7 +32,7 @@ class GenerationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPro
   "Generation.decode" should {
     "turn JsonLD Generation entity into the Generation object " in {
       forAll(locationCommandOutputObjects) { commandOutput =>
-        val activity = executionPlanners(runPlanEntities(commandOutput)).generateOne.buildProvenanceUnsafe()
+        val activity = executionPlanners(planEntities(commandOutput)).generateOne.buildProvenanceUnsafe()
 
         activity.asJsonLD.flatten
           .fold(throw _, identity)

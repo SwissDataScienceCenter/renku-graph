@@ -19,8 +19,8 @@
 package ch.datascience.graph.model.testentities
 
 import Dataset.{AdditionalInfo, Identification, Provenance}
-import RunPlan.CommandParameters
-import RunPlan.CommandParameters.CommandParameterFactory
+import Plan.CommandParameters
+import Plan.CommandParameters.CommandParameterFactory
 import cats.Applicative
 import ch.datascience.generators.Generators.Implicits.GenOps
 import ch.datascience.generators.Generators._
@@ -72,14 +72,14 @@ trait EntitiesGenerators {
   val entityLocations:       Gen[Location]        = Gen.oneOf(entityFileLocations, entityFolderLocations)
   val entityChecksums:       Gen[Checksum]        = nonBlankStrings(40, 40).map(_.value).map(Checksum.apply)
 
-  implicit val runPlanNames: Gen[runPlans.Name] = nonBlankStrings().map(_.value).generateAs[runPlans.Name]
-  implicit val runPlanDescriptions: Gen[runPlans.Description] =
-    sentences().map(_.value).generateAs[runPlans.Description]
-  implicit val runPlanCommands: Gen[runPlans.Command] = nonBlankStrings().map(_.value).generateAs[runPlans.Command]
-  implicit val runPlanProgrammingLanguages: Gen[runPlans.ProgrammingLanguage] =
-    nonBlankStrings().map(_.value).generateAs[runPlans.ProgrammingLanguage]
-  implicit val runPlanSuccessCodes: Gen[runPlans.SuccessCode] =
-    positiveInts().map(_.value).generateAs[runPlans.SuccessCode]
+  implicit val planNames: Gen[plans.Name] = nonBlankStrings().map(_.value).generateAs[plans.Name]
+  implicit val planDescriptions: Gen[plans.Description] =
+    sentences().map(_.value).generateAs[plans.Description]
+  implicit val planCommands: Gen[plans.Command] = nonBlankStrings().map(_.value).generateAs[plans.Command]
+  implicit val planProgrammingLanguages: Gen[plans.ProgrammingLanguage] =
+    nonBlankStrings().map(_.value).generateAs[plans.ProgrammingLanguage]
+  implicit val planSuccessCodes: Gen[plans.SuccessCode] =
+    positiveInts().map(_.value).generateAs[plans.SuccessCode]
 
   implicit val commandParameterNames: Gen[commandParameters.Name] =
     nonBlankStrings().map(_.value).generateAs[commandParameters.Name]
@@ -398,23 +398,23 @@ trait EntitiesGenerators {
   lazy val parameterDefaultValues: Gen[ParameterDefaultValue] =
     nonBlankStrings().map(v => ParameterDefaultValue(v.value))
 
-  def runPlanEntities(parameterFactories: CommandParameterFactory*): Project[ForksCount] => Gen[RunPlan] = project =>
+  def planEntities(parameterFactories: CommandParameterFactory*): Project[ForksCount] => Gen[Plan] = project =>
     for {
-      name    <- runPlanNames
-      command <- runPlanCommands
-    } yield RunPlan(name, command, CommandParameters.of(parameterFactories: _*), project)
+      name    <- planNames
+      command <- planCommands
+    } yield Plan(name, command, CommandParameters.of(parameterFactories: _*), project)
 
   lazy val parameterValueOverrides: Gen[ValueOverride] =
     nonBlankStrings().map(v => ValueOverride(v.value))
 
-  def executionPlanners(runPlanGen: Project[ForksCount] => Gen[RunPlan],
+  def executionPlanners(planGen:    Project[ForksCount] => Gen[Plan],
                         projectGen: Gen[Project[ForksCount]] = projectEntities[ForksCount.Zero](visibilityAny)
   ): Gen[ExecutionPlanner] = for {
     project    <- projectGen
-    runPlan    <- runPlanGen(project)
+    plan       <- planGen(project)
     author     <- personEntities
     cliVersion <- cliVersions
-  } yield ExecutionPlanner.of(runPlan, activityStartTimes(project.dateCreated).generateOne, author, cliVersion)
+  } yield ExecutionPlanner.of(plan, activityStartTimes(project.dateCreated).generateOne, author, cliVersion)
 
   private implicit lazy val genApplicative: Applicative[Gen] = new Applicative[Gen] {
     override def pure[A](x:   A): Gen[A] = Gen.const(x)

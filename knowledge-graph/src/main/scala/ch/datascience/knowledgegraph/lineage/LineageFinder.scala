@@ -60,9 +60,9 @@ class LineageFinderImpl[Interpretation[_]: MonadThrow](
 
   private def findDetailsAndLineage(edges: EdgeMap, projectPath: Path) = for {
     edgesSet         <- edges.toEdgesSet
-    runPlansDetails  <- findDetails(edges.keySet, projectPath)
+    plansDetails     <- findDetails(edges.keySet, projectPath)
     locationsDetails <- findDetails(edges.toLocationsSet, projectPath)
-    lineage          <- Lineage.from[Interpretation](edgesSet, runPlansDetails ++ locationsDetails)
+    lineage          <- Lineage.from[Interpretation](edgesSet, plansDetails ++ locationsDetails)
   } yield lineage.some
 
   private implicit class EdgesOps(edgesAndLocations: EdgeMap) {

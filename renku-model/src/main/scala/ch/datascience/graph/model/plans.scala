@@ -22,7 +22,7 @@ import ch.datascience.graph.model.views.{EntityIdJsonLdOps, TinyTypeJsonLDOps}
 import ch.datascience.tinytypes.{IntTinyType, StringTinyType, TinyTypeFactory}
 import ch.datascience.tinytypes.constraints.{NonBlank, NonNegativeInt, Url}
 
-object runPlans {
+object plans {
 
   class ResourceId private (val value: String) extends AnyVal with StringTinyType
   implicit object ResourceId

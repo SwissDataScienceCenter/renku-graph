@@ -35,7 +35,7 @@ class AssociationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPr
   "Association.decode" should {
 
     "turn JsonLD Association entity into the Association object" in {
-      forAll(executionPlanners(runPlanEntities(), projectEntities(visibilityAny)(anyForksCount))) { executionPlanner =>
+      forAll(executionPlanners(planEntities(), projectEntities(visibilityAny)(anyForksCount))) { executionPlanner =>
         val activity = executionPlanner.buildProvenanceUnsafe()
 
         activity.asJsonLD.flatten
@@ -45,8 +45,8 @@ class AssociationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPr
       }
     }
 
-    "fail if there are no RunPlan entity the Association points to" in {
-      val association = executionPlanners(runPlanEntities(), projectEntities(visibilityAny)(anyForksCount)).generateOne
+    "fail if there are no plan entity the Association points to" in {
+      val association = executionPlanners(planEntities(), projectEntities(visibilityAny)(anyForksCount)).generateOne
         .buildProvenanceUnsafe()
         .association
         .to[entities.Association]
@@ -56,7 +56,7 @@ class AssociationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPr
           entity.resourceId.asEntityId,
           entities.Association.entityTypes,
           prov / "agent"   -> entity.agent.asJsonLD,
-          prov / "hadPlan" -> entity.runPlan.resourceId.asEntityId.asJsonLD
+          prov / "hadPlan" -> entity.plan.resourceId.asEntityId.asJsonLD
         )
       }
 
@@ -67,11 +67,11 @@ class AssociationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPr
         .cursor
         .as[List[entities.Association]]
       error         shouldBe a[DecodingFailure]
-      error.message shouldBe s"Association ${association.resourceId} without or with multiple RunPlans"
+      error.message shouldBe s"Association ${association.resourceId} without or with multiple Plans"
     }
 
     "fail if there are no Agent entity the Association points to" in {
-      val association = executionPlanners(runPlanEntities(), projectEntities(visibilityAny)(anyForksCount)).generateOne
+      val association = executionPlanners(planEntities(), projectEntities(visibilityAny)(anyForksCount)).generateOne
         .buildProvenanceUnsafe()
         .association
         .to[entities.Association]
@@ -81,7 +81,7 @@ class AssociationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPr
           entity.resourceId.asEntityId,
           entities.Association.entityTypes,
           prov / "agent"   -> entity.agent.resourceId.asEntityId.asJsonLD,
-          prov / "hadPlan" -> entity.runPlan.asJsonLD
+          prov / "hadPlan" -> entity.plan.asJsonLD
         )
       }
 

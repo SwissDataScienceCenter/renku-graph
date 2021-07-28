@@ -124,7 +124,7 @@ class LineageFinderSpec extends AnyWordSpec with MockFactory with ScalaCheckDriv
       lineageFinder.find(projectPath, location, maybeAuthUser) shouldBeFailure exception
     }
 
-    "return a Failure if finding runPlan nodes details fails" in new TestCase {
+    "return a Failure if finding plan nodes details fails" in new TestCase {
 
       val initialEdgesMap = lineages.generateOne.toEdgesMap
       (edgesFinder

@@ -39,7 +39,7 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
       forAll(nonEmptyStrings().toGeneratorOf(ParameterDefaultValue), parameterValueOverrides) {
         (defaultValue, valueOverride) =>
           val activity = executionPlanners(
-            runPlanEntities(CommandParameter.from(defaultValue))
+            planEntities(CommandParameter.from(defaultValue))
           ).generateOne
             .planParameterValues(defaultValue -> valueOverride)
             .buildProvenanceUnsafe()
@@ -48,7 +48,7 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
             .fold(throw _, identity)
             .cursor
             .as[List[entities.ParameterValue]](
-              decodeList(entities.ParameterValue.decoder(activity.runPlan))
+              decodeList(entities.ParameterValue.decoder(activity.plan))
             )
 
           parameterValues           shouldBe activity.parameters.map(_.to[entities.ParameterValue])
@@ -59,7 +59,7 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
     "turn JsonLD InputParameterValue entity into the InputParameterValue object " in {
       forAll(entityLocations, entityChecksums) { (location, checksum) =>
         val activity = executionPlanners(
-          runPlanEntities(CommandInput.fromLocation(location))
+          planEntities(CommandInput.fromLocation(location))
         ).generateOne
           .planInputParameterValuesFromChecksum(location -> checksum)
           .buildProvenanceUnsafe()
@@ -68,7 +68,7 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
           .fold(throw _, identity)
           .cursor
           .as[List[entities.ParameterValue]](
-            decodeList(entities.ParameterValue.decoder(activity.runPlan))
+            decodeList(entities.ParameterValue.decoder(activity.plan))
           )
 
         parameterValues           shouldBe activity.parameters.map(_.to[entities.ParameterValue])
@@ -79,7 +79,7 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
     "turn JsonLD OutputParameterValue entity into the OutputParameterValue object " in {
       forAll(entityLocations) { location =>
         val activity = executionPlanners(
-          runPlanEntities(CommandOutput.fromLocation(location))
+          planEntities(CommandOutput.fromLocation(location))
         ).generateOne
           .buildProvenanceUnsafe()
 
@@ -87,7 +87,7 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
           .fold(throw _, identity)
           .cursor
           .as[List[entities.ParameterValue]](
-            decodeList(entities.ParameterValue.decoder(activity.runPlan))
+            decodeList(entities.ParameterValue.decoder(activity.plan))
           )
 
         parameterValues           shouldBe activity.parameters.map(_.to[entities.ParameterValue])
@@ -99,7 +99,7 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
       val defaultValue  = nonEmptyStrings().toGeneratorOf(ParameterDefaultValue).generateOne
       val valueOverride = parameterValueOverrides.generateOne
       val activity = executionPlanners(
-        runPlanEntities(CommandParameter.from(defaultValue))
+        planEntities(CommandParameter.from(defaultValue))
       ).generateOne
         .planParameterValues(defaultValue -> valueOverride)
         .buildProvenanceUnsafe()
@@ -108,18 +108,18 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
         .fold(throw _, identity)
         .cursor
         .as[List[entities.ParameterValue]](
-          decodeList(entities.ParameterValue.decoder(activity.runPlan.to[entities.RunPlan].copy(parameters = Nil)))
+          decodeList(entities.ParameterValue.decoder(activity.plan.to[entities.Plan].copy(parameters = Nil)))
         )
 
       failure         shouldBe a[DecodingFailure]
-      failure.message shouldBe s"VariableParameterValue points to a non-existing command parameter ${activity.runPlan.to[entities.RunPlan].parameters.map(_.resourceId).head}"
+      failure.message shouldBe s"VariableParameterValue points to a non-existing command parameter ${activity.plan.to[entities.Plan].parameters.map(_.resourceId).head}"
     }
 
     "fail if there are InputParameterValue for non-existing InputParameters" in {
       val location = entityLocations.generateOne
       val checksum = entityChecksums.generateOne
       val activity = executionPlanners(
-        runPlanEntities(CommandInput.fromLocation(location))
+        planEntities(CommandInput.fromLocation(location))
       ).generateOne
         .planInputParameterValuesFromChecksum(location -> checksum)
         .buildProvenanceUnsafe()
@@ -128,17 +128,17 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
         .fold(throw _, identity)
         .cursor
         .as[List[entities.ParameterValue]](
-          decodeList(entities.ParameterValue.decoder(activity.runPlan.to[entities.RunPlan].copy(inputs = Nil)))
+          decodeList(entities.ParameterValue.decoder(activity.plan.to[entities.Plan].copy(inputs = Nil)))
         )
 
       failure         shouldBe a[DecodingFailure]
-      failure.message shouldBe s"PathParameterValue points to a non-existing command parameter ${activity.runPlan.to[entities.RunPlan].inputs.map(_.resourceId).head}"
+      failure.message shouldBe s"PathParameterValue points to a non-existing command parameter ${activity.plan.to[entities.Plan].inputs.map(_.resourceId).head}"
     }
 
     "fail if there are OutputParameterValue for non-existing OutputParameters" in {
       val location = entityLocations.generateOne
       val activity = executionPlanners(
-        runPlanEntities(CommandOutput.fromLocation(location))
+        planEntities(CommandOutput.fromLocation(location))
       ).generateOne
         .buildProvenanceUnsafe()
 
@@ -146,11 +146,11 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
         .fold(throw _, identity)
         .cursor
         .as[List[entities.ParameterValue]](
-          decodeList(entities.ParameterValue.decoder(activity.runPlan.to[entities.RunPlan].copy(outputs = Nil)))
+          decodeList(entities.ParameterValue.decoder(activity.plan.to[entities.Plan].copy(outputs = Nil)))
         )
 
       failure         shouldBe a[DecodingFailure]
-      failure.message shouldBe s"PathParameterValue points to a non-existing command parameter ${activity.runPlan.to[entities.RunPlan].outputs.map(_.resourceId).head}"
+      failure.message shouldBe s"PathParameterValue points to a non-existing command parameter ${activity.plan.to[entities.Plan].outputs.map(_.resourceId).head}"
     }
   }
 }

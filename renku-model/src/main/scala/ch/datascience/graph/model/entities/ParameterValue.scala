@@ -103,11 +103,11 @@ object ParameterValue {
         )
     }
 
-  def decoder(runPlan: RunPlan): JsonLDDecoder[ParameterValue] =
-    variableParameterDecoder(runPlan)
-      .orElse(pathParameterDecoder(runPlan).widen[ParameterValue])
+  def decoder(plan: Plan): JsonLDDecoder[ParameterValue] =
+    variableParameterDecoder(plan)
+      .orElse(pathParameterDecoder(plan).widen[ParameterValue])
 
-  private def pathParameterDecoder(runPlan: RunPlan): JsonLDEntityDecoder[PathParameterValue] =
+  private def pathParameterDecoder(plan: Plan): JsonLDEntityDecoder[PathParameterValue] =
     JsonLDDecoder.entity(pathParameterTypes) { cursor =>
       for {
         resourceId       <- cursor.downEntityId.as[ResourceId]
@@ -116,11 +116,11 @@ object ParameterValue {
         valueReferenceId <- cursor.downField(schema / "valueReference").downEntityId.as[commandParameters.ResourceId]
         parameterValue <-
           Either.fromOption(
-            runPlan
+            plan
               .findInput(valueReferenceId)
               .map(InputParameterValue(resourceId, name, location, _))
               .orElse(
-                runPlan
+                plan
                   .findOutput(valueReferenceId)
                   .map(OutputParameterValue(resourceId, name, location, _))
               ),
@@ -129,7 +129,7 @@ object ParameterValue {
       } yield parameterValue
     }
 
-  private def variableParameterDecoder(runPlan: RunPlan): JsonLDEntityDecoder[VariableParameterValue] =
+  private def variableParameterDecoder(plan: Plan): JsonLDEntityDecoder[VariableParameterValue] =
     JsonLDDecoder.entity(variableParameterTypes) { cursor =>
       for {
         resourceId       <- cursor.downEntityId.as[ResourceId]
@@ -138,7 +138,7 @@ object ParameterValue {
         valueReferenceId <- cursor.downField(schema / "valueReference").downEntityId.as[commandParameters.ResourceId]
         commandParameter <-
           Either.fromOption(
-            runPlan.findParameter(valueReferenceId),
+            plan.findParameter(valueReferenceId),
             DecodingFailure(s"VariableParameterValue points to a non-existing command parameter $valueReferenceId", Nil)
           )
       } yield VariableParameterValue(resourceId, name, valueOverride, commandParameter)
