@@ -24,17 +24,15 @@ import cats.syntax.all._
 
 trait JsonLDArrayFlatten extends Flatten {
   self: JsonLDArray =>
-  override lazy val flatten: Either[MalformedJsonLD, JsonLD] =
-    for {
-      flattenedJsons <- this.jsons
-                          .foldLeft(Either.right[MalformedJsonLD, List[JsonLD]](List.empty[JsonLD])) {
-                            case (acc, jsonLDEntity: JsonLDEntity) =>
-                              for {
-                                jsons    <- deNest(List(jsonLDEntity), List.empty[JsonLDEntity])
-                                accRight <- acc
-                              } yield accRight ++ jsons
-                            case (acc, other) => acc.map(other +: _)
-                          }
-      flattenedArray <- checkForUniqueIds(flattenedJsons.distinct)
-    } yield JsonLD.arr(flattenedArray: _*)
+
+  override lazy val flatten: Either[MalformedJsonLD, JsonLD] = for {
+    flattened <- jsons.foldLeft(Either.right[MalformedJsonLD, List[JsonLD]](List.empty[JsonLD])) {
+                   case (flattened, jsonLDEntity: JsonLDEntity) =>
+                     flattened >>= (deNest(List(jsonLDEntity), _))
+                   case (flattened, JsonLDArray(jsons)) =>
+                     flattened >>= (deNest(jsons.toList, _))
+                   case (flattened, other) => flattened.map(_ ::: other :: Nil)
+                 }
+    validated <- checkForUniqueIds(flattened.distinct)
+  } yield JsonLD.arr(validated: _*)
 }

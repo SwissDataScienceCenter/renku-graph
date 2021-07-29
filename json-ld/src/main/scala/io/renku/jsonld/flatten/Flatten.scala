@@ -29,16 +29,19 @@ private[jsonld] trait Flatten extends IDValidation {
   @tailrec
   protected[flatten] final def deNest(toProcess:        List[JsonLD],
                                       topLevelEntities: List[JsonLD]
-  ): Either[MalformedJsonLD, List[JsonLD]] =
-    toProcess match {
-      case (entity: JsonLDEntity) :: entities =>
-        val processNext =
-          extractEntityProperties(entity.properties) ++ extractReverseProperties(entity.reverse.properties)
-        val currentEntityDeNested = transformEntityProperties(entity)
-        deNest(processNext ++ entities, currentEntityDeNested +: topLevelEntities)
-      case _ :: xs => deNest(xs, topLevelEntities)
-      case Nil     => topLevelEntities.asRight
-    }
+  ): Either[MalformedJsonLD, List[JsonLD]] = toProcess match {
+    case (entity: JsonLDEntity) :: leftToProcess =>
+      val processNext =
+        extractEntityProperties(entity.properties) ++ extractReverseProperties(entity.reverse.properties)
+      val currentEntityDeNested = transformEntityProperties(entity)
+      deNest(processNext ::: leftToProcess, topLevelEntities ::: currentEntityDeNested :: Nil)
+    case JsonLDArray(jsons) :: leftToProcess =>
+      deNest(jsons.toList ::: leftToProcess, topLevelEntities)
+    case _ :: leftToProcess =>
+      deNest(leftToProcess, topLevelEntities)
+    case Nil =>
+      topLevelEntities.asRight
+  }
 
   private def extractEntityProperties(properties: Map[Property, JsonLD]) =
     properties.foldLeft(List.empty[JsonLDEntity]) {

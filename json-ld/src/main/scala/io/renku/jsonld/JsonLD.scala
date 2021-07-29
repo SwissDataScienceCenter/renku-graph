@@ -38,7 +38,6 @@ abstract class JsonLD extends Product with Serializable {
   def asArray: Option[Vector[JsonLD]]
 
   def flatten: Either[MalformedJsonLD, JsonLD]
-
 }
 
 object JsonLD {

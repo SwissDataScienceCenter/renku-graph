@@ -70,7 +70,6 @@ class FlattenerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
          |
          V
 (child, parent, grandparent)  // order not guaranteed
-
          */
         forAll {
           (childlessGrandparent: JsonLDEntity, parentRelationProperty: Property, parentNotNested: JsonLDEntity) =>
@@ -148,6 +147,14 @@ class FlattenerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
       }
     }
 
+    "pull out entities nested in a nested JsonLDArray and put them on the root level" in {
+      forAll { (rootLevelEntity: JsonLDEntity, nestedEntity1: JsonLDEntity, nestedEntity2: JsonLDEntity) =>
+        JsonLD.arr(rootLevelEntity, JsonLD.arr(nestedEntity1, nestedEntity2)).flatten shouldBe Right(
+          JsonLD.arr(rootLevelEntity, nestedEntity1, nestedEntity2)
+        )
+      }
+    }
+
     "de-duplicate same children found in multiple entities" in {
       /*
       (parent0, parent1)
@@ -204,13 +211,13 @@ class FlattenerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
                   (entity0)        // or entity1
        */
       forAll { (property: Property, entity: JsonLDEntity) =>
-        val normalValues: List[JsonLD] = jsonLDValues.generateNonEmptyList(minElements = 2).toList
+        val normalValues  = jsonLDValues.generateNonEmptyList(minElements = 2).toList
         val mixedUpValues = Random.shuffle(normalValues)
         val normalEntity  = entity.copy(properties = entity.properties + (property -> JsonLD.arr(normalValues: _*)))
         val mixedUpEntity = entity.copy(properties = entity.properties + (property -> JsonLD.arr(mixedUpValues: _*)))
-        JsonLD.arr(normalEntity, mixedUpEntity).flatten should (be(Right(JsonLD.arr(normalEntity))) or be(
-          Right(JsonLD.arr(mixedUpEntity))
-        ))
+        JsonLD.arr(normalEntity, mixedUpEntity).flatten should (
+          be(Right(JsonLD.arr(normalEntity))) or be(Right(JsonLD.arr(mixedUpEntity)))
+        )
       }
     }
 
@@ -271,7 +278,6 @@ class FlattenerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
           val parent0Flattened               = entity0.copy(reverse = parent0ReverseFlattened)
 
           parent0.flatten shouldBe Right(JsonLD.arr(parent0Flattened, parent1Flattened, child2))
-
       }
     }
 
