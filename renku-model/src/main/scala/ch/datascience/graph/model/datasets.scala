@@ -117,7 +117,7 @@ object datasets {
 
     private val entityTypes = EntityTypes of (schema / "URL")
 
-    implicit val derivedFromJsonLdEncoder: JsonLDEncoder[DerivedFrom] = JsonLDEncoder.instance { derivedFrom =>
+    implicit val jsonLDEncoder: JsonLDEncoder[DerivedFrom] = JsonLDEncoder.instance { derivedFrom =>
       JsonLD.entity(
         EntityId of s"_:${java.util.UUID.randomUUID()}",
         entityTypes,

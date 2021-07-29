@@ -20,10 +20,11 @@ package ch.datascience.graph.model
 
 import ch.datascience.graph.model.views.{EntityIdJsonLdOps, TinyTypeJsonLDOps, UrlResourceRenderer}
 import ch.datascience.tinytypes._
+import cats.syntax.all._
 import ch.datascience.tinytypes.constraints._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
-import io.renku.jsonld.{EntityId, JsonLDEncoder}
+import io.renku.jsonld.{EntityId, JsonLDDecoder, JsonLDEncoder}
 
 import java.time.Instant
 
@@ -117,6 +118,14 @@ object projects {
             Decoder.failedWithMessage(
               s"'$decoded' is not a valid project visibility. Allowed values are: ${all.mkString(", ")}"
             )
+        }
+      }
+
+    implicit lazy val jsonLDDecoder: JsonLDDecoder[Visibility] =
+      JsonLDDecoder.decodeString.emap { decoded =>
+        all.find(_.value == decoded) match {
+          case Some(value) => value.asRight
+          case None        => s"'$decoded' is not a valid project visibility. Allowed values are: ${all.mkString(", ")}".asLeft
         }
       }
 

@@ -26,7 +26,6 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model._
-import ch.datascience.graph.model.datasets.{TopmostDerivedFrom, TopmostSameAs}
 import ch.datascience.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.testentities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
@@ -37,7 +36,6 @@ import ch.datascience.triplesgenerator.events.categories.triplesgenerated.Triple
 import io.circe.DecodingFailure
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{JsonLD, Property}
-import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -51,22 +49,7 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
 
     "successfully deserialize JsonLD to the model" in new TestCase {
       val activity = generateActivity(project)
-      val dataset = Gen
-        .oneOf(
-          datasetEntities(datasetProvenanceInternal, fixed(project)),
-          datasetEntities(datasetProvenanceImportedExternal, fixed(project)),
-          datasetEntities(datasetProvenanceImportedInternalAncestorInternal, fixed(project))
-            .map(ds => ds.copy(provenance = ds.provenance.copy(topmostSameAs = TopmostSameAs(ds.provenance.sameAs)))),
-          datasetEntities(datasetProvenanceImportedInternalAncestorExternal, fixed(project))
-            .map(ds => ds.copy(provenance = ds.provenance.copy(topmostSameAs = TopmostSameAs(ds.provenance.sameAs)))),
-          datasetEntities(datasetProvenanceModified, fixed(project))
-            .map(ds =>
-              ds.copy(provenance =
-                ds.provenance.copy(topmostDerivedFrom = TopmostDerivedFrom(ds.provenance.derivedFrom))
-              )
-            )
-        )
-        .generateOne
+      val dataset = datasetEntities(ofAnyProvenance, fixed(project)).generateOne
         .to[entities.Dataset[entities.Dataset.Provenance]]
 
       givenFindProjectInfo(project.path)

@@ -21,14 +21,15 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 import cats.data.ValidatedNel
 import cats.syntax.all._
 import ch.datascience.graph.model
+import ch.datascience.graph.model.GitLabApiUrl
 import ch.datascience.graph.model.entities.Dataset.Provenance
 import ch.datascience.graph.model.entities.Dataset.Provenance.{ImportedInternal, Modified}
 import ch.datascience.graph.model.entities._
-import io.renku.jsonld.{JsonLD, JsonLDEncoder}
+import io.renku.jsonld.JsonLD
 import monocle.{Lens, Traversal}
 
 private trait ProjectMetadata extends ProjectMetadataOps {
-  val project:    Project
+  def project: Project
   val activities: List[Activity]
   def datasets: List[Dataset[Provenance]]
 }
@@ -133,8 +134,6 @@ private object ProjectMetadata {
 
   private def collectPersons(project: Project): Set[Person] = project.members ++ project.maybeCreator
 
-  implicit lazy val encoder: JsonLDEncoder[ProjectMetadata] = JsonLDEncoder.instance(_ => JsonLD.Null)
-
   object Lenses {
     val membersLens = Traversal.fromTraverse[List, Person]
     val projectMembersLens = Lens[Project, List[Person]](_.members.toList)(persons => {
@@ -166,6 +165,20 @@ private object ProjectMetadata {
 
 private sealed trait ProjectMetadataOps {
   self: ProjectMetadata =>
+
+  import io.renku.jsonld.JsonLD.MalformedJsonLD
+
+  def encodeAsFlattenedJsonLD(implicit gitLabApiUrl: GitLabApiUrl): Either[MalformedJsonLD, JsonLD] = {
+    import io.renku.jsonld.syntax._
+    JsonLD
+      .arr(
+        project.asJsonLD ::
+          activities.map(_.association.plan).map(_.asJsonLD) :::
+          activities.map(_.asJsonLD) :::
+          datasets.map(_.asJsonLD): _*
+      )
+      .flatten
+  }
 
   import ProjectMetadata.Lenses._
 

@@ -22,10 +22,11 @@ import cats.MonadThrow
 import cats.data.EitherT
 import cats.effect.{ConcurrentEffect, Timer}
 import cats.syntax.all._
+import ch.datascience.graph.config.GitLabUrlLoader
+import ch.datascience.graph.model.{GitLabApiUrl, GitLabUrl}
 import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.{ProjectMetadata, TransformationStep}
-import io.renku.jsonld.syntax._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -39,8 +40,11 @@ private[triplesgenerated] trait TransformationStepsRunner[Interpretation[_]] {
 
 private[triplesgenerated] class TransformationStepsRunnerImpl[Interpretation[_]: MonadThrow](
     triplesUploader: TriplesUploader[Interpretation],
-    updatesUploader: UpdatesUploader[Interpretation]
+    updatesUploader: UpdatesUploader[Interpretation],
+    gitLabUrl:       GitLabUrl
 ) extends TransformationStepsRunner[Interpretation] {
+
+  private implicit val gitLabApiUrl: GitLabApiUrl = gitLabUrl.apiV4
 
   import TriplesUploadResult._
 
@@ -48,7 +52,7 @@ private[triplesgenerated] class TransformationStepsRunnerImpl[Interpretation[_]:
                    projectMetadata: ProjectMetadata
   ): Interpretation[TriplesUploadResult] =
     runAllSteps(projectMetadata, steps) >>= {
-      case (updatedMetadata, _: DeliverySuccess) => triplesUploader upload updatedMetadata.asJsonLD
+      case (updatedMetadata, _: DeliverySuccess) => encodeAndSend(updatedMetadata)
       case (_, failure) => failure.pure[Interpretation]
     }
 
@@ -93,6 +97,16 @@ private[triplesgenerated] class TransformationStepsRunnerImpl[Interpretation[_]:
      InvalidUpdatesFailure(s"${transformationStep.name} transformation step failed: $exception"): TriplesUploadResult
     ).pure[Interpretation]
   }
+
+  private def encodeAndSend(metadata: ProjectMetadata) = {
+    val m = metadata.encodeAsFlattenedJsonLD
+    m.leftMap(error =>
+      InvalidTriplesFailure(s"Metadata for project ${metadata.project.path} failed: ${error.getMessage}")
+        .pure[Interpretation]
+        .widen[TriplesUploadResult]
+    ).map(triplesUploader.upload)
+      .merge
+  }
 }
 
 private[triplesgenerated] object TransformationStepsRunner {
@@ -108,9 +122,10 @@ private[triplesgenerated] object TransformationStepsRunner {
       timer:            Timer[IO]
   ): IO[TransformationStepsRunnerImpl[IO]] = for {
     rdfStoreConfig <- RdfStoreConfig[IO]()
-  } yield new TransformationStepsRunnerImpl[IO](
-    new TriplesUploaderImpl[IO](rdfStoreConfig, logger, timeRecorder),
-    new UpdatesUploaderImpl(rdfStoreConfig, logger, timeRecorder)
+    gitlabUrl      <- GitLabUrlLoader[IO]()
+  } yield new TransformationStepsRunnerImpl[IO](new TriplesUploaderImpl[IO](rdfStoreConfig, logger, timeRecorder),
+                                                new UpdatesUploaderImpl(rdfStoreConfig, logger, timeRecorder),
+                                                gitlabUrl
   )
 }
 

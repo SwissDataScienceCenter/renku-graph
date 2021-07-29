@@ -165,7 +165,7 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
     "serialise derivedFrom to an object of type URL having schema:url property linked to the DerivedFrom's value" in {
       val derivedFrom = datasetDerivedFroms.generateOne
 
-      val json = DerivedFrom.derivedFromJsonLdEncoder(derivedFrom).toJson
+      val json = DerivedFrom.jsonLDEncoder(derivedFrom).toJson
 
       json.hcursor.downField("@type").as[String]                                    shouldBe Right((schema / "URL").toString)
       json.hcursor.downField((schema / "url").toString).downField("@id").as[String] shouldBe Right(derivedFrom.toString)

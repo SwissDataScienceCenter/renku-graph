@@ -22,15 +22,18 @@ import cats.data.NonEmptyList
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.Schemas.{prov, renku, schema}
 import ch.datascience.graph.model.entities.Dataset.Provenance
-import ch.datascience.graph.model.{InvalidationTime, activities, datasets, entities, projects}
+import ch.datascience.graph.model.{CliVersion, InvalidationTime, RenkuBaseUrl, SchemaVersion, activities, datasets, entities, projects}
 import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.testentities._
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators.projectMetadatas
+import io.renku.jsonld.JsonLDDecoder
+import io.renku.jsonld.JsonLDDecoder._
+import io.renku.jsonld.syntax._
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import io.renku.jsonld.syntax._
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import java.time.{Instant, LocalDateTime, ZoneOffset}
@@ -41,7 +44,7 @@ class ProjectMetadataSpec extends AnyWordSpec with should.Matchers with ScalaChe
   "from" should {
 
     "return a ProjectMetadata object if all the data is valid" in {
-      val project    = projectEntities[ForksCount](visibilityAny)(anyForksCount).generateOne
+      val project    = anyProjectEntities.generateOne
       val activities = activityEntities(fixed(project)).generateList().map(_.to[entities.Activity])
       val datasets = datasetEntities(ofAnyProvenance, fixed(project))
         .generateList()
@@ -179,7 +182,7 @@ class ProjectMetadataSpec extends AnyWordSpec with should.Matchers with ScalaChe
 
   "update - person" should {
     val oldPerson = personEntities().generateOne.to[entities.Person]
-    val project   = projectEntities[ForksCount](visibilityAny)(anyForksCount).generateOne
+    val project   = anyProjectEntities.generateOne
 
     "replace the old person with the new on project" in {
       val entitiesProject = project.to[entities.Project] match {
@@ -250,7 +253,7 @@ class ProjectMetadataSpec extends AnyWordSpec with should.Matchers with ScalaChe
   "update - dataset" should {
 
     "replace the old dataset with the new one" in {
-      val project = projectEntities[ForksCount](visibilityAny)(anyForksCount).generateOne
+      val project = anyProjectEntities.generateOne
 
       val dataset1 = datasetEntities(ofAnyProvenance, fixed(project)).generateOne
         .to[entities.Dataset[entities.Dataset.Provenance]]
@@ -403,9 +406,28 @@ class ProjectMetadataSpec extends AnyWordSpec with should.Matchers with ScalaChe
     }
   }
 
-  "encoder" should {
-    "encode all the metadata properties into JsonLD" in {
-      fail("BOOM!")
+  "encodeAsFlattenedJsonLD" should {
+    "encode all the metadata properties into a flattened JsonLD" in {
+      val project    = anyProjectEntities.generateOne
+      val activities = activityEntities(fixed(project)).generateList().map(_.to[entities.Activity])
+      val datasets = datasetEntities(ofAnyProvenance, fixed(project))
+        .generateList()
+        .map(_.to[entities.Dataset[entities.Dataset.Provenance]])
+      val entitiesProject = project.to[entities.Project]
+
+      val metadata = ProjectMetadata
+        .from(entitiesProject, activities, datasets)
+        .fold(errors => fail(errors.intercalate(", ")), identity)
+
+      val Right(jsonLD) = metadata.encodeAsFlattenedJsonLD
+
+      jsonLD.cursor
+        .as[List[entities.Project]](decodeList(projectDecoder(entitiesProject)))
+        .fold(fail(_), identity)                                      shouldBe List(entitiesProject)
+      jsonLD.cursor.as[List[entities.Activity]].fold(fail(_), identity) should contain theSameElementsAs activities
+      jsonLD.cursor
+        .as[List[entities.Dataset[entities.Dataset.Provenance]]]
+        .fold(fail(_), identity) should contain theSameElementsAs datasets
     }
   }
 
@@ -437,4 +459,47 @@ class ProjectMetadataSpec extends AnyWordSpec with should.Matchers with ScalaChe
     case p: Provenance.ImportedInternalAncestorInternal =>
       p.copy(date = timestamps(max = projectDate.value).generateAs[datasets.DateCreated])
   }
+
+  private def projectDecoder(
+      project:             entities.Project
+  )(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDDecoder[entities.Project] =
+    JsonLDDecoder.entity(entities.Project.entityTypes) { cursor =>
+      for {
+        resourceId          <- cursor.downEntityId.as[projects.ResourceId]
+        name                <- cursor.downField(schema / "name").as[projects.Name]
+        agent               <- cursor.downField(schema / "agent").as[CliVersion]
+        dateCreated         <- cursor.downField(schema / "dateCreated").as[projects.DateCreated]
+        maybeCreator        <- cursor.downField(schema / "creator").as[Option[entities.Person]]
+        visibility          <- cursor.downField(renku / "projectVisibility").as[projects.Visibility]
+        members             <- cursor.downField(schema / "member").as[List[entities.Person]].map(_.toSet)
+        schemaVersion       <- cursor.downField(schema / "schemaVersion").as[SchemaVersion]
+        maybeWasDerivedFrom <- cursor.downField(prov / "wasDerivedFrom").as[Option[projects.ResourceId]]
+      } yield maybeWasDerivedFrom match {
+        case Some(parentId) =>
+          entities.ProjectWithParent(
+            resourceId,
+            project.path,
+            name,
+            agent,
+            dateCreated,
+            maybeCreator,
+            visibility,
+            members,
+            schemaVersion,
+            parentId
+          )
+        case None =>
+          entities.ProjectWithoutParent(resourceId,
+                                        project.path,
+                                        name,
+                                        agent,
+                                        dateCreated,
+                                        maybeCreator,
+                                        visibility,
+                                        members,
+                                        schemaVersion
+          )
+      }
+    }
+
 }

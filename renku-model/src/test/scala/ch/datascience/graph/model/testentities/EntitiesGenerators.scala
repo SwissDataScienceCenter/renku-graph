@@ -27,7 +27,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model._
 import ch.datascience.graph.model.commandParameters.ParameterDefaultValue
-import ch.datascience.graph.model.datasets.{Date, DerivedFrom, ExternalSameAs, Identifier, InitialVersion, PartId, TopmostSameAs}
+import ch.datascience.graph.model.datasets.{Date, DerivedFrom, ExternalSameAs, Identifier, InitialVersion, PartId, TopmostDerivedFrom, TopmostSameAs}
 import ch.datascience.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import ch.datascience.graph.model.entityModel.{Checksum, Location}
 import ch.datascience.graph.model.parameterValues.ValueOverride
@@ -49,11 +49,13 @@ object EntitiesGenerators extends EntitiesGenerators
 
 private object Instances {
   implicit val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
-  implicit val gitLabApiUrl: GitLabApiUrl = gitLabApiUrls.generateOne
+  implicit val gitLabUrl:    GitLabUrl    = gitLabUrls.generateOne
+  implicit val gitLabApiUrl: GitLabApiUrl = gitLabUrl.apiV4
 }
 
 trait EntitiesGenerators {
   implicit val renkuBaseUrl: RenkuBaseUrl = Instances.renkuBaseUrl
+  implicit val gitLabUrl:    GitLabUrl    = Instances.gitLabUrl
   implicit val gitLabApiUrl: GitLabApiUrl = Instances.gitLabApiUrl
 
   def invalidationTimes(min: InstantTinyType): Gen[InvalidationTime] = invalidationTimes(min.value)
@@ -192,12 +194,11 @@ trait EntitiesGenerators {
       for {
         date           <- datasetPublishedDates()
         sameAs         <- datasetInternalSameAs
-        topmostSameAs  <- datasetExternalSameAs.map(TopmostSameAs(_))
         initialVersion <- datasetInitialVersions
         creators       <- personEntities.toGeneratorOfSet(maxElements = 1)
       } yield Dataset.Provenance.ImportedInternalAncestorExternal(Dataset.entityId(identifier),
                                                                   sameAs,
-                                                                  topmostSameAs,
+                                                                  TopmostSameAs(sameAs),
                                                                   initialVersion,
                                                                   date,
                                                                   creators
@@ -207,14 +208,13 @@ trait EntitiesGenerators {
       : ProvenanceGen[Dataset.Provenance.ImportedInternalAncestorInternal] = (identifier, projectDateCreated) =>
     implicit renkuBaseUrl =>
       for {
-        date          <- datasetCreatedDates(projectDateCreated.value)
-        sameAs        <- datasetInternalSameAs
-        topmostSameAs <- datasetInternalSameAs
-        creators      <- personEntities.toGeneratorOfSet(maxElements = 1)
+        date     <- datasetCreatedDates(projectDateCreated.value)
+        sameAs   <- datasetInternalSameAs
+        creators <- personEntities.toGeneratorOfSet(maxElements = 1)
       } yield Dataset.Provenance.ImportedInternalAncestorInternal(Dataset.entityId(identifier),
                                                                   sameAs,
-                                                                  TopmostSameAs(topmostSameAs),
-                                                                  InitialVersion(topmostSameAs.asIdentifier),
+                                                                  TopmostSameAs(sameAs),
+                                                                  InitialVersion(identifier),
                                                                   date,
                                                                   creators
       )
@@ -231,13 +231,12 @@ trait EntitiesGenerators {
   val datasetProvenanceModified: ProvenanceGen[Dataset.Provenance.Modified] = (identifier, projectDateCreated) =>
     implicit renkuBaseUrl =>
       for {
-        date               <- datasetCreatedDates(projectDateCreated.value)
-        derivedFrom        <- datasetDerivedFroms
-        topmostDerivedFrom <- datasetTopmostDerivedFroms
-        creators           <- personEntities.toGeneratorOfSet(maxElements = 1)
+        date        <- datasetCreatedDates(projectDateCreated.value)
+        derivedFrom <- datasetDerivedFroms
+        creators    <- personEntities.toGeneratorOfSet(maxElements = 1)
       } yield Dataset.Provenance.Modified(Dataset.entityId(identifier),
                                           derivedFrom,
-                                          topmostDerivedFrom,
+                                          TopmostDerivedFrom(derivedFrom),
                                           InitialVersion(identifier),
                                           date,
                                           creators
