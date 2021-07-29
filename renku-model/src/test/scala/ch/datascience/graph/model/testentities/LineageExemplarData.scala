@@ -229,10 +229,14 @@ object NodeDef {
         .getOrElse(throw new Exception("Non entity id found for Activity"))
         .toString,
       activity.show,
-      activity.asJsonLD.entityTypes
-        .map(_.toList.map(_.show))
-        .getOrElse(throw new Exception("No entityTypes found"))
-        .toSet
+      activity.asJsonLD.asArray
+        .flatMap(_.collect {
+          case entity if entity.entityId.exists(_.show.contains(activity.id.value)) =>
+            entity.entityTypes.map(_.toList.map(_.show))
+        }.sequence) match {
+        case None        => throw new Exception("No entityTypes found")
+        case Some(types) => types.flatten.toSet
+      }
     )
 
   private implicit lazy val activityShow: Show[Activity] = Show.show { activity =>

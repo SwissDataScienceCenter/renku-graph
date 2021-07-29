@@ -37,7 +37,7 @@ object DatasetPart {
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  implicit lazy val toEntitiesDatasetPart: DatasetPart => entities.DatasetPart = {
+  implicit def toEntitiesDatasetPart(implicit renkuBaseUrl: RenkuBaseUrl): DatasetPart => entities.DatasetPart = {
     case datasetPart: DatasetPart with HavingInvalidationTime =>
       entities.DatasetPart(
         datasets.PartResourceId(datasetPart.asEntityId.show),
@@ -61,29 +61,7 @@ object DatasetPart {
   }
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[DatasetPart] =
-    JsonLDEncoder.instance {
-      case part: DatasetPart with HavingInvalidationTime =>
-        JsonLD.entity(
-          part.asEntityId,
-          EntityTypes of (prov / "Entity", schema / "DigitalDocument"),
-          renku / "external"         -> part.external.asJsonLD,
-          prov / "entity"            -> part.entity.asJsonLD,
-          schema / "dateCreated"     -> part.dateCreated.asJsonLD,
-          schema / "url"             -> part.maybeUrl.asJsonLD,
-          renku / "source"           -> part.maybeSource.asJsonLD,
-          prov / "invalidatedAtTime" -> part.invalidationTime.asJsonLD
-        )
-      case part @ DatasetPart(_, external, entity, dateCreated, maybeUrl, maybeSource) =>
-        JsonLD.entity(
-          part.asEntityId,
-          EntityTypes of (prov / "Entity", schema / "DigitalDocument"),
-          renku / "external"     -> external.asJsonLD,
-          prov / "entity"        -> entity.asJsonLD,
-          schema / "dateCreated" -> dateCreated.asJsonLD,
-          schema / "url"         -> maybeUrl.asJsonLD,
-          renku / "source"       -> maybeSource.asJsonLD
-        )
-    }
+    JsonLDEncoder.instance(_.to[entities.DatasetPart].asJsonLD)
 
   implicit def entityIdEncoder[D <: DatasetPart](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[D] =
     EntityIdEncoder.instance(part => renkuBaseUrl / "dataset-files" / part.id / part.entity.location)

@@ -37,7 +37,7 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
   "Activity.decode" should {
 
     "turn JsonLD Activity entity into the Activity object" in {
-      forAll(executionPlanners(planEntities(), projectEntities(visibilityAny)(anyForksCount))) { executionPlanner =>
+      forAll(executionPlanners(planEntities(), anyProjectEntities)) { executionPlanner =>
         val activity = executionPlanner.buildProvenanceUnsafe()
         activity.asJsonLD.flatten
           .fold(throw _, identity)
@@ -48,12 +48,10 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
 
     "fail if there are Input Parameter Values for non-existing Usage Entities" in {
       val location = entityLocations.generateOne
-      val activity = executionPlanners(
-        planEntities(CommandInput.fromLocation(location)),
-        projectEntities(visibilityAny)(anyForksCount)
-      ).generateOne
-        .planInputParameterValuesFromChecksum(location -> entityChecksums.generateOne)
-        .buildProvenanceUnsafe()
+      val activity =
+        executionPlanners(planEntities(CommandInput.fromLocation(location)), anyProjectEntities).generateOne
+          .planInputParameterValuesFromChecksum(location -> entityChecksums.generateOne)
+          .buildProvenanceUnsafe()
 
       lazy val replaceEntityLocation: Vector[JsonLD] => JsonLD = { array =>
         JsonLD.arr(

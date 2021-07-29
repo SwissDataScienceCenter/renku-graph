@@ -23,7 +23,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{timestamps, timestampsNotInTheFuture}
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model._
-import ch.datascience.graph.model.datasets.TopmostSameAs
+import ch.datascience.graph.model.datasets.{TopmostDerivedFrom, TopmostSameAs}
 import ch.datascience.graph.model.entities.Dataset.Provenance
 import ch.datascience.graph.model.entities.Dataset.Provenance.{ImportedInternalAncestorExternal, ImportedInternalAncestorInternal}
 import ch.datascience.graph.model.testentities._
@@ -44,12 +44,17 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
             dataset.copy(provenance = p.copy(topmostSameAs = TopmostSameAs(p.sameAs)))
           case p: testentities.Dataset.Provenance.ImportedInternalAncestorExternal =>
             dataset.copy(provenance = p.copy(topmostSameAs = TopmostSameAs(p.sameAs)))
+          case p: testentities.Dataset.Provenance.Modified =>
+            dataset.copy(provenance = p.copy(topmostDerivedFrom = TopmostDerivedFrom(p.derivedFrom)))
           case _ => dataset
         }
 
-        cliDataset.asJsonLD.cursor.as[entities.Dataset[entities.Dataset.Provenance]] shouldBe cliDataset
-          .to[entities.Dataset[entities.Dataset.Provenance]]
-          .asRight
+        cliDataset.asJsonLD.flatten
+          .fold(throw _, identity)
+          .cursor
+          .as[List[entities.Dataset[entities.Dataset.Provenance]]] shouldBe List(
+          cliDataset.to[entities.Dataset[entities.Dataset.Provenance]]
+        ).asRight
       }
     }
 
@@ -61,8 +66,7 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       ).foreach { datasetGen =>
         val dataset = datasetGen.generateOne.to[entities.Dataset[entities.Dataset.Provenance]]
         val invalidPart = updatePartDateAfter(
-          datasetPartEntities(timestampsNotInTheFuture.generateOne).generateOne
-            .to[entities.DatasetPart]
+          datasetPartEntities(timestampsNotInTheFuture.generateOne).generateOne.to[entities.DatasetPart]
         )(dataset.provenance)
         val invalidDataset = dataset.copy(parts = invalidPart :: dataset.parts)
 
@@ -75,7 +79,9 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
 
     "succeed if dataset parts are older than the modified or imported internal dataset" in {
       List(
-        datasetEntities(datasetProvenanceModified),
+        datasetEntities(datasetProvenanceModified).map(ds =>
+          ds.copy(provenance = ds.provenance.copy(topmostDerivedFrom = TopmostDerivedFrom(ds.provenance.derivedFrom)))
+        ),
         datasetEntities(datasetProvenanceImportedInternalAncestorInternal).map(ds =>
           ds.copy(provenance = ds.provenance.copy(topmostSameAs = TopmostSameAs(ds.provenance.sameAs)))
         )

@@ -67,7 +67,7 @@ object Project {
   import io.renku.jsonld.syntax._
   import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 
-  private val entityTypes = EntityTypes.of(prov / "Location", schema / "Project")
+  val entityTypes: EntityTypes = EntityTypes.of(prov / "Location", schema / "Project")
 
   implicit def encoder[P <: Project](implicit gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[P] =
     JsonLDEncoder.instance {

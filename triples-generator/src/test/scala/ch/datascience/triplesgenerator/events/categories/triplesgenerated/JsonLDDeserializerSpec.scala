@@ -26,7 +26,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model._
-import ch.datascience.graph.model.datasets.TopmostSameAs
+import ch.datascience.graph.model.datasets.{TopmostDerivedFrom, TopmostSameAs}
 import ch.datascience.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.testentities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
@@ -60,6 +60,11 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
           datasetEntities(datasetProvenanceImportedInternalAncestorExternal, fixed(project))
             .map(ds => ds.copy(provenance = ds.provenance.copy(topmostSameAs = TopmostSameAs(ds.provenance.sameAs)))),
           datasetEntities(datasetProvenanceModified, fixed(project))
+            .map(ds =>
+              ds.copy(provenance =
+                ds.provenance.copy(topmostDerivedFrom = TopmostDerivedFrom(ds.provenance.derivedFrom))
+              )
+            )
         )
         .generateOne
         .to[entities.Dataset[entities.Dataset.Provenance]]
@@ -127,7 +132,7 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
       val dataset  = datasetEntities(ofAnyProvenance, fixed(project)).generateOne
 
       lazy val filterOutProject: Vector[JsonLD] => JsonLD = { array =>
-        JsonLD.arr(array.filter(_.cursor.getEntityTypes.map(_ != Project.types).getOrElse(false)): _*)
+        JsonLD.arr(array.filter(_.cursor.getEntityTypes.map(_ != entities.Project.entityTypes).getOrElse(false)): _*)
       }
 
       givenFindProjectInfo(project.path)

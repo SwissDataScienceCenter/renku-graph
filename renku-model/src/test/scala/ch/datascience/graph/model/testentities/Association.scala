@@ -19,31 +19,30 @@
 package ch.datascience.graph.model.testentities
 
 import cats.syntax.all._
-import ch.datascience.graph.model.{GitLabApiUrl, RenkuBaseUrl, associations, entities}
+import ch.datascience.graph.model.{RenkuBaseUrl, associations, entities}
 import io.renku.jsonld._
 
 final case class Association(activity: Activity, agent: Agent, plan: Plan)
 
 object Association {
 
-  def factory(agent: Agent, plan: Plan): Activity => Association =
-    Association(_, agent, plan)
+  def factory(agent: Agent, plan: Plan): Activity => Association = Association(_, agent, plan)
 
   import io.renku.jsonld.syntax._
 
-  implicit lazy val toEntitiesAssociation: Association => entities.Association = association =>
-    entities.Association(associations.ResourceId(association.asEntityId.show),
-                         association.agent.to[entities.Agent],
-                         association.plan.to[entities.Plan]
-    )
+  implicit def toEntitiesAssociation(implicit renkuBaseUrl: RenkuBaseUrl): Association => entities.Association =
+    association =>
+      entities.Association(associations.ResourceId(association.asEntityId.show),
+                           association.agent.to[entities.Agent],
+                           association.plan.to[entities.Plan]
+      )
 
-  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Association] =
-    JsonLDEncoder.instance { entity =>
-      JsonLD.entity(
-        entity.asEntityId,
-        EntityTypes of (prov / "Association"),
-        prov / "agent"   -> entity.agent.asJsonLD,
-        prov / "hadPlan" -> entity.plan.asJsonLD
+  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[Association] =
+    JsonLDEncoder.instance { association =>
+      val entitiesAssociation = association.to[entities.Association]
+      JsonLD.arr(
+        entitiesAssociation.plan.asJsonLD,
+        entitiesAssociation.asJsonLD
       )
     }
 

@@ -18,15 +18,15 @@
 
 package ch.datascience.graph.model.testentities
 
+import cats.syntax.all._
+import ch.datascience.graph.model._
 import ch.datascience.graph.model.activities.{EndTime, Order, StartTime}
 import ch.datascience.graph.model.entityModel._
 import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.testentities.Activity._
 import ch.datascience.graph.model.testentities.Entity.OutputEntity
-import ch.datascience.graph.model.{GitLabApiUrl, RenkuBaseUrl, activities, entities, projects}
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints.UUID
-import cats.syntax.all._
 
 final case class Activity(id:                  Id,
                           startTime:           StartTime,
@@ -96,7 +96,7 @@ object Activity {
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  implicit lazy val toEntitiesActivity: Activity => entities.Activity = activity =>
+  implicit def toEntitiesActivity(implicit renkuBaseUrl: RenkuBaseUrl): Activity => entities.Activity = activity =>
     entities.Activity(
       activities.ResourceId(activity.asEntityId.show),
       activity.startTime,
@@ -112,20 +112,13 @@ object Activity {
     )
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Activity] =
-    JsonLDEncoder.instance { entity =>
-      JsonLD.entity(
-        entity.asEntityId,
-        EntityTypes of (prov / "Activity"),
-        Reverse.ofJsonLDsUnsafe((prov / "activity") -> entity.generations.asJsonLD),
-        prov / "startedAtTime"        -> entity.startTime.asJsonLD,
-        prov / "endedAtTime"          -> entity.endTime.asJsonLD,
-        prov / "wasAssociatedWith"    -> JsonLD.arr(entity.agent.asJsonLD, entity.author.asJsonLD),
-        prov / "qualifiedAssociation" -> entity.association.asJsonLD,
-        prov / "qualifiedUsage"       -> entity.usages.asJsonLD,
-        renku / "parameter"           -> entity.parameters.asJsonLD,
-        schema / "isPartOf"           -> entity.project.asJsonLD,
-        renku / "order"               -> entity.order.asJsonLD
-      )
+    JsonLDEncoder.instance { activity =>
+      JsonLD
+        .arr(
+          activity.project.asJsonLD,
+          activity.association.plan.asJsonLD,
+          activity.to[entities.Activity].asJsonLD
+        )
     }
 
   implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[Activity] =

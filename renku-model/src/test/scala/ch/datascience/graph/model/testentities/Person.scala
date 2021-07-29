@@ -18,8 +18,8 @@
 
 package ch.datascience.graph.model.testentities
 
-import ch.datascience.graph.model.users.{Affiliation, Email, GitLabId, Name}
 import ch.datascience.graph.model._
+import ch.datascience.graph.model.users.{Affiliation, Email, GitLabId, Name}
 
 final case class Person(
     name:             Name,
@@ -36,10 +36,9 @@ object Person {
   ): Person = Person(name, Some(email))
 
   import io.renku.jsonld._
-  import JsonLDEncoder._
   import io.renku.jsonld.syntax._
 
-  implicit lazy val toEntitiesPerson: Person => entities.Person = person =>
+  implicit def toEntitiesPerson(implicit renkuBaseUrl: RenkuBaseUrl): Person => entities.Person = person =>
     entities.Person(
       users.ResourceId(person.asEntityId),
       person.name,
@@ -49,27 +48,7 @@ object Person {
     )
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Person] =
-    JsonLDEncoder.instance { entity =>
-      JsonLD.entity(
-        entity.asEntityId,
-        EntityTypes.of(prov / "Person", schema / "Person"),
-        schema / "email"       -> entity.maybeEmail.asJsonLD,
-        schema / "name"        -> entity.name.asJsonLD,
-        rdfs / "label"         -> entity.name.asJsonLD,
-        schema / "affiliation" -> entity.maybeAffiliation.asJsonLD,
-        schema / "sameAs"      -> entity.maybeGitLabId.asJsonLD(encodeOption(gitLabIdEncoder))
-      )
-    }
-
-  private def gitLabIdEncoder(implicit gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[GitLabId] = JsonLDEncoder.instance {
-    gitLabId =>
-      JsonLD.entity(
-        EntityId of (gitLabApiUrl / "users" / gitLabId).toString,
-        EntityTypes.of(schema / "URL"),
-        schema / "identifier"     -> gitLabId.value.asJsonLD,
-        schema / "additionalType" -> "GitLab".asJsonLD
-      )
-  }
+    JsonLDEncoder.instance(_.to[entities.Person].asJsonLD)
 
   implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[Person] =
     EntityIdEncoder.instance {

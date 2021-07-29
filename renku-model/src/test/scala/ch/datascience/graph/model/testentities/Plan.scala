@@ -21,11 +21,11 @@ package ch.datascience.graph.model.testentities
 import CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
 import Plan._
 import cats.syntax.all._
+import ch.datascience.graph.model._
 import ch.datascience.graph.model.commandParameters.Position
 import ch.datascience.graph.model.entityModel.Location
-import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.plans._
-import ch.datascience.graph.model._
+import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
 
@@ -50,7 +50,6 @@ case class Plan(id:                        Id,
 object Plan {
 
   import io.renku.jsonld._
-  import JsonLDEncoder._
   import io.renku.jsonld.syntax._
 
   def apply(
@@ -79,7 +78,7 @@ object Plan {
     def of(parameters: CommandParameterFactory*): List[CommandParameterFactory] = parameters.toList
   }
 
-  implicit lazy val toEntitiesPlan: Plan => entities.Plan =
+  implicit def toEntitiesPlan(implicit renkuBaseUrl: RenkuBaseUrl): Plan => entities.Plan =
     plan => {
       val maybeInvalidationTime = plan match {
         case plan: Plan with HavingInvalidationTime => plan.invalidationTime.some
@@ -102,49 +101,16 @@ object Plan {
       )
     }
 
-  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[Plan] = JsonLDEncoder.instance {
-    case plan: Plan with HavingInvalidationTime =>
-      JsonLD.entity(
-        plan.asEntityId,
-        EntityTypes.of(prov / "Plan", renku / "Plan"),
-        schema / "name"                -> plan.name.asJsonLD,
-        schema / "description"         -> plan.maybeDescription.asJsonLD,
-        renku / "command"              -> plan.command.asJsonLD,
-        schema / "programmingLanguage" -> plan.maybeProgrammingLanguage.asJsonLD,
-        schema / "keywords"            -> plan.keywords.asJsonLD,
-        renku / "hasArguments"         -> plan.parameters.asJsonLD,
-        renku / "hasInputs"            -> plan.inputs.asJsonLD,
-        renku / "hasOutputs"           -> plan.outputs.asJsonLD,
-        renku / "successCodes"         -> plan.successCodes.asJsonLD,
-        schema / "isPartOf"            -> plan.project.asEntityId.asJsonLD,
-        prov / "invalidatedAtTime"     -> plan.invalidationTime.asJsonLD
-      )
-    case plan: Plan =>
-      JsonLD.entity(
-        plan.asEntityId,
-        EntityTypes.of(prov / "Plan", renku / "Plan"),
-        schema / "name"                -> plan.name.asJsonLD,
-        schema / "description"         -> plan.maybeDescription.asJsonLD,
-        renku / "command"              -> plan.command.asJsonLD,
-        schema / "programmingLanguage" -> plan.maybeProgrammingLanguage.asJsonLD,
-        schema / "keywords"            -> plan.keywords.asJsonLD,
-        renku / "hasArguments"         -> plan.parameters.asJsonLD,
-        renku / "hasInputs"            -> plan.inputs.asJsonLD,
-        renku / "hasOutputs"           -> plan.outputs.asJsonLD,
-        renku / "successCodes"         -> plan.successCodes.asJsonLD,
-        schema / "isPartOf"            -> plan.project.asEntityId.asJsonLD
-      )
-  }
+  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[Plan] =
+    JsonLDEncoder.instance(_.to[entities.Plan].asJsonLD)
 
   implicit def entityIdEncoder[R <: Plan](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[R] =
     EntityIdEncoder.instance(plan => EntityId of renkuBaseUrl / "plans" / plan.id)
 
   final class Id private (val value: String) extends AnyVal with StringTinyType
   implicit object Id extends TinyTypeFactory[Id](new Id(_)) with UUID {
-
     def generate: Id = Id {
       java.util.UUID.randomUUID.toString
     }
   }
-
 }

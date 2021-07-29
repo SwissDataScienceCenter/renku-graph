@@ -21,7 +21,7 @@ package ch.datascience.graph.model.testentities
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.entityModel.{Checksum, Location}
-import ch.datascience.graph.model.{RenkuBaseUrl, entities, entityModel, generations}
+import ch.datascience.graph.model._
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 
@@ -40,45 +40,25 @@ object Entity {
       (generation: Generation) => OutputEntity(location, entityChecksums.generateOne, generation)
   }
 
-  implicit lazy val toEntity: Entity => entities.Entity = {
-    case e: InputEntity  => toInputEntity(e)
-    case e: OutputEntity => toOutputEntity(e)
+  implicit def toEntity(implicit renkuBaseUrl: RenkuBaseUrl): Entity => entities.Entity = {
+    case e: InputEntity  => toInputEntity(renkuBaseUrl)(e)
+    case e: OutputEntity => toOutputEntity(renkuBaseUrl)(e)
   }
 
-  implicit lazy val toInputEntity: InputEntity => entities.Entity.InputEntity = entity =>
-    entities.Entity.InputEntity(entityModel.ResourceId(entity.asEntityId.show), entity.location, entity.checksum)
+  implicit def toInputEntity(implicit renkuBaseUrl: RenkuBaseUrl): InputEntity => entities.Entity.InputEntity =
+    entity =>
+      entities.Entity.InputEntity(entityModel.ResourceId(entity.asEntityId.show), entity.location, entity.checksum)
 
-  implicit lazy val toOutputEntity: OutputEntity => entities.Entity.OutputEntity = entity =>
-    entities.Entity.OutputEntity(entityModel.ResourceId(entity.asEntityId.show),
-                                 entity.location,
-                                 entity.checksum,
-                                 generations.ResourceId(entity.generation.asEntityId.show)
-    )
-
-  implicit def encoder[E <: Entity](implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[E] = JsonLDEncoder.instance {
-    case entity @ InputEntity(location, checksum) =>
-      JsonLD.entity(
-        entity.asEntityId,
-        toEntityTypes(entity),
-        prov / "atLocation" -> location.asJsonLD,
-        renku / "checksum"  -> checksum.asJsonLD
+  implicit def toOutputEntity(implicit renkuBaseUrl: RenkuBaseUrl): OutputEntity => entities.Entity.OutputEntity =
+    entity =>
+      entities.Entity.OutputEntity(entityModel.ResourceId(entity.asEntityId.show),
+                                   entity.location,
+                                   entity.checksum,
+                                   generations.ResourceId(entity.generation.asEntityId.show)
       )
-    case entity @ OutputEntity(location, checksum, generation) =>
-      JsonLD.entity(
-        entity.asEntityId,
-        toEntityTypes(entity),
-        prov / "atLocation"          -> location.asJsonLD,
-        renku / "checksum"           -> checksum.asJsonLD,
-        prov / "qualifiedGeneration" -> generation.asEntityId.asJsonLD
-      )
-  }
 
-  private lazy val toEntityTypes: Entity => EntityTypes = { entity =>
-    entity.location match {
-      case Location.File(_)   => EntityTypes of (prov / "Entity", wfprov / "Artifact")
-      case Location.Folder(_) => EntityTypes of (prov / "Entity", wfprov / "Artifact", prov / "Collection")
-    }
-  }
+  implicit def encoder[E <: Entity](implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[E] =
+    JsonLDEncoder.instance(_.to[entities.Entity].asJsonLD)
 
   implicit def entityIdEncoder[E <: Entity](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[E] =
     EntityIdEncoder.instance(entity => EntityId of renkuBaseUrl / "blob" / entity.checksum / entity.location)

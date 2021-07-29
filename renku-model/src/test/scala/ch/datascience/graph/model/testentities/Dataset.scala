@@ -21,15 +21,12 @@ package ch.datascience.graph.model.testentities
 import Dataset._
 import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
+import ch.datascience.graph.model._
 import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.testentities.Dataset.Provenance.{ImportedExternal, ImportedInternal, ImportedInternalAncestorExternal, ImportedInternalAncestorInternal, Internal, Modified}
-import ch.datascience.graph.model._
-import io.renku.jsonld.JsonLDEncoder.encodeList
+import io.renku.jsonld._
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{EntityId, JsonLD, Property}
-
-import scala.language.implicitConversions
 
 case class Dataset[+P <: Provenance](identification: Identification,
                                      provenance:     P,
@@ -52,17 +49,6 @@ object Dataset {
       title:      Title,
       name:       Name
   )
-
-  object Identification {
-    private[Dataset] implicit lazy val encoder: Identification => Map[Property, JsonLD] = {
-      case Identification(identifier, title, name) =>
-        Map(
-          schema / "identifier"    -> identifier.asJsonLD,
-          schema / "name"          -> title.asJsonLD,
-          schema / "alternateName" -> name.asJsonLD
-        )
-    }
-  }
 
   sealed trait Provenance extends Product with Serializable {
     type D <: Date
@@ -133,83 +119,36 @@ object Dataset {
       override type D = DateCreated
       override lazy val topmostSameAs: TopmostSameAs = TopmostSameAs(entityId)
     }
-
-    import ch.datascience.graph.model.datasets.DerivedFrom._
-
-    private[Dataset] implicit def encoder(implicit
-        renkuBaseUrl: RenkuBaseUrl,
-        gitLabApiUrl: GitLabApiUrl
-    ): Provenance => Map[Property, JsonLD] = {
-      case provenance @ Internal(_, initialVersion, date, creators) =>
-        Map(
-          schema / "dateCreated"       -> date.asJsonLD,
-          schema / "creator"           -> creators.asJsonLD,
-          renku / "topmostSameAs"      -> provenance.topmostSameAs.asJsonLD,
-          renku / "topmostDerivedFrom" -> provenance.topmostDerivedFrom.asJsonLD,
-          renku / "originalIdentifier" -> initialVersion.asJsonLD
-        )
-      case provenance @ ImportedExternal(_, sameAs, initialVersion, date, creators) =>
-        Map(
-          schema / "datePublished"     -> date.asJsonLD,
-          schema / "sameAs"            -> sameAs.asJsonLD,
-          schema / "creator"           -> creators.asJsonLD,
-          renku / "topmostSameAs"      -> provenance.topmostSameAs.asJsonLD,
-          renku / "topmostDerivedFrom" -> provenance.topmostDerivedFrom.asJsonLD,
-          renku / "originalIdentifier" -> initialVersion.asJsonLD
-        )
-      case provenance @ ImportedInternalAncestorExternal(_, sameAs, topmostSameAs, initialVersion, date, creators) =>
-        Map(
-          schema / "datePublished"     -> date.asJsonLD,
-          schema / "sameAs"            -> sameAs.asJsonLD,
-          schema / "creator"           -> creators.asJsonLD,
-          renku / "topmostSameAs"      -> topmostSameAs.asJsonLD,
-          renku / "topmostDerivedFrom" -> provenance.topmostDerivedFrom.asJsonLD,
-          renku / "originalIdentifier" -> initialVersion.asJsonLD
-        )
-      case provenance @ ImportedInternalAncestorInternal(_, sameAs, topmostSameAs, initialVersion, date, creators) =>
-        Map(
-          schema / "dateCreated"       -> date.asJsonLD,
-          schema / "sameAs"            -> sameAs.asJsonLD,
-          schema / "creator"           -> creators.asJsonLD,
-          renku / "topmostSameAs"      -> topmostSameAs.asJsonLD,
-          renku / "topmostDerivedFrom" -> provenance.topmostDerivedFrom.asJsonLD,
-          renku / "originalIdentifier" -> initialVersion.asJsonLD
-        )
-      case provenance @ Modified(_, derivedFrom, topmostDerivedFrom, initialVersion, date, creators) =>
-        Map(
-          schema / "dateCreated"       -> date.asJsonLD,
-          prov / "wasDerivedFrom"      -> derivedFrom.asJsonLD,
-          schema / "creator"           -> creators.asJsonLD,
-          renku / "topmostSameAs"      -> provenance.topmostSameAs.asJsonLD,
-          renku / "topmostDerivedFrom" -> topmostDerivedFrom.asJsonLD,
-          renku / "originalIdentifier" -> initialVersion.asJsonLD
-        )
-    }
-
-    private implicit lazy val creatorsOrdering: Ordering[Person] = Ordering.by((p: Person) => p.name.value)
   }
 
   trait ProvenanceOps {
 
-    implicit lazy val toEntitiesProvenance
-        : entities.Dataset.Identification => Provenance => entities.Dataset.Provenance =
+    implicit def toEntitiesProvenance(implicit
+        renkuBaseUrl: RenkuBaseUrl
+    ): entities.Dataset.Identification => Provenance => entities.Dataset.Provenance =
       identification => {
-        case p: Internal                         => toEntitiesInternal(identification)(p)
-        case p: ImportedExternal                 => toEntitiesImportedExternal(identification)(p)
-        case p: ImportedInternalAncestorExternal => toEntitiesImportedInternalAncestorExternal(identification)(p)
-        case p: ImportedInternalAncestorInternal => toEntitiesImportedInternalAncestorInternal(identification)(p)
-        case p: Modified                         => toEntitiesModified(identification)(p)
+        case p: Internal => toEntitiesInternal(renkuBaseUrl)(identification)(p)
+        case p: ImportedExternal => toEntitiesImportedExternal(renkuBaseUrl)(identification)(p)
+        case p: ImportedInternalAncestorExternal =>
+          toEntitiesImportedInternalAncestorExternal(renkuBaseUrl)(identification)(p)
+        case p: ImportedInternalAncestorInternal =>
+          toEntitiesImportedInternalAncestorInternal(renkuBaseUrl)(identification)(p)
+        case p: Modified => toEntitiesModified(renkuBaseUrl)(identification)(p)
       }
 
-    implicit lazy val toEntitiesImportedInternal
-        : entities.Dataset.Identification => ImportedInternal => entities.Dataset.Provenance.ImportedInternal =
+    implicit def toEntitiesImportedInternal(implicit
+        renkuBaseUrl: RenkuBaseUrl
+    ): entities.Dataset.Identification => ImportedInternal => entities.Dataset.Provenance.ImportedInternal =
       identification => {
-        case p: ImportedInternalAncestorExternal => toEntitiesImportedInternalAncestorExternal(identification)(p)
-        case p: ImportedInternalAncestorInternal => toEntitiesImportedInternalAncestorInternal(identification)(p)
+        case p: ImportedInternalAncestorExternal =>
+          toEntitiesImportedInternalAncestorExternal(renkuBaseUrl)(identification)(p)
+        case p: ImportedInternalAncestorInternal =>
+          toEntitiesImportedInternalAncestorInternal(renkuBaseUrl)(identification)(p)
       }
 
-    implicit lazy val toEntitiesInternal
-        : entities.Dataset.Identification => Provenance.Internal => entities.Dataset.Provenance.Internal =
+    implicit def toEntitiesInternal(implicit
+        renkuBaseUrl: RenkuBaseUrl
+    ): entities.Dataset.Identification => Provenance.Internal => entities.Dataset.Provenance.Internal =
       identification => { case Internal(_, _, date, creators) =>
         entities.Dataset.Provenance.Internal(identification.resourceId,
                                              identification.identifier,
@@ -218,8 +157,9 @@ object Dataset {
         )
       }
 
-    implicit lazy val toEntitiesImportedExternal
-        : entities.Dataset.Identification => Provenance.ImportedExternal => entities.Dataset.Provenance.ImportedExternal =
+    implicit def toEntitiesImportedExternal(implicit
+        renkuBaseUrl: RenkuBaseUrl
+    ): entities.Dataset.Identification => Provenance.ImportedExternal => entities.Dataset.Provenance.ImportedExternal =
       identification => { case ImportedExternal(_, sameAs, _, date, creators) =>
         entities.Dataset.Provenance.ImportedExternal(identification.resourceId,
                                                      identification.identifier,
@@ -229,8 +169,9 @@ object Dataset {
         )
       }
 
-    implicit lazy val toEntitiesImportedInternalAncestorExternal
-        : entities.Dataset.Identification => ImportedInternalAncestorExternal => entities.Dataset.Provenance.ImportedInternalAncestorExternal =
+    implicit def toEntitiesImportedInternalAncestorExternal(implicit
+        renkuBaseUrl: RenkuBaseUrl
+    ): entities.Dataset.Identification => ImportedInternalAncestorExternal => entities.Dataset.Provenance.ImportedInternalAncestorExternal =
       identification => { case ImportedInternalAncestorExternal(_, sameAs, topmostSameAs, _, date, creators) =>
         entities.Dataset.Provenance.ImportedInternalAncestorExternal(identification.resourceId,
                                                                      identification.identifier,
@@ -241,8 +182,9 @@ object Dataset {
         )
       }
 
-    implicit lazy val toEntitiesImportedInternalAncestorInternal
-        : entities.Dataset.Identification => ImportedInternalAncestorInternal => entities.Dataset.Provenance.ImportedInternalAncestorInternal =
+    implicit def toEntitiesImportedInternalAncestorInternal(implicit
+        renkuBaseUrl: RenkuBaseUrl
+    ): entities.Dataset.Identification => ImportedInternalAncestorInternal => entities.Dataset.Provenance.ImportedInternalAncestorInternal =
       identification => { case ImportedInternalAncestorInternal(_, sameAs, topmostSameAs, _, date, creators) =>
         entities.Dataset.Provenance.ImportedInternalAncestorInternal(identification.resourceId,
                                                                      identification.identifier,
@@ -253,12 +195,13 @@ object Dataset {
         )
       }
 
-    implicit lazy val toEntitiesModified
-        : entities.Dataset.Identification => Provenance.Modified => entities.Dataset.Provenance.Modified =
-      identification => { case Modified(_, derivedFrom, _, initialVersion, date, creators) =>
+    implicit def toEntitiesModified(implicit
+        renkuBaseUrl: RenkuBaseUrl
+    ): entities.Dataset.Identification => Provenance.Modified => entities.Dataset.Provenance.Modified =
+      identification => { case Modified(_, derivedFrom, topmostDerivedFrom, initialVersion, date, creators) =>
         entities.Dataset.Provenance.Modified(identification.resourceId,
                                              derivedFrom,
-                                             TopmostDerivedFrom(derivedFrom),
+                                             topmostDerivedFrom,
                                              initialVersion,
                                              date,
                                              creators.map(_.to[entities.Person])
@@ -271,16 +214,6 @@ object Dataset {
       maybeVersion:      Option[Version]
   )
 
-  object Publishing {
-    private[Dataset] implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): Publishing => Map[Property, JsonLD] = {
-      case Publishing(publicationEvents, maybeVersion) =>
-        Map(
-          schema / "subjectOf" -> publicationEvents.asJsonLD,
-          schema / "version"   -> maybeVersion.asJsonLD
-        )
-    }
-  }
-
   final case class AdditionalInfo(
       url:              Url,
       maybeDescription: Option[Description],
@@ -288,19 +221,6 @@ object Dataset {
       images:           List[ImageUri],
       maybeLicense:     Option[License]
   )
-
-  object AdditionalInfo {
-    private[Dataset] implicit def encoder(datasetEntityId: EntityId): AdditionalInfo => Map[Property, JsonLD] = {
-      case AdditionalInfo(url, maybeDescription, keywords, images, maybeLicense) =>
-        Map(
-          schema / "url"         -> url.asJsonLD,
-          schema / "description" -> maybeDescription.asJsonLD,
-          schema / "keywords"    -> keywords.asJsonLD,
-          schema / "image"       -> images.zipWithIndex.asJsonLD(encodeList(imageUrlEncoder(datasetEntityId))),
-          schema / "license"     -> maybeLicense.asJsonLD
-        )
-    }
-  }
 
   def from[P <: Provenance](identification: Identification,
                             provenance:     P,
@@ -395,7 +315,8 @@ object Dataset {
   }.getOrElse(Validated.validNel(()))
 
   implicit def toEntitiesDataset[TP <: Provenance, EP <: entities.Dataset.Provenance](implicit
-      convert: entities.Dataset.Identification => TP => EP
+      convert:      entities.Dataset.Identification => TP => EP,
+      renkuBaseUrl: RenkuBaseUrl
   ): Dataset[TP] => entities.Dataset[EP] = { dataset: Dataset[TP] =>
     val maybeInvalidationTime = dataset match {
       case d: Dataset[TP] with HavingInvalidationTime => d.invalidationTime.some
@@ -432,47 +353,17 @@ object Dataset {
     )
   }
 
-  import io.renku.jsonld.JsonLDEncoder._
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
   implicit def encoder[P <: Provenance](implicit
       renkuBaseUrl: RenkuBaseUrl,
       gitLabApiUrl: GitLabApiUrl
-  ): JsonLDEncoder[Dataset[P]] = JsonLDEncoder.instance {
-    case dataset: Dataset[P] with HavingInvalidationTime =>
-      JsonLD
-        .entity(
-          dataset.entityId,
-          EntityTypes of (schema / "Dataset", prov / "Entity"),
-          List(
-            dataset.identification.asJsonLDProperties,
-            dataset.provenance.asJsonLDProperties,
-            dataset.additionalInfo.asJsonLDProperties(AdditionalInfo.encoder(dataset.entityId)),
-            dataset.publishing.asJsonLDProperties
-          ).flatten.toMap,
-          schema / "hasPart"         -> dataset.parts.asJsonLD,
-          schema / "isPartOf"        -> dataset.project.asJsonLD,
-          prov / "invalidatedAtTime" -> dataset.invalidationTime.asJsonLD
-        )
-    case dataset @ Dataset(identification, provenance, additionalInfo, publishing, parts, project) =>
-      JsonLD
-        .entity(
-          dataset.entityId,
-          EntityTypes of (schema / "Dataset", prov / "Entity"),
-          List(
-            identification.asJsonLDProperties,
-            provenance.asJsonLDProperties,
-            additionalInfo.asJsonLDProperties(AdditionalInfo.encoder(dataset.entityId)),
-            publishing.asJsonLDProperties
-          ).flatten.toMap,
-          schema / "hasPart"  -> parts.asJsonLD,
-          schema / "isPartOf" -> project.asJsonLD
-        )
-  }
-
-  private implicit class SerializationOps[T](obj: T) {
-    def asJsonLDProperties(implicit encoder: T => Map[Property, JsonLD]): Map[Property, JsonLD] = encoder(obj)
+  ): JsonLDEncoder[Dataset[P]] = JsonLDEncoder.instance { ds =>
+    JsonLD.arr(
+      ds.project.asJsonLD,
+      ds.to[entities.Dataset[entities.Dataset.Provenance]].asJsonLD
+    )
   }
 
   implicit def entityIdEncoder[P <: Provenance](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[Dataset[P]] =
@@ -480,16 +371,6 @@ object Dataset {
 
   def entityId(identifier: DatasetIdentifier)(implicit renkuBaseUrl: RenkuBaseUrl): EntityId =
     EntityId of (renkuBaseUrl / "datasets" / identifier)
-
-  private def imageUrlEncoder(datasetEntityId: EntityId): JsonLDEncoder[(ImageUri, Int)] =
-    JsonLDEncoder.instance { case (imageUrl, position) =>
-      JsonLD.entity(
-        imageEntityId(datasetEntityId, position),
-        EntityTypes of schema / "ImageObject",
-        (schema / "contentUrl") -> imageUrl.asJsonLD,
-        (schema / "position")   -> position.asJsonLD
-      )
-    }
 
   private def imageEntityId(datasetEntityId: EntityId, position: ImagePosition): UrlfiedEntityId =
     datasetEntityId.asUrlEntityId / "images" / position.toString

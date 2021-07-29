@@ -400,7 +400,12 @@ class ProjectMetadataSpec extends AnyWordSpec with should.Matchers with ScalaChe
                                                                              importedInternalAncestorExternal,
                                                                              modified
       )
+    }
+  }
 
+  "encoder" should {
+    "encode all the metadata properties into JsonLD" in {
+      fail("BOOM!")
     }
   }
 

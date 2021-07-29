@@ -43,15 +43,16 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
           ).generateOne
             .planParameterValues(defaultValue -> valueOverride)
             .buildProvenanceUnsafe()
+            .to[entities.Activity]
 
           val Right(parameterValues) = activity.asJsonLD.flatten
             .fold(throw _, identity)
             .cursor
             .as[List[entities.ParameterValue]](
-              decodeList(entities.ParameterValue.decoder(activity.plan))
+              decodeList(entities.ParameterValue.decoder(activity.association.plan))
             )
 
-          parameterValues           shouldBe activity.parameters.map(_.to[entities.ParameterValue])
+          parameterValues           shouldBe activity.parameters
           parameterValues.foreach(_ shouldBe a[entities.ParameterValue.VariableParameterValue])
       }
     }
@@ -63,15 +64,16 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
         ).generateOne
           .planInputParameterValuesFromChecksum(location -> checksum)
           .buildProvenanceUnsafe()
+          .to[entities.Activity]
 
         val Right(parameterValues) = activity.asJsonLD.flatten
           .fold(throw _, identity)
           .cursor
           .as[List[entities.ParameterValue]](
-            decodeList(entities.ParameterValue.decoder(activity.plan))
+            decodeList(entities.ParameterValue.decoder(activity.association.plan))
           )
 
-        parameterValues           shouldBe activity.parameters.map(_.to[entities.ParameterValue])
+        parameterValues           shouldBe activity.parameters
         parameterValues.foreach(_ shouldBe a[entities.ParameterValue.InputParameterValue])
       }
     }
@@ -82,15 +84,16 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
           planEntities(CommandOutput.fromLocation(location))
         ).generateOne
           .buildProvenanceUnsafe()
+          .to[entities.Activity]
 
         val Right(parameterValues) = activity.asJsonLD.flatten
           .fold(throw _, identity)
           .cursor
           .as[List[entities.ParameterValue]](
-            decodeList(entities.ParameterValue.decoder(activity.plan))
+            decodeList(entities.ParameterValue.decoder(activity.association.plan))
           )
 
-        parameterValues           shouldBe activity.parameters.map(_.to[entities.ParameterValue])
+        parameterValues           shouldBe activity.parameters
         parameterValues.foreach(_ shouldBe a[entities.ParameterValue.OutputParameterValue])
       }
     }

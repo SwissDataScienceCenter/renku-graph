@@ -112,53 +112,52 @@ object CommandParameterBase {
 
     val entityTypes: EntityTypes = EntityTypes of (renku / "CommandInput", renku / "CommandParameterBase")
 
-    implicit def commandInputEncoder[I <: CommandInput]: JsonLDEncoder[I] =
-      JsonLDEncoder.instance {
-        case LocationCommandInput(resourceId,
-                                  position,
-                                  name,
-                                  maybeDescription,
-                                  maybePrefix,
-                                  defaultValue,
-                                  temporary,
-                                  maybeEncodingFormat
-            ) =>
-          JsonLD.entity(
-            resourceId.asEntityId,
-            entityTypes,
-            schema / "name"           -> name.asJsonLD,
-            schema / "description"    -> maybeDescription.asJsonLD,
-            renku / "position"        -> position.asJsonLD,
-            renku / "prefix"          -> maybePrefix.asJsonLD,
-            schema / "defaultValue"   -> defaultValue.asJsonLD,
-            renku / "isTemporary"     -> temporary.asJsonLD,
-            schema / "encodingFormat" -> maybeEncodingFormat.asJsonLD,
-            rdfs / "label"            -> s"""Command Input Template "$defaultValue"""".asJsonLD
-          )
-        case MappedCommandInput(resourceId,
+    implicit def commandInputEncoder[I <: CommandInput]: JsonLDEncoder[I] = JsonLDEncoder.instance {
+      case LocationCommandInput(resourceId,
                                 position,
                                 name,
                                 maybeDescription,
                                 maybePrefix,
                                 defaultValue,
                                 temporary,
-                                maybeEncodingFormat,
-                                mappedTo
-            ) =>
-          JsonLD.entity(
-            resourceId.asEntityId,
-            entityTypes,
-            renku / "position"        -> position.asJsonLD,
-            schema / "name"           -> name.asJsonLD,
-            schema / "description"    -> maybeDescription.asJsonLD,
-            renku / "prefix"          -> maybePrefix.asJsonLD,
-            schema / "defaultValue"   -> defaultValue.asJsonLD,
-            renku / "isTemporary"     -> temporary.asJsonLD,
-            schema / "encodingFormat" -> maybeEncodingFormat.asJsonLD,
-            renku / "mappedTo"        -> mappedTo.asJsonLD,
-            rdfs / "label"            -> s"""Command Input Template "$defaultValue"""".asJsonLD
-          )
-      }
+                                maybeEncodingFormat
+          ) =>
+        JsonLD.entity(
+          resourceId.asEntityId,
+          entityTypes,
+          schema / "name"           -> name.asJsonLD,
+          schema / "description"    -> maybeDescription.asJsonLD,
+          renku / "position"        -> position.asJsonLD,
+          renku / "prefix"          -> maybePrefix.asJsonLD,
+          schema / "defaultValue"   -> defaultValue.asJsonLD,
+          renku / "isTemporary"     -> temporary.asJsonLD,
+          schema / "encodingFormat" -> maybeEncodingFormat.asJsonLD,
+          rdfs / "label"            -> s"""Command Input Template "$defaultValue"""".asJsonLD
+        )
+      case MappedCommandInput(resourceId,
+                              position,
+                              name,
+                              maybeDescription,
+                              maybePrefix,
+                              defaultValue,
+                              temporary,
+                              maybeEncodingFormat,
+                              mappedTo
+          ) =>
+        JsonLD.entity(
+          resourceId.asEntityId,
+          entityTypes,
+          renku / "position"        -> position.asJsonLD,
+          schema / "name"           -> name.asJsonLD,
+          schema / "description"    -> maybeDescription.asJsonLD,
+          renku / "prefix"          -> maybePrefix.asJsonLD,
+          schema / "defaultValue"   -> defaultValue.asJsonLD,
+          renku / "isTemporary"     -> temporary.asJsonLD,
+          schema / "encodingFormat" -> maybeEncodingFormat.asJsonLD,
+          renku / "mappedTo"        -> mappedTo.asJsonLD,
+          rdfs / "label"            -> s"""Command Input Template "$defaultValue"""".asJsonLD
+        )
+    }
 
     implicit lazy val decoder: JsonLDDecoder[CommandInput] = JsonLDDecoder.entity(entityTypes) { cursor =>
       for {

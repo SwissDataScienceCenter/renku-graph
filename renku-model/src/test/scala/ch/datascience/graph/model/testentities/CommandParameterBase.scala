@@ -18,14 +18,13 @@
 
 package ch.datascience.graph.model.testentities
 
-import ch.datascience.graph.model.{RenkuBaseUrl, commandParameters, entities}
+import cats.syntax.all._
 import ch.datascience.graph.model.commandParameters.IOStream.{StdErr, StdIn, StdOut}
 import ch.datascience.graph.model.commandParameters._
 import ch.datascience.graph.model.entityModel.Location
+import ch.datascience.graph.model.{RenkuBaseUrl, commandParameters, entities}
 import eu.timepit.refined.auto._
-import io.renku.jsonld.JsonLDEncoder._
 import io.renku.jsonld._
-import cats.syntax.all._
 import io.renku.jsonld.syntax._
 
 sealed trait CommandParameterBase {
@@ -64,7 +63,9 @@ object CommandParameterBase {
                            plan
           )
 
-    implicit lazy val toEntitiesCommandParameter: CommandParameter => entities.CommandParameterBase.CommandParameter =
+    implicit def toEntitiesCommandParameter(implicit
+        renkuBaseUrl: RenkuBaseUrl
+    ): CommandParameter => entities.CommandParameterBase.CommandParameter =
       parameter =>
         entities.CommandParameterBase.CommandParameter(
           commandParameters.ResourceId(parameter.asEntityId.show),
@@ -76,19 +77,7 @@ object CommandParameterBase {
         )
 
     implicit def commandParameterEncoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[CommandParameter] =
-      JsonLDEncoder.instance {
-        case parameter @ CommandParameter(position, name, maybeDescription, maybePrefix, defaultValue, _) =>
-          JsonLD.entity(
-            parameter.asEntityId,
-            EntityTypes of (renku / "CommandParameter", renku / "CommandParameterBase"),
-            schema / "name"         -> name.asJsonLD,
-            schema / "description"  -> maybeDescription.asJsonLD,
-            renku / "position"      -> position.asJsonLD,
-            renku / "prefix"        -> maybePrefix.asJsonLD,
-            schema / "defaultValue" -> defaultValue.asJsonLD,
-            rdfs / "label"          -> s"""Command Parameter "$defaultValue"""".asJsonLD
-          )
-      }
+      JsonLDEncoder.instance(_.to[entities.CommandParameterBase.CommandParameter].asJsonLD)
 
     implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[CommandParameter] =
       EntityIdEncoder.instance(parameter => parameter.plan.asEntityId.asUrlEntityId / "parameters" / parameter.position)
@@ -161,7 +150,9 @@ object CommandParameterBase {
       val mappedTo: IOStream.In = IOStream.StdIn(IOStream.ResourceId((renkuBaseUrl / "iostreams" / StdIn.name).value))
     }
 
-    implicit lazy val toEntitiesCommandInput: CommandInput => entities.CommandParameterBase.CommandInput = {
+    implicit def toEntitiesCommandInput(implicit
+        renkuBaseUrl: RenkuBaseUrl
+    ): CommandInput => entities.CommandParameterBase.CommandInput = {
       case parameter: LocationCommandInput =>
         entities.CommandParameterBase.LocationCommandInput(
           commandParameters.ResourceId(parameter.asEntityId.show),
@@ -187,52 +178,8 @@ object CommandParameterBase {
         )
     }
 
-    implicit def commandInputEncoder[I <: CommandInput](implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[I] =
-      JsonLDEncoder.instance {
-        case input @ LocationCommandInput(position,
-                                          name,
-                                          maybeDescription,
-                                          maybePrefix,
-                                          defaultValue,
-                                          temporary,
-                                          maybeEncodingFormat,
-                                          _
-            ) =>
-          JsonLD.entity(
-            input.asEntityId,
-            EntityTypes of (renku / "CommandInput", renku / "CommandParameterBase"),
-            schema / "name"           -> name.asJsonLD,
-            schema / "description"    -> maybeDescription.asJsonLD,
-            renku / "position"        -> position.asJsonLD,
-            renku / "prefix"          -> maybePrefix.asJsonLD,
-            schema / "defaultValue"   -> defaultValue.asJsonLD,
-            renku / "isTemporary"     -> temporary.asJsonLD,
-            schema / "encodingFormat" -> maybeEncodingFormat.asJsonLD,
-            rdfs / "label"            -> s"""Command Input Template "$defaultValue"""".asJsonLD
-          )
-        case input @ MappedCommandInput(position,
-                                        name,
-                                        maybeDescription,
-                                        maybePrefix,
-                                        defaultValue,
-                                        temporary,
-                                        maybeEncodingFormat,
-                                        _
-            ) =>
-          JsonLD.entity(
-            input.asEntityId,
-            EntityTypes of (renku / "CommandInput", renku / "CommandParameterBase"),
-            schema / "name"           -> name.asJsonLD,
-            schema / "description"    -> maybeDescription.asJsonLD,
-            renku / "position"        -> position.asJsonLD,
-            renku / "prefix"          -> maybePrefix.asJsonLD,
-            schema / "defaultValue"   -> defaultValue.asJsonLD,
-            renku / "mappedTo"        -> input.mappedTo.asJsonLD,
-            renku / "isTemporary"     -> temporary.asJsonLD,
-            schema / "encodingFormat" -> maybeEncodingFormat.asJsonLD,
-            rdfs / "label"            -> s"""Command Input Template "${input.defaultValue}"""".asJsonLD
-          )
-      }
+    implicit def commandInputEncoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[CommandInput] =
+      JsonLDEncoder.instance(_.to[entities.CommandParameterBase.CommandInput].asJsonLD)
 
     implicit def entityIdEncoder[I <: CommandInput](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[I] =
       EntityIdEncoder.instance(input => input.plan.asEntityId.asUrlEntityId / "inputs" / input.position)
@@ -313,7 +260,9 @@ object CommandParameterBase {
                                          plan:                Plan
     ) extends CommandOutput
 
-    implicit lazy val toEntitiesCommandOutput: CommandOutput => entities.CommandParameterBase.CommandOutput = {
+    implicit def toEntitiesCommandOutput(implicit
+        renkuBaseUrl: RenkuBaseUrl
+    ): CommandOutput => entities.CommandParameterBase.CommandOutput = {
       case parameter: LocationCommandOutput =>
         entities.CommandParameterBase.LocationCommandOutput(
           commandParameters.ResourceId(parameter.asEntityId.show),
@@ -342,59 +291,9 @@ object CommandParameterBase {
     }
 
     implicit def commandOutputEncoder[O <: CommandOutput](implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[O] =
-      JsonLDEncoder.instance {
-        case output @ LocationCommandOutput(position,
-                                            name,
-                                            maybeDescription,
-                                            maybePrefix,
-                                            defaultValue,
-                                            folderCreation,
-                                            temporary,
-                                            maybeEncodingFormat,
-                                            _
-            ) =>
-          JsonLD.entity(
-            output.asEntityId,
-            EntityTypes of (renku / "CommandOutput", renku / "CommandParameterBase"),
-            schema / "name"           -> name.asJsonLD,
-            schema / "description"    -> maybeDescription.asJsonLD,
-            renku / "position"        -> position.asJsonLD,
-            renku / "prefix"          -> maybePrefix.asJsonLD,
-            schema / "defaultValue"   -> defaultValue.asJsonLD,
-            renku / "isTemporary"     -> temporary.asJsonLD,
-            renku / "createFolder"    -> folderCreation.asJsonLD,
-            schema / "encodingFormat" -> maybeEncodingFormat.asJsonLD,
-            rdfs / "label"            -> s"""Command Output Template "$defaultValue"""".asJsonLD
-          )
-        case output @ MappedCommandOutput(position,
-                                          name,
-                                          maybeDescription,
-                                          maybePrefix,
-                                          defaultValue,
-                                          folderCreation,
-                                          temporary,
-                                          maybeEncodingFormat,
-                                          mappedTo,
-                                          _
-            ) =>
-          JsonLD.entity(
-            output.asEntityId,
-            EntityTypes of (renku / "CommandOutput", renku / "CommandParameterBase"),
-            schema / "name"           -> name.asJsonLD,
-            schema / "description"    -> maybeDescription.asJsonLD,
-            renku / "position"        -> position.asJsonLD,
-            renku / "prefix"          -> maybePrefix.asJsonLD,
-            schema / "defaultValue"   -> defaultValue.asJsonLD,
-            renku / "mappedTo"        -> mappedTo.asJsonLD,
-            renku / "isTemporary"     -> temporary.asJsonLD,
-            renku / "createFolder"    -> folderCreation.asJsonLD,
-            schema / "encodingFormat" -> maybeEncodingFormat.asJsonLD,
-            rdfs / "label"            -> s"""Command Output Template "$defaultValue"""".asJsonLD
-          )
-      }
+      JsonLDEncoder.instance(_.to[entities.CommandParameterBase.CommandOutput].asJsonLD)
 
     implicit def entityIdEncoder[O <: CommandOutput](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[O] =
       EntityIdEncoder.instance(output => output.plan.asEntityId.asUrlEntityId / "outputs" / output.position)
   }
-
 }

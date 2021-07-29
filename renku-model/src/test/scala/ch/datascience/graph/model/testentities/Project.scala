@@ -104,12 +104,14 @@ object Project {
     }
   }
 
-  implicit lazy val toEntitiesProject: Project[ForksCount] => entities.Project = {
-    case p: ProjectWithoutParent[ForksCount] => toEntitiesProjectWithoutParent(p)
-    case p: ProjectWithParent[ForksCount]    => toEntitiesProjectWithParent(p)
+  implicit def toEntitiesProject(implicit renkuBaseUrl: RenkuBaseUrl): Project[ForksCount] => entities.Project = {
+    case p: ProjectWithParent[ForksCount]    => toEntitiesProjectWithParent(renkuBaseUrl)(p)
+    case p: ProjectWithoutParent[ForksCount] => toEntitiesProjectWithoutParent(renkuBaseUrl)(p)
   }
 
-  private val toEntitiesProjectWithoutParent: ProjectWithoutParent[ForksCount] => entities.ProjectWithoutParent =
+  private def toEntitiesProjectWithoutParent(implicit
+      renkuBaseUrl: RenkuBaseUrl
+  ): ProjectWithoutParent[ForksCount] => entities.ProjectWithoutParent =
     project =>
       entities.ProjectWithoutParent(
         projects.ResourceId(project.asEntityId),
@@ -122,7 +124,10 @@ object Project {
         project.members.map(_.to[entities.Person]),
         project.version
       )
-  private val toEntitiesProjectWithParent: ProjectWithParent[ForksCount] => entities.ProjectWithParent =
+
+  private def toEntitiesProjectWithParent(implicit
+      renkuBaseUrl: RenkuBaseUrl
+  ): ProjectWithParent[ForksCount] => entities.ProjectWithParent =
     project =>
       entities.ProjectWithParent(
         projects.ResourceId(project.asEntityId),
@@ -137,37 +142,16 @@ object Project {
         project.parent.resourceId
       )
 
-  val types: EntityTypes = EntityTypes.of(prov / "Location", schema / "Project")
-
   implicit def encoder[P <: Project[_]](implicit
       renkuBaseUrl: RenkuBaseUrl,
       gitLabApiUrl: GitLabApiUrl
   ): JsonLDEncoder[P] = JsonLDEncoder.instance {
     case project: ProjectWithParent[_] =>
-      JsonLD.entity(
-        project.asEntityId,
-        types,
-        schema / "name"             -> project.name.asJsonLD,
-        schema / "agent"            -> project.agent.asJsonLD,
-        schema / "dateCreated"      -> project.dateCreated.asJsonLD,
-        schema / "creator"          -> project.maybeCreator.asJsonLD,
-        renku / "projectVisibility" -> project.visibility.asJsonLD,
-        schema / "member"           -> project.members.toList.asJsonLD,
-        schema / "schemaVersion"    -> project.version.asJsonLD,
-        prov / "wasDerivedFrom"     -> project.parent.asJsonLD(encoder)
+      JsonLD.arr(
+        project.to[entities.Project].asJsonLD,
+        project.parent.to[entities.Project].asJsonLD
       )
-    case project: Project[_] =>
-      JsonLD.entity(
-        project.asEntityId,
-        types,
-        schema / "name"             -> project.name.asJsonLD,
-        schema / "agent"            -> project.agent.asJsonLD,
-        schema / "dateCreated"      -> project.dateCreated.asJsonLD,
-        schema / "creator"          -> project.maybeCreator.asJsonLD,
-        renku / "projectVisibility" -> project.visibility.asJsonLD,
-        schema / "member"           -> project.members.toList.asJsonLD,
-        schema / "schemaVersion"    -> project.version.asJsonLD
-      )
+    case project: Project[_] => project.to[entities.Project].asJsonLD
   }
 
   implicit def entityIdEncoder[P <: Project[_]](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[P] =

@@ -57,22 +57,21 @@ object Activity {
            usages:            List[Usage],
            generations:       List[Generation],
            parameters:        List[ParameterValue]
-  ): ValidatedNel[String, Activity] =
-    validateState(usages, generations, parameters).map { _ =>
-      Activity(
-        resourceId,
-        startTime,
-        endTime,
-        author,
-        agent,
-        projectResourceId,
-        order,
-        association,
-        usages,
-        generations,
-        parameters
-      )
-    }
+  ): ValidatedNel[String, Activity] = validateState(usages, generations, parameters).map { _ =>
+    Activity(
+      resourceId,
+      startTime,
+      endTime,
+      author,
+      agent,
+      projectResourceId,
+      order,
+      association,
+      usages,
+      generations,
+      parameters
+    )
+  }
 
   private[Activity] def validateState(usages:      List[Usage],
                                       generations: List[Generation],
@@ -105,19 +104,19 @@ object Activity {
   }
 
   implicit def encoder(implicit gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Activity] = JsonLDEncoder.instance {
-    entity =>
+    activity =>
       JsonLD.entity(
-        entity.resourceId.asEntityId,
+        activity.resourceId.asEntityId,
         entityTypes,
-        Reverse.ofJsonLDsUnsafe((prov / "activity") -> entity.generations.asJsonLD),
-        prov / "startedAtTime"        -> entity.startTime.asJsonLD,
-        prov / "endedAtTime"          -> entity.endTime.asJsonLD,
-        prov / "wasAssociatedWith"    -> JsonLD.arr(entity.agent.asJsonLD, entity.author.asJsonLD),
-        prov / "qualifiedAssociation" -> entity.association.asJsonLD,
-        prov / "qualifiedUsage"       -> entity.usages.asJsonLD,
-        renku / "parameter"           -> entity.parameters.asJsonLD,
-        schema / "isPartOf"           -> entity.projectResourceId.asEntityId.asJsonLD,
-        renku / "order"               -> entity.order.asJsonLD
+        Reverse.ofJsonLDsUnsafe((prov / "activity") -> activity.generations.asJsonLD),
+        prov / "startedAtTime"        -> activity.startTime.asJsonLD,
+        prov / "endedAtTime"          -> activity.endTime.asJsonLD,
+        prov / "wasAssociatedWith"    -> JsonLD.arr(activity.agent.asJsonLD, activity.author.asJsonLD),
+        prov / "qualifiedAssociation" -> activity.association.asJsonLD,
+        prov / "qualifiedUsage"       -> activity.usages.asJsonLD,
+        renku / "parameter"           -> activity.parameters.asJsonLD,
+        schema / "isPartOf"           -> activity.projectResourceId.asEntityId.asJsonLD,
+        renku / "order"               -> activity.order.asJsonLD
       )
   }
 

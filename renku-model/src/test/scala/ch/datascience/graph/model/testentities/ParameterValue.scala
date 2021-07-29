@@ -19,17 +19,17 @@
 package ch.datascience.graph.model.testentities
 
 import cats.syntax.all._
-import ch.datascience.graph.model.{RenkuBaseUrl, entities, parameterValues}
 import ch.datascience.graph.model.commandParameters.Name
 import ch.datascience.graph.model.entityModel.LocationLike
 import ch.datascience.graph.model.parameterValues.ValueOverride
 import ch.datascience.graph.model.testentities.CommandParameterBase._
 import ch.datascience.graph.model.testentities.ParameterValue.PathParameterValue.{InputParameterValue, OutputParameterValue}
 import ch.datascience.graph.model.testentities.ParameterValue._
+import ch.datascience.graph.model.{RenkuBaseUrl, entities, parameterValues}
 import ch.datascience.tinytypes.constraints.UUID
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder, _}
+import io.renku.jsonld._
 
 sealed trait ParameterValue {
   type ValueReference <: CommandParameterBase
@@ -49,12 +49,14 @@ object ParameterValue {
     val activity: Activity
   }
 
-  implicit lazy val toEntitiesParameterValue: ParameterValue => entities.ParameterValue = {
+  implicit def toEntitiesParameterValue(implicit
+      renkuBaseUrl: RenkuBaseUrl
+  ): ParameterValue => entities.ParameterValue = {
     case p: VariableParameterValue =>
       entities.ParameterValue.VariableParameterValue(parameterValues.ResourceId(p.asEntityId.show),
                                                      p.name,
                                                      p.value,
-                                                     p.valueReference.to[CommandParameter]
+                                                     p.valueReference.to[entities.CommandParameterBase.CommandParameter]
       )
     case p: OutputParameterValue =>
       entities.ParameterValue.OutputParameterValue(parameterValues.ResourceId(p.asEntityId.show),
@@ -110,36 +112,10 @@ object ParameterValue {
 
     def factory(value: ValueOverride, valueReference: CommandParameter): Activity => VariableParameterValue =
       VariableParameterValue(Id.generate, valueReference.name, value, valueReference, _)
-
   }
 
   implicit def encoder[PV <: ParameterValue](implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[PV] =
-    JsonLDEncoder.instance {
-      case value @ InputParameterValue(_, name, location, valueReference, _) =>
-        JsonLD.entity(
-          value.asEntityId,
-          EntityTypes of (renku / "ParameterValue", renku / "PathParameterValue"),
-          schema / "name"           -> name.asJsonLD,
-          prov / "atLocation"       -> location.asJsonLD,
-          schema / "valueReference" -> valueReference.asEntityId.asJsonLD
-        )
-      case value @ OutputParameterValue(_, name, location, valueReference, _) =>
-        JsonLD.entity(
-          value.asEntityId,
-          EntityTypes of (renku / "ParameterValue", renku / "PathParameterValue"),
-          schema / "name"           -> name.asJsonLD,
-          prov / "atLocation"       -> location.asJsonLD,
-          schema / "valueReference" -> valueReference.asEntityId.asJsonLD
-        )
-      case value @ VariableParameterValue(_, name, valueOverride, valueReference, _) =>
-        JsonLD.entity(
-          value.asEntityId,
-          EntityTypes of (renku / "ParameterValue", renku / "VariableParameterValue"),
-          schema / "name"           -> name.asJsonLD,
-          schema / "value"          -> valueOverride.asJsonLD,
-          schema / "valueReference" -> valueReference.asEntityId.asJsonLD
-        )
-    }
+    JsonLDEncoder.instance(_.to[entities.ParameterValue].asJsonLD)
 
   implicit def entityIdEncoder[PV <: ParameterValue](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[PV] =
     EntityIdEncoder.instance(value => value.activity.asEntityId.asUrlEntityId / "parameter" / value.id)

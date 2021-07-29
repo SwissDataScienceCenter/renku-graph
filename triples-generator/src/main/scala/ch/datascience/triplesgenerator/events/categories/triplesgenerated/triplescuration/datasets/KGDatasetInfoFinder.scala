@@ -97,7 +97,7 @@ private class KGDatasetInfoFinderImpl(
     s"""|SELECT ?topmostDerivedFrom
         |WHERE {
         |  <$resourceIdAsString> a schema:Dataset;
-        |                 renku:topmostDerivedFrom ?topmostDerivedFrom.
+        |                        renku:topmostDerivedFrom ?topmostDerivedFrom.
         |}
         |""".stripMargin
   )

@@ -18,9 +18,9 @@
 
 package ch.datascience.graph.model.testentities
 
-import cats.syntax.all._
-import ch.datascience.graph.model.{GitLabApiUrl, RenkuBaseUrl, entities, usages}
 import Usage.Id
+import cats.syntax.all._
+import ch.datascience.graph.model.{RenkuBaseUrl, entities, usages}
 import ch.datascience.tinytypes.constraints.UUID
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
@@ -41,17 +41,11 @@ object Usage {
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  implicit lazy val toEntitiesUsage: Usage => entities.Usage = usage =>
+  implicit def toEntitiesUsage(implicit renkuBaseUrl: RenkuBaseUrl): Usage => entities.Usage = usage =>
     entities.Usage(usages.ResourceId(usage.asEntityId.show), usage.entity.to[entities.Entity])
 
-  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Usage] =
-    JsonLDEncoder.instance { case usage @ Usage(_, _, entity) =>
-      JsonLD.entity(
-        usage.asEntityId,
-        EntityTypes of (prov / "Usage"),
-        prov / "entity" -> entity.asJsonLD
-      )
-    }
+  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[Usage] =
+    JsonLDEncoder.instance(_.to[entities.Usage].asJsonLD)
 
   implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[Usage] =
     EntityIdEncoder.instance { case Usage(id, activity, entity) =>
