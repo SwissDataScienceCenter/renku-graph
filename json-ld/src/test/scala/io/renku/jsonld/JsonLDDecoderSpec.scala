@@ -123,6 +123,18 @@ class JsonLDDecoderSpec
       parent1.asJsonLD.cursor.as[Parent] shouldBe parent1.asRight
     }
 
+    "decode nested entities - flattened JsonLD case" in {
+      parent1.asJsonLD.flatten.fold(fail(_), identity).cursor.as[List[Parent]] shouldBe List(parent1).asRight
+    }
+
+    "decode entity with an optional value" in {
+      val containerWithNone = OptionalValueContainer(maybeName = None)
+      containerWithNone.asJsonLD.cursor.as[OptionalValueContainer] shouldBe containerWithNone.asRight
+
+      val containerWithSome = OptionalValueContainer(maybeName = nonEmptyStrings().generateOne.some)
+      containerWithSome.asJsonLD.cursor.as[OptionalValueContainer] shouldBe containerWithSome.asRight
+    }
+
     "decode list of entities" in {
       val jsonLD = JsonLD.arr(parent1.asJsonLD, parent2.asJsonLD)
 
@@ -134,6 +146,61 @@ class JsonLDDecoderSpec
     "decode entity with a property of List of values" in {
       val container = ValuesContainer("container", List("0.0", "0.1", "0.3"))
       container.asJsonLD.cursor.as[ValuesContainer] shouldBe container.asRight
+    }
+
+    "decode entity with a single value property when encoded as a single value array" in {
+      val childEncoder = JsonLDEncoder.instance[Child](child =>
+        JsonLD.entity(EntityId.of(s"child/${child.name}"),
+                      EntityTypes.of(schema / "Child"),
+                      schema / "name" -> JsonLD.arr(child.name.asJsonLD)
+        )
+      )
+
+      val parentEncoder = JsonLDEncoder.instance[Parent](parent =>
+        JsonLD.entity(parent.id,
+                      parent.types,
+                      schema / "name"  -> JsonLD.arr(parent.name.asJsonLD),
+                      schema / "child" -> JsonLD.arr(parent.child.asJsonLD(childEncoder))
+        )
+      )
+
+      parent1.asJsonLD(parentEncoder).cursor.as[Parent] shouldBe parent1.asRight
+    }
+
+    "decode entity with a single value property when encoded as a single value array - flattened JsonLD case" in {
+      val childEncoder = JsonLDEncoder.instance[Child](child =>
+        JsonLD.entity(EntityId.of(s"child/${child.name}"),
+                      EntityTypes.of(schema / "Child"),
+                      schema / "name" -> JsonLD.arr(child.name.asJsonLD)
+        )
+      )
+
+      val parentEncoder = JsonLDEncoder.instance[Parent](parent =>
+        JsonLD.entity(parent.id,
+                      parent.types,
+                      schema / "name"  -> JsonLD.arr(parent.name.asJsonLD),
+                      schema / "child" -> JsonLD.arr(parent.child.asJsonLD(childEncoder))
+        )
+      )
+
+      parent1.asJsonLD(parentEncoder).flatten.fold(fail(_), identity).cursor.as[List[Parent]] shouldBe
+        List(parent1).asRight
+    }
+
+    "decode entity with an optional value when the value is stored in an array" in {
+      val customEncoder = JsonLDEncoder.instance[OptionalValueContainer](container =>
+        JsonLD.entity(
+          EntityId.of(s"optionalValueContainer/${container.maybeName.getOrElse("container")}"),
+          EntityTypes.of(schema / "OptionalValueContainer"),
+          schema / "name" -> container.maybeName.map(name => JsonLD.arr(name.asJsonLD)).getOrElse(JsonLD.arr())
+        )
+      )
+
+      val containerWithNone = OptionalValueContainer(maybeName = None)
+      containerWithNone.asJsonLD(customEncoder).cursor.as[OptionalValueContainer] shouldBe containerWithNone.asRight
+
+      val containerWithSome = OptionalValueContainer(maybeName = nonEmptyStrings().generateOne.some)
+      containerWithSome.asJsonLD(customEncoder).cursor.as[OptionalValueContainer] shouldBe containerWithSome.asRight
     }
 
     "decode entity with a property of List of values - case with missing property in JsonLD" in {
@@ -206,18 +273,17 @@ class JsonLDDecoderSpec
       listOfList.asJsonLD.flatten.fold(throw _, identity).cursor.as[List[ListOfList]] shouldBe List(listOfList).asRight
     }
 
-    "decode a list of heterogenous entities" in {
-      val containerHList =
-        ContainerHList("hList", Parent("parent", Child("child2")), Child("child1"))
+    "decode entity which properties' values are encoded in a single heterogeneous list" in {
+      val listContainer = ListContainer("hList", Parent("parent", Child("child2")), Child("child1"))
 
-      containerHList.asJsonLD.cursor.as[ContainerHList] shouldBe containerHList.asRight
+      listContainer.asJsonLD.cursor.as[ListContainer] shouldBe listContainer.asRight
 
       JsonLD
-        .arr(containerHList.asJsonLD, Child("child3").asJsonLD)
+        .arr(listContainer.asJsonLD, Child("child3").asJsonLD)
         .flatten
         .fold(throw _, identity)
         .cursor
-        .as[List[ContainerHList]] shouldBe List(containerHList).asRight
+        .as[List[ListContainer]] shouldBe List(listContainer).asRight
     }
 
     "decode an entity with fallback - case when fallback has the same types" in {
@@ -282,10 +348,11 @@ class JsonLDDecoderSpec
   private sealed trait ChildTrait extends Entity
   private case class Child(name: String) extends ChildTrait
   private object ChildA extends Child("a")
+  private case class OptionalValueContainer(maybeName: Option[String]) extends Entity
   private case class ValuesContainer(name: String, tags: List[String]) extends Entity
   private case class ParentsContainer(name: String, parents: List[Parent])
   private case class ListOfList(name: String, list: List[List[String]])
-  private case class ContainerHList(name: String, parent: Parent, child: Child)
+  private case class ListContainer(name: String, parent: Parent, child: Child)
 
   private implicit lazy val parentEncoder: JsonLDEncoder[Parent] = JsonLDEncoder.instance(parent =>
     JsonLD.entity(parent.id,
@@ -294,57 +361,6 @@ class JsonLDDecoderSpec
                   schema / "child" -> parent.child.asJsonLD
     )
   )
-  private implicit lazy val childEncoder: JsonLDEncoder[Child] = JsonLDEncoder.instance(child =>
-    JsonLD.entity(EntityId.of(s"child/${child.name}"),
-                  EntityTypes.of(schema / "Child"),
-                  schema / "name" -> child.name.asJsonLD
-    )
-  )
-
-  private implicit lazy val childAEncoder: JsonLDEncoder[ChildA.type] = JsonLDEncoder.instance(child =>
-    JsonLD.entity(EntityId.of(s"child/${child.name}"),
-                  EntityTypes.of(schema / "Child", schema / "ChildA"),
-                  schema / "name" -> child.name.asJsonLD
-    )
-  )
-
-  private implicit lazy val valuesContainerEncoder: JsonLDEncoder[ValuesContainer] = JsonLDEncoder.instance(values =>
-    JsonLD.entity(
-      EntityId.of(s"container/${values.name}"),
-      EntityTypes.of(schema / "ValuesContainer"),
-      schema / "name" -> values.name.asJsonLD,
-      schema / "tags" -> values.tags.asJsonLD
-    )
-  )
-
-  private implicit lazy val parentsContainerEncoder: JsonLDEncoder[ParentsContainer] =
-    JsonLDEncoder.instance(parentsContainer =>
-      JsonLD.entity(
-        EntityId.of(s"container/${parentsContainer.name}"),
-        EntityTypes.of(schema / "ParentsContainer"),
-        schema / "name"    -> parentsContainer.name.asJsonLD,
-        schema / "parents" -> parentsContainer.parents.asJsonLD
-      )
-    )
-  private implicit lazy val listOfListEncoder: JsonLDEncoder[ListOfList] =
-    JsonLDEncoder.instance(listOfList =>
-      JsonLD.entity(
-        EntityId.of(s"listOfList/${listOfList.name}"),
-        EntityTypes.of(schema / "ListOfList"),
-        schema / "name" -> listOfList.name.asJsonLD,
-        schema / "list" -> listOfList.list.asJsonLD
-      )
-    )
-
-  private implicit lazy val hListEncoder: JsonLDEncoder[ContainerHList] =
-    JsonLDEncoder.instance(hList =>
-      JsonLD.entity(
-        EntityId.of(s"hlist/${hList.name}"),
-        EntityTypes.of(schema / "HList"),
-        schema / "name" -> hList.name.asJsonLD,
-        schema / "list" -> JsonLD.arr(hList.parent.asJsonLD, hList.child.asJsonLD)
-      )
-    )
 
   private implicit lazy val parentDecoder: JsonLDEntityDecoder[Parent] =
     JsonLDDecoder.entity(EntityTypes.of(schema / "Parent")) { cursor =>
@@ -356,10 +372,24 @@ class JsonLDDecoderSpec
       } yield Parent(id, types, name, child)
     }
 
+  private implicit lazy val childEncoder: JsonLDEncoder[Child] = JsonLDEncoder.instance(child =>
+    JsonLD.entity(EntityId.of(s"child/${child.name}"),
+                  EntityTypes.of(schema / "Child"),
+                  schema / "name" -> child.name.asJsonLD
+    )
+  )
+
   private implicit lazy val childDecoder: JsonLDEntityDecoder[Child] =
     JsonLDDecoder.entity(EntityTypes.of(schema / "Child")) { cursor =>
       cursor.downField(schema / "name").as[String] map Child.apply
     }
+
+  private implicit lazy val childAEncoder: JsonLDEncoder[ChildA.type] = JsonLDEncoder.instance(child =>
+    JsonLD.entity(EntityId.of(s"child/${child.name}"),
+                  EntityTypes.of(schema / "Child", schema / "ChildA"),
+                  schema / "name" -> child.name.asJsonLD
+    )
+  )
 
   private lazy val childADecoder: JsonLDEntityDecoder[ChildA.type] =
     JsonLDDecoder.entity(EntityTypes.of(schema / "Child")) { cursor =>
@@ -369,6 +399,29 @@ class JsonLDDecoderSpec
       }
     }
 
+  private implicit lazy val optionalValueContainerEncoder: JsonLDEncoder[OptionalValueContainer] =
+    JsonLDEncoder.instance(container =>
+      JsonLD.entity(
+        EntityId.of(s"optionalValueContainer/${container.maybeName.getOrElse("container")}"),
+        EntityTypes.of(schema / "OptionalValueContainer"),
+        schema / "name" -> container.maybeName.asJsonLD
+      )
+    )
+
+  private implicit lazy val optionalValueContainerDecoder: JsonLDEntityDecoder[OptionalValueContainer] =
+    JsonLDDecoder.entity(EntityTypes.of(schema / "OptionalValueContainer")) { cursor =>
+      cursor.downField(schema / "name").as[Option[String]] map OptionalValueContainer.apply
+    }
+
+  private implicit lazy val valuesContainerEncoder: JsonLDEncoder[ValuesContainer] = JsonLDEncoder.instance(values =>
+    JsonLD.entity(
+      EntityId.of(s"container/${values.name}"),
+      EntityTypes.of(schema / "ValuesContainer"),
+      schema / "name" -> values.name.asJsonLD,
+      schema / "tags" -> values.tags.asJsonLD
+    )
+  )
+
   private implicit lazy val valuesContainerDecoder: JsonLDEntityDecoder[ValuesContainer] =
     JsonLDDecoder.entity(EntityTypes.of(schema / "ValuesContainer")) { cursor =>
       for {
@@ -376,6 +429,16 @@ class JsonLDDecoderSpec
         tags <- cursor.downField(schema / "tags").as[List[String]]
       } yield ValuesContainer(name, tags)
     }
+
+  private implicit lazy val parentsContainerEncoder: JsonLDEncoder[ParentsContainer] =
+    JsonLDEncoder.instance(parentsContainer =>
+      JsonLD.entity(
+        EntityId.of(s"container/${parentsContainer.name}"),
+        EntityTypes.of(schema / "ParentsContainer"),
+        schema / "name"    -> parentsContainer.name.asJsonLD,
+        schema / "parents" -> parentsContainer.parents.asJsonLD
+      )
+    )
 
   private implicit lazy val parentsContainerDecoder: JsonLDDecoder[ParentsContainer] =
     JsonLDDecoder.entity(EntityTypes.of(schema / "ParentsContainer")) { cursor =>
@@ -385,6 +448,16 @@ class JsonLDDecoderSpec
       } yield ParentsContainer(name, parents)
     }
 
+  private implicit lazy val listOfListEncoder: JsonLDEncoder[ListOfList] =
+    JsonLDEncoder.instance(listOfList =>
+      JsonLD.entity(
+        EntityId.of(s"listOfList/${listOfList.name}"),
+        EntityTypes.of(schema / "ListOfList"),
+        schema / "name" -> listOfList.name.asJsonLD,
+        schema / "list" -> listOfList.list.asJsonLD
+      )
+    )
+
   private implicit lazy val listOfListDecoder: JsonLDDecoder[ListOfList] =
     JsonLDDecoder.entity(EntityTypes.of(schema / "ListOfList")) { cursor =>
       for {
@@ -393,13 +466,22 @@ class JsonLDDecoderSpec
       } yield ListOfList(name, list)
     }
 
-  private implicit lazy val hListDecoder: JsonLDDecoder[ContainerHList] =
-    JsonLDDecoder.entity(EntityTypes.of(schema / "HList")) { cursor =>
+  private implicit lazy val listContainerEncoder: JsonLDEncoder[ListContainer] =
+    JsonLDEncoder.instance(container =>
+      JsonLD.entity(
+        EntityId.of(s"container/${container.name}"),
+        EntityTypes.of(schema / "ListContainer"),
+        schema / "name" -> container.name.asJsonLD,
+        schema / "list" -> JsonLD.arr(container.parent.asJsonLD, container.child.asJsonLD)
+      )
+    )
+
+  private implicit lazy val listContainerDecoder: JsonLDDecoder[ListContainer] =
+    JsonLDDecoder.entity(EntityTypes.of(schema / "ListContainer")) { cursor =>
       for {
         name   <- cursor.downField(schema / "name").as[String]
         parent <- cursor.downField(schema / "list").downArray.as[List[Parent]]
         child  <- cursor.downField(schema / "list").downArray.as[List[Child]]
-      } yield ContainerHList(name, parent.head, child.head)
+      } yield ListContainer(name, parent.head, child.head)
     }
-
 }
