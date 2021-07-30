@@ -37,15 +37,15 @@ class KGProjectFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
   "findProject" should {
 
     "return details of the project with the given path when there's no parent" in new TestCase {
-      forAll(projectEntities[ForksCount.Zero](visibilityAny)) { project =>
-        loadToStore(projectEntities[ForksCount.Zero](visibilityAny).generateOne, project)
+      forAll(projectEntities[ForksCount.Zero](anyVisibility)) { project =>
+        loadToStore(projectEntities[ForksCount.Zero](anyVisibility).generateOne, project)
 
         metadataFinder.findProject(project.path).unsafeRunSync() shouldBe Some(project.to[KGProject])
       }
     }
 
     "return details of the project with the given path if it has a parent project" in new TestCase {
-      forAll(projectWithParentEntities(visibilityAny)) { project =>
+      forAll(projectWithParentEntities(anyVisibility)) { project =>
         loadToStore(project)
 
         metadataFinder.findProject(project.path).unsafeRunSync() shouldBe Some(project.to[KGProject])

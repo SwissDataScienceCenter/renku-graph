@@ -88,21 +88,23 @@ object GraphModelGenerators {
   implicit val projectDescriptions: Gen[projects.Description] = paragraphs() map (v => projects.Description(v.value))
   implicit val projectVisibilities: Gen[Visibility]           = Gen.oneOf(Visibility.all.toList)
   def projectCreatedDates(min: Instant = Instant.EPOCH): Gen[projects.DateCreated] =
-    timestamps(min, max = Instant.now()) map projects.DateCreated.apply
-  implicit val projectPaths: Gen[Path] = {
+    timestamps(min, max = Instant.now()).toGeneratorOf(projects.DateCreated)
+
+  implicit val projectNamespaces: Gen[projects.Namespace] = {
     val firstCharGen    = frequency(6 -> alphaChar, 2 -> numChar, 1 -> const('_'))
     val nonFirstCharGen = frequency(6 -> alphaChar, 2 -> numChar, 1 -> oneOf('_', '.', '-'))
-    val partsGenerator = for {
+    for {
       firstChar  <- firstCharGen
       otherChars <- nonEmptyList(nonFirstCharGen, minElements = 5, maxElements = 10)
-    } yield s"$firstChar${otherChars.toList.mkString("")}"
-
-    relativePaths(
-      minSegments = 2,
-      maxSegments = 5,
-      partsGenerator = partsGenerator
-    ) map Path.apply
+    } yield projects.Namespace(s"$firstChar${otherChars.toList.mkString("")}")
   }
+
+  implicit val projectPaths: Gen[Path] = relativePaths(
+    minSegments = 2,
+    maxSegments = 5,
+    partsGenerator = projectNamespaces.map(_.show)
+  ) map Path.apply
+
   implicit val projectResourceIds: Gen[ResourceId] = projectResourceIds()(renkuBaseUrls.generateOne)
   def projectResourceIds()(implicit renkuBaseUrl: RenkuBaseUrl): Gen[ResourceId] =
     for {

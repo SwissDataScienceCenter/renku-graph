@@ -61,7 +61,7 @@ class ProjectMetadataSpec extends AnyWordSpec with should.Matchers with ScalaChe
       val onlyGLMember  = personEntities(withGitLabId, withoutEmail).generateOne
       val gLAndKGMember = personEntities(withGitLabId, withEmail).generateOne
       val creator       = personEntities(withGitLabId, withEmail).generateOne
-      val project = projectEntities[ForksCount](visibilityAny)(anyForksCount).generateOne
+      val project = projectEntities[ForksCount](anyVisibility)(anyForksCount).generateOne
         .copy(maybeCreator = Some(creator), members = Set(onlyGLMember, gLAndKGMember))
 
       val activity = activityEntities(fixed(project)).generateOne
@@ -88,8 +88,8 @@ class ProjectMetadataSpec extends AnyWordSpec with should.Matchers with ScalaChe
     }
 
     "return a failure if activity or dataset points to a different project" in {
-      val project = projectEntities[ForksCount](visibilityAny)(anyForksCount).generateOne
-      val otherProject = projectEntities[ForksCount](visibilityAny)(anyForksCount).generateOne
+      val project = projectEntities[ForksCount](anyVisibility)(anyForksCount).generateOne
+      val otherProject = projectEntities[ForksCount](anyVisibility)(anyForksCount).generateOne
         .copy(dateCreated =
           timestamps(min = project.dateCreated.value, max = Instant.now).generateAs[projects.DateCreated]
         )
@@ -115,7 +115,7 @@ class ProjectMetadataSpec extends AnyWordSpec with should.Matchers with ScalaChe
     }
 
     "return a failure if activity's startTime is before project creation date - case of project without a parent" in {
-      val project = projectEntities[ForksCount](visibilityAny)(anyForksCount).generateOne
+      val project = projectEntities[ForksCount](anyVisibility)(anyForksCount).generateOne
       val invalidActivity = activityEntities(fixed(project)).generateOne
         .to[entities.Activity]
         .copy(startTime = timestamps(max = project.dateCreated.value).generateAs[activities.StartTime])
@@ -125,7 +125,7 @@ class ProjectMetadataSpec extends AnyWordSpec with should.Matchers with ScalaChe
     }
 
     "return a failure if internal or modified dataset's provenance date is before project creation date - case of project without a parent" in {
-      val project = projectEntities[ForksCount](visibilityAny)(anyForksCount).generateOne
+      val project = projectEntities[ForksCount](anyVisibility)(anyForksCount).generateOne
       List(
         datasetEntities(datasetProvenanceInternal, fixed(project)),
         datasetEntities(datasetProvenanceModified, fixed(project))
@@ -141,7 +141,7 @@ class ProjectMetadataSpec extends AnyWordSpec with should.Matchers with ScalaChe
     }
 
     "succeeds for datasets with external provenance and date older than project - case project without a parent" in {
-      val project = projectEntities[ForksCount](visibilityAny)(anyForksCount).generateOne
+      val project = projectEntities[ForksCount](anyVisibility)(anyForksCount).generateOne
 
       List(
         datasetEntities(datasetProvenanceImportedExternal, fixed(project)),
@@ -159,7 +159,7 @@ class ProjectMetadataSpec extends AnyWordSpec with should.Matchers with ScalaChe
     }
 
     "succeeds for datasets with any provenance and date older than project - case project with a parent" in {
-      val project = projectWithParentEntities(visibilityAny).generateOne
+      val project = projectWithParentEntities(anyVisibility).generateOne
       forAll(datasetEntities(ofAnyProvenance, fixed(project))) { dataset =>
         val validDataset = {
           val d = dataset.to[entities.Dataset[entities.Dataset.Provenance]]
@@ -274,7 +274,7 @@ class ProjectMetadataSpec extends AnyWordSpec with should.Matchers with ScalaChe
 
     "return all datasets with ImportedInternalAncestorExternal or ImportedInternalAncestorInternal provenance" +
       "which are not invalidated" in {
-        val project = projectEntities(visibilityAny)(anyForksCount).generateOne
+        val project = projectEntities(anyVisibility)(anyForksCount).generateOne
 
         val internal = datasetEntities(datasetProvenanceInternal, fixed(project)).generateOne
           .to[entities.Dataset[entities.Dataset.Provenance.Internal]]
@@ -316,7 +316,7 @@ class ProjectMetadataSpec extends AnyWordSpec with should.Matchers with ScalaChe
 
   "findModifiedDatasets" should {
     "return all datasets with Provenence.Modified which are not invalidated" in {
-      val project = projectEntities(visibilityAny)(anyForksCount).generateOne
+      val project = projectEntities(anyVisibility)(anyForksCount).generateOne
 
       val internal = datasetEntities(datasetProvenanceInternal, fixed(project)).generateOne
         .to[entities.Dataset[entities.Dataset.Provenance.Internal]]
@@ -355,7 +355,7 @@ class ProjectMetadataSpec extends AnyWordSpec with should.Matchers with ScalaChe
 
   "findInvalidatedDatasets" should {
     "find all invalidated datasets and not valid datasets" in {
-      val project = projectEntities(visibilityAny)(anyForksCount).generateOne
+      val project = projectEntities(anyVisibility)(anyForksCount).generateOne
 
       val internal = datasetEntities(datasetProvenanceInternal, fixed(project)).generateOne
         .to[entities.Dataset[entities.Dataset.Provenance.Internal]]

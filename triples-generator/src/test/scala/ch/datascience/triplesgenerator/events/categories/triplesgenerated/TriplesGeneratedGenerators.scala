@@ -46,7 +46,7 @@ private object TriplesGeneratedGenerators {
   } yield TriplesGeneratedEvent(eventId, project, entities, schemaVersion)
 
   lazy val projectMetadatas: Gen[ProjectMetadata] = for {
-    project <- projectEntities[ForksCount](visibilityAny)(anyForksCount)
+    project <- projectEntities[ForksCount](anyVisibility)(anyForksCount)
     activities <-
       executionPlanners(planEntities(), fixed(project)).map(_.buildProvenanceUnsafe()).toGeneratorOfList()
     datasets <- datasetEntities(ofAnyProvenance, fixed(project)).toGeneratorOfList()

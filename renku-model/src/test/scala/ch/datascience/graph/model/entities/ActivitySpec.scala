@@ -80,7 +80,7 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
       val location = entityLocations.generateOne
       val activity = executionPlanners(
         planEntities(CommandOutput.fromLocation(location)),
-        projectEntities(visibilityAny)(anyForksCount)
+        projectEntities(anyVisibility)(anyForksCount)
       ).generateOne
         .buildProvenanceUnsafe()
 
@@ -110,7 +110,7 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
     "fail if there is no Agent entity" in {
       val activity = executionPlanners(
         planEntities(),
-        projectEntities(visibilityAny)(anyForksCount)
+        projectEntities(anyVisibility)(anyForksCount)
       ).generateOne
         .buildProvenanceUnsafe()
         .to[entities.Activity]
@@ -144,7 +144,7 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
     "fail if there is no Author entity" in {
       val activity = executionPlanners(
         planEntities(),
-        projectEntities(visibilityAny)(anyForksCount)
+        projectEntities(anyVisibility)(anyForksCount)
       ).generateOne
         .buildProvenanceUnsafe()
         .to[entities.Activity]

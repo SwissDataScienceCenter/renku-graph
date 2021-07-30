@@ -61,7 +61,6 @@ object IntTinyType {
 
 trait Sensitive extends Any {
   self: TinyType =>
-
   override def toString: String = "<sensitive>"
 }
 

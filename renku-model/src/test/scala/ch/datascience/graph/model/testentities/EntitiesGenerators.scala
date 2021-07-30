@@ -96,11 +96,11 @@ trait EntitiesGenerators {
 
   lazy val visibilityPublic:    Gen[Visibility] = fixed(Visibility.Public)
   lazy val visibilityNonPublic: Gen[Visibility] = Gen.oneOf(Visibility.Internal, Visibility.Private)
-  lazy val visibilityAny:       Gen[Visibility] = projectVisibilities
+  lazy val anyVisibility:       Gen[Visibility] = projectVisibilities
 
   lazy val anyProjectEntities: Gen[Project[ForksCount]] = Gen.oneOf(
-    projectEntities(visibilityAny)(anyForksCount),
-    projectWithParentEntities(visibilityAny)
+    projectEntities(anyVisibility)(anyForksCount),
+    projectWithParentEntities(anyVisibility)
   )
 
   def projectWithParentEntities(
@@ -114,7 +114,7 @@ trait EntitiesGenerators {
       minDateCreated:       projects.DateCreated = projects.DateCreated(Instant.EPOCH)
   )(implicit forksCountGen: Gen[FC]): Gen[ProjectWithoutParent[FC]] = for {
     path         <- projectPaths
-    name         <- projectNames
+    name         <- Gen.const(path.toName)
     agent        <- cliVersions
     dateCreated  <- projectCreatedDates(minDateCreated.value)
     maybeCreator <- personEntities(withGitLabId).toGeneratorOfOptions
@@ -407,7 +407,7 @@ trait EntitiesGenerators {
     nonBlankStrings().map(v => ValueOverride(v.value))
 
   def executionPlanners(planGen:    Project[ForksCount] => Gen[Plan],
-                        projectGen: Gen[Project[ForksCount]] = projectEntities[ForksCount.Zero](visibilityAny)
+                        projectGen: Gen[Project[ForksCount]] = projectEntities[ForksCount.Zero](anyVisibility)
   ): Gen[ExecutionPlanner] = for {
     project    <- projectGen
     plan       <- planGen(project)

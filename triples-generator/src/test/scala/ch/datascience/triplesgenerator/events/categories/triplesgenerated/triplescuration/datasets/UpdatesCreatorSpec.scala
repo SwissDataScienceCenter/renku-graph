@@ -98,15 +98,15 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
       "select one the dataset with the oldest date " +
       "and update all datasets which have topmostSameAs pointing to the deleted DS with the selected resourceId" in {
         val grandparent = datasetEntities(datasetProvenanceInternal).generateOne.copy(parts = Nil)
-        val parent1     = grandparent.importTo(projectEntities(visibilityAny)(anyForksCount).generateOne)
-        val child1      = parent1.importTo(projectEntities(visibilityAny)(anyForksCount).generateOne)
+        val parent1     = grandparent.importTo(projectEntities(anyVisibility)(anyForksCount).generateOne)
+        val child1      = parent1.importTo(projectEntities(anyVisibility)(anyForksCount).generateOne)
         val parent2 = {
-          val ds = grandparent.importTo(projectEntities(visibilityAny)(anyForksCount).generateOne)
+          val ds = grandparent.importTo(projectEntities(anyVisibility)(anyForksCount).generateOne)
           ds.copy(provenance =
             ds.provenance.copy(date = datasetCreatedDates(parent1.provenance.date.instant).generateOne)
           )
         }
-        val child2 = parent2.importTo(projectEntities(visibilityAny)(anyForksCount).generateOne)
+        val child2 = parent2.importTo(projectEntities(anyVisibility)(anyForksCount).generateOne)
 
         val entitiesGrandparent = grandparent.to[entities.Dataset[entities.Dataset.Provenance.Internal]]
         val entitiesParent1     = parent1.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
@@ -165,13 +165,13 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
       "find datasets which have sameAs pointing to the deleted dataset " +
       "update their sameAs to their topmostSameAs" in {
         val grandparent = datasetEntities(datasetProvenanceImportedExternal).generateOne.copy(parts = Nil)
-        val parent1     = grandparent.importTo(projectEntities(visibilityAny)(anyForksCount).generateOne)
-        val child1      = parent1.importTo(projectEntities(visibilityAny)(anyForksCount).generateOne)
+        val parent1     = grandparent.importTo(projectEntities(anyVisibility)(anyForksCount).generateOne)
+        val child1      = parent1.importTo(projectEntities(anyVisibility)(anyForksCount).generateOne)
         val parent2 = {
-          val ds = grandparent.importTo(projectEntities(visibilityAny)(anyForksCount).generateOne)
+          val ds = grandparent.importTo(projectEntities(anyVisibility)(anyForksCount).generateOne)
           ds.copy(provenance = ds.provenance.copy(date = datasetPublishedDates(parent1.provenance.date).generateOne))
         }
-        val child2 = parent2.importTo(projectEntities(visibilityAny)(anyForksCount).generateOne)
+        val child2 = parent2.importTo(projectEntities(anyVisibility)(anyForksCount).generateOne)
 
         val entitiesGrandparent = grandparent.to[entities.Dataset[entities.Dataset.Provenance.ImportedExternal]]
         val entitiesParent1     = parent1.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorExternal]]

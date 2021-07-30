@@ -41,7 +41,7 @@ class KGProjectMembersFinderSpec
 
     "return all members of a given project" in new TestCase {
       val members = personEntities(withGitLabId).generateFixedSizeSet()
-      val project = projectEntities[ForksCount.Zero](visibilityAny).generateOne.copy(members = members)
+      val project = projectEntities[ForksCount.Zero](anyVisibility).generateOne.copy(members = members)
 
       loadToStore(project)
 

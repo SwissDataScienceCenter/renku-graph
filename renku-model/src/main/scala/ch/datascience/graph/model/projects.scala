@@ -33,7 +33,7 @@ object projects {
   final class Id private (val value: Int) extends AnyVal with IntTinyType
   implicit object Id extends TinyTypeFactory[Id](new Id(_)) with NonNegativeInt with TinyTypeJsonLDOps[Id]
 
-  class Path private (val value: String) extends AnyVal with RelativePathTinyType
+  final class Path private (val value: String) extends AnyVal with RelativePathTinyType
   implicit object Path extends TinyTypeFactory[Path](new Path(_)) with RelativePath with TinyTypeJsonLDOps[Path] {
     private val allowedFirstChar         = ('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9') :+ '_'
     private[projects] val regexValidator = "^([\\w.-]+)(\\/([\\w.-]+))+$"
@@ -41,9 +41,18 @@ object projects {
       check = v => (v contains "/") && (allowedFirstChar contains v.head) && (v matches regexValidator),
       message = (value: String) => s"'$value' is not a valid $typeName"
     )
+
+    implicit class PathOps(path: Path) {
+      private lazy val nameString :: namespacesStringReversed = path.show.split('/').toList.reverse
+      lazy val toName:       Name            = Name(nameString)
+      lazy val toNamespaces: List[Namespace] = namespacesStringReversed.reverseIterator.map(Namespace(_)).toList
+    }
   }
 
-  class ResourceId private (val value: String) extends AnyVal with StringTinyType
+  final class Namespace private (val value: String) extends AnyVal with StringTinyType
+  object Namespace extends TinyTypeFactory[Namespace](new Namespace(_)) with NonBlank with TinyTypeJsonLDOps[Namespace]
+
+  final class ResourceId private (val value: String) extends AnyVal with StringTinyType
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with Url

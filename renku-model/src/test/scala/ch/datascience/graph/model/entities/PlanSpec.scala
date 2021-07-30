@@ -55,7 +55,7 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
   } yield parameters ::: locationInputs ::: mappedInputs ::: locationOutputs ::: mappedOutputs
 
   private def planObjects(
-      projectGen: Gen[Project[ForksCount]] = projectEntities(visibilityAny)(anyForksCount)
+      projectGen: Gen[Project[ForksCount]] = projectEntities(anyVisibility)(anyForksCount)
   ): Gen[Plan] = for {
     name                     <- planNames
     command                  <- planCommands

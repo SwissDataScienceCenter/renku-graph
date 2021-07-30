@@ -35,7 +35,7 @@ class AssociationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPr
   "Association.decode" should {
 
     "turn JsonLD Association entity into the Association object" in {
-      forAll(executionPlanners(planEntities(), projectEntities(visibilityAny)(anyForksCount))) { executionPlanner =>
+      forAll(executionPlanners(planEntities(), projectEntities(anyVisibility)(anyForksCount))) { executionPlanner =>
         val activity = executionPlanner.buildProvenanceUnsafe()
 
         activity.asJsonLD.flatten
@@ -46,7 +46,7 @@ class AssociationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPr
     }
 
     "fail if there are no plan entity the Association points to" in {
-      val association = executionPlanners(planEntities(), projectEntities(visibilityAny)(anyForksCount)).generateOne
+      val association = executionPlanners(planEntities(), projectEntities(anyVisibility)(anyForksCount)).generateOne
         .buildProvenanceUnsafe()
         .association
         .to[entities.Association]
@@ -71,7 +71,7 @@ class AssociationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPr
     }
 
     "fail if there are no Agent entity the Association points to" in {
-      val association = executionPlanners(planEntities(), projectEntities(visibilityAny)(anyForksCount)).generateOne
+      val association = executionPlanners(planEntities(), projectEntities(anyVisibility)(anyForksCount)).generateOne
         .buildProvenanceUnsafe()
         .association
         .to[entities.Association]

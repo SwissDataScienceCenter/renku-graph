@@ -35,7 +35,7 @@ class KGProjectFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
   "find" should {
 
     "return name, derivedFrom, visibility, and creator for a given project ResourceId" in new TestCase {
-      forAll(projectEntities(visibilityAny)(anyForksCount).map(_.to[entities.Project])) { project =>
+      forAll(projectEntities(anyVisibility)(anyForksCount).map(_.to[entities.Project])) { project =>
         val maybeParent = project match {
           case projectWithParent: entities.ProjectWithParent    => Some(projectWithParent.parentResourceId)
           case _:                 entities.ProjectWithoutParent => None

@@ -142,7 +142,7 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
 
     "fail if there are other projects in the JsonLD" in new TestCase {
       val activity     = generateActivity(project)
-      val otherProject = projectEntities(visibilityAny)(anyForksCount).generateOne
+      val otherProject = projectEntities(anyVisibility)(anyForksCount).generateOne
       val dataset      = datasetEntities(ofAnyProvenance, fixed(otherProject)).generateOne
 
       givenFindProjectInfo(project.path)
@@ -260,7 +260,7 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
 
   private trait TestCase {
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
-    val project = projectEntities[ForksCount](visibilityAny)(anyForksCount).generateOne
+    val project = projectEntities[ForksCount](anyVisibility)(anyForksCount).generateOne
     val gitLabProjectInfo = GitLabProjectInfo(
       project.name,
       project.path,

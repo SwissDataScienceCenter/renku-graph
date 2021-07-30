@@ -112,5 +112,5 @@ class CommandParameterBaseSpec extends AnyWordSpec with should.Matchers with Sca
     }
   }
 
-  private lazy val project: Project[ForksCount] = projectEntities(visibilityAny)(anyForksCount).generateOne
+  private lazy val project: Project[ForksCount] = projectEntities(anyVisibility)(anyForksCount).generateOne
 }

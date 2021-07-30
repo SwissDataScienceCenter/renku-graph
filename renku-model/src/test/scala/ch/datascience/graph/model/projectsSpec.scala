@@ -56,7 +56,6 @@ class IdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Match
 class PathSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "Path" should {
-
     "be a RelativePath" in {
       Path shouldBe a[RelativePath]
     }
@@ -85,6 +84,22 @@ class PathSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Mat
     "fail for absolute URLs" in {
       an[IllegalArgumentException] shouldBe thrownBy {
         Path(httpUrls().generateOne)
+      }
+    }
+  }
+
+  "toName" should {
+    "extract the very last path segment" in {
+      forAll(projectNamespaces.toGeneratorOfNonEmptyList(), projectNames) { (namespaces, name) =>
+        Path(s"${namespaces.map(_.show).nonEmptyIntercalate("/")}/$name").toName shouldBe name
+      }
+    }
+  }
+
+  "toNamespaces" should {
+    "extract all the path segment except the last" in {
+      forAll(projectNamespaces.toGeneratorOfNonEmptyList(), projectNames) { (namespaces, name) =>
+        Path(s"${namespaces.map(_.show).nonEmptyIntercalate("/")}/$name").toNamespaces shouldBe namespaces.toList
       }
     }
   }

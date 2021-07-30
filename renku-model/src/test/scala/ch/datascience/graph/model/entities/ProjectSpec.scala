@@ -21,14 +21,14 @@ package ch.datascience.graph.model.entities
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.Schemas.{prov, schema}
+import ch.datascience.graph.model.Schemas.{prov, renku, schema}
 import ch.datascience.graph.model._
 import ch.datascience.graph.model.entities.Project.ProjectMember
 import ch.datascience.graph.model.testentities._
 import io.circe.DecodingFailure
 import io.renku.jsonld.JsonLDDecoder._
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{EntityTypes, JsonLD}
+import io.renku.jsonld.{EntityId, EntityTypes, JsonLD}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -37,18 +37,17 @@ import scala.util.Random
 
 class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
-  "Project.decode" should {
+  "decode" should {
 
     "turn JsonLD Project entity without parent into the Project object" in {
       forAll(gitLabProjectInfos.map(_.copy(maybeParentPath = None)), cliVersions, projectSchemaVersions) {
         (projectInfo, cliVersion, schemaVersion) =>
-          val resourceId    = projects.ResourceId(renkuBaseUrl, projectInfo.path)
-          val projectEntity = projectJsonLD(resourceId, cliVersion, schemaVersion)
-          val maybeCreator  = projectInfo.maybeCreator.map(_.toPayloadPerson)
-          val members       = projectInfo.members.map(_.toPayloadPerson)
-          val jsonLd        = projectEntity.flatten.fold(throw _, identity)
+          val resourceId   = projects.ResourceId(renkuBaseUrl, projectInfo.path)
+          val jsonLD       = cliLikeJsonLD(resourceId, cliVersion, schemaVersion).flatten.fold(fail(_), identity)
+          val maybeCreator = projectInfo.maybeCreator.map(_.toPayloadPerson)
+          val members      = projectInfo.members.map(_.toPayloadPerson)
 
-          jsonLd.cursor
+          jsonLD.cursor
             .as[List[entities.Project]](
               decodeList(entities.Project.decoder(projectInfo, (maybeCreator ++ members).toSet))
             ) shouldBe List(
@@ -73,7 +72,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
              projectSchemaVersions
       ) { (projectInfo, cliVersion, schemaVersion) =>
         val resourceId    = projects.ResourceId(renkuBaseUrl, projectInfo.path)
-        val projectEntity = projectJsonLD(resourceId, cliVersion, schemaVersion)
+        val projectEntity = cliLikeJsonLD(resourceId, cliVersion, schemaVersion)
         val maybeCreator  = projectInfo.maybeCreator.map(_.toPayloadPerson)
         val members       = projectInfo.members.map(_.toPayloadPerson)
         val jsonLd        = projectEntity.flatten.fold(throw _, identity)
@@ -103,7 +102,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         forAll(gitLabProjectInfos.map(_.copy(maybeParentPath = None)), cliVersions, projectSchemaVersions) {
           (projectInfo, cliVersion, schemaVersion) =>
             val resourceId    = projects.ResourceId(renkuBaseUrl, projectInfo.path)
-            val projectEntity = projectJsonLD(resourceId, cliVersion, schemaVersion)
+            val projectEntity = cliLikeJsonLD(resourceId, cliVersion, schemaVersion)
             val jsonLd        = projectEntity.flatten.fold(throw _, identity)
 
             val potentialMembers = {
@@ -134,7 +133,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       val projectInfo       = gitLabProjectInfos.map(_.copy(maybeParentPath = None)).generateOne
       val projectResourceId = projectResourceIds.generateOne
       val projectEntity =
-        projectJsonLD(projectResourceId, cliVersions.generateOne, projectSchemaVersions.generateOne)
+        cliLikeJsonLD(projectResourceId, cliVersions.generateOne, projectSchemaVersions.generateOne)
 
       val Left(error) = projectEntity.cursor.as[entities.Project](entities.Project.decoder(projectInfo, Set.empty))
       error shouldBe a[DecodingFailure]
@@ -144,7 +143,34 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     }
   }
 
-  private def projectJsonLD(resourceId: projects.ResourceId, cliVersion: CliVersion, schemaVersion: SchemaVersion) =
+  "encode" should {
+
+    "produce JsonLD with all the relevant properties" in {
+      forAll(anyProjectEntities map (_.to[entities.Project])) { project =>
+        val maybeParentId = project match {
+          case p: entities.ProjectWithParent => p.parentResourceId.some
+          case _ => Option.empty[projects.ResourceId]
+        }
+
+        project.asJsonLD shouldBe JsonLD.entity(
+          EntityId.of(project.resourceId.show),
+          entities.Project.entityTypes,
+          schema / "name"             -> project.name.asJsonLD,
+          renku / "projectPath"       -> project.path.asJsonLD,
+          renku / "projectNamespaces" -> project.namespaces.asJsonLD,
+          schema / "agent"            -> project.agent.asJsonLD,
+          schema / "dateCreated"      -> project.dateCreated.asJsonLD,
+          schema / "creator"          -> project.maybeCreator.asJsonLD,
+          renku / "projectVisibility" -> project.visibility.asJsonLD,
+          schema / "member"           -> project.members.toList.asJsonLD,
+          schema / "schemaVersion"    -> project.version.asJsonLD,
+          prov / "wasDerivedFrom"     -> maybeParentId.map(_.asEntityId).asJsonLD
+        )
+      }
+    }
+  }
+
+  private def cliLikeJsonLD(resourceId: projects.ResourceId, cliVersion: CliVersion, schemaVersion: SchemaVersion) =
     JsonLD.entity(
       resourceId.asEntityId,
       EntityTypes.of(prov / "Location", schema / "Project"),

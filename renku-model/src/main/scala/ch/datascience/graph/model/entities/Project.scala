@@ -36,6 +36,8 @@ sealed trait Project {
   val visibility:   Visibility
   val members:      Set[Person]
   val version:      SchemaVersion
+
+  lazy val namespaces: List[Namespace] = path.toNamespaces
 }
 
 final case class ProjectWithoutParent(resourceId:   ResourceId,
@@ -70,32 +72,26 @@ object Project {
   val entityTypes: EntityTypes = EntityTypes.of(prov / "Location", schema / "Project")
 
   implicit def encoder[P <: Project](implicit gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[P] =
-    JsonLDEncoder.instance {
-      case project: ProjectWithParent =>
-        JsonLD.entity(
-          project.resourceId.asEntityId,
-          entityTypes,
-          schema / "name"             -> project.name.asJsonLD,
-          schema / "agent"            -> project.agent.asJsonLD,
-          schema / "dateCreated"      -> project.dateCreated.asJsonLD,
-          schema / "creator"          -> project.maybeCreator.asJsonLD,
-          renku / "projectVisibility" -> project.visibility.asJsonLD,
-          schema / "member"           -> project.members.toList.asJsonLD,
-          schema / "schemaVersion"    -> project.version.asJsonLD,
-          prov / "wasDerivedFrom"     -> project.parentResourceId.asEntityId.asJsonLD
-        )
-      case project: Project =>
-        JsonLD.entity(
-          project.resourceId.asEntityId,
-          entityTypes,
-          schema / "name"             -> project.name.asJsonLD,
-          schema / "agent"            -> project.agent.asJsonLD,
-          schema / "dateCreated"      -> project.dateCreated.asJsonLD,
-          schema / "creator"          -> project.maybeCreator.asJsonLD,
-          renku / "projectVisibility" -> project.visibility.asJsonLD,
-          schema / "member"           -> project.members.toList.asJsonLD,
-          schema / "schemaVersion"    -> project.version.asJsonLD
-        )
+    JsonLDEncoder.instance { project =>
+      val maybeDerivedFrom = project match {
+        case p: ProjectWithParent => p.parentResourceId.asEntityId.some
+        case _ => None
+      }
+
+      JsonLD.entity(
+        project.resourceId.asEntityId,
+        entityTypes,
+        schema / "name"             -> project.name.asJsonLD,
+        renku / "projectPath"       -> project.path.asJsonLD,
+        renku / "projectNamespaces" -> project.namespaces.asJsonLD,
+        schema / "agent"            -> project.agent.asJsonLD,
+        schema / "dateCreated"      -> project.dateCreated.asJsonLD,
+        schema / "creator"          -> project.maybeCreator.asJsonLD,
+        renku / "projectVisibility" -> project.visibility.asJsonLD,
+        schema / "member"           -> project.members.toList.asJsonLD,
+        schema / "schemaVersion"    -> project.version.asJsonLD,
+        prov / "wasDerivedFrom"     -> maybeDerivedFrom.asJsonLD
+      )
     }
 
   implicit def decoder(
