@@ -147,28 +147,28 @@ private class DatasetsFinderImpl(
         |              SELECT DISTINCT ?id
         |              WHERE { ?id text:query (schema:name schema:description schema:alternateName schema:keywords '$phrase') }
         |            } {
-        |              ?id rdf:type <http://schema.org/Dataset>;
-        |              	   renku:topmostSameAs ?sameAs.
+        |              ?id a schema:Dataset;
+        |              	  renku:topmostSameAs ?sameAs.
         |            } UNION {
-        |              ?id rdf:type <http://schema.org/Person>.
+        |              ?id a schema:Person.
         |              ?luceneDsId schema:creator ?id;
-        |                          rdf:type <http://schema.org/Dataset>;
+        |                          a schema:Dataset;
         |                          renku:topmostSameAs ?sameAs.
         |            }
         |          }
         |        } {
-        |          ?dsId rdf:type <http://schema.org/Dataset>;
-        |                renku:topmostSameAs ?sameAs;
+        |          ?dsId a schema:Dataset;
         |                schema:isPartOf ?projectId ;
+        |                renku:topmostSameAs ?sameAs;
         |                prov:atLocation ?location .
         |          ${projectMemberFilterQuery(maybeUser)}
         |          BIND(CONCAT(?location, "/metadata.yml") AS ?metaDataLocation).
         |          FILTER NOT EXISTS {
         |              # Removing dataset that have an activity that invalidates them
-        |              ?deprecationEntity rdf:type <http://www.w3.org/ns/prov#Entity>;
-        |                                 prov:atLocation ?metaDataLocation ;
-        |                                 prov:wasInvalidatedBy ?invalidationActivity ;
-        |                                 schema:isPartOf ?projectId .
+        |              ?deprecationEntity  prov:atLocation ?metaDataLocation ;
+        |                                  schema:isPartOf ?projectId ;
+        |                                  a prov:Entity;
+        |                                  prov:wasInvalidatedBy ?invalidationActivity .
         |          }
         |          FILTER NOT EXISTS {
         |              ?someId schema:isPartOf ?projectId; 
@@ -179,7 +179,7 @@ private class DatasetsFinderImpl(
         |      GROUP BY ?sameAs
         |      HAVING (COUNT(*) > 0)
         |    } {
-        |      ?dsIdExample rdf:type <http://schema.org/Dataset>;
+        |      ?dsIdExample a schema:Dataset;
         |            renku:topmostSameAs ?sameAs;
         |            schema:identifier ?identifier;
         |            schema:name ?name ;
@@ -199,8 +199,8 @@ private class DatasetsFinderImpl(
         |      OPTIONAL { ?dsIdExample schema:url ?maybeUrl }
         |      BIND (IF(BOUND(?maybePublishedDate), ?maybePublishedDate, ?maybeDateCreated) AS ?date)
         |      FILTER NOT EXISTS {
-        |        ?someId prov:wasDerivedFrom/schema:url ?dsIdExample.
-        |        ?someId schema:isPartOf ?projectId.
+        |        ?someId prov:wasDerivedFrom/schema:url ?dsIdExample;
+        |                schema:isPartOf ?projectId.
         |      }
         |    }
         |  }
