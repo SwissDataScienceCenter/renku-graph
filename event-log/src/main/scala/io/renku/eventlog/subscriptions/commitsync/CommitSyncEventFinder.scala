@@ -22,7 +22,7 @@ import cats.data.Kleisli
 import cats.effect.{BracketThrow, IO}
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
-import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, LastSyncedDate}
+import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventStatus, LastSyncedDate}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
 import eu.timepit.refined.api.Refined
@@ -33,6 +33,7 @@ import skunk.data.Completion
 import skunk.implicits._
 
 import java.time.Instant
+import ch.datascience.graph.model.events.EventStatus.AwaitingDeletion
 
 private class CommitSyncEventFinderImpl[Interpretation[_]: BracketThrow](
     sessionResource:  SessionResource[Interpretation, EventLogDB],
@@ -54,30 +55,36 @@ private class CommitSyncEventFinderImpl[Interpretation[_]: BracketThrow](
   private def findEvent = measureExecutionTime {
     val (eventDate, lastSyncDate) = (EventDate.apply _ &&& LastSyncedDate.apply _)(now())
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find event"))
-      .select[CategoryName ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate,
+      .select[CategoryName ~ EventStatus ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate,
               (CommitSyncEvent, Option[LastSyncedDate])
       ](
-        sql"""SELECT
+        sql"""
+              SELECT
                 (SELECT evt.event_id
                   FROM event evt
                   WHERE evt.project_id = proj.project_id
                     AND evt.event_date = proj.latest_event_date
                   ORDER BY created_date DESC
                   LIMIT 1
-                ),
+                ) as event_id,
                 proj.project_id,
                 proj.project_path,
                 sync_time.last_synced,
                 proj.latest_event_date
               FROM project proj
+              LEFT JOIN event
+                ON event.event_id = event_id
               LEFT JOIN subscription_category_sync_time sync_time
                 ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryNameEncoder
               WHERE
-                sync_time.last_synced IS NULL
+                (event.status IS NULL
+                  OR (event.status IS NOT NULL AND event.status <> $eventStatusEncoder)
+                )
+                AND (sync_time.last_synced IS NULL
                 OR (
                      (($eventDateEncoder - proj.latest_event_date) <= INTERVAL '7 days' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 hour')
                   OR (($eventDateEncoder - proj.latest_event_date) >  INTERVAL '7 days' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 day')
-                )
+                ))
               ORDER BY proj.latest_event_date DESC
               LIMIT 1"""
           .query(
@@ -93,7 +100,7 @@ private class CommitSyncEventFinderImpl[Interpretation[_]: BracketThrow](
               MinimalCommitSyncEvent(projectId, projectPath) -> maybeLastSyncDate
           }
       )
-      .arguments(categoryName ~ eventDate ~ lastSyncDate ~ eventDate ~ lastSyncDate)
+      .arguments(categoryName ~ AwaitingDeletion ~ eventDate ~ lastSyncDate ~ eventDate ~ lastSyncDate)
       .build(_.option)
   }
 
