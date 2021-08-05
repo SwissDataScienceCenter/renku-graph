@@ -21,11 +21,14 @@ package ch.datascience.triplesgenerator
 import cats.effect.{Clock, ConcurrentEffect, Resource}
 import ch.datascience.metrics.RoutesMetrics
 import ch.datascience.triplesgenerator.events.EventEndpoint
+import com.typesafe.config.Config
 import org.http4s.dsl.Http4sDsl
+import scala.jdk.CollectionConverters._
 
 private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     eventEndpoint: EventEndpoint[F],
-    routesMetrics: RoutesMetrics[F]
+    routesMetrics: RoutesMetrics[F],
+    config:        Option[Config] = None
 )(implicit clock:  Clock[F])
     extends Http4sDsl[F] {
 
@@ -37,6 +40,10 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
     case request @ POST -> Root / "events" => processEvent(request)
     case GET            -> Root / "ping"   => Ok("pong")
+    case GET            -> Root / "config-info"   => Ok( config.map(_.entrySet().asScala.map{mapEntry =>
+                                                         mapEntry.getKey -> mapEntry.getValue.render()
+                                                       }.mkString("\n")).getOrElse("No config found")
+                                                     )
   }.withMetrics
   // format: on
 }

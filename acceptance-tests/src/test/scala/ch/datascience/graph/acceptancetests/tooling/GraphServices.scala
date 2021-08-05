@@ -114,7 +114,9 @@ object GraphServices {
 
   private val servicesRunner = (Semaphore[IO](1) map (new ServicesRunner(_))).unsafeRunSync()
 
-  def restart(service: ServiceRun): Unit = servicesRunner.restart(service)
+  def run(service:      ServiceRun): Unit = servicesRunner.run(service).unsafeRunSync()
+  def restart(service:  ServiceRun): Unit = servicesRunner.restart(service)
+  def stop(serviceName: String):     Unit = servicesRunner.stop(serviceName)
 
   sys.addShutdownHook {
     servicesRunner.stopAllServices()
