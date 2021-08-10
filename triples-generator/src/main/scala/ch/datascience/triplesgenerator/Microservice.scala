@@ -67,11 +67,9 @@ object Microservice extends IOMicroservice {
   }
 
   override def run(args: List[String]): IO[ExitCode] = for {
-    config                   <- parseConfigArgs(args)
-    certificateLoader        <- CertificateLoader[IO](ApplicationLogger)
-    gitCertificateInstaller  <- GitCertificateInstaller[IO](ApplicationLogger)
-    fusekiDatasetInitializer <- IOFusekiDatasetInitializer()
-
+    config                  <- parseConfigArgs(args)
+    certificateLoader       <- CertificateLoader[IO](ApplicationLogger)
+    gitCertificateInstaller <- GitCertificateInstaller[IO](ApplicationLogger)
     triplesGeneration       <- TriplesGeneration[IO]()
     sentryInitializer       <- SentryInitializer[IO]()
     metricsRegistry         <- MetricsRegistry()
@@ -107,7 +105,6 @@ object Microservice extends IOMicroservice {
                     gitCertificateInstaller,
                     sentryInitializer,
                     cliVersionCompatChecker,
-                    fusekiDatasetInitializer,
                     eventConsumersRegistry,
                     reProvisioning,
                     new HttpServer[IO](serverPort = ServicePort.value, routes),
@@ -123,7 +120,6 @@ private class MicroserviceRunner(
     gitCertificateInstaller:         GitCertificateInstaller[IO],
     sentryInitializer:               SentryInitializer[IO],
     cliVersionCompatibilityVerifier: CliVersionCompatibilityVerifier[IO],
-    datasetInitializer:              FusekiDatasetInitializer[IO],
     eventConsumersRegistry:          EventConsumersRegistry[IO],
     reProvisioning:                  ReProvisioning[IO],
     httpServer:                      HttpServer[IO],
@@ -137,7 +133,6 @@ private class MicroserviceRunner(
       _        <- gitCertificateInstaller.run()
       _        <- sentryInitializer.run()
       _        <- cliVersionCompatibilityVerifier.run()
-      _        <- datasetInitializer.run()
       _        <- eventConsumersRegistry.run().start.map(gatherCancelToken)
       _        <- reProvisioning.run().start.map(gatherCancelToken)
       exitCode <- httpServer.run()

@@ -41,7 +41,7 @@ trait ReProvisioning[Interpretation[_]] {
 class ReProvisioningImpl[Interpretation[_]](
     renkuVersionPairFinder:    RenkuVersionPairFinder[Interpretation],
     versionCompatibilityPairs: NonEmptyList[RenkuVersionPair],
-    reprovisionJudge:          ReprovisionJudge,
+    reprovisionJudge:          ReProvisionJudge,
     triplesRemover:            TriplesRemover[Interpretation],
     eventsReScheduler:         EventsReScheduler[Interpretation],
     renkuVersionPairUpdater:   RenkuVersionPairUpdater[Interpretation],
@@ -54,24 +54,22 @@ class ReProvisioningImpl[Interpretation[_]](
 
   import eventsReScheduler._
   import executionTimeRecorder._
-  import reprovisionJudge.isReprovisioningNeeded
+  import reprovisionJudge.isReProvisioningNeeded
   import triplesRemover._
 
   override def run(): Interpretation[Unit] =
     (for {
       currentVersionPair <- OptionT(renkuVersionPairFinder.find() recoverWith tryAgain(renkuVersionPairFinder.find()))
-      _ <- OptionT.liftF(
-             decideIfReprovisioningRequired(currentVersionPair)
-           )
+      _                  <- OptionT.liftF(decideIfReProvisioningRequired(currentVersionPair))
     } yield ()).value.void
 
-  private def decideIfReprovisioningRequired(currentVersionPair: RenkuVersionPair) =
-    isReprovisioningNeeded(currentVersionPair, versionCompatibilityPairs) match {
-      case true => triggerReProvisioning recoverWith tryAgain(triggerReProvisioning)
-      case false =>
-        renkuVersionPairUpdater
-          .update(versionCompatibilityPairs.head)
-          .flatMap(_ => logger.info("All projects' triples up to date"))
+  private def decideIfReProvisioningRequired(currentVersionPair: RenkuVersionPair) =
+    if (isReProvisioningNeeded(currentVersionPair, versionCompatibilityPairs)) {
+      triggerReProvisioning recoverWith tryAgain(triggerReProvisioning)
+    } else {
+      renkuVersionPairUpdater
+        .update(versionCompatibilityPairs.head)
+        .flatMap(_ => logger.info("All projects' triples up to date"))
     }
 
   private def triggerReProvisioning =
@@ -136,7 +134,7 @@ object IOReProvisioning {
     } yield new ReProvisioningImpl[IO](
       renkuVersionPairFinder,
       versionCompatibilityPairs,
-      new ReprovisionJudgeImpl(),
+      new ReProvisionJudgeImpl(),
       triplesRemover,
       eventsReScheduler,
       new RenkuVersionPairUpdaterImpl(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder),

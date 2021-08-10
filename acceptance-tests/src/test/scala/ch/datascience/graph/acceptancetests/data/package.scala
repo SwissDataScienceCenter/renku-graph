@@ -20,12 +20,9 @@ package ch.datascience.graph.acceptancetests
 
 import ch.datascience.config.renku
 import ch.datascience.graph.acceptancetests.tooling.RDFStore
-import ch.datascience.graph.model.{CliVersion, SchemaVersion}
 import ch.datascience.rdfstore.FusekiBaseUrl
-import ch.datascience.graph.model.RenkuVersionPair
 
 package object data {
-  val currentVersionPair:     RenkuVersionPair   = RenkuVersionPair(CliVersion("0.15.0"), SchemaVersion("8"))
   val renkuResourcesUrl:      renku.ResourcesUrl = renku.ResourcesUrl("http://localhost:9004/knowledge-graph")
   implicit val fusekiBaseUrl: FusekiBaseUrl      = RDFStore.fusekiBaseUrl
 }

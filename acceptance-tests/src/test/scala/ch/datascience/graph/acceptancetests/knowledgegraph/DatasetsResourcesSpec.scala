@@ -66,6 +66,7 @@ class DatasetsResourcesSpec
     with GivenWhenThen
     with GraphServices
     with AcceptanceTestPatience
+    with RdfStoreData
     with should.Matchers {
 
   import DatasetsResources._

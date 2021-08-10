@@ -47,7 +47,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects()
           .returning(IO(currentVersionCompatibilityPair.some))
 
-        (reprovisionJudge.isReprovisioningNeeded _)
+        (reprovisionJudge.isReProvisioningNeeded _)
           .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
           .returning(true)
 
@@ -85,7 +85,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
         .expects()
         .returning(IO(currentVersionCompatibilityPair.some))
 
-      (reprovisionJudge.isReprovisioningNeeded _)
+      (reprovisionJudge.isReProvisioningNeeded _)
         .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
         .returning(false)
 
@@ -111,7 +111,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects()
           .returning(currentVersionCompatibilityPair.some.pure[IO])
 
-        (reprovisionJudge.isReprovisioningNeeded _)
+        (reprovisionJudge.isReProvisioningNeeded _)
           .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
           .returning(false)
 
@@ -136,7 +136,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects()
           .returning(currentVersionCompatibilityPair.some.pure[IO])
 
-        (reprovisionJudge.isReprovisioningNeeded _)
+        (reprovisionJudge.isReProvisioningNeeded _)
           .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
           .returning(true)
 
@@ -183,7 +183,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects()
           .returning(currentVersionCompatibilityPair.some.pure[IO])
 
-        (reprovisionJudge.isReprovisioningNeeded _)
+        (reprovisionJudge.isReProvisioningNeeded _)
           .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
           .returning(true)
 
@@ -230,7 +230,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects()
           .returning(currentVersionCompatibilityPair.some.pure[IO])
 
-        (reprovisionJudge.isReprovisioningNeeded _)
+        (reprovisionJudge.isReProvisioningNeeded _)
           .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
           .returning(true)
 
@@ -278,7 +278,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects()
           .returning(currentVersionCompatibilityPair.some.pure[IO])
 
-        (reprovisionJudge.isReprovisioningNeeded _)
+        (reprovisionJudge.isReProvisioningNeeded _)
           .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
           .returning(true)
 
@@ -330,7 +330,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects()
           .returning(currentVersionCompatibilityPair.some.pure[IO])
 
-        (reprovisionJudge.isReprovisioningNeeded _)
+        (reprovisionJudge.isReProvisioningNeeded _)
           .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
           .returning(true)
 
@@ -376,7 +376,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
     val versionCompatibilityPairs       = renkuVersionPairs.generateNonEmptyList(2)
     val currentVersionCompatibilityPair = renkuVersionPairs.generateOne
     val renkuVersionPairFinder          = mock[RenkuVersionPairFinder[IO]]
-    val reprovisionJudge                = mock[ReprovisionJudge]
+    val reprovisionJudge                = mock[ReProvisionJudge]
     val triplesRemover                  = mock[TriplesRemover[IO]]
     val eventsReScheduler               = mock[EventsReScheduler[IO]]
     val renkuVersionPairUpdater         = mock[RenkuVersionPairUpdater[IO]]

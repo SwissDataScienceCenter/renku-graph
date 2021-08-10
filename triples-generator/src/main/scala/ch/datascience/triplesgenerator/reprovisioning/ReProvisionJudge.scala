@@ -22,17 +22,17 @@ import cats.data.NonEmptyList
 import ch.datascience.graph.model.{CliVersion, SchemaVersion}
 import ch.datascience.graph.model.RenkuVersionPair
 
-trait ReprovisionJudge {
+trait ReProvisionJudge {
 
-  def isReprovisioningNeeded(currentVersionPair:        RenkuVersionPair,
+  def isReProvisioningNeeded(currentVersionPair:        RenkuVersionPair,
                              versionCompatibilityPairs: NonEmptyList[RenkuVersionPair]
   ): Boolean
 
 }
 
-private class ReprovisionJudgeImpl extends ReprovisionJudge {
+private class ReProvisionJudgeImpl extends ReProvisionJudge {
 
-  override def isReprovisioningNeeded(currentVersionPair:        RenkuVersionPair,
+  override def isReProvisioningNeeded(currentVersionPair:        RenkuVersionPair,
                                       versionCompatibilityPairs: NonEmptyList[RenkuVersionPair]
   ): Boolean =
     `is current schema version different from latest`(currentVersionPair.schemaVersion,
