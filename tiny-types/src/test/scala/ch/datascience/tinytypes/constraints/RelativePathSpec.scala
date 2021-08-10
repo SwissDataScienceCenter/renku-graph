@@ -19,7 +19,7 @@
 package ch.datascience.tinytypes.constraints
 
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.{nonEmptyStrings, relativePaths}
+import ch.datascience.generators.Generators.{httpUrls, nonEmptyStrings, relativePaths}
 import ch.datascience.tinytypes.{RelativePathTinyType, TinyTypeFactory}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -42,6 +42,15 @@ class RelativePathSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
     "be instantiatable when values are not starting and ending with '/' but have the '/' sign inside" in {
       forAll(relativePaths()) { someValue =>
         RelativePathString(someValue).toString shouldBe someValue
+      }
+    }
+
+    "throw an IllegalArgumentException for values starting with a protocol" in {
+      s"http://${relativePaths().generateOne}" :: httpUrls().generateOne :: s"ftp://${relativePaths().generateOne}" :: Nil foreach {
+        value =>
+          intercept[IllegalArgumentException](
+            RelativePathString(value)
+          ).getMessage shouldBe s"'$value' is not a valid ch.datascience.tinytypes.constraints.RelativePathString"
       }
     }
 
