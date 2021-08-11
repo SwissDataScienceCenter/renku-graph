@@ -44,6 +44,7 @@ class EventStatusRenamerImplSpec
     with should.Matchers
     with EventLogDataProvisioning
     with EventDataFetching {
+
   protected override lazy val migrationsToRun: List[Migration] = List(
     eventLogTableCreator,
     projectPathAdder,
@@ -71,10 +72,10 @@ class EventStatusRenamerImplSpec
 
         eventStatusRenamer.run().unsafeRunSync() shouldBe ()
 
-        findEventsCompoundId(status = GeneratingTriples).toSet shouldBe processingEvents
-          .map(_.compoundEventId)
-          .toList
-          .toSet
+        findEventsCompoundId(status = GeneratingTriples).toSet shouldBe
+          (processingEvents.toList ++ otherEvents.filter(_.status == GeneratingTriples))
+            .map(_.compoundEventId)
+            .toSet
         findEventsCompoundId(status = GenerationRecoverableFailure).toSet shouldBe
           (recoverableEvents ++ otherEvents.filter(_.status == GenerationRecoverableFailure))
             .map(_.compoundEventId)
@@ -166,17 +167,16 @@ class EventStatusRenamerImplSpec
     .unsafeRunSync()
     .toSet
 
-  private def findEventsCompoundId(status: EventStatus): List[CompoundEventId] =
-    execute[List[CompoundEventId]] {
-      Kleisli { session =>
-        val query: Query[EventStatus, CompoundEventId] =
-          sql"""SELECT event_id, project_id
+  private def findEventsCompoundId(status: EventStatus): List[CompoundEventId] = execute[List[CompoundEventId]] {
+    Kleisli { session =>
+      val query: Query[EventStatus, CompoundEventId] =
+        sql"""SELECT event_id, project_id
                 FROM event
                 WHERE status = $eventStatusEncoder
                 ORDER BY created_date asc"""
-            .query(eventIdDecoder ~ projectIdDecoder)
-            .map { case eventId ~ projectId => CompoundEventId(eventId, projectId) }
-        session.prepare(query).use(_.stream(status, 32).compile.toList)
-      }
+          .query(eventIdDecoder ~ projectIdDecoder)
+          .map { case eventId ~ projectId => CompoundEventId(eventId, projectId) }
+      session.prepare(query).use(_.stream(status, 32).compile.toList)
     }
+  }
 }
