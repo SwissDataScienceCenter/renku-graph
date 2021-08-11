@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.acceptancetests
 
+import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
@@ -36,12 +37,13 @@ import ch.datascience.graph.model.projects.Visibility
 import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators.projects
 import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
-import ch.datascience.rdfstore.entities.Person
+import ch.datascience.rdfstore.entities.{Activity, Person}
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.triplesgenerator
 import io.circe.Json
 import io.renku.jsonld._
 import io.renku.jsonld.syntax.JsonEncoderOps
+import org.http4s.Response
 import org.http4s.Status.Ok
 import org.scalactic.source.Position
 import org.scalatest.GivenWhenThen
@@ -62,43 +64,22 @@ class ReProvisioningSpec
 
   Feature("ReProvisioning") {
 
-    implicit val accessToken: AccessToken = accessTokens.generateOne
-    val initialProjectVersion = SchemaVersion("8")
-    val project =
-      projects.generateOne.copy(path = model.projects.Path("public/re-provisioning"),
-                                visibility = Visibility.Public,
-                                version = initialProjectVersion
-      )
-    val commitId  = commitIds.generateOne
-    val committer = persons.generateOne
-
     Scenario("Update CLI version and expect re-provisioning") {
+      import TestData._
+
       Given("The TG is using an older version of the CLI")
 
       And("There is data from this version in Jena")
-      val activity = nonModifiedDataSetActivity(commitId = commitId, committer = committer)(
-        projectPath = project.path,
-        projectName = project.name,
-        projectDateCreated = project.created.date,
-        maybeProjectCreator = project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail)),
-        projectVersion = project.version
-      )()
 
       `data in the RDF store`(project, commitId, committer, JsonLD.arr(activity.asJsonLD))()
 
       `GET <gitlabApi>/projects/:path returning OK with`(project, maybeCreator = committer.some, withStatistics = true)
       val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)
 
-      projectDetailsResponse.status shouldBe Ok
-      val Right(projectDetails) = projectDetailsResponse.bodyAsJson.as[Json]
-      val Right(version)        = projectDetails.hcursor.downField("version").as[String]
-      version shouldBe initialProjectVersion.value
+      projectDetailsResponseIsValid(projectDetailsResponse, initialProjectSchemaVersion)
 
       val newSchemaVersion = SchemaVersion(nonEmptyStrings().generateOne)
-      val newTriples =
-        activity
-          .copy(committer = activity.committer, project = activity.project.copy(version = newSchemaVersion))
-          .asJsonLD
+      val newTriples       = getNewTriples(activity, newSchemaVersion)
 
       `GET <triples-generator>/projects/:id/commits/:id returning OK`(project, commitId, JsonLD.arr(newTriples))
 
@@ -110,21 +91,47 @@ class ReProvisioningSpec
 
       `GET <gitlabApi>/projects/:path returning OK with`(project, maybeCreator = committer.some, withStatistics = true)
 
-      val patience: org.scalatest.concurrent.Eventually.PatienceConfig =
-        Eventually.PatienceConfig(timeout = Span(20, Minutes), interval = Span(30000, Millis))
-
       eventually {
+
         val updatedProjectDetailsResponse =
           knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)
-
-        updatedProjectDetailsResponse.status shouldBe Ok
-        val Right(updatedProjectDetails) = updatedProjectDetailsResponse.bodyAsJson.as[Json]
-        val Right(updatedVersion)        = updatedProjectDetails.hcursor.downField("version").as[String]
-        updatedVersion shouldBe newSchemaVersion.value
+        projectDetailsResponseIsValid(updatedProjectDetailsResponse, newSchemaVersion)
 
       }(patience, Retrying.retryingNatureOfT, Position.here)
-
     }
+  }
+
+  object TestData {
+
+    implicit val accessToken: AccessToken = accessTokens.generateOne
+    val initialProjectSchemaVersion = SchemaVersion("8")
+    val project =
+      projects.generateOne.copy(path = model.projects.Path("public/re-provisioning"),
+                                visibility = Visibility.Public,
+                                version = initialProjectSchemaVersion
+      )
+    val commitId  = commitIds.generateOne
+    val committer = persons.generateOne
+
+    lazy val activity = nonModifiedDataSetActivity(commitId = commitId, committer = committer)(
+      projectPath = project.path,
+      projectName = project.name,
+      projectDateCreated = project.created.date,
+      maybeProjectCreator = project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail)),
+      projectVersion = project.version
+    )()
+
+    val patience: org.scalatest.concurrent.Eventually.PatienceConfig =
+      Eventually.PatienceConfig(timeout = Span(20, Minutes), interval = Span(30000, Millis))
+  }
+
+  private def projectDetailsResponseIsValid(projectDetailsResponse:       Response[IO],
+                                            expectedProjectSchemaVersion: SchemaVersion
+  ) = {
+    projectDetailsResponse.status shouldBe Ok
+    val Right(projectDetails)       = projectDetailsResponse.bodyAsJson.as[Json]
+    val Right(projectSchemaVersion) = projectDetails.hcursor.downField("version").as[String]
+    projectSchemaVersion shouldBe expectedProjectSchemaVersion.value
   }
 
   private def restartTGWithNewCompatMatrix(configFilename: String): Unit = {
@@ -137,4 +144,7 @@ class ReProvisioningSpec
     stop(newTriplesGenerator.name)
     GraphServices.run(newTriplesGenerator)
   }
+
+  private def getNewTriples(activity: Activity, newSchemaVersion: SchemaVersion) =
+    activity.copy(committer = activity.committer, project = activity.project.copy(version = newSchemaVersion)).asJsonLD
 }
