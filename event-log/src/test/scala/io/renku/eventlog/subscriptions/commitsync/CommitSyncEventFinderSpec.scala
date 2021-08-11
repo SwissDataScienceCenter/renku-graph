@@ -24,17 +24,20 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.{CompoundEventId, LastSyncedDate}
+import ch.datascience.graph.model.events.EventStatus.AwaitingDeletion
+import ch.datascience.graph.model.events.{CompoundEventId, EventStatus, LastSyncedDate}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.{CreatedDate, EventDate, InMemoryEventLogDbSpec}
+import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Duration
+import java.time.temporal.ChronoUnit
 
 class CommitSyncEventFinderSpec
     extends AnyWordSpec
@@ -151,7 +154,7 @@ class CommitSyncEventFinderSpec
         finder.popEvent().unsafeRunSync() shouldBe None
       }
 
-    "return events for " +
+    "return events for projects" +
       "which falls into the categories above " +
       "and have more than one event with the latest event date" in new TestCase {
         val commonEventDate = relativeTimestamps(moreThanAgo = Duration.ofHours(7 * 24 + 1)).generateAs(EventDate)
@@ -179,6 +182,35 @@ class CommitSyncEventFinderSpec
 
         finder.popEvent().unsafeRunSync() shouldBe None
       }
+
+    "not return events for projects" +
+      "where event statuses are AWAITING_DELETION" in new TestCase {
+
+        finder.popEvent().unsafeRunSync() shouldBe None
+        val sharedProjectPath = projectPaths.generateOne
+
+        val event0Date = EventDate(eventDates.generateOne.value.minus(1L, ChronoUnit.DAYS))
+        val event0Id   = compoundEventIds.generateOne
+        addEvent(event0Id, event0Date, sharedProjectPath, eventStatus = AwaitingDeletion)
+
+        val event1Id   = compoundEventIds.generateOne.copy(projectId = event0Id.projectId)
+        val event1Date = EventDate(event0Date.value.plus(1L, ChronoUnit.MINUTES))
+        addEvent(event1Id, event1Date, sharedProjectPath, eventStatus = AwaitingDeletion)
+
+        val lastSynced = relativeTimestamps(moreThanAgo = Duration.ofDays(1))
+          .generateAs(LastSyncedDate)
+
+        upsertLastSynced(event1Id.projectId, categoryName, lastSynced)
+
+        finder.popEvent().unsafeRunSync() shouldBe None
+
+        val event2Id   = compoundEventIds.generateOne.copy(projectId = event0Id.projectId)
+        val event2Date = EventDate(event1Date.value.plus(1L, ChronoUnit.MINUTES))
+        addEvent(event2Id, event2Date, sharedProjectPath)
+
+        finder.popEvent().unsafeRunSync() shouldBe Some(FullCommitSyncEvent(event2Id, sharedProjectPath, lastSynced))
+
+      }
   }
 
   private trait TestCase {
@@ -188,14 +220,17 @@ class CommitSyncEventFinderSpec
   private def addEvent(eventId:     CompoundEventId,
                        eventDate:   EventDate,
                        projectPath: projects.Path,
-                       createdDate: CreatedDate = createdDates.generateOne
+                       createdDate: CreatedDate = createdDates.generateOne,
+                       eventStatus: EventStatus =
+                         Gen.oneOf(EventStatus.all.filterNot(_ == AwaitingDeletion)).generateOne
   ): Unit =
-    storeEvent(eventId,
-               eventStatuses.generateOne,
-               executionDates.generateOne,
-               eventDate,
-               eventBodies.generateOne,
-               createdDate,
-               projectPath = projectPath
+    storeEvent(
+      eventId,
+      eventStatus,
+      executionDates.generateOne,
+      eventDate,
+      eventBodies.generateOne,
+      createdDate,
+      projectPath = projectPath
     )
 }

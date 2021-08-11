@@ -171,20 +171,20 @@ private class DatasetsFinderImpl(
         |                                  prov:wasInvalidatedBy ?invalidationActivity .
         |          }
         |          FILTER NOT EXISTS {
-        |              ?someId schema:isPartOf ?projectId; 
-        |                      prov:wasDerivedFrom/schema:url ?dsId.
+        |              ?someId  prov:wasDerivedFrom/schema:url ?dsId;
+        |                       schema:isPartOf ?projectId; 
         |          }
         |        }
         |      }
         |      GROUP BY ?sameAs
         |      HAVING (COUNT(*) > 0)
         |    } {
-        |      ?dsIdExample a schema:Dataset;
-        |            renku:topmostSameAs ?sameAs;
-        |            schema:identifier ?identifier;
-        |            schema:name ?name ;
-        |            schema:alternateName ?alternateName;
-        |            schema:isPartOf ?projectId .
+        |      ?dsIdExample renku:topmostSameAs ?sameAs;
+        |                   a schema:Dataset;
+        |                   schema:identifier ?identifier;
+        |                   schema:name ?name ;
+        |                   schema:alternateName ?alternateName;
+        |                   schema:isPartOf ?projectId .
         |      OPTIONAL {
         |        ?dsIdExample schema:image ?imageId .
         |        ?imageId     schema:position ?imagePosition ;
