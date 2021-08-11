@@ -16,14 +16,13 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.events.categories.commitsync
-package eventgeneration
+package ch.datascience.commiteventservice.events.categories.common
 
 import cats.MonadThrow
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.UpdateResult
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.UpdateResult._
+import ch.datascience.commiteventservice.events.categories.commitsync.categoryName
+import ch.datascience.commiteventservice.events.categories.common.UpdateResult._
 import ch.datascience.events.EventRequestContent
 import ch.datascience.events.consumers.Project
 import ch.datascience.events.producers.EventSender
@@ -36,7 +35,7 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-private[commitsync] trait CommitEventsRemover[Interpretation[_]] {
+private[categories] trait CommitEventsRemover[Interpretation[_]] {
   def removeDeletedEvent(project: Project, commitId: CommitId): Interpretation[UpdateResult]
 }
 
@@ -67,7 +66,7 @@ private class CommitEventsRemoverImpl[Interpretation[_]: MonadThrow](
       }
 }
 
-private[commitsync] object CommitEventsRemover {
+private[categories] object CommitEventsRemover {
 
   def apply(logger:     Logger[IO])(implicit
       concurrentEffect: ConcurrentEffect[IO],

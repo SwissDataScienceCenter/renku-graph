@@ -16,11 +16,11 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal
+package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration
 
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitWithParents
+import ch.datascience.commiteventservice.events.categories.common.CommitWithParents
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.events.CommitId
@@ -36,12 +36,12 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private[eventgeneration] trait EventDetailsFinder[Interpretation[_]] {
+private trait EventDetailsFinder[Interpretation[_]] {
   def checkIfExists(projectId:   projects.Id, commitId: CommitId): Interpretation[Boolean]
   def getEventDetails(projectId: projects.Id, commitId: CommitId): Interpretation[Option[CommitWithParents]]
 }
 
-private[eventgeneration] class EventDetailsFinderImpl[Interpretation[_]: ContextShift: Timer: ConcurrentEffect](
+private class EventDetailsFinderImpl[Interpretation[_]: ContextShift: Timer: ConcurrentEffect](
     eventLogUrl:             EventLogUrl,
     logger:                  Logger[Interpretation]
 )(implicit executionContext: ExecutionContext)
@@ -95,7 +95,7 @@ private[eventgeneration] class EventDetailsFinderImpl[Interpretation[_]: Context
 
 }
 
-private[eventgeneration] object EventDetailsFinder {
+private object EventDetailsFinder {
   def apply(
       logger: Logger[IO]
   )(implicit

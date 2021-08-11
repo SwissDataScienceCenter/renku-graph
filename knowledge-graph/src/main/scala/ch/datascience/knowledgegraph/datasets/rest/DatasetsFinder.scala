@@ -134,7 +134,7 @@ private class DatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer: Par
         |              WHERE { ?id text:query (schema:name schema:description schema:alternateName schema:keywords '$phrase') }
         |            } {
         |              ?id a schema:Dataset;
-        |              	renku:topmostSameAs ?sameAs.
+        |              	   renku:topmostSameAs ?sameAs.
         |            } UNION {
         |              ?id a schema:Person.
         |              ?luceneDsId schema:creator ?id;
@@ -144,14 +144,14 @@ private class DatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer: Par
         |          }
         |        } {
         |          ?dsId a schema:Dataset;
-        |                renku:topmostSameAs ?sameAs;
-        |                schema:isPartOf ?projectId .
+        |                schema:isPartOf ?projectId;
+        |                renku:topmostSameAs ?sameAs.
         |          FILTER NOT EXISTS {
         |            ?dsId prov:invalidatedAtTime ?invalidationTime.
         |          }
         |          FILTER NOT EXISTS {
-        |              ?someId prov:wasDerivedFrom/schema:url ?dsId.
-        |              ?someId schema:isPartOf ?projectId.
+        |              ?someId  prov:wasDerivedFrom/schema:url ?dsId;
+        |                       schema:isPartOf ?projectId; 
         |          }
         |          ${projectMemberFilterQuery(maybeUser)}
         |        }
@@ -179,8 +179,8 @@ private class DatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer: Par
         |      OPTIONAL { ?dsIdExample schema:url ?maybeUrl }
         |      BIND (IF(BOUND(?maybePublishedDate), ?maybePublishedDate, ?maybeDateCreated) AS ?date)
         |      FILTER NOT EXISTS {
-        |        ?someId prov:wasDerivedFrom/schema:url ?dsIdExample.
-        |        ?someId schema:isPartOf ?projectId.
+        |        ?someId prov:wasDerivedFrom/schema:url ?dsIdExample;
+        |                schema:isPartOf ?projectId.
         |      }
         |    }
         |  }

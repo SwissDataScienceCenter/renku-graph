@@ -21,12 +21,11 @@ package ch.datascience.commiteventservice.events.categories.commitsync
 import cats.Show
 import ch.datascience.events.consumers.Project
 import ch.datascience.graph.model.events.{CommitId, LastSyncedDate}
-import ch.datascience.graph.model.projects.{Id, Path, Visibility}
 
 private sealed trait CommitSyncEvent { val project: Project }
 
 private object CommitSyncEvent {
-  implicit lazy val eventInfoToString: Show[CommitSyncEvent] = Show.show(_.toString)
+  implicit lazy val show: Show[CommitSyncEvent] = Show.show(_.toString)
 }
 
 private final case class FullCommitSyncEvent(id: CommitId, override val project: Project, lastSynced: LastSyncedDate)
@@ -38,9 +37,3 @@ private final case class MinimalCommitSyncEvent(override val project: Project) e
   override lazy val toString: String =
     s"projectId = ${project.id}, projectPath = ${project.path}"
 }
-
-private final case class ProjectInfo(
-    id:         Id,
-    visibility: Visibility,
-    path:       Path
-)

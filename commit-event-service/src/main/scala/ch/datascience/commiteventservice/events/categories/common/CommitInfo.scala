@@ -16,12 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration
+package ch.datascience.commiteventservice.events.categories.common
 
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.users.{Email, Name}
 
-private case class CommitInfo(
+private[categories] case class CommitInfo(
     id:            CommitId,
     message:       CommitMessage,
     committedDate: CommittedDate,
@@ -30,7 +30,7 @@ private case class CommitInfo(
     parents:       List[CommitId]
 )
 
-private object CommitInfo {
+private[categories] object CommitInfo {
 
   import cats.syntax.all._
   import ch.datascience.tinytypes.json.TinyTypeDecoders._

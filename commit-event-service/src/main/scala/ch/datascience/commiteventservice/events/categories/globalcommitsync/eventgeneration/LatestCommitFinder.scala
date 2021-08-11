@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration
+package ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration
 
 import cats.data.OptionT
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
@@ -26,6 +26,7 @@ import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrlLoader
 import ch.datascience.graph.model.GitLabUrl
+import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.{AccessToken, RestClient}
 import io.circe.Decoder
@@ -37,10 +38,10 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.ExecutionContext
 
 private trait LatestCommitFinder[Interpretation[_]] {
-  def findLatestCommit(
+  def findLatestCommitId(
       projectId:        Id,
       maybeAccessToken: Option[AccessToken]
-  ): OptionT[Interpretation, CommitInfo]
+  ): OptionT[Interpretation, CommitId]
 }
 
 private class LatestCommitFinderImpl[Interpretation[_]: ConcurrentEffect: Timer](
@@ -51,28 +52,27 @@ private class LatestCommitFinderImpl[Interpretation[_]: ConcurrentEffect: Timer]
     extends RestClient(gitLabThrottler, logger)
     with LatestCommitFinder[Interpretation] {
 
-  import CommitInfo._
   import ch.datascience.http.client.RestClientError.UnauthorizedException
   import org.http4s.Method.GET
   import org.http4s.Status._
   import org.http4s.{Request, Response}
 
-  override def findLatestCommit(
+  override def findLatestCommitId(
       projectId:        Id,
       maybeAccessToken: Option[AccessToken]
-  ): OptionT[Interpretation, CommitInfo] = OptionT {
+  ): OptionT[Interpretation, CommitId] = OptionT {
     for {
-      stringUri       <- s"$gitLabUrl/api/v4/projects/$projectId/repository/commits".pure[Interpretation]
-      uri             <- validateUri(stringUri) map (_.withQueryParam("per_page", "1"))
-      maybeCommitInfo <- send(request(GET, uri, maybeAccessToken))(mapResponse)
-    } yield maybeCommitInfo
+      stringUri     <- s"$gitLabUrl/api/v4/projects/$projectId/repository/commits?per_page=1".pure[Interpretation]
+      uri           <- validateUri(stringUri)
+      maybeCommitId <- send(request(GET, uri, maybeAccessToken))(mapResponse)
+    } yield maybeCommitId
   }
 
   private lazy val mapResponse: PartialFunction[(Status, Request[Interpretation], Response[Interpretation]),
-                                                Interpretation[Option[CommitInfo]]
+                                                Interpretation[Option[CommitId]]
   ] = {
-    case (Ok, _, response)    => response.as[List[CommitInfo]] map (_.headOption)
-    case (NotFound, _, _)     => Option.empty[CommitInfo].pure[Interpretation]
+    case (Ok, _, response)    => response.as[List[CommitInfo]] map (_.headOption.map(_.id))
+    case (NotFound, _, _)     => Option.empty[CommitId].pure[Interpretation]
     case (Unauthorized, _, _) => UnauthorizedException.raiseError
   }
 

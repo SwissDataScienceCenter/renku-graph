@@ -14,8 +14,8 @@ webhookService:
     requests:
       memory: 150Mi
     limits:
-      memory: 350Mi
-  jvmXmx: 100M
+      memory: 550Mi
+  jvmXmx: 200M
   gitlab:
     rateLimit: 100/sec
   threadsNumber: 3
@@ -84,10 +84,10 @@ knowledgeGraph:
     requests:
       memory: 250Mi
     limits:
-      memory: 400Mi
+      memory: 800Mi
   gitlab:
     rateLimit: 100/sec
-  jvmXmx: 200M
+  jvmXmx: 512M
   threadsNumber: 4
   services:
     renku:
@@ -107,7 +107,7 @@ eventLog:
     requests:
       memory: 250Mi
     limits:
-      memory: 1000Mi
+      memory: 1200Mi
   jvmXmx: 512M
   threadsNumber: 6
   connectionPool: 10
@@ -124,8 +124,8 @@ commitEventService:
     requests:
       memory: 250Mi
     limits:
-      memory: 450Mi
-  jvmXmx: 200M
+      memory: 700Mi
+  jvmXmx: 300M
   gitlab:
     rateLimit: 100/sec
   threadsNumber: 3

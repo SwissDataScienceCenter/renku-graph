@@ -16,11 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration
-package historytraversal
+package ch.datascience.commiteventservice.events.categories.common
 
-import Generators._
 import cats.MonadError
+import ch.datascience.commiteventservice.events.categories.common.Generators._
 import ch.datascience.generators.Generators.Implicits._
 import io.circe.Json
 import io.circe.parser._

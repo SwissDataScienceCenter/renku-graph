@@ -16,19 +16,17 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.events.categories.commitsync
+package ch.datascience.commiteventservice.events.categories.globalcommitsync
 
-import io.circe.Json
-import io.circe.syntax._
+import cats.Show
+import ch.datascience.events.consumers.Project
+import ch.datascience.graph.model.events.{CommitId, LastSyncedDate}
 
-package object eventgeneration {
+private final case class GlobalCommitSyncEvent(project: Project, lastSynced: LastSyncedDate, commits: List[CommitId]) {
+  override lazy val toString: String =
+    s"projectId = ${project.id}, projectPath = ${project.path}, lastSynced = $lastSynced, numberOfCommits = ${commits.length}"
+}
 
-  implicit class PersonOps(person: Person) {
-
-    lazy val emailToJson: Json = person match {
-      case person: Person.WithEmail => person.email.value.asJson
-      case _ => Json.Null
-    }
-  }
-
+private object GlobalCommitSyncEvent {
+  implicit lazy val show: Show[GlobalCommitSyncEvent] = Show.show(_.toString)
 }

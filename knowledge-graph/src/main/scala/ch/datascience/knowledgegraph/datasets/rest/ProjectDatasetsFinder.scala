@@ -79,9 +79,9 @@ private class ProjectDatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Tim
         |    FILTER NOT EXISTS { ?otherDsId prov:wasDerivedFrom/schema:url ?datasetId }
         |    FILTER NOT EXISTS { ?datasetId prov:invalidatedAtTime ?invalidationTime. }
         |    OPTIONAL { 
-        |      ?datasetId   schema:image ?imageId .
         |      ?imageId     schema:position ?imagePosition ;
-        |                   schema:contentUrl ?imageUrl .
+        |                   schema:contentUrl ?imageUrl ;
+        |                   ^schema:image ?datasetId .
         |      BIND(CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
         |    }
         |}

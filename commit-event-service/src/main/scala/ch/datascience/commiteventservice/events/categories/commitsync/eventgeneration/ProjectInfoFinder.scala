@@ -19,7 +19,8 @@
 package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.commiteventservice.events.categories.commitsync.ProjectInfo
+import ch.datascience.commiteventservice.events.categories.common
+import ch.datascience.commiteventservice.events.categories.common.ProjectInfo
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrlLoader
@@ -73,7 +74,7 @@ private class ProjectInfoFinderImpl(
         id         <- cursor.downField("id").as[projects.Id]
         visibility <- cursor.downField("visibility").as[Option[Visibility]] map defaultToPublic
         path       <- cursor.downField("path_with_namespace").as[projects.Path]
-      } yield ProjectInfo(id, visibility, path)
+      } yield common.ProjectInfo(id, visibility, path)
 
     jsonOf[IO, ProjectInfo]
   }

@@ -19,8 +19,8 @@
 package ch.datascience.commiteventservice.events.categories.commitsync
 
 import ch.datascience.events.consumers.Project
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.EventsGenerators.{commitIds, lastSyncedDates}
+import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import org.scalacheck.Gen
 
 private object Generators {

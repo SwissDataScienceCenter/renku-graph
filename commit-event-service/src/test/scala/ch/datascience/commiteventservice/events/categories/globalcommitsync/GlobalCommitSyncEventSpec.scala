@@ -16,31 +16,23 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.events.categories.commitsync
+package ch.datascience.commiteventservice.events.categories.globalcommitsync
 
-import ch.datascience.commiteventservice.events.categories.commitsync.Generators._
+import ch.datascience.commiteventservice.events.categories.globalcommitsync.Generators.globalCommitSyncEventsNonZero
 import ch.datascience.generators.Generators.Implicits._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class CommitSyncEventSpec extends AnyWordSpec with should.Matchers {
+class GlobalCommitSyncEventSpec extends AnyWordSpec with should.Matchers {
 
-  "FullCommitSyncEvent.toString" should {
+  "toString" should {
 
-    "print out the event id, project id and path along with the last sync date" in {
-      val event = fullCommitSyncEvents.generateOne
-      event.toString shouldBe s"id = ${event.id}, " +
-        s"projectId = ${event.project.id}, " +
+    "print out the event id, project id, and path along with the last sync date" in {
+      val event = globalCommitSyncEventsNonZero.generateOne
+      event.toString shouldBe s"projectId = ${event.project.id}, " +
         s"projectPath = ${event.project.path}, " +
-        s"lastSynced = ${event.lastSynced}"
-    }
-  }
-
-  "MinimalCommitSyncEvent.toString" should {
-
-    "print out the event id, project id and path along with the last sync date" in {
-      val event = minimalCommitSyncEvents.generateOne
-      event.toString shouldBe s"projectId = ${event.project.id}, projectPath = ${event.project.path}"
+        s"lastSynced = ${event.lastSynced}, " +
+        s"numberOfCommits = ${event.commits.length}"
     }
   }
 }

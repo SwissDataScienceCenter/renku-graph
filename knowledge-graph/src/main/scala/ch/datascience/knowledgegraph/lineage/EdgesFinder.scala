@@ -51,7 +51,7 @@ private class EdgesFinderImpl(
   private type EdgeData = (RunInfo, Option[Node.Location], Option[Node.Location])
 
   override def findEdges(projectPath: Path, maybeUser: Option[AuthUser]): IO[EdgeMap] =
-    queryEdges(using = query(projectPath, maybeUser: Option[AuthUser])) map toNodesLocations
+    queryEdges(using = query(projectPath, maybeUser)) map toNodesLocations
 
   private def queryEdges(using: SparqlQuery): IO[Set[EdgeData]] = {
     val pageSize = 2000
@@ -77,24 +77,22 @@ private class EdgesFinderImpl(
         |WHERE {
         |  {
         |    ${projectMemberFilterQuery(ResourceId(renkuBaseUrl, path).showAs[RdfResource])(maybeUser)}
-        |    ?activity schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
-        |              a prov:Activity;
-        |              prov:qualifiedAssociation/prov:hadPlan ?plan;
-        |              prov:startedAtTime ?date.
-        |    ?plan renku:hasInputs ?input.
+        |    ?plan schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
+        |          renku:hasInputs ?input;
+        |          ^(prov:qualifiedAssociation/prov:hadPlan) ?activity.
+        |    ?activity prov:startedAtTime ?date.
         |    ?paramValue a renku:PathParameterValue;
-        |                schema:valueReference ?input.
-        |    ?paramValue prov:atLocation ?sourceEntityLocation.
+        |                schema:valueReference ?input;
+        |                prov:atLocation ?sourceEntityLocation.
         |  } UNION {
         |    ${projectMemberFilterQuery(ResourceId(renkuBaseUrl, path).showAs[RdfResource])(maybeUser)}
-        |    ?activity schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
-        |              a prov:Activity;
-        |              prov:qualifiedAssociation/prov:hadPlan ?plan;
-        |              prov:startedAtTime ?date.
-        |    ?plan renku:hasOutputs ?output.
+        |    ?plan schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
+        |          renku:hasOutputs ?output;
+        |          ^(prov:qualifiedAssociation/prov:hadPlan) ?activity.
+        |    ?activity prov:startedAtTime ?date.
         |    ?paramValue a renku:PathParameterValue;
-        |                schema:valueReference ?output.
-        |    ?paramValue prov:atLocation ?targetEntityLocation.
+        |                schema:valueReference ?output;
+        |                prov:atLocation ?targetEntityLocation.
         |  }
         |}
         |ORDER BY ASC(?date)

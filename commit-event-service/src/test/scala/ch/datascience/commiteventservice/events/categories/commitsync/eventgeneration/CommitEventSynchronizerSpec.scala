@@ -20,16 +20,16 @@ package ch.datascience.commiteventservice.events.categories.commitsync.eventgene
 
 import cats.data.OptionT
 import cats.syntax.all._
-import ch.datascience.commiteventservice.events.categories.commitsync.Generators.fullCommitSyncEvents
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer.UpdateResult._
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.Generators.commitInfos
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.{CommitInfoFinder, CommitToEventLog, EventDetailsFinder}
+import ch.datascience.commiteventservice.events.categories.commitsync.Generators._
 import ch.datascience.commiteventservice.events.categories.commitsync.{categoryName, logMessageCommon}
+import ch.datascience.commiteventservice.events.categories.common.Generators.commitInfos
+import ch.datascience.commiteventservice.events.categories.common.UpdateResult._
+import ch.datascience.commiteventservice.events.categories.common._
 import ch.datascience.events.consumers.Project
 import ch.datascience.generators.CommonGraphGenerators.personalAccessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators.batchDates
+import ch.datascience.graph.model.EventsGenerators.{batchDates, commitIds}
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
@@ -70,14 +70,14 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
     "succeed if the latest event in the Event Log  is already in EventLog and log the event as Existed" in new TestCase {
 
       val event            = fullCommitSyncEvents.generateOne
-      val latestCommitInfo = commitInfos.generateOne.copy(parents = List.empty[CommitId])
+      val latestCommitInfo = commitInfos.generateOne.copy(parents = commitIds.generateNonEmptyList().toList)
 
       givenAccessTokenIsFound(event.project.id)
 
       givenLatestCommitIsFound(latestCommitInfo, event.project.id)
 
       givenEventIsInEL(latestCommitInfo.id, event.project.id)(
-        CommitWithParents(latestCommitInfo.id, event.project.id, parents = List.empty[CommitId])
+        CommitWithParents(latestCommitInfo.id, event.project.id, parents = commitIds.generateNonEmptyList().toList)
       )
 
       givenCommitIsInGL(latestCommitInfo, event.project.id)
@@ -115,6 +115,37 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
 
       }
 
+    "succeed if there is a new commit and the creation succeeds for the first commit and stops once ids are on both gitlab and EL" in new TestCase {
+      val event            = fullCommitSyncEvents.generateOne
+      val parentCommit     = commitInfos.generateOne
+      val latestCommitInfo = commitInfos.generateOne.copy(parents = List(parentCommit.id, commitIds.generateOne))
+
+      givenAccessTokenIsFound(event.project.id)
+
+      givenLatestCommitIsFound(latestCommitInfo, event.project.id)
+
+      givenEventIsNotInEL(latestCommitInfo, event.project.id)
+      givenCommitIsInGL(latestCommitInfo, event.project.id)
+
+      (commitToEventLog.storeCommitInEventLog _)
+        .expects(event.project, latestCommitInfo, batchDate)
+        .returning(Success(Created))
+
+      givenEventIsInEL(parentCommit.id, event.project.id)(
+        CommitWithParents(parentCommit.id, event.project.id, parentCommit.parents)
+      )
+      givenCommitIsInGL(parentCommit, event.project.id)
+
+      commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
+
+      logger.loggedOnly(
+        logNewEventFound(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime),
+        logNoNewEvents(parentCommit.id, event.project, executionTimeRecorder.elapsedTime),
+        logSummary(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime, created = 1, existed = 1)
+      )
+
+    }
+
     "succeed if there is a new commit and the creation succeeds for the commit and its parents" in new TestCase {
       val event            = fullCommitSyncEvents.generateOne
       val parentCommit     = commitInfos.generateOne.copy(parents = List.empty[CommitId])
@@ -127,14 +158,14 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       givenEventIsNotInEL(latestCommitInfo, event.project.id)
       givenCommitIsInGL(latestCommitInfo, event.project.id)
 
-      (commitToEventLog.storeCommitsInEventLog _)
+      (commitToEventLog.storeCommitInEventLog _)
         .expects(event.project, latestCommitInfo, batchDate)
         .returning(Success(Created))
 
       givenEventIsNotInEL(parentCommit, event.project.id)
       givenCommitIsInGL(parentCommit, event.project.id)
 
-      (commitToEventLog.storeCommitsInEventLog _)
+      (commitToEventLog.storeCommitInEventLog _)
         .expects(event.project, parentCommit, batchDate)
         .returning(Success(Created))
 
@@ -165,7 +196,7 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
 
       (commitEventsRemover.removeDeletedEvent _)
         .expects(event.project, event.id)
-        .returning(Success(Deleted))
+        .returning(UpdateResult.Deleted.pure[Try])
 
       givenEventIsInEL(parentCommit.id, event.project.id)(returning =
         CommitWithParents(parentCommit.id, event.project.id, List.empty[CommitId])
@@ -174,7 +205,7 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
 
       (commitEventsRemover.removeDeletedEvent _)
         .expects(event.project, parentCommit.id)
-        .returning(Success(Deleted))
+        .returning(UpdateResult.Deleted.pure[Try])
 
       commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
 
@@ -197,7 +228,7 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       givenEventIsNotInEL(latestCommitInfo, event.project.id)
       givenCommitIsInGL(latestCommitInfo, event.project.id)
 
-      (commitToEventLog.storeCommitsInEventLog _)
+      (commitToEventLog.storeCommitInEventLog _)
         .expects(event.project, latestCommitInfo, batchDate)
         .returning(Success(Created))
 
@@ -208,7 +239,7 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
 
       (commitEventsRemover.removeDeletedEvent _)
         .expects(event.project, parentCommit.id)
-        .returning(Success(Deleted))
+        .returning(UpdateResult.Deleted.pure[Try])
 
       commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
 
@@ -232,7 +263,7 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       givenEventIsNotInEL(latestCommitInfo, event.project.id)
       givenCommitIsInGL(latestCommitInfo, event.project.id)
 
-      (commitToEventLog.storeCommitsInEventLog _)
+      (commitToEventLog.storeCommitInEventLog _)
         .expects(event.project, latestCommitInfo, batchDate)
         .returning(Success(Created))
 
@@ -244,7 +275,7 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       givenEventIsNotInEL(parent2Commit, event.project.id)
       givenCommitIsInGL(parent2Commit, event.project.id)
 
-      (commitToEventLog.storeCommitsInEventLog _)
+      (commitToEventLog.storeCommitInEventLog _)
         .expects(event.project, parent2Commit, batchDate)
         .returning(Success(Created))
 
@@ -271,7 +302,7 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       givenEventIsNotInEL(latestCommitInfo, event.project.id)
       givenCommitIsInGL(latestCommitInfo, event.project.id)
 
-      (commitToEventLog.storeCommitsInEventLog _)
+      (commitToEventLog.storeCommitInEventLog _)
         .expects(event.project, latestCommitInfo, batchDate)
         .returning(Success(Created))
 
@@ -286,7 +317,7 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       givenEventIsNotInEL(parent2Commit, event.project.id)
       givenCommitIsInGL(parent2Commit, event.project.id)
 
-      (commitToEventLog.storeCommitsInEventLog _)
+      (commitToEventLog.storeCommitInEventLog _)
         .expects(event.project, parent2Commit, batchDate)
         .returning(Success(Created))
 
@@ -314,14 +345,14 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
 
       val exception = exceptions.generateOne
 
-      (commitToEventLog.storeCommitsInEventLog _)
+      (commitToEventLog.storeCommitInEventLog _)
         .expects(event.project, latestCommitInfo, batchDate)
         .returning(Success(Failed(exception.getMessage, exception)))
 
       givenEventIsNotInEL(parent1Commit, event.project.id)
       givenCommitIsInGL(parent1Commit, event.project.id)
 
-      (commitToEventLog.storeCommitsInEventLog _)
+      (commitToEventLog.storeCommitInEventLog _)
         .expects(event.project, parent1Commit, batchDate)
         .returning(Success(Created))
 
@@ -333,6 +364,47 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
                                 executionTimeRecorder.elapsedTime,
                                 exception,
                                 exception.getMessage
+        ),
+        logNewEventFound(parent1Commit.id, event.project, executionTimeRecorder.elapsedTime),
+        logSummary(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime, created = 1, failed = 1)
+      )
+    }
+
+    "succeed and continue the process if the commit deletion is needed and return a failure" in new TestCase {
+      val event            = fullCommitSyncEvents.generateOne
+      val parent1Commit    = commitInfos.generateOne.copy(parents = List.empty[CommitId])
+      val latestCommitInfo = commitInfos.generateOne
+
+      givenAccessTokenIsFound(event.project.id)
+
+      givenLatestCommitIsFound(latestCommitInfo, event.project.id)
+
+      givenEventIsInEL(latestCommitInfo.id, event.project.id)(
+        CommitWithParents(latestCommitInfo.id, event.project.id, List(parent1Commit.id))
+      )
+      givenCommitIsNotInGL(latestCommitInfo.id, event.project.id)
+
+      val exception       = exceptions.generateOne
+      val deletionFailure = UpdateResult.Failed(nonEmptyStrings().generateOne, exception)
+      (commitEventsRemover.removeDeletedEvent _)
+        .expects(event.project, latestCommitInfo.id)
+        .returning(deletionFailure.pure[Try])
+
+      givenEventIsNotInEL(parent1Commit, event.project.id)
+      givenCommitIsInGL(parent1Commit, event.project.id)
+
+      (commitToEventLog.storeCommitInEventLog _)
+        .expects(event.project, parent1Commit, batchDate)
+        .returning(Success(Created))
+
+      commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
+
+      logger.loggedOnly(
+        logErrorSynchronization(latestCommitInfo.id,
+                                event.project,
+                                executionTimeRecorder.elapsedTime,
+                                exception,
+                                deletionFailure.message
         ),
         logNewEventFound(parent1Commit.id, event.project, executionTimeRecorder.elapsedTime),
         logSummary(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime, created = 1, failed = 1)
@@ -354,15 +426,14 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       givenCommitIsNotInGL(latestCommitInfo.id, event.project.id)
 
       val exception = exceptions.generateOne
-
       (commitEventsRemover.removeDeletedEvent _)
         .expects(event.project, latestCommitInfo.id)
-        .returning(Success(Failed(exception.getMessage, exception)))
+        .returning(exception.raiseError[Try, UpdateResult])
 
       givenEventIsNotInEL(parent1Commit, event.project.id)
       givenCommitIsInGL(parent1Commit, event.project.id)
 
-      (commitToEventLog.storeCommitsInEventLog _)
+      (commitToEventLog.storeCommitInEventLog _)
         .expects(event.project, parent1Commit, batchDate)
         .returning(Success(Created))
 
@@ -373,7 +444,7 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
                                 event.project,
                                 executionTimeRecorder.elapsedTime,
                                 exception,
-                                exception.getMessage
+                                "COMMIT_SYNC - Commit Remover failed to send commit deletion status"
         ),
         logNewEventFound(parent1Commit.id, event.project, executionTimeRecorder.elapsedTime),
         logSummary(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime, created = 1, failed = 1)

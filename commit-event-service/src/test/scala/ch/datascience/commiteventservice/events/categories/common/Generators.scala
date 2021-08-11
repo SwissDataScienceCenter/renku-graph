@@ -16,10 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration
+package ch.datascience.commiteventservice.events.categories.common
 
-import ch.datascience.commiteventservice.events.categories.commitsync.ProjectInfo
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
+import ch.datascience.commiteventservice.events.categories.common
+import ch.datascience.commiteventservice.events.categories.common.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
 import ch.datascience.events.consumers.Project
 import ch.datascience.generators.Generators.listOf
 import ch.datascience.graph.model.EventsGenerators.{batchDates, commitIds, commitMessages, committedDates}
@@ -28,7 +28,7 @@ import ch.datascience.graph.model.events.CommitId
 import org.scalacheck.Gen
 import org.scalacheck.Gen.choose
 
-private object Generators {
+private[categories] object Generators {
 
   implicit val commits: Gen[Commit] = for {
     id      <- commitIds
@@ -48,7 +48,7 @@ private object Generators {
     author        <- authors
     committer     <- committers
     parents       <- listOf(commitIds)
-  } yield CommitInfo(id, message, committedDate, author, committer, parents)
+  } yield common.CommitInfo(id, message, committedDate, author, committer, parents)
 
   implicit lazy val newCommitEvents: Gen[CommitEvent] = for {
     commitId      <- commitIds

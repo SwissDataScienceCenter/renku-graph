@@ -16,11 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal
+package ch.datascience.commiteventservice.events.categories.common
 
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitInfo
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrlLoader
@@ -35,7 +34,7 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private[eventgeneration] trait CommitInfoFinder[Interpretation[_]] {
+private[categories] trait CommitInfoFinder[Interpretation[_]] {
   def findCommitInfo(
       projectId: Id,
       commitId:  CommitId
@@ -48,7 +47,7 @@ private[eventgeneration] trait CommitInfoFinder[Interpretation[_]] {
   ): Interpretation[Option[CommitInfo]]
 }
 
-private[eventgeneration] class CommitInfoFinderImpl[Interpretation[_]: ConcurrentEffect: Timer](
+private[categories] class CommitInfoFinderImpl[Interpretation[_]: ConcurrentEffect: Timer](
     gitLabUrl:               GitLabUrl,
     gitLabThrottler:         Throttler[Interpretation, GitLab],
     logger:                  Logger[Interpretation]
@@ -100,7 +99,7 @@ private[eventgeneration] class CommitInfoFinderImpl[Interpretation[_]: Concurren
     jsonOf[Interpretation, CommitInfo]
 }
 
-object CommitInfoFinder {
+private[categories] object CommitInfoFinder {
   def apply(gitLabThrottler: Throttler[IO, GitLab], logger: Logger[IO])(implicit
       executionContext:      ExecutionContext,
       concurrentEffect:      ConcurrentEffect[IO],

@@ -16,13 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal
+package ch.datascience.commiteventservice.events.categories.common
 
 import cats.MonadThrow
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEvent
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
+import ch.datascience.commiteventservice.events.categories.common.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.events.EventBody
@@ -33,11 +32,11 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private trait CommitEventSender[Interpretation[_]] {
+private[categories] trait CommitEventSender[Interpretation[_]] {
   def send(commitEvent: CommitEvent): Interpretation[Unit]
 }
 
-private class CommitEventSenderImpl[Interpretation[_]: MonadThrow: ContextShift: Timer: ConcurrentEffect](
+private[categories] class CommitEventSenderImpl[Interpretation[_]: MonadThrow: ContextShift: Timer: ConcurrentEffect](
     eventLogUrl:             EventLogUrl,
     commitEventSerializer:   CommitEventSerializer[Interpretation],
     logger:                  Logger[Interpretation]
@@ -99,7 +98,7 @@ private class CommitEventSenderImpl[Interpretation[_]: MonadThrow: ContextShift:
   }
 }
 
-private object CommitEventSender {
+private[categories] object CommitEventSender {
 
   def apply(
       logger: Logger[IO]
