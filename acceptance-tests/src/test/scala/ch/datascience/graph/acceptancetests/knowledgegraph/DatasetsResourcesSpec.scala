@@ -216,22 +216,12 @@ class DatasetsResourcesSpec
       When("user is authenticated")
       `GET <gitlabApi>/user returning OK`(user)
 
-      And("he fetches details of the dataset project using the link from the response")
-      val datasetProjectLink = foundDatasetDetails.hcursor
-        .downField("isPartOf")
-        .downArray
-        ._links
-        .get(Rel("project-details"))
-        .getOrFail("No link with rel 'project-details'")
-
       val datasetUsedInProjectLink = foundDatasetDetails.hcursor
         .downField("usedIn")
         .downArray
         ._links
         .get(Rel("project-details"))
         .getOrFail("No link with rel 'project-details'")
-
-      datasetProjectLink shouldBe datasetUsedInProjectLink
 
       foundDatasetDetails.hcursor
         .downField("project")
