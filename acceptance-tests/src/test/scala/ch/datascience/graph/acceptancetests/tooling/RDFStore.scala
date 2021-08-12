@@ -18,19 +18,24 @@
 
 package ch.datascience.graph.acceptancetests.tooling
 
-import java.nio.file.Files
 import cats.effect.concurrent.MVar
 import cats.effect.{ContextShift, Fiber, IO}
+import ch.datascience.graph.Schemas.renku
+import ch.datascience.graph.acceptancetests.data.RdfStoreData
+import ch.datascience.graph.model.RenkuVersionPair
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.rdfstore.FusekiBaseUrl
+import ch.datascience.rdfstore.entities.bundles
+import io.renku.jsonld.EntityId
 import org.apache.jena.fuseki.main.FusekiServer
 import org.apache.jena.rdfconnection.RDFConnectionFactory
 import org.apache.lucene.store.MMapDirectory
 
+import java.nio.file.Files
 import scala.concurrent.ExecutionContext
 import scala.jdk.CollectionConverters._
 
-object RDFStore {
+object RDFStore extends RdfStoreData {
 
   private val logger = TestLogger()
 
@@ -100,12 +105,25 @@ object RDFStore {
 
   private val jenaReference = MVar.empty[IO, JenaInstance].unsafeRunSync()
 
-  def start(): IO[Unit] =
+  def start(maybeVersionPair: Option[RenkuVersionPair] = Some(currentVersionPair)): IO[Unit] =
     for {
       _ <- stop()
       newJena = new JenaInstance()
       _ <- jenaReference.put(newJena)
       _ <- newJena.start()
+      _ <- maybeVersionPair
+             .map { currentVersionPair =>
+               jenaReference.read.map { jena =>
+                 jena.connection
+                   .update(s"""
+            INSERT DATA{
+              <${EntityId
+                     .of((bundles.renkuBaseUrl / "version-pair").toString)}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <${renku / "VersionPair"}> ;
+                                <${renku / "cliVersion"}> '${currentVersionPair.cliVersion}' ;
+                                <${renku / "schemaVersion"}> '${currentVersionPair.schemaVersion}'}""")
+               }
+             }
+             .getOrElse(IO.unit)
     } yield ()
 
   def stop(): IO[Unit] =

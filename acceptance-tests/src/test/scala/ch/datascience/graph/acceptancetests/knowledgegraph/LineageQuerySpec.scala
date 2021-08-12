@@ -261,7 +261,7 @@ class LineageQuerySpec
       }
     }"""
 
-  def theExpectedEdges(exemplarData: ExemplarData) = {
+  def theExpectedEdges(exemplarData: ExemplarData): Right[Nothing, Set[Json]] = {
     import exemplarData._
     Right {
       Set(
@@ -275,7 +275,7 @@ class LineageQuerySpec
     }
   }
 
-  def theExpectedNodes(exemplarData: ExemplarData) = {
+  def theExpectedNodes(exemplarData: ExemplarData): Right[Nothing, Set[Json]] = {
     import exemplarData._
     Right {
       Set(

@@ -59,6 +59,7 @@ class ProjectsResourcesSpec
     with GivenWhenThen
     with GraphServices
     with AcceptanceTestPatience
+    with RdfStoreData
     with should.Matchers {
 
   import ProjectsResources._

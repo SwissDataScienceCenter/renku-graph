@@ -28,7 +28,7 @@ import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.interpreters.{IOSentryInitializer, TestLogger}
 import ch.datascience.testtools.MockedRunnableCollaborators
 import ch.datascience.triplesgenerator.config.certificates.GitCertificateInstaller
-import ch.datascience.triplesgenerator.init.{CliVersionCompatibilityVerifier, IOFusekiDatasetInitializer}
+import ch.datascience.triplesgenerator.init.CliVersionCompatibilityVerifier
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioning
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -53,7 +53,6 @@ class MicroserviceRunnerSpec
         given(gitCertificateInstaller).succeeds(returning = ())
         given(sentryInitializer).succeeds(returning = ())
         given(cliVersionCompatChecker).succeeds(returning = ())
-        given(datasetInitializer).succeeds(returning = ())
         given(eventConsumersRegistry).succeeds(returning = ())
         given(reProvisioning).succeeds(returning = ())
         given(httpServer).succeeds(returning = ExitCode.Success)
@@ -122,31 +121,12 @@ class MicroserviceRunnerSpec
       )
     }
 
-    "fail if RDF dataset verification fails" in new TestCase {
-
-      given(certificateLoader).succeeds(returning = ())
-      given(gitCertificateInstaller).succeeds(returning = ())
-      given(sentryInitializer).succeeds(returning = ())
-      given(cliVersionCompatChecker).succeeds(returning = ())
-      val exception = exceptions.generateOne
-      given(datasetInitializer).fails(becauseOf = exception)
-
-      intercept[Exception] {
-        runner.run().unsafeRunSync()
-      } shouldBe exception
-
-      logger.loggedOnly(
-        Error(exception.getMessage, exception)
-      )
-    }
-
     "fail if starting the Http Server fails" in new TestCase {
 
       given(certificateLoader).succeeds(returning = ())
       given(gitCertificateInstaller).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
       given(cliVersionCompatChecker).succeeds(returning = ())
-      given(datasetInitializer).succeeds(returning = ())
       given(eventConsumersRegistry).succeeds(returning = ())
       given(reProvisioning).succeeds(returning = ())
       val exception = exceptions.generateOne
@@ -167,7 +147,6 @@ class MicroserviceRunnerSpec
       given(gitCertificateInstaller).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
       given(cliVersionCompatChecker).succeeds(returning = ())
-      given(datasetInitializer).succeeds(returning = ())
       given(eventConsumersRegistry).fails(becauseOf = exceptions.generateOne)
       given(reProvisioning).succeeds(returning = ())
       given(httpServer).succeeds(returning = ExitCode.Success)
@@ -181,7 +160,6 @@ class MicroserviceRunnerSpec
       given(gitCertificateInstaller).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
       given(cliVersionCompatChecker).succeeds(returning = ())
-      given(datasetInitializer).succeeds(returning = ())
       given(eventConsumersRegistry).succeeds(returning = ())
       given(reProvisioning).fails(becauseOf = exceptions.generateOne)
       given(httpServer).succeeds(returning = ExitCode.Success)
@@ -196,7 +174,6 @@ class MicroserviceRunnerSpec
     val gitCertificateInstaller = mock[GitCertificateInstaller[IO]]
     val sentryInitializer       = mock[IOSentryInitializer]
     val cliVersionCompatChecker = mock[CliVersionCompatibilityVerifier[IO]]
-    val datasetInitializer      = mock[IOFusekiDatasetInitializer]
     val eventConsumersRegistry  = mock[EventConsumersRegistry[IO]]
     val reProvisioning          = mock[ReProvisioning[IO]]
     val httpServer              = mock[IOHttpServer]
@@ -207,7 +184,6 @@ class MicroserviceRunnerSpec
       gitCertificateInstaller,
       sentryInitializer,
       cliVersionCompatChecker,
-      datasetInitializer,
       eventConsumersRegistry,
       reProvisioning,
       httpServer,
