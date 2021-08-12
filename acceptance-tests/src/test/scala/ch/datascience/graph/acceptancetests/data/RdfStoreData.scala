@@ -16,26 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.init
+package ch.datascience.graph.acceptancetests.data
 
-import cats.effect.IO
-import ch.datascience.triplesgenerator.config.FusekiAdminConfig
-import org.typelevel.log4cats.Logger
+import ch.datascience.graph.model.{CliVersion, RenkuVersionPair, SchemaVersion}
 
-import scala.util.Try
-
-private abstract class TryDatasetExistenceChecker extends DatasetExistenceChecker[Try]
-
-private abstract class TryDatasetExistenceCreator extends DatasetExistenceCreator[Try]
-
-class IOFusekiDatasetInitializer(
-    fusekiAdminConfig:       FusekiAdminConfig,
-    datasetExistenceChecker: DatasetExistenceChecker[IO],
-    datasetExistenceCreator: DatasetExistenceCreator[IO],
-    logger:                  Logger[IO]
-) extends FusekiDatasetInitializer[IO](
-      fusekiAdminConfig,
-      datasetExistenceChecker,
-      datasetExistenceCreator,
-      logger
-    )
+trait RdfStoreData {
+  val currentVersionPair: RenkuVersionPair = RenkuVersionPair(CliVersion("0.15.0"), SchemaVersion("8"))
+}

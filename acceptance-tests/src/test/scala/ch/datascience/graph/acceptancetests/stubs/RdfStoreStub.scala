@@ -18,16 +18,13 @@
 
 package ch.datascience.graph.acceptancetests.stubs
 
-import ch.datascience.graph.acceptancetests.data.currentVersionPair
-import ch.datascience.graph.model.RenkuVersionPair
+import ch.datascience.graph.acceptancetests.data.RdfStoreData
 import com.github.tomakehurst.wiremock.client.WireMock
-import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig
-import io.circe.literal._
 
 import scala.annotation.tailrec
 
-object RdfStoreStub {
+object RdfStoreStub extends RdfStoreData {
   import com.github.tomakehurst.wiremock.WireMockServer
 
   private lazy val fusekiStub = new WireMockServer(wireMockConfig().port(3030))
@@ -35,8 +32,6 @@ object RdfStoreStub {
   def start(): Unit = {
     fusekiStub.start()
     WireMock.configureFor(fusekiStub.port())
-    givenTriplesUpToDateCheckReturning(currentVersionPair)
-    givenTriplesVersionPairIsUpdated()
     ()
   }
 
@@ -53,32 +48,4 @@ object RdfStoreStub {
     waitUntilDown()
   }
 
-  def givenRenkuDatasetExists(): Unit = {
-    stubFor {
-      get("/$/datasets/renku")
-        .willReturn(ok())
-    }
-    ()
-  }
-
-  private def givenTriplesUpToDateCheckReturning(version: RenkuVersionPair): Unit = {
-    stubFor {
-      post("/renku/sparql")
-        .willReturn(okJson(json"""{
-          "results": {
-            "bindings": [{
-              "cliVersion": { "value": ${version.cliVersion.toString} },
-              "schemaVersion": { "value": ${version.schemaVersion.toString} }
-            }]
-          }
-        }""".noSpaces))
-    }
-    ()
-  }
-
-  private def givenTriplesVersionPairIsUpdated() =
-    stubFor {
-      post("/renku/update")
-        .willReturn(ok())
-    }
 }

@@ -35,7 +35,7 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.jsonld.JsonLD
 
-object RemoteTriplesGenerator {
+object RemoteTriplesGenerator extends RdfStoreData {
 
   private val logger = TestLogger()
   private val port: Int Refined Positive = 8080

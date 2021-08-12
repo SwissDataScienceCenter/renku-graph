@@ -26,9 +26,9 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class ReprovisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFactory {
+class ReProvisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFactory {
 
-  "isReprovisioningNeeded" should {
+  "isReProvisioningNeeded" should {
     "return true when the config schema version is different than the current schema version" in new TestCase {
       // Compat matrix
       /**  current cli version is 1.2.1
@@ -40,7 +40,7 @@ class ReprovisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFac
         * [1.2.3 -> 11, 1.2.1 -> 12]
         */
       val newVersionPair = renkuVersionPairs.generateNonEmptyList(2, 2)
-      judge.isReprovisioningNeeded(currentVersionPair, newVersionPair) shouldBe true
+      judge.isReProvisioningNeeded(currentVersionPair, newVersionPair) shouldBe true
     }
 
     "return true when the last two schema version are the same but the cli versions are different" in new TestCase {
@@ -52,7 +52,7 @@ class ReprovisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFac
       val newVersionPair =
         renkuVersionPairs.generateNonEmptyList(2, 2).map(_.copy(schemaVersion = currentVersionPair.schemaVersion))
 
-      judge.isReprovisioningNeeded(currentVersionPair, newVersionPair) shouldBe true
+      judge.isReProvisioningNeeded(currentVersionPair, newVersionPair) shouldBe true
 
     }
 
@@ -64,12 +64,12 @@ class ReprovisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFac
         */
       val newVersionPair = renkuVersionPairs.generateOne.copy(schemaVersion = currentVersionPair.schemaVersion)
 
-      judge.isReprovisioningNeeded(currentVersionPair, NonEmptyList(newVersionPair, Nil)) shouldBe false
+      judge.isReProvisioningNeeded(currentVersionPair, NonEmptyList(newVersionPair, Nil)) shouldBe false
     }
   }
 
   private trait TestCase {
     val currentVersionPair = renkuVersionPairs.generateOne
-    val judge              = new ReprovisionJudgeImpl()
+    val judge              = new ReProvisionJudgeImpl()
   }
 }

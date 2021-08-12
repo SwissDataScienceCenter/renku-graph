@@ -69,7 +69,6 @@ trait GraphServices extends BeforeAndAfterAll {
 object GraphServices {
 
   import ch.datascience._
-  import ch.datascience.graph.acceptancetests.stubs.RdfStoreStub
 
   implicit lazy val executionContext: ExecutionContext     = ExecutionContext.global
   implicit lazy val contextShift:     ContextShift[IO]     = IO.contextShift(executionContext)
@@ -108,13 +107,14 @@ object GraphServices {
     "triples-generator",
     service = triplesgenerator.Microservice,
     serviceClient = triplesGeneratorClient,
-    preServiceStart = List(RDFStore.stop(), IO(RdfStoreStub.start()), IO(RdfStoreStub.givenRenkuDatasetExists())),
-    postServiceStart = List(IO(RdfStoreStub.shutdown()), RDFStore.start())
+    preServiceStart = List(RDFStore.stop(), RDFStore.start())
   )
 
   private val servicesRunner = (Semaphore[IO](1) map (new ServicesRunner(_))).unsafeRunSync()
 
-  def restart(service: ServiceRun): Unit = servicesRunner.restart(service)
+  def run(service:      ServiceRun): Unit = servicesRunner.run(service).unsafeRunSync()
+  def restart(service:  ServiceRun): Unit = servicesRunner.restart(service)
+  def stop(serviceName: String):     Unit = servicesRunner.stop(serviceName)
 
   sys.addShutdownHook {
     servicesRunner.stopAllServices()
