@@ -53,7 +53,7 @@ private class RenkuVersionPairUpdaterImpl(rdfStoreConfig: RdfStoreConfig,
   override def update(versionPair: RenkuVersionPair): IO[Unit] = updateWithNoResult {
     val entityId = (renkuBaseUrl / "version-pair").showAs[RdfResource]
     SparqlQuery.of(
-      name = "reprovisioning - cli and schema version create",
+      name = "ReProvisioning - cli and schema version create",
       Prefixes.of(
         rdf   -> "rdf",
         renku -> "renku"
@@ -62,7 +62,7 @@ private class RenkuVersionPairUpdaterImpl(rdfStoreConfig: RdfStoreConfig,
           |        $entityId <${RenkuVersionPairJsonLD.schemaVersion}> ?q .
           |}
           |
-          |INSERT { 
+          |INSERT{ 
           |  <${RenkuVersionPairJsonLD.id(renkuBaseUrl)}> rdf:type <${RenkuVersionPairJsonLD.objectType}> ;
           |                                         <${RenkuVersionPairJsonLD.cliVersion}> '${versionPair.cliVersion}' ;
           |                                          <${RenkuVersionPairJsonLD.schemaVersion}> '${versionPair.schemaVersion}'

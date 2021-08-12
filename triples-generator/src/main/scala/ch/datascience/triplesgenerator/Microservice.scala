@@ -36,6 +36,7 @@ import ch.datascience.triplesgenerator.config.{IOVersionCompatibilityConfig, Tri
 import ch.datascience.triplesgenerator.events.IOEventEndpoint
 import ch.datascience.triplesgenerator.init._
 import ch.datascience.triplesgenerator.reprovisioning.{IOReProvisioning, ReProvisioning, ReProvisioningStatus}
+import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
@@ -58,15 +59,21 @@ object Microservice extends IOMicroservice {
 
   protected implicit override def timer: Timer[IO] = IO.timer(executionContext)
 
-  override def run(args: List[String]): IO[ExitCode] = for {
-    certificateLoader        <- CertificateLoader[IO](ApplicationLogger)
-    gitCertificateInstaller  <- GitCertificateInstaller[IO](ApplicationLogger)
-    fusekiDatasetInitializer <- IOFusekiDatasetInitializer()
+  private def parseConfigArgs(args: List[String]): IO[Config] = IO {
+    args.headOption match {
+      case Some(configFileName) => ConfigFactory.load(configFileName)
+      case None                 => ConfigFactory.load
+    }
+  }
 
+  override def run(args: List[String]): IO[ExitCode] = for {
+    config                  <- parseConfigArgs(args)
+    certificateLoader       <- CertificateLoader[IO](ApplicationLogger)
+    gitCertificateInstaller <- GitCertificateInstaller[IO](ApplicationLogger)
     triplesGeneration       <- TriplesGeneration[IO]()
     sentryInitializer       <- SentryInitializer[IO]()
     metricsRegistry         <- MetricsRegistry()
-    renkuVersionPairs       <- IOVersionCompatibilityConfig(ApplicationLogger)
+    renkuVersionPairs       <- IOVersionCompatibilityConfig(ApplicationLogger, config)
     cliVersionCompatChecker <- IOCliVersionCompatibilityChecker(triplesGeneration, renkuVersionPairs)
     gitLabRateLimit         <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
     gitLabThrottler         <- Throttler[IO, GitLab](gitLabRateLimit)
@@ -91,14 +98,13 @@ object Microservice extends IOMicroservice {
     reProvisioning          <- IOReProvisioning(reProvisioningStatus, renkuVersionPairs, sparqlTimeRecorder, ApplicationLogger)
     eventProcessingEndpoint <- IOEventEndpoint(eventConsumersRegistry, reProvisioningStatus)
     microserviceRoutes =
-      new MicroserviceRoutes[IO](eventProcessingEndpoint, new RoutesMetrics[IO](metricsRegistry)).routes
+      new MicroserviceRoutes[IO](eventProcessingEndpoint, new RoutesMetrics[IO](metricsRegistry), config.some).routes
     exitCode <- microserviceRoutes.use { routes =>
                   new MicroserviceRunner(
                     certificateLoader,
                     gitCertificateInstaller,
                     sentryInitializer,
                     cliVersionCompatChecker,
-                    fusekiDatasetInitializer,
                     eventConsumersRegistry,
                     reProvisioning,
                     new HttpServer[IO](serverPort = ServicePort.value, routes),
@@ -114,7 +120,6 @@ private class MicroserviceRunner(
     gitCertificateInstaller:         GitCertificateInstaller[IO],
     sentryInitializer:               SentryInitializer[IO],
     cliVersionCompatibilityVerifier: CliVersionCompatibilityVerifier[IO],
-    datasetInitializer:              FusekiDatasetInitializer[IO],
     eventConsumersRegistry:          EventConsumersRegistry[IO],
     reProvisioning:                  ReProvisioning[IO],
     httpServer:                      HttpServer[IO],
@@ -128,7 +133,6 @@ private class MicroserviceRunner(
       _        <- gitCertificateInstaller.run()
       _        <- sentryInitializer.run()
       _        <- cliVersionCompatibilityVerifier.run()
-      _        <- datasetInitializer.run()
       _        <- eventConsumersRegistry.run().start.map(gatherCancelToken)
       _        <- reProvisioning.run().start.map(gatherCancelToken)
       exitCode <- httpServer.run()

@@ -29,7 +29,6 @@ import ch.datascience.graph.acceptancetests.tooling._
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.projects.ForksCount
-import ch.datascience.graph.model.testentities.EntitiesGenerators._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.webhookservice.model.HookToken
 import org.http4s.Status._

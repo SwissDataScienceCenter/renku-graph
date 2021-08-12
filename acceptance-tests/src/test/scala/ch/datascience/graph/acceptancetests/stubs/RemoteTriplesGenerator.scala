@@ -40,7 +40,7 @@ import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
 import org.scalatest.Assertions.fail
 
-object RemoteTriplesGenerator {
+object RemoteTriplesGenerator extends RdfStoreData {
 
   private val logger = TestLogger()
   private val port: Int Refined Positive = 8080

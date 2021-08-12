@@ -34,7 +34,6 @@ import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{BatchDate, CommitId, EventBody, EventId, EventStatus}
 import ch.datascience.graph.model.projects._
-import ch.datascience.graph.model.testentities.{gitLabApiUrl => _, renkuBaseUrl => _, _}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.microservices.MicroserviceIdentifier
 import io.circe.literal._

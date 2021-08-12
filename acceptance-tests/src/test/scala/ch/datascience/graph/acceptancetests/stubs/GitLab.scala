@@ -283,6 +283,7 @@ object GitLab {
             .willReturn(
               okJson(json"""{
               "id":   ${creatorId.value},
+              "username": ${creator.name.value},
               "name": ${creator.name.value}
             }""".noSpaces)
             )

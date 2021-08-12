@@ -32,7 +32,6 @@ import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplici
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.projects.ForksCount
-import ch.datascience.graph.model.testentities.{gitLabApiUrl => _, renkuBaseUrl => _, _}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.webhookservice.model.HookToken
 import eu.timepit.refined.api.Refined

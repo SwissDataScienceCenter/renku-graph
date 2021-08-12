@@ -28,7 +28,6 @@ import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.projects.ForksCount
-import ch.datascience.graph.model.testentities.EntitiesGenerators._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import io.circe.literal._

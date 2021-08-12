@@ -34,7 +34,6 @@ import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TestReadabilityTools._
 import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.testentities.Project._
-import ch.datascience.graph.model.testentities.{gitLabApiUrl => _, renkuBaseUrl => _, _}
 import ch.datascience.graph.model.{projects, testentities}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
@@ -47,12 +46,14 @@ import org.http4s.Status._
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
+import ch.datascience.graph.model.testentities._
 
 class ProjectsResourcesSpec
     extends AnyFeatureSpec
     with GivenWhenThen
     with GraphServices
     with AcceptanceTestPatience
+    with RdfStoreData
     with should.Matchers {
 
   import ProjectsResources._

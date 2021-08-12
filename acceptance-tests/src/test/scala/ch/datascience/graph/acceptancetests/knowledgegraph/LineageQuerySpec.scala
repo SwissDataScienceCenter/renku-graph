@@ -31,7 +31,6 @@ import ch.datascience.graph.model
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.testentities.LineageExemplarData.ExemplarData
-import ch.datascience.graph.model.testentities.{LineageExemplarData, NodeDef, gitLabApiUrl => _, renkuBaseUrl => _, _}
 import ch.datascience.http.client.AccessToken
 import io.circe.Json
 import io.circe.literal._
@@ -42,6 +41,7 @@ import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 import sangria.ast.Document
 import sangria.macros._
+import ch.datascience.graph.model.testentities._
 
 class LineageQuerySpec
     extends AnyFeatureSpec
@@ -233,7 +233,7 @@ class LineageQuerySpec
       }
     }"""
 
-  private def theExpectedEdges(exemplarData: ExemplarData) = {
+  private def theExpectedEdges(exemplarData: ExemplarData): Right[Nothing, Set[Json]] = {
     import exemplarData._
     Right {
       Set(
@@ -247,7 +247,7 @@ class LineageQuerySpec
     }
   }
 
-  private def theExpectedNodes(exemplarData: ExemplarData) = {
+  private def theExpectedNodes(exemplarData: ExemplarData): Right[Nothing, Set[Json]] = {
     import exemplarData._
     Right {
       Set(

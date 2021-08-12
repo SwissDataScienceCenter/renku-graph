@@ -33,7 +33,7 @@ import ch.datascience.graph.model
 import ch.datascience.graph.model.datasets.{DatePublished, Identifier, Title}
 import ch.datascience.graph.model.projects.Visibility
 import ch.datascience.graph.model.testentities.ModelOps.DatasetForkingResult
-import ch.datascience.graph.model.testentities.{gitLabApiUrl => _, renkuBaseUrl => _, _}
+import ch.datascience.graph.model.testentities.{Dataset, EntitiesGenerators, Person}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.http.rest.Links.{Href, Rel, _links}
@@ -57,7 +57,9 @@ class DatasetsResourcesSpec
     with GivenWhenThen
     with GraphServices
     with AcceptanceTestPatience
-    with should.Matchers {
+    with RdfStoreData
+    with should.Matchers
+    with EntitiesGenerators {
 
   import DatasetsResources._
 
@@ -359,7 +361,7 @@ object DatasetsResources {
       .findId(dataset.identification.title)
       .getOrElse(fail(s"No ${dataset.identification.title} dataset found among the results"))
 
-    dataset.identifier shouldBe actualIdentifier
+    dataset.identification.identifier shouldBe actualIdentifier
 
     json"""{
       "identifier": ${actualIdentifier.value},

@@ -104,6 +104,14 @@ class ServicesRunner(
       }.unsafeRunSync()
   }
 
+  def stop(serviceName: String): Unit =
+    cancelTokens.asScala.find { case (key, _) => key.name == serviceName } match {
+      case None => throw new IllegalStateException(s"'$serviceName' service not found so cannot be restarted")
+      case Some((_, cancelToken)) =>
+        logger.info(s"$serviceName service stopping")
+        cancelToken.unsafeRunSync()
+    }
+
   def stopAllServices(): Unit = cancelTokens.asScala.foreach { case (service, cancelToken) =>
     logger.info(s"Service ${service.name} stopping")
     cancelToken.unsafeRunSync()

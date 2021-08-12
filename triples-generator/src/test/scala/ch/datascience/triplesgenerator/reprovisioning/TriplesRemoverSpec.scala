@@ -44,7 +44,7 @@ class TriplesRemoverSpec extends AnyWordSpec with InMemoryRdfStore with should.M
         RenkuVersionPairJsonLD.schemaVersion -> JsonLD.fromString(versionPair.schemaVersion.toString)
       )
 
-      val reprovisioningJsonLD = JsonLD.entity(
+      val reProvisioningJsonLD = JsonLD.entity(
         id = ReProvisioningJsonLD.id,
         types = EntityTypes.of(ReProvisioningJsonLD.objectType),
         ReProvisioningJsonLD.reProvisioningStatus -> JsonLD.fromBoolean(true)
@@ -54,7 +54,7 @@ class TriplesRemoverSpec extends AnyWordSpec with InMemoryRdfStore with should.M
         datasetEntities(ofAnyProvenance).generateOne.asJsonLD,
         datasetEntities(ofAnyProvenance).generateOne.asJsonLD,
         versionPairJsonLD,
-        reprovisioningJsonLD
+        reProvisioningJsonLD
       )
 
       rdfStoreSize should be > 0
@@ -64,7 +64,7 @@ class TriplesRemoverSpec extends AnyWordSpec with InMemoryRdfStore with should.M
         .unsafeRunSync() shouldBe ((): Unit)
 
       val totalNumberOfTriples =
-        versionPairJsonLD.properties.size + 1 + reprovisioningJsonLD.properties.size + 1 // +1 for rdf:type
+        versionPairJsonLD.properties.size + 1 + reProvisioningJsonLD.properties.size + 1 // +1 for rdf:type
       rdfStoreSize shouldBe totalNumberOfTriples
     }
   }

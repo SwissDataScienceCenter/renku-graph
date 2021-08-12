@@ -145,7 +145,7 @@ private object ProjectMetadata {
       case p: ProjectWithParent    => p.copy(maybeCreator = maybeCreator)
     })
 
-    val activitiesLens     = Traversal.fromTraverse[List, Activity]
+    val activitiesLens: Traversal[List[Activity], Activity] = Traversal.fromTraverse[List, Activity]
     val activityAuthorLens = Lens[Activity, Person](_.author)(p => a => a.copy(author = p))
 
     val datasetsLens   = Traversal.fromTraverse[List, Dataset[Provenance]]
