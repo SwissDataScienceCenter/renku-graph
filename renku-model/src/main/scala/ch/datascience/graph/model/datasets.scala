@@ -26,7 +26,7 @@ import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, LocalDateNot
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string
 import io.circe.syntax._
-import io.circe.{Decoder, DecodingFailure, Encoder}
+import io.circe._
 import io.renku.jsonld.JsonLDDecoder.{decodeEntityId, decodeString}
 import io.renku.jsonld.JsonLDEncoder._
 import io.renku.jsonld._
@@ -99,7 +99,7 @@ object datasets {
       with NonNegativeInt
       with TinyTypeJsonLDOps[ImagePosition]
 
-  trait ImageUri extends Any with StringTinyType
+  trait ImageUri extends Any with TinyType { type V = String }
   object ImageUri extends From[ImageUri] with TinyTypeJsonLDOps[ImageUri] {
 
     def apply(value: String): ImageUri = from(value).fold(throw _, identity)
@@ -107,16 +107,20 @@ object datasets {
     override def from(value: String): Either[IllegalArgumentException, ImageUri] =
       Relative.from(value) orElse Absolute.from(value)
 
-    final class Relative private (val value: String) extends AnyVal with ImageUri
+    final class Relative private (val value: String) extends AnyVal with ImageUri with RelativePathTinyType {
+      override type V = String
+    }
     implicit object Relative extends TinyTypeFactory[Relative](new Relative(_)) with constraints.RelativePath
 
-    final class Absolute private (val value: String) extends AnyVal with ImageUri
+    final class Absolute private (val value: String) extends AnyVal with ImageUri with UrlTinyType {
+      override type V = String
+    }
     implicit object Absolute extends TinyTypeFactory[Absolute](new Absolute(_)) with constraints.Url
 
     import ch.datascience.tinytypes.json.TinyTypeEncoders._
 
     implicit lazy val encoder: Encoder[ImageUri] = Encoder.instance {
-      case uri: Relative => uri.asJson
+      case uri: Relative => Json.fromString(uri.value)
       case uri: Absolute => uri.asJson
     }
 

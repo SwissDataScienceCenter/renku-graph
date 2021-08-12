@@ -18,7 +18,7 @@
 
 package ch.datascience.http.rest.paging
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.syntax.all._
 import ch.datascience.config.renku
 import ch.datascience.http.rest.paging.PagingResponse.PagingInfo
@@ -34,11 +34,11 @@ object PagingResponse {
     override lazy val toString: String = s"PagingInfo(request: $pagingRequest, total: $total)"
   }
 
-  def from[Interpretation[_], Result](
+  def from[Interpretation[_]: MonadThrow, Result](
       results:       List[Result],
       pagingRequest: PagingRequest,
       total:         Total
-  )(implicit ME:     MonadError[Interpretation, Throwable]): Interpretation[PagingResponse[Result]] = {
+  ): Interpretation[PagingResponse[Result]] = {
 
     val pagingInfo = new PagingInfo(pagingRequest, total)
 
@@ -64,9 +64,7 @@ object PagingResponse {
     import org.http4s.circe.jsonEncoderOf
     import org.http4s.{EntityEncoder, Response, Status}
 
-    def updateResults[Interpretation[_]](
-        newResults: List[Result]
-    )(implicit ME:  MonadError[Interpretation, Throwable]): Interpretation[PagingResponse[Result]] =
+    def updateResults[Interpretation[_]: MonadThrow](newResults: List[Result]): Interpretation[PagingResponse[Result]] =
       if (response.results.size == newResults.size)
         new PagingResponse[Result](newResults, response.pagingInfo).pure[Interpretation]
       else

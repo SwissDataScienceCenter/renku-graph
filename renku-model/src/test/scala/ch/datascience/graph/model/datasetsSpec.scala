@@ -23,7 +23,7 @@ import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.datasets._
-import ch.datascience.tinytypes.UrlTinyType
+import ch.datascience.tinytypes.{RelativePathTinyType, UrlTinyType}
 import ch.datascience.tinytypes.constraints.{NonBlank, RelativePath}
 import eu.timepit.refined.api.Refined
 import io.circe.Json
@@ -56,6 +56,7 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
       forAll(relativePaths()) { path =>
         val uri = ImageUri(path)
         uri                 shouldBe a[ImageUri.Relative]
+        uri                 shouldBe a[RelativePathTinyType]
         ImageUri.from(path) shouldBe uri.asRight
       }
     }
@@ -64,6 +65,7 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
       forAll(httpUrls()) { path =>
         val uri = ImageUri(path)
         uri                 shouldBe a[ImageUri.Absolute]
+        uri                 shouldBe an[UrlTinyType]
         ImageUri.from(path) shouldBe uri.asRight
       }
     }
