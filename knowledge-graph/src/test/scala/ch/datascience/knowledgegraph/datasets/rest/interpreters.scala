@@ -32,9 +32,10 @@ class IOProjectDatasetsEndpointStub(projectDatasetsFinder: ProjectDatasetsFinder
 
 class IODatasetEndpointStub(datasetFinder:         DatasetFinder[IO],
                             renkuResourcesUrl:     renku.ResourcesUrl,
+                            gitLabUrl:             GitLabUrl,
                             executionTimeRecorder: ExecutionTimeRecorder[IO],
                             logger:                Logger[IO]
-) extends DatasetEndpoint[IO](datasetFinder, renkuResourcesUrl, executionTimeRecorder, logger)
+) extends DatasetEndpoint[IO](datasetFinder, renkuResourcesUrl, gitLabUrl, executionTimeRecorder, logger)
 
 class IODatasetsSearchEndpointStub(datasetsFinder:        DatasetsFinder[IO],
                                    renkuResourcesUrl:     renku.ResourcesUrl,

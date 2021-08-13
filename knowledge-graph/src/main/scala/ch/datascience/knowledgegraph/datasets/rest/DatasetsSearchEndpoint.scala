@@ -141,12 +141,18 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect: MonadThrow](
   private implicit lazy val imagesEncoder: Encoder[(List[ImageUri], projects.Path)] =
     Encoder.instance[(List[ImageUri], projects.Path)] { case (imageUris, exemplarProjectPath) =>
       Json.arr(imageUris.map {
-        case uri: ImageUri.Relative => json"""{
-          "location": $uri  
-        }""".deepMerge(_links(Link(Rel("view") -> Href(gitLabUrl / exemplarProjectPath / "raw" / "master" / uri))))
-        case uri: ImageUri.Absolute => json"""{
-          "location": $uri  
-        }""".deepMerge(_links(Link(Rel("view") -> Href(uri.show))))
+        case uri: ImageUri.Relative =>
+          json"""{
+            "location": $uri  
+          }""" deepMerge _links(
+            Link(Rel("view") -> Href(gitLabUrl / exemplarProjectPath / "raw" / "master" / uri))
+          )
+        case uri: ImageUri.Absolute =>
+          json"""{
+            "location": $uri  
+          }""" deepMerge _links(
+            Link(Rel("view") -> Href(uri.show))
+          )
       }: _*)
     }
 }

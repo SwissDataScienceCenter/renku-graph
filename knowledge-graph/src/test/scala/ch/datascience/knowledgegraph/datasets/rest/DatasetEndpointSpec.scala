@@ -70,7 +70,7 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
           .expects(dataset.id)
           .returning(dataset.some.pure[IO])
 
-        val response = getDataset(dataset.id).unsafeRunSync()
+        val response = endpoint.getDataset(dataset.id).unsafeRunSync()
 
         response.status                            shouldBe Ok
         response.contentType                       shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -109,7 +109,20 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
               links shouldBe Links.of(Rel("project-details") -> Href(renkuResourcesUrl / "projects" / path))
             }
             .getOrElse(fail("No 'path' or 'project-details' links on the 'usedIn' elements"))
+        }
 
+        val Right(imagesJsons) = responseCursor.downField("images").as[List[Json]]
+        imagesJsons should have size dataset.images.size
+        imagesJsons.foreach { json =>
+          (json.hcursor.downField("location").as[ImageUri], json._links)
+            .mapN {
+              case (uri: ImageUri.Relative, links) =>
+                links shouldBe Links.of(Rel("view") -> Href(gitLabUrl / dataset.project.path / "raw" / "master" / uri))
+              case (uri: ImageUri.Absolute, links) =>
+                links shouldBe Links.of(Rel("view") -> Href(uri.show))
+              case (uri, links) => fail(s"$uri 'location' or $links 'view' links of unknown shape")
+            }
+            .getOrElse(fail("No 'location' or 'view' links on the 'images' elements"))
         }
 
         logger.loggedOnly(Warn(s"Finding '${dataset.id}' dataset finished${executionTimeRecorder.executionTimeInfo}"))
@@ -126,7 +139,7 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
         .expects(identifier)
         .returning(Option.empty[model.Dataset].pure[IO])
 
-      val response = getDataset(identifier).unsafeRunSync()
+      val response = endpoint.getDataset(identifier).unsafeRunSync()
 
       response.status      shouldBe NotFound
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -146,7 +159,7 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
         .expects(identifier)
         .returning(exception.raiseError[IO, Option[model.Dataset]])
 
-      val response = getDataset(identifier).unsafeRunSync()
+      val response = endpoint.getDataset(identifier).unsafeRunSync()
 
       response.status      shouldBe InternalServerError
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -159,17 +172,13 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
 
   private trait TestCase {
     implicit val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
+    val gitLabUrl = gitLabUrls.generateOne
 
     val datasetsFinder        = mock[DatasetFinder[IO]]
     val renkuResourcesUrl     = renkuResourcesUrls.generateOne
     val logger                = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
-    val getDataset = new DatasetEndpoint[IO](
-      datasetsFinder,
-      renkuResourcesUrl,
-      executionTimeRecorder,
-      logger
-    ).getDataset _
+    val endpoint              = new DatasetEndpoint[IO](datasetsFinder, renkuResourcesUrl, gitLabUrl, executionTimeRecorder, logger)
   }
 
   private implicit val datasetEntityDecoder: EntityDecoder[IO, model.Dataset] = jsonOf[IO, model.Dataset]
@@ -190,7 +199,7 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       maybeSameAs      <- cursor.downField("sameAs").as[Option[SameAs]]
       maybeDerivedFrom <- cursor.downField("derivedFrom").as[Option[DerivedFrom]]
       versions         <- cursor.downField("versions").as[DatasetVersions]
-      images           <- cursor.downField("images").as[List[ImageUri]]
+      images           <- cursor.downField("images").as[List[ImageUri]](decodeList(imageUriDecoder))
       date <-
         maybeDateCreated
           .orElse(published._2)
@@ -262,4 +271,5 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       initial <- cursor.downField("initial").as[InitialVersion]
     } yield DatasetVersions(initial)
 
+  private lazy val imageUriDecoder: Decoder[ImageUri] = _.downField("location").as[ImageUri]
 }
