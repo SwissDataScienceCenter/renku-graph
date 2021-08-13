@@ -21,6 +21,7 @@ package io.renku.eventlog.init
 import Generators._
 import cats.data.Kleisli
 import cats.effect.IO
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventId, EventStatus}
@@ -94,21 +95,18 @@ class EventStatusRenamerImplSpec
         )
       }
 
-    "not do anything if there are no events with the status PROCESSING" in new TestCase {
+    "do nothing if there are no events with the status PROCESSING" in new TestCase {
       val otherEvents = events.generateNonEmptyList()
-      otherEvents.map(event => store(event, withStatus = event.status.toString))
+      otherEvents.map(event => store(event, withStatus = event.status.show))
 
-      eventStatusRenamer.run().unsafeRunSync() shouldBe ((): Unit)
+      eventStatusRenamer.run().unsafeRunSync() shouldBe ()
 
-      findEventsCompoundId(status = GeneratingTriples).toSet shouldBe Set.empty[CompoundId]
+      findEventsCompoundId(status = GeneratingTriples).toSet shouldBe otherEvents
+        .filter(_.status == GeneratingTriples)
+        .map(_.compoundEventId)
+        .toSet
 
       findEventsId shouldBe otherEvents.map(_.id).toList.toSet
-
-      logger.loggedOnly(
-        Info(s"'PROCESSING' event status renamed to 'GENERATING_TRIPLES'"),
-        Info(s"'RECOVERABLE_FAILURE' event status renamed to 'GENERATION_RECOVERABLE_FAILURE'"),
-        Info(s"'NON_RECOVERABLE_FAILURE' event status renamed to 'GENERATION_NON_RECOVERABLE_FAILURE'")
-      )
     }
   }
 
