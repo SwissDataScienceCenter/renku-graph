@@ -19,12 +19,15 @@
 package ch.datascience.graph.model
 
 import GraphModelGenerators._
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.datasets._
-import ch.datascience.tinytypes.UrlTinyType
-import ch.datascience.tinytypes.constraints.NonBlank
+import ch.datascience.tinytypes.{RelativePathTinyType, UrlTinyType}
+import ch.datascience.tinytypes.constraints.{NonBlank, RelativePath}
 import eu.timepit.refined.api.Refined
+import io.circe.Json
+import io.circe.syntax._
 import io.renku.jsonld.EntityId
 import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
@@ -38,6 +41,45 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
   "Identifier" should {
     "be a NonBlank" in {
       Identifier shouldBe a[NonBlank]
+    }
+  }
+
+  "PartLocation" should {
+    "be a RelativePath" in {
+      PartLocation shouldBe a[RelativePath]
+    }
+  }
+
+  "ImageUri" should {
+
+    "instantiate as ImageUri.Relative for relative paths" in {
+      forAll(relativePaths()) { path =>
+        val uri = ImageUri(path)
+        uri                 shouldBe a[ImageUri.Relative]
+        uri                 shouldBe a[RelativePathTinyType]
+        ImageUri.from(path) shouldBe uri.asRight
+      }
+    }
+
+    "instantiate as ImageUri.Absolute for absolute paths" in {
+      forAll(httpUrls()) { path =>
+        val uri = ImageUri(path)
+        uri                 shouldBe a[ImageUri.Absolute]
+        uri                 shouldBe an[UrlTinyType]
+        ImageUri.from(path) shouldBe uri.asRight
+      }
+    }
+
+    "provide an implicit Json encoder" in {
+      forAll(datasetImageUris) { uri =>
+        uri.asJson shouldBe Json.fromString(uri.value)
+      }
+    }
+
+    "provide an implicit Json decoder" in {
+      forAll(datasetImageUris) { uri =>
+        Json.fromString(uri.value).as[ImageUri] shouldBe uri.asRight
+      }
     }
   }
 

@@ -23,6 +23,7 @@ import cats.effect.{ConcurrentEffect, Timer}
 import cats.syntax.all._
 import ch.datascience.graph.model.Schemas._
 import ch.datascience.graph.model.datasets.{Date, DateCreated, DatePublished, Description, Identifier, ImageUri, Keyword, Name, Title}
+import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Visibility
 import ch.datascience.http.rest.paging.Paging.PagedResultsFinder
 import ch.datascience.http.rest.paging.{Paging, PagingRequest, PagingResponse}
@@ -52,15 +53,16 @@ private trait DatasetsFinder[Interpretation[_]] {
 private object DatasetsFinder {
 
   final case class DatasetSearchResult(
-      id:               Identifier,
-      title:            Title,
-      name:             Name,
-      maybeDescription: Option[Description],
-      creators:         Set[DatasetCreator],
-      date:             Date,
-      projectsCount:    ProjectsCount,
-      keywords:         List[Keyword],
-      images:           List[ImageUri]
+      id:                  Identifier,
+      title:               Title,
+      name:                Name,
+      maybeDescription:    Option[Description],
+      creators:            Set[DatasetCreator],
+      date:                Date,
+      exemplarProjectPath: projects.Path,
+      projectsCount:       ProjectsCount,
+      keywords:            List[Keyword],
+      images:              List[ImageUri]
   )
 
   final class ProjectsCount private (val value: Int) extends AnyVal with IntTinyType
@@ -119,12 +121,12 @@ private class DatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer: Par
   private def sparqlQuery(phrase: Phrase, sort: Sort.By, maybeUser: Option[AuthUser]): SparqlQuery = SparqlQuery.of(
     name = "ds free-text search",
     Prefixes.of(prov -> "prov", rdfs -> "rdfs", renku -> "renku", schema -> "schema", text -> "text"),
-    s"""|SELECT ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?projectsCount (GROUP_CONCAT(?keyword; separator='|') AS ?keywords) ?images
+    s"""|SELECT ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?exemplarProjectPath ?projectsCount (GROUP_CONCAT(?keyword; separator='|') AS ?keywords) ?images
         |WHERE {        
-        |  SELECT ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?projectsCount ?keyword (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
+        |  SELECT ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?exemplarProjectPath ?projectsCount ?keyword (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
         |  WHERE {
         |    {
-        |      SELECT (MIN(?dsId) AS ?dsIdExample) ?sameAs (COUNT(DISTINCT ?projectId) AS ?projectsCount)
+        |      SELECT ?sameAs (COUNT(DISTINCT ?projectId) AS ?projectsCount) (MIN(?projectDate) AS ?minProjectDate)
         |      WHERE {
         |        {
         |          SELECT DISTINCT ?sameAs
@@ -153,6 +155,7 @@ private class DatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer: Par
         |              ?someId  prov:wasDerivedFrom/schema:url ?dsId;
         |                       schema:isPartOf ?projectId; 
         |          }
+        |          ?projectId schema:dateCreated ?projectDate.
         |          ${projectMemberFilterQuery(maybeUser)}
         |        }
         |      }
@@ -160,15 +163,17 @@ private class DatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer: Par
         |      HAVING (COUNT(*) > 0)
         |    } {
         |      ?dsIdExample a schema:Dataset;
-        |            renku:topmostSameAs ?sameAs;
-        |            schema:identifier ?identifier;
-        |            schema:name ?name ;
-        |            schema:alternateName ?alternateName;
-        |            schema:isPartOf ?projectId .
+        |                   renku:topmostSameAs ?sameAs;
+        |                   schema:identifier ?identifier;
+        |                   schema:name ?name;
+        |                   schema:alternateName ?alternateName;
+        |                   schema:isPartOf ?exemplarProjectId.
+        |      ?exemplarProjectId schema:dateCreated ?minProjectDate;
+        |                         renku:projectPath ?exemplarProjectPath.
         |      OPTIONAL {
         |        ?dsIdExample schema:image ?imageId .
-        |        ?imageId     schema:position ?imagePosition ;
-        |                     schema:contentUrl ?imageUrl .
+        |        ?imageId schema:position ?imagePosition ;
+        |                 schema:contentUrl ?imageUrl .
         |        BIND(CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
         |      }
         |      OPTIONAL { ?dsIdExample schema:keywords ?keyword }
@@ -180,13 +185,13 @@ private class DatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer: Par
         |      BIND (IF(BOUND(?maybePublishedDate), ?maybePublishedDate, ?maybeDateCreated) AS ?date)
         |      FILTER NOT EXISTS {
         |        ?someId prov:wasDerivedFrom/schema:url ?dsIdExample;
-        |                schema:isPartOf ?projectId.
+        |                schema:isPartOf ?exemplarProjectId.
         |      }
         |    }
         |  }
-        |  GROUP BY ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?projectsCount ?keyword
+        |  GROUP BY ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?exemplarProjectPath ?projectsCount ?keyword
         |}
-        |GROUP BY ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?projectsCount ?images
+        |GROUP BY ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?exemplarProjectPath ?projectsCount ?images
         |${`ORDER BY`(sort)}
         |""".stripMargin
   )
@@ -237,14 +242,15 @@ private object DatasetsFinderImpl {
         .getOrElse(Nil)
 
     for {
-      id                 <- cursor.downField("identifier").downField("value").as[Identifier]
-      title              <- cursor.downField("name").downField("value").as[Title]
-      name               <- cursor.downField("alternateName").downField("value").as[Name]
-      maybeDateCreated   <- cursor.downField("maybeDateCreated").downField("value").as[Option[DateCreated]]
-      maybePublishedDate <- cursor.downField("maybePublishedDate").downField("value").as[Option[DatePublished]]
-      projectsCount      <- cursor.downField("projectsCount").downField("value").as[ProjectsCount]
-      keywords           <- cursor.downField("keywords").downField("value").as[Option[String]].map(toListOfKeywords)
-      images             <- cursor.downField("images").downField("value").as[Option[String]].map(toListOfImageUrls)
+      id                  <- cursor.downField("identifier").downField("value").as[Identifier]
+      title               <- cursor.downField("name").downField("value").as[Title]
+      name                <- cursor.downField("alternateName").downField("value").as[Name]
+      maybeDateCreated    <- cursor.downField("maybeDateCreated").downField("value").as[Option[DateCreated]]
+      maybePublishedDate  <- cursor.downField("maybePublishedDate").downField("value").as[Option[DatePublished]]
+      projectsCount       <- cursor.downField("projectsCount").downField("value").as[ProjectsCount]
+      exemplarProjectPath <- cursor.downField("exemplarProjectPath").downField("value").as[projects.Path]
+      keywords            <- cursor.downField("keywords").downField("value").as[Option[String]].map(toListOfKeywords)
+      images              <- cursor.downField("images").downField("value").as[Option[String]].map(toListOfImageUrls)
       maybeDescription <- cursor
                             .downField("maybeDescription")
                             .downField("value")
@@ -262,6 +268,7 @@ private object DatasetsFinderImpl {
       maybeDescription,
       Set.empty,
       date,
+      exemplarProjectPath,
       projectsCount,
       keywords,
       images

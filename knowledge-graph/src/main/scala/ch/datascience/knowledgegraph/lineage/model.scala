@@ -67,7 +67,7 @@ object model {
   final case class Node(location: Node.Location, label: Node.Label, types: Set[Node.Type])
 
   object Node {
-    import ch.datascience.tinytypes.constraints.{NonBlank, RelativePath}
+    import ch.datascience.tinytypes.constraints.NonBlank
     import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
     final class Id private (val value: String) extends AnyVal with StringTinyType
@@ -87,7 +87,7 @@ object model {
     object Type extends TinyTypeFactory[Type](new Type(_)) with NonBlank
 
     final class Location private (val value: String) extends AnyVal with StringTinyType
-    object Location extends TinyTypeFactory[Location](new Location(_)) with RelativePath
+    object Location extends TinyTypeFactory[Location](new Location(_))
 
     sealed trait SingleWordType extends Product with Serializable {
       val name: String

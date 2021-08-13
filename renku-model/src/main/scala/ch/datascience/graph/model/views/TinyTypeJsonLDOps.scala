@@ -19,22 +19,22 @@
 package ch.datascience.graph.model.views
 
 import cats.syntax.all._
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{From, TinyType}
 import io.renku.jsonld.{JsonLDDecoder, JsonLDEncoder}
 
 trait TinyTypeJsonLDOps[TT <: TinyType] extends JsonLDTinyTypeDecoder[TT] with JsonLDTinyTypeEncoder[TT] {
-  self: TinyTypeFactory[TT] =>
+  self: From[TT] =>
 }
 
 trait JsonLDTinyTypeDecoder[TT <: TinyType] {
-  self: TinyTypeFactory[TT] =>
+  self: From[TT] =>
 
   implicit def decoder(implicit valueDecoder: JsonLDDecoder[TT#V]): JsonLDDecoder[TT] =
     valueDecoder.emap(value => from(value).leftMap(_.getMessage))
 }
 
 trait JsonLDTinyTypeEncoder[TT <: TinyType] {
-  self: TinyTypeFactory[TT] =>
+  self: From[TT] =>
 
   implicit def encoder(implicit valueEncoder: JsonLDEncoder[TT#V]): JsonLDEncoder[TT] =
     valueEncoder.contramap[TT](_.value)

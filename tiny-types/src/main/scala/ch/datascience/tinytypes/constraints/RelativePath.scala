@@ -23,7 +23,7 @@ import ch.datascience.tinytypes._
 
 trait RelativePath extends Constraints[String] with NonBlank {
   addConstraint(
-    check = value => !value.startsWith("/") && !value.endsWith("/"),
+    check = value => !value.startsWith("/") && !value.endsWith("/") && !value.matches("^\\w+://.*"),
     message = value => s"'$value' is not a valid $typeName"
   )
 }

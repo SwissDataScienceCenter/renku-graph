@@ -21,18 +21,19 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.effect._
 import cats.syntax.all._
 import ch.datascience.config.renku
-import ch.datascience.graph.config.RenkuBaseUrlLoader
-import ch.datascience.graph.model.datasets.{DerivedFrom, SameAs}
-import ch.datascience.graph.model.projects
+import ch.datascience.graph.config.{GitLabUrlLoader, RenkuBaseUrlLoader}
+import ch.datascience.graph.model.datasets.{DerivedFrom, ImageUri, SameAs}
+import ch.datascience.graph.model.{GitLabUrl, projects}
 import ch.datascience.http.ErrorMessage
 import ch.datascience.http.InfoMessage._
 import ch.datascience.http.rest.Links._
 import ch.datascience.knowledgegraph.datasets.rest.ProjectDatasetsFinder.ProjectDataset
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
-import io.circe.Encoder
+import ch.datascience.tinytypes.json.TinyTypeEncoders
 import io.circe.literal._
 import io.circe.syntax._
+import io.circe.{Encoder, Json}
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
@@ -43,21 +44,24 @@ import scala.util.control.NonFatal
 class ProjectDatasetsEndpoint[Interpretation[_]: Effect](
     projectDatasetsFinder: ProjectDatasetsFinder[Interpretation],
     renkuResourcesUrl:     renku.ResourcesUrl,
+    gitLabUrl:             GitLabUrl,
     executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
     logger:                Logger[Interpretation]
-) extends Http4sDsl[Interpretation] {
+) extends Http4sDsl[Interpretation]
+    with TinyTypeEncoders {
 
   import ProjectDatasetsFinder.SameAsOrDerived
   import executionTimeRecorder._
   import org.http4s.circe._
 
-  def getProjectDatasets(projectPath: projects.Path): Interpretation[Response[Interpretation]] =
-    measureExecutionTime {
-      projectDatasetsFinder
-        .findProjectDatasets(projectPath)
-        .flatMap(datasets => Ok(datasets.asJson))
-        .recoverWith(httpResult(projectPath))
-    } map logExecutionTimeWhen(finishedSuccessfully(projectPath))
+  def getProjectDatasets(projectPath: projects.Path): Interpretation[Response[Interpretation]] = measureExecutionTime {
+    implicit val encoder: Encoder[ProjectDataset] = datasetEncoder(projectPath)
+
+    projectDatasetsFinder
+      .findProjectDatasets(projectPath)
+      .flatMap(datasets => Ok(datasets.asJson))
+      .recoverWith(httpResult(projectPath))
+  } map logExecutionTimeWhen(finishedSuccessfully(projectPath))
 
   private def httpResult(
       projectPath: projects.Path
@@ -76,7 +80,7 @@ class ProjectDatasetsEndpoint[Interpretation[_]: Effect](
     case Right(derivedFrom: DerivedFrom) => json"""{"derivedFrom": ${derivedFrom.toString}}"""
   }
 
-  private implicit val datasetEncoder: Encoder[ProjectDataset] =
+  private def datasetEncoder(projectPath: projects.Path): Encoder[ProjectDataset] =
     Encoder.instance[ProjectDataset] { case (id, initialVersion, title, name, sameAsOrDerived, images) =>
       json"""{
           "identifier": ${id.toString},
@@ -85,7 +89,7 @@ class ProjectDatasetsEndpoint[Interpretation[_]: Effect](
           },
           "title": ${title.toString},
           "name": ${name.toString},
-          "images": ${images.map(_.value)}
+          "images": ${images -> projectPath}
         }"""
         .deepMerge(sameAsOrDerived.asJson)
         .deepMerge(
@@ -94,6 +98,24 @@ class ProjectDatasetsEndpoint[Interpretation[_]: Effect](
             Rel("initial-version") -> Href(renkuResourcesUrl / "datasets" / initialVersion)
           )
         )
+    }
+
+  private implicit lazy val imagesEncoder: Encoder[(List[ImageUri], projects.Path)] =
+    Encoder.instance[(List[ImageUri], projects.Path)] { case (imageUris, exemplarProjectPath) =>
+      Json.arr(imageUris.map {
+        case uri: ImageUri.Relative =>
+          json"""{
+            "location": $uri  
+          }""" deepMerge _links(
+            Link(Rel("view") -> Href(gitLabUrl / exemplarProjectPath / "raw" / "master" / uri))
+          )
+        case uri: ImageUri.Absolute =>
+          json"""{
+            "location": $uri  
+          }""" deepMerge _links(
+            Link(Rel("view") -> Href(uri.show))
+          )
+      }: _*)
     }
 }
 
@@ -109,12 +131,14 @@ object IOProjectDatasetsEndpoint {
     for {
       rdfStoreConfig        <- RdfStoreConfig[IO]()
       renkuBaseUrl          <- RenkuBaseUrlLoader[IO]()
+      gitLabUrl             <- GitLabUrlLoader[IO]()
       renkuResourceUrl      <- renku.ResourcesUrl[IO]()
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
       projectDatasetFinder  <- ProjectDatasetsFinder(rdfStoreConfig, renkuBaseUrl, ApplicationLogger, timeRecorder)
     } yield new ProjectDatasetsEndpoint[IO](
       projectDatasetFinder,
       renkuResourceUrl,
+      gitLabUrl,
       executionTimeRecorder,
       ApplicationLogger
     )

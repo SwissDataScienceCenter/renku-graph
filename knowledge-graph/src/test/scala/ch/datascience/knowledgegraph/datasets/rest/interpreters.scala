@@ -20,23 +20,32 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.IO
 import ch.datascience.config.renku
+import ch.datascience.graph.model.GitLabUrl
 import ch.datascience.logging.ExecutionTimeRecorder
 import org.typelevel.log4cats.Logger
 
 class IOProjectDatasetsEndpointStub(projectDatasetsFinder: ProjectDatasetsFinder[IO],
                                     renkuResourcesUrl:     renku.ResourcesUrl,
+                                    gitLabUrl:             GitLabUrl,
                                     executionTimeRecorder: ExecutionTimeRecorder[IO],
                                     logger:                Logger[IO]
-) extends ProjectDatasetsEndpoint[IO](projectDatasetsFinder, renkuResourcesUrl, executionTimeRecorder, logger)
+) extends ProjectDatasetsEndpoint[IO](projectDatasetsFinder,
+                                      renkuResourcesUrl,
+                                      gitLabUrl,
+                                      executionTimeRecorder,
+                                      logger
+    )
 
 class IODatasetEndpointStub(datasetFinder:         DatasetFinder[IO],
                             renkuResourcesUrl:     renku.ResourcesUrl,
+                            gitLabUrl:             GitLabUrl,
                             executionTimeRecorder: ExecutionTimeRecorder[IO],
                             logger:                Logger[IO]
-) extends DatasetEndpoint[IO](datasetFinder, renkuResourcesUrl, executionTimeRecorder, logger)
+) extends DatasetEndpoint[IO](datasetFinder, renkuResourcesUrl, gitLabUrl, executionTimeRecorder, logger)
 
 class IODatasetsSearchEndpointStub(datasetsFinder:        DatasetsFinder[IO],
                                    renkuResourcesUrl:     renku.ResourcesUrl,
+                                   gitLabUrl:             GitLabUrl,
                                    executionTimeRecorder: ExecutionTimeRecorder[IO],
                                    logger:                Logger[IO]
-) extends DatasetsSearchEndpoint[IO](datasetsFinder, renkuResourcesUrl, executionTimeRecorder, logger)
+) extends DatasetsSearchEndpoint[IO](datasetsFinder, renkuResourcesUrl, gitLabUrl, executionTimeRecorder, logger)

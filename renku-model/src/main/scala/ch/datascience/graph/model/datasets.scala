@@ -25,7 +25,8 @@ import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, LocalDateNotInTheFuture, NonBlank, NonNegativeInt, UUID, Url => UrlConstraint}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string
-import io.circe.DecodingFailure
+import io.circe.syntax._
+import io.circe._
 import io.renku.jsonld.JsonLDDecoder.{decodeEntityId, decodeString}
 import io.renku.jsonld.JsonLDEncoder._
 import io.renku.jsonld._
@@ -98,11 +99,35 @@ object datasets {
       with NonNegativeInt
       with TinyTypeJsonLDOps[ImagePosition]
 
-  final class ImageUri private (val value: String) extends AnyVal with StringTinyType
-  implicit object ImageUri
-      extends TinyTypeFactory[ImageUri](new ImageUri(_))
-      with constraints.RelativePath
-      with TinyTypeJsonLDOps[ImageUri]
+  trait ImageUri extends Any with TinyType { type V = String }
+  object ImageUri extends From[ImageUri] with TinyTypeJsonLDOps[ImageUri] {
+
+    def apply(value: String): ImageUri = from(value).fold(throw _, identity)
+
+    override def from(value: String): Either[IllegalArgumentException, ImageUri] =
+      Relative.from(value) orElse Absolute.from(value)
+
+    final class Relative private (val value: String) extends AnyVal with ImageUri with RelativePathTinyType {
+      override type V = String
+    }
+    implicit object Relative extends TinyTypeFactory[Relative](new Relative(_)) with constraints.RelativePath
+
+    final class Absolute private (val value: String) extends AnyVal with ImageUri with UrlTinyType {
+      override type V = String
+    }
+    implicit object Absolute extends TinyTypeFactory[Absolute](new Absolute(_)) with constraints.Url
+
+    import ch.datascience.tinytypes.json.TinyTypeEncoders._
+
+    implicit lazy val encoder: Encoder[ImageUri] = Encoder.instance {
+      case uri: Relative => Json.fromString(uri.value)
+      case uri: Absolute => uri.asJson
+    }
+
+    implicit lazy val decoder: Decoder[ImageUri] = Decoder.decodeString.emap { value =>
+      (Relative.from(value) orElse Absolute.from(value)).leftMap(_ => s"Cannot decode $value to $ImageUri")
+    }
+  }
 
   final class PartLocation private (val value: String) extends AnyVal with StringTinyType
   implicit object PartLocation

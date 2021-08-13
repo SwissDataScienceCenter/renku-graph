@@ -63,7 +63,7 @@ Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&
 Response body example:
 
 ```
-[  
+[
    {  
       "identifier": "9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c",
       "title":"rmDaYfpehl",
@@ -84,7 +84,17 @@ Response body example:
       "date": "2012-10-14T03:02:25.639Z",            // either datePublished or dateCreated
       "projectsCount": 2,
       "keywords": ["grüezi", "안녕", "잘 지내?"],
-      "images": ["image.png"],
+      "images": [
+        {
+          "location": "image.png",
+          "_links":[  
+             {  
+                "rel":  "view",
+                "href": "https://renkulab.io/gitlab/project_path/raw/master/data/mniouUnmal/image.png"
+             }
+          ]
+        }
+      ],
       "_links":[  
          {  
             "rel":"details",
@@ -105,7 +115,17 @@ Response body example:
       "date": "2012-11-15T10:00:00.000Z",            // either datePublished or dateCreated
       "projectsCount": 1,
       "keywords": [],
-      "images": ["https://blah.com/image.png"],
+      "images": [
+        {
+          "location": "https://blah.com/image.png",
+          "_links":[  
+             {  
+                "rel":  "view",
+                "href": "https://blah.com/image.png"
+             }
+          ]
+        }
+      ],
       "_links":[  
          {  
             "rel":"details",
@@ -233,9 +253,25 @@ Response body example:
     "gfioui"
   ],
   "images": [
-    "https://renku.io/dataset1/23423423.jpg",
-    "image.png"
-  ]
+    {
+      "location": "image.png",
+      "_links":[  
+         {  
+            "rel":  "view",
+            "href": "https://renkulab.io/gitlab/project_path/raw/master/data/mniouUnmal/image.png"
+         }
+      ]
+    },
+    {
+      "location": "http://host/external-image.png",
+      "_links":[  
+         {  
+            "rel":  "view",
+            "href": "http://host/external-image.png"
+         }
+      ]
+    }
+  ],
 }
 ```
 
@@ -448,9 +484,28 @@ Response body example:
         "initial": "22222222-2222-2222-2222-222222222222"
       },
       "name": "a",
-      "sameAs" : "http://host/url2",                  // optional property when no "derivedFrom" exists
-      "derivedFrom" : "http://host/url2",             // optional property when no "sameAs" exists
-      "images": ["image.png"],
+      "sameAs" : "http://host/url2",        // optional property when no "derivedFrom" exists
+      "derivedFrom" : "http://host/url2",   // optional property when no "sameAs" exists
+      "images": [
+        {
+          "location": "image.png",
+          "_links":[  
+             {  
+                "rel":  "view",
+                "href": "https://renkulab.io/gitlab/project_path/raw/master/data/mniouUnmal/image.png"
+             }
+          ]
+        },
+        {
+          "location": "http://host/external-image.png",
+          "_links":[  
+             {  
+                "rel":  "view",
+                "href": "http://host/external-image.png"
+             }
+          ]
+        }
+      ],
       "_links": [  
          {  
             "rel": "details",

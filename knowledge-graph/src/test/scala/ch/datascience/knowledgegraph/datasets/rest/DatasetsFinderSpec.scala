@@ -24,6 +24,7 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.RenkuBaseUrl
 import ch.datascience.graph.model.projects.{ForksCount, Visibility}
 import ch.datascience.graph.model.testentities.EntitiesGenerators._
 import ch.datascience.graph.model.testentities.{Dataset, Person}
@@ -48,7 +49,7 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
 
   "findDatasets - no phrase" should {
 
-    Option(Phrase("*")) +: Option.empty[Phrase] +: Nil foreach { maybePhrase =>
+    Option(Phrase("*")) :: Option.empty[Phrase] :: Nil foreach { maybePhrase =>
       s"return all datasets when the given phrase is $maybePhrase " +
         "- case of datasets that has neither sameAs nor are imported to and/or from other projects" in new TestCase {
           val dataset1 = datasetEntities(datasetProvenanceInternal).generateOne
@@ -820,17 +821,19 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
 
   private implicit class DatasetOps(dataset: Dataset[_ <: Dataset.Provenance]) {
 
-    def toDatasetSearchResult(projectsCount: Int): DatasetSearchResult = DatasetSearchResult(
-      dataset.identification.identifier,
-      dataset.identification.title,
-      dataset.identification.name,
-      dataset.additionalInfo.maybeDescription,
-      dataset.provenance.creators.map(_.to[DatasetCreator]),
-      dataset.provenance.date,
-      ProjectsCount(projectsCount),
-      dataset.additionalInfo.keywords.sorted,
-      dataset.additionalInfo.images
-    )
+    def toDatasetSearchResult(projectsCount: Int)(implicit renkuBaseUrl: RenkuBaseUrl): DatasetSearchResult =
+      DatasetSearchResult(
+        dataset.identification.identifier,
+        dataset.identification.title,
+        dataset.identification.name,
+        dataset.additionalInfo.maybeDescription,
+        dataset.provenance.creators.map(_.to[DatasetCreator]),
+        dataset.provenance.date,
+        dataset.project.path,
+        ProjectsCount(projectsCount),
+        dataset.additionalInfo.keywords.sorted,
+        dataset.additionalInfo.images
+      )
   }
 
   private implicit class DatasetsListOps(datasets: List[Dataset[_ <: Dataset.Provenance]]) {
