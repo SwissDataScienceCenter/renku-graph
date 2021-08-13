@@ -30,7 +30,8 @@ import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TestReadabilityTools._
 import ch.datascience.graph.model
-import ch.datascience.graph.model.datasets.{DatePublished, Identifier, Title}
+import ch.datascience.graph.model.datasets.{DatePublished, Identifier, ImageUri, Title}
+import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Visibility
 import ch.datascience.graph.model.testentities.ModelOps.DatasetForkingResult
 import ch.datascience.graph.model.testentities.{Dataset, EntitiesGenerators, Person}
@@ -333,7 +334,7 @@ object DatasetsResources {
       },
       "title": ${dataset.identification.title.value},
       "name": ${dataset.identification.name.value},
-      "images": ${dataset.additionalInfo.images.map(_.value)}
+      "images": ${dataset.additionalInfo.images -> dataset.project.path}
     }"""
       .deepMerge(
         _links(
@@ -370,7 +371,7 @@ object DatasetsResources {
       "published": ${dataset.provenance.creators -> dataset.provenance.date},
       "date": ${dataset.provenance.date.instant},
       "projectsCount": $projectsCount,
-      "images": ${dataset.additionalInfo.images.map(_.value)},
+      "images": ${dataset.additionalInfo.images -> dataset.project.path},
       "keywords": ${dataset.additionalInfo.keywords.sorted.map(_.value)}
     }"""
       .addIfDefined("description" -> dataset.additionalInfo.maybeDescription)
@@ -397,6 +398,26 @@ object DatasetsResources {
       "name": $name
     }""" addIfDefined ("email" -> maybeEmail)
   }
+
+  private implicit lazy val imagesEncoder: Encoder[(List[ImageUri], projects.Path)] =
+    Encoder.instance[(List[ImageUri], projects.Path)] { case (images, exemplarProjectPath) =>
+      Json.arr(images.map {
+        case uri: ImageUri.Relative => json"""{
+            "location": $uri,
+            "_links": [{
+              "rel": "view",
+              "href": ${s"$gitLabUrl/$exemplarProjectPath/raw/master/$uri"}
+            }]
+          }"""
+        case uri: ImageUri.Absolute => json"""{
+            "location": $uri,
+            "_links": [{
+              "rel": "view",
+              "href": $uri
+            }]
+          }"""
+      }: _*)
+    }
 
   def sortCreators(json: Json): Option[Json] = {
 

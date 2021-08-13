@@ -53,7 +53,8 @@ object GitLab {
 
   private val logger = TestLogger()
   private val port:      Int Refined Positive = 2048
-  lazy val gitLabApiUrl: GitLabApiUrl         = GitLabUrl(s"http://localhost:$port").apiV4
+  lazy val gitLabUrl:    GitLabUrl            = GitLabUrl(s"http://localhost:$port")
+  lazy val gitLabApiUrl: GitLabApiUrl         = gitLabUrl.apiV4
 
   def `GET <gitlabApi>/user returning OK`(user: AuthUser): Unit =
     `GET <gitlabApi>/user returning OK`(user.id)(user.accessToken)
