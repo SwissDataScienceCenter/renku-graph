@@ -26,9 +26,15 @@ import org.typelevel.log4cats.Logger
 
 class IOProjectDatasetsEndpointStub(projectDatasetsFinder: ProjectDatasetsFinder[IO],
                                     renkuResourcesUrl:     renku.ResourcesUrl,
+                                    gitLabUrl:             GitLabUrl,
                                     executionTimeRecorder: ExecutionTimeRecorder[IO],
                                     logger:                Logger[IO]
-) extends ProjectDatasetsEndpoint[IO](projectDatasetsFinder, renkuResourcesUrl, executionTimeRecorder, logger)
+) extends ProjectDatasetsEndpoint[IO](projectDatasetsFinder,
+                                      renkuResourcesUrl,
+                                      gitLabUrl,
+                                      executionTimeRecorder,
+                                      logger
+    )
 
 class IODatasetEndpointStub(datasetFinder:         DatasetFinder[IO],
                             renkuResourcesUrl:     renku.ResourcesUrl,
