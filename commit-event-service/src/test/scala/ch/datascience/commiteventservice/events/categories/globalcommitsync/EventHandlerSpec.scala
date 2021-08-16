@@ -129,13 +129,12 @@ class EventHandlerSpec
   }
 
   private implicit def eventEncoder[E <: GlobalCommitSyncEvent]: Encoder[E] = Encoder.instance[E] {
-    case GlobalCommitSyncEvent(project, lastSynced, commitIds) => json"""{
+    case GlobalCommitSyncEvent(project, commitIds) => json"""{
         "categoryName": "GLOBAL_COMMIT_SYNC",
         "project": {
           "id":         ${project.id.value},
           "path":       ${project.path.value}
         },
-        "lastSynced":   ${lastSynced.value},
         "commitIds":    ${Json.arr(commitIds.map(_.asJson): _*)}
       }"""
   }

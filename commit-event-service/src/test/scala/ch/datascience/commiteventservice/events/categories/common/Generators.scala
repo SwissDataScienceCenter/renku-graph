@@ -20,7 +20,7 @@ package ch.datascience.commiteventservice.events.categories.common
 
 import ch.datascience.commiteventservice.events.categories.common
 import ch.datascience.commiteventservice.events.categories.common.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
-import ch.datascience.events.consumers.Project
+import ch.datascience.events.consumers.ConsumersModelGenerators._
 import ch.datascience.generators.Generators.listOf
 import ch.datascience.graph.model.EventsGenerators.{batchDates, commitIds, commitMessages, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths, projectVisibilities, userEmails, userNames}
@@ -32,7 +32,7 @@ private[categories] object Generators {
 
   implicit val commits: Gen[Commit] = for {
     id      <- commitIds
-    project <- projects
+    project <- projectsGen
   } yield Commit(id, project)
 
   implicit val projectInfos: Gen[ProjectInfo] = for {
@@ -52,7 +52,7 @@ private[categories] object Generators {
 
   implicit lazy val newCommitEvents: Gen[CommitEvent] = for {
     commitId      <- commitIds
-    project       <- projects
+    project       <- projectsGen
     message       <- commitMessages
     committedDate <- committedDates
     author        <- authors
@@ -63,7 +63,7 @@ private[categories] object Generators {
 
   implicit lazy val skippedCommitEvents: Gen[SkippedCommitEvent] = for {
     commitId      <- commitIds
-    project       <- projects
+    project       <- projectsGen
     message       <- commitMessages
     committedDate <- committedDates
     author        <- authors
@@ -89,11 +89,6 @@ private[categories] object Generators {
       email    <- userEmails
     } yield Committer(username, email)
   )
-
-  implicit lazy val projects: Gen[Project] = for {
-    projectId <- projectIds
-    path      <- projectPaths
-  } yield Project(projectId, path)
 
   implicit def parentsIdsLists(minNumber: Int = 0, maxNumber: Int = 4): Gen[List[CommitId]] = {
     require(minNumber <= maxNumber,

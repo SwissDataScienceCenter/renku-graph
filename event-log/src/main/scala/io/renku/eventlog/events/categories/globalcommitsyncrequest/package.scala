@@ -16,14 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.events.categories.globalcommitsync
+package io.renku.eventlog.events.categories
 
-import ch.datascience.events.consumers.Project
-import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.events.CategoryName
 
-private case class GlobalCommitSyncEvent(project: Project, commits: List[CommitId]) {
-
-  override lazy val toString: String =
-    s"projectId = ${project.id}, projectPath = ${project.path}, numberOfCommits = ${commits.length}"
-
+package object globalcommitsyncrequest {
+  val categoryName: CategoryName = CategoryName("GLOBAL_COMMIT_SYNC_REQUEST")
 }

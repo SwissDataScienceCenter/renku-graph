@@ -18,21 +18,20 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.effect.Effect
 import ch.datascience.http.ErrorMessage
-import org.typelevel.log4cats.Logger
 import io.circe.Json
 import io.renku.eventlog.subscriptions.EventProducersRegistry.{SubscriptionResult, UnsupportedPayload}
 import org.http4s.dsl.Http4sDsl
+import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-class SubscriptionsEndpoint[Interpretation[_]: Effect](
+class SubscriptionsEndpoint[Interpretation[_]: Effect: MonadThrow](
     subscriptionCategoryRegistry: EventProducersRegistry[Interpretation],
     logger:                       Logger[Interpretation]
-)(implicit ME:                    MonadError[Interpretation, Throwable])
-    extends Http4sDsl[Interpretation] {
+) extends Http4sDsl[Interpretation] {
 
   import SubscriptionsEndpoint._
   import cats.syntax.all._
@@ -51,13 +50,13 @@ class SubscriptionsEndpoint[Interpretation[_]: Effect](
   } recoverWith httpResponse
 
   private lazy val badRequest: PartialFunction[Throwable, Interpretation[Json]] = { case NonFatal(exception) =>
-    ME.raiseError(BadRequestError(exception))
+    BadRequestError(exception).raiseError[Interpretation, Json]
   }
 
   private def badRequestIfError(eitherErrorSuccess: SubscriptionResult): Interpretation[Unit] =
     eitherErrorSuccess match {
-      case UnsupportedPayload(message) => ME.raiseError[Unit](BadRequestError(message))
-      case _                           => ME.unit
+      case UnsupportedPayload(message) => BadRequestError(message).raiseError[Interpretation, Unit]
+      case _                           => ().pure[Interpretation]
     }
 
   private lazy val httpResponse: PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {

@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.model
 
+import cats.Show
 import cats.syntax.all._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
@@ -138,25 +139,25 @@ object events {
 
     sealed trait FailureStatus extends EventStatus
 
+    type GenerationRecoverableFailure = GenerationRecoverableFailure.type
     final case object GenerationRecoverableFailure extends FailureStatus {
       override val value: String = "GENERATION_RECOVERABLE_FAILURE"
     }
-    type GenerationRecoverableFailure = GenerationRecoverableFailure.type
 
+    type GenerationNonRecoverableFailure = GenerationNonRecoverableFailure.type
     final case object GenerationNonRecoverableFailure extends FailureStatus with FinalStatus {
       override val value: String = "GENERATION_NON_RECOVERABLE_FAILURE"
     }
-    type GenerationNonRecoverableFailure = GenerationNonRecoverableFailure.type
 
+    type TransformationRecoverableFailure = TransformationRecoverableFailure.type
     final case object TransformationRecoverableFailure extends FailureStatus {
       override val value: String = "TRANSFORMATION_RECOVERABLE_FAILURE"
     }
-    type TransformationRecoverableFailure = TransformationRecoverableFailure.type
 
+    type TransformationNonRecoverableFailure = TransformationNonRecoverableFailure.type
     final case object TransformationNonRecoverableFailure extends FailureStatus with FinalStatus {
       override val value: String = "TRANSFORMATION_NON_RECOVERABLE_FAILURE"
     }
-    type TransformationNonRecoverableFailure = TransformationNonRecoverableFailure.type
 
     implicit val eventStatusDecoder: Decoder[EventStatus] = decodeString.emap { value =>
       Either.fromOption(
@@ -193,5 +194,7 @@ object events {
   final class LastSyncedDate private (val value: Instant) extends AnyVal with InstantTinyType
   object LastSyncedDate extends TinyTypeFactory[LastSyncedDate](new LastSyncedDate(_)) with InstantNotInTheFuture {
     implicit val decoder: Decoder[LastSyncedDate] = instantDecoder(LastSyncedDate)
+
+    implicit lazy val show: Show[LastSyncedDate] = Show.show(date => show"lastSynced = ${date.value.toString}")
   }
 }

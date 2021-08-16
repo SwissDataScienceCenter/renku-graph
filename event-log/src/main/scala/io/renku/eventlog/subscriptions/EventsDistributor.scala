@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.data.OptionT
 import cats.effect.{ContextShift, Effect, IO, Timer}
 import cats.syntax.all._
@@ -36,7 +36,7 @@ private trait EventsDistributor[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
-private class EventsDistributorImpl[Interpretation[_]: Effect: MonadError[*[_], Throwable], CategoryEvent](
+private class EventsDistributorImpl[Interpretation[_]: Effect: MonadThrow: Timer, CategoryEvent](
     categoryName:     CategoryName,
     subscribers:      Subscribers[Interpretation],
     eventsFinder:     EventFinder[Interpretation, CategoryEvent],
@@ -46,8 +46,7 @@ private class EventsDistributorImpl[Interpretation[_]: Effect: MonadError[*[_], 
     logger:           Logger[Interpretation],
     noEventSleep:     FiniteDuration,
     onErrorSleep:     FiniteDuration
-)(implicit timer:     Timer[Interpretation])
-    extends EventsDistributor[Interpretation] {
+) extends EventsDistributor[Interpretation] {
 
   import dispatchRecovery._
   import eventsSender._
@@ -66,7 +65,7 @@ private class EventsDistributorImpl[Interpretation[_]: Effect: MonadError[*[_], 
 
   private def popEvent: OptionT[Interpretation, CategoryEvent] = OptionT {
     eventsFinder.popEvent() recoverWith logError
-  }.flatTapNone(timer sleep noEventSleep)
+  }.flatTapNone(Timer[Interpretation] sleep noEventSleep)
 
   private def dispatch(subscriber: SubscriberUrl)(event: CategoryEvent): Interpretation[Unit] = {
     sendEvent(subscriber, event) >>= handleResult(subscriber, event)
@@ -75,7 +74,7 @@ private class EventsDistributorImpl[Interpretation[_]: Effect: MonadError[*[_], 
   private lazy val logAndWait: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
     for {
       _ <- logger.error(exception)(s"$categoryName: executing event distribution on a subscriber failed")
-      _ <- timer sleep onErrorSleep
+      _ <- Timer[Interpretation] sleep onErrorSleep
     } yield ()
   }
 
@@ -107,7 +106,7 @@ private class EventsDistributorImpl[Interpretation[_]: Effect: MonadError[*[_], 
     case NonFatal(exception) =>
       for {
         _ <- logger.error(exception)(s"$categoryName: finding events to dispatch failed")
-        _ <- timer sleep onErrorSleep
+        _ <- Timer[Interpretation] sleep onErrorSleep
       } yield Option.empty[CategoryEvent]
   }
 }

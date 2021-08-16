@@ -34,7 +34,7 @@ object TriplesGeneratedGenerators {
 
   implicit val triplesGeneratedEvents: Gen[TriplesGeneratedEvent] = for {
     eventId       <- eventIds
-    project       <- projects
+    project       <- projectsGen
     triples       <- jsonLDTriples
     schemaVersion <- projectSchemaVersions
   } yield TriplesGeneratedEvent(eventId, project, triples, schemaVersion)

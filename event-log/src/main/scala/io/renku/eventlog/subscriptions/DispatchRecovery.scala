@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.syntax.all._
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.events.CategoryName
@@ -35,11 +35,11 @@ private trait DispatchRecovery[Interpretation[_], CategoryEvent] {
 
 private object LoggingDispatchRecovery {
 
-  def apply[Interpretation[_]: MonadError[*[_], Throwable], CategoryEvent](
+  def apply[Interpretation[_]: MonadThrow, CategoryEvent](
       categoryName: CategoryName,
       logger:       Logger[Interpretation]
   ): Interpretation[DispatchRecovery[Interpretation, CategoryEvent]] =
-    implicitly[MonadError[Interpretation, Throwable]].catchNonFatal {
+    MonadThrow[Interpretation].catchNonFatal {
       new DispatchRecovery[Interpretation, CategoryEvent] {
 
         override def returnToQueue(event: CategoryEvent): Interpretation[Unit] = ().pure[Interpretation]

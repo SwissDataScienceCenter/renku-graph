@@ -16,27 +16,17 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.commitsync
+package io.renku.eventlog.subscriptions.globalcommitsync
 
-import ch.datascience.events.consumers.ConsumersModelGenerators.projectsGen
+import ch.datascience.events.consumers.ConsumersModelGenerators._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.timestampsNotInTheFuture
-import ch.datascience.graph.model.EventsGenerators.compoundEventIds
-import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.events.LastSyncedDate
+import ch.datascience.graph.model.EventsGenerators.commitIds
 import org.scalacheck.Gen
 
 private object Generators {
 
-  val fullCommitSyncEvents: Gen[FullCommitSyncEvent] = for {
-    id         <- compoundEventIds
-    path       <- projectPaths
-    lastSynced <- timestampsNotInTheFuture toGeneratorOf LastSyncedDate
-  } yield FullCommitSyncEvent(id, path, lastSynced)
-
-  val minimalCommitSyncEvents: Gen[MinimalCommitSyncEvent] = for {
+  val globalCommitSyncEvents: Gen[GlobalCommitSyncEvent] = for {
     project <- projectsGen
-  } yield MinimalCommitSyncEvent(project)
-
-  val commitSyncEvents: Gen[CommitSyncEvent] = Gen.oneOf(fullCommitSyncEvents, minimalCommitSyncEvents)
+    commits <- commitIds.toGeneratorOfNonEmptyList().map(_.toList)
+  } yield GlobalCommitSyncEvent(project, commits)
 }

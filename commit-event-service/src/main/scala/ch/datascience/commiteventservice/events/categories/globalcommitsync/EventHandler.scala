@@ -28,7 +28,7 @@ import ch.datascience.control.Throttler
 import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult, Project}
-import ch.datascience.graph.model.events.{CategoryName, CommitId, LastSyncedDate}
+import ch.datascience.graph.model.events.{CategoryName, CommitId}
 import ch.datascience.logging.ExecutionTimeRecorder
 import io.circe.Decoder
 import org.typelevel.log4cats.Logger
@@ -66,10 +66,9 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow](
   private implicit val eventDecoder: Decoder[GlobalCommitSyncEvent] =
     cursor =>
       for {
-        project    <- cursor.downField("project").as[Project]
-        lastSynced <- cursor.downField("lastSynced").as[LastSyncedDate]
-        commitIds  <- cursor.downField("commitIds").as[List[CommitId]]
-      } yield GlobalCommitSyncEvent(project, lastSynced, commitIds)
+        project   <- cursor.downField("project").as[Project]
+        commitIds <- cursor.downField("commitIds").as[List[CommitId]]
+      } yield GlobalCommitSyncEvent(project, commitIds)
 
   private implicit lazy val projectDecoder: Decoder[Project] = cursor =>
     for {

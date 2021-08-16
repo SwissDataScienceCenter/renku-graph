@@ -1,0 +1,221 @@
+/*
+ * Copyright 2021 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package io.renku.eventlog.subscriptions.globalcommitsync
+
+import ch.datascience.db.SqlStatement
+import ch.datascience.events.consumers.ConsumersModelGenerators.projectsGen
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.events.EventStatus.AwaitingDeletion
+import ch.datascience.graph.model.events.{CommitId, CompoundEventId, EventStatus, LastSyncedDate}
+import ch.datascience.graph.model.projects
+import ch.datascience.metrics.TestLabeledHistogram
+import eu.timepit.refined.auto._
+import io.renku.eventlog.EventContentGenerators._
+import io.renku.eventlog.subscriptions.SubscriptionDataProvisioning
+import io.renku.eventlog.{CreatedDate, EventDate, InMemoryEventLogDbSpec}
+import org.scalacheck.Gen
+import org.scalamock.scalatest.MockFactory
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
+
+import java.time.Duration
+import java.time.temporal.ChronoUnit
+import scala.util.Random
+
+class GlobalCommitSyncEventFinderSpec
+    extends AnyWordSpec
+    with InMemoryEventLogDbSpec
+    with SubscriptionDataProvisioning
+    with MockFactory
+    with should.Matchers {
+  import GlobalCommitSyncEventFinder._
+
+  "popEvent" should {
+
+    "return None " +
+      s"when the subscription_category_sync_times table does not have rows for the $categoryName " +
+      "and the oldest event date is *LESS* than a week ago" in new TestCase {
+
+        finder.popEvent().unsafeRunSync() shouldBe None
+
+        val project0 = projectsGen.generateOne
+        val event0Date =
+          relativeTimestamps(lessThanAgo = syncInterval, moreThanAgo = Duration.ofHours(5)).generateAs(EventDate)
+        addEvent(genCompoundEventId(project0.id), event0Date, project0.path)
+
+        val project1   = projectsGen.generateOne
+        val event1Date = EventDate(event0Date.value.plus(2, ChronoUnit.HOURS))
+        addEvent(genCompoundEventId(project1.id), event1Date, project1.path)
+
+        finder.popEvent().unsafeRunSync() shouldBe None
+      }
+
+    "return an event with all commits " +
+      s"when the project hasn't been synced yet " + // i.e. new project
+      "and contains an event where the event_date is *MORE* than a week ago " +
+      "and the project's latest event is the most recent of all ready-to-sync projects" in new TestCase {
+
+        finder.popEvent().unsafeRunSync() shouldBe None
+
+        val project0                               = projectsGen.generateOne
+        val (project0Event0Id, project0Event0Date) = genCommitIdAndDate(olderThanAWeek = true, project0.id)
+        val (project0Event1Id, project0Event1Date) = genCommitIdAndDate(olderThanAWeek = false, project0.id)
+        addEvent(project0Event0Id, project0Event0Date, project0.path)
+        addEvent(project0Event1Id, project0Event1Date, project0.path)
+
+        val project1                               = projectsGen.generateOne
+        val (project1Event0Id, project1Event0Date) = genCommitIdAndDate(olderThanAWeek = true, project1.id)
+        val (project1Event1Id, project1Event1Date) = genCommitIdAndDate(olderThanAWeek = true, project1.id)
+        addEvent(project1Event0Id, project1Event0Date, project1.path)
+        addEvent(project1Event1Id, project1Event1Date, project1.path)
+
+        val Some(GlobalCommitSyncEvent(actualProject, commits)) = finder.popEvent().unsafeRunSync()
+
+        actualProject shouldBe project0
+        commits         should contain theSameElementsAs List(CommitId(project0Event0Id.id.value),
+                                                      CommitId(project0Event1Id.id.value)
+        )
+
+      }
+
+    "return None " +
+      s"when all projects were synced less than a week ago" in new TestCase {
+
+        finder.popEvent().unsafeRunSync() shouldBe None
+
+        val project0           = projectsGen.generateOne
+        val project0LastSynced = genLastSynced(false)
+
+        val (project0Event0Id, project0Event0Date) = genCommitIdAndDate(projectId = project0.id)
+        val (project0Event1Id, project0Event1Date) = genCommitIdAndDate(projectId = project0.id)
+        addEvent(project0Event0Id, project0Event0Date, project0.path)
+        addEvent(project0Event1Id, project0Event1Date, project0.path)
+        upsertLastSynced(project0.id, categoryName, project0LastSynced)
+
+        finder.popEvent().unsafeRunSync() shouldBe None
+      }
+
+    "return an event with all commit ids for the project" +
+      s"where the project hasn't been synced in the past week" +
+      s"and the project's latest event is the most recent of all ready-to-sync projects" in new TestCase {
+
+        finder.popEvent().unsafeRunSync() shouldBe None
+
+        val project0           = projectsGen.generateOne
+        val project0LastSynced = genLastSynced(true)
+
+        val (project0Event0Id, project0Event0Date) = genCommitIdAndDate(projectId = project0.id)
+        val (project0Event1Id, project0Event1Date) = genCommitIdAndDate(projectId = project0.id)
+        addEvent(project0Event0Id, project0Event0Date, project0.path)
+        addEvent(project0Event1Id, project0Event1Date, project0.path)
+        upsertLastSynced(project0.id, categoryName, project0LastSynced)
+
+        val project1           = projectsGen.generateOne
+        val project1LastSynced = genLastSynced(true)
+
+        val project1Event0Id   = genCompoundEventId(projectId = project1.id)
+        val project1Event0Date = EventDate(project0Event0Date.value.minus(1, ChronoUnit.DAYS))
+        addEvent(project1Event0Id, project1Event0Date, project1.path)
+        upsertLastSynced(project1.id, categoryName, project1LastSynced)
+
+        finder.popEvent().unsafeRunSync() shouldBe Some(
+          GlobalCommitSyncEvent(project0,
+                                List(CommitId(project0Event0Id.id.value), CommitId(project0Event1Id.id.value))
+          )
+        )
+      }
+
+    "return an event with all commit ids for the project which are *NOT* AWAITING_DELETION" +
+      s"where the project hasn't been synced in the past week" +
+      s"and the project's latest event is the most recent of all ready-to-sync projects" in new TestCase {
+
+        finder.popEvent().unsafeRunSync() shouldBe None
+
+        val project0           = projectsGen.generateOne
+        val project0LastSynced = genLastSynced(true)
+
+        val (project0Event0Id, project0Event0Date) = genCommitIdAndDate(projectId = project0.id)
+        val (project0Event1Id, project0Event1Date) = genCommitIdAndDate(projectId = project0.id)
+        addEvent(project0Event0Id, project0Event0Date, project0.path)
+        addEvent(project0Event1Id, project0Event1Date, project0.path, eventStatus = AwaitingDeletion)
+        upsertLastSynced(project0.id, categoryName, project0LastSynced)
+
+        finder.popEvent().unsafeRunSync() shouldBe Some(
+          GlobalCommitSyncEvent(project0, List(CommitId(project0Event0Id.id.value)))
+        )
+      }
+
+    "return None " +
+      "when all events are AWAITING_DELETION" in new TestCase {
+        finder.popEvent().unsafeRunSync() shouldBe None
+
+        val project0           = projectsGen.generateOne
+        val project0LastSynced = genLastSynced(true)
+
+        val (project0Event0Id, project0Event0Date) = genCommitIdAndDate(projectId = project0.id)
+        val (project0Event1Id, project0Event1Date) = genCommitIdAndDate(projectId = project0.id)
+        addEvent(project0Event0Id, project0Event0Date, project0.path, eventStatus = AwaitingDeletion)
+        addEvent(project0Event1Id, project0Event1Date, project0.path, eventStatus = AwaitingDeletion)
+        upsertLastSynced(project0.id, categoryName, project0LastSynced)
+
+        finder.popEvent().unsafeRunSync() shouldBe None
+
+      }
+  }
+
+  private trait TestCase {
+    val finder =
+      new GlobalCommitSyncEventFinderImpl(sessionResource, TestLabeledHistogram[SqlStatement.Name]("query_id"))
+  }
+
+  private def genCommitIdAndDate(olderThanAWeek: Boolean = Random.nextBoolean(),
+                                 projectId:      projects.Id = projectIds.generateOne
+  ) = {
+    val eventDate =
+      if (olderThanAWeek) relativeTimestamps(moreThanAgo = Duration.ofDays(8)).generateAs(EventDate)
+      else relativeTimestamps(lessThanAgo = Duration.ofDays(6)).generateAs(EventDate)
+    (genCompoundEventId(projectId), eventDate)
+  }
+
+  private def genCompoundEventId(projectId: projects.Id) = compoundEventIds.generateOne.copy(projectId = projectId)
+
+  private def genLastSynced(moreThanAWeekAgo: Boolean) = if (moreThanAWeekAgo)
+    relativeTimestamps(moreThanAgo = syncInterval.plus(2, ChronoUnit.HOURS)).generateAs(LastSyncedDate)
+  else relativeTimestamps(lessThanAgo = syncInterval.minus(2, ChronoUnit.HOURS)).generateAs(LastSyncedDate)
+
+  private def addEvent(
+      eventId:     CompoundEventId,
+      eventDate:   EventDate,
+      projectPath: projects.Path,
+      createdDate: CreatedDate = createdDates.generateOne,
+      eventStatus: EventStatus = Gen.oneOf(EventStatus.all.filterNot(_ == AwaitingDeletion)).generateOne
+  ): Unit =
+    storeEvent(
+      eventId,
+      eventStatus,
+      executionDates.generateOne,
+      eventDate,
+      eventBodies.generateOne,
+      createdDate,
+      projectPath = projectPath
+    )
+}

@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.subscriptions.commitsync
 
+import ch.datascience.events.consumers.Project
 import ch.datascience.graph.model.events.{CompoundEventId, LastSyncedDate}
 import ch.datascience.graph.model.projects
 import io.renku.eventlog.subscriptions.EventEncoder
@@ -31,9 +32,8 @@ private final case class FullCommitSyncEvent(id:             CompoundEventId,
   override lazy val toString: String = s"CommitSyncEvent $id, projectPath = $projectPath, lastSynced = $lastSyncedDate"
 }
 
-private final case class MinimalCommitSyncEvent(projectId: projects.Id, projectPath: projects.Path)
-    extends CommitSyncEvent {
-  override lazy val toString: String = s"CommitSyncEvent projectId = $projectId, projectPath = $projectPath"
+private final case class MinimalCommitSyncEvent(project: Project) extends CommitSyncEvent {
+  override lazy val toString: String = s"CommitSyncEvent projectId = ${project.id}, projectPath = ${project.path}"
 }
 
 private object CommitSyncEventEncoder extends EventEncoder[CommitSyncEvent] {
@@ -51,7 +51,7 @@ private object CommitSyncEventEncoder extends EventEncoder[CommitSyncEvent] {
         },
         "lastSynced":   ${lastSyncedDate.value}
       }"""
-    case MinimalCommitSyncEvent(projectId, projectPath)            => json"""{
+    case MinimalCommitSyncEvent(Project(projectId, projectPath))   => json"""{
         "categoryName": ${categoryName.value},
         "project": {
           "id":         ${projectId.value},

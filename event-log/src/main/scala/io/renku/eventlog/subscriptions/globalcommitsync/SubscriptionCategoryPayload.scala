@@ -16,14 +16,13 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.events.categories.globalcommitsync
+package io.renku.eventlog.subscriptions.globalcommitsync
 
-import ch.datascience.events.consumers.Project
-import ch.datascience.graph.model.events.CommitId
+import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
+import io.renku.eventlog.subscriptions
+import io.renku.eventlog.subscriptions.Capacity
 
-private case class GlobalCommitSyncEvent(project: Project, commits: List[CommitId]) {
-
-  override lazy val toString: String =
-    s"projectId = ${project.id}, projectPath = ${project.path}, numberOfCommits = ${commits.length}"
-
-}
+private case class SubscriptionCategoryPayload(subscriberUrl: SubscriberUrl,
+                                               subscriberId:  SubscriberId,
+                                               maybeCapacity: Option[Capacity]
+) extends subscriptions.SubscriptionInfo

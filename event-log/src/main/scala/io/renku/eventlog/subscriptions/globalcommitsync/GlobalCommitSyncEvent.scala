@@ -16,14 +16,30 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.events.categories.globalcommitsync
+package io.renku.eventlog.subscriptions.globalcommitsync
 
 import ch.datascience.events.consumers.Project
 import ch.datascience.graph.model.events.CommitId
+import io.renku.eventlog.subscriptions.EventEncoder
 
-private case class GlobalCommitSyncEvent(project: Project, commits: List[CommitId]) {
-
+private final case class GlobalCommitSyncEvent(project: Project, commits: List[CommitId]) {
   override lazy val toString: String =
-    s"projectId = ${project.id}, projectPath = ${project.path}, numberOfCommits = ${commits.length}"
+    s"GlobalCommitSyncEvent projectId = ${project.id}, projectPath = ${project.path}, numberOfCommits = ${commits.length}"
+}
 
+private object GlobalCommitSyncEventEncoder extends EventEncoder[GlobalCommitSyncEvent] {
+
+  import io.circe.Json
+  import io.circe.literal._
+
+  override def encodeEvent(event: GlobalCommitSyncEvent): Json = json"""{
+        "categoryName": ${categoryName.value},
+        "project": {
+          "id":         ${event.project.id.value},
+          "path":       ${event.project.path.value}
+        },
+        "commits":      ${event.commits.map(_.value)}
+      }"""
+
+  override def encodePayload(event: GlobalCommitSyncEvent): Option[String] = None
 }

@@ -32,7 +32,7 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-
+import ch.datascience.events.consumers.ConsumersModelGenerators.projectsGen
 import java.time.Instant
 import scala.util._
 
@@ -89,7 +89,7 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
 
     val startCommit = commitInfos.generateOne
     val batchDate   = BatchDate(Instant.now)
-    val project     = projects.generateOne
+    val project     = projectsGen.generateOne
 
     val commitEventSender = mock[CommitEventSender[Try]]
 

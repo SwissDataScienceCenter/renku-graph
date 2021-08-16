@@ -16,28 +16,36 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.commitsync
+package io.renku.eventlog.subscriptions.globalcommitsync
 
 import ch.datascience.generators.Generators.Implicits._
-import io.renku.eventlog.subscriptions.commitsync.Generators.{fullCommitSyncEvents, minimalCommitSyncEvents}
+import io.circe.literal._
+import io.renku.eventlog.subscriptions.globalcommitsync.Generators.globalCommitSyncEvents
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class CommitSyncEventSpec extends AnyWordSpec with should.Matchers {
+class GlobalCommitSyncEventEncoderSpec extends AnyWordSpec with should.Matchers {
 
-  "FullCommitSyncEvent.toString" should {
+  "encodeEvent" should {
 
-    "print out the eventId, projectPath, and lastSynced" in {
-      val event = fullCommitSyncEvents.generateOne
-      event.toString shouldBe s"CommitSyncEvent ${event.id}, projectPath = ${event.projectPath}, lastSynced = ${event.lastSyncedDate}"
+    "serialize GlobalCommitSyncEvent to Json" in {
+      val event = globalCommitSyncEvents.generateOne
+
+      GlobalCommitSyncEventEncoder.encodeEvent(event) shouldBe json"""{
+        "categoryName": ${categoryName.value},
+        "project": {
+          "id":         ${event.project.id.value},
+          "path":       ${event.project.path.value}
+        },
+        "commits":      ${event.commits.map(_.value)}
+      }"""
     }
+
   }
 
-  "MinimalCommitSyncEvent.toString" should {
-
-    "print out the eventId, projectPath, and lastSynced" in {
-      val event = minimalCommitSyncEvents.generateOne
-      event.toString shouldBe s"CommitSyncEvent projectId = ${event.project.id}, projectPath = ${event.project.path}"
+  "encodePayload" should {
+    "return None" in {
+      GlobalCommitSyncEventEncoder.encodePayload(globalCommitSyncEvents.generateOne) shouldBe None
     }
   }
 }

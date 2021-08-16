@@ -88,16 +88,16 @@ private class CommitSyncEventFinderImpl[Interpretation[_]: BracketThrow](
               ORDER BY proj.latest_event_date DESC
               LIMIT 1"""
           .query(
-            eventIdDecoder.opt ~ projectIdDecoder ~ projectPathDecoder ~ lastSyncedDateDecoder.opt ~ eventDateDecoder
+            eventIdDecoder.opt ~ projectDecoder ~ lastSyncedDateDecoder.opt ~ eventDateDecoder
           )
           .map {
-            case Some(eventId) ~ projectId ~ projectPath ~ maybeLastSyncDate ~ latestEventDate =>
-              FullCommitSyncEvent(CompoundEventId(eventId, projectId),
-                                  projectPath,
+            case Some(eventId) ~ project ~ maybeLastSyncDate ~ latestEventDate =>
+              FullCommitSyncEvent(CompoundEventId(eventId, project.id),
+                                  project.path,
                                   maybeLastSyncDate getOrElse LastSyncedDate(latestEventDate.value)
               ) -> maybeLastSyncDate
-            case None ~ projectId ~ projectPath ~ maybeLastSyncDate ~ _ =>
-              MinimalCommitSyncEvent(projectId, projectPath) -> maybeLastSyncDate
+            case None ~ project ~ maybeLastSyncDate ~ _ =>
+              MinimalCommitSyncEvent(project) -> maybeLastSyncDate
           }
       )
       .arguments(categoryName ~ AwaitingDeletion ~ eventDate ~ lastSyncDate ~ eventDate ~ lastSyncDate)
@@ -138,8 +138,8 @@ private class CommitSyncEventFinderImpl[Interpretation[_]: BracketThrow](
 
   private implicit class SyncEventOps(commitSyncEvent: CommitSyncEvent) {
     lazy val projectId: projects.Id = commitSyncEvent match {
-      case FullCommitSyncEvent(eventId, _, _)   => eventId.projectId
-      case MinimalCommitSyncEvent(projectId, _) => projectId
+      case FullCommitSyncEvent(eventId, _, _) => eventId.projectId
+      case MinimalCommitSyncEvent(project)    => project.id
     }
   }
 

@@ -20,6 +20,7 @@ package io.renku.eventlog.subscriptions
 package commitsync
 
 import ch.datascience.db.SqlStatement
+import ch.datascience.events.consumers.Project
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
@@ -64,7 +65,7 @@ class CommitSyncEventFinderSpec
         val event1ProjectPath = projectPaths.generateOne
         addEvent(event1Id, event1Date, event1ProjectPath)
         upsertLastSynced(event1Id.projectId,
-                         membersync.categoryName,
+                         categoryName,
                          relativeTimestamps(lessThanAgo = Duration.ofMillis(30)).generateAs(LastSyncedDate)
         )
 
@@ -99,7 +100,7 @@ class CommitSyncEventFinderSpec
           (project1Id, project1Path, project1EventDate),
           (project2Id, project2Path, project2EventDate)
         ).sortBy(_._3).reverse foreach { case (projectId, path, _) =>
-          finder.popEvent().unsafeRunSync() shouldBe Some(MinimalCommitSyncEvent(projectId, path))
+          finder.popEvent().unsafeRunSync() shouldBe Some(MinimalCommitSyncEvent(Project(projectId, path)))
         }
         finder.popEvent().unsafeRunSync() shouldBe None
       }

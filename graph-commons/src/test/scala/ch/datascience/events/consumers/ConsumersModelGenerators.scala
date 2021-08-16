@@ -30,7 +30,7 @@ object ConsumersModelGenerators {
     maybePayload <- nonEmptyStrings().toGeneratorOfOptions
   } yield EventRequestContent(event, maybePayload)
 
-  implicit lazy val projects: Gen[Project] = for {
+  implicit lazy val projectsGen: Gen[Project] = for {
     projectId <- projectIds
     path      <- projectPaths
   } yield Project(projectId, path)

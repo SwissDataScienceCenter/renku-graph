@@ -313,7 +313,7 @@ class CommitEventProcessorSpec
   private def commitsLists(size: Gen[Int Refined Positive] = positiveInts(max = 5)): Gen[NonEmptyList[CommitEvent]] =
     for {
       commitId <- commitIds
-      project  <- projects
+      project  <- projectsGen
       size     <- size
       commits  <- Gen.listOfN(size.value, commits(commitId, project))
     } yield NonEmptyList.fromListUnsafe(commits)

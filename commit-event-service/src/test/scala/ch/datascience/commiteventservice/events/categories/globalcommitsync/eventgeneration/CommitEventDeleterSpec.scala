@@ -20,8 +20,8 @@ package ch.datascience.commiteventservice.events.categories.globalcommitsync.eve
 
 import ch.datascience.commiteventservice.events.categories.common.EventStatusPatcher
 import ch.datascience.commiteventservice.events.categories.common.UpdateResult.{Deleted, Failed}
-import ch.datascience.commiteventservice.events.categories.globalcommitsync.Generators._
 import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.GlobalCommitEventSynchronizer.SynchronizationSummary
+import ch.datascience.events.consumers.ConsumersModelGenerators.projectsGen
 import ch.datascience.generators.CommonGraphGenerators.personalAccessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
