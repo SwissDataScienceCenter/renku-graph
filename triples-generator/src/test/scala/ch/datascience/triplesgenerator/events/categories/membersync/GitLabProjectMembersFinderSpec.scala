@@ -155,6 +155,7 @@ class GitLabProjectMembersFinderSpec
     member =>
       json"""{
       "id":        ${member.gitLabId.value},
+      "username":  ${member.name.value},
       "name":      ${member.name.value}
     }"""
   }

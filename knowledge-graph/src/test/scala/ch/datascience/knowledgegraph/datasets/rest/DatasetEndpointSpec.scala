@@ -91,16 +91,6 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
           }
           .getOrElse(fail("No 'path' or 'project-details' links on the 'project' element"))
 
-        val Right(projectsJsons) = responseCursor.downField("isPartOf").as[List[Json]]
-        projectsJsons should have size dataset.usedIn.size
-        projectsJsons.foreach { json =>
-          (json.hcursor.downField("path").as[Path], json._links)
-            .mapN { case (path, links) =>
-              links shouldBe Links.of(Rel("project-details") -> Href(renkuResourcesUrl / "projects" / path))
-            }
-            .getOrElse(fail("No 'path' or 'project-details' links on the 'isPartOf' elements"))
-        }
-
         val Right(usedInJsons) = responseCursor.downField("usedIn").as[List[Json]]
         usedInJsons should have size dataset.usedIn.size
         usedInJsons.foreach { json =>
