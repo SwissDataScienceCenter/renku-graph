@@ -34,10 +34,16 @@ import java.time.{Clock, Duration, Instant}
 object events {
 
   final class CategoryName private (val value: String) extends AnyVal with StringTinyType
-  implicit object CategoryName extends TinyTypeFactory[CategoryName](new CategoryName(_)) with NonBlank
+  implicit object CategoryName extends TinyTypeFactory[CategoryName](new CategoryName(_)) with NonBlank {
+    implicit lazy val show: Show[CategoryName] = Show.show(_.value)
+  }
 
   final case class CompoundEventId(id: EventId, projectId: projects.Id) {
     override lazy val toString: String = s"id = $id, projectId = $projectId"
+  }
+
+  object CompoundEventId {
+    implicit lazy val show: Show[CompoundEventId] = Show.show(id => show"${id.id}, ${id.projectId}")
   }
 
   final case class EventDetails(id: EventId, projectId: projects.Id, eventBody: EventBody) {
@@ -63,7 +69,9 @@ object events {
   }
 
   final class EventId private (val value: String) extends AnyVal with StringTinyType
-  implicit object EventId extends TinyTypeFactory[EventId](new EventId(_)) with NonBlank
+  implicit object EventId extends TinyTypeFactory[EventId](new EventId(_)) with NonBlank {
+    implicit lazy val show: Show[EventId] = Show.show(id => show"id = ${id.value}")
+  }
 
   final class EventBody private (val value: String) extends AnyVal with StringTinyType
   implicit object EventBody extends TinyTypeFactory[EventBody](new EventBody(_)) with NonBlank {
@@ -164,6 +172,20 @@ object events {
         EventStatus.all.find(_.value == value),
         ifNone = s"'$value' unknown EventStatus"
       )
+    }
+
+    implicit lazy val show: Show[EventStatus] = Show.show {
+      case New                                 => show"status = ${New.value}"
+      case GeneratingTriples                   => show"status = ${GeneratingTriples.value}"
+      case TriplesGenerated                    => show"status = ${TriplesGenerated.value}"
+      case TransformingTriples                 => show"status = ${TransformingTriples.value}"
+      case GenerationRecoverableFailure        => show"status = ${GenerationRecoverableFailure.value}"
+      case GenerationNonRecoverableFailure     => show"status = ${GenerationNonRecoverableFailure.value}"
+      case TransformationRecoverableFailure    => show"status = ${TransformationRecoverableFailure.value}"
+      case TransformationNonRecoverableFailure => show"status = ${TransformationNonRecoverableFailure.value}"
+      case TriplesStore                        => show"status = ${TriplesStore.value}"
+      case Skipped                             => show"status = ${Skipped.value}"
+      case AwaitingDeletion                    => show"status = ${AwaitingDeletion.value}"
     }
   }
 

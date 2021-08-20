@@ -87,7 +87,8 @@ object EventProducersRegistry {
                                   )
     memberSyncCategory <- membersync.SubscriptionCategory(sessionResource, queriesExecTimes, subscriberTracker, logger)
     commitSyncCategory <- commitsync.SubscriptionCategory(sessionResource, queriesExecTimes, subscriberTracker, logger)
-    globalCommitSyncCategory <- globalcommitsync.SubscriptionCategory(sessionResource, queriesExecTimes, subscriberTracker, logger)
+    globalCommitSyncCategory <-
+      globalcommitsync.SubscriptionCategory(sessionResource, queriesExecTimes, subscriberTracker, logger)
     triplesGeneratedCategory <- triplesgenerated.SubscriptionCategory(sessionResource,
                                                                       awaitingTransformationGauge,
                                                                       underTransformationGauge,

@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.subscriptions
 
+import cats.Show
 import ch.datascience.graph.model.EventsGenerators.compoundEventIds
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.{events, projects}
@@ -28,6 +29,8 @@ private case class TestCategoryEvent(value: Int)
 private object TestCategoryEvent {
   lazy val testCategoryEvents: Gen[TestCategoryEvent] =
     Arbitrary.arbInt.arbitrary map TestCategoryEvent.apply
+
+  implicit lazy val show: Show[TestCategoryEvent] = Show.fromToString
 }
 
 private case class TestCompoundIdEvent(eventId: events.EventId, projectId: projects.Id) {

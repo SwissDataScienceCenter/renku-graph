@@ -18,6 +18,8 @@
 
 package ch.datascience.graph.model
 
+import cats.Show
+import cats.implicits.showInterpolator
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
@@ -29,7 +31,9 @@ object projects {
 
   final class Id private (val value: Int) extends AnyVal with IntTinyType
 
-  implicit object Id extends TinyTypeFactory[Id](new Id(_)) with NonNegativeInt
+  implicit object Id extends TinyTypeFactory[Id](new Id(_)) with NonNegativeInt {
+    implicit lazy val show: Show[Id] = Show.show(id => show"projectId = ${id.value}")
+  }
 
   class Path private (val value: String) extends AnyVal with RelativePathTinyType
 
@@ -40,6 +44,7 @@ object projects {
       check = v => (v contains "/") && (allowedFirstChar contains v.head) && (v matches regexValidator),
       message = (value: String) => s"'$value' is not a valid $typeName"
     )
+    implicit lazy val show: Show[Path] = Show.show(path => show"projectPath = ${path.value}")
   }
 
   class ResourceId private (val value: String) extends AnyVal with StringTinyType

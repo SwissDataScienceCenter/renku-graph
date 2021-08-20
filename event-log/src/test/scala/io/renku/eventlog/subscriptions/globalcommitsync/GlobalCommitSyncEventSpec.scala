@@ -22,14 +22,15 @@ import ch.datascience.generators.Generators.Implicits._
 import io.renku.eventlog.subscriptions.globalcommitsync.Generators.globalCommitSyncEvents
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import cats.implicits.toShow
 
 class GlobalCommitSyncEventSpec extends AnyWordSpec with should.Matchers {
 
-  "FullCommitSyncEvent.toString" should {
+  "show" should {
 
     "print out the eventId, projectPath, and lastSynced" in {
       val event = globalCommitSyncEvents.generateOne
-      event.toString shouldBe s"GlobalCommitSyncEvent projectId = ${event.project.id}, projectPath = ${event.project.path}, numberOfCommits = ${event.commits.length}"
+      event.show shouldBe s"GlobalCommitSyncEvent projectId = ${event.project.id}, projectPath = ${event.project.path}, numberOfCommits = ${event.commits.length}"
 
     }
   }

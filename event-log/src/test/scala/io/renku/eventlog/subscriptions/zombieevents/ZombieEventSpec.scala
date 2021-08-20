@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.subscriptions.zombieevents
 
+import cats.implicits.toShow
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventStatuses}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
@@ -27,7 +28,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class ZombieEventSpec extends AnyWordSpec with should.Matchers {
 
-  "toString" should {
+  "show" should {
 
     "print out the id and status" in {
       val event = ZombieEvent(zombieEventProcessNames.generateOne,
@@ -35,7 +36,7 @@ class ZombieEventSpec extends AnyWordSpec with should.Matchers {
                               projectPaths.generateOne,
                               eventStatuses.generateOne
       )
-      event.toString shouldBe s"ZombieEvent ${event.generatedBy} ${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status}"
+      event.show shouldBe s"ZombieEvent ${event.generatedBy} ${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status}"
     }
   }
 }

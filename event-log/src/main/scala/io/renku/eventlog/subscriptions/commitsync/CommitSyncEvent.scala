@@ -18,6 +18,8 @@
 
 package io.renku.eventlog.subscriptions.commitsync
 
+import cats.Show
+import cats.implicits.{showInterpolator, toShow}
 import ch.datascience.events.consumers.Project
 import ch.datascience.graph.model.events.{CompoundEventId, LastSyncedDate}
 import ch.datascience.graph.model.projects
@@ -25,15 +27,27 @@ import io.renku.eventlog.subscriptions.EventEncoder
 
 private sealed trait CommitSyncEvent
 
+private object CommitSyncEvent {
+  implicit lazy val show: Show[CommitSyncEvent] = Show.show {
+    case event: FullCommitSyncEvent    => event.show
+    case event: MinimalCommitSyncEvent => event.show
+  }
+}
+
 private final case class FullCommitSyncEvent(id:             CompoundEventId,
                                              projectPath:    projects.Path,
                                              lastSyncedDate: LastSyncedDate
-) extends CommitSyncEvent {
-  override lazy val toString: String = s"CommitSyncEvent $id, projectPath = $projectPath, lastSynced = $lastSyncedDate"
+) extends CommitSyncEvent
+
+private object FullCommitSyncEvent {
+  implicit lazy val show: Show[FullCommitSyncEvent] =
+    Show.show(event => show"CommitSyncEvent ${event.id}, ${event.projectPath}, ${event.lastSyncedDate}")
 }
 
-private final case class MinimalCommitSyncEvent(project: Project) extends CommitSyncEvent {
-  override lazy val toString: String = s"CommitSyncEvent projectId = ${project.id}, projectPath = ${project.path}"
+private final case class MinimalCommitSyncEvent(project: Project) extends CommitSyncEvent
+
+private object MinimalCommitSyncEvent {
+  implicit lazy val show: Show[MinimalCommitSyncEvent] = Show.show(event => show"CommitSyncEvent ${event.project}")
 }
 
 private object CommitSyncEventEncoder extends EventEncoder[CommitSyncEvent] {

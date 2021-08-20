@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.MonadThrow
+import cats.{MonadThrow, Show}
 import cats.data.OptionT
 import cats.effect.{ContextShift, Effect, IO, Timer}
 import cats.syntax.all._
@@ -37,16 +37,17 @@ private trait EventsDistributor[Interpretation[_]] {
 }
 
 private class EventsDistributorImpl[Interpretation[_]: Effect: MonadThrow: Timer, CategoryEvent](
-    categoryName:     CategoryName,
-    subscribers:      Subscribers[Interpretation],
-    eventsFinder:     EventFinder[Interpretation, CategoryEvent],
-    eventsSender:     EventsSender[Interpretation, CategoryEvent],
-    eventDelivery:    EventDelivery[Interpretation, CategoryEvent],
-    dispatchRecovery: DispatchRecovery[Interpretation, CategoryEvent],
-    logger:           Logger[Interpretation],
-    noEventSleep:     FiniteDuration,
-    onErrorSleep:     FiniteDuration
-) extends EventsDistributor[Interpretation] {
+    categoryName:                 CategoryName,
+    subscribers:                  Subscribers[Interpretation],
+    eventsFinder:                 EventFinder[Interpretation, CategoryEvent],
+    eventsSender:                 EventsSender[Interpretation, CategoryEvent],
+    eventDelivery:                EventDelivery[Interpretation, CategoryEvent],
+    dispatchRecovery:             DispatchRecovery[Interpretation, CategoryEvent],
+    logger:                       Logger[Interpretation],
+    noEventSleep:                 FiniteDuration,
+    onErrorSleep:                 FiniteDuration
+)(implicit val showCategoryEvent: Show[CategoryEvent])
+    extends EventsDistributor[Interpretation] {
 
   import dispatchRecovery._
   import eventsSender._
@@ -67,25 +68,27 @@ private class EventsDistributorImpl[Interpretation[_]: Effect: MonadThrow: Timer
     eventsFinder.popEvent() recoverWith logError
   }.flatTapNone(Timer[Interpretation] sleep noEventSleep)
 
-  private def dispatch(subscriber: SubscriberUrl)(event: CategoryEvent): Interpretation[Unit] = {
+  private def dispatch(
+      subscriber: SubscriberUrl
+  )(event:        CategoryEvent): Interpretation[Unit] = {
     sendEvent(subscriber, event) >>= handleResult(subscriber, event)
   } recoverWith recover(subscriber, event)
 
   private lazy val logAndWait: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
     for {
-      _ <- logger.error(exception)(s"$categoryName: executing event distribution on a subscriber failed")
+      _ <- logger.error(exception)(show"$categoryName: executing event distribution on a subscriber failed")
       _ <- Timer[Interpretation] sleep onErrorSleep
     } yield ()
   }
 
   private def handleResult(subscriber: SubscriberUrl, event: CategoryEvent): SendingResult => Interpretation[Unit] = {
     case result @ Delivered =>
-      logger.info(s"$categoryName: $event, url = $subscriber -> $result")
+      logger.info(show"$categoryName: $event, $subscriber -> $result")
       eventDelivery.registerSending(event, subscriber) recoverWith logError(event, subscriber)
     case TemporarilyUnavailable =>
       (markBusy(subscriber) recover withNothing) >> (returnToQueue(event) recoverWith logError(event))
     case result @ Misdelivered =>
-      logger.error(s"$categoryName: $event, url = $subscriber -> $result")
+      logger.error(show"$categoryName: $event, $subscriber -> $result")
       (delete(subscriber) recover withNothing) >> (returnToQueue(event) recoverWith logError(event))
   }
 
@@ -126,7 +129,8 @@ private object IOEventsDistributor {
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
+      timer:            Timer[IO],
+      show:             Show[CategoryEvent]
   ): IO[EventsDistributor[IO]] =
     for {
       eventsSender <- IOEventsSender[CategoryEvent](categoryName, categoryEventEncoder, logger)

@@ -18,6 +18,7 @@
 
 package ch.datascience.events.consumers.subscriptions
 
+import cats.Show
 import cats.syntax.all._
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}
@@ -72,6 +73,8 @@ object SubscriberUrl extends TinyTypeFactory[SubscriberUrl](new SubscriberUrl(_)
       val url = new URL(subscriberUrl.value)
       MicroserviceBaseUrl(s"${url.getProtocol}://${url.getHost}:${url.getPort}").asRight[IllegalArgumentException]
     }
+
+  implicit lazy val show: Show[SubscriberUrl] = Show.show(url => show"url = ${url.value}")
 }
 
 final class SubscriberId private (val value: String) extends AnyVal with StringTinyType
@@ -80,4 +83,6 @@ object SubscriberId extends TinyTypeFactory[SubscriberId](new SubscriberId(_)) w
   def apply(microserviceId: MicroserviceIdentifier): SubscriberId = SubscriberId(microserviceId.toString)
 
   implicit val decoder: Decoder[SubscriberId] = stringDecoder(SubscriberId)
+
+  implicit lazy val show: Show[SubscriberId] = Show.show(id => show"id = ${id.value}")
 }

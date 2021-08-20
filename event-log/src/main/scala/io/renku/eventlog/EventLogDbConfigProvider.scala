@@ -18,15 +18,14 @@
 
 package io.renku.eventlog
 
-import cats.MonadError
+import cats.MonadThrow
 import ch.datascience.db.DBConfigProvider
 import eu.timepit.refined.auto._
 
 sealed trait EventLogDB
 
-class EventLogDbConfigProvider[Interpretation[_]](
-)(implicit ME: MonadError[Interpretation, Throwable])
-    extends DBConfigProvider[Interpretation, EventLogDB](
+class EventLogDbConfigProvider[Interpretation[_]: MonadThrow](
+) extends DBConfigProvider[Interpretation, EventLogDB](
       namespace = "event-log",
       dbName = "event_log"
     )

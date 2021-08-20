@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.subscriptions
 
+import cats.Show
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
@@ -40,6 +41,8 @@ private object EventsSender {
     case object Delivered              extends SendingResult
     case object TemporarilyUnavailable extends SendingResult
     case object Misdelivered           extends SendingResult
+
+    implicit lazy val show: Show[SendingResult] = Show.fromToString
   }
 }
 
@@ -91,7 +94,7 @@ private class EventsSenderImpl[Interpretation[_]: ConcurrentEffect: Timer, Categ
   private lazy val exceptionToSendingResult: PartialFunction[Throwable, Interpretation[SendingResult]] = {
     case _:         ConnectivityException => Misdelivered.pure[Interpretation].widen[SendingResult]
     case exception: ClientException =>
-      logger.error(exception)(s"$categoryName: sending event failed") >> TemporarilyUnavailable
+      logger.error(exception)(show"$categoryName: sending event failed") >> TemporarilyUnavailable
         .pure[Interpretation]
         .widen[SendingResult]
   }

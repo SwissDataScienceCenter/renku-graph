@@ -18,10 +18,16 @@
 
 package ch.datascience.events.consumers
 
+import cats.Show
+import cats.implicits.showInterpolator
 import ch.datascience.graph.model.projects
 import io.circe.Json
 
 final case class Project(id: projects.Id, path: projects.Path)
+
+object Project {
+  implicit lazy val show: Show[Project] = Show.show(project => show"${project.id}, ${project.path}")
+}
 
 sealed trait EventSchedulingResult extends Product with Serializable
 

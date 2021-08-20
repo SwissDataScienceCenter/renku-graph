@@ -46,7 +46,7 @@ private[subscriptions] object SubscriptionCategory {
                                              subscribers,
                                              eventsFinder,
                                              eventDelivery,
-      GlobalCommitSyncEventEncoder,
+                                             GlobalCommitSyncEventEncoder,
                                              dispatchRecovery,
                                              logger
                          )
