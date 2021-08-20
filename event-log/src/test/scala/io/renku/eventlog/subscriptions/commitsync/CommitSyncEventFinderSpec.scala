@@ -64,10 +64,6 @@ class CommitSyncEventFinderSpec
         val event1Date        = eventDates.generateOne
         val event1ProjectPath = projectPaths.generateOne
         addEvent(event1Id, event1Date, event1ProjectPath)
-        upsertLastSynced(event1Id.projectId,
-                         categoryName,
-                         relativeTimestamps(lessThanAgo = Duration.ofMillis(30)).generateAs(LastSyncedDate)
-        )
 
         List(
           (event0Id, event0ProjectPath, event0Date),

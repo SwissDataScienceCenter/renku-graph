@@ -55,8 +55,8 @@ private class CommitSyncEventFinderImpl[Interpretation[_]: BracketThrow](
   private def findEvent = measureExecutionTime {
     val (eventDate, lastSyncDate) = (EventDate.apply _ &&& LastSyncedDate.apply _)(now())
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find event"))
-      .select[CategoryName ~ EventStatus ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate,
-              (CommitSyncEvent, Option[LastSyncedDate])
+      .select[CategoryName ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate,
+              (CommitSyncEvent, Option[LastSyncedDate], Option[EventStatus])
       ](
         sql"""
               SELECT
@@ -66,21 +66,23 @@ private class CommitSyncEventFinderImpl[Interpretation[_]: BracketThrow](
                     AND evt.event_date = proj.latest_event_date
                   ORDER BY created_date DESC
                   LIMIT 1
-                ) as event_id,
+                ) event_id,
+				        (SELECT evt.status
+                  FROM event evt
+                  WHERE evt.project_id = proj.project_id
+                    AND evt.event_date = proj.latest_event_date
+                  ORDER BY created_date DESC
+                  LIMIT 1
+                ) event_status,
                 proj.project_id,
                 proj.project_path,
                 sync_time.last_synced,
                 proj.latest_event_date
               FROM project proj
-              LEFT JOIN event
-                ON event.event_id = event_id
               LEFT JOIN subscription_category_sync_time sync_time
                 ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryNameEncoder
               WHERE
-                (event.status IS NULL
-                  OR (event.status IS NOT NULL AND event.status <> $eventStatusEncoder)
-                )
-                AND (sync_time.last_synced IS NULL
+               (sync_time.last_synced IS NULL
                 OR (
                      (($eventDateEncoder - proj.latest_event_date) <= INTERVAL '7 days' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 hour')
                   OR (($eventDateEncoder - proj.latest_event_date) >  INTERVAL '7 days' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 day')
@@ -88,20 +90,30 @@ private class CommitSyncEventFinderImpl[Interpretation[_]: BracketThrow](
               ORDER BY proj.latest_event_date DESC
               LIMIT 1"""
           .query(
-            eventIdDecoder.opt ~ projectDecoder ~ lastSyncedDateDecoder.opt ~ eventDateDecoder
+            eventIdDecoder.opt ~ eventStatusDecoder.opt ~ projectDecoder ~ lastSyncedDateDecoder.opt ~ eventDateDecoder
           )
           .map {
-            case Some(eventId) ~ project ~ maybeLastSyncDate ~ latestEventDate =>
-              FullCommitSyncEvent(CompoundEventId(eventId, project.id),
-                                  project.path,
-                                  maybeLastSyncDate getOrElse LastSyncedDate(latestEventDate.value)
-              ) -> maybeLastSyncDate
-            case None ~ project ~ maybeLastSyncDate ~ _ =>
-              MinimalCommitSyncEvent(project) -> maybeLastSyncDate
+            case Some(eventId) ~ maybeEventStatus ~ project ~ maybeLastSyncDate ~ latestEventDate =>
+              (FullCommitSyncEvent(CompoundEventId(eventId, project.id),
+                                   project.path,
+                                   maybeLastSyncDate getOrElse LastSyncedDate(latestEventDate.value)
+               ),
+               maybeLastSyncDate,
+               maybeEventStatus
+              )
+            case None ~ _ ~ project ~ maybeLastSyncDate ~ _ =>
+              (MinimalCommitSyncEvent(project), maybeLastSyncDate, None)
           }
       )
-      .arguments(categoryName ~ AwaitingDeletion ~ eventDate ~ lastSyncDate ~ eventDate ~ lastSyncDate)
+      .arguments(categoryName ~ eventDate ~ lastSyncDate ~ eventDate ~ lastSyncDate)
       .build(_.option)
+      .mapResult {
+        case Some((event: FullCommitSyncEvent, maybeSyncDate, Some(eventStatus))) if eventStatus != AwaitingDeletion =>
+          Some((event, maybeSyncDate))
+        case Some((event: MinimalCommitSyncEvent, maybeSyncDate, _)) =>
+          Some((event, maybeSyncDate))
+        case _ => None
+      }
   }
 
   private def setSyncDate(event: CommitSyncEvent, maybeSyncedDate: Option[LastSyncedDate]) =
