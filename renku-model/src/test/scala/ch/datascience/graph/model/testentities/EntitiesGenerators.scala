@@ -353,9 +353,8 @@ trait EntitiesGenerators {
     external    <- datasetPartExternals
     entity      <- inputEntities
     dateCreated <- datasetCreatedDates(minDateCreated)
-    maybeUrl    <- datasetUrls.toGeneratorOfOptions
     maybeSource <- datasetPartSources.toGeneratorOfOptions
-  } yield DatasetPart(PartId.generate, external, entity, dateCreated, maybeUrl, maybeSource)
+  } yield DatasetPart(PartId.generate, external, entity, dateCreated, maybeSource)
 
   def publicationEventEntities(minDateCreated: Instant): Gen[PublicationEvent] = for {
     about            <- nonEmptyStrings() map AboutEvent.apply

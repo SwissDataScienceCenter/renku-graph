@@ -19,7 +19,7 @@
 package ch.datascience.graph.model.testentities
 
 import cats.syntax.all._
-import ch.datascience.graph.model.datasets.{DateCreated, PartExternal, PartId, PartSource, Url}
+import ch.datascience.graph.model.datasets.{DateCreated, PartExternal, PartId, PartSource}
 import ch.datascience.graph.model.{datasets, entities}
 
 case class DatasetPart(
@@ -27,7 +27,6 @@ case class DatasetPart(
     external:    PartExternal,
     entity:      Entity,
     dateCreated: DateCreated,
-    maybeUrl:    Option[Url],
     maybeSource: Option[PartSource]
 )
 
@@ -44,7 +43,6 @@ object DatasetPart {
         datasetPart.external,
         datasetPart.entity.to[entities.Entity],
         datasetPart.dateCreated,
-        datasetPart.maybeUrl,
         datasetPart.maybeSource,
         datasetPart.invalidationTime.some
       )
@@ -54,7 +52,6 @@ object DatasetPart {
         datasetPart.external,
         datasetPart.entity.to[entities.Entity],
         datasetPart.dateCreated,
-        datasetPart.maybeUrl,
         datasetPart.maybeSource,
         None
       )

@@ -352,13 +352,8 @@ trait ModelOps extends Dataset.ProvenanceOps {
     ): ValidatedNel[String, DatasetPart with HavingInvalidationTime] =
       Validated.condNel(
         test = (time.value compareTo part.dateCreated.value) >= 0,
-        new DatasetPart(datasets.PartId.generate,
-                        part.external,
-                        part.entity,
-                        part.dateCreated,
-                        part.maybeUrl,
-                        part.maybeSource
-        ) with HavingInvalidationTime {
+        new DatasetPart(datasets.PartId.generate, part.external, part.entity, part.dateCreated, part.maybeSource)
+          with HavingInvalidationTime {
           override val invalidationTime: InvalidationTime = time
         },
         s"Invalidation time $time is older than dataset part ${part.entity.location}"

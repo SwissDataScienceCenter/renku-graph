@@ -168,7 +168,7 @@ Response body example:
   },
   "title" : "dataset title",
   "name" : "dataset alternate name",
-  "url" : "http://host/url1",  // optional property
+  "url" : "http://host/url1",                     // optional property
   "sameAs" : "http://host/url2",                  // optional property when no "derivedFrom" exists
   "derivedFrom" : "http://host/url1",             // optional property when no "sameAs" exists
   "description" : "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
