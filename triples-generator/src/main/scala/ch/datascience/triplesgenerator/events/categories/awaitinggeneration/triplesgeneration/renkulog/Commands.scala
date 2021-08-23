@@ -144,7 +144,7 @@ private object Commands {
     }
   }
 
-  class Renku(renkuExport: Path => CommandResult = %%("renku", "graph", "export")(_))(implicit
+  class Renku(renkuExport: Path => CommandResult = %%("renku", "graph", "export", "--full", "--strict")(_))(implicit
       contextShift:        ContextShift[IO],
       timer:               Timer[IO],
       ME:                  MonadError[IO, Throwable],
