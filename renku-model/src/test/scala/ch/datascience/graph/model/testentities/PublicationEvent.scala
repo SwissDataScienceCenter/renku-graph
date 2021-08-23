@@ -20,11 +20,12 @@ package ch.datascience.graph.model.testentities
 
 import cats.syntax.all._
 import ch.datascience.graph.model.publicationEvents._
-import ch.datascience.graph.model.{RenkuBaseUrl, entities, publicationEvents}
+import ch.datascience.graph.model.testentities.Dataset.Provenance
+import ch.datascience.graph.model.{RenkuBaseUrl, datasets, entities, publicationEvents}
 
-final case class PublicationEvent(about:            AboutEvent,
+final case class PublicationEvent(dataset:          Dataset[Provenance],
+                                  about:            AboutEvent,
                                   maybeDescription: Option[Description],
-                                  location:         Location,
                                   name:             Name,
                                   startDate:        StartDate
 )
@@ -39,9 +40,9 @@ object PublicationEvent {
   ): PublicationEvent => entities.PublicationEvent = publicationEvent =>
     entities.PublicationEvent(
       publicationEvents.ResourceId(publicationEvent.asEntityId.show),
+      datasets.ResourceId(publicationEvent.dataset.asEntityId.show),
       publicationEvent.about,
       publicationEvent.maybeDescription,
-      publicationEvent.location,
       publicationEvent.name,
       publicationEvent.startDate
     )
@@ -50,5 +51,5 @@ object PublicationEvent {
     JsonLDEncoder.instance(_.to[entities.PublicationEvent].asJsonLD)
 
   implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[PublicationEvent] =
-    EntityIdEncoder.instance(event => renkuBaseUrl / "datasettags" / s"${event.name}@${event.location}")
+    EntityIdEncoder.instance(event => renkuBaseUrl / "datasettags" / s"${event.name}@${event.dataset.asEntityId.show}")
 }

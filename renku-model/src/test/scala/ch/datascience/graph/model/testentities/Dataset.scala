@@ -28,17 +28,19 @@ import ch.datascience.graph.model.testentities.Dataset.Provenance.{ImportedExter
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 
-case class Dataset[+P <: Provenance](identification: Identification,
-                                     provenance:     P,
-                                     additionalInfo: AdditionalInfo,
-                                     publishing:     Publishing,
-                                     parts:          List[DatasetPart],
-                                     project:        Project[ForksCount]
+case class Dataset[+P <: Provenance](identification:            Identification,
+                                     provenance:                P,
+                                     additionalInfo:            AdditionalInfo,
+                                     parts:                     List[DatasetPart],
+                                     publicationEventFactories: List[Dataset[Provenance] => PublicationEvent],
+                                     project:                   Project[ForksCount]
 ) {
+
+  val publicationEvents: List[PublicationEvent] = publicationEventFactories.map(_.apply(this))
 
   def entityId(implicit renkuBaseUrl: RenkuBaseUrl): EntityId = Dataset.entityId(identification.identifier)
 
-  validateState(identification.identifier, provenance, project, parts, publishing.publicationEvents)
+  validateState(identification.identifier, provenance, parts, publicationEvents, project)
     .fold(errors => throw new IllegalStateException(errors.nonEmptyIntercalate("; ")), _ => ())
 }
 
@@ -209,42 +211,46 @@ object Dataset {
       }
   }
 
-  final case class Publishing(
-      publicationEvents: List[PublicationEvent],
-      maybeVersion:      Option[Version]
-  )
-
   final case class AdditionalInfo(
       url:              Url,
       maybeDescription: Option[Description],
       keywords:         List[Keyword],
       images:           List[ImageUri],
-      maybeLicense:     Option[License]
+      maybeLicense:     Option[License],
+      maybeVersion:     Option[Version]
   )
 
-  def from[P <: Provenance](identification: Identification,
-                            provenance:     P,
-                            additionalInfo: AdditionalInfo,
-                            publishing:     Publishing,
-                            parts:          List[DatasetPart],
-                            project:        Project[ForksCount]
+  def from[P <: Provenance](identification:            Identification,
+                            provenance:                P,
+                            additionalInfo:            AdditionalInfo,
+                            parts:                     List[DatasetPart],
+                            publicationEventFactories: List[Dataset[Provenance] => PublicationEvent],
+                            project:                   Project[ForksCount]
   ): ValidatedNel[String, Dataset[P]] =
-    validateState(identification.identifier, provenance, project, parts, publishing.publicationEvents).map(_ =>
-      Dataset[P](
-        identification,
-        provenance,
-        additionalInfo,
-        publishing,
-        parts,
-        project
+    validateState(identification.identifier, provenance, parts, publicationEvents = Nil, project)
+      .map(_ =>
+        Dataset[P](
+          identification,
+          provenance,
+          additionalInfo,
+          parts,
+          publicationEventFactories = Nil,
+          project
+        )
       )
-    )
+      .andThen { dataset =>
+        validatePublicationEvents(identification.identifier,
+                                  provenance,
+                                  publicationEventFactories.map(_.apply(dataset)),
+                                  project
+        ).map(_ => dataset.copy(publicationEventFactories = publicationEventFactories))
+      }
 
   private[Dataset] def validateState[P <: Provenance](identifier:        Identifier,
                                                       provenance:        P,
-                                                      project:           Project[ForksCount],
                                                       parts:             List[DatasetPart],
-                                                      publicationEvents: List[PublicationEvent]
+                                                      publicationEvents: List[PublicationEvent],
+                                                      project:           Project[ForksCount]
   ): ValidatedNel[String, Unit] = List(
     validateDateCreated(identifier, project, provenance),
     validateCreators(identifier, provenance.creators),
@@ -342,12 +348,11 @@ object Dataset {
             imagePosition
           )
         },
-        dataset.additionalInfo.maybeLicense
-      ),
-      entities.Dataset.Publishing(dataset.publishing.publicationEvents.map(_.to[entities.PublicationEvent]),
-                                  dataset.publishing.maybeVersion
+        dataset.additionalInfo.maybeLicense,
+        dataset.additionalInfo.maybeVersion
       ),
       dataset.parts.map(_.to[entities.DatasetPart]),
+      dataset.publicationEvents.map(_.to[entities.PublicationEvent]),
       projects.ResourceId(dataset.project.asEntityId.show),
       maybeInvalidationTime
     )

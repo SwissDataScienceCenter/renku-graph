@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.model.entities
 
+import cats.data.NonEmptyList
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{timestamps, timestampsNotInTheFuture}
@@ -63,14 +64,18 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         datasetEntities(datasetProvenanceInternal),
         datasetEntities(datasetProvenanceImportedExternal),
         datasetEntities(datasetProvenanceImportedInternalAncestorExternal)
-      ).foreach { datasetGen =>
+      ) foreach { datasetGen =>
         val dataset = datasetGen.generateOne.to[entities.Dataset[entities.Dataset.Provenance]]
         val invalidPart = updatePartDateAfter(
           datasetPartEntities(timestampsNotInTheFuture.generateOne).generateOne.to[entities.DatasetPart]
         )(dataset.provenance)
         val invalidDataset = dataset.copy(parts = invalidPart :: dataset.parts)
 
-        val Left(error) = invalidDataset.asJsonLD.cursor.as[entities.Dataset[entities.Dataset.Provenance]]
+        val Left(error) = invalidDataset.asJsonLD.flatten
+          .fold(throw _, identity)
+          .cursor
+          .as[List[entities.Dataset[entities.Dataset.Provenance]]]
+
         error shouldBe a[DecodingFailure]
         error.getMessage shouldBe s"Dataset ${invalidDataset.identification.identifier} " +
           s"Part ${invalidPart.entity.location} startTime ${invalidPart.dateCreated} is older than Dataset ${invalidDataset.provenance.date.instant}"
@@ -85,7 +90,7 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         datasetEntities(datasetProvenanceImportedInternalAncestorInternal).map(ds =>
           ds.copy(provenance = ds.provenance.copy(topmostSameAs = TopmostSameAs(ds.provenance.sameAs)))
         )
-      ).foreach { datasetGen =>
+      ) foreach { datasetGen =>
         val dataset = datasetGen.generateOne.to[entities.Dataset[entities.Dataset.Provenance]]
         val olderPart = updatePartDateAfter(
           datasetPartEntities(timestampsNotInTheFuture.generateOne).generateOne
@@ -93,7 +98,10 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         )(dataset.provenance)
         val validDataset = dataset.copy(parts = olderPart :: dataset.parts)
 
-        validDataset.asJsonLD.cursor.as[entities.Dataset[entities.Dataset.Provenance]] shouldBe Right(validDataset)
+        validDataset.asJsonLD.flatten
+          .fold(throw _, identity)
+          .cursor
+          .as[List[entities.Dataset[entities.Dataset.Provenance]]] shouldBe List(validDataset).asRight
       }
     }
 
@@ -104,10 +112,60 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         .to[entities.Dataset[entities.Dataset.Provenance]]
         .copy(maybeInvalidationTime = invalidationTime.some)
 
-      val Left(error) = invalidatedDataset.asJsonLD.cursor.as[entities.Dataset[entities.Dataset.Provenance]]
+      val Left(error) = invalidatedDataset.asJsonLD.flatten
+        .fold(throw _, identity)
+        .cursor
+        .as[List[entities.Dataset[entities.Dataset.Provenance]]]
+
       error shouldBe a[DecodingFailure]
       error.getMessage shouldBe s"Dataset ${invalidatedDataset.identification.identifier} " +
         s"invalidationTime $invalidationTime is older than Dataset ${invalidatedDataset.provenance.date}"
+    }
+
+    "skip publicationEvents that do not belong to a different dataset" in {
+      val dataset = datasetEntities(ofAnyProvenance).generateOne.to[entities.Dataset[entities.Dataset.Provenance]]
+
+      val otherDatasetPublicationEvent =
+        publicationEventFactories(dataset.provenance.date.instant)
+          .generateOne(datasetEntities(ofAnyProvenance).generateOne)
+          .to[entities.PublicationEvent]
+
+      dataset
+        .copy(publicationEvents = List(otherDatasetPublicationEvent))
+        .asJsonLD
+        .flatten
+        .fold(throw _, identity)
+        .cursor
+        .as[List[entities.Dataset[entities.Dataset.Provenance]]] shouldBe List(
+        dataset.copy(publicationEvents = Nil)
+      ).asRight
+    }
+  }
+
+  "from" should {
+    "return a failure when initializing with a PublicationEvent belonging to another dataset" in {
+      val dataset = datasetEntities(ofAnyProvenance).generateOne.to[entities.Dataset[entities.Dataset.Provenance]]
+
+      val otherDatasetPublicationEvent =
+        publicationEventFactories(dataset.provenance.date.instant)
+          .generateOne(datasetEntities(ofAnyProvenance).generateOne)
+          .to[entities.PublicationEvent]
+
+      val errors = entities.Dataset.from(
+        dataset.identification,
+        dataset.provenance,
+        dataset.additionalInfo,
+        dataset.parts,
+        List(otherDatasetPublicationEvent),
+        dataset.projectResourceId,
+        dataset.maybeInvalidationTime
+      )
+
+      errors.isInvalid shouldBe true
+      errors.swap.fold(_ => fail("Errors expected"), identity) shouldBe NonEmptyList.one {
+        s"PublishingEvent ${otherDatasetPublicationEvent.resourceId} " +
+          s"refers to ${otherDatasetPublicationEvent.location} which is not ${dataset.resourceId}"
+      }
     }
   }
 

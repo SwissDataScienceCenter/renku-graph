@@ -22,7 +22,7 @@ import cats.data.ValidatedNel
 import cats.syntax.all._
 import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.entities.Dataset.Provenance.{ImportedInternal, ImportedInternalAncestorExternal, ImportedInternalAncestorInternal, Modified}
-import ch.datascience.graph.model.entities.Dataset.{Provenance, _}
+import ch.datascience.graph.model.entities.Dataset._
 import ch.datascience.graph.model.{GitLabApiUrl, InvalidationTime, projects}
 import io.circe.DecodingFailure
 
@@ -31,8 +31,8 @@ import java.time.Instant
 final case class Dataset[+P <: Provenance](identification:        Identification,
                                            provenance:            P,
                                            additionalInfo:        AdditionalInfo,
-                                           publishing:            Publishing,
                                            parts:                 List[DatasetPart],
+                                           publicationEvents:     List[PublicationEvent],
                                            projectResourceId:     projects.ResourceId,
                                            maybeInvalidationTime: Option[InvalidationTime]
 ) extends DatasetOps[P]
@@ -48,15 +48,23 @@ object Dataset {
   def from[P <: Provenance](identification:        Identification,
                             provenance:            P,
                             additionalInfo:        AdditionalInfo,
-                            publishing:            Publishing,
                             parts:                 List[DatasetPart],
+                            publicationEvents:     List[PublicationEvent],
                             projectResourceId:     projects.ResourceId,
                             maybeInvalidationTime: Option[InvalidationTime]
   ): ValidatedNel[String, Dataset[P]] = List(
     validateDates(parts, identification)(provenance),
-    validate(maybeInvalidationTime, identification)(provenance)
+    validate(maybeInvalidationTime, identification)(provenance),
+    validate(publicationEvents, identification)
   ).sequence.map { _ =>
-    Dataset(identification, provenance, additionalInfo, publishing, parts, projectResourceId, maybeInvalidationTime)
+    Dataset(identification,
+            provenance,
+            additionalInfo,
+            parts,
+            publicationEvents,
+            projectResourceId,
+            maybeInvalidationTime
+    )
   }
 
   private def validateDates[P <: Provenance](parts:          List[DatasetPart],
@@ -89,6 +97,18 @@ object Dataset {
         s"Dataset ${identification.identifier} invalidationTime $time is older than Dataset ${provenance.date}".invalidNel
       case _ => ().validNel[String]
     }
+
+  private def validate(
+      publishingEvents: List[PublicationEvent],
+      identification:   Identification
+  ): ValidatedNel[String, Unit] = publishingEvents
+    .map {
+      case event if event.location == identification.resourceId => ().validNel[String]
+      case event =>
+        s"PublishingEvent ${event.resourceId} refers to ${event.location} which is not ${identification.resourceId}".invalidNel
+    }
+    .sequence
+    .void
 
   final case class Identification(
       resourceId: ResourceId,
@@ -328,46 +348,26 @@ object Dataset {
     private implicit lazy val creatorsOrdering: Ordering[Person] = Ordering.by(_.name.value)
   }
 
-  final case class Publishing(
-      publicationEvents: List[PublicationEvent],
-      maybeVersion:      Option[Version]
-  )
-
-  object Publishing {
-    private[Dataset] implicit lazy val encoder: Publishing => Map[Property, JsonLD] = {
-      case Publishing(publicationEvents, maybeVersion) =>
-        Map(
-          schema / "subjectOf" -> publicationEvents.asJsonLD,
-          schema / "version"   -> maybeVersion.asJsonLD
-        )
-    }
-    private[Dataset] implicit lazy val decoder: JsonLDDecoder[Publishing] = JsonLDDecoder.entity(entityTypes) {
-      cursor =>
-        for {
-          publicationEvents <- cursor.downField(schema / "subjectOf").as[List[PublicationEvent]]
-          maybeVersion      <- cursor.downField(schema / "version").as[Option[Version]]
-        } yield Publishing(publicationEvents, maybeVersion)
-    }
-  }
-
   final case class AdditionalInfo(
       url:              Url,
       maybeDescription: Option[Description],
       keywords:         List[Keyword],
       images:           List[Image],
-      maybeLicense:     Option[License]
+      maybeLicense:     Option[License],
+      maybeVersion:     Option[Version]
   )
 
   object AdditionalInfo {
 
     private[Dataset] implicit lazy val encoder: AdditionalInfo => Map[Property, JsonLD] = {
-      case AdditionalInfo(url, maybeDescription, keywords, images, maybeLicense) =>
+      case AdditionalInfo(url, maybeDescription, keywords, images, maybeLicense, maybeVersion) =>
         Map(
           schema / "url"         -> url.asJsonLD,
           schema / "description" -> maybeDescription.asJsonLD,
           schema / "keywords"    -> keywords.asJsonLD,
           schema / "image"       -> images.asJsonLD,
-          schema / "license"     -> maybeLicense.asJsonLD
+          schema / "license"     -> maybeLicense.asJsonLD,
+          schema / "version"     -> maybeVersion.asJsonLD
         )
     }
 
@@ -379,7 +379,8 @@ object Dataset {
           keywords         <- cursor.downField(schema / "keywords").as[List[Keyword]].map(_.sorted)
           images           <- cursor.downField(schema / "image").as[List[Image]].map(_.sortBy(_.position))
           maybeLicense     <- cursor.downField(schema / "license").as[Option[License]]
-        } yield AdditionalInfo(url, maybeDescription, keywords, images, maybeLicense)
+          maybeVersion     <- cursor.downField(schema / "version").as[Option[Version]]
+        } yield AdditionalInfo(url, maybeDescription, keywords, images, maybeLicense, maybeVersion)
     }
   }
 
@@ -416,35 +417,47 @@ object Dataset {
     }
 
     JsonLDEncoder.instance { dataset =>
-      JsonLD
-        .entity(
-          dataset.resourceId.asEntityId,
-          entityTypes,
-          List(
-            dataset.identification.asJsonLDProperties,
-            dataset.provenance.asJsonLDProperties,
-            dataset.additionalInfo.asJsonLDProperties,
-            dataset.publishing.asJsonLDProperties
-          ).flatten.toMap,
-          schema / "hasPart"         -> dataset.parts.asJsonLD,
-          schema / "isPartOf"        -> dataset.projectResourceId.asEntityId.asJsonLD,
-          prov / "invalidatedAtTime" -> dataset.maybeInvalidationTime.asJsonLD
-        )
+      JsonLD.arr(
+        JsonLD
+          .entity(
+            dataset.resourceId.asEntityId,
+            entityTypes,
+            List(
+              dataset.identification.asJsonLDProperties,
+              dataset.provenance.asJsonLDProperties,
+              dataset.additionalInfo.asJsonLDProperties
+            ).flatten.toMap,
+            schema / "hasPart"         -> dataset.parts.asJsonLD,
+            schema / "isPartOf"        -> dataset.projectResourceId.asEntityId.asJsonLD,
+            prov / "invalidatedAtTime" -> dataset.maybeInvalidationTime.asJsonLD
+          ) :: dataset.publicationEvents.map(_.asJsonLD): _*
+      )
     }
   }
 
   implicit lazy val decoder: JsonLDDecoder[Dataset[Provenance]] = JsonLDDecoder.entity(entityTypes) { cursor =>
     for {
-      identification        <- cursor.as[Identification]
-      provenance            <- cursor.as[Provenance](Provenance.decoder(identification))
-      additionalInfo        <- cursor.as[AdditionalInfo]
-      publishing            <- cursor.as[Publishing]
-      parts                 <- cursor.downField(schema / "hasPart").as[List[DatasetPart]]
+      identification <- cursor.as[Identification]
+      provenance     <- cursor.as[Provenance](Provenance.decoder(identification))
+      additionalInfo <- cursor.as[AdditionalInfo]
+      parts          <- cursor.downField(schema / "hasPart").as[List[DatasetPart]]
+      publicationEvents <-
+        cursor.top
+          .map(_.cursor.as[List[PublicationEvent]].map(_.filter(_.location == identification.resourceId)))
+          .sequence
+          .map(_ getOrElse Nil)
       projectResourceId     <- cursor.downField(schema / "isPartOf").downEntityId.as[projects.ResourceId]
       maybeInvalidationTime <- cursor.downField(prov / "invalidatedAtTime").as[Option[InvalidationTime]]
       dataset <-
         Dataset
-          .from(identification, provenance, additionalInfo, publishing, parts, projectResourceId, maybeInvalidationTime)
+          .from(identification,
+                provenance,
+                additionalInfo,
+                parts,
+                publicationEvents,
+                projectResourceId,
+                maybeInvalidationTime
+          )
           .toEither
           .leftMap(errors => DecodingFailure(errors.intercalate("; "), Nil))
     } yield dataset

@@ -30,13 +30,14 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class PublicationEventSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
-  "PublicationEvent.decode" should {
+  "decode" should {
 
     "turn JsonLD PublicationEvent entity into the PublicationEvent object" in {
       val startDate = timestampsNotInTheFuture.generateOne
-      forAll(publicationEventEntities(startDate)) { publicationEvent: PublicationEvent =>
-        publicationEvent.asJsonLD.cursor
-          .as[entities.PublicationEvent] shouldBe publicationEvent.to[entities.PublicationEvent].asRight
+      val dataset   = datasetEntities(ofAnyProvenance).generateOne
+      forAll(publicationEventFactories(startDate)) { eventFactory: (Dataset[Dataset.Provenance] => PublicationEvent) =>
+        val event = eventFactory(dataset)
+        event.asJsonLD.cursor.as[entities.PublicationEvent] shouldBe event.to[entities.PublicationEvent].asRight
       }
     }
   }

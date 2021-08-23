@@ -18,6 +18,7 @@
 
 package io.renku.jsonld
 
+import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.jsonld.JsonLD._
 import io.renku.jsonld.syntax._
@@ -131,9 +132,9 @@ object Cursor {
 
     def findEntity(entityTypes: EntityTypes): Option[JsonLDEntity] = jsonLD match {
       case JsonLDEntityId(entityId) =>
-        allEntities.get(entityId).flatMap { entity =>
-          if (entity.types.contains(entityTypes)) Some(entity)
-          else None
+        allEntities.get(entityId) >>= {
+          case entity if entity.types contains entityTypes => Some(entity)
+          case _                                           => None
         }
       case entity @ JsonLDEntity(_, types, _, _) if types.contains(entityTypes) => Some(entity)
       case _                                                                    => None

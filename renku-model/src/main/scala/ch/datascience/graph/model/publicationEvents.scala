@@ -44,12 +44,6 @@ object publicationEvents {
       with NonBlank
       with TinyTypeJsonLDOps[Description]
 
-  final class Location private (val value: String) extends AnyVal with StringTinyType
-  implicit object Location
-      extends TinyTypeFactory[Location](new Location(_))
-      with NonBlank
-      with TinyTypeJsonLDOps[Location]
-
   final class Name private (val value: String) extends AnyVal with StringTinyType
   implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank with TinyTypeJsonLDOps[Name]
 

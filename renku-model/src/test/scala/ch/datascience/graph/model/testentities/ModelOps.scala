@@ -135,8 +135,8 @@ trait ModelOps extends Dataset.ProvenanceOps {
                           dataset.provenance.creators + personEntities.generateOne
                         ),
                         dataset.additionalInfo,
-                        dataset.publishing,
                         dataset.parts,
+                        dataset.publicationEventFactories,
                         dataset.project
             ) with HavingInvalidationTime {
               override val invalidationTime: InvalidationTime = time
@@ -156,8 +156,8 @@ trait ModelOps extends Dataset.ProvenanceOps {
                           dataset.provenance.creators + personEntities.generateOne
                         ),
                         dataset.additionalInfo,
-                        dataset.publishing,
                         dataset.parts,
+                        dataset.publicationEventFactories,
                         dataset.project
             ) with HavingInvalidationTime {
               override val invalidationTime: InvalidationTime = time

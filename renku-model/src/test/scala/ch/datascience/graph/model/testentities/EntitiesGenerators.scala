@@ -27,7 +27,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model._
 import ch.datascience.graph.model.commandParameters.ParameterDefaultValue
-import ch.datascience.graph.model.datasets.{Date, DerivedFrom, ExternalSameAs, Identifier, InitialVersion, PartId, TopmostDerivedFrom, TopmostSameAs}
+import ch.datascience.graph.model.datasets.{DerivedFrom, ExternalSameAs, Identifier, InitialVersion, PartId, TopmostDerivedFrom, TopmostSameAs}
 import ch.datascience.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import ch.datascience.graph.model.entityModel.{Checksum, Location}
 import ch.datascience.graph.model.parameterValues.ValueOverride
@@ -252,22 +252,14 @@ trait EntitiesGenerators {
         datasetProvenanceModified(identifier, projectDateCreated)(renkuBaseUrl)
       )
 
-  def datasetPublishing(date: Date, project: Project[_]): Gen[Dataset.Publishing] = for {
-    publicationEvents <-
-      publicationEventEntities(date match {
-        case dateCreated: datasets.DateCreated => dateCreated.value
-        case _ => project.dateCreated.value
-      }).toGeneratorOfList()
-    maybeVersion <- datasetVersions.toGeneratorOfOptions
-  } yield Dataset.Publishing(publicationEvents, maybeVersion)
-
   val datasetAdditionalInfos: Gen[Dataset.AdditionalInfo] = for {
     url              <- datasetUrls
     maybeDescription <- datasetDescriptions.toGeneratorOfOptions
     keywords         <- datasetKeywords.toGeneratorOfList()
     images           <- datasetImageUris.toGeneratorOfList()
     maybeLicense     <- datasetLicenses.toGeneratorOfOptions
-  } yield Dataset.AdditionalInfo(url, maybeDescription, keywords, images, maybeLicense)
+    maybeVersion     <- datasetVersions.toGeneratorOfOptions
+  } yield Dataset.AdditionalInfo(url, maybeDescription, keywords, images, maybeLicense, maybeVersion)
 
   def importedExternalDatasetEntities(
       sharedInProjects:    Int = 1,
@@ -310,14 +302,19 @@ trait EntitiesGenerators {
     identification <- identificationGen
     provenance     <- provenanceGen(identification.identifier, project.dateCreated)(renkuBaseUrl)
     additionalInfo <- additionalInfoGen
-    publishing     <- datasetPublishing(provenance.date, project)
     parts          <- datasetPartEntities(provenance.date.instant).toGeneratorOfList()
+    publicationEventFactories <- publicationEventFactories {
+                                   provenance.date match {
+                                     case dateCreated: datasets.DateCreated => dateCreated.value
+                                     case _ => project.dateCreated.value
+                                   }
+                                 }.toGeneratorOfList()
   } yield Dataset(
     identification,
     provenance,
     additionalInfo,
-    publishing,
     parts,
+    publicationEventFactories,
     project
   )
 
@@ -331,8 +328,13 @@ trait EntitiesGenerators {
             )
     modifyingPerson <- personEntities
     additionalInfo  <- datasetAdditionalInfos
-    publishing      <- datasetPublishing(date, original.project)
     parts           <- datasetPartEntities(date.instant).toGeneratorOfList()
+    publicationEventFactories <- publicationEventFactories {
+                                   date match {
+                                     case dateCreated: datasets.DateCreated => dateCreated.value
+                                     case _ => original.project.dateCreated.value
+                                   }
+                                 }.toGeneratorOfList()
   } yield Dataset(
     original.identification.copy(identifier = identifier, title = title),
     Provenance.Modified(
@@ -344,8 +346,8 @@ trait EntitiesGenerators {
       original.provenance.creators + modifyingPerson
     ),
     additionalInfo,
-    publishing,
     parts,
+    publicationEventFactories,
     original.project
   )
 
@@ -356,13 +358,12 @@ trait EntitiesGenerators {
     maybeSource <- datasetPartSources.toGeneratorOfOptions
   } yield DatasetPart(PartId.generate, external, entity, dateCreated, maybeSource)
 
-  def publicationEventEntities(minDateCreated: Instant): Gen[PublicationEvent] = for {
+  def publicationEventFactories(minDateCreated: Instant): Gen[Dataset[Provenance] => PublicationEvent] = for {
     about            <- nonEmptyStrings() map AboutEvent.apply
     maybeDescription <- sentences().map(_.value).map(publicationEvents.Description.apply).toGeneratorOfOptions
-    location         <- relativePaths() map publicationEvents.Location.apply
     name             <- nonEmptyStrings() map publicationEvents.Name.apply
     startDate        <- timestamps(minDateCreated, max = Instant.now()) map publicationEvents.StartDate.apply
-  } yield PublicationEvent(about, maybeDescription, location, name, startDate)
+  } yield PublicationEvent(_, about, maybeDescription, name, startDate)
 
   lazy val inputEntities: Gen[InputEntity] = for {
     location <- entityLocations

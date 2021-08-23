@@ -152,8 +152,8 @@ private class DatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer: Par
         |            ?dsId prov:invalidatedAtTime ?invalidationTime.
         |          }
         |          FILTER NOT EXISTS {
-        |              ?someId  prov:wasDerivedFrom/schema:url ?dsId;
-        |                       schema:isPartOf ?projectId; 
+        |            ?someId prov:wasDerivedFrom/schema:url ?dsId;
+        |                    schema:isPartOf ?projectId; 
         |          }
         |          ?projectId schema:dateCreated ?projectDate.
         |          ${projectMemberFilterQuery(maybeUser)}
