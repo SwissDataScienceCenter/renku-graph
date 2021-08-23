@@ -25,7 +25,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.nonEmptyStrings
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning.`data in the RDF store`
-import ch.datascience.graph.acceptancetests.stubs.GitLab.`GET <gitlabApi>/projects/:path returning OK with`
+import ch.datascience.graph.acceptancetests.stubs.GitLab.`GET <gitlabApi>/projects/:path AND :id returning OK with`
 import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator.`GET <triples-generator>/projects/:id/commits/:id returning OK`
 import ch.datascience.graph.acceptancetests.tooling.GraphServices._
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools.ResponseOps
@@ -36,9 +36,10 @@ import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.projects.Visibility
 import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators.projects
+import ch.datascience.knowledgegraph.projects.model.Statistics.CommitsCount
 import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
-import ch.datascience.rdfstore.entities.{Activity, Person}
 import ch.datascience.rdfstore.entities.bundles._
+import ch.datascience.rdfstore.entities.{Activity, Person}
 import ch.datascience.triplesgenerator
 import io.circe.Json
 import io.renku.jsonld._
@@ -73,7 +74,10 @@ class ReProvisioningSpec
 
       `data in the RDF store`(project, commitId, committer, JsonLD.arr(activity.asJsonLD))()
 
-      `GET <gitlabApi>/projects/:path returning OK with`(project, maybeCreator = committer.some, withStatistics = true)
+      `GET <gitlabApi>/projects/:path AND :id returning OK with`(project,
+                                                                 maybeCreator = committer.some,
+                                                                 maybeCommitsCount = CommitsCount(1).some
+      )
       val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)
 
       projectDetailsResponseIsValid(projectDetailsResponse, initialProjectSchemaVersion)
@@ -89,7 +93,11 @@ class ReProvisioningSpec
       Then("Re-provisioning is triggered")
       And("The new data can be queried in Jena")
 
-      `GET <gitlabApi>/projects/:path returning OK with`(project, maybeCreator = committer.some, withStatistics = true)
+      `GET <gitlabApi>/projects/:path AND :id returning OK with`(
+        project,
+        maybeCreator = committer.some,
+        maybeCommitsCount = CommitsCount(1).some
+      )
 
       eventually {
 

@@ -31,7 +31,6 @@ import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplici
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.projects.Visibility.Public
-import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.knowledgegraph.projects.model.Project
@@ -70,7 +69,7 @@ class EventsProcessingStatusSpec
       webhookServiceClient.GET(s"projects/$projectId/events/status").status shouldBe NotFound
 
       When("there is a webhook but no events in the Event Log")
-      givenHookValidationToHookExists(projectId, project.path)
+      givenHookValidationToHookExists(project)
 
       Then("the status endpoint should return OK with done = total = 0")
       val noEventsResponse = webhookServiceClient GET s"projects/$projectId/events/status"
@@ -106,15 +105,13 @@ class EventsProcessingStatusSpec
   }
 
   private def givenHookValidationToHookExists(
-      projectId:          Id,
-      projectPath:        Path
+      project:            Project
   )(implicit accessToken: AccessToken): Unit = {
-    `GET <gitlabApi>/projects/:id returning OK`(projectId, projectPath)
+    `GET <gitlabApi>/projects/:path AND :id returning OK with`(project.copy(visibility = Public))
     tokenRepositoryClient
-      .PUT(s"projects/$projectId/tokens", accessToken.toJson, maybeAccessToken = None)
+      .PUT(s"projects/${project.id}/tokens", accessToken.toJson, maybeAccessToken = None)
       .status shouldBe NoContent
-    `GET <gitlabApi>/projects/:id returning OK`(projectId, projectVisibility = Public)
-    `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(projectId)
+    `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(project.id)
   }
 
   private def sendEventsForProcessing(project: Project)(implicit accessToken: AccessToken) = {
@@ -131,7 +128,7 @@ class EventsProcessingStatusSpec
     `GET <gitlabApi>/projects/:id/repository/commits returning OK with a commit`(project.id, allCommitIds.head)
 
     // assuring there's project info in GitLab for the triples curation process
-    `GET <gitlabApi>/projects/:path returning OK with`(project)
+    `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
 
     allCommitIds foreach { commitId =>
       // GitLab to return commit info about all the parent commits

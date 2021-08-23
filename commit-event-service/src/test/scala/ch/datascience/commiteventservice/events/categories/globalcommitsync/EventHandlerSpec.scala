@@ -135,7 +135,7 @@ class EventHandlerSpec
           "id":         ${project.id.value},
           "path":       ${project.path.value}
         },
-        "commitIds":    ${Json.arr(commitIds.map(_.asJson): _*)}
+        "commits":    ${Json.arr(commitIds.map(_.asJson): _*)}
       }"""
   }
 }

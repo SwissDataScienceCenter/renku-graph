@@ -44,6 +44,8 @@ private object Generators {
       )
     )
 
+  lazy val commitCounts: Gen[CommitCount] = positiveInts().map(_.value).toGeneratorOf(CommitCount)
+
   def globalCommitSyncEvents(projectIdGen: Gen[projects.Id] = projectIds,
                              commitIdsGen: Gen[List[CommitId]] = listOf(commitIds)
   ): Gen[GlobalCommitSyncEvent] = for {

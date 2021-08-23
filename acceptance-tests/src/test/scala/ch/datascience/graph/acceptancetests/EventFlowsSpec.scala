@@ -17,6 +17,7 @@
  */
 
 package ch.datascience.graph.acceptancetests
+import cats.implicits.catsSyntaxOptionId
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.db.EventLog
@@ -29,6 +30,7 @@ import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
+import ch.datascience.knowledgegraph.projects.model.Statistics.CommitsCount
 import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
 import ch.datascience.webhookservice.model.HookToken
 import org.http4s.Status._
@@ -78,7 +80,7 @@ class EventFlowsSpec
       )
 
       And("project exists in GitLab")
-      `GET <gitlabApi>/projects/:path returning OK with`(project)
+      `GET <gitlabApi>/projects/:path AND :id returning OK with`(project, maybeCommitsCount = CommitsCount(1).some)
 
       When("a Push Event arrives")
       webhookServiceClient
@@ -121,7 +123,7 @@ class EventFlowsSpec
       )
 
       And("project exists in GitLab")
-      `GET <gitlabApi>/projects/:path returning OK with`(project)
+      `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
 
       When("a Push Event arrives")
       webhookServiceClient
@@ -165,7 +167,7 @@ class EventFlowsSpec
       )
 
       And("project exists in GitLab")
-      `GET <gitlabApi>/projects/:path returning OK with`(project)
+      `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
 
       When("a Push Event arrives")
       webhookServiceClient

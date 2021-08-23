@@ -36,13 +36,10 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-private[events] class EventHandler[Interpretation[_]: MonadThrow](
+private[events] class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurrent](
     override val categoryName: CategoryName,
     commitEventSynchronizer:   GlobalCommitEventSynchronizer[Interpretation],
     logger:                    Logger[Interpretation]
-)(implicit
-    contextShift: ContextShift[Interpretation],
-    concurrent:   Concurrent[Interpretation]
 ) extends consumers.EventHandler[Interpretation] {
   import ch.datascience.graph.model.projects
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
@@ -55,7 +52,7 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow](
         fromEither[Interpretation](
           request.event.as[GlobalCommitSyncEvent].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult]
         )
-      result <- (contextShift.shift *> concurrent
+      result <- (ContextShift[Interpretation].shift *> Concurrent[Interpretation]
                   .start(synchronizeEvents(event) recoverWith logError(event))).toRightT
                   .map(_ => Accepted)
                   .semiflatTap(logger log event)
@@ -67,7 +64,7 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow](
     cursor =>
       for {
         project   <- cursor.downField("project").as[Project]
-        commitIds <- cursor.downField("commitIds").as[List[CommitId]]
+        commitIds <- cursor.downField("commits").as[List[CommitId]]
       } yield GlobalCommitSyncEvent(project, commitIds)
 
   private implicit lazy val projectDecoder: Decoder[Project] = cursor =>

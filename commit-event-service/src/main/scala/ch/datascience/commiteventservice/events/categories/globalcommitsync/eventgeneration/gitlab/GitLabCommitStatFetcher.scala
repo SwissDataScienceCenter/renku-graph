@@ -30,6 +30,7 @@ import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.http.client.{AccessToken, RestClient}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
+import io.circe.Decoder
 import org.http4s.Method.GET
 import org.http4s.Status.{Ok, Unauthorized}
 import org.http4s.circe.jsonOf
@@ -72,7 +73,7 @@ private[globalcommitsync] class GitLabCommitStatFetcherImpl[Interpretation[_]: C
   } yield ProjectCommitStats(maybeLatestCommitId, commitCount)
 
   private def fetchCommitCount(projectId: projects.Id)(implicit maybeAccessToken: Option[AccessToken]) = for {
-    uri         <- validateUri(s"${gitLabApiUrl}/projects/$projectId")
+    uri         <- validateUri(s"$gitLabApiUrl/projects/$projectId?statistics=true")
     commitCount <- send(request(GET, uri, maybeAccessToken))(mapCountResponse)
   } yield commitCount
 
@@ -82,8 +83,11 @@ private[globalcommitsync] class GitLabCommitStatFetcherImpl[Interpretation[_]: C
     case (Unauthorized, _, _) => UnauthorizedException.raiseError
   }
 
-  private implicit val commitCountDecoder: EntityDecoder[Interpretation, CommitCount] =
+  private implicit val commitCountDecoder: EntityDecoder[Interpretation, CommitCount] = {
+    implicit val commitDecoder: Decoder[CommitCount] =
+      _.downField("statistics").downField("commit_count").as[Int].map(CommitCount(_))
     jsonOf[Interpretation, CommitCount]
+  }
 }
 
 private[globalcommitsync] object GitLabCommitStatFetcher {

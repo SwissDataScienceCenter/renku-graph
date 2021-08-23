@@ -179,14 +179,11 @@ class DatasetsResourcesSpec
         )
       )
 
-      `data in the RDF store`(project, dataset1CommitId, dataset1Committer, jsonLDTriples)(
+      val projectWithStatistics = `data in the RDF store`(project, dataset1CommitId, dataset1Committer, jsonLDTriples)(
         NonEmptyList.of(dataset1Committer, persons.generateOne.copy(maybeGitLabId = user.id.some)).map(_.asMember())
       )
 
       `wait for events to be processed`(project.id)
-
-      And("the project exists in GitLab")
-      `GET <gitlabApi>/projects/:path returning OK with`(project, withStatistics = true)
 
       When("user fetches project's datasets with GET knowledge-graph/projects/<project-name>/datasets")
       val projectDatasetsResponse = knowledgeGraphClient GET s"knowledge-graph/projects/${project.path}/datasets"
@@ -233,7 +230,7 @@ class DatasetsResourcesSpec
 
       Then("he should get OK response with project details")
       getProjectResponse.status     shouldBe Ok
-      getProjectResponse.bodyAsJson shouldBe ProjectsResources.fullJson(project)
+      getProjectResponse.bodyAsJson shouldBe ProjectsResources.fullJson(projectWithStatistics)
 
       When("user fetches initial version of the modified dataset with the link from the response")
       val modifiedDataset2Json = foundDatasets
