@@ -19,9 +19,11 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 
 import cats.effect.IO
+import cats.effect.concurrent.Deferred
 import cats.syntax.all._
 import ch.datascience.events.consumers.EventSchedulingResult._
-import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult, Project}
+import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
+import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventRequestContent, EventSchedulingResult, Project}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
@@ -29,7 +31,7 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
+import ch.datascience.interpreters.TestLogger.Level.Info
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
 import io.circe.literal._
 import io.circe.syntax._
@@ -51,14 +53,14 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
           .expects(eventId, project, schemaVersion, eventBody)
           .returning(triplesGeneratedEvent.pure[IO])
 
-        (processingRunner.scheduleForProcessing _)
+        (eventProcessor.process _)
           .expects(triplesGeneratedEvent)
-          .returning(EventSchedulingResult.Accepted.pure[IO])
+          .returning(().pure[IO])
 
         val requestContent: EventRequestContent =
           requestContent((eventId, project).asJson(eventEncoder), bodyContent.some)
 
-        handler.handle(requestContent).unsafeRunSync() shouldBe Accepted
+        handler.handle(requestContent).getResult shouldBe Accepted
 
         logger.loggedOnly(
           Info(
@@ -67,44 +69,12 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
         )
       }
 
-    "decode an event from the request, " +
-      "schedule triples generation " +
-      s"and return $Busy if event processor returned $Busy" in new TestCase {
-
-        val triplesGeneratedEvent = eventBody.toTriplesGeneratedEvent
-        (eventBodyDeserializer.toTriplesGeneratedEvent _)
-          .expects(eventId, project, schemaVersion, eventBody)
-          .returning(triplesGeneratedEvent.pure[IO])
-
-        (processingRunner.scheduleForProcessing _)
-          .expects(triplesGeneratedEvent)
-          .returning(EventSchedulingResult.Busy.pure[IO])
-
-        val requestContent: EventRequestContent =
-          requestContent((eventId, project).asJson(eventEncoder), bodyContent.some)
-
-        handler.handle(requestContent).unsafeRunSync() shouldBe Busy
-
-        logger.expectNoLogs()
-      }
-
-    s"return $UnsupportedEventType if event is of wrong category" in new TestCase {
-
-      val event   = jsons.generateOne.asJson
-      val payload = nonEmptyStrings().generateSome
-      val request = requestContent(event, payload)
-
-      handler.handle(request).unsafeRunSync() shouldBe UnsupportedEventType
-
-      logger.expectNoLogs()
-    }
-
     s"return $BadRequest if event body is not present" in new TestCase {
 
       val requestContent: EventRequestContent =
         requestContent((eventId, project).asJson(eventEncoder), None)
 
-      handler.handle(requestContent).unsafeRunSync() shouldBe BadRequest
+      handler.handle(requestContent).getResult shouldBe BadRequest
 
       logger.expectNoLogs()
     }
@@ -114,32 +84,30 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
       val requestContent: EventRequestContent =
         requestContent((eventId, project).asJson(eventEncoder), jsons.generateOne.noSpaces.some)
 
-      handler.handle(requestContent).unsafeRunSync() shouldBe BadRequest
+      handler.handle(requestContent).getResult shouldBe BadRequest
 
       logger.expectNoLogs()
     }
 
-    s"return $SchedulingError when event processor fails while accepting the event" in new TestCase {
+    s"return $Accepted when event processor fails processing the event" in new TestCase {
 
       val triplesGeneratedEvent = eventBody.toTriplesGeneratedEvent
       (eventBodyDeserializer.toTriplesGeneratedEvent _)
         .expects(eventId, project, schemaVersion, eventBody)
         .returning(triplesGeneratedEvent.pure[IO])
 
-      val exception = exceptions.generateOne
-      (processingRunner.scheduleForProcessing _)
+      (eventProcessor.process _)
         .expects(triplesGeneratedEvent)
-        .returning(exception.raiseError[IO, EventSchedulingResult])
+        .returning(exceptions.generateOne.raiseError[IO, Unit])
 
       val requestContent: EventRequestContent =
         requestContent((eventId, project).asJson(eventEncoder), bodyContent.some)
 
-      handler.handle(requestContent).unsafeRunSync() shouldBe SchedulingError(exception)
+      handler.handle(requestContent).getResult shouldBe Accepted
 
       logger.loggedOnly(
-        Error(
-          s"${handler.categoryName}: $eventId, projectPath = ${triplesGeneratedEvent.project.path} -> $SchedulingError",
-          exception
+        Info(
+          s"${handler.categoryName}: $eventId, projectPath = ${triplesGeneratedEvent.project.path} -> $Accepted"
         )
       )
     }
@@ -155,10 +123,19 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
     val bodyContent = json"""{ "schemaVersion": ${schemaVersion.value}, "payload": ${eventBody.value} }""".noSpaces
 
-    val processingRunner      = mock[EventsProcessingRunner[IO]]
-    val eventBodyDeserializer = mock[EventBodyDeserializer[IO]]
-    val logger                = TestLogger[IO]()
-    val handler               = new EventHandler[IO](categoryName, processingRunner, eventBodyDeserializer, logger)
+    val eventProcessor             = mock[EventProcessor[IO]]
+    val eventBodyDeserializer      = mock[EventBodyDeserializer[IO]]
+    val concurrentProcessesLimiter = mock[ConcurrentProcessesLimiter[IO]]
+    val subscriptionMechanism      = mock[SubscriptionMechanism[IO]]
+    val logger                     = TestLogger[IO]()
+    val handler =
+      new EventHandler[IO](categoryName,
+                           eventBodyDeserializer,
+                           subscriptionMechanism,
+                           concurrentProcessesLimiter,
+                           eventProcessor,
+                           logger
+      )
 
     def requestContent(event: Json, maybePayload: Option[String]): EventRequestContent =
       EventRequestContent(event, maybePayload)
@@ -179,5 +156,9 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
   private implicit class EventBodyOps(eventBody: EventBody) {
     lazy val toTriplesGeneratedEvent: TriplesGeneratedEvent =
       triplesGeneratedEvents.generateOne
+  }
+
+  private implicit class HandlerOps(handlerResult: IO[(Deferred[IO, Unit], IO[EventSchedulingResult])]) {
+    lazy val getResult = handlerResult.unsafeRunSync()._2.unsafeRunSync()
   }
 }

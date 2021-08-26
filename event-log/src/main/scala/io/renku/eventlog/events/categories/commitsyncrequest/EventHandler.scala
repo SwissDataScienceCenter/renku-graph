@@ -18,14 +18,15 @@
 
 package io.renku.eventlog.events.categories.commitsyncrequest
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.data.EitherT.fromEither
+import cats.effect.concurrent.Deferred
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
-import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult}
+import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventRequestContent, EventSchedulingResult}
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.metrics.LabeledHistogram
 import io.circe.Decoder
@@ -34,22 +35,23 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private class EventHandler[Interpretation[_]: MonadError[*[_], Throwable]](
+private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurrent](
     override val categoryName: CategoryName,
     commitSyncForcer:          CommitSyncForcer[Interpretation],
     logger:                    Logger[Interpretation]
-)(implicit
-    contextShift: ContextShift[Interpretation],
-    concurrent:   Concurrent[Interpretation]
-) extends consumers.EventHandler[Interpretation] {
+) extends consumers.EventHandlerWithProcessLimiter[Interpretation](ConcurrentProcessesLimiter.withoutLimit) {
 
   import ch.datascience.graph.model.projects
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import commitSyncForcer._
 
-  override def handle(request: EventRequestContent): Interpretation[EventSchedulingResult] = {
+  override def handle(
+      request: EventRequestContent
+  ): Interpretation[(Deferred[Interpretation, Unit], Interpretation[EventSchedulingResult])] =
+    Deferred[Interpretation, Unit].map(_ -> startForceCommitSync(request))
+
+  private def startForceCommitSync(request: EventRequestContent) = {
     for {
-      _ <- fromEither[Interpretation](request.event.validateCategoryName)
       event <-
         fromEither[Interpretation](
           request.event.as[(projects.Id, projects.Path)].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult]

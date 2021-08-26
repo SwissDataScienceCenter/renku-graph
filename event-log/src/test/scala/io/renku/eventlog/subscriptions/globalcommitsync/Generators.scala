@@ -20,13 +20,14 @@ package io.renku.eventlog.subscriptions.globalcommitsync
 
 import ch.datascience.events.consumers.ConsumersModelGenerators._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators.commitIds
+import ch.datascience.graph.model.EventsGenerators.{commitIds, lastSyncedDates}
 import org.scalacheck.Gen
 
 private object Generators {
 
   val globalCommitSyncEvents: Gen[GlobalCommitSyncEvent] = for {
-    project <- projectsGen
-    commits <- commitIds.toGeneratorOfNonEmptyList().map(_.toList)
-  } yield GlobalCommitSyncEvent(project, commits)
+    project             <- projectsGen
+    commits             <- commitIds.toGeneratorOfNonEmptyList().map(_.toList)
+    currentLastSyncDate <- lastSyncedDates.toGeneratorOfOptions
+  } yield GlobalCommitSyncEvent(project, commits, currentLastSyncDate)
 }

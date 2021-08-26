@@ -39,31 +39,35 @@ import skunk.implicits._
 import java.time.{Duration, Instant}
 
 private class GlobalCommitSyncEventFinderImpl[Interpretation[_]: BracketThrow: Sync](
-    sessionResource:  SessionResource[Interpretation, EventLogDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
-    now:              () => Instant = () => Instant.now
+    sessionResource:       SessionResource[Interpretation, EventLogDB],
+    lastSyncedDateUpdater: LastSyncedDateUpdater[Interpretation],
+    queriesExecTimes:      LabeledHistogram[Interpretation, SqlStatement.Name],
+    now:                   () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with EventFinder[Interpretation, GlobalCommitSyncEvent]
     with SubscriptionTypeSerializers {
 
-  override def popEvent(): Interpretation[Option[GlobalCommitSyncEvent]] = sessionResource.useK(findEventAndMarkTaken)
+  override def popEvent(): Interpretation[Option[GlobalCommitSyncEvent]] =
+    sessionResource.useK(findEventAndMarkTaken)
 
   private def findEventAndMarkTaken =
     findProject >>= findCommits >>= {
-      case Some((project, commits)) =>
-        val event = GlobalCommitSyncEvent(project, commits)
-        updateLastSyncedDate(event) map toNoneIfEventAlreadyTaken(event)
+      case Some(event) =>
+        Kleisli.liftF(
+          lastSyncedDateUpdater.run(event.project.id, LastSyncedDate(now()).some)
+        ) map toNoneIfEventAlreadyTaken(event)
       case None => Kleisli.pure(Option.empty[GlobalCommitSyncEvent])
     }
 
   private def findProject = measureExecutionTime {
     val lastSyncDate = LastSyncedDate(now())
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find project"))
-      .select[CategoryName ~ LastSyncedDate ~ LastSyncedDate, Project](
+      .select[CategoryName ~ LastSyncedDate ~ LastSyncedDate, (Project, Option[LastSyncedDate])](
         sql"""
               SELECT
                 proj.project_id,
-                proj.project_path
+                proj.project_path,
+                sync_time.last_synced
               FROM project proj
               LEFT JOIN subscription_category_sync_time sync_time
                 ON proj.project_id = sync_time.project_id AND sync_time.category_name = $categoryNameEncoder
@@ -74,15 +78,16 @@ private class GlobalCommitSyncEventFinderImpl[Interpretation[_]: BracketThrow: S
                 OR  (($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '#${syncInterval.toDays.toString} days')
               ORDER BY proj.latest_event_date DESC
               LIMIT 1"""
-          .query(projectDecoder)
+          .query(projectDecoder ~ lastSyncedDateDecoder.opt)
+          .map { case project ~ lastSyncedDate => (project, lastSyncedDate) }
       )
       .arguments(categoryName ~ lastSyncDate ~ lastSyncDate)
       .build(_.option)
   }
 
-  private def findCommits(maybeProject: Option[Project]) =
-    maybeProject match {
-      case Some(project) =>
+  private def findCommits(maybeProjectAndLastSyncedDate: Option[(Project, Option[LastSyncedDate])]) =
+    maybeProjectAndLastSyncedDate match {
+      case Some((project, maybeLastSyncedDate)) =>
         measureExecutionTime {
           SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find commits"))
             .select[projects.Id ~ EventStatus, CommitId](
@@ -95,30 +100,12 @@ private class GlobalCommitSyncEventFinderImpl[Interpretation[_]: BracketThrow: S
             .arguments(project.id ~ AwaitingDeletion)
             .build(_.toList)
             .mapResult {
-              case Nil     => Option.empty[(Project, List[CommitId])]
-              case commits => Some((project, commits))
+              case Nil     => Option.empty[GlobalCommitSyncEvent]
+              case commits => Some(GlobalCommitSyncEvent(project, commits, maybeLastSyncedDate))
             }
         }
-      case None => Kleisli.pure(Option.empty[(Project, List[CommitId])])
+      case None => Kleisli.pure(Option.empty[GlobalCommitSyncEvent])
     }
-
-  private def updateLastSyncedDate(event: GlobalCommitSyncEvent) =
-    measureExecutionTime {
-      SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - update last_synced"))
-        .command[projects.Id ~ CategoryName ~ LastSyncedDate](
-          sql"""INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
-                VALUES ( $projectIdEncoder, $categoryNameEncoder, $lastSyncedDateEncoder)
-                ON CONFLICT (project_id, category_name)
-                DO UPDATE SET last_synced = EXCLUDED.last_synced
-            """.command
-        )
-        .arguments(event.projectId ~ categoryName ~ LastSyncedDate(now()))
-        .build
-    }
-
-  private implicit class SyncEventOps(event: GlobalCommitSyncEvent) {
-    lazy val projectId: projects.Id = event.project.id
-  }
 
   private def toNoneIfEventAlreadyTaken(event: GlobalCommitSyncEvent): Completion => Option[GlobalCommitSyncEvent] = {
     case Completion.Update(1) | Completion.Insert(1) => Some(event)
@@ -131,9 +118,11 @@ private object GlobalCommitSyncEventFinder {
   val syncInterval = Duration.ofDays(7)
 
   def apply(
-      sessionResource:  SessionResource[IO, EventLogDB],
-      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
-  ): IO[EventFinder[IO, GlobalCommitSyncEvent]] = IO {
-    new GlobalCommitSyncEventFinderImpl(sessionResource, queriesExecTimes)
-  }
+      sessionResource:       SessionResource[IO, EventLogDB],
+      lastSyncedDateUpdater: LastSyncedDateUpdater[IO],
+      queriesExecTimes:      LabeledHistogram[IO, SqlStatement.Name]
+  ): IO[EventFinder[IO, GlobalCommitSyncEvent]] = IO(
+    new GlobalCommitSyncEventFinderImpl(sessionResource, lastSyncedDateUpdater, queriesExecTimes)
+  )
+
 }

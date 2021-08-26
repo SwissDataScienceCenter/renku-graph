@@ -30,7 +30,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.eventlog._
-import io.renku.eventlog.subscriptions.{SubscriptionTypeSerializers, commitsync, membersync}
+import io.renku.eventlog.subscriptions.{SubscriptionTypeSerializers, commitsync, globalcommitsync, membersync}
 import skunk._
 import skunk.codec.all._
 import skunk.implicits._
@@ -65,7 +65,7 @@ class StatsFinderImpl[Interpretation[_]: Sync: BracketThrow](
     val (eventDate, lastSyncedDate) = (EventDate.apply _ &&& LastSyncedDate.apply _) (now())
     SqlStatement(name = "category name events count").select[CategoryName ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~
       CategoryName ~ CategoryName ~ CategoryName ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ CategoryName ~
-      CategoryName, (CategoryName, Long)](
+      CategoryName ~ CategoryName  ~ LastSyncedDate ~ CategoryName ~ CategoryName ~ EventDate, (CategoryName, Long)](
       sql"""
           SELECT all_counts.category_name, SUM(all_counts.count)
           FROM (
@@ -96,21 +96,37 @@ class StatsFinderImpl[Interpretation[_]: Sync: BracketThrow](
                    (($eventDateEncoder - proj.latest_event_date) <= INTERVAL '7 days' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 hour')
                 OR (($eventDateEncoder - proj.latest_event_date) >  INTERVAL '7 days' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 day')
               GROUP BY sync_time.category_name
-            ) UNION ALL (
+            )  UNION ALL (
               SELECT $categoryNameEncoder AS category_name, COUNT(DISTINCT proj.project_id) AS count
               FROM project proj
               WHERE proj.project_id NOT IN (
                 SELECT project_id
                 FROM subscription_category_sync_time
                 WHERE category_name = $categoryNameEncoder
-              )
+              ) 
+            ) UNION ALL (
+              SELECT sync_time.category_name, COUNT(DISTINCT proj.project_id) AS count
+              FROM project proj
+              LEFT JOIN subscription_category_sync_time sync_time
+                ON proj.project_id = sync_time.project_id AND sync_time.category_name = $categoryNameEncoder
+              WHERE ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '7 days'
+              GROUP BY sync_time.category_name
+            ) UNION ALL (
+              SELECT $categoryNameEncoder AS category_name, COUNT(DISTINCT proj.project_id) AS count
+              FROM project proj
+              LEFT JOIN subscription_category_sync_time sync_time
+                ON proj.project_id = sync_time.project_id AND sync_time.category_name = $categoryNameEncoder
+              LEFT JOIN event evt
+                ON proj.project_id = evt.project_id AND (($eventDateEncoder - evt.event_date) > INTERVAL '7 days')
+              WHERE
+                sync_time.last_synced IS NULL AND evt.event_id IS NOT NULL
             )
           ) all_counts
           GROUP BY all_counts.category_name
           """.query(categoryNameDecoder ~ numeric).map { case categoryName ~ (count: BigDecimal) => (categoryName, count.longValue) }
     ).arguments(membersync.categoryName ~ eventDate ~ lastSyncedDate ~ eventDate ~ lastSyncedDate ~ eventDate ~
       lastSyncedDate ~ membersync.categoryName ~ membersync.categoryName ~ commitsync.categoryName ~ eventDate ~
-      lastSyncedDate ~ eventDate ~ lastSyncedDate ~ commitsync.categoryName ~ commitsync.categoryName).build(_.toList)
+      lastSyncedDate ~ eventDate ~ lastSyncedDate ~ commitsync.categoryName ~ commitsync.categoryName ~ globalcommitsync.categoryName ~ lastSyncedDate ~ globalcommitsync.categoryName ~ globalcommitsync.categoryName ~ eventDate).build(_.toList)
   }
 
   override def statuses(): Interpretation[Map[EventStatus, Long]] = sessionResource.useK { 

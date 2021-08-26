@@ -24,9 +24,7 @@ import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.graph.model.projects
 import io.renku.eventlog.subscriptions.EventEncoder
 
-private final case class AwaitingGenerationEvent(id: CompoundEventId, projectPath: projects.Path, body: EventBody) {
-  override lazy val toString: String = s"$AwaitingGenerationEvent $id, projectPath = $projectPath"
-}
+private final case class AwaitingGenerationEvent(id: CompoundEventId, projectPath: projects.Path, body: EventBody)
 
 private object AwaitingGenerationEvent {
   implicit lazy val show: Show[AwaitingGenerationEvent] =

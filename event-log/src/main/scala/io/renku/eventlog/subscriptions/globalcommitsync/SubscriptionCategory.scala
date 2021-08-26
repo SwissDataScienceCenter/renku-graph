@@ -38,10 +38,11 @@ private[subscriptions] object SubscriptionCategory {
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[subscriptions.SubscriptionCategory[IO]] = for {
-    subscribers      <- Subscribers(categoryName, subscriberTracker, logger)
-    eventsFinder     <- GlobalCommitSyncEventFinder(sessionResource, queriesExecTimes)
-    dispatchRecovery <- LoggingDispatchRecovery[IO, GlobalCommitSyncEvent](categoryName, logger)
-    eventDelivery    <- EventDelivery.noOp[IO, GlobalCommitSyncEvent]
+    subscribers           <- Subscribers(categoryName, subscriberTracker, logger)
+    lastSyncedDateUpdater <- LastSyncedDateUpdater(sessionResource, queriesExecTimes)
+    eventsFinder          <- GlobalCommitSyncEventFinder(sessionResource, lastSyncedDateUpdater, queriesExecTimes)
+    dispatchRecovery      <- DispatchRecovery(lastSyncedDateUpdater, logger)
+    eventDelivery         <- EventDelivery.noOp[IO, GlobalCommitSyncEvent]
     eventsDistributor <- IOEventsDistributor(categoryName,
                                              subscribers,
                                              eventsFinder,

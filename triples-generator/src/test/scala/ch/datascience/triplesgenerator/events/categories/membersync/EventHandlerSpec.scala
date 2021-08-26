@@ -19,9 +19,9 @@
 package ch.datascience.triplesgenerator.events.categories.membersync
 
 import cats.effect.IO
-import ch.datascience.events.consumers.ConsumersModelGenerators._
-import ch.datascience.events.consumers.EventRequestContent
-import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
+import cats.effect.concurrent.Deferred
+import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult}
+import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
@@ -50,7 +50,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
         val request = requestContent(projectPath.asJson(eventEncoder))
 
-        handler.handle(request).unsafeRunSync() shouldBe Accepted
+        handler.handle(request).getResult shouldBe Accepted
 
         logger.loggedOnly(
           Info(
@@ -58,15 +58,6 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
           )
         )
       }
-
-    s"return $UnsupportedEventType if event is of wrong category" in new TestCase {
-
-      val request = eventRequestContents.generateOne.copy(event = jsons.generateOne.asJson)
-
-      handler.handle(request).unsafeRunSync() shouldBe UnsupportedEventType
-
-      logger.expectNoLogs()
-    }
 
     s"return $BadRequest if project path is malformed" in new TestCase {
 
@@ -77,7 +68,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
         }
       }""")
 
-      handler.handle(request).unsafeRunSync() shouldBe BadRequest
+      handler.handle(request).getResult shouldBe BadRequest
 
       logger.expectNoLogs()
     }
@@ -102,4 +93,8 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
         }
       }"""
     }
+
+  private implicit class HandlerOps(handlerResult: IO[(Deferred[IO, Unit], IO[EventSchedulingResult])]) {
+    lazy val getResult = handlerResult.unsafeRunSync()._2.unsafeRunSync()
+  }
 }

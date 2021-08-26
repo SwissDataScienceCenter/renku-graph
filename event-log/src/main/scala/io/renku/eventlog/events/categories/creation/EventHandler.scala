@@ -18,37 +18,42 @@
 
 package io.renku.eventlog.events.categories.creation
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.data.EitherT.fromEither
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.concurrent.Deferred
+import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
-import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult, Project}
+import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventRequestContent, EventSchedulingResult, Project}
 import ch.datascience.graph.model.events.{BatchDate, CategoryName, EventBody, EventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import org.typelevel.log4cats.Logger
 import io.circe.{Decoder, DecodingFailure, HCursor}
 import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
 import io.renku.eventlog._
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private class EventHandler[Interpretation[_]: MonadError[*[_], Throwable]](
+private class EventHandler[Interpretation[_]: MonadThrow: Concurrent](
     override val categoryName: CategoryName,
     eventPersister:            EventPersister[Interpretation],
     logger:                    Logger[Interpretation]
-) extends consumers.EventHandler[Interpretation] {
+) extends consumers.EventHandlerWithProcessLimiter[Interpretation](ConcurrentProcessesLimiter.withoutLimit) {
 
   import ch.datascience.graph.model.projects
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import eventPersister._
 
-  override def handle(request: EventRequestContent): Interpretation[EventSchedulingResult] = {
+  override def handle(
+      request: EventRequestContent
+  ): Interpretation[(Deferred[Interpretation, Unit], Interpretation[EventSchedulingResult])] =
+    Deferred[Interpretation, Unit].map(_ -> storeEvent(request))
+
+  private def storeEvent(request: EventRequestContent): Interpretation[EventSchedulingResult] = {
     for {
-      _ <- fromEither[Interpretation](request.event.validateCategoryName)
       event <-
         fromEither[Interpretation](request.event.as[Event].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult])
       result <- storeNewEvent(event).toRightT

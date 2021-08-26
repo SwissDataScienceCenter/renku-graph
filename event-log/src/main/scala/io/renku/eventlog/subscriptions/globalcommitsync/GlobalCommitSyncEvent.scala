@@ -21,10 +21,13 @@ package io.renku.eventlog.subscriptions.globalcommitsync
 import cats.Show
 import cats.implicits.showInterpolator
 import ch.datascience.events.consumers.Project
-import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.events.{CommitId, LastSyncedDate}
 import io.renku.eventlog.subscriptions.EventEncoder
 
-private final case class GlobalCommitSyncEvent(project: Project, commits: List[CommitId])
+private final case class GlobalCommitSyncEvent(project:             Project,
+                                               commits:             List[CommitId],
+                                               maybeLastSyncedDate: Option[LastSyncedDate]
+)
 
 private object GlobalCommitSyncEvent {
   implicit lazy val show: Show[GlobalCommitSyncEvent] =

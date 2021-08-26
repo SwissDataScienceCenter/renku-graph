@@ -46,8 +46,7 @@ class StatsFinderSpec
 
   "countEventsByCategoryName" should {
 
-    "return info about number of events grouped by categoryName" in {
-
+    "return info about number of events grouped by categoryName for the memberSync category" in {
       // MEMBER_SYNC specific
       val compoundId1 = compoundEventIds.generateOne
       val eventDate1  = EventDate(generateInstant(lessThanAgo = Duration.ofMinutes(59)))
@@ -74,29 +73,90 @@ class StatsFinderSpec
       upsertProject(compoundId4, projectPaths.generateOne, eventDate4)
       upsertLastSynced(compoundId4.projectId, membersync.categoryName, lastSynced4)
 
-      // COMMIT_SYNC specific
-      val compoundId5   = compoundEventIds.generateOne
-      val eventDate5    = EventDate(generateInstant(lessThanAgo = Duration.ofDays(7)))
-      val lastSyncDate5 = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofMinutes(61)))
-      upsertProject(compoundId5, projectPaths.generateOne, eventDate5)
-      upsertLastSynced(compoundId5.projectId, commitsync.categoryName, lastSyncDate5)
+      stats.countEventsByCategoryName().unsafeRunSync() shouldBe Map(
+        membersync.categoryName       -> 3L,
+        commitsync.categoryName       -> 4L,
+        globalcommitsync.categoryName -> 0L
+      )
+    }
 
-      val compoundId6   = compoundEventIds.generateOne
-      val eventDate6    = EventDate(generateInstant(moreThanAgo = Duration.ofHours(7 * 24 + 1)))
-      val lastSyncDate6 = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofMinutes(25)))
-      upsertProject(compoundId6, projectPaths.generateOne, eventDate6)
-      upsertLastSynced(compoundId6.projectId, commitsync.categoryName, lastSyncDate6)
+    "return info about number of events grouped by categoryName for the commitSync category" in {
+
+      // COMMIT_SYNC specific
+      val compoundId1   = compoundEventIds.generateOne
+      val eventDate1    = EventDate(generateInstant(lessThanAgo = Duration.ofDays(7)))
+      val lastSyncDate1 = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofMinutes(61)))
+      upsertProject(compoundId1, projectPaths.generateOne, eventDate1)
+      upsertLastSynced(compoundId1.projectId, commitsync.categoryName, lastSyncDate1)
+
+      val compoundId2   = compoundEventIds.generateOne
+      val eventDate2    = EventDate(generateInstant(moreThanAgo = Duration.ofHours(7 * 24 + 1)))
+      val lastSyncDate2 = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofMinutes(25)))
+      upsertProject(compoundId2, projectPaths.generateOne, eventDate2)
+      upsertLastSynced(compoundId2.projectId, commitsync.categoryName, lastSyncDate2)
 
       // COMMIT_SYNC should not see this one
-      val compoundId7   = compoundEventIds.generateOne
-      val eventDate7    = EventDate(generateInstant(moreThanAgo = Duration.ofHours(7 * 24 + 1)))
-      val lastSyncDate7 = LastSyncedDate(generateInstant(lessThanAgo = Duration.ofHours(23)))
-      upsertProject(compoundId7, projectPaths.generateOne, eventDate7)
-      upsertLastSynced(compoundId7.projectId, commitsync.categoryName, lastSyncDate7)
+      val compoundId3   = compoundEventIds.generateOne
+      val eventDate3    = EventDate(generateInstant(moreThanAgo = Duration.ofHours(7 * 24 + 1)))
+      val lastSyncDate3 = LastSyncedDate(generateInstant(lessThanAgo = Duration.ofHours(23)))
+      upsertProject(compoundId3, projectPaths.generateOne, eventDate3)
+      upsertLastSynced(compoundId3.projectId, commitsync.categoryName, lastSyncDate3)
 
       stats.countEventsByCategoryName().unsafeRunSync() shouldBe Map(
-        membersync.categoryName -> 6L,
-        commitsync.categoryName -> 6L
+        membersync.categoryName       -> 3L,
+        commitsync.categoryName       -> 2L,
+        globalcommitsync.categoryName -> 0L
+      )
+    }
+
+    "return info about number of events grouped by categoryName for the globalCommitSync category" in {
+
+      // GLOBAL_COMMIT_SYNC specific
+      val compoundId1   = compoundEventIds.generateOne
+      val eventDate1    = EventDate(generateInstant(lessThanAgo = Duration.ofDays(7)))
+      val lastSyncDate1 = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofDays(7)))
+      storeEvent(compoundId1,
+                 eventStatuses.generateOne,
+                 executionDates.generateOne,
+                 eventDate1,
+                 eventBodies.generateOne
+      )
+      upsertLastSynced(compoundId1.projectId, globalcommitsync.categoryName, lastSyncDate1)
+
+      val compoundId2 = compoundEventIds.generateOne
+      val eventDate2  = EventDate(generateInstant(moreThanAgo = Duration.ofDays(8)))
+      storeEvent(compoundId2,
+                 eventStatuses.generateOne,
+                 executionDates.generateOne,
+                 eventDate2,
+                 eventBodies.generateOne
+      )
+
+      // GLOBAL_COMMIT_SYNC should not see this one
+      val compoundId3   = compoundEventIds.generateOne
+      val eventDate3    = EventDate(generateInstant(moreThanAgo = Duration.ofDays(7)))
+      val lastSyncDate3 = LastSyncedDate(generateInstant(lessThanAgo = Duration.ofDays(7)))
+      storeEvent(compoundId3,
+                 eventStatuses.generateOne,
+                 executionDates.generateOne,
+                 eventDate3,
+                 eventBodies.generateOne
+      )
+      upsertLastSynced(compoundId3.projectId, globalcommitsync.categoryName, lastSyncDate3)
+
+      val compoundId4 = compoundEventIds.generateOne
+      val eventDate4  = EventDate(generateInstant(lessThanAgo = Duration.ofDays(7)))
+      storeEvent(compoundId4,
+                 eventStatuses.generateOne,
+                 executionDates.generateOne,
+                 eventDate4,
+                 eventBodies.generateOne
+      )
+
+      stats.countEventsByCategoryName().unsafeRunSync() shouldBe Map(
+        membersync.categoryName       -> 4L,
+        commitsync.categoryName       -> 4L,
+        globalcommitsync.categoryName -> 2L
       )
     }
   }

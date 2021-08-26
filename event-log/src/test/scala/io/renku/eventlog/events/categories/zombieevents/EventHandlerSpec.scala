@@ -19,9 +19,10 @@
 package io.renku.eventlog.events.categories.zombieevents
 
 import cats.effect.IO
+import cats.effect.concurrent.Deferred
 import cats.syntax.all._
-import ch.datascience.events.consumers.EventRequestContent
-import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
+import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult}
+import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{exceptions, jsons}
 import ch.datascience.graph.model.EventsGenerators.compoundEventIds
@@ -68,7 +69,7 @@ class EventHandlerSpec
             (underTriplesGenerationGauge.decrement _).expects(event.projectPath).returning(IO.unit)
           }
 
-          handler.handle(requestContent(event.asJson)).unsafeRunSync() shouldBe Accepted
+          handler.handle(requestContent(event.asJson)).getResult shouldBe Accepted
 
           eventually {
             logger.loggedOnly(
@@ -99,7 +100,7 @@ class EventHandlerSpec
             (underTriplesTransformationGauge.decrement _).expects(event.projectPath).returning(IO.unit)
           }
 
-          handler.handle(requestContent(event.asJson)).unsafeRunSync() shouldBe Accepted
+          handler.handle(requestContent(event.asJson)).getResult shouldBe Accepted
 
           eventually {
             logger.loggedOnly(
@@ -124,7 +125,7 @@ class EventHandlerSpec
         .expects(event)
         .returning(exception.raiseError[IO, UpdateResult])
 
-      handler.handle(requestContent(event.asJson)).unsafeRunSync() shouldBe Accepted
+      handler.handle(requestContent(event.asJson)).getResult shouldBe Accepted
 
       eventually {
         logger.loggedOnly(
@@ -137,14 +138,6 @@ class EventHandlerSpec
           )
         )
       }
-
-    }
-
-    s"return $UnsupportedEventType if event is of wrong category" in new TestCase {
-
-      handler.handle(requestContent(jsons.generateOne.asJson)).unsafeRunSync() shouldBe UnsupportedEventType
-
-      logger.expectNoLogs()
     }
 
     s"return $BadRequest if event is malformed" in new TestCase {
@@ -155,7 +148,7 @@ class EventHandlerSpec
         }"""
       }
 
-      handler.handle(request).unsafeRunSync() shouldBe BadRequest
+      handler.handle(request).getResult shouldBe BadRequest
 
       logger.expectNoLogs()
     }
@@ -181,7 +174,7 @@ class EventHandlerSpec
           .value}}"""
       }
 
-      handler.handle(request).unsafeRunSync() shouldBe BadRequest
+      handler.handle(request).getResult shouldBe BadRequest
 
       logger.expectNoLogs()
     }
@@ -225,5 +218,9 @@ class EventHandlerSpec
       },
       "status":       ${event.status.value}
     }"""
+  }
+
+  private implicit class HandlerOps(handlerResult: IO[(Deferred[IO, Unit], IO[EventSchedulingResult])]) {
+    lazy val getResult = handlerResult.unsafeRunSync()._2.unsafeRunSync()
   }
 }
