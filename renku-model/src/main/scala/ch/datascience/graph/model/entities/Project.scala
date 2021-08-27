@@ -18,15 +18,16 @@
 
 package ch.datascience.graph.model.entities
 
+import cats.data.ValidatedNel
 import cats.syntax.all._
+import ch.datascience.graph.model
 import ch.datascience.graph.model._
+import ch.datascience.graph.model.entities.Dataset.Provenance
 import ch.datascience.graph.model.projects._
-import io.circe.DecodingFailure
 import io.renku.jsonld.JsonLDDecoder
+import monocle.{Lens, Traversal}
 
-import scala.util.Try
-
-sealed trait Project {
+sealed trait Project extends Product with Serializable {
   val resourceId:   ResourceId
   val path:         Path
   val name:         Name
@@ -36,7 +37,10 @@ sealed trait Project {
   val visibility:   Visibility
   val members:      Set[Person]
   val version:      SchemaVersion
+  val activities:   List[Activity]
+  val datasets:     List[Dataset[Dataset.Provenance]]
 
+  lazy val plans:      Set[Plan]       = activities.map(_.association.plan).toSet
   lazy val namespaces: List[Namespace] = path.toNamespaces
 }
 
@@ -48,8 +52,71 @@ final case class ProjectWithoutParent(resourceId:   ResourceId,
                                       maybeCreator: Option[Person],
                                       visibility:   Visibility,
                                       members:      Set[Person],
-                                      version:      SchemaVersion
+                                      version:      SchemaVersion,
+                                      activities:   List[Activity],
+                                      datasets:     List[Dataset[Dataset.Provenance]]
 ) extends Project
+
+object ProjectWithoutParent extends ProjectFactory {
+
+  def from(resourceId:   ResourceId,
+           path:         Path,
+           name:         Name,
+           agent:        CliVersion,
+           dateCreated:  DateCreated,
+           maybeCreator: Option[Person],
+           visibility:   Visibility,
+           members:      Set[Person],
+           version:      SchemaVersion,
+           activities:   List[Activity],
+           datasets:     List[Dataset[Dataset.Provenance]]
+  ): ValidatedNel[String, ProjectWithoutParent] =
+    validateDates(dateCreated, activities, datasets)
+      .map { _ =>
+        val (syncedActivities, syncedDatasets) =
+          syncPersons(projectPersons = members ++ maybeCreator, activities, datasets)
+        ProjectWithoutParent(resourceId,
+                             path,
+                             name,
+                             agent,
+                             dateCreated,
+                             maybeCreator,
+                             visibility,
+                             members,
+                             version,
+                             syncedActivities,
+                             syncedDatasets
+        )
+      }
+
+  private def validateDates(dateCreated: DateCreated,
+                            activities:  List[Activity],
+                            datasets:    List[Dataset[Provenance]]
+  ): ValidatedNel[String, Unit] =
+    activities
+      .map { activity =>
+        import activity._
+        if ((startTime.value compareTo dateCreated.value) >= 0) ().validNel[String]
+        else s"Activity $resourceId startTime $startTime is older than project $dateCreated".invalidNel
+      }
+      .sequence
+      .void |+| datasets
+      .map {
+        def compareDateWithProject(dataset: Dataset[Provenance], dsCreated: model.datasets.DateCreated) =
+          if ((dsCreated.value compareTo dateCreated.value) >= 0) ().validNel[String]
+          else
+            s"Dataset ${dataset.identification.identifier} date $dsCreated is older than project $dateCreated".invalidNel
+
+        dataset =>
+          dataset.provenance match {
+            case p: Provenance.Internal => compareDateWithProject(dataset, p.date)
+            case p: Provenance.Modified => compareDateWithProject(dataset, p.date)
+            case _ => ().validNel[String]
+          }
+      }
+      .sequence
+      .void
+}
 
 final case class ProjectWithParent(resourceId:       ResourceId,
                                    path:             Path,
@@ -60,8 +127,91 @@ final case class ProjectWithParent(resourceId:       ResourceId,
                                    visibility:       Visibility,
                                    members:          Set[Person],
                                    version:          SchemaVersion,
+                                   activities:       List[Activity],
+                                   datasets:         List[Dataset[Dataset.Provenance]],
                                    parentResourceId: ResourceId
 ) extends Project
+
+object ProjectWithParent extends ProjectFactory {
+
+  def from(resourceId:       ResourceId,
+           path:             Path,
+           name:             Name,
+           agent:            CliVersion,
+           dateCreated:      DateCreated,
+           maybeCreator:     Option[Person],
+           visibility:       Visibility,
+           members:          Set[Person],
+           version:          SchemaVersion,
+           activities:       List[Activity],
+           datasets:         List[Dataset[Dataset.Provenance]],
+           parentResourceId: ResourceId
+  ): ValidatedNel[String, ProjectWithParent] = {
+    val (syncedActivities, syncedDatasets) =
+      syncPersons(projectPersons = members ++ maybeCreator, activities, datasets)
+    ProjectWithParent(resourceId,
+                      path,
+                      name,
+                      agent,
+                      dateCreated,
+                      maybeCreator,
+                      visibility,
+                      members,
+                      version,
+                      syncedActivities,
+                      syncedDatasets,
+                      parentResourceId
+    ).validNel
+  }
+}
+
+trait ProjectFactory {
+
+  def syncPersons(projectPersons: Set[Person],
+                  activities:     List[Activity],
+                  datasets:       List[Dataset[Provenance]]
+  ): (List[Activity], List[Dataset[Provenance]]) =
+    activities.updateAuthors(from = projectPersons) -> datasets.updateCreators(from = projectPersons)
+
+  private implicit class ActivitiesOps(activities: List[Activity]) {
+
+    def updateAuthors(from: Set[Person]): List[Activity] =
+      activitiesLens.modify { activity =>
+        from
+          .find(_.resourceId == activity.author.resourceId)
+          .map(person => activityAuthorLens.modify(_ => person)(activity))
+          .getOrElse(activity)
+      }(activities)
+  }
+
+  private implicit class DatasetsOps(datasets: List[Dataset[Provenance]]) {
+
+    def updateCreators(from: Set[Person]): List[Dataset[Provenance]] = {
+      val creatorsUpdate = creatorsLens.modify { person =>
+        from.find(_.resourceId == person.resourceId).getOrElse(person)
+      }
+      datasetsLens.modify(
+        provenanceLens.modify(provCreatorsLens.modify(creatorsUpdate))
+      )(datasets)
+    }
+  }
+
+  private val activitiesLens: Traversal[List[Activity], Activity] = Traversal.fromTraverse[List, Activity]
+  private val activityAuthorLens = Lens[Activity, Person](_.author)(p => a => a.copy(author = p))
+
+  private val datasetsLens   = Traversal.fromTraverse[List, Dataset[Provenance]]
+  private val provenanceLens = Lens[Dataset[Provenance], Provenance](_.provenance)(p => d => d.copy(provenance = p))
+  private val creatorsLens   = Traversal.fromTraverse[List, Person]
+  private val provCreatorsLens = Lens[Provenance, List[Person]](_.creators.toList) { crts =>
+    {
+      case p: Provenance.Internal                         => p.copy(creators = crts.toSet)
+      case p: Provenance.ImportedExternal                 => p.copy(creators = crts.toSet)
+      case p: Provenance.ImportedInternalAncestorExternal => p.copy(creators = crts.toSet)
+      case p: Provenance.ImportedInternalAncestorInternal => p.copy(creators = crts.toSet)
+      case p: Provenance.Modified                         => p.copy(creators = crts.toSet)
+    }
+  }
+}
 
 object Project {
 
@@ -77,99 +227,29 @@ object Project {
         case p: ProjectWithParent => p.parentResourceId.asEntityId.some
         case _ => None
       }
-
-      JsonLD.entity(
-        project.resourceId.asEntityId,
-        entityTypes,
-        schema / "name"             -> project.name.asJsonLD,
-        renku / "projectPath"       -> project.path.asJsonLD,
-        renku / "projectNamespaces" -> project.namespaces.asJsonLD,
-        schema / "agent"            -> project.agent.asJsonLD,
-        schema / "dateCreated"      -> project.dateCreated.asJsonLD,
-        schema / "creator"          -> project.maybeCreator.asJsonLD,
-        renku / "projectVisibility" -> project.visibility.asJsonLD,
-        schema / "member"           -> project.members.toList.asJsonLD,
-        schema / "schemaVersion"    -> project.version.asJsonLD,
-        prov / "wasDerivedFrom"     -> maybeDerivedFrom.asJsonLD
+      JsonLD.arr(
+        JsonLD.entity(
+          project.resourceId.asEntityId,
+          entityTypes,
+          schema / "name"             -> project.name.asJsonLD,
+          renku / "projectPath"       -> project.path.asJsonLD,
+          renku / "projectNamespaces" -> project.namespaces.asJsonLD,
+          schema / "agent"            -> project.agent.asJsonLD,
+          schema / "dateCreated"      -> project.dateCreated.asJsonLD,
+          schema / "creator"          -> project.maybeCreator.asJsonLD,
+          renku / "projectVisibility" -> project.visibility.asJsonLD,
+          schema / "member"           -> project.members.toList.asJsonLD,
+          schema / "schemaVersion"    -> project.version.asJsonLD,
+          renku / "hasActivity"       -> project.activities.asJsonLD,
+          renku / "hasPlan"           -> project.plans.toList.asJsonLD,
+          renku / "hasDataset"        -> project.datasets.asJsonLD,
+          prov / "wasDerivedFrom"     -> maybeDerivedFrom.asJsonLD
+        ) :: project.datasets.flatMap(_.publicationEvents.map(_.asJsonLD)): _*
       )
     }
 
-  implicit def decoder(
-      gitLabInfo:          GitLabProjectInfo,
-      allJsonLdPersons:    Set[Person]
-  )(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDDecoder[Project] = JsonLDDecoder.entity(entityTypes) { cursor =>
-    def matchByNameOrUsername(member: ProjectMember): users.Name => Boolean =
-      name => name == member.name || name.value == member.username.value
-
-    def byNameUsernameOrAlternateName(member: ProjectMember): Person => Boolean =
-      person =>
-        matchByNameOrUsername(member)(person.name) ||
-          person.alternativeNames.exists(matchByNameOrUsername(member))
-
-    def toPerson(projectMember: ProjectMember): Person = Person(
-      users.ResourceId((renkuBaseUrl / "persons" / projectMember.name).show),
-      projectMember.name,
-      None,
-      None,
-      projectMember.gitLabId.some
-    )
-
-    val maybeCreator: Option[Person] = gitLabInfo.maybeCreator.map(creator =>
-      allJsonLdPersons
-        .find(byNameUsernameOrAlternateName(creator))
-        .map(_.copy(maybeGitLabId = Some(creator.gitLabId)))
-        .getOrElse(toPerson(creator))
-    )
-
-    val members: Set[Person] = gitLabInfo.members.map(member =>
-      allJsonLdPersons
-        .find(byNameUsernameOrAlternateName(member))
-        .map(_.copy(maybeGitLabId = Some(member.gitLabId)))
-        .getOrElse(toPerson(member))
-    )
-
-    def checkProjectsMatching(resourceId: ResourceId) = resourceId
-      .as[Try, projects.Path]
-      .toEither
-      .leftMap(_ => DecodingFailure(s"Cannot extract project path from $resourceId", Nil))
-      .flatMap {
-        case path if path == gitLabInfo.path => Right(())
-        case path =>
-          Left(DecodingFailure(s"Project '$path' found in JsonLD does not match '${gitLabInfo.path}'", Nil))
-      }
-
-    for {
-      resourceId    <- cursor.downEntityId.as[ResourceId]
-      agent         <- cursor.downField(schema / "agent").as[CliVersion]
-      schemaVersion <- cursor.downField(schema / "schemaVersion").as[SchemaVersion]
-      _             <- checkProjectsMatching(resourceId)
-    } yield gitLabInfo.maybeParentPath match {
-      case Some(parentPath) =>
-        ProjectWithParent(
-          resourceId,
-          gitLabInfo.path,
-          gitLabInfo.name,
-          agent,
-          gitLabInfo.dateCreated,
-          maybeCreator,
-          gitLabInfo.visibility,
-          members,
-          schemaVersion,
-          ResourceId(renkuBaseUrl, parentPath)
-        )
-      case None =>
-        ProjectWithoutParent(resourceId,
-                             gitLabInfo.path,
-                             gitLabInfo.name,
-                             agent,
-                             gitLabInfo.dateCreated,
-                             maybeCreator,
-                             gitLabInfo.visibility,
-                             members,
-                             schemaVersion
-        )
-    }
-  }
+  def decoder(gitLabInfo: GitLabProjectInfo)(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDDecoder[Project] =
+    ProjectJsonLDDecoder(gitLabInfo)
 
   final case class GitLabProjectInfo(name:            Name,
                                      path:            Path,
@@ -179,5 +259,6 @@ object Project {
                                      visibility:      Visibility,
                                      maybeParentPath: Option[Path]
   )
+
   final case class ProjectMember(name: users.Name, username: users.Username, gitLabId: users.GitLabId)
 }

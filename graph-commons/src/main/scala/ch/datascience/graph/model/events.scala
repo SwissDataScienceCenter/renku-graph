@@ -58,7 +58,7 @@ object events {
   final class CommittedDate private (val value: Instant) extends AnyVal with InstantTinyType
   implicit object CommittedDate extends TinyTypeFactory[CommittedDate](new CommittedDate(_)) with BoundedInstant {
     import java.time.temporal.ChronoUnit.HOURS
-    protected[this] override def maybeMax: Option[Instant] = now.plus(24, HOURS).some
+    protected[this] override def maybeMax: Option[Instant] = instantNow.plus(24, HOURS).some
   }
 
   final class EventId private (val value: String) extends AnyVal with StringTinyType

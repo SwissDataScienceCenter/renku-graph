@@ -23,19 +23,18 @@ import cats.data.EitherT
 import cats.effect.{ConcurrentEffect, Timer}
 import cats.syntax.all._
 import ch.datascience.graph.config.GitLabUrlLoader
+import ch.datascience.graph.model.entities.Project
 import ch.datascience.graph.model.{GitLabApiUrl, GitLabUrl}
 import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.{ProjectMetadata, TransformationStep}
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TransformationStep
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 private[triplesgenerated] trait TransformationStepsRunner[Interpretation[_]] {
-  def run(steps:           List[TransformationStep[Interpretation]],
-          projectMetadata: ProjectMetadata
-  ): Interpretation[TriplesUploadResult]
+  def run(steps: List[TransformationStep[Interpretation]], project: Project): Interpretation[TriplesUploadResult]
 }
 
 private[triplesgenerated] class TransformationStepsRunnerImpl[Interpretation[_]: MonadThrow](
@@ -47,38 +46,37 @@ private[triplesgenerated] class TransformationStepsRunnerImpl[Interpretation[_]:
   private implicit val gitLabApiUrl: GitLabApiUrl = gitLabUrl.apiV4
 
   import TriplesUploadResult._
+  import io.renku.jsonld.syntax._
 
-  override def run(steps:           List[TransformationStep[Interpretation]],
-                   projectMetadata: ProjectMetadata
+  override def run(steps:   List[TransformationStep[Interpretation]],
+                   project: Project
   ): Interpretation[TriplesUploadResult] =
-    runAllSteps(projectMetadata, steps) >>= {
-      case (updatedMetadata, _: DeliverySuccess) => encodeAndSend(updatedMetadata)
+    runAllSteps(project, steps) >>= {
+      case (updatedProject, _: DeliverySuccess) => encodeAndSend(updatedProject)
       case (_, failure) => failure.pure[Interpretation]
     }
 
-  private def runAllSteps(projectMetadata: ProjectMetadata,
-                          steps:           List[TransformationStep[Interpretation]]
-  ): Interpretation[(ProjectMetadata, TriplesUploadResult)] =
-    steps.foldLeft(
-      (projectMetadata, DeliverySuccess: TriplesUploadResult).pure[Interpretation]
-    )((lastStepResults, nextStep) =>
+  private def runAllSteps(project: Project,
+                          steps:   List[TransformationStep[Interpretation]]
+  ): Interpretation[(Project, TriplesUploadResult)] =
+    steps.foldLeft((project, DeliverySuccess: TriplesUploadResult).pure[Interpretation])((lastStepResults, nextStep) =>
       lastStepResults >>= {
         case (_, _: TriplesUploadFailure) => lastStepResults
         case (previousMetadata, _) => runSingleStep(nextStep, previousMetadata)
       }
     )
 
-  private def runSingleStep(nextStep: TransformationStep[Interpretation], previousMetadata: ProjectMetadata) = {
+  private def runSingleStep(nextStep: TransformationStep[Interpretation], previousProject: Project) = {
     for {
-      stepResults    <- nextStep run previousMetadata
+      stepResults    <- nextStep run previousProject
       sendingResults <- EitherT.right[ProcessingRecoverableError](execute(stepResults.queries))
-    } yield stepResults.projectMetadata -> sendingResults
+    } yield stepResults.project -> sendingResults
   }
     .leftMap(recoverableFailure =>
-      previousMetadata -> (RecoverableFailure(recoverableFailure.getMessage): TriplesUploadResult)
+      previousProject -> (RecoverableFailure(recoverableFailure.getMessage): TriplesUploadResult)
     )
     .merge
-    .recoverWith(transformationFailure(previousMetadata, nextStep))
+    .recoverWith(transformationFailure(previousProject, nextStep))
 
   private def execute(queries: List[SparqlQuery]) =
     queries
@@ -90,23 +88,23 @@ private[triplesgenerated] class TransformationStepsRunnerImpl[Interpretation[_]:
       }
 
   private def transformationFailure(
-      metadata:           ProjectMetadata,
+      project:            Project,
       transformationStep: TransformationStep[Interpretation]
-  ): PartialFunction[Throwable, Interpretation[(ProjectMetadata, TriplesUploadResult)]] = { case NonFatal(exception) =>
-    (metadata,
+  ): PartialFunction[Throwable, Interpretation[(Project, TriplesUploadResult)]] = { case NonFatal(exception) =>
+    (project,
      InvalidUpdatesFailure(s"${transformationStep.name} transformation step failed: $exception"): TriplesUploadResult
     ).pure[Interpretation]
   }
 
-  private def encodeAndSend(metadata: ProjectMetadata) = {
-    val m = metadata.encodeAsFlattenedJsonLD
-    m.leftMap(error =>
-      InvalidTriplesFailure(s"Metadata for project ${metadata.project.path} failed: ${error.getMessage}")
-        .pure[Interpretation]
-        .widen[TriplesUploadResult]
-    ).map(triplesUploader.upload)
+  private def encodeAndSend(project: Project) =
+    project.asJsonLD.flatten
+      .leftMap(error =>
+        InvalidTriplesFailure(s"Metadata for project ${project.path} failed: ${error.getMessage}")
+          .pure[Interpretation]
+          .widen[TriplesUploadResult]
+      )
+      .map(triplesUploader.upload)
       .merge
-  }
 }
 
 private[triplesgenerated] object TransformationStepsRunner {

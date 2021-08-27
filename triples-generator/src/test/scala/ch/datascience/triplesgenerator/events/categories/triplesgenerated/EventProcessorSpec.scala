@@ -26,10 +26,12 @@ import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.entities.Project
 import ch.datascience.graph.model.events.EventStatus.{TransformationNonRecoverableFailure, TransformationRecoverableFailure, TriplesGenerated}
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects.Path
-import ch.datascience.graph.model.{SchemaVersion, projects}
+import ch.datascience.graph.model.testentities._
+import ch.datascience.graph.model.{SchemaVersion, entities, projects}
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
@@ -77,10 +79,10 @@ class EventProcessorSpec
       givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
         .returning(context.pure(maybeAccessToken))
 
-      val projectMetadata = projectMetadatas.generateOne
-      givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(projectMetadata))
+      val project = projectEntitiesWithDatasetsAndActivities.generateOne.to[entities.Project]
+      givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(project))
 
-      successfulTriplesTransformationAndUpload(projectMetadata)
+      successfulTriplesTransformationAndUpload(project)
 
       expectEventMarkedAsDone(triplesGeneratedEvent.compoundEventId, triplesGeneratedEvent.project.path)
 
@@ -115,8 +117,7 @@ class EventProcessorSpec
       val exception = exceptions.generateOne
 
       givenDeserialization(triplesGeneratedEvent,
-                           returning =
-                             EitherT.right[ProcessingRecoverableError](exception.raiseError[Try, ProjectMetadata])
+                           returning = EitherT.right[ProcessingRecoverableError](exception.raiseError[Try, Project])
       )
 
       expectEventMarkedAsNonRecoverableFailure(triplesGeneratedEvent, exception)
@@ -132,8 +133,8 @@ class EventProcessorSpec
       givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
         .returning(context.pure(maybeAccessToken))
 
-      val projectMetadata = projectMetadatas.generateOne
-      givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(projectMetadata))
+      val project = projectEntitiesWithDatasetsAndActivities.generateOne.to[entities.Project]
+      givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(project))
 
       val steps = transformationSteps[Try].generateList()
       (() => stepsCreator.createSteps)
@@ -142,7 +143,7 @@ class EventProcessorSpec
 
       val failure = TriplesUploadResult.RecoverableFailure(exceptions.generateOne.getMessage)
       (triplesUploader.run _)
-        .expects(steps, projectMetadata)
+        .expects(steps, project)
         .returning(failure.pure[Try].widen[TriplesUploadResult])
 
       expectEventMarkedAsRecoverableFailure(triplesGeneratedEvent, failure)
@@ -158,8 +159,8 @@ class EventProcessorSpec
       givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
         .returning(context.pure(maybeAccessToken))
 
-      val projectMetadata = projectMetadatas.generateOne
-      givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(projectMetadata))
+      val project = projectEntitiesWithDatasetsAndActivities.generateOne.to[entities.Project]
+      givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(project))
 
       val steps = transformationSteps[Try].generateList()
 
@@ -169,7 +170,7 @@ class EventProcessorSpec
 
       val exception = exceptions.generateOne
       (triplesUploader.run _)
-        .expects(steps, projectMetadata)
+        .expects(steps, project)
         .returning(exception.raiseError[Try, TriplesUploadResult])
 
       expectEventMarkedAsNonRecoverableFailure(triplesGeneratedEvent, exception)
@@ -186,8 +187,8 @@ class EventProcessorSpec
         givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
           .returning(context.pure(maybeAccessToken))
 
-        val projectMetadata = projectMetadatas.generateOne
-        givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(projectMetadata))
+        val project = projectEntitiesWithDatasetsAndActivities.generateOne.to[entities.Project]
+        givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(project))
 
         val steps = transformationSteps[Try].generateList()
         (() => stepsCreator.createSteps)
@@ -196,7 +197,7 @@ class EventProcessorSpec
 
         val uploadingError = nonEmptyStrings().map(RecoverableFailure.apply).generateOne
         (triplesUploader.run _)
-          .expects(steps, projectMetadata)
+          .expects(steps, project)
           .returning(context.pure(uploadingError))
 
         expectEventMarkedAsRecoverableFailure(triplesGeneratedEvent, uploadingError)
@@ -214,8 +215,8 @@ class EventProcessorSpec
           givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
             .returning(context.pure(maybeAccessToken))
 
-          val projectMetadata = projectMetadatas.generateOne
-          givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(projectMetadata))
+          val project = projectEntitiesWithDatasetsAndActivities.generateOne.to[entities.Project]
+          givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(project))
 
           val steps = transformationSteps[Try].generateList()
           (() => stepsCreator.createSteps)
@@ -223,7 +224,7 @@ class EventProcessorSpec
             .returning(steps)
 
           (triplesUploader.run _)
-            .expects(steps, projectMetadata)
+            .expects(steps, project)
             .returning(context.pure(failure))
 
           expectEventMarkedAsNonRecoverableFailure(triplesGeneratedEvent, failure)
@@ -241,10 +242,10 @@ class EventProcessorSpec
       givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
         .returning(context.pure(maybeAccessToken))
 
-      val projectMetadata = projectMetadatas.generateOne
-      givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(projectMetadata))
+      val project = projectEntitiesWithDatasetsAndActivities.generateOne.to[entities.Project]
+      givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(project))
 
-      successfulTriplesTransformationAndUpload(projectMetadata)
+      successfulTriplesTransformationAndUpload(project)
 
       val exception = exceptions.generateOne
       (eventStatusUpdater
@@ -343,19 +344,19 @@ class EventProcessorSpec
         .findAccessToken(_: Path)(_: Path => String))
         .expects(forProjectPath, projectPathToPath)
 
-    def successfulTriplesTransformationAndUpload(projectMetadata: ProjectMetadata) = {
+    def successfulTriplesTransformationAndUpload(project: Project) = {
       val steps = transformationSteps[Try].generateList()
       (() => stepsCreator.createSteps)
         .expects()
         .returning(steps)
 
       (triplesUploader.run _)
-        .expects(steps, projectMetadata)
+        .expects(steps, project)
         .returning(Success(DeliverySuccess))
     }
 
     def givenDeserialization(event:     TriplesGeneratedEvent,
-                             returning: EitherT[Try, ProcessingRecoverableError, ProjectMetadata]
+                             returning: EitherT[Try, ProcessingRecoverableError, Project]
     ) = (jsonLDDeserializer
       .deserializeToModel(_: TriplesGeneratedEvent)(_: Option[AccessToken]))
       .expects(event, maybeAccessToken)

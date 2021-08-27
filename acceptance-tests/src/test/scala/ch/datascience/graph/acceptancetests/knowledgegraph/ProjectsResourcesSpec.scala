@@ -74,7 +74,7 @@ class ProjectsResourcesSpec
     ).generateOne
   }
 
-  private val dataset = datasetEntities(datasetProvenanceInternal, fixed(project.entitiesProject)).generateOne
+  private val dataset = datasetEntities(provenanceInternal, fixed(project.entitiesProject)).generateOne
 
   Feature("GET knowledge-graph/projects/<namespace>/<name> to find project's details") {
 
@@ -86,7 +86,7 @@ class ProjectsResourcesSpec
       Given("some data in the RDF Store")
 
       val jsonLDParentProjectTriples = JsonLD.arr(
-        datasetEntities(datasetProvenanceInternal, fixed(parentProject.entitiesProject)).generateOne.asJsonLD,
+        datasetEntities(provenanceInternal, fixed(parentProject.entitiesProject)).generateOne.asJsonLD,
         parentProject.entitiesProject.asJsonLD
       )
 

@@ -68,7 +68,7 @@ private class KGDatasetInfoFinderImpl(
     s"""|SELECT ?topmostSameAs
         |WHERE {
         |  <$resourceId> a schema:Dataset;
-        |            renku:topmostSameAs ?topmostSameAs.
+        |                renku:topmostSameAs ?topmostSameAs.
         |}
         |""".stripMargin
   )

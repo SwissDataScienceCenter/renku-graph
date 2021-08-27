@@ -26,7 +26,7 @@ import ch.datascience.graph.acceptancetests.tooling.TestLogger
 import ch.datascience.graph.model
 import ch.datascience.graph.model._
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.testentities.EntitiesGenerators._
+import ch.datascience.graph.model.testentities.generators.EntitiesGenerators._
 import ch.datascience.graph.model.testentities.{ExecutionPlanner, Person, Plan}
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._

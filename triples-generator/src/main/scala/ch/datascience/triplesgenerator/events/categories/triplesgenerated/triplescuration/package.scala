@@ -21,6 +21,7 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 import cats.data.{EitherT, OptionT}
 import cats.syntax.all._
 import cats.{MonadError, MonadThrow}
+import ch.datascience.graph.model.entities.Project
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.circe.Decoder.decodeString
 import io.circe.{Decoder, Json}
@@ -29,7 +30,7 @@ import io.renku.jsonld.{EntityId, Property}
 package object triplescuration {
 
   private[triplesgenerated] type TransformationResults[Interpretation[_]] =
-    EitherT[Interpretation, ProcessingRecoverableError, ProjectMetadata]
+    EitherT[Interpretation, ProcessingRecoverableError, Project]
 
   implicit class JsonOps(json: Json) {
 

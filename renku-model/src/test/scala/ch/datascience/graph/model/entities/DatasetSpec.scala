@@ -29,6 +29,7 @@ import ch.datascience.graph.model.entities.Dataset.Provenance
 import ch.datascience.graph.model.entities.Dataset.Provenance.{ImportedInternalAncestorExternal, ImportedInternalAncestorInternal}
 import ch.datascience.graph.model.testentities._
 import io.circe.DecodingFailure
+import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -36,34 +37,26 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
-  "Dataset.decode" should {
+  "decode" should {
 
     "turn JsonLD Dataset entity into the Dataset object" in {
-      forAll(datasetEntities(ofAnyProvenance)) { dataset =>
-        val cliDataset = dataset.provenance match {
-          case p: testentities.Dataset.Provenance.ImportedInternalAncestorInternal =>
-            dataset.copy(provenance = p.copy(topmostSameAs = TopmostSameAs(p.sameAs)))
-          case p: testentities.Dataset.Provenance.ImportedInternalAncestorExternal =>
-            dataset.copy(provenance = p.copy(topmostSameAs = TopmostSameAs(p.sameAs)))
-          case p: testentities.Dataset.Provenance.Modified =>
-            dataset.copy(provenance = p.copy(topmostDerivedFrom = TopmostDerivedFrom(p.derivedFrom)))
-          case _ => dataset
-        }
-
-        cliDataset.asJsonLD.flatten
+      forAll(datasetEntities(ofAnyProvenance).decoupledFromProject) { dataset =>
+        JsonLD
+          .arr(dataset.asJsonLD :: dataset.publicationEvents.map(_.asJsonLD): _*)
+          .flatten
           .fold(throw _, identity)
           .cursor
           .as[List[entities.Dataset[entities.Dataset.Provenance]]] shouldBe List(
-          cliDataset.to[entities.Dataset[entities.Dataset.Provenance]]
+          dataset.to[entities.Dataset[entities.Dataset.Provenance]]
         ).asRight
       }
     }
 
     "fail if dataset parts are older than the internal or imported external dataset" in {
       List(
-        datasetEntities(datasetProvenanceInternal),
-        datasetEntities(datasetProvenanceImportedExternal),
-        datasetEntities(datasetProvenanceImportedInternalAncestorExternal)
+        datasetEntities(provenanceInternal).decoupledFromProject,
+        datasetEntities(provenanceImportedExternal).decoupledFromProject,
+        datasetEntities(provenanceImportedInternalAncestorExternal).decoupledFromProject
       ) foreach { datasetGen =>
         val dataset = datasetGen.generateOne.to[entities.Dataset[entities.Dataset.Provenance]]
         val invalidPart = updatePartDateAfter(
@@ -84,12 +77,8 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
 
     "succeed if dataset parts are older than the modified or imported internal dataset" in {
       List(
-        datasetEntities(datasetProvenanceModified).map(ds =>
-          ds.copy(provenance = ds.provenance.copy(topmostDerivedFrom = TopmostDerivedFrom(ds.provenance.derivedFrom)))
-        ),
-        datasetEntities(datasetProvenanceImportedInternalAncestorInternal).map(ds =>
-          ds.copy(provenance = ds.provenance.copy(topmostSameAs = TopmostSameAs(ds.provenance.sameAs)))
-        )
+        datasetEntities(provenanceModified).decoupledFromProject,
+        datasetEntities(provenanceImportedInternalAncestorInternal).decoupledFromProject
       ) foreach { datasetGen =>
         val dataset = datasetGen.generateOne.to[entities.Dataset[entities.Dataset.Provenance]]
         val olderPart = updatePartDateAfter(
@@ -98,7 +87,9 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         )(dataset.provenance)
         val validDataset = dataset.copy(parts = olderPart :: dataset.parts)
 
-        validDataset.asJsonLD.flatten
+        JsonLD
+          .arr(validDataset.asJsonLD :: validDataset.publicationEvents.map(_.asJsonLD): _*)
+          .flatten
           .fold(throw _, identity)
           .cursor
           .as[List[entities.Dataset[entities.Dataset.Provenance]]] shouldBe List(validDataset).asRight
@@ -106,14 +97,14 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     }
 
     "fail if invalidationTime is older than the dataset" in {
-      val dataset          = datasetEntities(ofAnyProvenance).generateOne
+      val dataset = datasetEntities(provenanceModified).decoupledFromProject.generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance.Modified]]
       val invalidationTime = timestamps(max = dataset.provenance.date.instant).generateAs(InvalidationTime)
       val invalidatedDataset = dataset
-        .to[entities.Dataset[entities.Dataset.Provenance]]
-        .copy(maybeInvalidationTime = invalidationTime.some)
+        .copy(provenance = dataset.provenance.copy(maybeInvalidationTime = invalidationTime.some))
 
       val Left(error) = invalidatedDataset.asJsonLD.flatten
-        .fold(throw _, identity)
+        .fold(fail(_), identity)
         .cursor
         .as[List[entities.Dataset[entities.Dataset.Provenance]]]
 
@@ -123,32 +114,33 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     }
 
     "skip publicationEvents that do not belong to a different dataset" in {
-      val dataset = datasetEntities(ofAnyProvenance).generateOne.to[entities.Dataset[entities.Dataset.Provenance]]
+      val dataset = datasetEntities(ofAnyProvenance).decoupledFromProject.generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance]]
+        .copy(publicationEvents = Nil)
 
       val otherDatasetPublicationEvent =
         publicationEventFactories(dataset.provenance.date.instant)
-          .generateOne(datasetEntities(ofAnyProvenance).generateOne)
+          .generateOne(datasetEntities(ofAnyProvenance).decoupledFromProject.generateOne)
           .to[entities.PublicationEvent]
 
-      dataset
-        .copy(publicationEvents = List(otherDatasetPublicationEvent))
-        .asJsonLD
+      JsonLD
+        .arr(dataset.asJsonLD, otherDatasetPublicationEvent.asJsonLD)
         .flatten
         .fold(throw _, identity)
         .cursor
-        .as[List[entities.Dataset[entities.Dataset.Provenance]]] shouldBe List(
-        dataset.copy(publicationEvents = Nil)
-      ).asRight
+        .as[List[entities.Dataset[entities.Dataset.Provenance]]] shouldBe List(dataset).asRight
     }
   }
 
   "from" should {
+
     "return a failure when initializing with a PublicationEvent belonging to another dataset" in {
-      val dataset = datasetEntities(ofAnyProvenance).generateOne.to[entities.Dataset[entities.Dataset.Provenance]]
+      val dataset = datasetEntities(ofAnyProvenance).decoupledFromProject.generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance]]
 
       val otherDatasetPublicationEvent =
         publicationEventFactories(dataset.provenance.date.instant)
-          .generateOne(datasetEntities(ofAnyProvenance).generateOne)
+          .generateOne(datasetEntities(ofAnyProvenance).decoupledFromProject.generateOne)
           .to[entities.PublicationEvent]
 
       val errors = entities.Dataset.from(
@@ -156,9 +148,7 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         dataset.provenance,
         dataset.additionalInfo,
         dataset.parts,
-        List(otherDatasetPublicationEvent),
-        dataset.projectResourceId,
-        dataset.maybeInvalidationTime
+        List(otherDatasetPublicationEvent)
       )
 
       errors.isInvalid shouldBe true
@@ -174,14 +164,12 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     "replace the topmostSameAs " in {
       List(
         datasetEntities(
-          datasetProvenanceImportedInternalAncestorExternal
-            .asInstanceOf[ProvenanceGen[Dataset.Provenance.ImportedInternal]]
-        ).generateOne.to[entities.Dataset[Provenance.ImportedInternal]],
+          provenanceImportedInternalAncestorExternal.asInstanceOf[ProvenanceGen[Dataset.Provenance.ImportedInternal]]
+        ).decoupledFromProject.generateOne.to[entities.Dataset[Provenance.ImportedInternal]],
         datasetEntities(
-          datasetProvenanceImportedInternalAncestorInternal
-            .asInstanceOf[ProvenanceGen[Dataset.Provenance.ImportedInternal]]
-        ).generateOne.to[entities.Dataset[Provenance.ImportedInternal]]
-      ).foreach { dataset =>
+          provenanceImportedInternalAncestorInternal.asInstanceOf[ProvenanceGen[Dataset.Provenance.ImportedInternal]]
+        ).decoupledFromProject.generateOne.to[entities.Dataset[Provenance.ImportedInternal]]
+      ) foreach { dataset =>
         val newTopmostSameAs = datasetTopmostSameAs.generateOne
         val provenance = dataset.provenance match {
           case p: ImportedInternalAncestorExternal => p.copy(topmostSameAs = newTopmostSameAs)
@@ -193,7 +181,8 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     }
 
     "replace the topmostDerivedFrom " in {
-      val dataset = datasetEntities(datasetProvenanceModified).generateOne.to[entities.Dataset[Provenance.Modified]]
+      val dataset = datasetEntities(provenanceModified).decoupledFromProject.generateOne
+        .to[entities.Dataset[Provenance.Modified]]
 
       val newTopmostDerivedFrom = datasetTopmostDerivedFroms.generateOne
 

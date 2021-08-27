@@ -146,14 +146,14 @@ private class DatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer: Par
         |          }
         |        } {
         |          ?dsId a schema:Dataset;
-        |                schema:isPartOf ?projectId;
+        |                ^renku:hasDataset ?projectId;
         |                renku:topmostSameAs ?sameAs.
         |          FILTER NOT EXISTS {
         |            ?dsId prov:invalidatedAtTime ?invalidationTime.
         |          }
         |          FILTER NOT EXISTS {
         |            ?someId prov:wasDerivedFrom/schema:url ?dsId;
-        |                    schema:isPartOf ?projectId; 
+        |                    ^renku:hasDataset ?projectId; 
         |          }
         |          ?projectId schema:dateCreated ?projectDate.
         |          ${projectMemberFilterQuery(maybeUser)}
@@ -167,7 +167,7 @@ private class DatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer: Par
         |                   schema:identifier ?identifier;
         |                   schema:name ?name;
         |                   schema:alternateName ?alternateName;
-        |                   schema:isPartOf ?exemplarProjectId.
+        |                   ^renku:hasDataset ?exemplarProjectId.
         |      ?exemplarProjectId schema:dateCreated ?minProjectDate;
         |                         renku:projectPath ?exemplarProjectPath.
         |      OPTIONAL {
@@ -185,7 +185,7 @@ private class DatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer: Par
         |      BIND (IF(BOUND(?maybePublishedDate), ?maybePublishedDate, ?maybeDateCreated) AS ?date)
         |      FILTER NOT EXISTS {
         |        ?someId prov:wasDerivedFrom/schema:url ?dsIdExample;
-        |                schema:isPartOf ?exemplarProjectId.
+        |                ^renku:hasDataset ?exemplarProjectId.
         |      }
         |    }
         |  }

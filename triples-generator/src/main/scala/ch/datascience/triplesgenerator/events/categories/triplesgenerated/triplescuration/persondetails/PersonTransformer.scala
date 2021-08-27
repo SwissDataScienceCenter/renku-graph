@@ -26,9 +26,9 @@ import cats.syntax.all._
 import ch.datascience.http.client.RestClientError._
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TransformationStep
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{ResultData, Transformation}
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.{ProjectFunctions, TransformationStep}
 import eu.timepit.refined.auto._
 import org.typelevel.log4cats.Logger
 
@@ -39,27 +39,30 @@ private[triplescuration] trait PersonTransformer[Interpretation[_]] {
 }
 
 private class PersonTransformerImpl[Interpretation[_]: MonadThrow](
-    kgPersonFinder: KGPersonFinder[Interpretation],
-    personMerger:   PersonMerger,
-    updatesCreator: UpdatesCreator
+    kgPersonFinder:   KGPersonFinder[Interpretation],
+    personMerger:     PersonMerger,
+    updatesCreator:   UpdatesCreator,
+    projectFunctions: ProjectFunctions
 ) extends PersonTransformer[Interpretation] {
+
+  import projectFunctions._
 
   override def createTransformationStep: TransformationStep[Interpretation] =
     TransformationStep("Person Details Updates", createTransformation)
 
-  private def createTransformation: Transformation[Interpretation] = projectMetadata =>
+  private def createTransformation: Transformation[Interpretation] = project =>
     EitherT {
-      projectMetadata.findAllPersons
-        .foldLeft(ResultData(projectMetadata, List.empty).pure[Interpretation]) { (previousResultsF, person) =>
+      findAllPersons(project)
+        .foldLeft(ResultData(project, List.empty).pure[Interpretation]) { (previousResultsF, person) =>
           for {
             previousResults   <- previousResultsF
             maybeKGPerson     <- kgPersonFinder.find(person)
             maybeMergedPerson <- maybeKGPerson.map(personMerger.merge(person, _)).sequence
           } yield (maybeKGPerson, maybeMergedPerson)
             .mapN { (kgPerson, mergedPerson) =>
-              val updatedProjectMetadata = previousResults.projectMetadata.update(person, mergedPerson)
+              val updatedProjectMetadata = update(person, mergedPerson)(previousResults.project)
               val queries                = updatesCreator.prepareUpdates(kgPerson)
-              ResultData(updatedProjectMetadata, queries ::: previousResults.queries)
+              ResultData(updatedProjectMetadata, previousResults.queries ::: queries)
             }
             .getOrElse(previousResults)
         }
@@ -91,5 +94,5 @@ private[triplescuration] object PersonTransformer {
       timer:            Timer[IO]
   ): IO[PersonTransformer[IO]] = for {
     kgPersonFinder <- KGPersonFinder(logger, timeRecorder)
-  } yield new PersonTransformerImpl[IO](kgPersonFinder, PersonMerger, UpdatesCreator)
+  } yield new PersonTransformerImpl[IO](kgPersonFinder, PersonMerger, UpdatesCreator, ProjectFunctions)
 }

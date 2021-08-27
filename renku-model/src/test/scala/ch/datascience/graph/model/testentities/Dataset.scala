@@ -23,25 +23,21 @@ import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
 import ch.datascience.graph.model._
 import ch.datascience.graph.model.datasets._
-import ch.datascience.graph.model.projects.ForksCount
-import ch.datascience.graph.model.testentities.Dataset.Provenance.{ImportedExternal, ImportedInternal, ImportedInternalAncestorExternal, ImportedInternalAncestorInternal, Internal, Modified}
+import ch.datascience.graph.model.testentities.Dataset.Provenance._
+import ch.datascience.tinytypes.InstantTinyType
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 
-case class Dataset[+P <: Provenance](identification:            Identification,
-                                     provenance:                P,
-                                     additionalInfo:            AdditionalInfo,
-                                     parts:                     List[DatasetPart],
-                                     publicationEventFactories: List[Dataset[Provenance] => PublicationEvent],
-                                     project:                   Project[ForksCount]
+final case class Dataset[+P <: Provenance](identification:            Identification,
+                                           provenance:                P,
+                                           additionalInfo:            AdditionalInfo,
+                                           parts:                     List[DatasetPart],
+                                           publicationEventFactories: List[Dataset[Provenance] => PublicationEvent]
 ) {
 
   val publicationEvents: List[PublicationEvent] = publicationEventFactories.map(_.apply(this))
 
   def entityId(implicit renkuBaseUrl: RenkuBaseUrl): EntityId = Dataset.entityId(identification.identifier)
-
-  validateState(identification.identifier, provenance, parts, publicationEvents, project)
-    .fold(errors => throw new IllegalStateException(errors.nonEmptyIntercalate("; ")), _ => ())
 }
 
 object Dataset {
@@ -63,14 +59,25 @@ object Dataset {
 
   object Provenance extends ProvenanceOps {
 
+    sealed trait NonModified extends Provenance with Product with Serializable {
+      val entityId:      EntityId
+      val topmostSameAs: TopmostSameAs
+      val date:          D
+      val creators:      Set[Person]
+      override lazy val topmostDerivedFrom: TopmostDerivedFrom = TopmostDerivedFrom(entityId)
+    }
+
+    sealed trait ImportedInternal extends NonModified with Product with Serializable {
+      val sameAs: InternalSameAs
+    }
+
     final case class Internal(entityId:       EntityId,
                               initialVersion: InitialVersion,
                               date:           DateCreated,
                               creators:       Set[Person]
-    ) extends Provenance {
+    ) extends NonModified {
       override type D = DateCreated
-      override lazy val topmostSameAs:      TopmostSameAs      = TopmostSameAs(entityId)
-      override lazy val topmostDerivedFrom: TopmostDerivedFrom = TopmostDerivedFrom(entityId)
+      override lazy val topmostSameAs: TopmostSameAs = TopmostSameAs(entityId)
     }
 
     final case class ImportedExternal(entityId:       EntityId,
@@ -78,20 +85,11 @@ object Dataset {
                                       initialVersion: InitialVersion,
                                       date:           DatePublished,
                                       creators:       Set[Person]
-    ) extends Provenance {
+    ) extends NonModified {
       override type D = DatePublished
-      override lazy val topmostSameAs:      TopmostSameAs      = TopmostSameAs(sameAs)
-      override lazy val topmostDerivedFrom: TopmostDerivedFrom = TopmostDerivedFrom(entityId)
+      override lazy val topmostSameAs: TopmostSameAs = TopmostSameAs(sameAs)
     }
 
-    sealed trait ImportedInternal extends Provenance with Product with Serializable {
-      val entityId:      EntityId
-      val sameAs:        InternalSameAs
-      val topmostSameAs: TopmostSameAs
-      val date:          D
-      val creators:      Set[Person]
-      override lazy val topmostDerivedFrom: TopmostDerivedFrom = TopmostDerivedFrom(entityId)
-    }
     final case class ImportedInternalAncestorExternal(entityId:       EntityId,
                                                       sameAs:         InternalSameAs,
                                                       topmostSameAs:  TopmostSameAs,
@@ -111,12 +109,13 @@ object Dataset {
       override type D = DateCreated
     }
 
-    final case class Modified(entityId:           EntityId,
-                              derivedFrom:        DerivedFrom,
-                              topmostDerivedFrom: TopmostDerivedFrom,
-                              initialVersion:     InitialVersion,
-                              date:               DateCreated,
-                              creators:           Set[Person]
+    final case class Modified(entityId:              EntityId,
+                              derivedFrom:           DerivedFrom,
+                              topmostDerivedFrom:    TopmostDerivedFrom,
+                              initialVersion:        InitialVersion,
+                              date:                  DateCreated,
+                              creators:              Set[Person],
+                              maybeInvalidationTime: Option[InvalidationTime]
     ) extends Provenance {
       override type D = DateCreated
       override lazy val topmostSameAs: TopmostSameAs = TopmostSameAs(entityId)
@@ -200,14 +199,16 @@ object Dataset {
     implicit def toEntitiesModified(implicit
         renkuBaseUrl: RenkuBaseUrl
     ): entities.Dataset.Identification => Provenance.Modified => entities.Dataset.Provenance.Modified =
-      identification => { case Modified(_, derivedFrom, topmostDerivedFrom, initialVersion, date, creators) =>
-        entities.Dataset.Provenance.Modified(identification.resourceId,
-                                             derivedFrom,
-                                             topmostDerivedFrom,
-                                             initialVersion,
-                                             date,
-                                             creators.map(_.to[entities.Person])
-        )
+      identification => {
+        case Modified(_, derivedFrom, topmostDerivedFrom, initialVersion, date, creators, maybeInvalidationTime) =>
+          entities.Dataset.Provenance.Modified(identification.resourceId,
+                                               derivedFrom,
+                                               topmostDerivedFrom,
+                                               initialVersion,
+                                               date,
+                                               creators.map(_.to[entities.Person]),
+                                               maybeInvalidationTime
+          )
       }
   }
 
@@ -225,24 +226,24 @@ object Dataset {
                             additionalInfo:            AdditionalInfo,
                             parts:                     List[DatasetPart],
                             publicationEventFactories: List[Dataset[Provenance] => PublicationEvent],
-                            project:                   Project[ForksCount]
+                            project:                   Project
   ): ValidatedNel[String, Dataset[P]] =
-    validateState(identification.identifier, provenance, parts, publicationEvents = Nil, project)
-      .map(_ =>
-        Dataset[P](
-          identification,
-          provenance,
-          additionalInfo,
-          parts,
-          publicationEventFactories = Nil,
-          project
-        )
-      )
+    from(identification, provenance, additionalInfo, parts, publicationEventFactories, project.topAncestorDateCreated)
+
+  def from[P <: Provenance](identification:            Identification,
+                            provenance:                P,
+                            additionalInfo:            AdditionalInfo,
+                            parts:                     List[DatasetPart],
+                            publicationEventFactories: List[Dataset[Provenance] => PublicationEvent],
+                            minDate:                   InstantTinyType
+  ): ValidatedNel[String, Dataset[P]] =
+    validateState(identification.identifier, provenance, parts, publicationEvents = Nil, minDate)
+      .map(_ => Dataset[P](identification, provenance, additionalInfo, parts, publicationEventFactories = Nil))
       .andThen { dataset =>
         validatePublicationEvents(identification.identifier,
                                   provenance,
                                   publicationEventFactories.map(_.apply(dataset)),
-                                  project
+                                  minDate
         ).map(_ => dataset.copy(publicationEventFactories = publicationEventFactories))
       }
 
@@ -250,34 +251,34 @@ object Dataset {
                                                       provenance:        P,
                                                       parts:             List[DatasetPart],
                                                       publicationEvents: List[PublicationEvent],
-                                                      project:           Project[ForksCount]
+                                                      minDate:           InstantTinyType
   ): ValidatedNel[String, Unit] = List(
-    validateDateCreated(identifier, project, provenance),
+    validateDateCreated(identifier, provenance, minDate),
     validateCreators(identifier, provenance.creators),
     validateParts(identifier, provenance, parts),
-    validatePublicationEvents(identifier, provenance, publicationEvents, project)
+    validatePublicationEvents(identifier, provenance, publicationEvents, minDate)
   ).sequence.void
 
   private[Dataset] def validateCreators(identifier: Identifier, creators: Set[Person]): ValidatedNel[String, Unit] =
     Validated.condNel(creators.nonEmpty, (), s"No creators on dataset with id: $identifier")
 
   private[Dataset] def validateDateCreated[P <: Provenance](identifier: Identifier,
-                                                            project:    Project[ForksCount],
-                                                            provenance: P
+                                                            provenance: P,
+                                                            minDate:    InstantTinyType
   ): ValidatedNel[String, Unit] = provenance match {
     case prov: Provenance.Internal =>
       Validated.condNel(
-        test = (prov.date.value compareTo project.topAncestorDateCreated.value) >= 0,
+        test = (prov.date.value compareTo minDate.value) >= 0,
         (),
-        s"Internal Dataset with id: $identifier is older than project ${project.name}"
+        s"Internal Dataset with id: $identifier is older than min date $minDate"
       )
     case prov: Provenance.Modified =>
       Validated.condNel(
-        test = (prov.date.value compareTo project.topAncestorDateCreated.value) >= 0,
+        test = (prov.date.value compareTo minDate.value) >= 0,
         (),
-        s"Modified Dataset with id: $identifier is older than project ${project.name}"
+        s"Modified Dataset with id: $identifier is older than min date $minDate"
       )
-    case _ => Validated.validNel(())
+    case _ => ().validNel
   }
 
   private[Dataset] def validateParts[P <: Provenance](
@@ -303,14 +304,14 @@ object Dataset {
       identifier:        Identifier,
       provenance:        P,
       publicationEvents: List[PublicationEvent],
-      project:           Project[_]
+      minDate:           InstantTinyType
   ): ValidatedNel[String, Unit] = {
     provenance match {
       case prov: Provenance.Internal         => Some(prov.date.instant, "dataset date")
-      case _:    Provenance.ImportedExternal => Some(project.topAncestorDateCreated.value, "project date")
+      case _:    Provenance.ImportedExternal => Some(minDate.value, "min date")
       case _ => None
     }
-  }.map { case (minDate, dateLabel) =>
+  } map { case (minDate, dateLabel) =>
     publicationEvents.map { event =>
       Validated.condNel(
         test = (event.startDate.value compareTo minDate) >= 0,
@@ -318,16 +319,12 @@ object Dataset {
         s"Publication Event ${event.about} on dataset with id: $identifier is older than $dateLabel"
       )
     }.combineAll
-  }.getOrElse(Validated.validNel(()))
+  } getOrElse Validated.validNel(())
 
   implicit def toEntitiesDataset[TP <: Provenance, EP <: entities.Dataset.Provenance](implicit
       convert:      entities.Dataset.Identification => TP => EP,
       renkuBaseUrl: RenkuBaseUrl
   ): Dataset[TP] => entities.Dataset[EP] = { dataset: Dataset[TP] =>
-    val maybeInvalidationTime = dataset match {
-      case d: Dataset[TP] with HavingInvalidationTime => d.invalidationTime.some
-      case _ => None
-    }
     val identification = entities.Dataset.Identification(ResourceId((dataset: Dataset[Provenance]).asEntityId.show),
                                                          dataset.identification.identifier,
                                                          dataset.identification.title,
@@ -352,9 +349,7 @@ object Dataset {
         dataset.additionalInfo.maybeVersion
       ),
       dataset.parts.map(_.to[entities.DatasetPart]),
-      dataset.publicationEvents.map(_.to[entities.PublicationEvent]),
-      projects.ResourceId(dataset.project.asEntityId.show),
-      maybeInvalidationTime
+      dataset.publicationEvents.map(_.to[entities.PublicationEvent])
     )
   }
 
@@ -364,12 +359,7 @@ object Dataset {
   implicit def encoder[P <: Provenance](implicit
       renkuBaseUrl: RenkuBaseUrl,
       gitLabApiUrl: GitLabApiUrl
-  ): JsonLDEncoder[Dataset[P]] = JsonLDEncoder.instance { ds =>
-    JsonLD.arr(
-      ds.project.asJsonLD,
-      ds.to[entities.Dataset[entities.Dataset.Provenance]].asJsonLD
-    )
-  }
+  ): JsonLDEncoder[Dataset[P]] = JsonLDEncoder.instance(_.to[entities.Dataset[entities.Dataset.Provenance]].asJsonLD)
 
   implicit def entityIdEncoder[P <: Provenance](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[Dataset[P]] =
     EntityIdEncoder.instance(dataset => entityId(dataset.identification.identifier))

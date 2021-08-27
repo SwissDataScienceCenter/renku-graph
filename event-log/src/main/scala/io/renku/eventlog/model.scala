@@ -35,7 +35,7 @@ final class EventDate private (val value: Instant) extends AnyVal with InstantTi
 object EventDate extends TinyTypeFactory[EventDate](new EventDate(_)) with BoundedInstant {
   import java.time.temporal.ChronoUnit.HOURS
 
-  protected[this] override def maybeMax: Option[Instant] = Some(now.plus(24, HOURS))
+  protected[this] override def maybeMax: Option[Instant] = Some(instantNow.plus(24, HOURS))
 
   implicit val decoder: Decoder[EventDate] = instantDecoder(EventDate)
 }

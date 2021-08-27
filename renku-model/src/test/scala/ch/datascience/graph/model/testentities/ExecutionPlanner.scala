@@ -22,6 +22,7 @@ import cats.Semigroup
 import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model._
 import ch.datascience.graph.model.commandParameters._
 import ch.datascience.graph.model.entityModel._
 import ch.datascience.graph.model.parameterValues._
@@ -31,13 +32,13 @@ import ch.datascience.graph.model.testentities.CommandParameterBase.{CommandInpu
 import ch.datascience.graph.model.testentities.Entity.{InputEntity, OutputEntity}
 import ch.datascience.graph.model.testentities.ExecutionPlanner.ActivityData
 import ch.datascience.graph.model.testentities.ParameterValue.{PathParameterValue, VariableParameterValue}
-import ch.datascience.graph.model.{CliVersion, activities, testentities}
 
 final case class ExecutionPlanner(plan:                     Plan,
                                   activityData:             ActivityData,
                                   parametersValueOverrides: List[(ParameterDefaultValue, ValueOverride)],
                                   inputsValueOverrides:     List[(InputDefaultValue, Entity)],
-                                  outputsValueOverrides:    List[(OutputDefaultValue, Location)]
+                                  outputsValueOverrides:    List[(OutputDefaultValue, Location)],
+                                  projectDateCreated:       projects.DateCreated
 ) {
 
   def planParameterValues(
@@ -81,7 +82,6 @@ final case class ExecutionPlanner(plan:                     Plan,
       activities.EndTime(activityTime.value),
       author,
       Agent(cliVersion),
-      plan.project,
       activities.Order(1),
       Association.factory(Agent(cliVersion), plan),
       usageFactories,
@@ -194,9 +194,9 @@ final case class ExecutionPlanner(plan:                     Plan,
   private lazy val validateStartTime: ValidatedNel[String, ActivityData] = {
     val (startTime, _, _) = activityData
     Validated.condNel(
-      (startTime.value compareTo plan.project.dateCreated.value) >= 0,
+      (startTime.value compareTo projectDateCreated.value) >= 0,
       activityData,
-      s"Activity start time $startTime cannot be older than project ${plan.project.dateCreated}"
+      s"Activity start time $startTime cannot be older than project creation date $projectDateCreated"
     )
   }
 }
@@ -205,6 +205,14 @@ object ExecutionPlanner {
 
   private type ActivityData = (activities.StartTime, Person, CliVersion)
 
-  def of(plan: Plan, activityTime: activities.StartTime, author: Person, cliVersion: CliVersion): ExecutionPlanner =
-    ExecutionPlanner(plan, (activityTime, author, cliVersion), List.empty, List.empty, List.empty)
+  def of(plan: Plan, activityTime: activities.StartTime, author: Person, project: Project): ExecutionPlanner =
+    of(plan, activityTime, author, project.agent, project.topAncestorDateCreated)
+
+  def of(plan:               Plan,
+         activityTime:       activities.StartTime,
+         author:             Person,
+         cliVersion:         CliVersion,
+         projectDateCreated: projects.DateCreated
+  ): ExecutionPlanner =
+    ExecutionPlanner(plan, (activityTime, author, cliVersion), List.empty, List.empty, List.empty, projectDateCreated)
 }

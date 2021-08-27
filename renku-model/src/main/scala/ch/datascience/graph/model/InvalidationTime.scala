@@ -34,5 +34,7 @@ object InvalidationTime
 
   import java.time.temporal.ChronoUnit.HOURS
 
-  protected[this] override def maybeMax: Option[Instant] = now.plus(2, HOURS).some
+  protected[this] override def maybeMax: Option[Instant] = instantNow.plus(2, HOURS).some
+
+  def now: InvalidationTime = InvalidationTime(instantNow)
 }

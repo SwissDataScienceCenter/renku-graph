@@ -23,10 +23,11 @@ import ch.datascience.generators.CommonGraphGenerators.{clientExceptions, connec
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.entities
+import ch.datascience.graph.model.testentities._
 import ch.datascience.http.client.RestClientError
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TransformationStep.ResultData
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators.projectMetadatas
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects.KGProjectFinder.KGProjectInfo
 import org.scalacheck.Gen
@@ -48,42 +49,42 @@ class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       )
 
       (kgProjectFinder.find _)
-        .expects(projectMetadata.project.resourceId)
+        .expects(project.resourceId)
         .returning(kgProjectInfo.some.pure[Try])
 
       val updates = sparqlQueries.generateList()
 
       (updatesCreator.prepareUpdates _)
-        .expects(projectMetadata.project, kgProjectInfo)
+        .expects(project, kgProjectInfo)
         .returning(updates)
 
       val step = transformer.createTransformationStep
 
       step.name.value shouldBe "Project Details Updates"
-      val Success(Right(updateResult)) = step.run(projectMetadata).value
-      updateResult shouldBe ResultData(projectMetadata, updates)
+      val Success(Right(updateResult)) = step.run(project).value
+      updateResult shouldBe ResultData(project, updates)
     }
 
     "do nothing if no project found in KG" in new TestCase {
       (kgProjectFinder.find _)
-        .expects(projectMetadata.project.resourceId)
+        .expects(project.resourceId)
         .returning(None.pure[Try])
 
       val step = transformer.createTransformationStep
 
-      val Success(Right(updateResult)) = step.run(projectMetadata).value
-      updateResult shouldBe ResultData(projectMetadata, Nil)
+      val Success(Right(updateResult)) = step.run(project).value
+      updateResult shouldBe ResultData(project, Nil)
     }
 
     "return the ProcessingRecoverableFailure if calls to KG fails with a network or HTTP error" in new TestCase {
       val exception = recoverableClientErrors.generateOne
       (kgProjectFinder.find _)
-        .expects(projectMetadata.project.resourceId)
+        .expects(project.resourceId)
         .returning(exception.raiseError[Try, Option[KGProjectInfo]])
 
       val step = transformer.createTransformationStep
 
-      val Success(Left(recoverableError)) = step.run(projectMetadata).value
+      val Success(Left(recoverableError)) = step.run(project).value
 
       recoverableError            shouldBe a[TransformationRecoverableError]
       recoverableError.getMessage shouldBe "Problem finding project details in KG"
@@ -92,12 +93,12 @@ class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
     "fail with NonRecoverableFailure if finding calls to KG fails with an unknown exception" in new TestCase {
       val exception = exceptions.generateOne
       (kgProjectFinder.find _)
-        .expects(projectMetadata.project.resourceId)
+        .expects(project.resourceId)
         .returning(exception.raiseError[Try, Option[KGProjectInfo]])
 
       val step = transformer.createTransformationStep
 
-      val Failure(nonRecoverableError) = step.run(projectMetadata).value
+      val Failure(nonRecoverableError) = step.run(project).value
       nonRecoverableError shouldBe exception
     }
   }
@@ -108,7 +109,7 @@ class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
     val updatesCreator  = mock[UpdatesCreator]
     val transformer     = new ProjectTransformerImpl[Try](kgProjectFinder, updatesCreator)
 
-    val projectMetadata = projectMetadatas.generateOne
+    val project = projectEntitiesWithDatasetsAndActivities.generateOne.to[entities.Project]
   }
 
   private lazy val recoverableClientErrors: Gen[RestClientError] =

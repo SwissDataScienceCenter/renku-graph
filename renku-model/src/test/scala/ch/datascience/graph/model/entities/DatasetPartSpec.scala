@@ -21,7 +21,6 @@ package ch.datascience.graph.model.entities
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{timestamps, timestampsNotInTheFuture}
-import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.testentities._
 import ch.datascience.graph.model.{InvalidationTime, entities}
 import io.circe.DecodingFailure
@@ -32,31 +31,29 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class DatasetPartSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
-  "DatasetPart.decode" should {
-
-    "turn JsonLD DatasetPart with HavingInvalidation time entity into the DatasetPart object" in {
-      forAll(
-        datasetEntities(datasetProvenanceInternal, projectEntities[ForksCount.Zero](visibilityPublic))
-      ) { dataset =>
-        val datasetPart      = datasetPartEntities(dataset.provenance.date.value).generateOne
-        val invalidationTime = invalidationTimes(datasetPart.dateCreated.value).generateOne
-        val invalidatedDataset = dataset
-          .copy(parts = List(datasetPart))
-          .invalidatePart(datasetPart, invalidationTime)
-          .fold(errors => throw new Exception(errors.intercalate("\n")), identity)
-
-        invalidatedDataset.asJsonLD.flatten
-          .fold(throw _, identity)
-          .cursor
-          .as[List[entities.DatasetPart]] shouldBe invalidatedDataset.parts.map(_.to[entities.DatasetPart]).asRight
-      }
-    }
+  "decode" should {
 
     "turn JsonLD DatasetPart entity into the DatasetPart object" in {
       val startDate = timestampsNotInTheFuture.generateOne
       forAll(datasetPartEntities(startDate)) { datasetPart =>
         datasetPart.asJsonLD.cursor
           .as[entities.DatasetPart] shouldBe datasetPart.to[entities.DatasetPart].asRight
+      }
+    }
+
+    "turn JsonLD DatasetPart with InvalidationTime entity into the DatasetPart object" in {
+      forAll(datasetEntities(ofAnyProvenance).decoupledFromProject) { dataset =>
+        val datasetPart      = datasetPartEntities(dataset.provenance.date.instant).generateOne
+        val invalidationTime = invalidationTimes(datasetPart.dateCreated.value).generateOne
+        val invalidatedDataset = dataset
+          .copy(parts = List(datasetPart))
+          .invalidatePart(datasetPart, invalidationTime)
+          .fold(errors => fail(errors.intercalate("; ")), identity)
+
+        invalidatedDataset.asJsonLD.flatten
+          .fold(throw _, identity)
+          .cursor
+          .as[List[entities.DatasetPart]] shouldBe invalidatedDataset.parts.map(_.to[entities.DatasetPart]).asRight
       }
     }
 

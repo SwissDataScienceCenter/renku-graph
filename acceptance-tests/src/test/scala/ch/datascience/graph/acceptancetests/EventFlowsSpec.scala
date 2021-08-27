@@ -28,7 +28,6 @@ import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.tooling._
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.http.client.AccessToken
 import ch.datascience.webhookservice.model.HookToken
 import org.http4s.Status._
@@ -60,7 +59,7 @@ class EventFlowsSpec
     Scenario("Valid events get through to the RDF store") {
 
       implicit val accessToken: AccessToken = accessTokens.generateOne
-      val project   = dataProjects(projectEntities[ForksCount.Zero](visibilityPublic)).generateOne
+      val project   = dataProjects(projectEntities(visibilityPublic)).generateOne
       val projectId = project.id
       val commitId  = commitIds.generateOne
       val committer = personEntities.generateOne
@@ -96,7 +95,7 @@ class EventFlowsSpec
     Scenario("A non recoverable generation error arises and the events are reported as failed") {
 
       implicit val accessToken: AccessToken = accessTokens.generateOne
-      val project   = dataProjects(projectEntities[ForksCount.Zero](visibilityPublic)).generateOne
+      val project   = dataProjects(projectEntities(visibilityPublic)).generateOne
       val projectId = project.id
       val commitId  = commitIds.generateOne
 
@@ -133,7 +132,7 @@ class EventFlowsSpec
     ) {
 
       implicit val accessToken: AccessToken = accessTokens.generateOne
-      val project   = dataProjects(projectEntities[ForksCount.Zero](visibilityPublic)).generateOne
+      val project   = dataProjects(projectEntities(visibilityPublic)).generateOne
       val projectId = project.id
       val commitId  = commitIds.generateOne
 
@@ -167,7 +166,7 @@ class EventFlowsSpec
     Scenario("A non recoverable transformation error arises and the events are reported as a non recoverable failure") {
 
       implicit val accessToken: AccessToken = accessTokens.generateOne
-      val project   = dataProjects(projectEntities[ForksCount.Zero](visibilityPublic)).generateOne
+      val project   = dataProjects(projectEntities(visibilityPublic)).generateOne
       val projectId = project.id
       val commitId  = commitIds.generateOne
       val committer = personEntities.generateOne
@@ -203,7 +202,7 @@ class EventFlowsSpec
     Scenario("A recoverable transformation error arises and the events are reported as a recoverable failure") {
 
       implicit val accessToken: AccessToken = accessTokens.generateOne
-      val project   = dataProjects(projectEntities[ForksCount.Zero](visibilityPublic)).generateOne
+      val project   = dataProjects(projectEntities(visibilityPublic)).generateOne
       val projectId = project.id
       val commitId  = commitIds.generateOne
       val committer = personEntities.generateOne

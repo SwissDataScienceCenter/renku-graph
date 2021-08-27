@@ -39,7 +39,7 @@ object activities {
       with BoundedInstant
       with TinyTypeJsonLDOps[StartTime] {
     import java.time.temporal.ChronoUnit.HOURS
-    protected[this] override def maybeMax: Option[Instant] = now.plus(24, HOURS).some
+    protected[this] override def maybeMax: Option[Instant] = instantNow.plus(24, HOURS).some
   }
 
   final class EndTime private (val value: Instant) extends AnyVal with InstantTinyType
@@ -48,7 +48,7 @@ object activities {
       with BoundedInstant
       with TinyTypeJsonLDOps[EndTime] {
     import java.time.temporal.ChronoUnit.HOURS
-    protected[this] override def maybeMax: Option[Instant] = now.plus(24, HOURS).some
+    protected[this] override def maybeMax: Option[Instant] = instantNow.plus(24, HOURS).some
   }
 
   final class Order private (val value: Int) extends AnyVal with IntTinyType

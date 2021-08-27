@@ -20,6 +20,7 @@ package ch.datascience.graph.model.entities
 
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.GraphModelGenerators.projectCreatedDates
 import ch.datascience.graph.model.Schemas.prov
 import ch.datascience.graph.model.entities
 import ch.datascience.graph.model.testentities._
@@ -32,23 +33,21 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class AssociationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
-  "Association.decode" should {
+  "decode" should {
 
     "turn JsonLD Association entity into the Association object" in {
-      forAll(executionPlanners(planEntities(), projectEntities(anyVisibility)(anyForksCount))) { executionPlanner =>
-        val activity = executionPlanner.buildProvenanceUnsafe()
-
-        activity.asJsonLD.flatten
+      forAll(activityEntities(planEntities())(projectCreatedDates().generateOne).map(_.association)) { association =>
+        JsonLD
+          .arr(association.asJsonLD, association.plan.asJsonLD)
+          .flatten
           .fold(throw _, identity)
           .cursor
-          .as[List[entities.Association]] shouldBe List(activity.association.to[entities.Association]).asRight
+          .as[List[entities.Association]] shouldBe List(association.to[entities.Association]).asRight
       }
     }
 
-    "fail if there are no plan entity the Association points to" in {
-      val association = executionPlanners(planEntities(), projectEntities(anyVisibility)(anyForksCount)).generateOne
-        .buildProvenanceUnsafe()
-        .association
+    "fail if there is no plan entity the Association points to" in {
+      val association = activityEntities(planEntities())(projectCreatedDates().generateOne).generateOne.association
         .to[entities.Association]
 
       val encoder = JsonLDEncoder.instance[entities.Association] { entity =>
@@ -71,9 +70,7 @@ class AssociationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPr
     }
 
     "fail if there are no Agent entity the Association points to" in {
-      val association = executionPlanners(planEntities(), projectEntities(anyVisibility)(anyForksCount)).generateOne
-        .buildProvenanceUnsafe()
-        .association
+      val association = activityEntities(planEntities())(projectCreatedDates().generateOne).generateOne.association
         .to[entities.Association]
 
       val encoder = JsonLDEncoder.instance[entities.Association] { entity =>

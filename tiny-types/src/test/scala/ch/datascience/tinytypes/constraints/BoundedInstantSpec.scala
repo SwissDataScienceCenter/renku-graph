@@ -34,11 +34,11 @@ class BoundedInstantSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
     object Type
         extends TinyTypeFactory[InstantTinyType](instant => new InstantTinyType { val value = instant })
         with BoundedInstant {
-      protected[this] override lazy val now: Instant         = Instant.now()
-      val min:                               Instant         = now.minus(24, HOURS)
-      val max:                               Instant         = now.plus(24, HOURS)
-      protected[this] override def maybeMin: Option[Instant] = Some(min)
-      protected[this] override def maybeMax: Option[Instant] = Some(max)
+      protected[this] override lazy val instantNow: Instant         = Instant.now()
+      val min:                                      Instant         = instantNow.minus(24, HOURS)
+      val max:                                      Instant         = instantNow.plus(24, HOURS)
+      protected[this] override def maybeMin:        Option[Instant] = Some(min)
+      protected[this] override def maybeMax:        Option[Instant] = Some(max)
     }
 
     "be instantiatable instants from within the defined boundaries" in {
@@ -84,9 +84,9 @@ class BoundedInstantSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
     object Type
         extends TinyTypeFactory[InstantTinyType](instant => new InstantTinyType { val value = instant })
         with BoundedInstant {
-      protected[this] override lazy val now: Instant         = Instant.now()
-      val min:                               Instant         = now.minus(24, HOURS)
-      protected[this] override def maybeMin: Option[Instant] = Some(min)
+      protected[this] override lazy val instantNow: Instant         = Instant.now()
+      val min:                                      Instant         = instantNow.minus(24, HOURS)
+      protected[this] override def maybeMin:        Option[Instant] = Some(min)
     }
 
     "be instantiatable instants from within the defined boundaries" in {
@@ -116,9 +116,9 @@ class BoundedInstantSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
     object Type
         extends TinyTypeFactory[InstantTinyType](instant => new InstantTinyType { val value = instant })
         with BoundedInstant {
-      protected[this] override lazy val now: Instant         = Instant.now()
-      val max:                               Instant         = now.plus(24, HOURS)
-      protected[this] override def maybeMax: Option[Instant] = Some(max)
+      protected[this] override lazy val instantNow: Instant         = Instant.now()
+      val max:                                      Instant         = instantNow.plus(24, HOURS)
+      protected[this] override def maybeMax:        Option[Instant] = Some(max)
     }
 
     "be instantiatable instants from within the defined boundaries" in {

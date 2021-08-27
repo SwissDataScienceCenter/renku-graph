@@ -18,13 +18,12 @@
 
 package ch.datascience.knowledgegraph.projects.rest
 
-import Converters._
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.testentities._
 import ch.datascience.interpreters.TestLogger
+import ch.datascience.knowledgegraph.projects.rest.Converters._
 import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder.KGProject
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
@@ -37,8 +36,8 @@ class KGProjectFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
   "findProject" should {
 
     "return details of the project with the given path when there's no parent" in new TestCase {
-      forAll(projectEntities[ForksCount.Zero](anyVisibility)) { project =>
-        loadToStore(projectEntities[ForksCount.Zero](anyVisibility).generateOne, project)
+      forAll(projectEntities(anyVisibility)) { project =>
+        loadToStore(anyProjectEntities.generateOne, project)
 
         metadataFinder.findProject(project.path).unsafeRunSync() shouldBe Some(project.to[KGProject])
       }
@@ -46,7 +45,7 @@ class KGProjectFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
 
     "return details of the project with the given path if it has a parent project" in new TestCase {
       forAll(projectWithParentEntities(anyVisibility)) { project =>
-        loadToStore(project)
+        loadToStore(project, project.parent)
 
         metadataFinder.findProject(project.path).unsafeRunSync() shouldBe Some(project.to[KGProject])
       }

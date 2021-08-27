@@ -124,7 +124,7 @@ private object NodeDetailsFinder {
   implicit val locationQuery: (Node.Location, ResourceId) => SparqlQuery = (location, path) =>
     SparqlQuery.of(
       name = "lineage - entity details",
-      Prefixes.of(prov -> "prov", schema -> "schema"),
+      Prefixes.of(prov -> "prov", schema -> "schema", renku -> "renku"),
       s"""|SELECT DISTINCT ?type ?location ?label
           |WHERE {
           |  { 
@@ -134,9 +134,9 @@ private object NodeDetailsFinder {
           |  } {
           |    ?activityId a prov:Activity ;
           |                prov:qualifiedUsage / prov:entity ?entity ;
-          |                schema:isPartOf ${path.showAs[RdfResource]} .
+          |                ^renku:hasActivity ${path.showAs[RdfResource]} .
           |  } UNION {
-          |    ?entity prov:qualifiedGeneration / prov:activity / schema:isPartOf ${path.showAs[RdfResource]} .
+          |    ?entity prov:qualifiedGeneration / prov:activity / ^renku:hasActivity ${path.showAs[RdfResource]} .
           |  }
           |  BIND ('$location' AS ?location)
           |  BIND ('$location' AS ?label)

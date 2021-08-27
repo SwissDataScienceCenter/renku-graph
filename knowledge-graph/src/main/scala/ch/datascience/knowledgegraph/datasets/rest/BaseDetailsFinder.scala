@@ -31,7 +31,6 @@ import io.circe.{DecodingFailure, HCursor}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.util.Try
 
 private class BaseDetailsFinder[Interpretation[_]: ConcurrentEffect: Timer](
     rdfStoreConfig:          RdfStoreConfig,
@@ -49,23 +48,24 @@ private class BaseDetailsFinder[Interpretation[_]: ConcurrentEffect: Timer](
   private def queryForDatasetDetails(identifier: Identifier) = SparqlQuery.of(
     name = "ds by id - details",
     Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema"),
-    s"""|SELECT DISTINCT ?identifier ?name ?maybeDateCreated ?alternateName ?url ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?maybeDatePublished ?projectId ?projectName
+    s"""|SELECT DISTINCT ?identifier ?name ?maybeDateCreated ?alternateName ?url ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?maybeDatePublished ?projectPath ?projectName
         |WHERE {        
         |  {
-        |    SELECT ?projectId ?projectName
+        |    SELECT ?projectId ?projectPath ?projectName
         |    WHERE {
         |      ?datasetId a schema:Dataset;
         |                 schema:identifier '$identifier';
-        |                 schema:isPartOf ?projectId .
+        |                 ^renku:hasDataset  ?projectId.
         |      ?projectId schema:dateCreated ?dateCreated ;
-        |                 schema:name ?projectName .
+        |                 schema:name ?projectName;
+        |                 renku:projectPath ?projectPath.
         |      FILTER NOT EXISTS {
         |        ?datasetId prov:invalidatedAtTime ?invalidationTime.
         |      }
         |      FILTER NOT EXISTS {
         |        ?parentDsId prov:wasDerivedFrom / schema:url ?datasetId.
         |        ?parentDsId prov:invalidatedAtTime ?invalidationTimeOnChild;
-        |                    schema:isPartOf ?projectId.
+        |                    ^renku:hasDataset  ?projectId.
         |      }
         |    }
         |    ORDER BY ?dateCreated ?projectName
@@ -75,7 +75,7 @@ private class BaseDetailsFinder[Interpretation[_]: ConcurrentEffect: Timer](
         |  ?datasetId schema:identifier '$identifier';
         |             schema:identifier ?identifier;
         |             a schema:Dataset;
-        |             schema:isPartOf ?projectId;   
+        |             ^renku:hasDataset  ?projectId;   
         |             schema:url ?url;
         |             schema:name ?name;
         |             schema:alternateName ?alternateName;
@@ -125,9 +125,7 @@ private class BaseDetailsFinder[Interpretation[_]: ConcurrentEffect: Timer](
     case Nil            => Option.empty[Dataset].pure[Interpretation]
     case dataset :: Nil => Option(dataset).pure[Interpretation]
     case dataset :: _ =>
-      new Exception(
-        s"More than one dataset with ${dataset.id} id"
-      ).raiseError[Interpretation, Option[Dataset]]
+      new Exception(s"More than one dataset with ${dataset.id} id").raiseError[Interpretation, Option[Dataset]]
   }
 }
 
@@ -214,7 +212,7 @@ private object BaseDetailsFinder {
         maybeDescription <- extract[Option[String]]("description")
                               .map(blankToNone)
                               .flatMap(toOption[Description])
-        projectPath <- extract[projects.ResourceId]("projectId") >>= toProjectPath
+        projectPath <- extract[projects.Path]("projectPath")
         projectName <- extract[projects.Name]("projectName")
         dataset <- createDataset(identifier,
                                  title,
@@ -248,12 +246,6 @@ private object BaseDetailsFinder {
 
     _.downField("results").downField("bindings").as(decodeList[ImageUri])
   }
-
-  def toProjectPath(projectPath: projects.ResourceId) =
-    projectPath
-      .as[Try, Path]
-      .toEither
-      .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
 
   private def extract[T](property: String)(implicit cursor: HCursor, decoder: Decoder[T]): Result[T] =
     cursor.downField(property).downField("value").as[T]

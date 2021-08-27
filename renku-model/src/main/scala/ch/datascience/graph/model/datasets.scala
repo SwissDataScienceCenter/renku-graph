@@ -144,7 +144,7 @@ object datasets {
 
     implicit val jsonLDEncoder: JsonLDEncoder[DerivedFrom] = JsonLDEncoder.instance { derivedFrom =>
       JsonLD.entity(
-        EntityId of s"_:${java.util.UUID.randomUUID()}",
+        EntityId of s"$derivedFrom/${derivedFrom.value.hashCode}",
         entityTypes,
         schema / "url" -> EntityId.of(derivedFrom.value).asJsonLD
       )
@@ -209,7 +209,7 @@ object datasets {
 
     implicit lazy val internalSameAsEncoder: JsonLDEncoder[InternalSameAs] = JsonLDEncoder.instance { sameAs =>
       JsonLD.entity(
-        EntityId of s"_:${java.util.UUID.randomUUID()}",
+        EntityId of s"$sameAs/${sameAs.value.hashCode}",
         urlEntityTypes,
         schema / "url" -> EntityId.of(sameAs.value).asJsonLD
       )
@@ -221,7 +221,7 @@ object datasets {
 
     implicit lazy val externalSameAsEncoder: JsonLDEncoder[ExternalSameAs] = JsonLDEncoder.instance { sameAs =>
       JsonLD.entity(
-        EntityId of s"_:${java.util.UUID.randomUUID()}",
+        EntityId of s"$sameAs/${sameAs.value.hashCode}",
         urlEntityTypes,
         schema / "url" -> sameAs.value.asJsonLD
       )

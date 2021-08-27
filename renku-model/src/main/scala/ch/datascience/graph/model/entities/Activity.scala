@@ -22,20 +22,18 @@ import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
 import ch.datascience.graph.model.activities.{EndTime, Order, ResourceId, StartTime}
 import ch.datascience.graph.model.entities.ParameterValue.{InputParameterValue, OutputParameterValue}
-import ch.datascience.graph.model.projects
 import io.circe.DecodingFailure
 
-final case class Activity(resourceId:        ResourceId,
-                          startTime:         StartTime,
-                          endTime:           EndTime,
-                          author:            Person,
-                          agent:             Agent,
-                          projectResourceId: projects.ResourceId,
-                          order:             Order,
-                          association:       Association,
-                          usages:            List[Usage],
-                          generations:       List[Generation],
-                          parameters:        List[ParameterValue]
+final case class Activity(resourceId:  ResourceId,
+                          startTime:   StartTime,
+                          endTime:     EndTime,
+                          author:      Person,
+                          agent:       Agent,
+                          order:       Order,
+                          association: Association,
+                          usages:      List[Usage],
+                          generations: List[Generation],
+                          parameters:  List[ParameterValue]
 )
 
 object Activity {
@@ -46,17 +44,16 @@ object Activity {
 
   val entityTypes: EntityTypes = EntityTypes of (prov / "Activity")
 
-  def from(resourceId:        ResourceId,
-           startTime:         StartTime,
-           endTime:           EndTime,
-           author:            Person,
-           agent:             Agent,
-           projectResourceId: projects.ResourceId,
-           order:             Order,
-           association:       Association,
-           usages:            List[Usage],
-           generations:       List[Generation],
-           parameters:        List[ParameterValue]
+  def from(resourceId:  ResourceId,
+           startTime:   StartTime,
+           endTime:     EndTime,
+           author:      Person,
+           agent:       Agent,
+           order:       Order,
+           association: Association,
+           usages:      List[Usage],
+           generations: List[Generation],
+           parameters:  List[ParameterValue]
   ): ValidatedNel[String, Activity] = validateState(usages, generations, parameters).map { _ =>
     Activity(
       resourceId,
@@ -64,7 +61,6 @@ object Activity {
       endTime,
       author,
       agent,
-      projectResourceId,
       order,
       association,
       usages,
@@ -115,7 +111,6 @@ object Activity {
         prov / "qualifiedAssociation" -> activity.association.asJsonLD,
         prov / "qualifiedUsage"       -> activity.usages.asJsonLD,
         renku / "parameter"           -> activity.parameters.asJsonLD,
-        schema / "isPartOf"           -> activity.projectResourceId.asEntityId.asJsonLD,
         renku / "order"               -> activity.order.asJsonLD
       )
   }
@@ -138,7 +133,6 @@ object Activity {
                   case author :: Nil => Right(author)
                   case _             => Left(DecodingFailure(s"Activity $resourceId without or with multiple authors", Nil))
                 }
-      projectId   <- cursor.downField(schema / "isPartOf").downEntityId.as[projects.ResourceId]
       order       <- cursor.downField(renku / "order").as[Order]
       association <- cursor.downField(prov / "qualifiedAssociation").as[Association]
       usages      <- cursor.downField(prov / "qualifiedUsage").as[List[Usage]]
@@ -151,7 +145,6 @@ object Activity {
                           endedAtTime,
                           author,
                           agent,
-                          projectId,
                           order,
                           association,
                           usages,

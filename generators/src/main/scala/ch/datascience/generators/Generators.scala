@@ -38,6 +38,8 @@ object Generators {
 
   type NonBlank = String Refined NonEmpty
 
+  def fixed[V](value: V): Gen[V] = Gen.const(value)
+
   def emptyOptionOf[T]: Gen[Option[T]] = Gen.const(Option.empty[T])
 
   def nonEmptyStrings(maxLength: Int = 10, charsGenerator: Gen[Char] = alphaChar): Gen[String] = {
@@ -347,6 +349,8 @@ object Generators {
         if (generated == value) generateDifferentThan(value)
         else generated
       }
+
+      def toGenerateOfFixedValue: Gen[T] = fixed(generateExample(generator))
 
       def toGeneratorOfSomes:   Gen[Option[T]] = generator map Option.apply
       def toGeneratorOfNones:   Gen[Option[T]] = Gen.const(None)

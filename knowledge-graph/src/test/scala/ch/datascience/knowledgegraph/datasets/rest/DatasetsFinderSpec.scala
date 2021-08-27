@@ -21,13 +21,11 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.generators.Generators
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.RenkuBaseUrl
-import ch.datascience.graph.model.projects.{ForksCount, Visibility}
-import ch.datascience.graph.model.testentities.EntitiesGenerators._
-import ch.datascience.graph.model.testentities.{Dataset, Person}
+import ch.datascience.graph.model.projects.Visibility
+import ch.datascience.graph.model.testentities._
 import ch.datascience.http.rest.SortBy.Direction
 import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.http.rest.paging.model.{Page, PerPage, Total}
@@ -41,6 +39,8 @@ import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
+import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -52,317 +52,316 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
     Option(Phrase("*")) :: Option.empty[Phrase] :: Nil foreach { maybePhrase =>
       s"return all datasets when the given phrase is $maybePhrase " +
         "- case of datasets that has neither sameAs nor are imported to and/or from other projects" in new TestCase {
-          val dataset1 = datasetEntities(datasetProvenanceInternal).generateOne
-          val dataset2Imported =
-            dataset1 importTo projectEntities[ForksCount.Zero](visibilityPublic).generateOne
 
-          val dataset3 = datasetEntities(datasetProvenanceInternal).generateOne
+          val (dataset1, project1)                   = publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
+          val (dataset1ImportedToProject2, project2) = publicProjectEntities.importDataset(dataset1).generateOne
+          val (dataset3, project3)                   = publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
 
-          loadToStore(dataset1, dataset2Imported, dataset3)
+          loadToStore(project1, project2, project3)
 
           val result = datasetsFinder
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
             .unsafeRunSync()
 
           val expectedResults = List(
-            List(dataset1, dataset2Imported).toDatasetSearchResult(matchIdFrom = result.results),
-            List(dataset3.toDatasetSearchResult(projectsCount = 1))
+            List(
+              dataset1                   -> project1,
+              dataset1ImportedToProject2 -> project2
+            ).toDatasetSearchResult(matchIdFrom = result.results, projectsCount = 2),
+            List((dataset3 -> project3).toDatasetSearchResult(projectsCount = 1))
           ).flatten.sortBy(_.title)
 
-          result.results shouldBe expectedResults
-
+          result.results          shouldBe expectedResults
           result.pagingInfo.total shouldBe Total(expectedResults.size)
         }
 
       s"return all datasets when the given phrase is $maybePhrase " +
         "- case of non-modified datasets" in new TestCase {
 
-          val datasets = datasetEntities(provenanceGen = datasetProvenanceImportedExternal)
+          val projects = projectEntities(visibilityPublic)
+            .withDatasets(datasetEntities(provenanceImportedExternal))
             .generateNonEmptyList(maxElements = Refined.unsafeApply(PagingRequest.default.perPage.value))
             .toList
 
-          loadToStore(datasets: _*)
+          loadToStore(projects: _*)
 
           val result = datasetsFinder
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
             .unsafeRunSync()
 
-          result.results shouldBe datasets
+          result.results shouldBe projects
+            .map(project => project.datasets.head -> project)
             .map(_.toDatasetSearchResult(projectsCount = 1))
             .sortBy(_.title)
-
-          result.pagingInfo.total shouldBe Total(datasets.size)
+          result.pagingInfo.total shouldBe Total(projects.size)
         }
 
       s"return all datasets when the given phrase is $maybePhrase " +
         "- case of shared sameAs" in new TestCase {
 
-          val datasets = importedExternalDatasetEntities(sharedInProjects = 3).generateOne
+          val dataset              = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
+          val (dataset1, project1) = publicProjectEntities.importDataset(dataset).generateOne
+          val (dataset2, project2) = publicProjectEntities.importDataset(dataset).generateOne
+          val (dataset3, project3) = publicProjectEntities.importDataset(dataset).generateOne
 
-          loadToStore(datasets: _*)
-
-          val result = datasetsFinder
-            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
-            .unsafeRunSync()
-
-          result.results shouldBe datasets.toDatasetSearchResult(matchIdFrom = result.results).toList
-
-          result.pagingInfo.total shouldBe Total(1)
-        }
-
-      s"return all datasets when the given phrase is $maybePhrase " +
-        "- case of shared sameAs with modification on some projects" in new TestCase {
-
-          val dataset1 :: dataset2 :: Nil = importedExternalDatasetEntities(sharedInProjects = 2).generateOne
-
-          val dataset2Modified = modifiedDatasetEntities(dataset2).generateOne
-
-          loadToStore(dataset1, dataset2, dataset2Modified)
-
-          val result = datasetsFinder
-            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
-            .unsafeRunSync()
-
-          result.results shouldBe List(dataset1, dataset2Modified)
-            .map(_.toDatasetSearchResult(projectsCount = 1))
-            .sortBy(_.title)
-
-          result.pagingInfo.total shouldBe Total(2)
-        }
-
-      s"return all datasets when the given phrase is $maybePhrase " +
-        "- case of shared sameAs and forks" in new TestCase {
-
-          val dataset1 :: dataset2 :: Nil = importedExternalDatasetEntities(sharedInProjects = 2).generateOne
-
-          val datasets2Fork = dataset2.forkProject().fork
-
-          loadToStore(dataset1, dataset2, datasets2Fork)
-
-          val result = datasetsFinder
-            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
-            .unsafeRunSync()
-
-          result.results shouldBe List(dataset1, dataset2, datasets2Fork)
-            .toDatasetSearchResult(matchIdFrom = result.results)
-            .toList
-
-          result.pagingInfo.total shouldBe Total(1)
-        }
-
-      s"return latest versions of datasets when the given phrase is $maybePhrase " +
-        "- case of one level of modification" in new TestCase {
-
-          val originalDatasetsList = datasetEntities(datasetProvenanceImportedExternal)
-            .generateNonEmptyList(maxElements = Refined.unsafeApply(PagingRequest.default.perPage.value))
-            .toList
-          val modifiedDatasetsList = originalDatasetsList.map(modifiedDatasetEntities(_).generateOne)
-
-          loadToStore(originalDatasetsList ++ modifiedDatasetsList: _*)
-
-          val result = datasetsFinder
-            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
-            .unsafeRunSync()
-
-          result.results shouldBe modifiedDatasetsList
-            .map(_.toDatasetSearchResult(projectsCount = 1))
-            .sortBy(_.title)
-
-          result.pagingInfo.total shouldBe Total(modifiedDatasetsList.size)
-        }
-
-      s"return latest versions of datasets when the given phrase is $maybePhrase " +
-        "- case more than one level of modification" in new TestCase {
-
-          val original      = datasetEntities(datasetProvenanceInternal).generateOne
-          val modification1 = modifiedDatasetEntities(original).generateOne
-          val modification2 = modifiedDatasetEntities(modification1).generateOne
-
-          loadToStore(original, modification1, modification2)
-
-          val result = datasetsFinder
-            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
-            .unsafeRunSync()
-
-          result.results            should contain only modification2.toDatasetSearchResult(projectsCount = 1)
-          result.pagingInfo.total shouldBe Total(1)
-        }
-
-      s"return latest versions of datasets when the given phrase is $maybePhrase " +
-        "- case if there are modified and non-modified datasets" in new TestCase {
-
-          val dataset1             = datasetEntities(datasetProvenanceInternal).generateOne
-          val dataset1Modification = modifiedDatasetEntities(dataset1).generateOne
-          val dataset2             = datasetEntities(datasetProvenanceImportedExternal).generateOne
-
-          loadToStore(dataset1, dataset1Modification, dataset2)
-
-          val result = datasetsFinder
-            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
-            .unsafeRunSync()
-
-          result.results shouldBe List(dataset1Modification, dataset2)
-            .map(_.toDatasetSearchResult(projectsCount = 1))
-            .sortBy(_.title)
-          result.pagingInfo.total shouldBe Total(2)
-        }
-
-      s"return latest versions of datasets when the given phrase is $maybePhrase " +
-        "- case if shared datasets are modified on some projects but not all" in new TestCase {
-
-          val dataset1 :: dataset2 :: Nil = importedExternalDatasetEntities(2).generateOne
-          val dataset2Modified            = modifiedDatasetEntities(dataset2).generateOne
-
-          loadToStore(dataset1, dataset2, dataset2Modified)
-
-          val result = datasetsFinder
-            .findDatasets(None, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
-            .unsafeRunSync()
-
-          result.results shouldBe List(dataset1, dataset2Modified)
-            .map(_.toDatasetSearchResult(projectsCount = 1))
-            .sortBy(_.title)
-
-          result.pagingInfo.total shouldBe Total(2)
-        }
-
-      s"return latest versions of datasets when the given phrase is $maybePhrase " +
-        "- case with forks on renku created datasets" in new TestCase {
-
-          val dataset     = datasetEntities(datasetProvenanceInternal).generateOne
-          val datasetFork = dataset.forkProject().fork
-
-          loadToStore(dataset, datasetFork)
-
-          val result = datasetsFinder
-            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
-            .unsafeRunSync()
-
-          result.results should contain theSameElementsAs List(dataset, datasetFork)
-            .toDatasetSearchResult(matchIdFrom = result.results)
-            .toList
-
-          result.pagingInfo.total shouldBe Total(1)
-        }
-
-      s"return latest versions of datasets when the given phrase is $maybePhrase " +
-        "- case with more than one level of modification and forks on the 1st level" in new TestCase {
-
-          val dataset             = datasetEntities(datasetProvenanceInternal).generateOne
-          val datasetFork         = dataset.forkProject().fork
-          val datasetModification = modifiedDatasetEntities(dataset).generateOne
-
-          loadToStore(dataset, datasetFork, datasetModification)
+          loadToStore(project1, project2, project3)
 
           val result = datasetsFinder
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
             .unsafeRunSync()
 
           result.results shouldBe List(
-            datasetFork.toDatasetSearchResult(projectsCount = 1),
-            datasetModification.toDatasetSearchResult(projectsCount = 1)
+            (dataset1, project1),
+            (dataset2, project2),
+            (dataset3, project3)
+          ).toDatasetSearchResult(matchIdFrom = result.results, projectsCount = 3).toList
+          result.pagingInfo.total shouldBe Total(1)
+        }
+
+      s"return all datasets when the given phrase is $maybePhrase " +
+        "- case of shared sameAs with modification on some projects" in new TestCase {
+          val dataset                             = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
+          val (dataset1, project1)                = publicProjectEntities.importDataset(dataset).generateOne
+          val (dataset2, project2)                = publicProjectEntities.importDataset(dataset).generateOne
+          val (dataset2Modified, project2Updated) = project2.addDataset(dataset2.createModification())
+
+          loadToStore(List(project1, project2Updated))
+
+          val result = datasetsFinder
+            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+            .unsafeRunSync()
+
+          result.results shouldBe List(
+            (dataset1, project1),
+            (dataset2Modified, project2Updated)
+          ).map(_.toDatasetSearchResult(projectsCount = 1)).sortBy(_.title)
+          result.pagingInfo.total shouldBe Total(2)
+        }
+
+      s"return all datasets when the given phrase is $maybePhrase " +
+        "- case of shared sameAs and forks" in new TestCase {
+
+          val dataset              = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
+          val (dataset1, project1) = publicProjectEntities.importDataset(dataset).generateOne
+          val (dataset2, project2 ::~ project2Fork) =
+            publicProjectEntities.importDataset(dataset).forkOnce().generateOne
+
+          loadToStore(project1, project2, project2Fork)
+
+          val result = datasetsFinder
+            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+            .unsafeRunSync()
+
+          result.results shouldBe List(
+            (dataset1, project1),
+            (dataset2, project2)
+          ).toDatasetSearchResult(matchIdFrom = result.results, projectsCount = 3).toList
+          result.pagingInfo.total shouldBe Total(1)
+        }
+
+      s"return latest versions of datasets when the given phrase is $maybePhrase " +
+        "- case of one level of modification" in new TestCase {
+
+          val ((_, dataset1Modified), project1) =
+            publicProjectEntities.addDatasetAndModification(datasetEntities(provenanceImportedExternal)).generateOne
+          val ((_, dataset2Modified), project2) =
+            publicProjectEntities.addDatasetAndModification(datasetEntities(provenanceImportedExternal)).generateOne
+
+          loadToStore(project1, project2)
+
+          val result = datasetsFinder
+            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+            .unsafeRunSync()
+
+          result.results shouldBe List(dataset1Modified -> project1, dataset2Modified -> project2)
+            .map(_.toDatasetSearchResult(projectsCount = 1))
+            .sortBy(_.title)
+          result.pagingInfo.total shouldBe Total(2)
+        }
+
+      s"return latest versions of datasets when the given phrase is $maybePhrase " +
+        "- case more than one level of modification" in new TestCase {
+
+          val (_ ::~ modification1, project) =
+            publicProjectEntities.addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
+          val (modification2, projectWithAllDatasets) = project.addDataset(modification1.createModification())
+
+          loadToStore(projectWithAllDatasets)
+
+          val result = datasetsFinder
+            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+            .unsafeRunSync()
+
+          result.results          shouldBe List((modification2, projectWithAllDatasets).toDatasetSearchResult(projectsCount = 1))
+          result.pagingInfo.total shouldBe Total(1)
+        }
+
+      s"return latest versions of datasets when the given phrase is $maybePhrase " +
+        "- case if there are modified and non-modified datasets" in new TestCase {
+
+          val (_ ::~ dataset1Modification, project1) =
+            publicProjectEntities.addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
+          val (dataset2, project2) =
+            publicProjectEntities.addDataset(datasetEntities(provenanceImportedExternal)).generateOne
+
+          loadToStore(project1, project2)
+
+          val result = datasetsFinder
+            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+            .unsafeRunSync()
+
+          result.results shouldBe List(
+            dataset1Modification -> project1,
+            dataset2             -> project2
+          ).map(_.toDatasetSearchResult(projectsCount = 1)).sortBy(_.title)
+          result.pagingInfo.total shouldBe Total(2)
+        }
+
+      s"return latest versions of datasets when the given phrase is $maybePhrase " +
+        "- case if shared datasets are modified on some projects but not all" in new TestCase {
+
+          val dataset                             = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
+          val (dataset1, project1)                = publicProjectEntities.importDataset(dataset).generateOne
+          val (dataset2, project2)                = publicProjectEntities.importDataset(dataset).generateOne
+          val (dataset2Modified, project2Updated) = project2.addDataset(dataset2.createModification())
+
+          loadToStore(project1, project2Updated)
+
+          val result = datasetsFinder
+            .findDatasets(None, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+            .unsafeRunSync()
+
+          result.results shouldBe List(
+            dataset1         -> project1,
+            dataset2Modified -> project2Updated
+          ).map(_.toDatasetSearchResult(projectsCount = 1)).sortBy(_.title)
+          result.pagingInfo.total shouldBe Total(2)
+        }
+
+      s"return latest versions of datasets when the given phrase is $maybePhrase " +
+        "- case with forks on renku created datasets" in new TestCase {
+
+          val (dataset, project ::~ fork) = publicProjectEntities
+            .addDataset(datasetEntities(provenanceInternal))
+            .forkOnce()
+            .generateOne
+
+          loadToStore(project, fork)
+
+          val result = datasetsFinder
+            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+            .unsafeRunSync()
+
+          result.results          shouldBe List((dataset -> project).toDatasetSearchResult(projectsCount = 2))
+          result.pagingInfo.total shouldBe Total(1)
+        }
+
+      s"return latest versions of datasets when the given phrase is $maybePhrase " +
+        "- case with more than one level of modification and forks on the 1st level" in new TestCase {
+
+          val (dataset, project ::~ fork) =
+            publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).forkOnce().generateOne
+          val (datasetModified, projectUpdated) = project.addDataset(dataset.createModification())
+
+          loadToStore(projectUpdated, fork)
+
+          val result = datasetsFinder
+            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+            .unsafeRunSync()
+
+          result.results shouldBe List(
+            (dataset, fork).toDatasetSearchResult(projectsCount = 1),
+            (datasetModified, projectUpdated).toDatasetSearchResult(projectsCount = 1)
           ).sortBy(_.title)
 
           result.pagingInfo.total shouldBe Total(2)
         }
 
       s"return latest versions of datasets when the given phrase is $maybePhrase " +
-        "- case with more than one level of modification and forks on not the 1st level" in new TestCase {
+        "- case with more than one level of modification and forks not on the 1st level" in new TestCase {
 
-          val dataset                   = datasetEntities(datasetProvenanceImportedExternal).generateOne
-          val datasetModification       = modifiedDatasetEntities(dataset).generateOne
-          val datasetModificationFork   = datasetModification.forkProject().fork
-          val datasetModificationOnFork = modifiedDatasetEntities(datasetModificationFork).generateOne
+          val (dataset ::~ datasetModification, project ::~ fork) =
+            publicProjectEntities
+              .addDatasetAndModification(datasetEntities(provenanceImportedExternal))
+              .forkOnce()
+              .generateOne
+          val (modificationOfModificationOnFork, forkUpdated) =
+            fork.addDataset(datasetModification.createModification())
 
-          loadToStore(dataset, datasetModification, datasetModificationFork, datasetModificationOnFork)
+          loadToStore(project, forkUpdated)
 
           val result = datasetsFinder
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
             .unsafeRunSync()
 
           result.results should contain theSameElementsAs List(
-            datasetModification.toDatasetSearchResult(projectsCount = 1),
-            datasetModificationOnFork.toDatasetSearchResult(projectsCount = 1)
+            (datasetModification, project).toDatasetSearchResult(projectsCount = 1),
+            (modificationOfModificationOnFork, forkUpdated).toDatasetSearchResult(projectsCount = 1)
           ).sortBy(_.title)
-
           result.pagingInfo.total shouldBe Total(2)
         }
 
       s"not return deleted datasets when the given phrase is $maybePhrase" +
         "- case with unrelated datasets" in new TestCase {
-          val dataset1 = datasetEntities(datasetProvenanceImportedExternal).generateOne
-          val dataset2 = datasetEntities(datasetProvenanceImportedExternal).generateOne
-          val dataset2Deleted = dataset2
-            .invalidate(
-              invalidationTimes(dataset2.provenance.date.instant, dataset2.project.dateCreated.value).generateOne
-            )
-            .fold(errors => fail(errors.intercalate("; ")), identity)
+          val (dataset1, project1) =
+            publicProjectEntities.addDataset(datasetEntities(provenanceImportedExternal)).generateOne
+          val (_, project2) =
+            publicProjectEntities.addDatasetAndInvalidation(datasetEntities(provenanceImportedExternal)).generateOne
 
-          loadToStore(dataset1, dataset2, dataset2Deleted)
+          loadToStore(project1, project2)
 
           val result = datasetsFinder
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
             .unsafeRunSync()
 
-          result.results should contain theSameElementsAs List(dataset1.toDatasetSearchResult(projectsCount = 1))
+          result.results shouldBe List((dataset1, project1).toDatasetSearchResult(projectsCount = 1))
         }
 
       s"not return deleted datasets when the given phrase is $maybePhrase" +
         "- case with forks on renku created datasets and the fork dataset is deleted" in new TestCase {
 
-          val dataset     = datasetEntities(datasetProvenanceInternal).generateOne
-          val datasetFork = dataset.forkProject().fork
-          val datasetForkDeleted = datasetFork
-            .invalidate(invalidationTimes(datasetFork.provenance.date).generateOne)
-            .fold(errors => fail(errors.intercalate("; ")), identity)
+          val (dataset, project ::~ fork) =
+            publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).forkOnce().generateOne
+          val forkUpdated = fork.addDatasets(dataset.invalidateNow)
 
-          loadToStore(dataset, datasetFork, datasetForkDeleted)
+          loadToStore(project, forkUpdated)
 
           val result = datasetsFinder
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
             .unsafeRunSync()
 
-          result.results should contain theSameElementsAs List(dataset.toDatasetSearchResult(projectsCount = 1))
-
+          result.results shouldBe List((dataset, project).toDatasetSearchResult(projectsCount = 1))
         }
 
       s"not return deleted datasets when the given phrase is $maybePhrase" +
         "- case with forks on renku created datasets and original dataset is deleted" in new TestCase {
 
-          val dataset = datasetEntities(datasetProvenanceInternal).generateOne
+          val (dataset, project ::~ fork) =
+            publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).forkOnce().generateOne
+          val afterForkingUpdated = project.addDatasets(dataset.invalidateNow)
 
-          val datasetFork = dataset.forkProject().fork
-          val datasetDeleted = dataset
-            .invalidate(invalidationTimes(dataset.provenance.date).generateOne)
-            .fold(errors => fail(errors.intercalate("; ")), identity)
-
-          loadToStore(dataset, datasetFork, datasetDeleted)
+          loadToStore(afterForkingUpdated, fork)
 
           val result = datasetsFinder
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
             .unsafeRunSync()
 
-          result.results should contain theSameElementsAs List(datasetFork.toDatasetSearchResult(projectsCount = 1))
-
+          result.results shouldBe List((dataset, fork).toDatasetSearchResult(projectsCount = 1))
         }
 
       s"not return deleted datasets when the given phrase is $maybePhrase" +
         "- case with modification on renku created datasets" in new TestCase {
 
-          val dataset         = datasetEntities(datasetProvenanceInternal).generateOne
-          val datasetModified = modifiedDatasetEntities(dataset).generateOne
-          val datasetModifiedDeleted = datasetModified
-            .invalidate(invalidationTimes(datasetModified.provenance.date).generateOne)
-            .fold(errors => fail(errors.intercalate("; ")), identity)
+          val (_ ::~ datasetModified, project) =
+            publicProjectEntities.addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
+          val projectUpdated = project.addDatasets(datasetModified.invalidateNow)
 
-          loadToStore(dataset, datasetModified, datasetModifiedDeleted)
+          loadToStore(projectUpdated)
 
-          val result = datasetsFinder
+          datasetsFinder
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
             .unsafeRunSync()
-
-          result.results should contain theSameElementsAs Nil
-
+            .results shouldBe Nil
         }
     }
   }
@@ -372,195 +371,226 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
     "returns all datasets containing the phrase - " +
       "case with no shared SameAs and no modifications" in new TestCase {
 
-        val phrase               = phrases.generateOne.value
-        val dataset1             = datasetEntities(datasetProvenanceInternal).generateOne.makeNameContaining(phrase)
-        val dataset2             = datasetEntities(datasetProvenanceInternal).generateOne.makeDescContaining(phrase)
-        val dataset3             = datasetEntities(datasetProvenanceInternal).generateOne.makeCreatorNameContaining(phrase)
-        val dataset4             = datasetEntities(datasetProvenanceInternal).generateOne.makeTitleContaining(phrase)
-        val dataset5             = datasetEntities(datasetProvenanceInternal).generateOne.makeKeywordsContaining(phrase)
-        val datasetWithoutPhrase = datasetEntities(ofAnyProvenance).generateOne
+        val phrase = phrases.generateOne.value
+        val (dataset1, project1) = publicProjectEntities
+          .addDataset(datasetEntities(provenanceInternal).modify(_.makeNameContaining(phrase)))
+          .generateOne
+        val (dataset2, project2) = publicProjectEntities
+          .addDataset(datasetEntities(provenanceInternal).modify(_.makeDescContaining(phrase)))
+          .generateOne
+        val (dataset3, project3) = publicProjectEntities
+          .addDataset(datasetEntities(provenanceInternal).modify(_.makeCreatorNameContaining(phrase)))
+          .generateOne
+        val (dataset4, project4) = publicProjectEntities
+          .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(phrase)))
+          .generateOne
+        val (dataset5, project5) = publicProjectEntities
+          .addDataset(datasetEntities(provenanceInternal).modify(_.makeKeywordsContaining(phrase)))
+          .generateOne
+        val (_, projectWithoutPhrase) =
+          publicProjectEntities.addDataset(datasetEntities(ofAnyProvenance)).generateOne
 
-        loadToStore(dataset1, dataset2, dataset3, dataset4, dataset5, datasetWithoutPhrase)
+        loadToStore(project1, project2, project3, project4, project5, projectWithoutPhrase)
 
         val result = datasetsFinder
           .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
           .unsafeRunSync()
 
-        result.results shouldBe List(dataset1, dataset2, dataset3, dataset4, dataset5)
-          .map(_.toDatasetSearchResult(projectsCount = 1))
-          .sortBy(_.title)
-
+        result.results shouldBe List((dataset1, project1),
+                                     (dataset2, project2),
+                                     (dataset3, project3),
+                                     (dataset4, project4),
+                                     (dataset5, project5)
+        ).map(_.toDatasetSearchResult(projectsCount = 1)).sortBy(_.title)
         result.pagingInfo.total shouldBe Total(5)
       }
 
     "return no results if there is no matching dataset" in new TestCase {
 
-      val dataset = datasetEntities(datasetProvenanceInternal).generateOne
+      val (_, project) = publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
 
-      loadToStore(dataset)
+      loadToStore(project)
 
-      val result = datasetsFinder
+      datasetsFinder
         .findDatasets(Some(phrases.generateOne), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
         .unsafeRunSync()
-
-      result.results.isEmpty  shouldBe true
-      result.pagingInfo.total shouldBe Total(0)
+        .results shouldBe Nil
     }
 
     "return no datasets if the match was only in an older version which is not used anymore" in new TestCase {
 
-      val phrase       = phrases.generateOne
-      val original     = datasetEntities(datasetProvenanceInternal).generateOne.makeKeywordsContaining(phrase.value)
-      val modification = modifiedDatasetEntities(original).generateOne
+      val phrase = phrases.generateOne
+      val (_, project) = publicProjectEntities
+        .addDatasetAndModification(datasetEntities(provenanceInternal).modify(_.makeKeywordsContaining(phrase.value)))
+        .generateOne
 
-      loadToStore(original, modification)
+      loadToStore(project)
 
       datasetsFinder
         .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
         .unsafeRunSync()
-        .results
-        .isEmpty shouldBe true
+        .results shouldBe Nil
     }
 
     "return datasets matching the criteria excluding datasets which were modified and does not match anymore" in new TestCase {
 
       val phrase = phrases.generateOne
-      val dataset1 :: dataset2 :: Nil =
-        importedExternalDatasetEntities(2).generateOne.map(_.makeKeywordsContaining(phrase.value))
-      val dataset2Modification = modifiedDatasetEntities(dataset2).generateOne
+      val (dataset1, project1) = publicProjectEntities
+        .addDataset(datasetEntities(provenanceImportedExternal).modify(_.makeKeywordsContaining(phrase.value)))
+        .generateOne
+      val (_, project2) = publicProjectEntities
+        .addDatasetAndModification(
+          datasetEntities(provenanceImportedExternal).modify(_.makeKeywordsContaining(phrase.value))
+        )
+        .generateOne
 
-      loadToStore(dataset1, dataset2, dataset2Modification)
+      loadToStore(project1, project2)
 
       datasetsFinder
         .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
         .unsafeRunSync()
-        .results shouldBe List(dataset1.toDatasetSearchResult(projectsCount = 1))
+        .results shouldBe List((dataset1, project1).toDatasetSearchResult(projectsCount = 1))
     }
 
     "return datasets matching the criteria after modification" in new TestCase {
 
-      val phrase                      = phrases.generateOne
-      val dataset1 :: dataset2 :: Nil = importedExternalDatasetEntities(2).generateOne
-      val dataset2Modification        = modifiedDatasetEntities(dataset2).generateOne.makeKeywordsContaining(phrase.value)
+      val phrase = phrases.generateOne
+      val (_, project1) =
+        publicProjectEntities.addDataset(datasetEntities(provenanceImportedExternal)).generateOne
+      val (dataset2, project2) =
+        publicProjectEntities.addDataset(datasetEntities(provenanceImportedExternal)).generateOne
+      val (dataset2Modified, project2Updated) =
+        project2.addDataset(dataset2.createModification(_.makeKeywordsContaining(phrase.value)))
 
-      loadToStore(dataset1, dataset2, dataset2Modification)
+      loadToStore(project1, project2Updated)
 
       datasetsFinder
         .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
         .unsafeRunSync()
-        .results shouldBe List(dataset2Modification.toDatasetSearchResult(projectsCount = 1))
+        .results shouldBe List((dataset2Modified, project2Updated).toDatasetSearchResult(projectsCount = 1))
     }
 
     "return no datasets if the criteria is matched somewhere in the middle of the modification hierarchy" in new TestCase {
 
-      val phrase  = phrases.generateOne
-      val dataset = datasetEntities(datasetProvenanceInternal).generateOne
-      val datasetModification1 = modifiedDatasetEntities(dataset).generateOne
-        .makeKeywordsContaining(phrase.value)
-      val datasetModification2 = modifiedDatasetEntities(datasetModification1).generateOne
+      val phrase             = phrases.generateOne
+      val (dataset, project) = publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
+      val (datasetModification1, projectUpdate1) =
+        project.addDataset(dataset.createModification(_.makeKeywordsContaining(phrase.value)))
+      val (_, projectUpdate2) = projectUpdate1.addDataset(datasetModification1.createModification())
 
-      loadToStore(dataset, datasetModification1, datasetModification2)
+      loadToStore(projectUpdate2)
 
       datasetsFinder
         .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
         .unsafeRunSync()
-        .results
-        .isEmpty shouldBe true
+        .results shouldBe Nil
     }
 
     "return datasets matching the criteria excluding datasets which were modified on forks and does not match anymore" in new TestCase {
 
       val phrase = phrases.generateOne
-      val dataset1 = datasetEntities(datasetProvenanceInternal).generateOne
-        .makeKeywordsContaining(phrase.value)
-      val dataset1Fork             = dataset1.forkProject().fork
-      val dataset1ForkModification = modifiedDatasetEntities(dataset1Fork).generateOne
+      val (dataset, project ::~ fork) = publicProjectEntities
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeKeywordsContaining(phrase.value)))
+        .forkOnce()
+        .generateOne
+      val _ ::~ forkUpdated = fork.addDataset(dataset.createModification())
 
-      loadToStore(dataset1, dataset1Fork, dataset1ForkModification)
+      loadToStore(project, forkUpdated)
 
       datasetsFinder
         .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
         .unsafeRunSync()
-        .results shouldBe List(dataset1.toDatasetSearchResult(projectsCount = 1))
+        .results shouldBe List((dataset, project).toDatasetSearchResult(projectsCount = 1))
     }
 
     "return datasets matching the criteria after modification of the fork" in new TestCase {
 
-      val phrase       = phrases.generateOne
-      val dataset1     = datasetEntities(datasetProvenanceInternal).generateOne
-      val dataset1Fork = dataset1.forkProject().fork
-      val dataset1ForkModified = modifiedDatasetEntities(dataset1Fork).generateOne
-        .makeKeywordsContaining(phrase.value)
+      val phrase = phrases.generateOne
+      val (dataset, project ::~ fork) =
+        publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).forkOnce().generateOne
+      val (datasetModified, forkUpdated) =
+        fork.addDataset(dataset.createModification(_.makeKeywordsContaining(phrase.value)))
 
-      loadToStore(dataset1, dataset1Fork, dataset1ForkModified)
+      loadToStore(project, forkUpdated)
 
       datasetsFinder
         .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
         .unsafeRunSync()
-        .results shouldBe List(dataset1ForkModified.toDatasetSearchResult(projectsCount = 1))
+        .results shouldBe List((datasetModified, forkUpdated).toDatasetSearchResult(projectsCount = 1))
     }
 
-    s"not return deleted datasets even if the phrase match" +
+    "not return deleted datasets even if the phrase match" +
       "- case with unrelated datasets" in new TestCase {
+
         val phrase = phrases.generateOne
+        val (_, project) = publicProjectEntities
+          .addDatasetAndInvalidation(datasetEntities(provenanceInternal).modify(_.makeDescContaining(phrase.value)))
+          .generateOne
 
-        val dataset = datasetEntities(datasetProvenanceInternal).generateOne.makeDescContaining(phrase.value)
-        val datasetDeleted = dataset
-          .invalidate(invalidationTimes(dataset.provenance.date).generateOne)
-          .fold(errors => fail(errors.intercalate("; ")), identity)
-
-        loadToStore(dataset, datasetDeleted)
+        loadToStore(project)
 
         datasetsFinder
           .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
           .unsafeRunSync()
           .results shouldBe Nil
-
       }
   }
 
-  "findDatasets with explicit sorting given" should {
+  "findDatasets when explicit sorting given" should {
 
     s"return datasets with name, description or creator matching the given phrase sorted by $TitleProperty" in new TestCase {
-      forAll(
-        datasetEntities(datasetProvenanceInternal),
-        datasetEntities(datasetProvenanceInternal),
-        datasetEntities(datasetProvenanceInternal),
-        datasetEntities(datasetProvenanceInternal)
-      ) { (dataset1Orig, dataset2Orig, dataset3Orig, nonPhrased) =>
-        val phrase                         = phrases.generateOne
-        val (dataset1, dataset2, dataset3) = addPhraseToVariousFields(phrase, dataset1Orig, dataset2Orig, dataset3Orig)
+      val phrase = phrases.generateOne
+      val (dataset1, project1) = publicProjectEntities
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(phrase.value)))
+        .generateOne
 
-        loadToStore(dataset1, dataset2, dataset3, nonPhrased)
+      val (dataset2, project2) = publicProjectEntities
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeDescContaining(phrase.value)))
+        .generateOne
 
-        val results = datasetsFinder
-          .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
-          .unsafeRunSync()
-          .results
+      val (dataset3, project3) = publicProjectEntities
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeKeywordsContaining(phrase.value)))
+        .generateOne
 
-        results shouldBe List(dataset1, dataset2, dataset3)
-          .map(_.toDatasetSearchResult(1))
-          .sortBy(_.title)
-      }
+      val (_, projectNonPhrased) = publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
+
+      loadToStore(project1, project2, project3, projectNonPhrased)
+
+      val results = datasetsFinder
+        .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+        .unsafeRunSync()
+        .results
+
+      results shouldBe List((dataset1, project1), (dataset2, project2), (dataset3, project3))
+        .map(_.toDatasetSearchResult(1))
+        .sortBy(_.title)
+
     }
 
     s"return datasets with name, description or creator matching the given phrase sorted by $DatePublishedProperty" in new TestCase {
       val phrase = phrases.generateOne
-      val (dataset1, dataset2, dataset3) = addPhraseToVariousFields(
-        phrase,
-        datasetEntities(datasetProvenanceImportedExternal).generateOne,
-        datasetEntities(datasetProvenanceImportedExternal).generateOne,
-        datasetEntities(datasetProvenanceImportedExternal).generateOne
-      )
+      val (dataset1, project1) = publicProjectEntities
+        .addDataset(datasetEntities(provenanceImportedExternal).modify(_.makeTitleContaining(phrase.value)))
+        .generateOne
+      val (dataset2, project2) = publicProjectEntities
+        .addDataset(datasetEntities(provenanceImportedExternal).modify(_.makeDescContaining(phrase.value)))
+        .generateOne
+      val (dataset3, project3) = publicProjectEntities
+        .addDataset(datasetEntities(provenanceImportedExternal).modify(_.makeKeywordsContaining(phrase.value)))
+        .generateOne
 
-      loadToStore(dataset1, dataset2, dataset3, datasetEntities(datasetProvenanceInternal).generateOne)
+      loadToStore(project1,
+                  project2,
+                  project3,
+                  publicProjectEntities.addDataset(datasetEntities(provenanceImportedExternal)).generateOne._2
+      )
 
       val results = datasetsFinder
         .findDatasets(Some(phrase), Sort.By(DatePublishedProperty, Direction.Desc), PagingRequest.default, None)
         .unsafeRunSync()
         .results
 
-      results shouldBe List(dataset1, dataset2, dataset3)
+      results shouldBe List((dataset1, project1), (dataset2, project2), (dataset3, project3))
         .map(_.toDatasetSearchResult(projectsCount = 1))
         .sortBy(_.date.instant)
         .reverse
@@ -568,21 +598,28 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
 
     s"return datasets with name, description or creator matching the given phrase sorted by $DateProperty" in new TestCase {
       val phrase = phrases.generateOne
-      val (dataset1, dataset2, dataset3) = addPhraseToVariousFields(
-        phrase,
-        datasetEntities(datasetProvenanceInternal).generateOne,
-        datasetEntities(datasetProvenanceInternal).generateOne,
-        datasetEntities(datasetProvenanceInternal).generateOne
-      )
+      val (dataset1, project1) = publicProjectEntities
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(phrase.value)))
+        .generateOne
+      val (dataset2, project2) = publicProjectEntities
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeDescContaining(phrase.value)))
+        .generateOne
+      val (dataset3, project3) = publicProjectEntities
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeKeywordsContaining(phrase.value)))
+        .generateOne
 
-      loadToStore(dataset1, dataset2, dataset3, datasetEntities(datasetProvenanceInternal).generateOne)
+      loadToStore(project1,
+                  project2,
+                  project3,
+                  publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne._2
+      )
 
       val results = datasetsFinder
         .findDatasets(Some(phrase), Sort.By(DateProperty, Direction.Desc), PagingRequest.default, None)
         .unsafeRunSync()
         .results
 
-      results shouldBe List(dataset1, dataset2, dataset3)
+      results shouldBe List((dataset1, project1), (dataset2, project2), (dataset3, project3))
         .map(_.toDatasetSearchResult(projectsCount = 1))
         .sortBy(_.date.instant)
         .reverse
@@ -591,30 +628,37 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
     s"return datasets with name, description or creator matching the given phrase sorted by $ProjectsCountProperty" in new TestCase {
       val phrase = phrases.generateOne
 
-      val (dataset1, dataset2, dataset3) = addPhraseToVariousFields(
-        phrase,
-        datasetEntities(datasetProvenanceInternal).generateOne,
-        datasetEntities(datasetProvenanceInternal).generateOne,
-        datasetEntities(datasetProvenanceInternal).generateOne
-      )
+      val (dataset1, project1 ::~ project1Fork) = publicProjectEntities
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(phrase.value)))
+        .forkOnce()
+        .generateOne
+      val (dataset2, project2 ::~ project2Forks) = publicProjectEntities
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeDescContaining(phrase.value)))
+        .generateOne
+        .map(_.fork(2))
+      val (dataset3, project3) = publicProjectEntities
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeKeywordsContaining(phrase.value)))
+        .generateOne
 
-      val datasets = List(
-        List(dataset1, dataset1.forkProject().fork),
-        List(dataset2, dataset2.forkProject().fork, dataset2.forkProject().fork),
-        List(dataset3),
-        List(datasetEntities(datasetProvenanceInternal).generateOne)
+      loadToStore(
+        project1 ::
+          project1Fork ::
+          project2 ::
+          project2Forks.toList :::
+          project3 ::
+          publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne._2 :: Nil
       )
-
-      loadToStore(datasets.flatten: _*)
 
       val results = datasetsFinder
         .findDatasets(Some(phrase), Sort.By(ProjectsCountProperty, Direction.Asc), PagingRequest.default, None)
         .unsafeRunSync()
         .results
 
-      results shouldBe datasets
-        .flatMap(_.toDatasetSearchResult(matchIdFrom = results))
-        .sortBy(_.projectsCount)
+      results shouldBe List(
+        (dataset1, project1).toDatasetSearchResult(projectsCount = 2),
+        (dataset2, project2).toDatasetSearchResult(projectsCount = project2Forks.size + 1),
+        (dataset3, project3).toDatasetSearchResult(projectsCount = 1)
+      ).sortBy(_.projectsCount)
     }
   }
 
@@ -622,14 +666,21 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
 
     "return the requested page of datasets matching the given phrase" in new TestCase {
       val phrase = phrases.generateOne
-      val (dataset1, dataset2, dataset3) = addPhraseToVariousFields(
-        phrase,
-        datasetEntities(datasetProvenanceInternal).generateOne,
-        datasetEntities(datasetProvenanceInternal).generateOne,
-        datasetEntities(datasetProvenanceInternal).generateOne
-      )
+      val (dataset1, project1) = publicProjectEntities
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(phrase.value)))
+        .generateOne
+      val (dataset2, project2) = publicProjectEntities
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeDescContaining(phrase.value)))
+        .generateOne
+      val (dataset3, project3) = publicProjectEntities
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeKeywordsContaining(phrase.value)))
+        .generateOne
 
-      loadToStore(dataset1, dataset2, dataset3, datasetEntities(datasetProvenanceInternal).generateOne)
+      loadToStore(project1,
+                  project2,
+                  project3,
+                  publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne._2
+      )
 
       val pagingRequest = PagingRequest(Page(2), PerPage(1))
 
@@ -637,7 +688,7 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
         .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), pagingRequest, None)
         .unsafeRunSync()
 
-      result.results shouldBe List(dataset1, dataset2, dataset3)
+      result.results shouldBe List((dataset1, project1), (dataset2, project2), (dataset3, project3))
         .map(_.toDatasetSearchResult(projectsCount = 1))
         .sortBy(_.title)
         .get(1)
@@ -649,14 +700,17 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
 
     "return no results if the requested page does not exist" in new TestCase {
       val phrase = phrases.generateOne
-      val (dataset1, dataset2, dataset3) = addPhraseToVariousFields(
-        phrase,
-        datasetEntities(datasetProvenanceInternal).generateOne,
-        datasetEntities(datasetProvenanceInternal).generateOne,
-        datasetEntities(datasetProvenanceInternal).generateOne
-      )
+      val (_, project1) = publicProjectEntities
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(phrase.value)))
+        .generateOne
+      val (_, project2) = publicProjectEntities
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeDescContaining(phrase.value)))
+        .generateOne
+      val (_, project3) = publicProjectEntities
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeKeywordsContaining(phrase.value)))
+        .generateOne
 
-      loadToStore(dataset1, dataset2, dataset3)
+      loadToStore(project1, project2, project3)
 
       val pagingRequest = PagingRequest(Page(2), PerPage(3))
 
@@ -671,72 +725,64 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
   }
 
   "findDatasets with unauthorized user" should {
-    List(Visibility.Private, Visibility.Internal).foreach { nonPublic =>
+
+    List(Visibility.Private, Visibility.Internal) foreach { nonPublic =>
       s"not return dataset from project with visibility $nonPublic" in new TestCase {
-        val publicDataset = datasetEntities(
-          provenanceGen = datasetProvenanceInternal,
-          projectsGen = projectEntities[ForksCount.Zero](visibilityPublic)
-        ).generateOne
+        val (publicDataset, publicProject) =
+          publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
+        val (_, privateProject) =
+          projectEntities(fixed(nonPublic)).addDataset(datasetEntities(provenanceInternal)).generateOne
 
-        val privateDataset = datasetEntities(
-          provenanceGen = datasetProvenanceInternal,
-          projectsGen = projectEntities[ForksCount.Zero](fixed(nonPublic))
-        ).generateOne
-
-        loadToStore(publicDataset, privateDataset)
+        loadToStore(publicProject, privateProject)
 
         val result = datasetsFinder
           .findDatasets(None, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
           .unsafeRunSync()
 
-        result.results shouldBe List(publicDataset.toDatasetSearchResult(projectsCount = 1))
-
+        result.results          shouldBe List((publicDataset, publicProject).toDatasetSearchResult(projectsCount = 1))
         result.pagingInfo.total shouldBe Total(1)
       }
 
       s"not count projects with visibility $nonPublic" in new TestCase {
-        val publicDataset = datasetEntities(
-          provenanceGen = datasetProvenanceInternal,
-          projectsGen = projectEntities[ForksCount.Zero](visibilityPublic)
-        ).generateOne
+        val (publicDataset, publicProject) =
+          publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
 
-        val publicDatasetOnPrivateProject = publicDataset
-          .importTo(projectEntities[ForksCount.Zero](visibilityNonPublic).generateOne)
+        val (_, privateProjectWithPublicDataset) =
+          projectEntities(fixed(nonPublic)).importDataset(publicDataset).generateOne
 
-        loadToStore(publicDataset, publicDatasetOnPrivateProject)
+        loadToStore(publicProject, privateProjectWithPublicDataset)
 
         val result = datasetsFinder
           .findDatasets(None, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
           .unsafeRunSync()
 
-        result.results          shouldBe List(publicDataset.toDatasetSearchResult(projectsCount = 1))
+        result.results          shouldBe List((publicDataset, publicProject).toDatasetSearchResult(projectsCount = 1))
         result.pagingInfo.total shouldBe Total(1)
       }
     }
   }
 
   "findDatasets with authorized user" should {
-    s"return public datasets and private datasets from project the user is a member of" in new TestCase {
+
+    "return public datasets and private datasets from project the user is a member of" in new TestCase {
+
+      val (publicDataset, publicProject) =
+        publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
+
       val userWithGitlabId = personEntities(userGitLabIds.toGeneratorOfSomes).generateOne
-      val publicDataset = datasetEntities(
-        provenanceGen = datasetProvenanceInternal,
-        projectsGen = projectEntities[ForksCount.Zero](visibilityPublic)
-      ).generateOne
+      val (privateDatasetWithAccess, privateProjectWithAccess) =
+        projectEntities(visibilityNonPublic)
+          .modify(_.copy(members = Set(userWithGitlabId)))
+          .addDataset(datasetEntities(provenanceInternal))
+          .generateOne
 
-      val privateDatasetWithAccess = datasetEntities(
-        provenanceGen = datasetProvenanceInternal,
-        projectsGen = projectEntities[ForksCount.Zero](visibilityNonPublic).map(_.copy(members = Set(userWithGitlabId)))
-      ).generateOne
+      val (_, privateProjectWithoutAccess) =
+        projectEntities(visibilityNonPublic).addDataset(datasetEntities(provenanceInternal)).generateOne
 
-      val privateDatasetWithoutAccess = datasetEntities(
-        provenanceGen = datasetProvenanceInternal,
-        projectsGen = projectEntities[ForksCount.Zero](visibilityNonPublic)
-      ).generateOne
-
-      loadToStore(publicDataset, privateDatasetWithAccess, privateDatasetWithoutAccess)
+      loadToStore(publicProject, privateProjectWithAccess, privateProjectWithoutAccess)
 
       val result = datasetsFinder
-        .findDatasets(None,
+        .findDatasets(maybePhrase = None,
                       Sort.By(TitleProperty, Direction.Asc),
                       PagingRequest.default,
                       userWithGitlabId.toAuthUser.some
@@ -744,37 +790,33 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
         .unsafeRunSync()
 
       val datasetsList = List(
-        publicDataset.toDatasetSearchResult(projectsCount = 1),
-        privateDatasetWithAccess.toDatasetSearchResult(projectsCount = 1)
+        (publicDataset, publicProject).toDatasetSearchResult(projectsCount = 1),
+        (privateDatasetWithAccess, privateProjectWithAccess).toDatasetSearchResult(projectsCount = 1)
       ).sortBy(_.title)
 
-      result.results shouldBe datasetsList
-
+      result.results          shouldBe datasetsList
       result.pagingInfo.total shouldBe Total(2)
     }
 
-    s"return public datasets and private datasets from project the user is a member of " +
-      s"but not count project the user is not a member of" in new TestCase {
+    "return public datasets and private datasets from project the user is a member of " +
+      "but not count project the user is not a member of" in new TestCase {
+
+        val (publicDataset, publicProject) =
+          publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
+        val (privateDatasetWithoutAccess, privateProjectWithoutAccess) =
+          projectEntities(visibilityNonPublic).addDataset(datasetEntities(provenanceInternal)).generateOne
+
         val userWithGitlabId = personEntities(userGitLabIds.toGeneratorOfSomes).generateOne
-        val publicDataset = datasetEntities(
-          provenanceGen = datasetProvenanceInternal,
-          projectsGen = projectEntities[ForksCount.Zero](visibilityPublic)
-        ).generateOne
+        val (privateDatasetWithAccess, privateProjectWithAccess) =
+          projectEntities(visibilityNonPublic)
+            .modify(_.copy(members = Set(userWithGitlabId)))
+            .importDataset(privateDatasetWithoutAccess)
+            .generateOne
 
-        val privateDataset = datasetEntities(
-          provenanceGen = datasetProvenanceInternal,
-          projectsGen = projectEntities[ForksCount.Zero](visibilityNonPublic)
-        ).generateOne
-
-        val privateDatasetWithAccess = privateDataset.importTo(
-          projectEntities[ForksCount.Zero](visibilityNonPublic).generateOne
-            .copy(members = Set(userWithGitlabId))
-        )
-
-        loadToStore(privateDataset, publicDataset, privateDatasetWithAccess)
+        loadToStore(publicProject, privateProjectWithoutAccess, privateProjectWithAccess)
 
         val result = datasetsFinder
-          .findDatasets(None,
+          .findDatasets(maybePhrase = None,
                         Sort.By(TitleProperty, Direction.Asc),
                         PagingRequest.default,
                         userWithGitlabId.toAuthUser.some
@@ -782,8 +824,8 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
           .unsafeRunSync()
 
         val datasetsList = List(
-          publicDataset.toDatasetSearchResult(projectsCount = 1),
-          privateDatasetWithAccess.toDatasetSearchResult(projectsCount = 1)
+          (publicDataset, publicProject).toDatasetSearchResult(projectsCount = 1),
+          (privateDatasetWithAccess, privateProjectWithAccess).toDatasetSearchResult(projectsCount = 1)
         ).sortBy(_.title)
 
         result.results          shouldBe datasetsList
@@ -802,26 +844,17 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
     )
   }
 
+  private lazy val publicProjectEntities: Gen[ProjectWithoutParent] = projectEntities(visibilityPublic)
+
   implicit class PersonOps(person: Person) {
     lazy val toAuthUser: AuthUser = AuthUser(person.maybeGitLabId.get, accessTokens.generateOne)
   }
 
-  def addPhraseToVariousFields[P <: Dataset.Provenance](
-      containingPhrase: Phrase,
-      dataset1Orig:     Dataset[P],
-      dataset2Orig:     Dataset[P],
-      dataset3Orig:     Dataset[P]
-  ): (Dataset[P], Dataset[P], Dataset[P]) = {
-    val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(containingPhrase.toString)
-    val dataset1 = dataset1Orig.makeTitleContaining(nonEmptyPhrase.value)
-    val dataset2 = dataset2Orig.makeDescContaining(nonEmptyPhrase.value)
-    val dataset3 = dataset3Orig.makeKeywordsContaining(nonEmptyPhrase.value)
-    (dataset1, dataset2, dataset3)
-  }
+  private implicit class DatasetOps(datasetAndProject: (Dataset[Dataset.Provenance], Project)) {
 
-  private implicit class DatasetOps(dataset: Dataset[_ <: Dataset.Provenance]) {
+    private lazy val (dataset, project) = datasetAndProject
 
-    def toDatasetSearchResult(projectsCount: Int)(implicit renkuBaseUrl: RenkuBaseUrl): DatasetSearchResult =
+    def toDatasetSearchResult(projectsCount: Int): DatasetSearchResult =
       DatasetSearchResult(
         dataset.identification.identifier,
         dataset.identification.title,
@@ -829,18 +862,18 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
         dataset.additionalInfo.maybeDescription,
         dataset.provenance.creators.map(_.to[DatasetCreator]),
         dataset.provenance.date,
-        dataset.project.path,
+        project.path,
         ProjectsCount(projectsCount),
         dataset.additionalInfo.keywords.sorted,
         dataset.additionalInfo.images
       )
   }
 
-  private implicit class DatasetsListOps(datasets: List[Dataset[_ <: Dataset.Provenance]]) {
+  private implicit class ProjectsListOps(datasetsAndProjects: List[(Dataset[Dataset.Provenance], Project)]) {
 
-    def toDatasetSearchResult(matchIdFrom: List[DatasetSearchResult]): Option[DatasetSearchResult] =
-      datasets
-        .find(dataset => matchIdFrom.exists(_.id == dataset.identifier))
-        .map(_.toDatasetSearchResult(projectsCount = datasets.size))
+    def toDatasetSearchResult(matchIdFrom: List[DatasetSearchResult], projectsCount: Int): Option[DatasetSearchResult] =
+      datasetsAndProjects
+        .find { case (dataset, _) => matchIdFrom.exists(_.id == dataset.identifier) }
+        .map(_.toDatasetSearchResult(projectsCount))
   }
 }

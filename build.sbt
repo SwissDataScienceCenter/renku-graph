@@ -66,7 +66,8 @@ lazy val renkuModel = Project(
 ).dependsOn(
   tinyTypes % "compile->compile",
   tinyTypes % "test->test",
-  jsonLd    % "compile->compile"
+  jsonLd    % "compile->compile",
+  jsonLd    % "test->test"
 ).enablePlugins(
   AutomateHeaderPlugin
 )

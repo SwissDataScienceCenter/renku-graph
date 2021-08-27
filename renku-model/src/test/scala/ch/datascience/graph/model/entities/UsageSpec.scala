@@ -20,19 +20,24 @@ package ch.datascience.graph.model.entities
 
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.GraphModelGenerators.projectCreatedDates
+import ch.datascience.graph.model.entities
 import ch.datascience.graph.model.testentities.CommandParameterBase.CommandInput
 import ch.datascience.graph.model.testentities._
-import ch.datascience.graph.model.entities
 import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class UsageSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
-  "Usage.decode" should {
+
+  "decode" should {
+
     "turn JsonLD Usage entity into the Usage object" in {
       forAll(entityLocations, entityChecksums) { (location, checksum) =>
-        val activity = executionPlanners(planEntities(CommandInput.fromLocation(location))).generateOne
+        val activity = executionPlanners(planEntities(CommandInput.fromLocation(location)),
+                                         projectCreatedDates().generateOne
+        ).generateOne
           .planInputParameterValuesFromChecksum(location -> checksum)
           .buildProvenanceUnsafe()
 

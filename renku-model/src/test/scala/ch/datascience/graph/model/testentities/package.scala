@@ -20,10 +20,16 @@ package ch.datascience.graph.model
 
 import cats.kernel.Semigroup
 import ch.datascience.graph.model.datasets.SameAs
+import ch.datascience.graph.model.testentities.generators.EntitiesGenerators
 import ch.datascience.tinytypes.constraints._
 import io.renku.jsonld._
 
 package object testentities extends Schemas with EntitiesGenerators with ModelOps {
+
+  type ::~[+A, +B] = (A, B)
+  object ::~ {
+    def unapply[A, B](t: A ::~ B): Some[A ::~ B] = Some(t)
+  }
 
   implicit val renkuBaseUrlToEntityId: RenkuBaseUrl => EntityId = url => EntityId of url.value
 

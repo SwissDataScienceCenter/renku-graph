@@ -33,7 +33,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
 
   "prepareUpdates" should {
     "generate queries which deletes the project name when changed" in {
-      val project = projectEntities(anyVisibility)(anyForksCount).generateOne.to[entities.Project]
+      val project = anyProjectEntities.generateOne.to[entities.Project]
       val kgProjectInfo =
         (projectNames.generateOne, project.maybeParent, project.visibility, project.maybeCreator.map(_.resourceId))
 
@@ -47,7 +47,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
     }
 
     "generate queries which deletes the project's derivedFrom when changed" in {
-      val project = projectWithParentEntities(anyVisibility).generateOne.to[entities.Project]
+      val project = projectWithParentEntities(anyVisibility).generateOne.to[entities.ProjectWithParent]
       val kgProjectInfo =
         (project.name, projectResourceIds.generateSome, project.visibility, project.maybeCreator.map(_.resourceId))
 
@@ -61,7 +61,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
     }
 
     "generate queries which deletes the project's derivedFrom when removed" in {
-      val project = projectWithParentEntities(anyVisibility).generateOne.to[entities.Project]
+      val project = projectWithParentEntities(anyVisibility).generateOne.to[entities.ProjectWithParent]
       val kgProjectInfo =
         (project.name, None, project.visibility, project.maybeCreator.map(_.resourceId))
 
@@ -75,7 +75,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
     }
 
     "not generate queries which deletes the project's derivedFrom when NOT changed" in {
-      val project = projectWithParentEntities(anyVisibility).generateOne.to[entities.Project]
+      val project = projectWithParentEntities(anyVisibility).generateOne.to[entities.ProjectWithParent]
       val kgProjectInfo =
         (project.name, project.maybeParent, project.visibility, project.maybeCreator.map(_.resourceId))
 
@@ -91,7 +91,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
     }
 
     "generate queries which deletes the project visibility when changed" in {
-      val project = projectEntities(anyVisibility)(anyForksCount).generateOne.to[entities.Project]
+      val project = anyProjectEntities.generateOne.to[entities.Project]
       val kgProjectInfo =
         (project.name,
          project.maybeParent,
@@ -109,7 +109,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
     }
 
     "not generate a queries when nothing changed" in {
-      val project = projectEntities(anyVisibility)(anyForksCount).generateOne.to[entities.Project]
+      val project = anyProjectEntities.generateOne.to[entities.Project]
       val kgProjectInfo =
         (project.name, project.maybeParent, project.visibility, project.maybeCreator.map(_.resourceId))
 
@@ -144,5 +144,4 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
       .unsafeRunSync()
       .map(row => (row.get("name"), row.get("maybeParent"), row.get("visibility")))
       .toSet
-
 }

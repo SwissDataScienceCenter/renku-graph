@@ -21,7 +21,7 @@ package ch.datascience.graph.model.entities
 import ch.datascience.graph.model.Schemas._
 import ch.datascience.graph.model.entities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
 import ch.datascience.graph.model.plans._
-import ch.datascience.graph.model.{InvalidationTime, commandParameters, projects}
+import ch.datascience.graph.model.{InvalidationTime, commandParameters}
 import io.renku.jsonld.JsonLDDecoder
 
 final case class Plan(resourceId:               ResourceId,
@@ -34,7 +34,6 @@ final case class Plan(resourceId:               ResourceId,
                       inputs:                   List[CommandInput],
                       outputs:                  List[CommandOutput],
                       successCodes:             List[SuccessCode],
-                      projectResourceId:        projects.ResourceId,
                       maybeInvalidationTime:    Option[InvalidationTime]
 ) extends PlanOps
 
@@ -70,7 +69,6 @@ object Plan {
       renku / "hasInputs"            -> plan.inputs.asJsonLD,
       renku / "hasOutputs"           -> plan.outputs.asJsonLD,
       renku / "successCodes"         -> plan.successCodes.asJsonLD,
-      schema / "isPartOf"            -> plan.projectResourceId.asEntityId.asJsonLD,
       prov / "invalidatedAtTime"     -> plan.maybeInvalidationTime.asJsonLD
     )
   }
@@ -87,7 +85,6 @@ object Plan {
       inputs                <- cursor.downField(renku / "hasInputs").as[List[CommandInput]]
       outputs               <- cursor.downField(renku / "hasOutputs").as[List[CommandOutput]]
       successCodes          <- cursor.downField(renku / "successCodes").as[List[SuccessCode]]
-      projectId             <- cursor.downField(schema / "isPartOf").downEntityId.as[projects.ResourceId]
       maybeInvalidationTime <- cursor.downField(prov / "invalidatedAtTime").as[Option[InvalidationTime]]
     } yield Plan(resourceId,
                  name,
@@ -99,7 +96,6 @@ object Plan {
                  inputs,
                  outputs,
                  successCodes,
-                 projectId,
                  maybeInvalidationTime
     )
   }

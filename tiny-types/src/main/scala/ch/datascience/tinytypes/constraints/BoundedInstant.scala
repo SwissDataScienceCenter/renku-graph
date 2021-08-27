@@ -23,9 +23,9 @@ import ch.datascience.tinytypes.Constraints
 import java.time.Instant
 
 trait BoundedInstant extends Constraints[Instant] {
-  protected[this] def maybeMin: Option[Instant] = None
-  protected[this] def maybeMax: Option[Instant] = None
-  protected[this] def now:      Instant         = Instant.now()
+  protected[this] def maybeMin:   Option[Instant] = None
+  protected[this] def maybeMax:   Option[Instant] = None
+  protected[this] def instantNow: Instant         = Instant.now()
 
   addConstraint(
     check = v => maybeMin.forall(min => v.compareTo(min) >= 0) && maybeMax.forall(max => v.compareTo(max) <= 0),

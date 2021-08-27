@@ -25,7 +25,6 @@ import ch.datascience.graph.model._
 import ch.datascience.graph.model.commandParameters.Position
 import ch.datascience.graph.model.entityModel.Location
 import ch.datascience.graph.model.plans._
-import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
 
@@ -36,13 +35,12 @@ case class Plan(id:                        Id,
                 maybeProgrammingLanguage:  Option[ProgrammingLanguage],
                 keywords:                  List[Keyword],
                 commandParameterFactories: List[Plan => CommandParameterBase],
-                successCodes:              List[SuccessCode],
-                project:                   Project[ForksCount]
+                successCodes:              List[SuccessCode]
 ) {
-  private lazy val commandParameters: List[CommandParameterBase] = commandParameterFactories.map(_.apply(this))
-  lazy val parameters:                List[CommandParameter]     = commandParameters.collect { case param: CommandParameter => param }
-  lazy val inputs:                    List[CommandInput]         = commandParameters.collect { case in: CommandInput => in }
-  lazy val outputs:                   List[CommandOutput]        = commandParameters.collect { case out: CommandOutput => out }
+  private val commandParameters: List[CommandParameterBase] = commandParameterFactories.map(_.apply(this))
+  val parameters:                List[CommandParameter]     = commandParameters.collect { case param: CommandParameter => param }
+  val inputs:                    List[CommandInput]         = commandParameters.collect { case in: CommandInput => in }
+  val outputs:                   List[CommandOutput]        = commandParameters.collect { case out: CommandOutput => out }
 
   def getInput(location: Location): Option[CommandInput] = inputs.find(_.defaultValue.value == location)
 }
@@ -55,8 +53,7 @@ object Plan {
   def apply(
       name:                      Name,
       command:                   Command,
-      commandParameterFactories: List[Position => Plan => CommandParameterBase],
-      project:                   Project[ForksCount]
+      commandParameterFactories: List[Position => Plan => CommandParameterBase]
   ): Plan = Plan(
     Id.generate,
     name,
@@ -67,8 +64,7 @@ object Plan {
     commandParameterFactories = commandParameterFactories.zipWithIndex.map { case (factory, idx) =>
       factory(Position(idx + 1))
     },
-    successCodes = Nil,
-    project
+    successCodes = Nil
   )
 
   object CommandParameters {
@@ -96,7 +92,6 @@ object Plan {
         plan.inputs.map(_.to[entities.CommandParameterBase.CommandInput]),
         plan.outputs.map(_.to[entities.CommandParameterBase.CommandOutput]),
         plan.successCodes,
-        projects.ResourceId(plan.project.asEntityId),
         maybeInvalidationTime
       )
     }

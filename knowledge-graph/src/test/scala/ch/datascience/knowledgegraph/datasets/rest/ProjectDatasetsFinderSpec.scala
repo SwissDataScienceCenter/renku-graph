@@ -23,7 +23,6 @@ import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{InitialVersion, SameAs}
-import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.testentities._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
@@ -43,92 +42,79 @@ class ProjectDatasetsFinderSpec
   "findProjectDatasets" should {
 
     "return the very last modification of a dataset for the given project" in new TestCase {
-      forAll(datasetEntities(datasetProvenanceInternal)) { originalDataset =>
-        val datasetModification1 = modifiedDatasetEntities(originalDataset).generateOne
-        val datasetModification2 = modifiedDatasetEntities(datasetModification1).generateOne
+      val (original ::~ modification1, project) =
+        projectEntities(anyVisibility).addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
+      val (modification2, projectComplete) = project.addDataset(modification1.createModification())
 
-        loadToStore(
-          datasetEntities(ofAnyProvenance).generateOne,
-          originalDataset,
-          datasetModification1,
-          datasetModification2
-        )
+      loadToStore(
+        projectEntities(anyVisibility).addDataset(datasetEntities(ofAnyProvenance)).generateOne._2,
+        projectComplete
+      )
 
-        datasetsFinder
-          .findProjectDatasets(originalDataset.project.path)
-          .unsafeRunSync() shouldBe List(
-          (datasetModification2.identification.identifier,
-           InitialVersion(originalDataset.identification.identifier),
-           datasetModification2.identification.title,
-           datasetModification2.identification.name,
-           datasetModification2.provenance.derivedFrom.asRight,
-           datasetModification2.additionalInfo.images
-          )
+      datasetsFinder
+        .findProjectDatasets(projectComplete.path)
+        .unsafeRunSync() shouldBe List(
+        (modification2.identification.identifier,
+         InitialVersion(original.identification.identifier),
+         modification2.identification.title,
+         modification2.identification.name,
+         modification2.provenance.derivedFrom.asRight,
+         modification2.additionalInfo.images
         )
-      }
+      )
     }
 
     "return non-modified datasets and the very last modifications of project's datasets" in new TestCase {
-      forAll(datasetEntities(datasetProvenanceImportedExternal)) { dataset1 =>
-        val dataset2             = datasetEntities(datasetProvenanceInternal, projectsGen = fixed(dataset1.project)).generateOne
-        val dataset2Modification = modifiedDatasetEntities(dataset2).generateOne
+      val (dataset1 ::~ dataset2 ::~ modified2, project) = projectEntities(anyVisibility)
+        .addDataset(datasetEntities(provenanceImportedExternal))
+        .addDatasetAndModification(datasetEntities(provenanceInternal))
+        .generateOne
 
-        loadToStore(
-          dataset1,
-          dataset2,
-          dataset2Modification
-        )
+      loadToStore(project)
 
-        datasetsFinder.findProjectDatasets(dataset1.project.path).unsafeRunSync() shouldBe List(
-          (dataset1.identification.identifier,
-           InitialVersion(dataset1.identification.identifier),
-           dataset1.identification.title,
-           dataset1.identification.name,
-           dataset1.provenance.sameAs.asLeft,
-           dataset1.additionalInfo.images
-          ),
-          (dataset2Modification.identification.identifier,
-           InitialVersion(dataset2.identification.identifier),
-           dataset2Modification.identification.title,
-           dataset2Modification.identification.name,
-           dataset2Modification.provenance.derivedFrom.asRight,
-           dataset2Modification.additionalInfo.images
-          )
-        ).sortBy(_._3)
-      }
-    }
-
-    "return all datasets of the given project without merging datasets having the same sameAs" in new TestCase {
-      val originDataset = datasetEntities(datasetProvenanceInternal).generateOne
-      val project       = projectEntities[ForksCount.Zero](visibilityNonPublic).generateOne
-      val dataset1 = {
-        val intermediate = originDataset.importTo(project)
-        intermediate.copy(identification = intermediate.identification.copy(title = datasetTitles.generateOne))
-      }
-      val dataset2 = {
-        val intermediate = originDataset.importTo(project)
-        intermediate.copy(identification = intermediate.identification.copy(title = datasetTitles.generateOne))
-      }
-
-      assume(dataset1.provenance.topmostSameAs == dataset2.provenance.topmostSameAs)
-      assume(dataset1.provenance.topmostSameAs == originDataset.provenance.topmostSameAs)
-
-      loadToStore(originDataset, dataset1, dataset2)
-
-      datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() should contain theSameElementsAs List(
+      datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() shouldBe List(
         (dataset1.identification.identifier,
          InitialVersion(dataset1.identification.identifier),
          dataset1.identification.title,
-         originDataset.identification.name,
+         dataset1.identification.name,
          dataset1.provenance.sameAs.asLeft,
-         originDataset.additionalInfo.images
+         dataset1.additionalInfo.images
+        ),
+        (modified2.identification.identifier,
+         InitialVersion(dataset2.identification.identifier),
+         modified2.identification.title,
+         modified2.identification.name,
+         modified2.provenance.derivedFrom.asRight,
+         modified2.additionalInfo.images
+        )
+      ).sortBy(_._3)
+    }
+
+    "return all datasets of the given project without merging datasets having the same sameAs" in new TestCase {
+      val (original, originalProject) =
+        anyProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
+      val (dataset1 ::~ dataset2, project) =
+        anyProjectEntities.importDataset(original).importDataset(original).generateOne
+
+      assume(dataset1.provenance.topmostSameAs == dataset2.provenance.topmostSameAs)
+      assume(dataset1.provenance.topmostSameAs == original.provenance.topmostSameAs)
+
+      loadToStore(originalProject, project)
+
+      datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() shouldBe List(
+        (dataset1.identification.identifier,
+         InitialVersion(dataset1.identification.identifier),
+         dataset1.identification.title,
+         original.identification.name,
+         dataset1.provenance.sameAs.asLeft,
+         original.additionalInfo.images
         ),
         (dataset2.identification.identifier,
          InitialVersion(dataset2.identification.identifier),
          dataset2.identification.title,
-         originDataset.identification.name,
+         original.identification.name,
          dataset2.provenance.sameAs.asLeft,
-         originDataset.additionalInfo.images
+         original.additionalInfo.images
         )
       ).sortBy(_._3)
     }
@@ -138,15 +124,14 @@ class ProjectDatasetsFinderSpec
     }
 
     "not returned deleted dataset" in new TestCase {
-      val dataset1 = datasetEntities(datasetProvenanceInternal).generateOne
-      val dataset1Deleted = dataset1
-        .invalidate(invalidationTimes(dataset1.provenance.date).generateOne)
-        .fold(errors => fail(errors.intercalate("; ")), identity)
-      val dataset2 = datasetEntities(datasetProvenanceInternal, projectsGen = fixed(dataset1.project)).generateOne
+      val (_ ::~ _ ::~ dataset2, project) = projectEntities(anyVisibility)
+        .addDatasetAndInvalidation(datasetEntities(provenanceInternal))
+        .addDataset(datasetEntities(provenanceInternal))
+        .generateOne
 
-      loadToStore(dataset1, dataset1Deleted, dataset2)
+      loadToStore(project)
 
-      datasetsFinder.findProjectDatasets(dataset1.project.path).unsafeRunSync() shouldBe List(
+      datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() shouldBe List(
         (dataset2.identification.identifier,
          InitialVersion(dataset2.identification.identifier),
          dataset2.identification.title,
@@ -158,15 +143,12 @@ class ProjectDatasetsFinderSpec
     }
 
     "not returned deleted dataset when its latest version was deleted" in new TestCase {
-      val dataset         = datasetEntities(datasetProvenanceInternal).generateOne
-      val datasetModified = modifiedDatasetEntities(dataset).generateOne
-      val datasetModifiedDeleted = datasetModified
-        .invalidate(invalidationTimes(datasetModified.provenance.date).generateOne)
-        .fold(errors => fail(errors.intercalate("; ")), identity)
+      val (_ ::~ modification, project) =
+        projectEntities(anyVisibility).addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
 
-      loadToStore(dataset, datasetModified, datasetModifiedDeleted)
+      loadToStore(project.addDatasets(modification.invalidateNow))
 
-      datasetsFinder.findProjectDatasets(dataset.project.path).unsafeRunSync() shouldBe Nil
+      datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() shouldBe Nil
     }
   }
 

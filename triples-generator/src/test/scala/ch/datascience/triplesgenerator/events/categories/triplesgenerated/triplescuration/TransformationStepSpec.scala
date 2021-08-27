@@ -22,10 +22,11 @@ import cats.data.EitherT
 import ch.datascience.generators.CommonGraphGenerators.sparqlQueries
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.entities
+import ch.datascience.graph.model.testentities._
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TransformationStep
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{ResultData, TransformationStepResult}
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators.projectMetadatas
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.{ProjectMetadata, TransformationStep}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -37,17 +38,19 @@ class TransformationStepSpec extends AnyWordSpec with MockFactory with should.Ma
   "run" should {
 
     "executes step's transformation" in {
-      val stepTransformation = mockFunction[ProjectMetadata, TransformationStepResult[Try]]
+      val stepTransformation = mockFunction[entities.Project, TransformationStepResult[Try]]
       val step               = TransformationStep(nonBlankStrings().generateOne, stepTransformation)
 
-      val projectMetadata = projectMetadatas.generateOne
+      val project = projectEntitiesWithDatasetsAndActivities.generateOne.to[entities.Project]
 
       val result = EitherT.rightT[Try, ProcessingRecoverableError](
-        ResultData(projectMetadatas.generateOne, sparqlQueries.generateList())
+        ResultData(projectEntitiesWithDatasetsAndActivities.generateOne.to[entities.Project],
+                   sparqlQueries.generateList()
+        )
       )
-      stepTransformation.expects(projectMetadata).returning(result)
+      stepTransformation.expects(project).returning(result)
 
-      step.run(projectMetadata) shouldBe result
+      step.run(project) shouldBe result
     }
   }
 }

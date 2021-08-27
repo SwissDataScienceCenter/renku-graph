@@ -51,21 +51,22 @@ class TriplesRemoverSpec extends AnyWordSpec with InMemoryRdfStore with should.M
       )
 
       loadToStore(
-        datasetEntities(ofAnyProvenance).generateOne.asJsonLD,
-        datasetEntities(ofAnyProvenance).generateOne.asJsonLD,
+        anyProjectEntities.generateOne.asJsonLD,
+        anyProjectEntities.generateOne.asJsonLD,
         versionPairJsonLD,
         reProvisioningJsonLD
       )
 
-      rdfStoreSize should be > 0
+      val versionRelatedTriplesCount =
+        versionPairJsonLD.properties.size + 1 + reProvisioningJsonLD.properties.size + 1 // +1 for rdf:type
+
+      rdfStoreSize should be > versionRelatedTriplesCount
 
       triplesRemover
         .removeAllTriples()
         .unsafeRunSync() shouldBe ((): Unit)
 
-      val totalNumberOfTriples =
-        versionPairJsonLD.properties.size + 1 + reProvisioningJsonLD.properties.size + 1 // +1 for rdf:type
-      rdfStoreSize shouldBe totalNumberOfTriples
+      rdfStoreSize shouldBe versionRelatedTriplesCount
     }
   }
 

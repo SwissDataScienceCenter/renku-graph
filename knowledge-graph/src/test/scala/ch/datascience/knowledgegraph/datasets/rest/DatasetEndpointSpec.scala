@@ -26,7 +26,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.projects.Path
-import ch.datascience.graph.model.testentities.EntitiesGenerators._
+import ch.datascience.graph.model.testentities.generators.EntitiesGenerators._
 import ch.datascience.graph.model.users.{Affiliation, Email, Name => UserName}
 import ch.datascience.graph.model.{RenkuBaseUrl, projects}
 import ch.datascience.http.InfoMessage._
@@ -61,8 +61,12 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
     "respond with OK and the found NonModifiedDataset" in new TestCase {
       forAll(
         Gen.oneOf(
-          datasetEntities(datasetProvenanceImportedExternal).map(_.to[NonModifiedDataset]),
-          datasetEntities(datasetProvenanceModified).map(_.to[ModifiedDataset])
+          anyProjectEntities
+            .addDataset(datasetEntities(provenanceImportedExternal))
+            .map((importedExternalToNonModified _).tupled),
+          anyProjectEntities
+            .addDataset(datasetEntities(provenanceModified))
+            .map((modifiedToModified _).tupled)
         )
       ) { dataset =>
         (datasetsFinder

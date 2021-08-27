@@ -26,7 +26,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import ch.datascience.graph.model.projects.Path
-import ch.datascience.graph.model.testentities.EntitiesGenerators._
+import ch.datascience.graph.model.testentities.generators.EntitiesGenerators._
 import ch.datascience.graph.model.{GitLabUrl, users}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.UrlEncoder._

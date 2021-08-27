@@ -23,18 +23,16 @@ import cats.syntax.all._
 import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.entities.Dataset.Provenance.{ImportedInternal, ImportedInternalAncestorExternal, ImportedInternalAncestorInternal, Modified}
 import ch.datascience.graph.model.entities.Dataset._
-import ch.datascience.graph.model.{GitLabApiUrl, InvalidationTime, projects}
+import ch.datascience.graph.model.{GitLabApiUrl, InvalidationTime}
 import io.circe.DecodingFailure
 
 import java.time.Instant
 
-final case class Dataset[+P <: Provenance](identification:        Identification,
-                                           provenance:            P,
-                                           additionalInfo:        AdditionalInfo,
-                                           parts:                 List[DatasetPart],
-                                           publicationEvents:     List[PublicationEvent],
-                                           projectResourceId:     projects.ResourceId,
-                                           maybeInvalidationTime: Option[InvalidationTime]
+final case class Dataset[+P <: Provenance](identification:    Identification,
+                                           provenance:        P,
+                                           additionalInfo:    AdditionalInfo,
+                                           parts:             List[DatasetPart],
+                                           publicationEvents: List[PublicationEvent]
 ) extends DatasetOps[P]
 
 object Dataset {
@@ -45,26 +43,16 @@ object Dataset {
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  def from[P <: Provenance](identification:        Identification,
-                            provenance:            P,
-                            additionalInfo:        AdditionalInfo,
-                            parts:                 List[DatasetPart],
-                            publicationEvents:     List[PublicationEvent],
-                            projectResourceId:     projects.ResourceId,
-                            maybeInvalidationTime: Option[InvalidationTime]
+  def from[P <: Provenance](identification:    Identification,
+                            provenance:        P,
+                            additionalInfo:    AdditionalInfo,
+                            parts:             List[DatasetPart],
+                            publicationEvents: List[PublicationEvent]
   ): ValidatedNel[String, Dataset[P]] = List(
     validateDates(parts, identification)(provenance),
-    validate(maybeInvalidationTime, identification)(provenance),
     validate(publicationEvents, identification)
   ).sequence.map { _ =>
-    Dataset(identification,
-            provenance,
-            additionalInfo,
-            parts,
-            publicationEvents,
-            projectResourceId,
-            maybeInvalidationTime
-    )
+    Dataset(identification, provenance, additionalInfo, parts, publicationEvents)
   }
 
   private def validateDates[P <: Provenance](parts:          List[DatasetPart],
@@ -73,6 +61,7 @@ object Dataset {
     case p: Provenance.Internal                         => verifyDate(parts, identification, p.date.value)
     case p: Provenance.ImportedExternal                 => verifyDate(parts, identification, p.date.instant)
     case p: Provenance.ImportedInternalAncestorExternal => verifyDate(parts, identification, p.date.instant)
+    case p: Provenance.Modified                         => validate(p.maybeInvalidationTime, identification)(p)
     case _ => ().validNel[String]
   }
 
@@ -204,12 +193,13 @@ object Dataset {
       override type D = DateCreated
     }
 
-    final case class Modified(resourceId:         ResourceId,
-                              derivedFrom:        DerivedFrom,
-                              topmostDerivedFrom: TopmostDerivedFrom,
-                              initialVersion:     InitialVersion,
-                              date:               DateCreated,
-                              creators:           Set[Person]
+    final case class Modified(resourceId:            ResourceId,
+                              derivedFrom:           DerivedFrom,
+                              topmostDerivedFrom:    TopmostDerivedFrom,
+                              initialVersion:        InitialVersion,
+                              date:                  DateCreated,
+                              creators:              Set[Person],
+                              maybeInvalidationTime: Option[InvalidationTime]
     ) extends Provenance {
       override type D = DateCreated
       override lazy val topmostSameAs: TopmostSameAs = TopmostSameAs(resourceId.asEntityId)
@@ -251,14 +241,22 @@ object Dataset {
           renku / "topmostDerivedFrom" -> provenance.topmostDerivedFrom.asJsonLD,
           renku / "originalIdentifier" -> provenance.initialVersion.asJsonLD
         )
-      case provenance @ Modified(_, derivedFrom, topmostDerivedFrom, initialVersion, date, creators) =>
+      case provenance @ Modified(_,
+                                 derivedFrom,
+                                 topmostDerivedFrom,
+                                 initialVersion,
+                                 date,
+                                 creators,
+                                 maybeInvalidationTime
+          ) =>
         Map(
           schema / "dateCreated"       -> date.asJsonLD,
           prov / "wasDerivedFrom"      -> derivedFrom.asJsonLD,
           schema / "creator"           -> creators.asJsonLD,
           renku / "topmostSameAs"      -> provenance.topmostSameAs.asJsonLD,
           renku / "topmostDerivedFrom" -> topmostDerivedFrom.asJsonLD,
-          renku / "originalIdentifier" -> initialVersion.asJsonLD
+          renku / "originalIdentifier" -> initialVersion.asJsonLD,
+          prov / "invalidatedAtTime"   -> maybeInvalidationTime.asJsonLD
         )
     }
 
@@ -280,13 +278,15 @@ object Dataset {
                                    .leftFlatMap(_ => Option.empty[ExternalSameAs].asRight)
           maybeDerivedFrom <-
             cursor.downField(prov / "wasDerivedFrom").as[Option[DerivedFrom]](decodeOption(DerivedFrom.jsonLDDecoder))
-          maybeInitialVersion <- cursor.downField(renku / "originalIdentifier").as[Option[InitialVersion]]
+          maybeInitialVersion   <- cursor.downField(renku / "originalIdentifier").as[Option[InitialVersion]]
+          maybeInvalidationTime <- cursor.downField(prov / "invalidatedAtTime").as[Option[InvalidationTime]]
           provenance <- createProvenance(identification, creators.toSet)(maybeDateCreated,
                                                                          maybeDatePublished,
                                                                          maybeInternalSameAs,
                                                                          maybeExternalSameAs,
                                                                          maybeDerivedFrom,
-                                                                         maybeInitialVersion
+                                                                         maybeInitialVersion,
+                                                                         maybeInvalidationTime
                         )
         } yield provenance
       }
@@ -296,13 +296,14 @@ object Dataset {
                                                                                           Option[InternalSameAs],
                                                                                           Option[ExternalSameAs],
                                                                                           Option[DerivedFrom],
-                                                                                          Option[InitialVersion]
+                                                                                          Option[InitialVersion],
+                                                                                          Option[InvalidationTime]
     ) => Result[Provenance] = {
-      case (Some(dateCreated), None, None, None, None, _) =>
+      case (Some(dateCreated), None, None, None, None, _, None) =>
         Internal(identification.resourceId, identification.identifier, dateCreated, creators).asRight
-      case (None, Some(datePublished), None, Some(sameAs), None, _) =>
+      case (None, Some(datePublished), None, Some(sameAs), None, _, None) =>
         ImportedExternal(identification.resourceId, identification.identifier, sameAs, datePublished, creators).asRight
-      case (Some(dateCreated), None, Some(sameAs), None, None, _) =>
+      case (Some(dateCreated), None, Some(sameAs), None, None, _, None) =>
         ImportedInternalAncestorInternal(identification.resourceId,
                                          identification.identifier,
                                          sameAs,
@@ -310,7 +311,7 @@ object Dataset {
                                          dateCreated,
                                          creators
         ).asRight
-      case (None, Some(datePublished), Some(sameAs), None, None, _) =>
+      case (None, Some(datePublished), Some(sameAs), None, None, _, None) =>
         ImportedInternalAncestorExternal(identification.resourceId,
                                          identification.identifier,
                                          sameAs,
@@ -318,20 +319,22 @@ object Dataset {
                                          datePublished,
                                          creators
         ).asRight
-      case (Some(dateCreated), None, None, None, Some(derivedFrom), Some(initialVersion)) =>
+      case (Some(dateCreated), None, None, None, Some(derivedFrom), Some(initialVersion), maybeInvalidationTime) =>
         Modified(identification.resourceId,
                  derivedFrom,
                  TopmostDerivedFrom(derivedFrom),
                  initialVersion,
                  dateCreated,
-                 creators
+                 creators,
+                 maybeInvalidationTime
         ).asRight
       case (maybeDateCreated,
             maybeDatePublished,
             maybeInternalSameAs,
             maybeExternalSameAs,
             maybeDerivedFrom,
-            maybeInitialVersion
+            maybeInitialVersion,
+            maybeInvalidationTime
           ) =>
         DecodingFailure(
           "Invalid dataset data " +
@@ -340,7 +343,8 @@ object Dataset {
             s"internalSameAs: $maybeInternalSameAs, " +
             s"externalSameAs: $maybeExternalSameAs, " +
             s"derivedFrom: $maybeDerivedFrom, " +
-            s"initialVersion: $maybeInitialVersion",
+            s"initialVersion: $maybeInitialVersion" +
+            s"maybeInvalidationTime: $maybeInvalidationTime",
           Nil
         ).asLeft
     }
@@ -417,21 +421,17 @@ object Dataset {
     }
 
     JsonLDEncoder.instance { dataset =>
-      JsonLD.arr(
-        JsonLD
-          .entity(
-            dataset.resourceId.asEntityId,
-            entityTypes,
-            List(
-              dataset.identification.asJsonLDProperties,
-              dataset.provenance.asJsonLDProperties,
-              dataset.additionalInfo.asJsonLDProperties
-            ).flatten.toMap,
-            schema / "hasPart"         -> dataset.parts.asJsonLD,
-            schema / "isPartOf"        -> dataset.projectResourceId.asEntityId.asJsonLD,
-            prov / "invalidatedAtTime" -> dataset.maybeInvalidationTime.asJsonLD
-          ) :: dataset.publicationEvents.map(_.asJsonLD): _*
-      )
+      JsonLD
+        .entity(
+          dataset.resourceId.asEntityId,
+          entityTypes,
+          List(
+            dataset.identification.asJsonLDProperties,
+            dataset.provenance.asJsonLDProperties,
+            dataset.additionalInfo.asJsonLDProperties
+          ).flatten.toMap,
+          schema / "hasPart" -> dataset.parts.asJsonLD
+        )
     }
   }
 
@@ -446,18 +446,9 @@ object Dataset {
           .map(_.cursor.as[List[PublicationEvent]].map(_.filter(_.location == identification.resourceId)))
           .sequence
           .map(_ getOrElse Nil)
-      projectResourceId     <- cursor.downField(schema / "isPartOf").downEntityId.as[projects.ResourceId]
-      maybeInvalidationTime <- cursor.downField(prov / "invalidatedAtTime").as[Option[InvalidationTime]]
       dataset <-
         Dataset
-          .from(identification,
-                provenance,
-                additionalInfo,
-                parts,
-                publicationEvents,
-                projectResourceId,
-                maybeInvalidationTime
-          )
+          .from(identification, provenance, additionalInfo, parts, publicationEvents)
           .toEither
           .leftMap(errors => DecodingFailure(errors.intercalate("; "), Nil))
     } yield dataset

@@ -20,19 +20,13 @@ package ch.datascience.knowledgegraph.metrics
 
 import cats.effect.IO
 import cats.implicits.toShow
-import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators.cliVersions
-import ch.datascience.graph.model.projects.ForksCount
-import ch.datascience.graph.model.testentities.EntitiesGenerators.personEntities
 import ch.datascience.graph.model.testentities._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import eu.timepit.refined.auto._
 import io.renku.jsonld.Property
-import io.renku.jsonld.syntax._
-import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -54,24 +48,24 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
 
     "return info about number of objects by types" in new TestCase {
 
-      val datasets   = datasetEntities(ofAnyProvenance).generateNonEmptyList()
-      val activities = activityEntities.generateNonEmptyList(minElements = 10, maxElements = 50)
-      val persons    = activities.map(_.author)
+      val projectsWithDatasets =
+        anyProjectEntities.addDataset(datasetEntities(ofAnyProvenance)).generateNonEmptyList().toList
+      val projectsWithActivities = anyProjectEntities
+        .withActivities(activityEntities(planEntities()))
+        .generateNonEmptyList(minElements = 10, maxElements = 50)
+        .toList
+      val persons = projectsWithActivities.flatMap(_.activities.map(_.author))
 
       val entitiesWithActivities = Map
         .empty[EntityLabel, Count]
-        .update(schema / "Dataset", datasets.size)
-        .update(schema / "Project", activities.size + datasets.size)
-        .update(prov / "Activity", activities.size)
-        .update(renku / "Plan", activities.map(_.association.plan).size)
+        .update(schema / "Dataset", projectsWithDatasets.size)
+        .update(schema / "Project", projectsWithActivities.size + projectsWithDatasets.size)
+        .update(prov / "Activity", projectsWithActivities.size)
+        .update(renku / "Plan", projectsWithActivities.size)
         .update(schema / "Person", persons.size)
-        .update(schema / "Person with GitLabId", persons.toList.count(_.maybeGitLabId.isDefined))
+        .update(schema / "Person with GitLabId", persons.count(_.maybeGitLabId.isDefined))
 
-      loadToStore(
-        datasets.toList.map(_.asJsonLD) :::
-          activities.toList.map(_.asJsonLD) :::
-          activities.toList.map(_.association.plan.asJsonLD): _*
-      )
+      loadToStore(projectsWithDatasets.map(_._2) ::: projectsWithActivities: _*)
 
       stats.entitiesCount().unsafeRunSync() shouldBe entitiesWithActivities
     }
@@ -85,18 +79,6 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
       new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO](logger))
     )
   }
-
-  private lazy val activityEntities: Gen[Activity] = for {
-    name       <- planNames
-    command    <- planCommands
-    author     <- personEntities
-    cliVersion <- cliVersions
-    project    <- projectEntities[ForksCount.Zero](visibilityPublic)
-    startTime  <- activityStartTimes(project.dateCreated)
-  } yield ExecutionPlanner
-    .of(Plan(name, command, commandParameterFactories = Nil, project), startTime, author, cliVersion)
-    .buildProvenanceGraph
-    .fold(errors => fail(errors.intercalate("\n")), identity)
 
   private implicit class MapOps(entitiesByType: Map[EntityLabel, Count]) {
     def update(entityType: Property, count: Long): Map[EntityLabel, Count] = {

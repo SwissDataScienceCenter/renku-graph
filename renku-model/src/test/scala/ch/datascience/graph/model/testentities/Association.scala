@@ -38,13 +38,7 @@ object Association {
       )
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[Association] =
-    JsonLDEncoder.instance { association =>
-      val entitiesAssociation = association.to[entities.Association]
-      JsonLD.arr(
-        entitiesAssociation.plan.asJsonLD,
-        entitiesAssociation.asJsonLD
-      )
-    }
+    JsonLDEncoder.instance(association => association.to[entities.Association].asJsonLD)
 
   implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[Association] =
     EntityIdEncoder.instance(entity => entity.activity.asEntityId.asUrlEntityId / "association")

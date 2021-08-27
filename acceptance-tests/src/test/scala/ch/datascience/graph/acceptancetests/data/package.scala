@@ -28,7 +28,7 @@ import ch.datascience.graph.acceptancetests.data.Project._
 import ch.datascience.graph.model
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model._
-import ch.datascience.graph.model.testentities.EntitiesGenerators._
+import ch.datascience.graph.model.testentities.generators.EntitiesGenerators._
 import org.scalacheck.Gen
 
 import java.time.Instant.now

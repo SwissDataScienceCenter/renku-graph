@@ -18,18 +18,21 @@
 
 package ch.datascience.graph.model.entities
 
+import Generators._
 import cats.syntax.all._
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.GraphModelGenerators.projectCreatedDates
 import ch.datascience.graph.model.entities
 import ch.datascience.graph.model.testentities._
-import ch.datascience.generators.Generators.Implicits._
+import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-import Generators._
-import io.renku.jsonld.syntax._
 
 class EntitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
-  "Entity.decode" should {
+
+  "decode" should {
+
     "turn JsonLD InputEntity entity into the Entity object " in {
       forAll(inputEntities) { entity =>
         entity.asJsonLD.flatten
@@ -41,7 +44,7 @@ class EntitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
 
     "turn JsonLD Output entity into the Entity object " in {
       forAll(locationCommandOutputObjects) { commandOutput =>
-        val activity = executionPlanners(planEntities(commandOutput)).generateOne.buildProvenanceUnsafe()
+        val activity = activityEntities(planEntities(commandOutput))(projectCreatedDates().generateOne).generateOne
 
         activity.asJsonLD.flatten
           .fold(throw _, identity)

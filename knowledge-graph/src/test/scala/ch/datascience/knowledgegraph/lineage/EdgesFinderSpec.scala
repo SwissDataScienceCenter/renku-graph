@@ -22,7 +22,6 @@ import cats.effect.IO
 import ch.datascience.generators.CommonGraphGenerators.authUsers
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.testentities._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Warn
@@ -41,11 +40,10 @@ class EdgesFinderSpec extends AnyWordSpec with InMemoryRdfStore with ExternalSer
     "return all the edges of the given project " +
       "case when the user is not authenticated and the project is public" in new TestCase {
 
-        val (jsons, exemplarData) = LineageExemplarData(projectEntities[ForksCount.Zero](visibilityPublic).generateOne)
-
-        loadToStore(jsons: _*)
-
+        val exemplarData = LineageExemplarData(projectEntities(visibilityPublic).generateOne)
         import exemplarData._
+
+        loadToStore(project)
 
         edgesFinder
           .findEdges(project.path, maybeUser = None)
@@ -74,9 +72,9 @@ class EdgesFinderSpec extends AnyWordSpec with InMemoryRdfStore with ExternalSer
 
     "return None if the project is not public " +
       "case when the user is not a member of the project or not authenticated" in new TestCase {
-        val (jsons, _) = LineageExemplarData(projectEntities[ForksCount.Zero](visibilityNonPublic).generateOne)
+        val exemplarData = LineageExemplarData(projectEntities(visibilityNonPublic).generateOne)
 
-        loadToStore(jsons: _*)
+        loadToStore(exemplarData.project)
 
         edgesFinder
           .findEdges(projectPaths.generateOne, authUsers.generateOption)
@@ -91,15 +89,14 @@ class EdgesFinderSpec extends AnyWordSpec with InMemoryRdfStore with ExternalSer
       "case when the user is authenticated and is a member of the project" in new TestCase {
         val authUser = authUsers.generateOne
 
-        val (jsons, exemplarData) = LineageExemplarData(
-          projectEntities[ForksCount.Zero](visibilityNonPublic).generateOne.copy(
+        val exemplarData = LineageExemplarData(
+          projectEntities(visibilityNonPublic).generateOne.copy(
             members = Set(personEntities.generateOne.copy(maybeGitLabId = Some(authUser.id)))
           )
         )
-
-        loadToStore(jsons: _*)
-
         import exemplarData._
+
+        loadToStore(project)
 
         edgesFinder
           .findEdges(project.path, Some(authUser))

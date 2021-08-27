@@ -34,7 +34,8 @@ import ch.datascience.graph.model.datasets.{DatePublished, Identifier, ImageUri,
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Visibility
 import ch.datascience.graph.model.testentities.ModelOps.DatasetForkingResult
-import ch.datascience.graph.model.testentities.{Dataset, EntitiesGenerators, Person}
+import ch.datascience.graph.model.testentities.generators.EntitiesGenerators
+import ch.datascience.graph.model.testentities.{Dataset, Person}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.http.rest.Links.{Href, Rel, _links}
@@ -72,8 +73,8 @@ class DatasetsResourcesSpec
     val project = dataProjects(
       projectEntities[model.projects.ForksCount.Zero](visibilityPublic).generateOne
     ).generateOne
-    val dataset1         = datasetEntities(datasetProvenanceInternal, fixed(project.entitiesProject)).generateOne
-    val dataset2         = datasetEntities(datasetProvenanceInternal, fixed(project.entitiesProject)).generateOne
+    val dataset1         = datasetEntities(provenanceInternal, fixed(project.entitiesProject)).generateOne
+    val dataset2         = datasetEntities(provenanceInternal, fixed(project.entitiesProject)).generateOne
     val dataset2Modified = modifiedDatasetEntities(dataset2).generateOne
 
     Scenario("As a user I would like to find project's datasets by calling a REST endpoint") {
@@ -155,13 +156,13 @@ class DatasetsResourcesSpec
 
       val text = nonBlankStrings(minLength = 10).generateOne
 
-      val dataset1                                     = datasetEntities(datasetProvenanceInternal).generateOne.makeTitleContaining(text)
-      val dataset2                                     = datasetEntities(datasetProvenanceInternal).generateOne.makeDescContaining(text)
-      val dataset3                                     = datasetEntities(datasetProvenanceInternal).generateOne.makeCreatorNameContaining(text)
-      val dataset4Original                             = datasetEntities(datasetProvenanceInternal).generateOne.makeKeywordsContaining(text)
+      val dataset1                                     = datasetEntities(provenanceInternal).generateOne.makeTitleContaining(text)
+      val dataset2                                     = datasetEntities(provenanceInternal).generateOne.makeDescContaining(text)
+      val dataset3                                     = datasetEntities(provenanceInternal).generateOne.makeCreatorNameContaining(text)
+      val dataset4Original                             = datasetEntities(provenanceInternal).generateOne.makeKeywordsContaining(text)
       val DatasetForkingResult(dataset4, dataset5Fork) = dataset4Original.forkProject()
-      val dataset6WithoutText                          = datasetEntities(datasetProvenanceInternal).generateOne
-      val dataset7Private = datasetEntities(datasetProvenanceInternal,
+      val dataset6WithoutText                          = datasetEntities(provenanceInternal).generateOne
+      val dataset7Private = datasetEntities(provenanceInternal,
                                             projectEntities[model.projects.ForksCount.Zero](visibilityNonPublic)
       ).generateOne.makeTitleContaining(text)
 
@@ -262,15 +263,15 @@ class DatasetsResourcesSpec
 
       val text = nonBlankStrings(minLength = 10).generateOne
 
-      val dataset1 = datasetEntities(datasetProvenanceInternal).generateOne.makeTitleContaining(text)
+      val dataset1 = datasetEntities(provenanceInternal).generateOne.makeTitleContaining(text)
 
       val dataset2Private = datasetEntities(
-        datasetProvenanceInternal,
+        provenanceInternal,
         projectEntities[model.projects.ForksCount.Zero](Gen.oneOf(Visibility.Private, Visibility.Internal))
       ).generateOne.makeTitleContaining(text)
 
       val dataset3PrivateWithAccess = datasetEntities(
-        datasetProvenanceInternal,
+        provenanceInternal,
         projectEntities[model.projects.ForksCount.Zero](Gen.oneOf(Visibility.Private, Visibility.Internal))
           .map(_.copy(members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some))))
       ).generateOne.makeTitleContaining(text)

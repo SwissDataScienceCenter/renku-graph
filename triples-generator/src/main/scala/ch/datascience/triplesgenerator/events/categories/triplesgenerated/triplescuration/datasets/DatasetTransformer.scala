@@ -27,9 +27,9 @@ import ch.datascience.graph.model.entities.Dataset
 import ch.datascience.http.client.RestClientError._
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TransformationStep
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{ResultData, Transformation}
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.{ProjectFunctions, TransformationStep}
 import eu.timepit.refined.auto._
 import org.typelevel.log4cats.Logger
 
@@ -41,23 +41,25 @@ private[triplescuration] trait DatasetTransformer[Interpretation[_]] {
 
 private[triplescuration] class DatasetTransformerImpl[Interpretation[_]: MonadThrow](
     kgDatasetInfoFinder: KGDatasetInfoFinder[Interpretation],
-    updatesCreator:      UpdatesCreator
+    updatesCreator:      UpdatesCreator,
+    projectFunctions:    ProjectFunctions
 ) extends DatasetTransformer[Interpretation] {
 
   import kgDatasetInfoFinder._
+  import projectFunctions._
 
   override def createTransformationStep: TransformationStep[Interpretation] =
     TransformationStep("Dataset Details Updates", createTransformation)
 
   private def createTransformation: Transformation[Interpretation] = projectMetadata =>
     EitherT {
-      (updateTopmostSameAs(ResultData(projectMetadata)) >>= updateTopmostDerivedFrom >>= updateHierarchyOnDeletion)
+      (updateTopmostSameAs(ResultData(projectMetadata)) >>= updateTopmostDerivedFrom >>= updateHierarchyOnInvalidation)
         .map(_.asRight[ProcessingRecoverableError])
         .recoverWith(maybeToRecoverableError)
     }
 
   private def updateTopmostSameAs(resultData: ResultData) =
-    resultData.projectMetadata.findInternallyImportedDatasets
+    findInternallyImportedDatasets(resultData.project)
       .foldLeft(resultData.pure[Interpretation]) { (resultDataF, dataset) =>
         for {
           resultData               <- resultDataF
@@ -65,13 +67,13 @@ private[triplescuration] class DatasetTransformerImpl[Interpretation[_]: MonadTh
           maybeKGTopmostSameAs     <- findTopmostSameAs(dataset.identification.resourceId)
           updatedDataset = maybeParentTopmostSameAs.map(dataset.update).getOrElse(dataset)
         } yield ResultData(
-          projectMetadata = resultData.projectMetadata.update(dataset, updatedDataset),
+          project = update(dataset, updatedDataset)(resultData.project),
           queries = resultData.queries ::: updatesCreator.prepareUpdates(dataset, maybeKGTopmostSameAs)
         )
       }
 
   private def updateTopmostDerivedFrom(resultData: ResultData) =
-    resultData.projectMetadata.findModifiedDatasets
+    findModifiedDatasets(resultData.project)
       .foldLeft(resultData.pure[Interpretation]) { (resultDataF, dataset) =>
         for {
           resultData                    <- resultDataF
@@ -79,26 +81,32 @@ private[triplescuration] class DatasetTransformerImpl[Interpretation[_]: MonadTh
           maybeKGTopmostDerivedFrom     <- findTopmostDerivedFrom(dataset.identification.resourceId)
           updatedDataset = maybeParentTopmostDerivedFrom.map(dataset.update).getOrElse(dataset)
         } yield ResultData(
-          projectMetadata = resultData.projectMetadata.update(dataset, updatedDataset),
+          project = update(dataset, updatedDataset)(resultData.project),
           queries = resultData.queries ::: updatesCreator.prepareUpdates(dataset, maybeKGTopmostDerivedFrom)
         )
       }
 
-  private def updateHierarchyOnDeletion(resultData: ResultData) = resultData.projectMetadata.findInvalidatedDatasets
+  private def updateHierarchyOnInvalidation(resultData: ResultData) = findInvalidatedDatasets(resultData.project)
     .foldLeft(resultData.pure[Interpretation]) { (resultDataF, dataset) =>
       for {
         resultData <- resultDataF
         queries = dataset.provenance match {
                     case _: Dataset.Provenance.Internal =>
-                      updatesCreator.prepareUpdates(dataset.asInstanceOf[Dataset[Dataset.Provenance.Internal]])
+                      updatesCreator.prepareUpdatesWhenInvalidated(
+                        dataset.asInstanceOf[Dataset[Dataset.Provenance.Internal]]
+                      )
                     case _: Dataset.Provenance.ImportedExternal =>
-                      updatesCreator.prepareUpdates(dataset.asInstanceOf[Dataset[Dataset.Provenance.ImportedExternal]])
+                      updatesCreator.prepareUpdatesWhenInvalidated(
+                        dataset.asInstanceOf[Dataset[Dataset.Provenance.ImportedExternal]]
+                      )
                     case _: Dataset.Provenance.ImportedInternal =>
-                      updatesCreator.prepareUpdates(dataset.asInstanceOf[Dataset[Dataset.Provenance.ImportedInternal]])
+                      updatesCreator.prepareUpdatesWhenInvalidated(
+                        dataset.asInstanceOf[Dataset[Dataset.Provenance.ImportedInternal]]
+                      )
                     case _ => Nil
                   }
       } yield ResultData(
-        projectMetadata = resultData.projectMetadata,
+        project = resultData.project,
         queries = resultData.queries ::: queries
       )
     }
@@ -124,5 +132,5 @@ private[triplescuration] object DatasetTransformer {
   )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[DatasetTransformer[IO]] =
     for {
       kgDatasetInfoFinder <- IOKGDatasetInfoFinder(logger, timeRecorder)
-    } yield new DatasetTransformerImpl[IO](kgDatasetInfoFinder, UpdatesCreator)
+    } yield new DatasetTransformerImpl[IO](kgDatasetInfoFinder, UpdatesCreator, ProjectFunctions)
 }

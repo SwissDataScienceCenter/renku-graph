@@ -28,10 +28,10 @@ import ch.datascience.graph.model.entities
 import ch.datascience.graph.model.testentities._
 import ch.datascience.http.client.RestClientError
 import ch.datascience.http.client.RestClientError.UnauthorizedException
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.ProjectMetadata
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.ProjectFunctions
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.ProjectFunctions._
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TransformationStep.ResultData
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
-import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -47,74 +47,72 @@ class PersonTransformerSpec extends AnyWordSpec with should.Matchers with MockFa
       "try to find matching Person in KG, " +
       "merge the data and update the model " +
       "and generate relevant delete queries" in new TestCase {
-        val projectMetadata = mock[ProjectMetadata]
-        val persons         = personEntities.generateSet().map(_.to[entities.Person])
+        val persons = personEntities.generateSet()
+        val project = anyProjectEntities
+          .modify(membersLens.modify(_ => persons) andThen creatorLens.modify(_ => None))
+          .generateOne
+          .to[entities.Project]
 
-        (() => projectMetadata.findAllPersons)
-          .expects()
-          .returning(persons)
-
-        val expectedResultData = persons.foldLeft(ResultData(projectMetadata, List.empty)) { (resultData, person) =>
-          val maybeKGPerson = personEntities.generateOption.map(_.to[entities.Person])
-          (kgPersonFinder.find _).expects(person).returning(maybeKGPerson.pure[Try])
-          maybeKGPerson match {
-            case Some(kgPerson) =>
-              val mergedPerson = personEntities.generateOne.to[entities.Person]
-              (personMerger
-                .merge(_: entities.Person, _: entities.Person)(_: MonadThrow[Try]))
-                .expects(person, kgPerson, *)
-                .returning(mergedPerson.pure[Try])
-              val updatedProjectMetadata = mock[ProjectMetadata]
-              (resultData.projectMetadata
-                .update(_: entities.Person, _: entities.Person))
-                .expects(person, mergedPerson)
-                .returning(updatedProjectMetadata)
-              val queries = sparqlQueries.generateList()
-              (updatesCreator.prepareUpdates _).expects(kgPerson).returning(queries)
-              ResultData(updatedProjectMetadata, queries ::: resultData.queries)
-            case None =>
-              resultData
+        val expectedResultData =
+          persons.map(_.to[entities.Person]).foldLeft(ResultData(project, List.empty)) { (resultData, person) =>
+            val maybeKGPerson = personEntities.generateOption.map(_.to[entities.Person])
+            (kgPersonFinder.find _).expects(person).returning(maybeKGPerson.pure[Try])
+            maybeKGPerson match {
+              case Some(kgPerson) =>
+                val mergedPerson = personEntities.generateOne.to[entities.Person]
+                (personMerger
+                  .merge(_: entities.Person, _: entities.Person)(_: MonadThrow[Try]))
+                  .expects(person, kgPerson, *)
+                  .returning(mergedPerson.pure[Try])
+                val queries = sparqlQueries.generateList()
+                (updatesCreator.prepareUpdates _).expects(kgPerson).returning(queries)
+                ResultData(update(person, mergedPerson)(resultData.project), resultData.queries ::: queries)
+              case None => resultData
+            }
           }
-        }
 
         val step = transformer.createTransformationStep
 
         step.name.value shouldBe "Person Details Updates"
-        val Success(Right(updateResult)) = step.run(projectMetadata).value
+        val Success(Right(updateResult)) = step.run(project).value
         updateResult shouldBe expectedResultData
       }
 
     "fail with RecoverableFailure if finding matching Person in KG fails with a network or HTTP error" in new TestCase {
-      val projectMetadata = mock[ProjectMetadata]
-      val persons         = personEntities.generateSet(minElements = 1).map(_.to[entities.Person])
+      val person = personEntities.generateOne
+      val project = anyProjectEntities
+        .modify(membersLens.modify(_ => Set(person)) andThen creatorLens.modify(_ => None))
+        .generateOne
+        .to[entities.Project]
 
-      (() => projectMetadata.findAllPersons)
-        .expects()
-        .returning(persons)
       val exception = recoverableClientErrors.generateOne
-      (kgPersonFinder.find _).expects(persons.head).returning(exception.raiseError[Try, Option[entities.Person]])
+      (kgPersonFinder.find _)
+        .expects(person.to[entities.Person])
+        .returning(exception.raiseError[Try, Option[entities.Person]])
 
       val step = transformer.createTransformationStep
 
-      val Success(Left(recoverableError)) = step.run(projectMetadata).value
+      val Success(Left(recoverableError)) = step.run(project).value
 
       recoverableError            shouldBe a[TransformationRecoverableError]
       recoverableError.getMessage shouldBe "Problem finding person details in KG"
     }
 
     "fail with NonRecoverableFailure if finding matching Person in KG fails with an unknown exception" in new TestCase {
-      val projectMetadata = mock[ProjectMetadata]
-      val persons         = personEntities.generateSet(minElements = 1).map(_.to[entities.Person])
+      val person = personEntities.generateOne
+      val project = anyProjectEntities
+        .modify(membersLens.modify(_ => Set(person)) andThen creatorLens.modify(_ => None))
+        .generateOne
+        .to[entities.Project]
 
-      (() => projectMetadata.findAllPersons)
-        .expects()
-        .returning(persons)
       val exception = exceptions.generateOne
-      (kgPersonFinder.find _).expects(persons.head).returning(exception.raiseError[Try, Option[entities.Person]])
+      (kgPersonFinder.find _)
+        .expects(person.to[entities.Person])
+        .returning(exception.raiseError[Try, Option[entities.Person]])
 
       val step = transformer.createTransformationStep
 
-      val Failure(nonRecoverableError) = step.run(projectMetadata).value
+      val Failure(nonRecoverableError) = step.run(project).value
       nonRecoverableError shouldBe exception
     }
   }
@@ -124,11 +122,7 @@ class PersonTransformerSpec extends AnyWordSpec with should.Matchers with MockFa
     val updatesCreator = mock[UpdatesCreator]
     val kgPersonFinder = mock[KGPersonFinder[Try]]
     val personMerger   = mock[PersonMerger]
-    val transformer = new PersonTransformerImpl[Try](
-      kgPersonFinder,
-      personMerger,
-      updatesCreator
-    )
+    val transformer    = new PersonTransformerImpl[Try](kgPersonFinder, personMerger, updatesCreator, ProjectFunctions)
   }
 
   private lazy val recoverableClientErrors: Gen[RestClientError] =

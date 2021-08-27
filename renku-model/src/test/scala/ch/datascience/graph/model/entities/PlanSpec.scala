@@ -23,7 +23,6 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.nonEmptyStrings
 import ch.datascience.graph.model.commandParameters.Position
 import ch.datascience.graph.model.entities.Generators._
-import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.testentities._
 import ch.datascience.graph.model.{entities, plans}
 import io.renku.jsonld.syntax._
@@ -37,7 +36,7 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
   "decode" should {
 
     "turn JsonLD Plan entity into the Plan object" in {
-      forAll(planObjects()) { plan =>
+      forAll(planObjects) { plan =>
         plan.asJsonLD.flatten
           .fold(throw _, identity)
           .cursor
@@ -54,9 +53,7 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
     mappedOutputs   <- mappedCommandOutputObjects.toGeneratorOfList()
   } yield parameters ::: locationInputs ::: mappedInputs ::: locationOutputs ::: mappedOutputs
 
-  private def planObjects(
-      projectGen: Gen[Project[ForksCount]] = projectEntities(anyVisibility)(anyForksCount)
-  ): Gen[Plan] = for {
+  private lazy val planObjects: Gen[Plan] = for {
     name                     <- planNames
     command                  <- planCommands
     maybeDescription         <- planDescriptions.toGeneratorOfOptions
@@ -64,7 +61,6 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
     keywords                 <- nonEmptyStrings().map(plans.Keyword).toGeneratorOfList()
     paramFactories           <- parameterFactoryLists
     successCodes             <- planSuccessCodes.toGeneratorOfList()
-    project                  <- projectGen
   } yield Plan(
     Plan.Id.generate,
     name,
@@ -75,7 +71,6 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
     commandParameterFactories = paramFactories.zipWithIndex.map { case (factory, idx) =>
       factory(Position(idx + 1))
     },
-    successCodes,
-    project
+    successCodes
   )
 }

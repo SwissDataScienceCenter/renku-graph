@@ -29,16 +29,16 @@ import eu.timepit.refined.auto._
 
 private trait UpdatesCreator {
 
-  def prepareUpdates(dataset: Dataset[Dataset.Provenance.Internal])(implicit
-      ev:                     Dataset.Provenance.Internal.type
+  def prepareUpdatesWhenInvalidated(dataset: Dataset[Dataset.Provenance.Internal])(implicit
+      ev:                                    Dataset.Provenance.Internal.type
   ): List[SparqlQuery]
 
-  def prepareUpdates(dataset: Dataset[Dataset.Provenance.ImportedExternal])(implicit
-      ev:                     Dataset.Provenance.ImportedExternal.type
+  def prepareUpdatesWhenInvalidated(dataset: Dataset[Dataset.Provenance.ImportedExternal])(implicit
+      ev:                                    Dataset.Provenance.ImportedExternal.type
   ): List[SparqlQuery]
 
-  def prepareUpdates(dataset: Dataset[Dataset.Provenance.ImportedInternal])(implicit
-      ev:                     Dataset.Provenance.ImportedInternal.type
+  def prepareUpdatesWhenInvalidated(dataset: Dataset[Dataset.Provenance.ImportedInternal])(implicit
+      ev:                                    Dataset.Provenance.ImportedInternal.type
   ): List[SparqlQuery]
 
   def prepareUpdates(dataset:              Dataset[Dataset.Provenance.ImportedInternal],
@@ -52,38 +52,28 @@ private trait UpdatesCreator {
 
 private object UpdatesCreator extends UpdatesCreator {
 
-  def prepareUpdates(
+  def prepareUpdatesWhenInvalidated(
       dataset:   Dataset[Dataset.Provenance.Internal]
   )(implicit ev: Dataset.Provenance.Internal.type): List[SparqlQuery] =
-    Option
-      .when(dataset.maybeInvalidationTime.isDefined) {
-        List(useTopmostSameAsFromTheOldestDeletedDSChildOnAncestors(dataset), deleteSameAs(dataset))
-      }
-      .toList
-      .flatten
+    List(useTopmostSameAsFromTheOldestDeletedDSChildOnAncestors(dataset), deleteSameAs(dataset))
 
-  def prepareUpdates(
+  def prepareUpdatesWhenInvalidated(
       dataset:   Dataset[Dataset.Provenance.ImportedExternal]
   )(implicit ev: Dataset.Provenance.ImportedExternal.type): List[SparqlQuery] =
-    Option
-      .when(dataset.maybeInvalidationTime.isDefined)(useDeletedDSSameAsAsChildSameAs(dataset))
-      .toList
+    List(useDeletedDSSameAsAsChildSameAs(dataset))
 
-  def prepareUpdates(dataset: Dataset[Dataset.Provenance.ImportedInternal])(implicit
-      ev:                     Dataset.Provenance.ImportedInternal.type
-  ): List[SparqlQuery] =
-    Option
-      .when(dataset.maybeInvalidationTime.isDefined)(useDeletedDSSameAsAsChildSameAs(dataset))
-      .toList
+  def prepareUpdatesWhenInvalidated(
+      dataset:   Dataset[Dataset.Provenance.ImportedInternal]
+  )(implicit ev: Dataset.Provenance.ImportedInternal.type): List[SparqlQuery] =
+    List(useDeletedDSSameAsAsChildSameAs(dataset))
 
   override def prepareUpdates(dataset:              Dataset[Provenance.ImportedInternal],
                               maybeKGTopmostSameAs: Option[TopmostSameAs]
   )(implicit ev:                                    datasets.TopmostSameAs.type): List[SparqlQuery] =
     Option
-      .when(
-        !(maybeKGTopmostSameAs contains dataset.provenance.topmostSameAs)
-          && dataset.maybeInvalidationTime.isEmpty
-      )(prepareSameAsUpdate(dataset.resourceId, dataset.provenance.topmostSameAs))
+      .when(!(maybeKGTopmostSameAs contains dataset.provenance.topmostSameAs))(
+        prepareSameAsUpdate(dataset.resourceId, dataset.provenance.topmostSameAs)
+      )
       .toList
 
   override def prepareUpdates(dataset:                   Dataset[Provenance.Modified],
@@ -92,7 +82,7 @@ private object UpdatesCreator extends UpdatesCreator {
     Option
       .when(
         !(maybeKGTopmostDerivedFrom contains dataset.provenance.topmostDerivedFrom) &&
-          dataset.maybeInvalidationTime.isEmpty
+          dataset.provenance.maybeInvalidationTime.isEmpty
       )(prepareDerivedFromUpdate(dataset.resourceId, dataset.provenance.topmostDerivedFrom))
       .toList
 

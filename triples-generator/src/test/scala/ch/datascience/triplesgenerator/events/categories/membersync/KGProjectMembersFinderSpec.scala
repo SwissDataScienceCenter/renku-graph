@@ -21,7 +21,6 @@ package ch.datascience.triplesgenerator.events.categories.membersync
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.testentities._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
@@ -41,7 +40,7 @@ class KGProjectMembersFinderSpec
 
     "return all members of a given project" in new TestCase {
       val members = personEntities(withGitLabId).generateFixedSizeSet()
-      val project = projectEntities[ForksCount.Zero](anyVisibility).generateOne.copy(members = members)
+      val project = anyProjectEntities.modify(membersLens.modify(_ => members)).generateOne
 
       loadToStore(project)
 

@@ -19,17 +19,12 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 
 import ch.datascience.events.consumers.ConsumersModelGenerators._
-import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{exceptions, nonEmptyStrings}
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators.projectSchemaVersions
-import ch.datascience.graph.model.entities
-import ch.datascience.graph.model.projects.ForksCount
-import ch.datascience.graph.model.testentities._
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
 import io.renku.jsonld.generators.JsonLDGenerators.jsonLDEntities
 import org.scalacheck.Gen
-import cats.syntax.all._
 
 private object TriplesGeneratedGenerators {
 
@@ -44,19 +39,5 @@ private object TriplesGeneratedGenerators {
     entities      <- jsonLDEntities
     schemaVersion <- projectSchemaVersions
   } yield TriplesGeneratedEvent(eventId, project, entities, schemaVersion)
-
-  lazy val projectMetadatas: Gen[ProjectMetadata] = for {
-    project <- projectEntities[ForksCount](anyVisibility)(anyForksCount)
-    activities <-
-      executionPlanners(planEntities(), fixed(project)).map(_.buildProvenanceUnsafe()).toGeneratorOfList()
-    datasets <- datasetEntities(ofAnyProvenance, fixed(project)).toGeneratorOfList()
-  } yield ProjectMetadata
-    .from(
-      project.to[entities.Project],
-      activities.map(_.to[entities.Activity]),
-      datasets
-        .map(_.to[entities.Dataset[entities.Dataset.Provenance]])
-    )
-    .fold(errors => throw new IllegalStateException(errors.intercalate("; ")), identity)
 
 }

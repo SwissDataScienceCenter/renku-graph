@@ -19,6 +19,7 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 
 import cats.data.EitherT
+import ch.datascience.graph.model.entities.Project
 import ch.datascience.rdfstore.SparqlQuery
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{Transformation, TransformationStepResult}
@@ -29,24 +30,20 @@ private[triplesgenerated] final case class TransformationStep[Interpretation[_]]
     name:           String Refined NonEmpty,
     transformation: Transformation[Interpretation]
 ) {
-  def run(projectMetadata: ProjectMetadata): TransformationStepResult[Interpretation] =
-    transformation(projectMetadata)
+  def run(project: Project): TransformationStepResult[Interpretation] = transformation(project)
 }
 
 private object TransformationStep {
 
   private[triplesgenerated] type Transformation[Interpretation[_]] =
-    ProjectMetadata => TransformationStepResult[Interpretation]
+    Project => TransformationStepResult[Interpretation]
 
   private[triplesgenerated] type TransformationStepResult[Interpretation[_]] =
     EitherT[Interpretation, ProcessingRecoverableError, ResultData]
 
-  private[triplesgenerated] final case class ResultData(
-      projectMetadata: ProjectMetadata,
-      queries:         List[SparqlQuery]
-  )
+  private[triplesgenerated] final case class ResultData(project: Project, queries: List[SparqlQuery])
 
   object ResultData {
-    def apply(projectMetadata: ProjectMetadata): ResultData = ResultData(projectMetadata, queries = Nil)
+    def apply(project: Project): ResultData = ResultData(project, queries = Nil)
   }
 }

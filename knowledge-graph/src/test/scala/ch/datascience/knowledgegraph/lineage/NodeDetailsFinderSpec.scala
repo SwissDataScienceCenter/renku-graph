@@ -32,7 +32,6 @@ import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import ch.datascience.stubbing.ExternalServiceStubbing
 import eu.timepit.refined.auto._
 import io.renku.jsonld.EntityId
-import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -50,23 +49,26 @@ class NodeDetailsFinderSpec
 
       val input  = entityLocations.generateOne
       val output = entityLocations.generateOne
-      val activity = executionPlanners(
-        planEntities(
-          CommandInput.fromLocation(input),
-          CommandOutput.fromLocation(output)
+
+      val project = anyProjectEntities
+        .addActivity(project =>
+          executionPlanners(
+            planEntities(
+              CommandInput.fromLocation(input),
+              CommandOutput.fromLocation(output)
+            ),
+            project
+          ).map(_.planInputParameterValuesFromChecksum(input -> entityChecksums.generateOne).buildProvenanceUnsafe())
         )
-      ).generateOne
-        .planInputParameterValuesFromChecksum(input -> entityChecksums.generateOne)
-        .buildProvenanceGraph
-        .fold(errors => throw new Exception(errors.toList.mkString), identity)
+        .generateOne
 
-      loadToStore(activity.plan.asJsonLD, activity.asJsonLD)
+      loadToStore(project)
 
-      val inputEntityNode  = NodeDef(activity, input).toNode
-      val outputEntityNode = NodeDef(activity, output).toNode
+      val inputEntityNode  = NodeDef(project.activities.head, input).toNode
+      val outputEntityNode = NodeDef(project.activities.head, output).toNode
 
       nodeDetailsFinder
-        .findDetails(Set(inputEntityNode.location, outputEntityNode.location), activity.project.path)
+        .findDetails(Set(inputEntityNode.location, outputEntityNode.location), project.path)
         .unsafeRunSync() shouldBe Set(inputEntityNode, outputEntityNode)
     }
 
@@ -80,23 +82,27 @@ class NodeDetailsFinderSpec
 
       val input  = entityLocations.generateOne
       val output = entityLocations.generateOne
-      val activity = executionPlanners(
-        planEntities(
-          CommandInput.fromLocation(input),
-          CommandOutput.fromLocation(output)
+      val project = anyProjectEntities
+        .addActivity(project =>
+          executionPlanners(
+            planEntities(
+              CommandInput.fromLocation(input),
+              CommandOutput.fromLocation(output)
+            ),
+            project
+          ).map(
+            _.planInputParameterValuesFromChecksum(input -> entityChecksums.generateOne).buildProvenanceUnsafe()
+          )
         )
-      ).generateOne
-        .planInputParameterValuesFromChecksum(input -> entityChecksums.generateOne)
-        .buildProvenanceGraph
-        .fold(errors => throw new Exception(errors.toList.mkString), identity)
+        .generateOne
 
-      loadToStore(activity.plan.asJsonLD, activity.asJsonLD)
+      loadToStore(project)
 
       val missingLocation = nodeLocations.generateOne
 
       val exception = intercept[Exception] {
         nodeDetailsFinder
-          .findDetails(Set(Node.Location(input.toString), missingLocation), activity.project.path)
+          .findDetails(Set(Node.Location(input.toString), missingLocation), project.path)
           .unsafeRunSync()
       }
 
@@ -113,28 +119,37 @@ class NodeDetailsFinderSpec
 
       val input  = entityLocations.generateOne
       val output = entityLocations.generateOne
-      val activity1 = executionPlanners(
-        planEntities(
-          CommandInput.fromLocation(input),
-          CommandOutput.fromLocation(output)
-        )
-      ).generateOne
-        .planInputParameterValuesFromChecksum(input -> entityChecksums.generateOne)
-        .buildProvenanceGraph
-        .fold(errors => throw new Exception(errors.toList.mkString), identity)
-      val activity2 = executionPlanners(
-        planEntities(CommandInput.fromLocation(output)),
-        fixed(activity1.project)
-      ).generateOne
-        .planInputParameterValuesFromChecksum(
-          output -> activity1
-            .findGenerationChecksum(output)
-            .getOrElse(throw new Exception(s"No generation for $output"))
-        )
-        .buildProvenanceGraph
-        .fold(errors => throw new Exception(errors.toList.mkString), identity)
 
-      loadToStore(activity1.plan.asJsonLD, activity1.asJsonLD, activity2.plan.asJsonLD, activity2.asJsonLD)
+      val project = anyProjectEntities
+        .addActivity(project =>
+          executionPlanners(
+            planEntities(
+              CommandInput.fromLocation(input),
+              CommandOutput.fromLocation(output)
+            ),
+            project
+          ).map(
+            _.planInputParameterValuesFromChecksum(input -> entityChecksums.generateOne)
+              .buildProvenanceUnsafe()
+          )
+        )
+        .addActivity(project =>
+          executionPlanners(
+            planEntities(CommandInput.fromLocation(output)),
+            project
+          ).generateOne
+            .planInputParameterValuesFromEntity(
+              output -> project.activities.head
+                .findGenerationEntity(output)
+                .getOrElse(throw new Exception(s"No generation entity for $output"))
+            )
+            .buildProvenanceUnsafe()
+        )
+        .generateOne
+
+      loadToStore(project)
+
+      val activity1 :: activity2 :: Nil = project.activities
 
       val activity1Node = NodeDef(activity1).toNode
       val activity2Node = NodeDef(activity2).toNode
@@ -145,7 +160,7 @@ class NodeDetailsFinderSpec
             RunInfo(EntityId.of(activity1Node.location.toString), activity1.startTime.value),
             RunInfo(EntityId.of(activity2Node.location.toString), activity2.startTime.value)
           ),
-          activity1.project.path
+          project.path
         )
         .unsafeRunSync() shouldBe Set(activity1Node, activity2Node)
     }
@@ -153,23 +168,31 @@ class NodeDetailsFinderSpec
     "find details of a Plan with mapped command parameters" in new TestCase {
       val input +: output +: errOutput +: Nil =
         entityLocations.generateNonEmptyList(minElements = 3, maxElements = 3).toList
-      val activity = executionPlanners(
-        planEntities(
-          CommandInput.streamedFromLocation(input),
-          CommandOutput.streamedFromLocation(output, CommandOutput.stdOut),
-          CommandOutput.streamedFromLocation(errOutput, CommandOutput.stdErr)
-        )
-      ).generateOne
-        .planInputParameterValuesFromChecksum(input -> entityChecksums.generateOne)
-        .buildProvenanceGraph
-        .fold(errors => throw new Exception(errors.toList.mkString), identity)
 
-      loadToStore(activity.plan.asJsonLD, activity.asJsonLD)
+      val project = anyProjectEntities
+        .addActivity(project =>
+          executionPlanners(
+            planEntities(
+              CommandInput.streamedFromLocation(input),
+              CommandOutput.streamedFromLocation(output, CommandOutput.stdOut),
+              CommandOutput.streamedFromLocation(errOutput, CommandOutput.stdErr)
+            ),
+            project
+          ).map(
+            _.planInputParameterValuesFromChecksum(input -> entityChecksums.generateOne)
+              .buildProvenanceUnsafe()
+          )
+        )
+        .generateOne
+
+      loadToStore(project)
+
+      val activity = project.activities.head
 
       nodeDetailsFinder
         .findDetails(
           Set(RunInfo(EntityId.of(NodeDef(activity).toNode.location.toString), activity.startTime.value)),
-          activity.project.path
+          project.path
         )
         .unsafeRunSync() shouldBe Set(NodeDef(activity).toNode)
     }

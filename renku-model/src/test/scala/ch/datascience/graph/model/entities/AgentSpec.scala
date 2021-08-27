@@ -29,7 +29,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class AgentSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
-  "Agent.decode" should {
+  "decode" should {
 
     "turn JsonLD Agent entity into the Agent object" in {
       forAll { agent: Agent =>

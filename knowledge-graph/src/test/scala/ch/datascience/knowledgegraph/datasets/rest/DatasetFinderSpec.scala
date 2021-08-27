@@ -24,7 +24,6 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.SameAs
-import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.testentities._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.model._
@@ -43,99 +42,87 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
     "return details of the dataset with the given id " +
       "- a case of a non-modified renku dataset used in a single project" in new TestCase {
 
-        forAll(datasetEntities(datasetProvenanceInternal)) { dataset =>
-          loadToStore(dataset, datasetEntities(ofAnyProvenance).generateOne)
+        forAll(anyProjectEntities addDataset datasetEntities(provenanceInternal),
+               anyProjectEntities addDataset datasetEntities(ofAnyProvenance)
+        ) { case ((dataset, project), (_, otherProject)) =>
+          loadToStore(project, otherProject)
 
           datasetFinder
             .findDataset(dataset.identifier)
-            .unsafeRunSync() shouldBe dataset.to[NonModifiedDataset].some
+            .unsafeRunSync() shouldBe internalToNonModified(dataset, project).some
         }
       }
 
     "return details of the dataset with the given id " +
       "- a case when unrelated projects are using the same imported dataset" in new TestCase {
-        val dataset1 :: dataset2 :: Nil = importedExternalDatasetEntities(sharedInProjects = 2).generateOne
+        val commonSameAs = datasetExternalSameAs.toGenerateOfFixedValue
+        val (dataset1, project1) =
+          anyProjectEntities.addDataset(datasetEntities(provenanceImportedExternal(commonSameAs))).generateOne
+        val (dataset2, project2) =
+          anyProjectEntities.addDataset(datasetEntities(provenanceImportedExternal(commonSameAs))).generateOne
 
-        loadToStore(dataset1, dataset2, datasetEntities(ofAnyProvenance).generateOne)
+        loadToStore(project1, project2, anyProjectEntities.addDataset(datasetEntities(ofAnyProvenance)).generateOne._2)
 
         datasetFinder.findDataset(dataset1.identifier).unsafeRunSync() shouldBe Some(
-          dataset1
-            .to[NonModifiedDataset]
-            .copy(
-              usedIn = List(
-                dataset1.project.to[DatasetProject],
-                dataset2.project.to[DatasetProject]
-              ).sorted
-            )
+          importedExternalToNonModified(dataset1, project1)
+            .copy(usedIn = List(project1.to[DatasetProject], project2.to[DatasetProject]).sorted)
         )
 
         datasetFinder.findDataset(dataset2.identifier).unsafeRunSync() shouldBe Some(
-          dataset2
-            .to[NonModifiedDataset]
-            .copy(
-              usedIn = List(
-                dataset1.project.to[DatasetProject],
-                dataset2.project.to[DatasetProject]
-              ).sorted
-            )
+          importedExternalToNonModified(dataset2, project2)
+            .copy(usedIn = List(project1.to[DatasetProject], project2.to[DatasetProject]).sorted)
         )
       }
 
     "return details of the dataset with the given id " +
       "- a case when dataset is modified" in new TestCase {
-        val dataset1 :: dataset2 :: Nil = importedExternalDatasetEntities(sharedInProjects = 2).generateOne
+        val commonSameAs = datasetExternalSameAs.toGenerateOfFixedValue
+        val (_ ::~ dataset1Modified, project1) =
+          anyProjectEntities
+            .addDatasetAndModification(datasetEntities(provenanceImportedExternal(commonSameAs)))
+            .generateOne
+        val (dataset2, project2) =
+          anyProjectEntities.addDataset(datasetEntities(provenanceImportedExternal(commonSameAs))).generateOne
 
-        val modifiedDatasetOnProject1 = modifiedDatasetEntities(dataset1).generateOne
-
-        loadToStore(dataset1, dataset2, modifiedDatasetOnProject1)
+        loadToStore(project1, project2)
 
         datasetFinder
           .findDataset(dataset2.identifier)
-          .unsafeRunSync() shouldBe dataset2.to[NonModifiedDataset].some
+          .unsafeRunSync() shouldBe importedExternalToNonModified(dataset2, project2).some
 
         datasetFinder
-          .findDataset(modifiedDatasetOnProject1.identifier)
-          .unsafeRunSync() shouldBe modifiedDatasetOnProject1.to[ModifiedDataset].some
+          .findDataset(dataset1Modified.identifier)
+          .unsafeRunSync() shouldBe modifiedToModified(dataset1Modified, project1).some
       }
 
     "return details of the dataset with the given id " +
       "- a case when unrelated projects are using the same dataset created in a Renku project" in new TestCase {
-        forAll(datasetEntities(datasetProvenanceInternal)) { sourceDataset =>
-          val datasetOnProject1 =
-            sourceDataset importTo projectEntities[ForksCount.Zero](visibilityPublic).generateOne
-          val datasetOnProject2 =
-            sourceDataset importTo projectEntities[ForksCount.Zero](visibilityPublic).generateOne
+        forAll(anyProjectEntities addDataset datasetEntities(provenanceInternal)) {
+          case (sourceDataset, sourceProject) =>
+            val (_, project1)        = (projectEntities(visibilityPublic) importDataset sourceDataset).generateOne
+            val (dataset2, project2) = (projectEntities(visibilityPublic) importDataset sourceDataset).generateOne
 
-          loadToStore(
-            sourceDataset,
-            datasetOnProject1,
-            datasetOnProject2,
-            datasetEntities(ofAnyProvenance).generateOne
-          )
+            loadToStore(sourceProject, project1, project2)
 
-          datasetFinder.findDataset(sourceDataset.identifier).unsafeRunSync() shouldBe
-            sourceDataset
-              .to[NonModifiedDataset]
-              .copy(
-                usedIn = List(
-                  sourceDataset.project.to[DatasetProject],
-                  datasetOnProject1.project.to[DatasetProject],
-                  datasetOnProject2.project.to[DatasetProject]
-                ).sorted
-              )
-              .some
+            datasetFinder.findDataset(sourceDataset.identifier).unsafeRunSync() shouldBe
+              internalToNonModified(sourceDataset, sourceProject)
+                .copy(
+                  usedIn = List(sourceProject.to[DatasetProject],
+                                project1.to[DatasetProject],
+                                project2.to[DatasetProject]
+                  ).sorted
+                )
+                .some
 
-          datasetFinder.findDataset(datasetOnProject2.identifier).unsafeRunSync() shouldBe
-            datasetOnProject2
-              .to[NonModifiedDataset]
-              .copy(
-                usedIn = List(
-                  sourceDataset.project.to[DatasetProject],
-                  datasetOnProject1.project.to[DatasetProject],
-                  datasetOnProject2.project.to[DatasetProject]
-                ).sorted
-              )
-              .some
+            datasetFinder.findDataset(dataset2.identifier).unsafeRunSync() shouldBe
+              importedInternalToNonModified(dataset2, project2)
+                .copy(
+                  usedIn = List(sourceProject.to[DatasetProject],
+                                project1.to[DatasetProject],
+                                project2.to[DatasetProject]
+                  ).sorted
+                )
+                .some
         }
       }
 
@@ -145,37 +132,35 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
 
     "return None if dataset was invalidated" in new TestCase {
 
-      val original = datasetEntities(datasetProvenanceInternal).generateOne
-      val invalidated = original
-        .invalidate(invalidationTimes(original.provenance.date).generateOne)
-        .fold(errors => fail(errors.intercalate("; ")), identity)
+      val (original ::~ invalidation, project) =
+        (projectEntities(visibilityPublic) addDatasetAndInvalidation datasetEntities(provenanceInternal)).generateOne
 
-      loadToStore(original, invalidated)
+      loadToStore(project)
 
-      datasetFinder.findDataset(original.identifier).unsafeRunSync()    shouldBe None
-      datasetFinder.findDataset(invalidated.identifier).unsafeRunSync() shouldBe None
+      datasetFinder.findDataset(original.identifier).unsafeRunSync()     shouldBe None
+      datasetFinder.findDataset(invalidation.identifier).unsafeRunSync() shouldBe None
     }
 
     "return a dataset without invalidated part" in new TestCase {
-      val original = datasetEntities(datasetProvenanceInternal)
-        .map(ds => ds.copy(parts = datasetPartEntities(ds.provenance.date.instant).generateNonEmptyList().toList))
+      val (dataset, project) = anyProjectEntities
+        .addDataset(
+          datasetEntities(provenanceInternal)
+            .modify { ds =>
+              ds.copy(parts = datasetPartEntities(ds.provenance.date.instant).generateNonEmptyList().toList)
+            }
+        )
         .generateOne
-      val partToInvalidate = Random.shuffle(original.parts).head
-      val originalWithInvalidatedPart = original
-        .invalidatePart(partToInvalidate, invalidationTimes(partToInvalidate.dateCreated).generateOne)
-        .fold(errors => fail(errors.intercalate("; ")), identity)
+      val partToInvalidate           = Random.shuffle(dataset.parts).head
+      val datasetWithInvalidatedPart = dataset.invalidatePartNow(partToInvalidate)
+      val projectBothDatasets        = project.addDatasets(datasetWithInvalidatedPart)
 
-      loadToStore(original, originalWithInvalidatedPart)
+      loadToStore(projectBothDatasets)
 
-      datasetFinder.findDataset(original.identifier).unsafeRunSync() shouldBe Some(
-        original.to[NonModifiedDataset].copy(usedIn = Nil)
-      )
+      datasetFinder.findDataset(dataset.identifier).unsafeRunSync() shouldBe
+        internalToNonModified(dataset, project).copy(usedIn = Nil).some
 
-      datasetFinder.findDataset(originalWithInvalidatedPart.identifier).unsafeRunSync() shouldBe Some(
-        originalWithInvalidatedPart
-          .copy(parts = original.parts.filterNot(_ == partToInvalidate))
-          .to[ModifiedDataset]
-      )
+      datasetFinder.findDataset(datasetWithInvalidatedPart.identifier).unsafeRunSync() shouldBe
+        modifiedToModified(datasetWithInvalidatedPart, projectBothDatasets).some
     }
   }
 
@@ -183,86 +168,72 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
 
     "return details of the dataset with the given id " +
       "- a case when a Renku created dataset is defined on a project which has a fork" in new TestCase {
+        val (originalDataset, originalProject ::~ fork) = projectEntities(visibilityPublic)
+          .addDataset(datasetEntities(provenanceInternal))
+          .forkOnce()
+          .generateOne
 
-        forAll(datasetEntities(datasetProvenanceInternal)) { originalDataset =>
-          val datasetOnForkedProject = originalDataset.forkProject().fork
+        loadToStore(originalProject, fork)
 
-          loadToStore(originalDataset, datasetOnForkedProject)
+        assume(originalProject.datasets === fork.datasets,
+               "Datasets on original project and its fork should be the same"
+        )
 
-          assume(originalDataset.identifier === datasetOnForkedProject.identifier,
-                 "Datasets on original project and fork have different identifiers"
-          )
-
-          datasetFinder.findDataset(originalDataset.identifier).unsafeRunSync() shouldBe
-            originalDataset
-              .to[NonModifiedDataset]
-              .copy(
-                usedIn = List(
-                  originalDataset.project.to[DatasetProject],
-                  datasetOnForkedProject.project.to[DatasetProject]
-                ).sorted
-              )
-              .some
-        }
+        datasetFinder.findDataset(originalDataset.identifier).unsafeRunSync() shouldBe
+          internalToNonModified(originalDataset, originalProject)
+            .copy(usedIn = List(originalProject.to[DatasetProject], fork.to[DatasetProject]).sorted)
+            .some
       }
 
     "return details of the dataset with the given id " +
       "- a case when unrelated projects are sharing a dataset and one of the projects is forked" in new TestCase {
-        val dataset1 :: dataset2 :: Nil = importedExternalDatasetEntities(sharedInProjects = 2).generateOne
-        val dataset2Fork                = dataset2.forkProject().fork
+        val commonSameAs = datasetExternalSameAs.toGenerateOfFixedValue
+        val (dataset1, project1) =
+          anyProjectEntities.addDataset(datasetEntities(provenanceImportedExternal(commonSameAs))).generateOne
+        val (dataset2, project2 ::~ project2Fork) =
+          anyProjectEntities
+            .addDataset(datasetEntities(provenanceImportedExternal(commonSameAs)))
+            .forkOnce()
+            .generateOne
 
-        loadToStore(dataset1, dataset2, dataset2Fork)
+        loadToStore(project1, project2, project2Fork)
 
         datasetFinder.findDataset(dataset1.identifier).unsafeRunSync() shouldBe
-          dataset1
-            .to[NonModifiedDataset]
-            .copy(
-              usedIn = List(
-                dataset1.project.to[DatasetProject],
-                dataset2.project.to[DatasetProject],
-                dataset2Fork.project.to[DatasetProject]
-              ).sorted
+          importedExternalToNonModified(dataset1, project1)
+            .copy(usedIn =
+              List(project1.to[DatasetProject], project2.to[DatasetProject], project2Fork.to[DatasetProject]).sorted
             )
             .some
 
-        assume(dataset2.identifier === dataset2Fork.identifier,
-               "Datasets on original project and fork have different identifiers"
-        )
+        assume(project2.datasets === project2Fork.datasets, "Datasets on original project and fork should be the same")
 
         datasetFinder.findDataset(dataset2.identifier).unsafeRunSync() shouldBe
-          dataset2
-            .to[NonModifiedDataset]
-            .copy(
-              usedIn = List(
-                dataset1.project.to[DatasetProject],
-                dataset2.project.to[DatasetProject],
-                dataset2Fork.project.to[DatasetProject]
-              ).sorted
+          importedExternalToNonModified(dataset2, project2)
+            .copy(usedIn =
+              List(project1.to[DatasetProject], project2.to[DatasetProject], project2Fork.to[DatasetProject]).sorted
             )
             .some
       }
 
     "return details of the dataset with the given id " +
       "- a case when a Renku created dataset is defined on a grandparent project with two levels of forks" in new TestCase {
-        forAll(datasetEntities(datasetProvenanceInternal)) { grandparentDataset =>
-          val parentDataset = grandparentDataset.forkProject().fork
-          val childDataset  = parentDataset.forkProject().fork
+        forAll(anyProjectEntities addDataset datasetEntities(provenanceInternal)) { case dataset ::~ grandparent =>
+          val grandparentForked ::~ parent = grandparent.forkOnce()
+          val parentForked ::~ child       = parent.forkOnce()
 
-          loadToStore(grandparentDataset, parentDataset, childDataset)
+          loadToStore(grandparentForked, parentForked, child)
 
           assume(
-            (grandparentDataset.identifier === parentDataset.identifier) && (parentDataset.identifier === childDataset.identifier),
-            "Datasets on original project and fork have different identifiers"
+            (grandparentForked.datasets === parentForked.datasets) && (parentForked.datasets === child.datasets),
+            "Datasets on original project and forks have to be the same"
           )
 
-          datasetFinder.findDataset(grandparentDataset.identifier).unsafeRunSync() shouldBe
-            grandparentDataset
-              .to[NonModifiedDataset]
-              .copy(
-                usedIn = List(
-                  grandparentDataset.project.to[DatasetProject],
-                  parentDataset.project.to[DatasetProject],
-                  childDataset.project.to[DatasetProject]
+          datasetFinder.findDataset(dataset.identifier).unsafeRunSync() shouldBe
+            internalToNonModified(dataset, grandparentForked)
+              .copy(usedIn =
+                List(grandparentForked.to[DatasetProject],
+                     parentForked.to[DatasetProject],
+                     child.to[DatasetProject]
                 ).sorted
               )
               .some
@@ -271,117 +242,85 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
 
     "return details of the modified dataset with the given id " +
       "- case when modification is followed by forking" in new TestCase {
-        forAll(datasetEntities(datasetProvenanceInternal)) { original =>
-          val modified     = modifiedDatasetEntities(original).generateOne
-          val modifiedFork = modified.forkProject().fork
+        forAll(anyProjectEntities.addDatasetAndModification(datasetEntities(provenanceInternal)).forkOnce()) {
+          case (original ::~ modified, project ::~ fork) =>
+            loadToStore(project, fork)
 
-          loadToStore(original, modified, modifiedFork)
+            datasetFinder.findDataset(original.identifier).unsafeRunSync() shouldBe
+              internalToNonModified(original, project).copy(usedIn = Nil).some
 
-          datasetFinder.findDataset(original.identifier).unsafeRunSync() shouldBe Some(
-            original
-              .to[NonModifiedDataset]
-              .copy(usedIn = Nil)
-          )
-
-          datasetFinder.findDataset(modified.identifier).unsafeRunSync() shouldBe Some(
-            modified
-              .to[ModifiedDataset]
-              .copy(
-                usedIn = List(
-                  modified.project.to[DatasetProject],
-                  modifiedFork.project.to[DatasetProject]
-                ).sorted
-              )
-          )
+            datasetFinder.findDataset(modified.identifier).unsafeRunSync() shouldBe
+              modifiedToModified(modified, project)
+                .copy(usedIn = List(project.to[DatasetProject], fork.to[DatasetProject]).sorted)
+                .some
         }
       }
 
     "return details of the modified dataset with the given id " +
       "- case when modification is followed by forking and some other modification" in new TestCase {
-        forAll(datasetEntities(datasetProvenanceInternal)) { original =>
-          val modified      = modifiedDatasetEntities(original).generateOne
-          val modifiedFork  = modified.forkProject().fork
-          val modifiedAgain = modifiedDatasetEntities(modified).generateOne
+        val (original ::~ modified, project ::~ fork) = anyProjectEntities
+          .addDatasetAndModification(datasetEntities(provenanceInternal))
+          .forkOnce()
+          .generateOne
+        val (modifiedAgain, projectUpdated) = project.addDataset(modified.createModification())
 
-          loadToStore(original, modified, modifiedFork, modifiedAgain)
+        loadToStore(projectUpdated, fork)
 
-          datasetFinder.findDataset(original.identifier).unsafeRunSync() shouldBe Some(
-            original
-              .to[NonModifiedDataset]
-              .copy(usedIn = Nil)
-          )
+        datasetFinder.findDataset(original.identifier).unsafeRunSync() shouldBe
+          internalToNonModified(original, projectUpdated).copy(usedIn = Nil).some
 
-          assume(modified.identifier === modifiedFork.identifier, "Dataset after forking must have the same identifier")
+        datasetFinder.findDataset(modified.identifier).unsafeRunSync() shouldBe
+          modifiedToModified(modified, projectUpdated).copy(usedIn = List(fork.to[DatasetProject])).some
 
-          datasetFinder.findDataset(modified.identifier).unsafeRunSync() shouldBe Some(
-            modified
-              .to[ModifiedDataset]
-              .copy(usedIn = List(modifiedFork.project.to[DatasetProject]))
-          )
-
-          datasetFinder.findDataset(modifiedAgain.identifier).unsafeRunSync() shouldBe Some(
-            modifiedAgain.to[ModifiedDataset]
-          )
-        }
+        datasetFinder.findDataset(modifiedAgain.identifier).unsafeRunSync() shouldBe
+          modifiedToModified(modifiedAgain, projectUpdated).some
       }
 
     "return details of the dataset with the given id " +
       "- case when forking is followed by modification" in new TestCase {
-        forAll(datasetEntities(datasetProvenanceInternal)) { original =>
-          val originalForked = original.forkProject().fork
-          val modifiedForked = modifiedDatasetEntities(originalForked).generateOne
+        forAll(anyProjectEntities.addDataset(datasetEntities(provenanceInternal)).forkOnce()) {
+          case (original, project ::~ fork) =>
+            val (modifiedOnFork, forkUpdated) = fork.addDataset(original.createModification())
 
-          loadToStore(original, originalForked, modifiedForked)
+            loadToStore(project, forkUpdated)
 
-          assume(original.identifier === originalForked.identifier,
-                 "Dataset after forking must have the same identifier"
-          )
+            datasetFinder.findDataset(original.identifier).unsafeRunSync() shouldBe
+              internalToNonModified(original, project).some
 
-          datasetFinder.findDataset(original.identifier).unsafeRunSync() shouldBe Some(
-            original.to[NonModifiedDataset]
-          )
-
-          datasetFinder.findDataset(modifiedForked.identifier).unsafeRunSync() shouldBe Some(
-            modifiedForked.to[ModifiedDataset]
-          )
+            datasetFinder.findDataset(modifiedOnFork.identifier).unsafeRunSync() shouldBe
+              modifiedToModified(modifiedOnFork, forkUpdated).some
         }
       }
 
     "return details of the dataset with the given id " +
       "- case when a dataset on a fork is deleted" in new TestCase {
-        forAll(datasetEntities(datasetProvenanceInternal)) { original =>
-          val forked = original.forkProject().fork
-          val invalidatedForked = forked
-            .invalidate(invalidationTimes(forked.provenance.date).generateOne)
-            .fold(errors => fail(errors.intercalate("; ")), identity)
+        forAll(anyProjectEntities.addDataset(datasetEntities(provenanceInternal)).forkOnce()) {
+          case (original, project ::~ fork) =>
+            val invalidation         = original.invalidateNow
+            val forkWithInvalidation = fork.addDatasets(invalidation)
 
-          loadToStore(original, forked, invalidatedForked)
+            loadToStore(project, forkWithInvalidation)
 
-          datasetFinder.findDataset(original.identifier).unsafeRunSync() shouldBe Some(
-            original.to[NonModifiedDataset]
-          )
+            datasetFinder.findDataset(original.identifier).unsafeRunSync() shouldBe
+              internalToNonModified(original, project).some
 
-          datasetFinder.findDataset(invalidatedForked.identifier).unsafeRunSync() shouldBe None
+            datasetFinder.findDataset(invalidation.identifier).unsafeRunSync() shouldBe None
         }
       }
 
     "return details of a fork dataset with the given id " +
-      "- case when the parent of a fork dataset is deleted" in new TestCase {
-        val originalDataset = datasetEntities(datasetProvenanceInternal).generateOne
-        val datasetForked   = originalDataset.forkProject().fork
-        val invalidatedOriginalDataset = originalDataset
-          .invalidate(
-            invalidationTimes(originalDataset.provenance.date).generateOne
-          )
-          .fold(errors => fail(errors.intercalate("; ")), identity)
+      "- case when the dataset on the parent is deleted" in new TestCase {
+        val (original, project ::~ fork) =
+          anyProjectEntities.addDataset(datasetEntities(provenanceInternal)).forkOnce().generateOne
+        val invalidation            = original.invalidateNow
+        val projectWithInvalidation = project.addDatasets(invalidation)
 
-        loadToStore(originalDataset, datasetForked, invalidatedOriginalDataset)
+        loadToStore(projectWithInvalidation, fork)
 
-        datasetFinder.findDataset(datasetForked.identifier).unsafeRunSync() shouldBe Some(
-          datasetForked.to[NonModifiedDataset]
-        )
+        datasetFinder.findDataset(original.identifier).unsafeRunSync() shouldBe
+          internalToNonModified(original, fork).some
 
-        datasetFinder.findDataset(invalidatedOriginalDataset.identifier).unsafeRunSync() shouldBe None
+        datasetFinder.findDataset(invalidation.identifier).unsafeRunSync() shouldBe None
       }
   }
 
@@ -389,148 +328,125 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
 
     "return details of the dataset with the given id " +
       "- case when the first dataset is imported from a third party provider" in new TestCase {
-        val dataset1 :: dataset2 :: Nil = importedExternalDatasetEntities(sharedInProjects = 2).generateOne
-        val dataset3                    = dataset2.importTo(projectEntities[ForksCount.Zero](visibilityPublic).generateOne)
+        val commonSameAs = datasetExternalSameAs.toGenerateOfFixedValue
+        val (dataset1, project1) =
+          anyProjectEntities.addDataset(datasetEntities(provenanceImportedExternal(commonSameAs))).generateOne
+        val (dataset2, project2) =
+          anyProjectEntities.addDataset(datasetEntities(provenanceImportedExternal(commonSameAs))).generateOne
+        val (dataset3, project3) =
+          anyProjectEntities.importDataset(dataset2).generateOne
 
-        loadToStore(dataset1, dataset2, dataset3)
+        loadToStore(project1, project2, project3)
 
         datasetFinder.findDataset(dataset1.identifier).unsafeRunSync() shouldBe Some(
-          dataset1
-            .to[NonModifiedDataset]
-            .copy(
-              usedIn = List(
-                dataset1.project.to[DatasetProject],
-                dataset2.project.to[DatasetProject],
-                dataset3.project.to[DatasetProject]
-              ).sorted
-            )
+          importedExternalToNonModified(dataset1, project1)
+            .copy(usedIn = List(project1, project2, project3).map(_.to[DatasetProject]).sorted)
         )
 
         datasetFinder.findDataset(dataset3.identifier).unsafeRunSync() shouldBe Some(
-          dataset3
-            .to[NonModifiedDataset]
+          importedInternalToNonModified(dataset3, project3)
             .copy(
               sameAs = dataset2.provenance.sameAs,
-              usedIn = List(
-                dataset1.project.to[DatasetProject],
-                dataset2.project.to[DatasetProject],
-                dataset3.project.to[DatasetProject]
-              ).sorted
+              usedIn = List(project1, project2, project3).map(_.to[DatasetProject]).sorted
             )
         )
       }
 
     "return details of the dataset with the given id " +
       "- case when the first dataset is renku created" in new TestCase {
+        val (dataset1, project1) =
+          anyProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
+        val (dataset2, project2) = anyProjectEntities.importDataset(dataset1).generateOne
+        val (dataset3, project3) = anyProjectEntities.importDataset(dataset2).generateOne
 
-        val dataset1 = datasetEntities(datasetProvenanceInternal).generateOne
-        val dataset2 = dataset1.importTo(projectEntities[ForksCount.Zero](visibilityPublic).generateOne)
-        val dataset3 = dataset2.importTo(projectEntities[ForksCount.Zero](visibilityPublic).generateOne)
-
-        loadToStore(dataset1, dataset2, dataset3)
+        loadToStore(project1, project2, project3)
 
         datasetFinder
           .findDataset(dataset1.identifier)
           .unsafeRunSync() shouldBe Some(
-          dataset1
-            .to[NonModifiedDataset]
-            .copy(
-              usedIn = List(
-                dataset1.project.to[DatasetProject],
-                dataset2.project.to[DatasetProject],
-                dataset3.project.to[DatasetProject]
-              ).sorted
-            )
+          internalToNonModified(dataset1, project1)
+            .copy(usedIn = List(project1, project2, project3).map(_.to[DatasetProject]).sorted)
         )
 
         datasetFinder
           .findDataset(dataset3.identifier)
           .unsafeRunSync() shouldBe Some(
-          dataset3
-            .to[NonModifiedDataset]
+          importedInternalToNonModified(dataset3, project3)
             .copy(
               sameAs = SameAs(dataset1.provenance.entityId),
-              usedIn = List(
-                dataset1.project.to[DatasetProject],
-                dataset2.project.to[DatasetProject],
-                dataset3.project.to[DatasetProject]
-              ).sorted
+              usedIn = List(project1, project2, project3).map(_.to[DatasetProject]).sorted
             )
         )
       }
 
     "return details of the dataset with the given id " +
       "- case when the sameAs hierarchy is broken by dataset modification" in new TestCase {
-        val dataset1         = datasetEntities(datasetProvenanceInternal).generateOne
-        val dataset2         = dataset1.importTo(projectEntities[ForksCount.Zero](visibilityPublic).generateOne)
-        val dataset2Modified = modifiedDatasetEntities(dataset2).generateOne
-        val dataset3         = dataset2Modified.importTo(projectEntities[ForksCount.Zero](visibilityPublic).generateOne)
+        val (dataset1, project1) =
+          anyProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
+        val (dataset2, project2)                = anyProjectEntities.importDataset(dataset1).generateOne
+        val (dataset2Modified, project2Updated) = project2.addDataset(dataset2.createModification())
+        val (_, project3)                       = anyProjectEntities.importDataset(dataset2Modified).generateOne
 
-        loadToStore(dataset1, dataset2, dataset2Modified, dataset3)
+        loadToStore(project1, project2Updated, project3)
 
-        datasetFinder.findDataset(dataset1.identifier).unsafeRunSync() shouldBe Some(dataset1.to[NonModifiedDataset])
+        datasetFinder.findDataset(dataset1.identifier).unsafeRunSync() shouldBe Some(
+          internalToNonModified(dataset1, project1)
+        )
         datasetFinder.findDataset(dataset2Modified.identifier).unsafeRunSync() shouldBe Some(
-          dataset2Modified
-            .to[ModifiedDataset]
-            .copy(
-              usedIn = List(
-                dataset2Modified.project.to[DatasetProject],
-                dataset3.project.to[DatasetProject]
-              ).sorted
-            )
+          modifiedToModified(dataset2Modified, project2Updated)
+            .copy(usedIn = List(project2Updated.to[DatasetProject], project3.to[DatasetProject]).sorted)
         )
       }
 
     "not return the details of a dataset" +
       "- case when the latest import of the dataset has been invalidated" in new TestCase {
+        val (dataset1, project1) =
+          anyProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
+        val (dataset2, project2) = anyProjectEntities.importDataset(dataset1).generateOne
+        val dataset2Invalidation = dataset2.invalidateNow
+        val project2Updated      = project2.addDatasets(dataset2Invalidation)
 
-        val dataset1 = datasetEntities(datasetProvenanceInternal).generateOne
-        val dataset2 = dataset1.importTo(projectEntities[ForksCount.Zero](visibilityPublic).generateOne)
-        val invalidated = dataset2
-          .invalidate(
-            invalidationTimes(dataset2.provenance.date.instant, dataset2.project.dateCreated.value).generateOne
-          )
-          .fold(errors => fail(errors.intercalate("; ")), identity)
+        loadToStore(project1, project2Updated)
 
-        loadToStore(dataset1, dataset2, invalidated)
-
-        datasetFinder.findDataset(dataset1.identifier).unsafeRunSync()    shouldBe Some(dataset1.to[NonModifiedDataset])
-        datasetFinder.findDataset(dataset2.identifier).unsafeRunSync()    shouldBe None
-        datasetFinder.findDataset(invalidated.identifier).unsafeRunSync() shouldBe None
+        datasetFinder.findDataset(dataset1.identifier).unsafeRunSync() shouldBe Some(
+          internalToNonModified(dataset1, project1)
+        )
+        datasetFinder.findDataset(dataset2.identifier).unsafeRunSync()             shouldBe None
+        datasetFinder.findDataset(dataset2Invalidation.identifier).unsafeRunSync() shouldBe None
       }
 
     "not return the details of a dataset" +
       "- case when the original dataset has been invalidated" in new TestCase {
 
-        val dataset1 = datasetEntities(datasetProvenanceInternal).generateOne
-        val dataset2 = dataset1.importTo(projectEntities[ForksCount.Zero](visibilityPublic).generateOne)
-        val invalidated = dataset1
-          .invalidate(invalidationTimes(dataset1.provenance.date).generateOne)
-          .fold(errors => fail(errors.intercalate("; ")), identity)
+        val (dataset1, project1) =
+          anyProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
+        val (dataset2, project2) = anyProjectEntities.importDataset(dataset1).generateOne
+        val dataset1Invalidation = dataset1.invalidateNow
+        val project1Updated      = project1.addDatasets(dataset1Invalidation)
 
-        loadToStore(dataset1, invalidated, dataset2)
+        loadToStore(project1Updated, project2)
 
-        datasetFinder.findDataset(dataset1.identifier).unsafeRunSync()    shouldBe None
-        datasetFinder.findDataset(invalidated.identifier).unsafeRunSync() shouldBe None
-        datasetFinder.findDataset(dataset2.identifier).unsafeRunSync()    shouldBe Some(dataset2.to[NonModifiedDataset])
+        datasetFinder.findDataset(dataset1.identifier).unsafeRunSync()             shouldBe None
+        datasetFinder.findDataset(dataset1Invalidation.identifier).unsafeRunSync() shouldBe None
+        datasetFinder.findDataset(dataset2.identifier).unsafeRunSync() shouldBe Some(
+          importedInternalToNonModified(dataset2, project2)
+        )
       }
 
     "not return the details of a dataset" +
       "- case when the latest modification of the dataset has been invalidated" in new TestCase {
+        val (dataset ::~ datasetModified, project) =
+          anyProjectEntities.addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
+        val datasetInvalidation = datasetModified.invalidateNow
+        val projectUpdated      = project.addDatasets(datasetInvalidation)
 
-        val dataset         = datasetEntities(datasetProvenanceInternal).generateOne
-        val datasetModified = modifiedDatasetEntities(dataset).generateOne
-        val datasetModifiedInvalidated = datasetModified
-          .invalidate(invalidationTimes(datasetModified.provenance.date).generateOne)
-          .fold(errors => fail(errors.intercalate("; ")), identity)
-
-        loadToStore(dataset, datasetModified, datasetModifiedInvalidated)
+        loadToStore(projectUpdated)
 
         datasetFinder.findDataset(dataset.identifier).unsafeRunSync() shouldBe Some(
-          dataset.to[NonModifiedDataset].copy(usedIn = Nil)
+          internalToNonModified(dataset, projectUpdated).copy(usedIn = Nil)
         )
-        datasetFinder.findDataset(datasetModified.identifier).unsafeRunSync()            shouldBe None
-        datasetFinder.findDataset(datasetModifiedInvalidated.identifier).unsafeRunSync() shouldBe None
+        datasetFinder.findDataset(datasetModified.identifier).unsafeRunSync()     shouldBe None
+        datasetFinder.findDataset(datasetInvalidation.identifier).unsafeRunSync() shouldBe None
       }
   }
 

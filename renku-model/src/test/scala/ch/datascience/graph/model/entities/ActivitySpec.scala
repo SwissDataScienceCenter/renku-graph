@@ -20,7 +20,8 @@ package ch.datascience.graph.model.entities
 
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.Schemas.{prov, renku, schema}
+import ch.datascience.graph.model.GraphModelGenerators.projectCreatedDates
+import ch.datascience.graph.model.Schemas.{prov, renku}
 import ch.datascience.graph.model.entities
 import ch.datascience.graph.model.entities.Activity.entityTypes
 import ch.datascience.graph.model.testentities.CommandParameterBase.{CommandInput, CommandOutput}
@@ -34,12 +35,13 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
-  "Activity.decode" should {
+  "decode" should {
 
     "turn JsonLD Activity entity into the Activity object" in {
-      forAll(executionPlanners(planEntities(), anyProjectEntities)) { executionPlanner =>
-        val activity = executionPlanner.buildProvenanceUnsafe()
-        activity.asJsonLD.flatten
+      forAll(activityEntities(planEntities())(projectCreatedDates().generateOne)) { activity =>
+        JsonLD
+          .arr(activity.asJsonLD, activity.association.plan.asJsonLD)
+          .flatten
           .fold(throw _, identity)
           .cursor
           .as[List[entities.Activity]] shouldBe List(activity.to[entities.Activity]).asRight
@@ -49,7 +51,7 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
     "fail if there are Input Parameter Values for non-existing Usage Entities" in {
       val location = entityLocations.generateOne
       val activity =
-        executionPlanners(planEntities(CommandInput.fromLocation(location)), anyProjectEntities).generateOne
+        executionPlanners(planEntities(CommandInput.fromLocation(location)), anyProjectEntities.generateOne).generateOne
           .planInputParameterValuesFromChecksum(location -> entityChecksums.generateOne)
           .buildProvenanceUnsafe()
 
@@ -68,10 +70,14 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
         )
       }
 
-      val Left(error) = activity.asJsonLD.flatten
+      val Left(error) = JsonLD
+        .arr(activity.asJsonLD, activity.association.plan.asJsonLD)
+        .asJsonLD
+        .flatten
         .fold(throw _, _.asArray.fold(fail("JsonLD is not an array"))(replaceEntityLocation))
         .cursor
         .as[List[entities.Activity]]
+
       error              shouldBe a[DecodingFailure]
       error.getMessage() shouldBe s"No Usage found for InputParameterValue with $location"
     }
@@ -80,9 +86,8 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
       val location = entityLocations.generateOne
       val activity = executionPlanners(
         planEntities(CommandOutput.fromLocation(location)),
-        projectEntities(anyVisibility)(anyForksCount)
-      ).generateOne
-        .buildProvenanceUnsafe()
+        anyProjectEntities.generateOne
+      ).generateOne.buildProvenanceUnsafe()
 
       lazy val replaceEntityLocation: Vector[JsonLD] => JsonLD = { array =>
         JsonLD.arr(
@@ -99,19 +104,20 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
         )
       }
 
-      val Left(error) = activity.asJsonLD.flatten
+      val Left(error) = JsonLD
+        .arr(activity.asJsonLD, activity.association.plan.asJsonLD)
+        .asJsonLD
+        .flatten
         .fold(throw _, _.asArray.fold(fail("JsonLD is not an array"))(replaceEntityLocation))
         .cursor
         .as[List[entities.Activity]]
+
       error              shouldBe a[DecodingFailure]
       error.getMessage() shouldBe s"No Generation found for OutputParameterValue with $location"
     }
 
     "fail if there is no Agent entity" in {
-      val activity = executionPlanners(
-        planEntities(),
-        projectEntities(anyVisibility)(anyForksCount)
-      ).generateOne
+      val activity = executionPlanners(planEntities(), anyProjectEntities.generateOne).generateOne
         .buildProvenanceUnsafe()
         .to[entities.Activity]
 
@@ -126,26 +132,23 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
           prov / "qualifiedAssociation" -> entity.association.asJsonLD,
           prov / "qualifiedUsage"       -> entity.usages.asJsonLD,
           renku / "parameter"           -> entity.parameters.asJsonLD,
-          schema / "isPartOf"           -> entity.projectResourceId.asEntityId.asJsonLD,
           renku / "order"               -> entity.order.asJsonLD
         )
       }
 
-      val Left(error) = activity
-        .asJsonLD(encoder)
+      val Left(error) = JsonLD
+        .arr(activity.asJsonLD(encoder), activity.association.plan.asJsonLD)
         .flatten
         .fold(throw _, identity)
         .cursor
         .as[List[entities.Activity]]
+
       error         shouldBe a[DecodingFailure]
       error.message shouldBe s"Activity ${activity.resourceId} without or with multiple agents"
     }
 
     "fail if there is no Author entity" in {
-      val activity = executionPlanners(
-        planEntities(),
-        projectEntities(anyVisibility)(anyForksCount)
-      ).generateOne
+      val activity = executionPlanners(planEntities(), anyProjectEntities.generateOne).generateOne
         .buildProvenanceUnsafe()
         .to[entities.Activity]
 
@@ -160,17 +163,17 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
           prov / "qualifiedAssociation" -> entity.association.asJsonLD,
           prov / "qualifiedUsage"       -> entity.usages.asJsonLD,
           renku / "parameter"           -> entity.parameters.asJsonLD,
-          schema / "isPartOf"           -> entity.projectResourceId.asEntityId.asJsonLD,
           renku / "order"               -> entity.order.asJsonLD
         )
       }
 
-      val Left(error) = activity
-        .asJsonLD(encoder)
+      val Left(error) = JsonLD
+        .arr(activity.asJsonLD(encoder), activity.association.plan.asJsonLD)
         .flatten
         .fold(throw _, identity)
         .cursor
         .as[List[entities.Activity]]
+
       error         shouldBe a[DecodingFailure]
       error.message shouldBe s"Activity ${activity.resourceId} without or with multiple authors"
     }

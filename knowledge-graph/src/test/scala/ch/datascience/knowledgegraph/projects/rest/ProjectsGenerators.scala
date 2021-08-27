@@ -18,20 +18,19 @@
 
 package ch.datascience.knowledgegraph.projects.rest
 
-import Converters._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{httpUrls => urls, _}
-import ch.datascience.graph.model
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.model.projects.ResourceId._
-import ch.datascience.graph.model.testentities.EntitiesGenerators._
+import ch.datascience.graph.model.testentities.generators.EntitiesGenerators._
 import ch.datascience.knowledgegraph.projects.model.Forking.ForksCount
 import ch.datascience.knowledgegraph.projects.model.Permissions._
 import ch.datascience.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount, Tag}
 import ch.datascience.knowledgegraph.projects.model.Statistics._
 import ch.datascience.knowledgegraph.projects.model.Urls.{HttpUrl, ReadmeUrl, SshUrl, WebUrl}
 import ch.datascience.knowledgegraph.projects.model._
+import ch.datascience.knowledgegraph.projects.rest.Converters._
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
 import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder._
 import org.scalacheck.Gen
@@ -41,7 +40,7 @@ private object ProjectsGenerators {
   implicit val projects: Gen[Project] = for {
     kgProject <-
       Gen
-        .oneOf(projectEntities[model.projects.ForksCount.Zero](anyVisibility), projectWithParentEntities(anyVisibility))
+        .oneOf(anyProjectEntities, projectWithParentEntities(anyVisibility))
         .map(_.to[KGProject])
     gitLabProject <- gitLabProjects
   } yield Project(

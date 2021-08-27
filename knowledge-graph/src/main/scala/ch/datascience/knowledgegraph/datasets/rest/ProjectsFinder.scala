@@ -55,13 +55,13 @@ private class ProjectsFinder[Interpretation[_]: ConcurrentEffect: Timer](
         |  ?dsId a schema:Dataset;
         |        schema:identifier '$identifier';
         |        renku:topmostSameAs ?topmostSameAs.
-        |        
+        |  
         |  ?allDsId a schema:Dataset;
         |           renku:topmostSameAs ?topmostSameAs;
-        |           schema:isPartOf ?projectId.
+        |           ^renku:hasDataset ?projectId.
         |  FILTER NOT EXISTS {
-        |   ?modifiedDsId prov:wasDerivedFrom / schema:url ?allDsId;
-        |    			        schema:isPartOf ?projectId.
+        |    ?projectDatasets prov:wasDerivedFrom / schema:url ?allDsId;
+        |                     ^renku:hasDataset ?projectId. 
         |  }
         |  FILTER NOT EXISTS {
         |    ?allDsId prov:invalidatedAtTime ?invalidationTime .

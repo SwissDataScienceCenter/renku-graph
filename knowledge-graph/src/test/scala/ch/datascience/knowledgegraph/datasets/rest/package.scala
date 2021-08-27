@@ -20,9 +20,9 @@ package ch.datascience.knowledgegraph.datasets
 
 import ch.datascience.generators.CommonGraphGenerators.sortBys
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.{RenkuBaseUrl, testentities}
 import ch.datascience.graph.model.datasets._
-import ch.datascience.graph.model.testentities.{Dataset, Person, Project}
+import ch.datascience.graph.model.{RenkuBaseUrl, testentities}
+import ch.datascience.graph.model.testentities.{Dataset, HavingInvalidationTime, Person, Project}
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import eu.timepit.refined.auto._
@@ -35,98 +35,85 @@ package object rest {
   implicit lazy val personToCreator: Person => DatasetCreator =
     person => DatasetCreator(person.maybeEmail, person.name, person.maybeAffiliation)
 
-  implicit lazy val projectToDatasetProject: Project[_] => DatasetProject =
+  implicit lazy val projectToDatasetProject: Project => DatasetProject =
     project => DatasetProject(project.path, project.name)
 
-  implicit def internalToNonModified(implicit
-      renkuBaseUrl: RenkuBaseUrl
-  ): testentities.Dataset[Dataset.Provenance.Internal] => NonModifiedDataset =
-    dataset =>
-      NonModifiedDataset(
-        dataset.identification.identifier,
-        dataset.identification.title,
-        dataset.identification.name,
-        dataset.additionalInfo.url,
-        SameAs(dataset.entityId),
-        DatasetVersions(dataset.provenance.initialVersion),
-        dataset.additionalInfo.maybeDescription,
-        dataset.provenance.creators.map(person =>
-          DatasetCreator(person.maybeEmail, person.name, person.maybeAffiliation)
-        ),
-        dataset.provenance.date,
-        dataset.parts.map(part => model.DatasetPart(PartLocation(part.entity.location.value))).sortBy(_.location),
-        DatasetProject(dataset.project.path, dataset.project.name),
-        usedIn = List(DatasetProject(dataset.project.path, dataset.project.name)),
-        dataset.additionalInfo.keywords.sorted,
-        dataset.additionalInfo.images
-      )
+  def internalToNonModified(dataset: Dataset[Dataset.Provenance.Internal], project: Project)(implicit
+      renkuBaseUrl:                  RenkuBaseUrl
+  ): NonModifiedDataset = NonModifiedDataset(
+    dataset.identification.identifier,
+    dataset.identification.title,
+    dataset.identification.name,
+    dataset.additionalInfo.url,
+    SameAs(dataset.entityId),
+    DatasetVersions(dataset.provenance.initialVersion),
+    dataset.additionalInfo.maybeDescription,
+    dataset.provenance.creators.map(person => DatasetCreator(person.maybeEmail, person.name, person.maybeAffiliation)),
+    dataset.provenance.date,
+    dataset.parts.map(part => model.DatasetPart(PartLocation(part.entity.location.value))).sortBy(_.location),
+    DatasetProject(project.path, project.name),
+    usedIn = List(DatasetProject(project.path, project.name)),
+    dataset.additionalInfo.keywords.sorted,
+    dataset.additionalInfo.images
+  )
 
-  implicit def importedExternalToNonModified(implicit
-      renkuBaseUrl: RenkuBaseUrl
-  ): testentities.Dataset[Dataset.Provenance.ImportedExternal] => NonModifiedDataset =
-    dataset =>
-      NonModifiedDataset(
-        dataset.identification.identifier,
-        dataset.identification.title,
-        dataset.identification.name,
-        dataset.additionalInfo.url,
-        dataset.provenance.sameAs,
-        DatasetVersions(dataset.provenance.initialVersion),
-        dataset.additionalInfo.maybeDescription,
-        dataset.provenance.creators.map(person =>
-          DatasetCreator(person.maybeEmail, person.name, person.maybeAffiliation)
-        ),
-        dataset.provenance.date,
-        dataset.parts.map(part => model.DatasetPart(PartLocation(part.entity.location.value))).sortBy(_.location),
-        DatasetProject(dataset.project.path, dataset.project.name),
-        usedIn = List(DatasetProject(dataset.project.path, dataset.project.name)),
-        dataset.additionalInfo.keywords.sorted,
-        dataset.additionalInfo.images
-      )
+  def importedExternalToNonModified(dataset: Dataset[Dataset.Provenance.ImportedExternal], project: Project)(implicit
+      renkuBaseUrl:                          RenkuBaseUrl
+  ): NonModifiedDataset = NonModifiedDataset(
+    dataset.identification.identifier,
+    dataset.identification.title,
+    dataset.identification.name,
+    dataset.additionalInfo.url,
+    dataset.provenance.sameAs,
+    DatasetVersions(dataset.provenance.initialVersion),
+    dataset.additionalInfo.maybeDescription,
+    dataset.provenance.creators.map(person => DatasetCreator(person.maybeEmail, person.name, person.maybeAffiliation)),
+    dataset.provenance.date,
+    dataset.parts.map(part => model.DatasetPart(PartLocation(part.entity.location.value))).sortBy(_.location),
+    DatasetProject(project.path, project.name),
+    usedIn = List(DatasetProject(project.path, project.name)),
+    dataset.additionalInfo.keywords.sorted,
+    dataset.additionalInfo.images
+  )
 
-  implicit def importedInternalToNonModified[P <: Dataset.Provenance.ImportedInternal](implicit
-      renkuBaseUrl: RenkuBaseUrl
-  ): testentities.Dataset[P] => NonModifiedDataset =
-    dataset =>
-      NonModifiedDataset(
-        dataset.identification.identifier,
-        dataset.identification.title,
-        dataset.identification.name,
-        dataset.additionalInfo.url,
-        dataset.provenance.sameAs,
-        DatasetVersions(dataset.provenance.initialVersion),
-        dataset.additionalInfo.maybeDescription,
-        dataset.provenance.creators.map(person =>
-          DatasetCreator(person.maybeEmail, person.name, person.maybeAffiliation)
-        ),
-        dataset.provenance.date,
-        dataset.parts.map(part => model.DatasetPart(PartLocation(part.entity.location.value))).sortBy(_.location),
-        DatasetProject(dataset.project.path, dataset.project.name),
-        usedIn = List(DatasetProject(dataset.project.path, dataset.project.name)),
-        dataset.additionalInfo.keywords.sorted,
-        dataset.additionalInfo.images
-      )
+  def importedInternalToNonModified(dataset: Dataset[Dataset.Provenance.ImportedInternal], project: Project)(implicit
+      renkuBaseUrl:                          RenkuBaseUrl
+  ): NonModifiedDataset = NonModifiedDataset(
+    dataset.identification.identifier,
+    dataset.identification.title,
+    dataset.identification.name,
+    dataset.additionalInfo.url,
+    dataset.provenance.sameAs,
+    DatasetVersions(dataset.provenance.initialVersion),
+    dataset.additionalInfo.maybeDescription,
+    dataset.provenance.creators.map(person => DatasetCreator(person.maybeEmail, person.name, person.maybeAffiliation)),
+    dataset.provenance.date,
+    dataset.parts.map(part => model.DatasetPart(PartLocation(part.entity.location.value))).sortBy(_.location),
+    DatasetProject(project.path, project.name),
+    usedIn = List(DatasetProject(project.path, project.name)),
+    dataset.additionalInfo.keywords.sorted,
+    dataset.additionalInfo.images
+  )
 
-  implicit def modifiedToModified(implicit
-      renkuBaseUrl: RenkuBaseUrl
-  ): testentities.Dataset[Dataset.Provenance.Modified] => ModifiedDataset =
-    dataset =>
-      ModifiedDataset(
-        dataset.identifier,
-        dataset.identification.title,
-        dataset.identification.name,
-        dataset.additionalInfo.url,
-        dataset.provenance.derivedFrom,
-        DatasetVersions(dataset.provenance.initialVersion),
-        dataset.additionalInfo.maybeDescription,
-        dataset.provenance.creators.map(person =>
-          DatasetCreator(person.maybeEmail, person.name, person.maybeAffiliation)
-        ),
-        dataset.provenance.date,
-        dataset.parts.map(part => model.DatasetPart(PartLocation(part.entity.location.value))).sortBy(_.location),
-        DatasetProject(dataset.project.path, dataset.project.name),
-        usedIn = List(DatasetProject(dataset.project.path, dataset.project.name)),
-        dataset.additionalInfo.keywords.sorted,
-        dataset.additionalInfo.images
-      )
+  def modifiedToModified(dataset: Dataset[Dataset.Provenance.Modified], project: Project)(implicit
+      renkuBaseUrl:               RenkuBaseUrl
+  ): ModifiedDataset = ModifiedDataset(
+    dataset.identifier,
+    dataset.identification.title,
+    dataset.identification.name,
+    dataset.additionalInfo.url,
+    dataset.provenance.derivedFrom,
+    DatasetVersions(dataset.provenance.initialVersion),
+    dataset.additionalInfo.maybeDescription,
+    dataset.provenance.creators.map(person => DatasetCreator(person.maybeEmail, person.name, person.maybeAffiliation)),
+    dataset.provenance.date,
+    dataset.parts
+      .filterNot { case _: testentities.DatasetPart with HavingInvalidationTime => true; case _ => false }
+      .map(part => model.DatasetPart(PartLocation(part.entity.location.value)))
+      .sortBy(_.location),
+    DatasetProject(project.path, project.name),
+    usedIn = List(DatasetProject(project.path, project.name)),
+    dataset.additionalInfo.keywords.sorted,
+    dataset.additionalInfo.images
+  )
 }

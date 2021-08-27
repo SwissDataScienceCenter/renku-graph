@@ -24,7 +24,7 @@ import ch.datascience.graph.acceptancetests.db.{EventLog, TokenRepository}
 import ch.datascience.graph.acceptancetests.stubs.{GitLab, RemoteTriplesGenerator}
 import ch.datascience.graph.acceptancetests.tooling.KnowledgeGraphClient.KnowledgeGraphClient
 import ch.datascience.graph.acceptancetests.tooling.WebhookServiceClient.WebhookServiceClient
-import ch.datascience.graph.model.testentities.EntitiesGenerators
+import ch.datascience.graph.model.testentities.generators.EntitiesGenerators
 import ch.datascience.rdfstore.FusekiBaseUrl
 import io.renku.eventlog
 import org.scalatest.{BeforeAndAfterAll, Suite}

@@ -21,7 +21,7 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated.tripl
 import cats.data.EitherT
 import cats.effect._
 import cats.syntax.all._
-import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException, UnauthorizedException, UnexpectedResponseException}
+import ch.datascience.http.client.RestClientError._
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TransformationStep
@@ -44,16 +44,15 @@ class ProjectTransformerImpl[Interpretation[_]: MonadThrow](
   override def createTransformationStep: TransformationStep[Interpretation] =
     TransformationStep("Project Details Updates", createTransformation)
 
-  private def createTransformation: Transformation[Interpretation] = projectMetadata =>
+  private def createTransformation: Transformation[Interpretation] = project =>
     EitherT {
       kGProjectFinder
-        .find(projectMetadata.project.resourceId)
+        .find(project.resourceId)
         .map {
-          case None =>
-            TransformationStep.ResultData(projectMetadata, Nil).asRight[ProcessingRecoverableError]
+          case None => TransformationStep.ResultData(project, Nil).asRight[ProcessingRecoverableError]
           case Some(kgProjectInfo) =>
             TransformationStep
-              .ResultData(projectMetadata, updatesCreator.prepareUpdates(projectMetadata.project, kgProjectInfo))
+              .ResultData(project, updatesCreator.prepareUpdates(project, kgProjectInfo))
               .asRight[ProcessingRecoverableError]
         }
         .recoverWith(maybeToRecoverableError)

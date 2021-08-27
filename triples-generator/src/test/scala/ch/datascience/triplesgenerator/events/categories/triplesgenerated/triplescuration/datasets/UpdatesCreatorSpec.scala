@@ -21,7 +21,7 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated.tripl
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{ResourceId, SameAs, TopmostDerivedFrom, TopmostSameAs}
+import ch.datascience.graph.model.datasets.{SameAs, TopmostDerivedFrom, TopmostSameAs}
 import ch.datascience.graph.model.entities
 import ch.datascience.graph.model.testentities._
 import ch.datascience.rdfstore.InMemoryRdfStore
@@ -39,12 +39,12 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
         val dataset0AsTopmostSameAs = TopmostSameAs(datasetResourceIds.generateOne.value)
 
         val dataset1 = {
-          val ds = datasetEntities(datasetProvenanceImportedInternal).generateOne
+          val ds = datasetEntities(provenanceImportedInternal).decoupledFromProject.generateOne
             .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]]
           setTopmostSameAs(ds, dataset0AsTopmostSameAs)
         }
         val dataset2 = {
-          val ds = datasetEntities(datasetProvenanceImportedInternal).generateOne
+          val ds = datasetEntities(provenanceImportedInternal).decoupledFromProject.generateOne
             .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]]
           setTopmostSameAs(ds, TopmostSameAs(dataset1.resourceId.value))
         }
@@ -68,12 +68,12 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
         val dataset0AsTopmostDerivedFrom = TopmostDerivedFrom(datasetResourceIds.generateOne.value)
 
         val dataset1 = {
-          val ds = datasetEntities(datasetProvenanceModified).generateOne
+          val ds = datasetEntities(provenanceModified).decoupledFromProject.generateOne
             .to[entities.Dataset[entities.Dataset.Provenance.Modified]]
           ds.copy(provenance = ds.provenance.copy(topmostDerivedFrom = dataset0AsTopmostDerivedFrom))
         }
         val dataset2 = {
-          val ds = datasetEntities(datasetProvenanceModified).generateOne
+          val ds = datasetEntities(provenanceModified).decoupledFromProject.generateOne
             .to[entities.Dataset[entities.Dataset.Provenance.Modified]]
           ds.copy(provenance = ds.provenance.copy(topmostDerivedFrom = TopmostDerivedFrom(dataset1.resourceId.value)))
         }
@@ -97,16 +97,15 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
       "update their sameAs to None " +
       "select one the dataset with the oldest date " +
       "and update all datasets which have topmostSameAs pointing to the deleted DS with the selected resourceId" in {
-        val grandparent = datasetEntities(datasetProvenanceInternal).generateOne.copy(parts = Nil)
-        val parent1     = grandparent.importTo(projectEntities(anyVisibility)(anyForksCount).generateOne)
-        val child1      = parent1.importTo(projectEntities(anyVisibility)(anyForksCount).generateOne)
+        val grandparent  = datasetEntities(provenanceInternal).decoupledFromProject.generateOne.copy(parts = Nil)
+        val (parent1, _) = anyProjectEntities.importDataset(grandparent).generateOne
+        val (child1, _)  = anyProjectEntities.importDataset(parent1).generateOne
         val parent2 = {
-          val ds = grandparent.importTo(projectEntities(anyVisibility)(anyForksCount).generateOne)
-          ds.copy(provenance =
-            ds.provenance.copy(date = datasetCreatedDates(parent1.provenance.date.instant).generateOne)
-          )
+          val (ds, _) = anyProjectEntities.importDataset(grandparent).generateOne
+          provenanceLens[Dataset.Provenance.ImportedInternalAncestorInternal]
+            .modify(_.copy(date = datasetCreatedDates(min = parent1.provenance.date.instant).generateOne))(ds)
         }
-        val child2 = parent2.importTo(projectEntities(anyVisibility)(anyForksCount).generateOne)
+        val (child2, _) = anyProjectEntities.importDataset(parent2).generateOne
 
         val entitiesGrandparent = grandparent.to[entities.Dataset[entities.Dataset.Provenance.Internal]]
         val entitiesParent1     = parent1.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
@@ -136,14 +135,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
           )
         )
 
-        UpdatesCreator
-          .prepareUpdates(
-            entitiesGrandparent.copy(
-              maybeInvalidationTime = invalidationTimes(entitiesGrandparent.provenance.date).generateSome
-            )
-          )
-          .runAll
-          .unsafeRunSync()
+        UpdatesCreator.prepareUpdatesWhenInvalidated(entitiesGrandparent).runAll.unsafeRunSync()
 
         findDatasets.map(onlySameAsAndTop) shouldBe Set(
           (entitiesGrandparent.resourceId.value, None, entitiesGrandparent.provenance.topmostSameAs.value.some),
@@ -164,14 +156,15 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
       "in case of imported external dataset, " +
       "find datasets which have sameAs pointing to the deleted dataset " +
       "update their sameAs to their topmostSameAs" in {
-        val grandparent = datasetEntities(datasetProvenanceImportedExternal).generateOne.copy(parts = Nil)
-        val parent1     = grandparent.importTo(projectEntities(anyVisibility)(anyForksCount).generateOne)
-        val child1      = parent1.importTo(projectEntities(anyVisibility)(anyForksCount).generateOne)
+        val grandparent  = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne.copy(parts = Nil)
+        val (parent1, _) = anyProjectEntities.importDataset(grandparent).generateOne
+        val (child1, _)  = anyProjectEntities.importDataset(parent1).generateOne
         val parent2 = {
-          val ds = grandparent.importTo(projectEntities(anyVisibility)(anyForksCount).generateOne)
-          ds.copy(provenance = ds.provenance.copy(date = datasetPublishedDates(parent1.provenance.date).generateOne))
+          val (ds, _) = anyProjectEntities.importDataset(grandparent).generateOne
+          provenanceLens[Dataset.Provenance.ImportedInternalAncestorExternal]
+            .modify(_.copy(date = datasetPublishedDates(parent1.provenance.date).generateOne))(ds)
         }
-        val child2 = parent2.importTo(projectEntities(anyVisibility)(anyForksCount).generateOne)
+        val (child2, _) = anyProjectEntities.importDataset(parent2).generateOne
 
         val entitiesGrandparent = grandparent.to[entities.Dataset[entities.Dataset.Provenance.ImportedExternal]]
         val entitiesParent1     = parent1.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorExternal]]
@@ -204,14 +197,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
           )
         )
 
-        UpdatesCreator
-          .prepareUpdates(
-            entitiesGrandparent.copy(
-              maybeInvalidationTime = invalidationTimes(entitiesGrandparent.provenance.date.instant).generateSome
-            )
-          )
-          .runAll
-          .unsafeRunSync()
+        UpdatesCreator.prepareUpdatesWhenInvalidated(entitiesGrandparent).runAll.unsafeRunSync()
 
         findDatasets.map(onlySameAsAndTop) shouldBe Set(
           (entitiesGrandparent.resourceId.value,
@@ -241,12 +227,12 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
       Table(
         ("Provenance name", "Parent Dataset and SameAs"),
         ("internal", {
-           val d = datasetEntities(datasetProvenanceInternal).generateOne.copy(parts = Nil)
+           val d = datasetEntities(provenanceInternal).decoupledFromProject.generateOne.copy(parts = Nil)
            d -> Option.empty[SameAs]
          }
         ),
         ("imported external", {
-           val d = datasetEntities(datasetProvenanceImportedExternal).generateOne.copy(parts = Nil)
+           val d = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne.copy(parts = Nil)
            d -> d.provenance.sameAs.some
          }
         )
@@ -256,9 +242,9 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
         s"in case of $datasetType dataset, " +
         "find datasets which have sameAs pointing to the deleted dataset " +
         "update their sameAs to the deleted dataset sameAs" in {
-          val parent = grandparent.importTo(anyProjectEntities.generateOne)(importedInternal)
-          val child1 = parent.importTo(anyProjectEntities.generateOne)(importedInternal)
-          val child2 = parent.importTo(anyProjectEntities.generateOne)(importedInternal)
+          val (parent, _) = anyProjectEntities.importDataset(grandparent)(importedInternal).generateOne
+          val (child1, _) = anyProjectEntities.importDataset(parent)(importedInternal).generateOne
+          val (child2, _) = anyProjectEntities.importDataset(parent)(importedInternal).generateOne
 
           val entitiesGrandparent =
             grandparent.widen[Dataset.Provenance].to[entities.Dataset[entities.Dataset.Provenance]]
@@ -283,14 +269,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
             (entitiesChild2.resourceId.value, entitiesParent.resourceId.value.some, grandparentTopmostSameAs)
           )
 
-          UpdatesCreator
-            .prepareUpdates(
-              entitiesParent.copy(
-                maybeInvalidationTime = invalidationTimes(entitiesGrandparent.provenance.date.instant).generateSome
-              )
-            )
-            .runAll
-            .unsafeRunSync()
+          UpdatesCreator.prepareUpdatesWhenInvalidated(entitiesParent).runAll.unsafeRunSync()
 
           findDatasets.map(onlySameAsAndTop) shouldBe Set(
             (entitiesGrandparent.resourceId.value, maybeGrandparentSameAs.map(_.value), grandparentTopmostSameAs),
@@ -348,7 +327,4 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
   ) => (String, Option[String], Option[String]) = { case (resourceId, sameAs, maybeTopmostSameAs, _, _) =>
     (resourceId, sameAs, maybeTopmostSameAs)
   }
-
-  private def deleteDataset(id: ResourceId) =
-    runQuery(s"""|DELETE { ?dsId renku:topmostDerivedFrom <${id.value}> }""")
 }

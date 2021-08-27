@@ -22,7 +22,6 @@ import cats.syntax.all._
 import ch.datascience.graph.model._
 import ch.datascience.graph.model.activities.{EndTime, Order, StartTime}
 import ch.datascience.graph.model.entityModel._
-import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.testentities.Activity._
 import ch.datascience.graph.model.testentities.Entity.OutputEntity
 import ch.datascience.tinytypes._
@@ -33,7 +32,6 @@ final case class Activity(id:                  Id,
                           endTime:             EndTime,
                           author:              Person,
                           agent:               Agent,
-                          project:             Project[ForksCount],
                           order:               Order,
                           associationFactory:  Activity => Association,
                           usageFactories:      List[Activity => Usage],
@@ -41,11 +39,11 @@ final case class Activity(id:                  Id,
                           parameterFactories:  List[Activity => ParameterValue]
 ) {
 
-  lazy val association: Association          = associationFactory(this)
-  lazy val plan:        Plan                 = association.plan
-  lazy val usages:      List[Usage]          = usageFactories.map(_.apply(this))
-  lazy val parameters:  List[ParameterValue] = parameterFactories.map(_.apply(this))
-  lazy val generations: List[Generation]     = generationFactories.map(_.apply(this))
+  val association: Association          = associationFactory(this)
+  val plan:        Plan                 = association.plan
+  val usages:      List[Usage]          = usageFactories.map(_.apply(this))
+  val parameters:  List[ParameterValue] = parameterFactories.map(_.apply(this))
+  val generations: List[Generation]     = generationFactories.map(_.apply(this))
 
   def findEntity(location: Location): Option[Entity] =
     findUsageEntity(location) orElse findGenerationEntity(location)
@@ -75,7 +73,6 @@ object Activity {
             startTime:           StartTime,
             author:              Person,
             agent:               Agent,
-            project:             Project[ForksCount],
             order:               Order,
             associationFactory:  Activity => Association,
             usageFactories:      List[Activity => Usage] = Nil,
@@ -85,7 +82,6 @@ object Activity {
                              EndTime(startTime.value),
                              author,
                              agent,
-                             project,
                              order,
                              associationFactory,
                              usageFactories,
@@ -103,7 +99,6 @@ object Activity {
       activity.endTime,
       activity.author.to[entities.Person],
       activity.agent.to[entities.Agent],
-      projects.ResourceId(activity.project.asEntityId.show),
       activity.order,
       activity.association.to[entities.Association],
       activity.usages.map(_.to[entities.Usage]),
@@ -112,14 +107,7 @@ object Activity {
     )
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Activity] =
-    JsonLDEncoder.instance { activity =>
-      JsonLD
-        .arr(
-          activity.project.asJsonLD,
-          activity.association.plan.asJsonLD,
-          activity.to[entities.Activity].asJsonLD
-        )
-    }
+    JsonLDEncoder.instance(activity => activity.to[entities.Activity].asJsonLD)
 
   implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[Activity] =
     EntityIdEncoder.instance(entity => EntityId of renkuBaseUrl / "activities" / entity.id)

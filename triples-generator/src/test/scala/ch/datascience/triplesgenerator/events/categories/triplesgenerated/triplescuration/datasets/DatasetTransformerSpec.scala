@@ -26,12 +26,11 @@ import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{DerivedFrom, InternalSameAs, ResourceId, TopmostDerivedFrom, TopmostSameAs}
 import ch.datascience.graph.model.entities
-import ch.datascience.graph.model.entities.Dataset
 import ch.datascience.graph.model.testentities._
 import ch.datascience.http.client.RestClientError
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.rdfstore.SparqlQuery
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.ProjectMetadata
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.ProjectFunctions
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -43,19 +42,22 @@ import scala.util.{Failure, Success, Try}
 class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "createTransformationStep" should {
-    val projectMetadata = mock[ProjectMetadata]
 
     "find all internally imported datasets, " +
       "find the topmostSameAs for their sameAs and resourceId, " +
       "update the datasets with the topmostSameAs found for sameAs " +
       "and create update queries" in new TestCase {
 
-        val dataset1 = datasetEntities(datasetProvenanceImportedInternal).generateOne
-          .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]]
-        val dataset2 = datasetEntities(datasetProvenanceImportedInternal).generateOne
-          .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]]
-
-        (() => projectMetadata.findInternallyImportedDatasets).expects().returning(List(dataset1, dataset2))
+        val (dataset1 ::~ dataset2, project) = anyProjectEntities
+          .addDataset(datasetEntities(provenanceImportedInternal))
+          .addDataset(datasetEntities(provenanceImportedInternal))
+          .generateOne
+          .bimap(
+            _.bimap(_.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]],
+                    _.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]]
+            ),
+            _.to[entities.Project]
+          )
 
         val kgTopmostSameAs = datasetTopmostSameAs.generateOne
         findingParentTopmostSameAsFor(dataset1.provenance.sameAs, returning = kgTopmostSameAs.some.pure[Try])
@@ -63,33 +65,18 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         val dataset1Queries = sparqlQueries.generateList()
         prepareQueriesForSameAs(dataset1 -> Option.empty[TopmostSameAs], returning = dataset1Queries)
 
-        val updatedProjectMetadataAfterDS1Update = mock[ProjectMetadata]
-        (projectMetadata
-          .update(_: entities.Dataset[entities.Dataset.Provenance], _: entities.Dataset[entities.Dataset.Provenance]))
-          .expects(dataset1, dataset1.update(kgTopmostSameAs))
-          .returning(updatedProjectMetadataAfterDS1Update)
-
         findingParentTopmostSameAsFor(dataset2.provenance.sameAs, returning = None.pure[Try])
         val dataset2KgTopmostSameAs = datasetTopmostSameAs.generateSome
         findingTopmostSameAsFor(dataset2.identification.resourceId, returning = dataset2KgTopmostSameAs.pure[Try])
         val dataset2Queries = sparqlQueries.generateList()
         prepareQueriesForSameAs(dataset2 -> dataset2KgTopmostSameAs, returning = dataset2Queries)
 
-        val updatedProjectMetadataAfterDS2Update = mock[ProjectMetadata]
-        (updatedProjectMetadataAfterDS1Update
-          .update(_: entities.Dataset[entities.Dataset.Provenance], _: entities.Dataset[entities.Dataset.Provenance]))
-          .expects(dataset2, dataset2)
-          .returning(updatedProjectMetadataAfterDS2Update)
-
-        (() => updatedProjectMetadataAfterDS2Update.findModifiedDatasets).expects().returning(Nil)
-        (() => updatedProjectMetadataAfterDS2Update.findInvalidatedDatasets).expects().returning(Nil)
-
         val step = transformer.createTransformationStep
 
         step.name.value shouldBe "Dataset Details Updates"
-        val Success(Right(updateResult)) = step.run(projectMetadata).value
-        updateResult.projectMetadata shouldBe updatedProjectMetadataAfterDS2Update
-        updateResult.queries         shouldBe (dataset1Queries ::: dataset2Queries)
+        val Success(Right(updateResult)) = step.run(project).value
+        updateResult.project shouldBe ProjectFunctions.update(dataset1, dataset1.update(kgTopmostSameAs))(project)
+        updateResult.queries shouldBe (dataset1Queries ::: dataset2Queries)
       }
 
     "find all modified datasets, " +
@@ -97,14 +84,16 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       "update the datasets with the found topmostDerived if found " +
       "and update the modified datasets in the metadata" in new TestCase {
 
-        (() => projectMetadata.findInternallyImportedDatasets).expects().returning(Nil)
-
-        val dataset1 = datasetEntities(datasetProvenanceModified).generateOne
-          .to[entities.Dataset[entities.Dataset.Provenance.Modified]]
-        val dataset2 = datasetEntities(datasetProvenanceModified).generateOne
-          .to[entities.Dataset[entities.Dataset.Provenance.Modified]]
-
-        (() => projectMetadata.findModifiedDatasets).expects().returning(List(dataset1, dataset2))
+        val (dataset1 ::~ dataset2, project) = anyProjectEntities
+          .addDataset(datasetEntities(provenanceModified))
+          .addDataset(datasetEntities(provenanceModified))
+          .generateOne
+          .bimap(
+            _.bimap(_.to[entities.Dataset[entities.Dataset.Provenance.Modified]],
+                    _.to[entities.Dataset[entities.Dataset.Provenance.Modified]]
+            ),
+            _.to[entities.Project]
+          )
 
         val kgTopmostDerivedFrom = datasetTopmostDerivedFroms.generateOne
         findingParentTopmostDerivedFromFor(dataset1.provenance.derivedFrom,
@@ -116,12 +105,6 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         val dataset1Queries = sparqlQueries.generateList()
         prepareQueriesForDerivedFrom(dataset1 -> Option.empty[TopmostDerivedFrom], returning = dataset1Queries)
 
-        val updatedProjectMetadataAfterDs1Update = mock[ProjectMetadata]
-        (projectMetadata
-          .update(_: entities.Dataset[entities.Dataset.Provenance], _: entities.Dataset[entities.Dataset.Provenance]))
-          .expects(dataset1, dataset1.update(kgTopmostDerivedFrom))
-          .returning(updatedProjectMetadataAfterDs1Update)
-
         findingParentTopmostDerivedFromFor(dataset2.provenance.derivedFrom, returning = None.pure[Try])
         val dataset2KgTopmostDerivedFrom = datasetTopmostDerivedFroms.generateSome
         findingTopmostDerivedFromFor(dataset2.identification.resourceId,
@@ -130,104 +113,71 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         val dataset2Queries = sparqlQueries.generateList()
         prepareQueriesForDerivedFrom(dataset2 -> dataset2KgTopmostDerivedFrom, returning = dataset2Queries)
 
-        val updatedProjectMetadataAfterDs2Update = mock[ProjectMetadata]
-        (updatedProjectMetadataAfterDs1Update
-          .update(_: entities.Dataset[entities.Dataset.Provenance], _: entities.Dataset[entities.Dataset.Provenance]))
-          .expects(dataset2, dataset2)
-          .returning(updatedProjectMetadataAfterDs2Update)
-
-        (() => updatedProjectMetadataAfterDs2Update.findInvalidatedDatasets).expects().returning(Nil)
-
         val step = transformer.createTransformationStep
 
         step.name.value shouldBe "Dataset Details Updates"
-        val Success(Right(updateResult)) = step.run(projectMetadata).value
-        updateResult.projectMetadata shouldBe updatedProjectMetadataAfterDs2Update
-        updateResult.queries         shouldBe (dataset1Queries ::: dataset2Queries)
+        val Success(Right(updateResult)) = step.run(project).value
+        updateResult.project shouldBe ProjectFunctions.update(dataset1, dataset1.update(kgTopmostDerivedFrom))(project)
+        updateResult.queries shouldBe (dataset1Queries ::: dataset2Queries)
       }
 
     "prepare updates for deleted datasets" in new TestCase {
-      (() => projectMetadata.findInternallyImportedDatasets).expects().returning(Nil)
-      (() => projectMetadata.findModifiedDatasets).expects().returning(Nil)
-
-      val internal = {
-        val ds = datasetEntities(datasetProvenanceInternal).generateOne
-          .copy(parts = Nil)
-          .to[entities.Dataset[entities.Dataset.Provenance.Internal]]
-        ds.copy(maybeInvalidationTime = invalidationTimes(ds.provenance.date.instant).generateSome)
-      }
-      val importedExternal = {
-        val ds = datasetEntities(datasetProvenanceImportedExternal).generateOne
-          .copy(parts = Nil)
-          .to[entities.Dataset[entities.Dataset.Provenance.ImportedExternal]]
-        ds.copy(maybeInvalidationTime = invalidationTimes(ds.provenance.date.instant).generateSome)
-      }
-      val ancestorInternal = {
-        val ds = datasetEntities(datasetProvenanceImportedInternalAncestorInternal).generateOne
-          .copy(parts = Nil)
-          .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
-        ds.copy(maybeInvalidationTime = invalidationTimes(ds.provenance.date.instant).generateSome)
-      }
-      val ancestorExternal = {
-        val ds = datasetEntities(datasetProvenanceImportedInternalAncestorExternal).generateOne
-          .copy(parts = Nil)
-          .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorExternal]]
-        ds.copy(maybeInvalidationTime = invalidationTimes(ds.provenance.date.instant).generateSome)
-      }
-      val modified = {
-        val ds = datasetEntities(datasetProvenanceModified).generateOne
-          .copy(parts = Nil)
-          .to[entities.Dataset[entities.Dataset.Provenance.Modified]]
-        ds.copy(maybeInvalidationTime = invalidationTimes(ds.provenance.date.instant).generateSome)
-      }
-
-      (() => projectMetadata.findInvalidatedDatasets)
-        .expects()
-        .returning(List(internal, importedExternal, ancestorInternal, ancestorExternal, modified))
+      val (internal ::~ _ ::~ importedExternal ::~ _ ::~ ancestorInternal ::~ _ ::~ ancestorExternal ::~ _ ::~ _ ::~ _,
+           projectWithAllDatasets
+      ) = anyProjectEntities
+        .addDatasetAndInvalidation(datasetEntities(provenanceInternal))
+        .addDatasetAndInvalidation(datasetEntities(provenanceImportedExternal))
+        .addDatasetAndInvalidation(datasetEntities(provenanceImportedInternalAncestorInternal))
+        .addDatasetAndInvalidation(datasetEntities(provenanceImportedInternalAncestorExternal))
+        .addDatasetAndInvalidation(datasetEntities(provenanceModified))
+        .generateOne
+      val entitiesProjectWithAllDatasets = projectWithAllDatasets.to[entities.Project]
 
       val internalDsQueries = sparqlQueries.generateList()
       (updatesCreator
-        .prepareUpdates(_: entities.Dataset[entities.Dataset.Provenance.Internal])(_: Dataset.Provenance.Internal.type))
-        .expects(internal, *)
+        .prepareUpdatesWhenInvalidated(_: entities.Dataset[entities.Dataset.Provenance.Internal])(
+          _: entities.Dataset.Provenance.Internal.type
+        ))
+        .expects(internal.to[entities.Dataset[entities.Dataset.Provenance.Internal]], *)
         .returning(internalDsQueries)
 
       val importedExternalDsQueries = sparqlQueries.generateList()
       (updatesCreator
-        .prepareUpdates(_: entities.Dataset[entities.Dataset.Provenance.ImportedExternal])(
-          _: Dataset.Provenance.ImportedExternal.type
+        .prepareUpdatesWhenInvalidated(_: entities.Dataset[entities.Dataset.Provenance.ImportedExternal])(
+          _: entities.Dataset.Provenance.ImportedExternal.type
         ))
-        .expects(importedExternal, *)
+        .expects(importedExternal.to[entities.Dataset[entities.Dataset.Provenance.ImportedExternal]], *)
         .returning(importedExternalDsQueries)
 
       val ancestorInternalDsQueries = sparqlQueries.generateList()
       (updatesCreator
-        .prepareUpdates(_: entities.Dataset[entities.Dataset.Provenance.ImportedInternal])(
-          _: Dataset.Provenance.ImportedInternal.type
+        .prepareUpdatesWhenInvalidated(_: entities.Dataset[entities.Dataset.Provenance.ImportedInternal])(
+          _: entities.Dataset.Provenance.ImportedInternal.type
         ))
-        .expects(ancestorInternal, *)
+        .expects(ancestorInternal.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]], *)
         .returning(ancestorInternalDsQueries)
 
       val ancestorExternalDsQueries = sparqlQueries.generateList()
       (updatesCreator
-        .prepareUpdates(_: entities.Dataset[entities.Dataset.Provenance.ImportedInternal])(
-          _: Dataset.Provenance.ImportedInternal.type
+        .prepareUpdatesWhenInvalidated(_: entities.Dataset[entities.Dataset.Provenance.ImportedInternal])(
+          _: entities.Dataset.Provenance.ImportedInternal.type
         ))
-        .expects(ancestorExternal, *)
+        .expects(ancestorExternal.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorExternal]], *)
         .returning(ancestorExternalDsQueries)
 
       val step = transformer.createTransformationStep
 
-      val Success(Right(updateResult)) = step.run(projectMetadata).value
-      updateResult.projectMetadata shouldBe projectMetadata
-      updateResult.queries         shouldBe (internalDsQueries ::: importedExternalDsQueries ::: ancestorInternalDsQueries ::: ancestorExternalDsQueries)
+      val Success(Right(updateResult)) = step.run(entitiesProjectWithAllDatasets).value
 
+      updateResult.project shouldBe entitiesProjectWithAllDatasets
+      updateResult.queries   should contain theSameElementsAs (internalDsQueries ::: importedExternalDsQueries ::: ancestorInternalDsQueries ::: ancestorExternalDsQueries)
     }
 
     "return the ProcessingRecoverableFailure if calls to KG fails with a network or HTTP error" in new TestCase {
-      val dataset = datasetEntities(datasetProvenanceImportedInternal).generateOne
-        .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]]
-
-      (() => projectMetadata.findInternallyImportedDatasets).expects().returning(List(dataset))
+      val (dataset, project) = anyProjectEntities
+        .addDataset(datasetEntities(provenanceImportedInternal))
+        .generateOne
+        .bimap(_.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]], _.to[entities.Project])
 
       val exception = recoverableClientErrors.generateOne
       findingParentTopmostSameAsFor(dataset.provenance.sameAs,
@@ -236,17 +186,17 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
 
       val step = transformer.createTransformationStep
 
-      val Success(Left(recoverableError)) = step.run(projectMetadata).value
+      val Success(Left(recoverableError)) = step.run(project).value
 
       recoverableError            shouldBe a[TransformationRecoverableError]
       recoverableError.getMessage shouldBe "Problem finding dataset details in KG"
     }
 
     "fail with NonRecoverableFailure if finding calls to KG fails with an unknown exception" in new TestCase {
-      val dataset = datasetEntities(datasetProvenanceImportedInternal).generateOne
-        .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]]
-
-      (() => projectMetadata.findInternallyImportedDatasets).expects().returning(List(dataset))
+      val (dataset, project) = anyProjectEntities
+        .addDataset(datasetEntities(provenanceImportedInternal))
+        .generateOne
+        .bimap(_.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]], _.to[entities.Project])
 
       val exception = exceptions.generateOne
       findingParentTopmostSameAsFor(dataset.provenance.sameAs,
@@ -255,7 +205,7 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
 
       val step = transformer.createTransformationStep
 
-      val Failure(nonRecoverableError) = step.run(projectMetadata).value
+      val Failure(nonRecoverableError) = step.run(project).value
       nonRecoverableError shouldBe exception
     }
 
@@ -264,7 +214,7 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
   private trait TestCase {
     val kgDatasetInfoFinder = mock[KGDatasetInfoFinder[Try]]
     val updatesCreator      = mock[UpdatesCreator]
-    val transformer         = new DatasetTransformerImpl[Try](kgDatasetInfoFinder, updatesCreator)
+    val transformer         = new DatasetTransformerImpl[Try](kgDatasetInfoFinder, updatesCreator, ProjectFunctions)
 
     def findingParentTopmostSameAsFor(sameAs: InternalSameAs, returning: Try[Option[TopmostSameAs]]) =
       (kgDatasetInfoFinder

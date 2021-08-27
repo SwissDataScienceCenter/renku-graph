@@ -27,7 +27,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.testentities.EntitiesGenerators._
+import ch.datascience.graph.model.testentities.generators.EntitiesGenerators._
 import ch.datascience.http.ErrorMessage
 import ch.datascience.http.InfoMessage._
 import ch.datascience.http.rest.paging.PagingRequest.Decoders.{page, perPage}

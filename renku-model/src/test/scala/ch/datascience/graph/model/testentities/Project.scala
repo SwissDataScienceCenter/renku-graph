@@ -18,142 +18,194 @@
 
 package ch.datascience.graph.model.testentities
 
+import cats.data.ValidatedNel
+import cats.syntax.all._
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model
 import ch.datascience.graph.model._
 import ch.datascience.graph.model.projects.{DateCreated, ForksCount, Name, Path, Visibility}
+import ch.datascience.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
 
-sealed trait Project[+FC <: ForksCount] extends Project.ProjectOps[FC] {
+sealed trait Project extends Project.ProjectOps with Product with Serializable {
   val path:         Path
   val name:         Name
   val agent:        CliVersion
   val dateCreated:  DateCreated
   val maybeCreator: Option[Person]
   val visibility:   Visibility
-  val forksCount:   FC
+  val forksCount:   ForksCount
   val members:      Set[Person]
   val version:      SchemaVersion
+  val activities:   List[Activity]
+  val datasets:     List[Dataset[Dataset.Provenance]]
+
+  type ProjectType <: Project
+
+  lazy val plans: Set[Plan] = activities.map(_.association.plan).toSet
 }
 
-final case class ProjectWithoutParent[+FC <: ForksCount](path:         Path,
-                                                         name:         Name,
-                                                         agent:        CliVersion,
-                                                         dateCreated:  DateCreated,
-                                                         maybeCreator: Option[Person],
-                                                         visibility:   Visibility,
-                                                         forksCount:   FC,
-                                                         members:      Set[Person],
-                                                         version:      SchemaVersion
-) extends Project[FC]
+final case class ProjectWithoutParent(path:         Path,
+                                      name:         Name,
+                                      agent:        CliVersion,
+                                      dateCreated:  DateCreated,
+                                      maybeCreator: Option[Person],
+                                      visibility:   Visibility,
+                                      forksCount:   ForksCount,
+                                      members:      Set[Person],
+                                      version:      SchemaVersion,
+                                      activities:   List[Activity],
+                                      datasets:     List[Dataset[Dataset.Provenance]]
+) extends Project {
 
-final case class ProjectWithParent[+FC <: ForksCount](path:         Path,
-                                                      name:         Name,
-                                                      agent:        CliVersion,
-                                                      dateCreated:  DateCreated,
-                                                      maybeCreator: Option[Person],
-                                                      visibility:   Visibility,
-                                                      forksCount:   FC,
-                                                      members:      Set[Person],
-                                                      version:      SchemaVersion,
-                                                      parent:       Project[ForksCount.NonZero]
-) extends Project[FC]
+  validateDates(dateCreated, activities, datasets)
+    .fold(errors => throw new IllegalStateException(errors.intercalate("; ")), identity)
+
+  override type ProjectType = ProjectWithoutParent
+
+  override def addActivities(toAdd: Activity*): ProjectWithoutParent =
+    copy(activities = activities ::: toAdd.toList)
+
+  override def addDatasets[P <: Dataset.Provenance](toAdd: Dataset[P]*): ProjectWithoutParent =
+    copy(datasets = datasets ::: toAdd.toList)
+
+  override def addDataset[P <: Dataset.Provenance](
+      factory: DatasetGenFactory[P]
+  ): (Dataset[P], ProjectWithoutParent) = {
+    val dataset = factory(dateCreated).generateOne
+    dataset -> copy(datasets = datasets ::: dataset :: Nil)
+  }
+
+  private def validateDates(projectDateCreated: projects.DateCreated,
+                            activities:         List[Activity],
+                            datasets:           List[Dataset[Dataset.Provenance]]
+  ): ValidatedNel[String, Unit] = activities
+    .map { activity =>
+      import activity._
+      if ((startTime.value compareTo projectDateCreated.value) >= 0) ().validNel[String]
+      else s"Activity $id startTime $startTime is older than project $projectDateCreated".invalidNel
+    }
+    .sequence
+    .void |+| datasets
+    .map {
+      def compareDateWithProject(dataset: Dataset[Dataset.Provenance], dateCreated: model.datasets.DateCreated) =
+        if ((dateCreated compareTo projectDateCreated.value) >= 0) ().validNel[String]
+        else
+          s"Dataset ${dataset.identification.identifier} startTime $dateCreated is older than project $projectDateCreated".invalidNel
+
+      dataset =>
+        dataset.provenance match {
+          case p: Dataset.Provenance.Internal => compareDateWithProject(dataset, p.date)
+          case p: Dataset.Provenance.Modified => compareDateWithProject(dataset, p.date)
+          case _ => ().validNel[String]
+        }
+    }
+    .sequence
+    .void
+}
+
+final case class ProjectWithParent(path:         Path,
+                                   name:         Name,
+                                   agent:        CliVersion,
+                                   dateCreated:  DateCreated,
+                                   maybeCreator: Option[Person],
+                                   visibility:   Visibility,
+                                   forksCount:   ForksCount,
+                                   members:      Set[Person],
+                                   version:      SchemaVersion,
+                                   activities:   List[Activity],
+                                   datasets:     List[Dataset[Dataset.Provenance]],
+                                   parent:       Project
+) extends Project {
+  override type ProjectType = ProjectWithParent
+
+  override def addActivities(toAdd: Activity*): ProjectWithParent =
+    copy(activities = activities ::: toAdd.toList)
+
+  override def addDatasets[P <: Dataset.Provenance](toAdd: Dataset[P]*): ProjectWithParent =
+    copy(datasets = datasets ::: toAdd.toList)
+
+  override def addDataset[P <: Dataset.Provenance](factory: DatasetGenFactory[P]): (Dataset[P], ProjectWithParent) = {
+    val dataset = factory(dateCreated).generateOne
+    dataset -> copy(datasets = datasets ::: dataset :: Nil)
+  }
+}
 
 object Project {
 
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  def withoutParent[FC <: ForksCount](path:         Path,
-                                      name:         Name,
-                                      agent:        CliVersion,
-                                      dateCreated:  DateCreated,
-                                      maybeCreator: Option[Person],
-                                      visibility:   Visibility,
-                                      forksCount:   FC,
-                                      members:      Set[Person],
-                                      version:      SchemaVersion
-  ): ProjectWithoutParent[FC] =
-    ProjectWithoutParent[FC](path, name, agent, dateCreated, maybeCreator, visibility, forksCount, members, version)
-
-  def withParent[FC <: ForksCount](path:          Path,
-                                   name:          Name,
-                                   agent:         CliVersion,
-                                   dateCreated:   DateCreated,
-                                   maybeCreator:  Option[Person],
-                                   visibility:    Visibility,
-                                   forksCount:    FC,
-                                   members:       Set[Person],
-                                   version:       SchemaVersion,
-                                   parentProject: Project[ForksCount.NonZero]
-  ): ProjectWithParent[FC] = new ProjectWithParent[FC](path,
-                                                       name,
-                                                       agent,
-                                                       dateCreated,
-                                                       maybeCreator,
-                                                       visibility,
-                                                       forksCount,
-                                                       members,
-                                                       version,
-                                                       parentProject
-  )
-
-  trait ProjectOps[+FC <: ForksCount] {
-    self: Project[FC] =>
+  trait ProjectOps {
+    self: Project =>
 
     lazy val topAncestorDateCreated: DateCreated = this match {
-      case project: ProjectWithParent[_] => project.parent.topAncestorDateCreated
+      case project: ProjectWithParent => project.parent.topAncestorDateCreated
       case project => project.dateCreated
     }
+
+    def addActivities(toAdd: Activity*): ProjectType
+
+    def addDatasets[P <: Dataset.Provenance](toAdd: Dataset[P]*): ProjectType
+
+    def addDataset[P <: Dataset.Provenance](toAdd: DatasetGenFactory[P]): (Dataset[P], ProjectType)
   }
 
-  implicit def toEntitiesProject(implicit renkuBaseUrl: RenkuBaseUrl): Project[ForksCount] => entities.Project = {
-    case p: ProjectWithParent[ForksCount]    => toEntitiesProjectWithParent(renkuBaseUrl)(p)
-    case p: ProjectWithoutParent[ForksCount] => toEntitiesProjectWithoutParent(renkuBaseUrl)(p)
+  implicit def toEntitiesProject(implicit
+      renkuBaseUrl: RenkuBaseUrl
+  ): Project => entities.Project = {
+    case p: ProjectWithParent    => toEntitiesProjectWithParent(renkuBaseUrl)(p)
+    case p: ProjectWithoutParent => toEntitiesProjectWithoutParent(renkuBaseUrl)(p)
   }
 
-  private def toEntitiesProjectWithoutParent(implicit
+  implicit def toEntitiesProjectWithoutParent(implicit
       renkuBaseUrl: RenkuBaseUrl
-  ): ProjectWithoutParent[ForksCount] => entities.ProjectWithoutParent =
+  ): ProjectWithoutParent => entities.ProjectWithoutParent =
     project =>
-      entities.ProjectWithoutParent(
-        projects.ResourceId(project.asEntityId),
-        project.path,
-        project.name,
-        project.agent,
-        project.dateCreated,
-        project.maybeCreator.map(_.to[entities.Person]),
-        project.visibility,
-        project.members.map(_.to[entities.Person]),
-        project.version
-      )
+      entities.ProjectWithoutParent
+        .from(
+          projects.ResourceId(project.asEntityId),
+          project.path,
+          project.name,
+          project.agent,
+          project.dateCreated,
+          project.maybeCreator.map(_.to[entities.Person]),
+          project.visibility,
+          project.members.map(_.to[entities.Person]),
+          project.version,
+          project.activities.map(_.to[entities.Activity]),
+          project.datasets.map(_.to[entities.Dataset[entities.Dataset.Provenance]])
+        )
+        .fold(errors => throw new IllegalStateException(errors.intercalate("; ")), identity)
 
-  private def toEntitiesProjectWithParent(implicit
+  implicit def toEntitiesProjectWithParent(implicit
       renkuBaseUrl: RenkuBaseUrl
-  ): ProjectWithParent[ForksCount] => entities.ProjectWithParent =
+  ): ProjectWithParent => entities.ProjectWithParent =
     project =>
-      entities.ProjectWithParent(
-        projects.ResourceId(project.asEntityId),
-        project.path,
-        project.name,
-        project.agent,
-        project.dateCreated,
-        project.maybeCreator.map(_.to[entities.Person]),
-        project.visibility,
-        project.members.map(_.to[entities.Person]),
-        project.version,
-        project.parent.resourceId
-      )
+      entities.ProjectWithParent
+        .from(
+          projects.ResourceId(project.asEntityId),
+          project.path,
+          project.name,
+          project.agent,
+          project.dateCreated,
+          project.maybeCreator.map(_.to[entities.Person]),
+          project.visibility,
+          project.members.map(_.to[entities.Person]),
+          project.version,
+          project.activities.map(_.to[entities.Activity]),
+          project.datasets.map(_.to[entities.Dataset[entities.Dataset.Provenance]]),
+          projects.ResourceId(project.parent.asEntityId)
+        )
+        .fold(errors => throw new IllegalStateException(errors.intercalate("; ")), identity)
 
-  implicit def encoder[P <: Project[_]](implicit
+  implicit def encoder[P <: Project](implicit
       renkuBaseUrl: RenkuBaseUrl,
       gitLabApiUrl: GitLabApiUrl
   ): JsonLDEncoder[P] = JsonLDEncoder.instance {
-    case project: ProjectWithParent[_] =>
-      JsonLD.arr(
-        project.to[entities.Project].asJsonLD,
-        project.parent.to[entities.Project].asJsonLD
-      )
-    case project: Project[_] => project.to[entities.Project].asJsonLD
+    case project: ProjectWithParent    => project.to[entities.ProjectWithParent].asJsonLD
+    case project: ProjectWithoutParent => project.to[entities.ProjectWithoutParent].asJsonLD
   }
 
-  implicit def entityIdEncoder[P <: Project[_]](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[P] =
+  implicit def entityIdEncoder[P <: Project](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[P] =
     EntityIdEncoder.instance(project => renkuBaseUrl / "projects" / project.path)
 }

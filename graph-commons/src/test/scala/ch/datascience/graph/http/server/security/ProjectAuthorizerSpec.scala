@@ -23,7 +23,6 @@ import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.authUsers
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.projects.Visibility._
 import ch.datascience.graph.model.testentities._
 import ch.datascience.graph.model.{GitLabApiUrl, RenkuBaseUrl}
@@ -31,7 +30,6 @@ import ch.datascience.http.server.security.EndpointSecurityException.Authorizati
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
-import io.renku.jsonld.syntax._
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -41,37 +39,35 @@ class ProjectAuthorizerSpec extends AnyWordSpec with InMemoryRdfStore with shoul
   "authorize" should {
 
     "succeed if the given project is public and there's no auth user" in new TestCase {
-      val project = projectEntities[ForksCount.Zero](visibilityPublic).generateOne.copy(
-        visibility = Public
-      )
+      val project = projectEntities(visibilityPublic).generateOne.copy(visibility = Public)
 
-      loadToStore(project.asJsonLD)
+      loadToStore(project)
 
-      authorizer.authorize(project.path, maybeAuthUser = None).value.unsafeRunSync() shouldBe Right(())
+      authorizer.authorize(project.path, maybeAuthUser = None).value.unsafeRunSync() shouldBe ().asRight
     }
 
     "succeed if the given project is public and the user has rights for the project" in new TestCase {
       val authUser = authUsers.generateOne
-      val project = projectEntities[ForksCount.Zero](visibilityPublic).generateOne.copy(
+      val project = projectEntities(visibilityPublic).generateOne.copy(
         visibility = Public,
         members = Set(personEntities.generateOne.copy(maybeGitLabId = authUser.id.some))
       )
 
-      loadToStore(project.asJsonLD)
+      loadToStore(project)
 
-      authorizer.authorize(project.path, authUser.some).value.unsafeRunSync() shouldBe Right(())
+      authorizer.authorize(project.path, authUser.some).value.unsafeRunSync() shouldBe ().asRight
     }
 
     "succeed if the given project is non-public and the user has rights for the project" in new TestCase {
       val authUser = authUsers.generateOne
-      val project = projectEntities[ForksCount.Zero](visibilityNonPublic).generateOne.copy(
+      val project = projectEntities(visibilityNonPublic).generateOne.copy(
         visibility = Gen.oneOf(Private, Internal).generateOne,
         members = Set(personEntities.generateOne.copy(maybeGitLabId = authUser.id.some))
       )
 
-      loadToStore(project.asJsonLD)
+      loadToStore(project)
 
-      authorizer.authorize(project.path, authUser.some).value.unsafeRunSync() shouldBe Right(())
+      authorizer.authorize(project.path, authUser.some).value.unsafeRunSync() shouldBe ().asRight
     }
 
     "succeed if there's no project with the given id" in new TestCase {
@@ -81,29 +77,30 @@ class ProjectAuthorizerSpec extends AnyWordSpec with InMemoryRdfStore with shoul
           authUsers.generateOption
         )
         .value
-        .unsafeRunSync() shouldBe Right(())
+        .unsafeRunSync() shouldBe ().asRight
     }
 
     "fail if the given project is non-public and the user does not have rights for it" in new TestCase {
-      val project = projectEntities[ForksCount.Zero](visibilityNonPublic).generateOne.copy(
+      val project = projectEntities(visibilityNonPublic).generateOne.copy(
         visibility = Gen.oneOf(Private, Internal).generateOne,
         members = personEntities.generateFixedSizeSet()
       )
 
-      loadToStore(project.asJsonLD)
+      loadToStore(project)
 
-      authorizer.authorize(project.path, authUsers.generateSome).value.unsafeRunSync() shouldBe Left(
-        AuthorizationFailure
-      )
+      authorizer
+        .authorize(project.path, authUsers.generateSome)
+        .value
+        .unsafeRunSync() shouldBe AuthorizationFailure.asLeft
     }
 
     "fail if the given project is non-public and there's no authorized user" in new TestCase {
-      val project = projectEntities[ForksCount.Zero](visibilityNonPublic).generateOne.copy(
+      val project = projectEntities(visibilityNonPublic).generateOne.copy(
         visibility = Gen.oneOf(Private, Internal).generateOne,
         members = personEntities.generateFixedSizeSet()
       )
 
-      loadToStore(project.asJsonLD)
+      loadToStore(project)
 
       authorizer.authorize(project.path, maybeAuthUser = None).value.unsafeRunSync() shouldBe Left(
         AuthorizationFailure

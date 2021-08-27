@@ -27,15 +27,15 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model._
 import ch.datascience.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
-import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.testentities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
 import ch.datascience.graph.model.testentities._
+import ch.datascience.graph.model.testentities.generators.EntitiesGenerators.ActivityGenFactory
 import ch.datascience.http.client.AccessToken
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
 import io.circe.DecodingFailure
+import io.renku.jsonld.{EntityId, JsonLD, Property}
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{JsonLD, Property}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -48,38 +48,36 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
   "deserializeToModel" should {
 
     "successfully deserialize JsonLD to the model" in new TestCase {
-      val activity = generateActivity(project)
-      val dataset = datasetEntities(ofAnyProvenance, fixed(project)).generateOne
-        .to[entities.Dataset[entities.Dataset.Provenance]]
+      val project = anyProjectEntities
+        .withDatasets(datasetEntities(ofAnyProvenance))
+        .withActivities(activityEntities)
+        .generateOne
 
       givenFindProjectInfo(project.path)
-        .returning(EitherT.rightT[Try, ProcessingRecoverableError](gitLabProjectInfo.some))
+        .returning(EitherT.rightT[Try, ProcessingRecoverableError](gitLabProjectInfo(project).some))
 
       val Success(results) = deserializer
         .deserializeToModel(
           triplesGeneratedEvents.generateOne.copy(
             project = consumers.Project(projectIds.generateOne, project.path),
-            triples = JsonLD.arr(project.asJsonLD, activity.asJsonLD, dataset.asJsonLD).flatten.fold(throw _, identity)
+            triples = JsonLD
+              .arr(project.asJsonLD :: project.datasets.flatMap(_.publicationEvents.map(_.asJsonLD)): _*)
+              .flatten
+              .fold(throw _, identity)
           )
         )
         .value
 
-      results shouldBe a[Right[_, _]]
-
-      val Right(metadata) = results
-      metadata.project  shouldBe project.to[entities.Project]
-      metadata.activities should contain theSameElementsAs List(activity.to[entities.Activity])
-      val actual   = metadata.datasets
-      val expected = List(dataset)
-
-      actual should contain theSameElementsAs expected
+      results shouldBe project.to[entities.Project].asRight
     }
 
     "fail if there's no project info found for the project" in new TestCase {
-      givenFindProjectInfo(project.path)
+      val projectPath = projectPaths.generateOne
+
+      givenFindProjectInfo(projectPath)
         .returning(EitherT.rightT[Try, ProcessingRecoverableError](Option.empty[GitLabProjectInfo]))
 
-      val eventProject = consumers.Project(projectIds.generateOne, project.path)
+      val eventProject = consumers.Project(projectIds.generateOne, projectPath)
 
       val Failure(error) = deserializer
         .deserializeToModel(
@@ -95,15 +93,16 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
     }
 
     "fail if fetching the project info fails" in new TestCase {
-      val exception = exceptions.generateOne
+      val projectPath = projectPaths.generateOne
 
-      givenFindProjectInfo(project.path)
+      val exception = exceptions.generateOne
+      givenFindProjectInfo(projectPath)
         .returning(EitherT(exception.raiseError[Try, Either[ProcessingRecoverableError, Option[GitLabProjectInfo]]]))
 
       deserializer
         .deserializeToModel(
           triplesGeneratedEvents.generateOne.copy(
-            project = consumers.Project(projectIds.generateOne, project.path),
+            project = consumers.Project(projectIds.generateOne, projectPath),
             triples = JsonLD.arr()
           )
         )
@@ -111,22 +110,25 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
     }
 
     "fail if no project is found in the JsonLD" in new TestCase {
-      val activity = generateActivity(project)
-      val dataset  = datasetEntities(ofAnyProvenance, fixed(project)).generateOne
-
-      lazy val filterOutProject: Vector[JsonLD] => JsonLD = { array =>
-        JsonLD.arr(array.filter(_.cursor.getEntityTypes.map(_ != entities.Project.entityTypes).getOrElse(false)): _*)
-      }
+      val project = anyProjectEntities
+        .withDatasets(datasetEntities(ofAnyProvenance))
+        .withActivities(activityEntities)
+        .generateOne
 
       givenFindProjectInfo(project.path)
-        .returning(EitherT.rightT[Try, ProcessingRecoverableError](gitLabProjectInfo.some))
+        .returning(EitherT.rightT[Try, ProcessingRecoverableError](gitLabProjectInfo(project).some))
 
       val triples = JsonLD
-        .arr(activity.asJsonLD, dataset.asJsonLD)
+        .arr(
+          project.activities.map(_.asJsonLD) :::
+            project.activities.map(_.plan.asJsonLD) :::
+            project.datasets.map(_.asJsonLD): _*
+        )
         .flatten
-        .fold(throw _, _.asArray.fold(fail("JsonLD is not an array"))(filterOutProject))
+        .fold(throw _, identity)
 
       val eventProject = consumers.Project(projectIds.generateOne, project.path)
+
       val Failure(error) = deserializer
         .deserializeToModel(
           triplesGeneratedEvents.generateOne.copy(
@@ -141,12 +143,61 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
     }
 
     "fail if there are other projects in the JsonLD" in new TestCase {
-      val activity     = generateActivity(project)
-      val otherProject = projectEntities(anyVisibility)(anyForksCount).generateOne
-      val dataset      = datasetEntities(ofAnyProvenance, fixed(otherProject)).generateOne
+      val project      = anyProjectEntities.generateOne
+      val otherProject = anyProjectEntities.generateOne
 
       givenFindProjectInfo(project.path)
-        .returning(EitherT.rightT[Try, ProcessingRecoverableError](gitLabProjectInfo.some))
+        .returning(EitherT.rightT[Try, ProcessingRecoverableError](gitLabProjectInfo(project).some))
+
+      val eventProject = consumers.Project(projectIds.generateOne, project.path)
+
+      val Failure(error) = deserializer
+        .deserializeToModel(
+          triplesGeneratedEvents.generateOne.copy(
+            project = eventProject,
+            triples = JsonLD
+              .arr(project.asJsonLD, otherProject.asJsonLD)
+              .flatten
+              .fold(throw _, identity)
+          )
+        )
+        .value
+
+      error            shouldBe a[IllegalStateException]
+      error.getMessage shouldBe s"Finding Project entity in the JsonLD for ${eventProject.show} failed"
+      error.getCause   shouldBe a[DecodingFailure]
+    }
+
+    "fail if there the JsonLD payload is for a different project" in new TestCase {
+      val project = anyProjectEntities.generateOne
+
+      givenFindProjectInfo(project.path)
+        .returning(EitherT.rightT[Try, ProcessingRecoverableError](gitLabProjectInfo(project).some))
+
+      val eventProject = consumers.Project(projectIds.generateOne, project.path)
+      val otherProject = anyProjectEntities.generateOne
+
+      val Failure(error) = deserializer
+        .deserializeToModel(
+          triplesGeneratedEvents.generateOne.copy(
+            project = eventProject,
+            triples = JsonLD
+              .arr(otherProject.asJsonLD)
+              .flatten
+              .fold(throw _, identity)
+          )
+        )
+        .value
+
+      error            shouldBe a[IllegalStateException]
+      error.getMessage shouldBe s"Finding Project entity in the JsonLD for ${eventProject.show} failed"
+    }
+
+    "fail if the payload is invalid" in new TestCase {
+      val project = anyProjectEntities.generateOne
+
+      givenFindProjectInfo(project.path)
+        .returning(EitherT.rightT[Try, ProcessingRecoverableError](gitLabProjectInfo(project).some))
 
       val eventProject = consumers.Project(projectIds.generateOne, project.path)
       val Failure(error) = deserializer
@@ -154,124 +205,39 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
           triplesGeneratedEvents.generateOne.copy(
             project = eventProject,
             triples = JsonLD
-              .arr(project.asJsonLD, activity.asJsonLD, dataset.asJsonLD)
+              .arr(project.asJsonLD,
+                   JsonLD.entity(EntityId.of(httpUrls().generateOne),
+                                 entities.Activity.entityTypes,
+                                 Map.empty[Property, JsonLD]
+                   )
+              )
               .flatten
               .fold(throw _, identity)
           )
         )
         .value
+
       error            shouldBe a[IllegalStateException]
       error.getMessage shouldBe s"Finding Project entity in the JsonLD for ${eventProject.show} failed"
-      error.getCause   shouldBe a[DecodingFailure]
-    }
-
-    "fail if decoding Person entities fails" in new TestCase {
-      val triples = JsonLD
-        .arr(project.asJsonLD,
-             JsonLD.entity(userResourceIds.generateOne.asEntityId,
-                           entities.Person.entityTypes,
-                           Map.empty[Property, JsonLD]
-             )
-        )
-        .flatten
-        .fold(throw _, identity)
-
-      val eventProject = consumers.Project(projectIds.generateOne, project.path)
-      val Failure(error) = deserializer
-        .deserializeToModel(
-          triplesGeneratedEvents.generateOne.copy(project = eventProject, triples = triples)
-        )
-        .value
-
-      error            shouldBe a[IllegalStateException]
-      error.getMessage shouldBe s"Finding Person entities in the JsonLD for ${eventProject.show} failed"
-    }
-
-    "fail if decoding Activity entities fails" in new TestCase {
-      val activity = JsonLD.entity(activities.ResourceId(httpUrls().generateOne).asEntityId,
-                                   entities.Activity.entityTypes,
-                                   Map.empty[Property, JsonLD]
-      )
-
-      givenFindProjectInfo(project.path)
-        .returning(EitherT.rightT[Try, ProcessingRecoverableError](gitLabProjectInfo.some))
-
-      val eventProject = consumers.Project(projectIds.generateOne, project.path)
-      val Failure(error) = deserializer
-        .deserializeToModel(
-          triplesGeneratedEvents.generateOne.copy(
-            project = eventProject,
-            triples = JsonLD.arr(project.asJsonLD, activity).flatten.fold(throw _, identity)
-          )
-        )
-        .value
-
-      error            shouldBe a[IllegalStateException]
-      error.getMessage shouldBe s"Finding Activity entities in the JsonLD for ${eventProject.show} failed"
-    }
-
-    "fail if decoding Dataset entities fails" in new TestCase {
-      val dataset = JsonLD.entity(datasets.ResourceId(httpUrls().generateOne).asEntityId,
-                                  entities.Dataset.entityTypes,
-                                  Map.empty[Property, JsonLD]
-      )
-
-      givenFindProjectInfo(project.path)
-        .returning(EitherT.rightT[Try, ProcessingRecoverableError](gitLabProjectInfo.some))
-
-      val eventProject = consumers.Project(projectIds.generateOne, project.path)
-      val Failure(error) = deserializer
-        .deserializeToModel(
-          triplesGeneratedEvents.generateOne.copy(
-            project = eventProject,
-            triples = JsonLD.arr(project.asJsonLD, dataset).flatten.fold(throw _, identity)
-          )
-        )
-        .value
-
-      error            shouldBe a[IllegalStateException]
-      error.getMessage shouldBe s"Finding Dataset entities in the JsonLD for ${eventProject.show} failed"
-    }
-
-    "fail if the payload is invalid" in new TestCase {
-      val activity = {
-        val a = generateActivity(project)
-        a.copy(startTime = timestamps(max = project.dateCreated.value).generateAs[activities.StartTime])
-      }
-      val dataset = datasetEntities(ofAnyProvenance, fixed(project)).generateOne
-
-      givenFindProjectInfo(project.path)
-        .returning(EitherT.rightT[Try, ProcessingRecoverableError](gitLabProjectInfo.some))
-
-      val eventProject = consumers.Project(projectIds.generateOne, project.path)
-      val Failure(error) = deserializer
-        .deserializeToModel(
-          triplesGeneratedEvents.generateOne.copy(
-            project = eventProject,
-            triples = JsonLD.arr(project.asJsonLD, activity.asJsonLD, dataset.asJsonLD).flatten.fold(throw _, identity)
-          )
-        )
-        .value
-
-      error          shouldBe a[IllegalStateException]
-      error.getMessage should startWith(s"Invalid payload for project ${eventProject.show}: ")
     }
   }
 
   private trait TestCase {
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
-    val project = projectEntities[ForksCount](anyVisibility)(anyForksCount).generateOne
-    val gitLabProjectInfo = GitLabProjectInfo(
+
+    def gitLabProjectInfo(project: Project) = GitLabProjectInfo(
       project.name,
       project.path,
       project.dateCreated,
       project.maybeCreator.map(_.to[ProjectMember]),
       project.members.map(_.to[ProjectMember]),
       project.visibility,
-      maybeParentPath = None
+      maybeParentPath = project match {
+        case p: ProjectWithParent    => p.parent.path.some
+        case _: ProjectWithoutParent => None
+      }
     )
 
-    private val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
     val projectInfoFinder = mock[ProjectInfoFinder[Try]]
     val deserializer      = new JsonLDDeserializerImpl[Try](projectInfoFinder, renkuBaseUrl)
 
@@ -290,7 +256,7 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
     }
   }
 
-  private def generateActivity(project: Project[ForksCount]) = {
+  private def activityEntities: ActivityGenFactory = project => {
     val paramValue = parameterDefaultValues.generateOne
     val input      = entityLocations.generateOne
     val output     = entityLocations.generateOne
@@ -300,11 +266,10 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
         CommandInput.fromLocation(input),
         CommandOutput.fromLocation(output)
       ),
-      fixed(project)
+      project
     ).generateOne
       .planParameterValues(paramValue -> parameterValueOverrides.generateOne)
       .planInputParameterValuesFromChecksum(input -> entityChecksums.generateOne)
-      .buildProvenanceGraph
-      .fold(errors => fail(errors.toList.mkString), identity)
+      .buildProvenanceUnsafe()
   }
 }
