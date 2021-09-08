@@ -29,7 +29,7 @@ import ch.datascience.graph.acceptancetests.tooling.TestLogger
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.{ForksCount, Id}
+import ch.datascience.graph.model.projects.Id
 import ch.datascience.graph.model.testentities.{Person, ProjectWithParent}
 import ch.datascience.graph.model.{GitLabApiUrl, GitLabUrl, users}
 import ch.datascience.http.client.AccessToken
@@ -172,7 +172,7 @@ object GitLab {
   }
 
   def `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(
-      project:            data.Project[_]
+      project:            data.Project
   )(implicit accessToken: AccessToken): Unit = {
     implicit val personEncoder: Encoder[Person] = Encoder.instance { person =>
       json"""{
@@ -193,9 +193,7 @@ object GitLab {
     ()
   }
 
-  def `GET <gitlabApi>/projects/:id returning OK`[FC <: ForksCount](
-      project:            data.Project[FC]
-  )(implicit accessToken: AccessToken): Unit = {
+  def `GET <gitlabApi>/projects/:id returning OK`(project: data.Project)(implicit accessToken: AccessToken): Unit = {
     stubFor {
       get(s"/api/v4/projects/${project.id}").withAccessTokenInHeader
         .willReturn(okJson(json"""{
@@ -209,8 +207,8 @@ object GitLab {
     ()
   }
 
-  def `GET <gitlabApi>/projects/:path returning OK with`[FC <: ForksCount](
-      project:            data.Project[FC],
+  def `GET <gitlabApi>/projects/:path returning OK with`(
+      project:            data.Project,
       withStatistics:     Boolean = false
   )(implicit accessToken: AccessToken): Unit = {
 
@@ -267,7 +265,7 @@ object GitLab {
             }"""
               .deepMerge(
                 project.entitiesProject match {
-                  case withParent: ProjectWithParent[FC] =>
+                  case withParent: ProjectWithParent =>
                     json"""{"forked_from_project":  {"path_with_namespace": ${withParent.parent.path.value}} }"""
                   case _ => Json.obj()
                 }
@@ -294,7 +292,7 @@ object GitLab {
   }
 
   def `GET <gitlabApi>/projects/:path returning BadRequest`(
-      project:            data.Project[_]
+      project:            data.Project
   )(implicit accessToken: AccessToken): StubMapping =
     stubFor {
       get(s"/api/v4/projects/${urlEncode(project.path.value)}").withAccessTokenInHeader
@@ -302,7 +300,7 @@ object GitLab {
     }
 
   def `GET <gitlabApi>/projects/:path having connectivity issues`(
-      project:            data.Project[_]
+      project:            data.Project
   )(implicit accessToken: AccessToken): StubMapping =
     stubFor {
       get(s"/api/v4/projects/${urlEncode(project.path.value)}").withAccessTokenInHeader

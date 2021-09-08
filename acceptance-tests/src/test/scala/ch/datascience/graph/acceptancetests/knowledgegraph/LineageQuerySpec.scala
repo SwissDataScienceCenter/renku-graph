@@ -28,20 +28,20 @@ import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import ch.datascience.graph.model
+import ch.datascience.graph.model.Schemas._
 import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.ForksCount
+import ch.datascience.graph.model.testentities.{LineageExemplarData, NodeDef}
 import ch.datascience.graph.model.testentities.LineageExemplarData.ExemplarData
 import ch.datascience.http.client.AccessToken
 import io.circe.Json
 import io.circe.literal._
-import io.renku.jsonld.JsonLD
+import io.renku.jsonld.syntax._
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 import sangria.ast.Document
 import sangria.macros._
-import ch.datascience.graph.model.testentities._
 
 class LineageQuerySpec
     extends AnyFeatureSpec
@@ -54,17 +54,20 @@ class LineageQuerySpec
   Feature("GraphQL query to find lineage") {
 
     implicit val accessToken: AccessToken = accessTokens.generateOne
-    val project = dataProjects(
-      projectEntities[ForksCount.Zero](visibilityPublic)
-        .map(
-          _.copy(
-            path = projects.Path("public/lineage-project"),
-            agent = cliVersion
-          )
-        )
-    ).generateOne
 
-    val (jsons, exemplarData) = LineageExemplarData(project.entitiesProject)
+    val (exemplarData, project) = {
+      val lineageData = LineageExemplarData(
+        projectEntities(visibilityPublic)
+          .map(
+            _.copy(
+              path = projects.Path("public/lineage-project"),
+              agent = cliVersion
+            )
+          )
+          .generateOne
+      )
+      (lineageData, dataProjects(lineageData.project).generateOne)
+    }
 
     /**  ========================================== EXPECTED GRAPH  ==========================================
       *  When looking for grid_plot of commit 9
@@ -80,7 +83,7 @@ class LineageQuerySpec
     Scenario("As a user I would like to find project's lineage with a GraphQL query") {
 
       Given("some data in the RDF Store")
-      `data in the RDF store`(project, JsonLD.arr(jsons: _*))
+      `data in the RDF store`(project, exemplarData.project.asJsonLD)
 
       When("user posts a graphql query to fetch lineage")
       val response = knowledgeGraphClient POST lineageQuery
@@ -120,24 +123,28 @@ class LineageQuerySpec
     implicit val accessToken: AccessToken = user.accessToken
     Scenario("As an authenticated user I would like to find lineage of project I am a member of with a GraphQL query") {
 
-      val accessibleProject = projectEntities[ForksCount.Zero](visibilityNonPublic).generateOne.copy(
-        path = model.projects.Path("accessible/member-project"),
-        members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some))
+      val accessibleExemplarData = LineageExemplarData(
+        projectEntities(visibilityNonPublic).generateOne.copy(
+          path = model.projects.Path("accessible/member-project"),
+          members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some))
+        )
       )
 
-      val (accessibleJsons, accessibleExemplarData) = LineageExemplarData(accessibleProject)
-
       Given("some data in the RDF Store with a project I am a member of")
-      `data in the RDF store`(dataProjects(accessibleProject).generateOne, JsonLD.arr(accessibleJsons: _*))
+      `data in the RDF store`(dataProjects(accessibleExemplarData.project).generateOne,
+                              accessibleExemplarData.project.asJsonLD
+      )
 
       And("a project I am not a member of")
-      val privateProject =
-        projectEntities[ForksCount.Zero](visibilityNonPublic).generateOne.copy(
+
+      val privateExemplarData = LineageExemplarData(
+        projectEntities(visibilityNonPublic).generateOne.copy(
           path = model.projects.Path("private/secret-project")
         )
-
-      val (privateJsons, privateExemplarData) = LineageExemplarData(privateProject)
-      `data in the RDF store`(dataProjects(privateProject).generateOne, JsonLD.arr(privateJsons: _*))
+      )
+      `data in the RDF store`(dataProjects(privateExemplarData.project).generateOne,
+                              privateExemplarData.project.asJsonLD
+      )
 
       And("I am authenticated")
       `GET <gitlabApi>/user returning OK`(user)
@@ -147,8 +154,14 @@ class LineageQuerySpec
         knowledgeGraphClient.POST(
           namedLineageQuery,
           variables = Map(
-            "projectPath" -> accessibleProject.path.toString,
-            "filePath"    -> accessibleExemplarData.`grid_plot entity`.location
+            "projectPath" -> projectEntities(visibilityNonPublic).generateOne
+              .copy(
+                path = model.projects.Path("accessible/member-project"),
+                members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some))
+              )
+              .path
+              .toString,
+            "filePath" -> accessibleExemplarData.`grid_plot entity`.location
           ),
           maybeAccessToken = accessToken.some
         )
@@ -165,7 +178,7 @@ class LineageQuerySpec
         knowledgeGraphClient.POST(
           namedLineageQuery,
           variables = Map(
-            "projectPath" -> privateProject.path.toString,
+            "projectPath" -> privateExemplarData.project.path.toString,
             "filePath"    -> privateExemplarData.`grid_plot entity`.location
           ),
           maybeAccessToken = accessToken.some
@@ -181,18 +194,18 @@ class LineageQuerySpec
 
     Scenario("As an unauthenticated user I should not be able to find a lineage from a private project") {
       Given("some data in the RDF Store with a project I am a member of")
-      val privateProject = projectEntities[ForksCount.Zero](visibilityNonPublic).generateOne.copy(
-        path = model.projects.Path("unauthenticated/private-project")
+      val exemplarData = LineageExemplarData(
+        projectEntities(visibilityNonPublic).generateOne.copy(
+          path = model.projects.Path("unauthenticated/private-project")
+        )
       )
-
-      val (privateJsons, examplarData) = LineageExemplarData(privateProject)
-      `data in the RDF store`(dataProjects(privateProject).generateOne, JsonLD.arr(privateJsons: _*))
+      `data in the RDF store`(dataProjects(exemplarData.project).generateOne, exemplarData.project.asJsonLD)
 
       When("user posts a graphql query to fetch lineage")
       val response = knowledgeGraphClient.POST(namedLineageQuery,
                                                variables = Map(
-                                                 "projectPath" -> privateProject.path.toString,
-                                                 "filePath"    -> examplarData.`grid_plot entity`.location
+                                                 "projectPath" -> exemplarData.project.path.toString,
+                                                 "filePath"    -> exemplarData.`grid_plot entity`.location
                                                )
       )
 

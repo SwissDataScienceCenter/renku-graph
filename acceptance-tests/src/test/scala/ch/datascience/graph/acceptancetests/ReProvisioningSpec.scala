@@ -30,7 +30,6 @@ import ch.datascience.graph.acceptancetests.tooling.GraphServices._
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools.ResponseOps
 import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplicits, ServiceRun}
 import ch.datascience.graph.model.EventsGenerators.commitIds
-import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.{SchemaVersion, testentities}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.triplesgenerator
@@ -65,7 +64,7 @@ class ReProvisioningSpec
 
       And("There is data from this version in Jena")
 
-      val project  = dataProjects(activity.project).generateOne
+      val project  = dataProjects(testEntitiesProject).generateOne
       val commitId = commitIds.generateOne
 
       `data in the RDF store`(project, JsonLD.arr(activity.asJsonLD))
@@ -78,7 +77,7 @@ class ReProvisioningSpec
       val newSchemaVersion = SchemaVersion(nonEmptyStrings().generateOne)
       val newActivity = executionPlanners(
         planEntities(),
-        projectEntities[ForksCount.Zero](visibilityPublic).map(_.copy(version = newSchemaVersion))
+        projectEntities(visibilityPublic).map(_.copy(version = newSchemaVersion)).generateOne
       ).generateOne
         .buildProvenanceUnsafe()
 
@@ -105,16 +104,14 @@ class ReProvisioningSpec
     }
   }
 
-  object TestData {
+  private object TestData {
 
     implicit val accessToken: AccessToken = accessTokens.generateOne
     val initialProjectSchemaVersion = SchemaVersion("8")
 
-    val activity: testentities.Activity = executionPlanners(
-      planEntities(),
-      projectEntities[ForksCount.Zero](visibilityPublic).map(p => p.copy(version = initialProjectSchemaVersion))
-    ).generateOne
-      .buildProvenanceUnsafe()
+    val testEntitiesProject = projectEntities(visibilityPublic).generateOne.copy(version = initialProjectSchemaVersion)
+    val activity: testentities.Activity =
+      executionPlanners(planEntities(), testEntitiesProject).generateOne.buildProvenanceUnsafe()
 
     val patience: org.scalatest.concurrent.Eventually.PatienceConfig =
       Eventually.PatienceConfig(timeout = Span(20, Minutes), interval = Span(30000, Millis))

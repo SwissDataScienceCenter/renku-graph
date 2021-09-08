@@ -34,6 +34,7 @@ import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TestReadabilityTools._
 import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.graph.model.testentities.Project._
+import ch.datascience.graph.model.testentities._
 import ch.datascience.graph.model.{projects, testentities}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
@@ -46,7 +47,6 @@ import org.http4s.Status._
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
-import ch.datascience.graph.model.testentities._
 
 class ProjectsResourcesSpec
     extends AnyFeatureSpec
@@ -61,20 +61,23 @@ class ProjectsResourcesSpec
   private val user = authUsers.generateOne
   private implicit val accessToken: AccessToken = user.accessToken
 
-  private val (parentProject, project) = {
+  private val (dataset, parentProject, project) = {
     val creator = personEntities(withGitLabId, withEmail).generateOne
-    val (parent, child) = projectEntities[ForksCount.Zero](visibilityPublic).generateOne
+    val (parent, child) = projectEntities(visibilityPublic).generateOne
       .copy(maybeCreator = creator.some, members = personEntities(withGitLabId).generateFixedSizeSet() + creator)
       .forkOnce()
 
-    dataProjects(parent).generateOne -> dataProjects(
-      child.copy(visibility = visibilityNonPublic.generateOne,
-                 members = child.members + personEntities.generateOne.copy(maybeGitLabId = user.id.some)
-      )
-    ).generateOne
-  }
+    val (dataset, parentWithDataset) = parent.addDataset(datasetEntities(provenanceInternal))
 
-  private val dataset = datasetEntities(provenanceInternal, fixed(project.entitiesProject)).generateOne
+    (dataset,
+     dataProjects(parentWithDataset).generateOne,
+     dataProjects(
+       child.copy(visibility = visibilityNonPublic.generateOne,
+                  members = child.members + personEntities.generateOne.copy(maybeGitLabId = user.id.some)
+       )
+     ).generateOne
+    )
+  }
 
   Feature("GET knowledge-graph/projects/<namespace>/<name> to find project's details") {
 
@@ -85,10 +88,7 @@ class ProjectsResourcesSpec
 
       Given("some data in the RDF Store")
 
-      val jsonLDParentProjectTriples = JsonLD.arr(
-        datasetEntities(provenanceInternal, fixed(parentProject.entitiesProject)).generateOne.asJsonLD,
-        parentProject.entitiesProject.asJsonLD
-      )
+      val jsonLDParentProjectTriples = parentProject.entitiesProject.asJsonLD
 
       `data in the RDF store`(parentProject, jsonLDParentProjectTriples)
       `wait for events to be processed`(parentProject.id)
@@ -114,7 +114,7 @@ class ProjectsResourcesSpec
       Then("he should get OK response with the projects datasets")
       datasetsResponse.status shouldBe Ok
       val Right(foundDatasets) = datasetsResponse.bodyAsJson.as[List[Json]]
-      foundDatasets should contain theSameElementsAs List(briefJson(dataset))
+      foundDatasets should contain theSameElementsAs List(briefJson(dataset, project.path))
 
       When("there's an authenticated user who is not project member")
       val nonMemberAccessToken = accessTokens.generateOne
@@ -132,7 +132,7 @@ class ProjectsResourcesSpec
 
 object ProjectsResources {
 
-  def fullJson(project: data.Project[ForksCount]): Json = json"""{
+  def fullJson(project: data.Project): Json = json"""{
     "identifier":  ${project.id.value}, 
     "path":        ${project.path.value}, 
     "name":        ${project.name.value},
@@ -175,9 +175,9 @@ object ProjectsResources {
     }""" addIfDefined ("readme" -> urls.maybeReadme.map(_.value))
   }
 
-  private implicit lazy val forkingEncoder: Encoder[(ForksCount, testentities.Project[ForksCount])] =
+  private implicit lazy val forkingEncoder: Encoder[(ForksCount, testentities.Project)] =
     Encoder.instance {
-      case (forksCount, project: ProjectWithParent[_]) => json"""{
+      case (forksCount, project: testentities.ProjectWithParent) => json"""{
       "forksCount": ${forksCount.value},
       "parent": {
         "path":    ${project.parent.path.value},

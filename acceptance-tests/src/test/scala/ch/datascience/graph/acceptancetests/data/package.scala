@@ -25,10 +25,8 @@ import ch.datascience.graph.acceptancetests.data.Project.Permissions._
 import ch.datascience.graph.acceptancetests.data.Project.Statistics._
 import ch.datascience.graph.acceptancetests.data.Project.Urls._
 import ch.datascience.graph.acceptancetests.data.Project._
-import ch.datascience.graph.model
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model._
-import ch.datascience.graph.model.testentities.generators.EntitiesGenerators._
 import org.scalacheck.Gen
 
 import java.time.Instant.now
@@ -38,9 +36,9 @@ package object data extends RdfStoreData {
   implicit val cliVersion: CliVersion         = currentVersionPair.cliVersion
   val renkuResourcesUrl:   renku.ResourcesUrl = renku.ResourcesUrl("http://localhost:9004/knowledge-graph")
 
-  def dataProjects[FC <: model.projects.ForksCount](
-      projectGen: Gen[testentities.Project[FC]]
-  ): Gen[Project[FC]] = for {
+  def dataProjects(
+      projectGen: Gen[testentities.Project]
+  ): Gen[Project] = for {
     project          <- projectGen
     id               <- projectIds
     maybeDescription <- projectDescriptions.toGeneratorOfOptions
@@ -52,9 +50,7 @@ package object data extends RdfStoreData {
     statistics       <- statisticsObjects
   } yield Project(project, id, maybeDescription, updatedAt, urls, tags, starsCount, permissions, statistics)
 
-  def dataProjects[FC <: model.projects.ForksCount](
-      project: testentities.Project[FC]
-  ): Gen[Project[FC]] = dataProjects(fixed(project))
+  def dataProjects(project: testentities.Project): Gen[Project] = dataProjects(fixed(project))
 
   implicit lazy val urlsObjects: Gen[Urls] = for {
     sshUrl         <- sshUrls

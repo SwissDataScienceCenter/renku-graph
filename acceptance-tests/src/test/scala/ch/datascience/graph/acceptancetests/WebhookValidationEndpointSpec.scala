@@ -25,7 +25,6 @@ import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TokenRepositoryClient._
-import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.http.client.AccessToken
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
@@ -37,7 +36,7 @@ class WebhookValidationEndpointSpec extends AnyFeatureSpec with GivenWhenThen wi
   Feature("Existence of a Graph Services hook can be validated") {
 
     Scenario("There's a Graph Services hook on a Public project in GitLab") {
-      val project = dataProjects(projectEntities[ForksCount.Zero](visibilityPublic)).generateOne
+      val project = dataProjects(projectEntities(visibilityPublic)).generateOne
       implicit val accessToken: AccessToken = accessTokens.generateOne
       Given("api user is authenticated")
       `GET <gitlabApi>/user returning OK`()
@@ -57,7 +56,7 @@ class WebhookValidationEndpointSpec extends AnyFeatureSpec with GivenWhenThen wi
 
     Scenario("There's no Graph Services hook on a Public project in GitLab") {
 
-      val project = dataProjects(projectEntities[ForksCount.Zero](visibilityPublic)).generateOne
+      val project = dataProjects(projectEntities(visibilityPublic)).generateOne
       implicit val accessToken: AccessToken = accessTokens.generateOne
       Given("api user is authenticated")
       `GET <gitlabApi>/user returning OK`()
@@ -77,7 +76,7 @@ class WebhookValidationEndpointSpec extends AnyFeatureSpec with GivenWhenThen wi
 
     Scenario("There's a Graph Services hook on a non-public project in GitLab") {
 
-      val project = dataProjects(projectEntities[ForksCount.Zero](visibilityNonPublic)).generateOne
+      val project = dataProjects(projectEntities(visibilityNonPublic)).generateOne
       implicit val accessToken: AccessToken = accessTokens.generateOne
       Given("api user is authenticated")
       `GET <gitlabApi>/user returning OK`()

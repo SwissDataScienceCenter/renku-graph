@@ -27,7 +27,6 @@ import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import ch.datascience.graph.model.EventsGenerators.commitIds
-import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import io.circe.literal._
@@ -47,7 +46,7 @@ class WebhookCreationSpec
 
     Scenario("Graph Services hook is present on the project in GitLab") {
 
-      val project = dataProjects(projectEntities[ForksCount.Zero](visibilityPublic)).generateOne
+      val project = dataProjects(projectEntities(visibilityPublic)).generateOne
 
       implicit val accessToken: AccessToken = accessTokens.generateOne
       Given("api user is authenticated")
@@ -68,7 +67,7 @@ class WebhookCreationSpec
 
     Scenario("No Graph Services webhook on the project in GitLab") {
 
-      val project   = dataProjects(projectEntities[ForksCount.Zero](visibilityPublic)).generateOne
+      val project   = dataProjects(projectEntities(visibilityPublic)).generateOne
       val projectId = project.id
       implicit val accessToken: AccessToken = accessTokens.generateOne
       Given("api user is authenticated")

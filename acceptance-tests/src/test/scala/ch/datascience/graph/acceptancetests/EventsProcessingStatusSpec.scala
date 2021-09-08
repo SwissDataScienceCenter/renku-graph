@@ -31,7 +31,6 @@ import ch.datascience.graph.acceptancetests.tooling.TokenRepositoryClient._
 import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.http.client.AccessToken
 import ch.datascience.webhookservice.model.HookToken
 import eu.timepit.refined.api.Refined
@@ -58,7 +57,7 @@ class EventsProcessingStatusSpec
 
     Scenario("As a user I would like to see progress of events processing for my project") {
 
-      val project   = dataProjects(projectEntities[ForksCount.Zero](visibilityPublic)).generateOne
+      val project   = dataProjects(projectEntities(visibilityPublic)).generateOne
       val projectId = project.id
       implicit val accessToken: AccessToken = accessTokens.generateOne
 
@@ -102,9 +101,7 @@ class EventsProcessingStatusSpec
     }
   }
 
-  private def givenHookValidationToHookExists(
-      project:            data.Project[ForksCount]
-  )(implicit accessToken: AccessToken): Unit = {
+  private def givenHookValidationToHookExists(project: data.Project)(implicit accessToken: AccessToken): Unit = {
     `GET <gitlabApi>/projects/:id returning OK`(project)
     tokenRepositoryClient
       .PUT(s"projects/${project.id}/tokens", accessToken.toJson, maybeAccessToken = None)
@@ -113,9 +110,7 @@ class EventsProcessingStatusSpec
     `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(project.id)
   }
 
-  private def sendEventsForProcessing(
-      project:            data.Project[ForksCount]
-  )(implicit accessToken: AccessToken) = {
+  private def sendEventsForProcessing(project: data.Project)(implicit accessToken: AccessToken) = {
 
     val allCommitIds = commitIds.generateNonEmptyList(minElements = numberOfEvents, maxElements = numberOfEvents).toList
 

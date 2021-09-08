@@ -67,7 +67,7 @@ class ZombieEventDetectionSpec
       s"should be detected and re-processes"
   ) {
     implicit val accessToken: AccessToken = accessTokens.generateOne
-    val project   = dataProjects(projectEntities[ForksCount.Zero](visibilityPublic)).generateOne
+    val project   = dataProjects(projectEntities(visibilityPublic)).generateOne
     val projectId = project.id
     val commitId  = commitIds.generateOne
     val committer = personEntities.generateOne
@@ -102,7 +102,7 @@ class ZombieEventDetectionSpec
     }
   }
 
-  private def insertProjectToDB(project: data.Project[_], eventDate: EventDate): Int = EventLog.execute { session =>
+  private def insertProjectToDB(project: data.Project, eventDate: EventDate): Int = EventLog.execute { session =>
     val query: Command[Id ~ Path ~ EventDate] =
       sql"""INSERT INTO project (project_id, project_path, latest_event_date)
           VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
@@ -119,7 +119,7 @@ class ZombieEventDetectionSpec
 
   private def insertEventToDB(
       commitId:       CommitId,
-      project:        data.Project[_],
+      project:        data.Project,
       eventDate:      EventDate
   )(implicit session: Session[IO]) = {
     val query: Command[EventId ~ Id ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody] =
@@ -149,7 +149,7 @@ class ZombieEventDetectionSpec
       )
   }
 
-  private def insertEventDeliveryToDB(commitId: CommitId, project: data.Project[_])(implicit session: Session[IO]) = {
+  private def insertEventDeliveryToDB(commitId: CommitId, project: data.Project)(implicit session: Session[IO]) = {
     val query: Command[EventId ~ Id ~ MicroserviceIdentifier] = sql"""
           INSERT INTO event_delivery (event_id, project_id, delivery_id)
           VALUES ($eventIdEncoder, $projectIdEncoder, $microserviceIdentifierEncoder)

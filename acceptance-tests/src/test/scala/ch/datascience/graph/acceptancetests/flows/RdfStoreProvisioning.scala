@@ -29,7 +29,6 @@ import ch.datascience.graph.acceptancetests.tooling.ModelImplicits
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.ForksCount
 import ch.datascience.http.client.AccessToken
 import ch.datascience.webhookservice.model.HookToken
 import io.renku.jsonld.JsonLD
@@ -40,8 +39,8 @@ import org.scalatest.matchers.should
 
 object RdfStoreProvisioning extends ModelImplicits with Eventually with AcceptanceTestPatience with should.Matchers {
 
-  def `data in the RDF store`[FC <: ForksCount](
-      project:            data.Project[FC],
+  def `data in the RDF store`(
+      project:            data.Project,
       triples:            JsonLD
   )(implicit accessToken: AccessToken): Assertion = {
     val projectId = project.id

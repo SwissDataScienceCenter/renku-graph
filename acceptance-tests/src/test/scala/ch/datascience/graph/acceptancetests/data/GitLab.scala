@@ -27,7 +27,7 @@ import io.circe.literal._
 
 object GitLab {
 
-  def pushEvent(project: Project[_], commitId: CommitId): Json = json"""{
+  def pushEvent(project: Project, commitId: CommitId): Json = json"""{
     "after":         ${commitId.value},
     "user_id":       ${positiveInts().generateOne.value}, 
     "user_username": ${nonEmptyStrings().generateOne},

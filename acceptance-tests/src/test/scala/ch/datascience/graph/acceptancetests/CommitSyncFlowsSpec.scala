@@ -31,7 +31,7 @@ import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplici
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.events.EventId
 import ch.datascience.graph.model.events.EventStatus.TriplesStore
-import ch.datascience.graph.model.projects.{ForksCount, Id}
+import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.AccessToken
 import ch.datascience.webhookservice.model.HookToken
 import io.renku.eventlog.TypeSerializers
@@ -62,7 +62,7 @@ class CommitSyncFlowsSpec
     Scenario("There's a commit in GitLab for which there's no event in EL") {
 
       implicit val accessToken: AccessToken = accessTokens.generateOne
-      val project           = dataProjects(projectEntities[ForksCount.Zero](visibilityPublic)).generateOne
+      val project           = dataProjects(projectEntities(visibilityPublic)).generateOne
       val projectId         = project.id
       val nonMissedCommitId = commitIds.generateOne
       val missedCommitId    = commitIds.generateOne
