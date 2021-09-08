@@ -42,28 +42,32 @@ private class JsonLDParser() extends Parser {
 
   private def parseObject(jsonObject: JsonObject): Either[ParsingFailure, JsonLD] = {
     val propsMap = jsonObject.toMap
-    (propsMap.get("@id"), propsMap.get("@type"), propsMap.get("@value")) match {
-      case (Some(entityId), Some(types), None) => jsonObject.toJsonLdEntity(entityId, types)
-      case (Some(entityId), None, None)        => toJsonLDEntityId(entityId)
-      case (None, maybeTypes, Some(value))     => toJsonLDValue(maybeTypes, value)
-      case (None, _, _)                        => ParsingFailure("Entity without @id").asLeft[JsonLD]
-      case (Some(_), Some(_), Some(_))         => ParsingFailure("Invalid entity").asLeft[JsonLD]
-      case (Some(_), None, Some(_))            => ParsingFailure("Entity with @id and @value but no @type").asLeft[JsonLD]
+    (propsMap.get("@id"), propsMap.get("@type"), propsMap.get("@reverse"), propsMap.get("@value")) match {
+      case (Some(entityId), Some(types), maybeReverse, None) => jsonObject.toJsonLdEntity(entityId, types, maybeReverse)
+      case (Some(entityId), None, None, None)                => toJsonLDEntityId(entityId)
+      case (None, maybeTypes, None, Some(value))             => toJsonLDValue(maybeTypes, value)
+      case (Some(_), None, Some(_), None)                    => ParsingFailure("Entity with reverse but no type").asLeft[JsonLD]
+      case (None, _, _, _)                                   => ParsingFailure("Entity without @id").asLeft[JsonLD]
+      case (Some(_), Some(_), _, Some(_))                    => ParsingFailure("Invalid entity").asLeft[JsonLD]
+      case (Some(_), None, _, Some(_))                       => ParsingFailure("Entity with @id and @value but no @type").asLeft[JsonLD]
     }
   }
 
   private implicit class JsonObjectOps(jsonObject: JsonObject) {
 
-    def toJsonLdEntity(entityId: Json, types: Json) = for {
+    def toJsonLdEntity(entityId:     Json,
+                       types:        Json,
+                       maybeReverse: Option[Json]
+    ): Either[ParsingFailure, JsonLD.JsonLDEntity] = for {
       id         <- entityId.as[EntityId].leftMap(e => ParsingFailure(e.message, e))
       types      <- types.as[EntityTypes].leftMap(e => ParsingFailure(e.message, e))
       properties <- extractProperties(jsonObject)
-      // TODO check for @reverse
-    } yield JsonLD.JsonLDEntity(id, types, properties.toMap, Reverse.empty)
+      reverse    <- maybeReverse.map(extractReverse).getOrElse(Reverse.empty.asRight)
+    } yield JsonLD.JsonLDEntity(id, types, properties.toMap, reverse)
 
     private def extractProperties(jsonObject: JsonObject) =
       jsonObject.toMap.view
-        .filterKeys(key => key != "@id" && key != "@type")
+        .filterKeys(key => key != "@id" && key != "@type" && key != "@reverse")
         .toList
         .map(toPropsAndValues)
         .sequence
@@ -81,6 +85,31 @@ private class JsonLDParser() extends Parser {
           propValues  <- jsonObjects.map(parseObject).sequence
         } yield Property(prop) -> JsonLD.arr(propValues: _*)
       case (prop, _) => ParsingFailure(s"Malformed entity's $prop property value").asLeft[(Property, JsonLD)]
+    }
+
+    private lazy val extractReverse: Json => Either[ParsingFailure, Reverse] = {
+      case json if json.isObject =>
+        json.asObject
+          .map(parseReverseObject)
+          .getOrElse(ParsingFailure("Malformed entity's @reverse property").asLeft[Reverse])
+      case _ => ParsingFailure("Malformed entity's @reverse property - not an object").asLeft[Reverse]
+    }
+
+    private def parseReverseObject(jsonObject: JsonObject): Either[ParsingFailure, Reverse] =
+      jsonObject.toMap.view
+        .filterKeys(key => key != "@id" && key != "@type" && key != "@reverse" && key != "@value")
+        .toList match {
+        case Nil => ParsingFailure("Malformed entity's @reverse property - no properties defined").asLeft[Reverse]
+        case props =>
+          props
+            .map(toPropAndJsonLD)
+            .sequence
+            .map(Reverse.fromList)
+            .flatMap(_.fold(error => ParsingFailure(error.getMessage).asLeft[Reverse], _.asRight[ParsingFailure]))
+      }
+
+    private lazy val toPropAndJsonLD: ((String, Json)) => Either[ParsingFailure, (Property, JsonLD)] = {
+      case (prop, json) => parse(json).map(Property(prop) -> _)
     }
   }
 

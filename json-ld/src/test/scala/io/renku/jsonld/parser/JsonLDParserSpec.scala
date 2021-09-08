@@ -24,7 +24,7 @@ import io.circe.literal.JsonStringContext
 import io.renku.jsonld.generators.Generators.Implicits._
 import io.renku.jsonld.generators.Generators.{localDates, nonEmptyStrings, timestamps}
 import io.renku.jsonld.generators.JsonLDGenerators._
-import io.renku.jsonld.{JsonLD, Property}
+import io.renku.jsonld.{JsonLD, Property, Reverse}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -75,6 +75,17 @@ class JsonLDParserSpec extends AnyWordSpec with should.Matchers {
         .fold(throw _, identity)
 
       parser.parse(flattenedJsonLD.toJson) shouldBe Right(flattenedJsonLD)
+    }
+
+    "successfully parse an object with a reverse property" in {
+      val entity = JsonLD.entity(
+        entityIds.generateOne,
+        entityTypesObject.generateOne,
+        Reverse.ofJsonLDsUnsafe((schema / "reversedProperty") -> jsonLDEntities.generateOne),
+        schema / "single" -> jsonLDEntities.generateOne
+      )
+
+      parser.parse(entity.toJson) shouldBe Right(entity)
     }
 
     "return a ParsingFailure when a object has no @id" in {
