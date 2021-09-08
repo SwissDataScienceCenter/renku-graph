@@ -88,6 +88,9 @@ class ZombieEventDetectionSpec
       maybeCommitsCount = CommitsCount(1).some
     )
 
+    And("the event commit in GitLab")
+    `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
+
     And("access token is present")
     givenAccessTokenPresentFor(project)
 
