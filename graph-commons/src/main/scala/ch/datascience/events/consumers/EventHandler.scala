@@ -20,7 +20,6 @@ package ch.datascience.events.consumers
 
 import cats.data.EitherT
 import cats.data.EitherT.fromEither
-import cats.effect.concurrent.Deferred
 import cats.syntax.all._
 import cats.{Monad, MonadError}
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, SchedulingError, UnsupportedEventType}
@@ -34,9 +33,9 @@ import scala.util.control.NonFatal
 trait EventHandler[Interpretation[_]] {
   def tryHandling(request: EventRequestContent): Interpretation[EventSchedulingResult]
 
-  protected def handle(
+  protected def createHandlingProcess(
       request: EventRequestContent
-  ): Interpretation[(Deferred[Interpretation, Unit], Interpretation[EventSchedulingResult])]
+  ): Interpretation[EventHandlingProcess[Interpretation]]
 }
 
 abstract class EventHandlerWithProcessLimiter[Interpretation[_]: Monad](
@@ -44,18 +43,15 @@ abstract class EventHandlerWithProcessLimiter[Interpretation[_]: Monad](
 ) extends EventHandler[Interpretation] {
   val categoryName: CategoryName
 
-  def maybeReleaseProcess: Option[Interpretation[Unit]] = None
-
   final override def tryHandling(request: EventRequestContent): Interpretation[EventSchedulingResult] = (for {
-    _ <- fromEither[Interpretation](request.event.validateCategoryName)
-    r <- EitherT[Interpretation, EventSchedulingResult, EventSchedulingResult](
-           (processesLimiter tryExecuting (handle(request), maybeReleaseProcess)).map(_.asRight)
-         )
+    _                    <- fromEither[Interpretation](request.event.validateCategoryName)
+    eventHandlingProcess <- EitherT.right(createHandlingProcess(request))
+    r                    <- EitherT.right[EventSchedulingResult](processesLimiter tryExecuting eventHandlingProcess)
   } yield r).merge
 
-  protected def handle(
+  protected def createHandlingProcess(
       request: EventRequestContent
-  ): Interpretation[(Deferred[Interpretation, Unit], Interpretation[EventSchedulingResult])]
+  ): Interpretation[EventHandlingProcess[Interpretation]]
 
   implicit class JsonOps(json: Json) {
 

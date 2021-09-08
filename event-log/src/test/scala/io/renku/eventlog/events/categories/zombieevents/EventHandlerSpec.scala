@@ -19,9 +19,8 @@
 package io.renku.eventlog.events.categories.zombieevents
 
 import cats.effect.IO
-import cats.effect.concurrent.Deferred
 import cats.syntax.all._
-import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult}
+import ch.datascience.events.consumers.EventRequestContent
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{exceptions, jsons}
@@ -69,7 +68,14 @@ class EventHandlerSpec
             (underTriplesGenerationGauge.decrement _).expects(event.projectPath).returning(IO.unit)
           }
 
-          handler.handle(requestContent(event.asJson)).getResult shouldBe Accepted
+          handler
+            .createHandlingProcess(requestContent(event.asJson))
+            .unsafeRunSync()
+            .process
+            .value
+            .unsafeRunSync() shouldBe Right(
+            Accepted
+          )
 
           eventually {
             logger.loggedOnly(
@@ -100,7 +106,14 @@ class EventHandlerSpec
             (underTriplesTransformationGauge.decrement _).expects(event.projectPath).returning(IO.unit)
           }
 
-          handler.handle(requestContent(event.asJson)).getResult shouldBe Accepted
+          handler
+            .createHandlingProcess(requestContent(event.asJson))
+            .unsafeRunSync()
+            .process
+            .value
+            .unsafeRunSync() shouldBe Right(
+            Accepted
+          )
 
           eventually {
             logger.loggedOnly(
@@ -125,7 +138,12 @@ class EventHandlerSpec
         .expects(event)
         .returning(exception.raiseError[IO, UpdateResult])
 
-      handler.handle(requestContent(event.asJson)).getResult shouldBe Accepted
+      handler
+        .createHandlingProcess(requestContent(event.asJson))
+        .unsafeRunSync()
+        .process
+        .value
+        .unsafeRunSync() shouldBe Right(Accepted)
 
       eventually {
         logger.loggedOnly(
@@ -148,7 +166,7 @@ class EventHandlerSpec
         }"""
       }
 
-      handler.handle(request).getResult shouldBe BadRequest
+      handler.createHandlingProcess(request).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(BadRequest)
 
       logger.expectNoLogs()
     }
@@ -174,7 +192,7 @@ class EventHandlerSpec
           .value}}"""
       }
 
-      handler.handle(request).getResult shouldBe BadRequest
+      handler.createHandlingProcess(request).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(BadRequest)
 
       logger.expectNoLogs()
     }
@@ -220,7 +238,4 @@ class EventHandlerSpec
     }"""
   }
 
-  private implicit class HandlerOps(handlerResult: IO[(Deferred[IO, Unit], IO[EventSchedulingResult])]) {
-    lazy val getResult = handlerResult.unsafeRunSync()._2.unsafeRunSync()
-  }
 }

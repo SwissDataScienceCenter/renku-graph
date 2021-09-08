@@ -18,36 +18,64 @@
 
 package ch.datascience.events.consumers
 
-import cats.effect.{ContextShift, IO}
+import cats.data.EitherT
 import cats.effect.concurrent.{Deferred, Semaphore}
+import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
 import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{exceptions, positiveInts}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.concurrent.Eventually
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import java.util.concurrent.atomic.AtomicBoolean
 import scala.concurrent.ExecutionContext.global
 
-class ConcurrentProcessesLimiterSpec extends AnyWordSpec with MockFactory with should.Matchers with Eventually {
+class ConcurrentProcessesLimiterSpec
+    extends AnyWordSpec
+    with MockFactory
+    with should.Matchers
+    with Eventually
+    with IntegrationPatience {
 
   "tryExecuting" should {
 
-    Set(Accepted, BadRequest).foreach { result =>
-      s"execute a process if there are available spots and return the result $result" in new TestCase {
-        (() => semaphore.available).expects().returning(processesCount.value.toLong.pure[IO])
-        (() => semaphore.acquire).expects().returning(().pure[IO])
-        (() => semaphore.release).expects().returning(().pure[IO])
+    s"execute a process if there are available spots and return the result" in new TestCase {
+      (() => semaphore.available).expects().returning(processesCount.value.toLong.pure[IO])
+      (() => semaphore.acquire).expects().returning(().pure[IO])
+      (() => semaphore.release).expects().returning(().pure[IO])
 
-        var releaseFunctionWasCalled = false
-        releaseFunction.expects().onCall(_ => releaseFunctionWasCalled = true)
+      val releaseFunctionWasCalled = new AtomicBoolean(false)
 
-        limiter.tryExecuting(resultWithCompletion(IO(result)), releaseProcess.some).unsafeRunSync() shouldBe result
-        eventually {
-          releaseFunctionWasCalled shouldBe true
-        }
+      tryExecuting(
+        (deferred: Deferred[IO, Unit]) =>
+          EitherT
+            .rightT[IO, EventSchedulingResult](Accepted: EventSchedulingResult)
+            .semiflatTap(_ => deferred.complete(())),
+        IO.delay(releaseFunctionWasCalled.set(true))
+      ).unsafeRunSync() shouldBe Accepted
+
+      eventually {
+        releaseFunctionWasCalled.get() shouldBe true
+      }
+    }
+
+    s"execute a process if there are available spots and return BadRequest" in new TestCase {
+      (() => semaphore.available).expects().returning(processesCount.value.toLong.pure[IO])
+      (() => semaphore.acquire).expects().returning(().pure[IO])
+      (() => semaphore.release).expects().returning(().pure[IO])
+
+      val releaseFunctionWasCalled = new AtomicBoolean(false)
+
+      tryExecuting(
+        _ => EitherT.leftT[IO, EventSchedulingResult](BadRequest: EventSchedulingResult),
+        IO.delay(releaseFunctionWasCalled.set(true))
+      ).unsafeRunSync() shouldBe BadRequest
+
+      eventually {
+        releaseFunctionWasCalled.get() shouldBe false
       }
     }
 
@@ -56,18 +84,20 @@ class ConcurrentProcessesLimiterSpec extends AnyWordSpec with MockFactory with s
       (() => semaphore.acquire).expects().returning(().pure[IO])
       (() => semaphore.release).expects().returning(().pure[IO])
 
-      var releaseFunctionWasCalled = false
-      releaseFunction.expects().onCall(_ => releaseFunctionWasCalled = true)
+      val releaseFunctionWasCalled = new AtomicBoolean(false)
 
       val exception = exceptions.generateOne
-      val process   = exception.raiseError[IO, EventSchedulingResult]
 
-      limiter
-        .tryExecuting(resultWithCompletion(process), releaseProcess.some)
-        .unsafeRunSync() shouldBe SchedulingError(exception)
+      tryExecuting(
+        _ =>
+          EitherT.right(
+            IO.delay(releaseFunctionWasCalled.set(true)) >> exception.raiseError[IO, EventSchedulingResult]
+          ),
+        IO.delay(releaseFunctionWasCalled.set(false))
+      ).unsafeRunSync() shouldBe SchedulingError(exception)
 
       eventually {
-        releaseFunctionWasCalled shouldBe true
+        releaseFunctionWasCalled.get shouldBe true
       }
     }
 
@@ -75,35 +105,28 @@ class ConcurrentProcessesLimiterSpec extends AnyWordSpec with MockFactory with s
       (() => semaphore.available).expects().returning(processesCount.value.toLong.pure[IO])
       (() => semaphore.acquire).expects().returning(().pure[IO])
       (() => semaphore.release).expects().returning(().pure[IO])
+      val releaseFunctionWasCalled = new AtomicBoolean(false)
 
-      val exception = exceptions.generateOne
-      override val releaseProcess: IO[Unit] = exception.raiseError[IO, Unit]
+      tryExecuting(
+        (deferred: Deferred[IO, Unit]) =>
+          EitherT
+            .rightT[IO, EventSchedulingResult](Accepted: EventSchedulingResult)
+            .semiflatTap(_ => deferred.complete(())),
+        IO.delay(releaseFunctionWasCalled.set(true)) >> exceptions.generateOne.raiseError[IO, Unit]
+      ).unsafeRunSync() shouldBe Accepted
 
-      limiter
-        .tryExecuting(resultWithCompletion(IO(Accepted)), releaseProcess.some)
-        .unsafeRunSync() shouldBe Accepted
-    }
-
-    "release the semaphore once if the releaseProcess and the process fails" in new TestCase {
-      (() => semaphore.available).expects().returning(processesCount.value.toLong.pure[IO])
-      (() => semaphore.acquire).expects().returning(().pure[IO])
-      (() => semaphore.release).expects().returning(().pure[IO])
-
-      val exception = exceptions.generateOne
-      val process   = exception.raiseError[IO, EventSchedulingResult]
-
-      val releasingException = exceptions.generateOne
-      override val releaseProcess: IO[Unit] = releasingException.raiseError[IO, Unit]
-
-      limiter
-        .tryExecuting(resultWithCompletion(process), releaseProcess.some)
-        .unsafeRunSync() shouldBe SchedulingError(exception)
+      eventually {
+        releaseFunctionWasCalled.get shouldBe true
+      }
     }
 
     "return Busy if there are no available spots" in new TestCase {
       (() => semaphore.available).expects().returning(0L.pure[IO])
 
-      limiter.tryExecuting(resultWithCompletion(IO(Accepted)), releaseProcess.some).unsafeRunSync() shouldBe Busy
+      tryExecuting(
+        _ => EitherT.rightT[IO, EventSchedulingResult](Accepted: EventSchedulingResult),
+        IO.unit
+      ).unsafeRunSync() shouldBe Busy
     }
 
     "throw an error if acquiring the semaphore fails and all spots are available" in new TestCase {
@@ -112,9 +135,10 @@ class ConcurrentProcessesLimiterSpec extends AnyWordSpec with MockFactory with s
       (() => semaphore.acquire).expects().returning(exception.raiseError[IO, Unit])
 
       intercept[Exception] {
-        limiter
-          .tryExecuting(resultWithCompletion(IO(Accepted)), releaseProcess.some)
-          .unsafeRunSync()
+        tryExecuting(
+          _ => EitherT.rightT[IO, EventSchedulingResult](Accepted: EventSchedulingResult),
+          IO.unit
+        ).unsafeRunSync()
       }.getMessage shouldBe exception.getMessage
     }
 
@@ -126,10 +150,12 @@ class ConcurrentProcessesLimiterSpec extends AnyWordSpec with MockFactory with s
         (() => semaphore.available).expects().returning(0.toLong.pure[IO]).once()
         (() => semaphore.release).expects().returning(().pure[IO])
       }
+
       intercept[Exception] {
-        limiter
-          .tryExecuting(resultWithCompletion(IO(Accepted)), releaseProcess.some)
-          .unsafeRunSync()
+        tryExecuting(
+          _ => EitherT.rightT[IO, EventSchedulingResult](Accepted: EventSchedulingResult),
+          IO.unit
+        ).unsafeRunSync()
       }.getMessage shouldBe exception.getMessage
     }
 
@@ -138,35 +164,19 @@ class ConcurrentProcessesLimiterSpec extends AnyWordSpec with MockFactory with s
   "withoutLimit" should {
     Set(Accepted, BadRequest).foreach { result =>
       s"execute a process and return the result $result" in new TestCase {
-        releaseFunction.expects().returning(())
-
         withoutLimit
-          .tryExecuting(resultWithoutLimit(IO(result)), releaseProcess.some)
+          .tryExecuting(resultWithoutLimit(IO(result)))
           .unsafeRunSync() shouldBe result
       }
     }
 
-    "run the releaseProcess and return a SchedulingError if the process fails" in new TestCase {
-      releaseFunction.expects().returning(())
+    "return a SchedulingError if the process fails" in new TestCase {
 
       val exception = exceptions.generateOne
       val process   = exception.raiseError[IO, EventSchedulingResult]
 
       withoutLimit
-        .tryExecuting(resultWithoutLimit(process), releaseProcess.some)
-        .unsafeRunSync() shouldBe SchedulingError(exception)
-    }
-
-    "return a SchedulingError if both the releaseProcess and the process fails" in new TestCase {
-
-      val exception = exceptions.generateOne
-      val process   = exception.raiseError[IO, EventSchedulingResult]
-
-      val releasingException = exceptions.generateOne
-      override val releaseProcess: IO[Unit] = releasingException.raiseError[IO, Unit]
-
-      withoutLimit
-        .tryExecuting(resultWithoutLimit(process), releaseProcess.some)
+        .tryExecuting(resultWithoutLimit(process))
         .unsafeRunSync() shouldBe SchedulingError(exception)
     }
   }
@@ -174,25 +184,23 @@ class ConcurrentProcessesLimiterSpec extends AnyWordSpec with MockFactory with s
   private implicit def cs: ContextShift[IO] = IO.contextShift(global)
   private trait TestCase {
 
-    val processesCount  = positiveInts().generateOne
-    val semaphore       = mock[TestSemaphore]
-    val releaseFunction = mockFunction[Unit]
-    val releaseProcess  = IO(releaseFunction())
-    val deferredDone    = Deferred[IO, Unit]
+    val processesCount = positiveInts().generateOne
+    val semaphore      = mock[TestSemaphore]
 
-    val limiter      = new ConcurrentProcessesLimiterImpl[IO](processesCount, semaphore) {}
+    val limiter      = new ConcurrentProcessesLimiterImpl[IO](processesCount, semaphore)
     val withoutLimit = ConcurrentProcessesLimiter.withoutLimit[IO]
 
-    def resultWithoutLimit(result: IO[EventSchedulingResult]): IO[(Deferred[IO, Unit], IO[EventSchedulingResult])] =
-      deferredDone.map(_ -> result)
+    def resultWithoutLimit(result: IO[EventSchedulingResult]): EventHandlingProcess[IO] =
+      EventHandlingProcess[IO](EitherT.right(result)).unsafeRunSync()
 
-    def resultWithCompletion(result: IO[EventSchedulingResult]): IO[(Deferred[IO, Unit], IO[EventSchedulingResult])] =
-      deferredDone.map(done =>
-        done -> (for {
-          r <- result
-          _ <- done.complete(())
-        } yield r)
-      )
+    def tryExecuting(process:        Deferred[IO, Unit] => EitherT[IO, EventSchedulingResult, EventSchedulingResult],
+                     releaseProcess: IO[Unit]
+    ): IO[EventSchedulingResult] =
+      for {
+        handlerProcess <- EventHandlingProcess.withWaitingForCompletion[IO](process, releaseProcess)
+        result         <- limiter.tryExecuting(handlerProcess)
+      } yield result
+
   }
 
   private trait TestSemaphore extends Semaphore[IO]

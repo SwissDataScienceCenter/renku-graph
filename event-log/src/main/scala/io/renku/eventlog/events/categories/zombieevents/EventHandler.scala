@@ -19,14 +19,13 @@
 package io.renku.eventlog.events.categories.zombieevents
 
 import cats.data.EitherT.fromEither
-import cats.effect.concurrent.Deferred
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
 import cats.{Applicative, MonadThrow}
 import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
-import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventRequestContent, EventSchedulingResult}
+import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventRequestContent, EventSchedulingResult}
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventId, EventStatus}
 import ch.datascience.graph.model.projects
@@ -51,24 +50,21 @@ private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurre
   import ch.datascience.graph.model.projects
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-  override def handle(
+  override def createHandlingProcess(
       request: EventRequestContent
-  ): Interpretation[(Deferred[Interpretation, Unit], Interpretation[EventSchedulingResult])] =
-    Deferred[Interpretation, Unit].map(_ -> startCleanZombieEvents(request))
+  ): Interpretation[EventHandlingProcess[Interpretation]] =
+    EventHandlingProcess[Interpretation](startCleanZombieEvents(request))
 
-  private def startCleanZombieEvents(request: EventRequestContent) = {
-    for {
-      event <- fromEither[Interpretation](
-                 request.event.as[ZombieEvent].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult]
-               )
-
-      result <- (ContextShift[Interpretation].shift *> Concurrent[Interpretation]
-                  .start(cleanZombieStatus(event))).toRightT
-                  .map(_ => Accepted)
-                  .semiflatTap(logger.log(event))
-                  .leftSemiflatTap(logger.log(event))
-    } yield result
-  }.merge
+  private def startCleanZombieEvents(request: EventRequestContent) = for {
+    event <- fromEither[Interpretation](
+               request.event.as[ZombieEvent].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult]
+             )
+    result <- (ContextShift[Interpretation].shift *> Concurrent[Interpretation]
+                .start(cleanZombieStatus(event))).toRightT
+                .map(_ => Accepted: EventSchedulingResult)
+                .semiflatTap(logger.log(event))
+                .leftSemiflatTap(logger.log(event))
+  } yield result
 
   private def cleanZombieStatus(event: ZombieEvent): Interpretation[Unit] = {
     for {

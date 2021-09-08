@@ -28,7 +28,7 @@ import cats.syntax.all._
 import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
-import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventRequestContent, EventSchedulingResult}
+import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventRequestContent, EventSchedulingResult}
 import ch.datascience.graph.model.RenkuVersionPair
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventBody}
 import ch.datascience.metrics.MetricsRegistry
@@ -51,27 +51,29 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow: ConcurrentEffe
   import currentVersionPair.schemaVersion
   import eventBodyDeserializer.toCommitEvents
 
-  override def maybeReleaseProcess: Option[Interpretation[Unit]] =
-    Concurrent[Interpretation].start(subscriptionMechanism.renewSubscription()).void.some
-
-  override def handle(
+  override def createHandlingProcess(
       requestContent: EventRequestContent
-  ): Interpretation[(Deferred[Interpretation, Unit], Interpretation[EventSchedulingResult])] =
-    Deferred[Interpretation, Unit].map(done => done -> startProcessEvent(requestContent, done))
+  ): Interpretation[EventHandlingProcess[Interpretation]] =
+    EventHandlingProcess.withWaitingForCompletion[Interpretation](
+      deferred => startProcessEvent(requestContent, deferred),
+      subscriptionMechanism.renewSubscription()
+    )
 
-  private def startProcessEvent(requestContent: EventRequestContent, done: Deferred[Interpretation, Unit]) = {
+  private def startProcessEvent(requestContent: EventRequestContent, deferred: Deferred[Interpretation, Unit]) =
     for {
       eventId      <- fromEither(requestContent.event.getEventId)
       eventBody    <- fromOption[Interpretation](requestContent.maybePayload.map(EventBody.apply), BadRequest)
       commitEvents <- toCommitEvents(eventBody).toRightT(recoverTo = BadRequest)
       result <-
-        (ContextShift[Interpretation].shift *> Concurrent[Interpretation]
-          .start(eventProcessor.process(eventId, commitEvents, schemaVersion).flatMap(_ => done.complete(())))).toRightT
-          .map(_ => Accepted)
+        Concurrent[Interpretation]
+          .start(
+            eventProcessor.process(eventId, commitEvents, schemaVersion) >> deferred.complete(())
+          )
+          .toRightT
+          .map(_ => Accepted: EventSchedulingResult)
           .semiflatTap(logger.log(eventId -> commitEvents))
           .leftSemiflatTap(logger.log(eventId -> commitEvents))
     } yield result
-  }.merge
 
   private implicit lazy val eventInfoToString: ((CompoundEventId, NonEmptyList[CommitEvent])) => String = {
     case (eventId, events) => s"$eventId, projectPath = ${events.head.project.path}"

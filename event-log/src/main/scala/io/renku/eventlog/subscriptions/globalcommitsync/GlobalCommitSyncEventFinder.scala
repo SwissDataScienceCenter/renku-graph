@@ -62,7 +62,7 @@ private class GlobalCommitSyncEventFinderImpl[Interpretation[_]: BracketThrow: S
   private def findProject = measureExecutionTime {
     val lastSyncDate = LastSyncedDate(now())
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find project"))
-      .select[CategoryName ~ LastSyncedDate ~ LastSyncedDate, (Project, Option[LastSyncedDate])](
+      .select[CategoryName ~ LastSyncedDate, (Project, Option[LastSyncedDate])](
         sql"""
               SELECT
                 proj.project_id,
@@ -71,17 +71,15 @@ private class GlobalCommitSyncEventFinderImpl[Interpretation[_]: BracketThrow: S
               FROM project proj
               LEFT JOIN subscription_category_sync_time sync_time
                 ON proj.project_id = sync_time.project_id AND sync_time.category_name = $categoryNameEncoder
-              LEFT JOIN event evt
-                ON proj.project_id = evt.project_id AND ( ($lastSyncedDateEncoder - evt.event_date) > INTERVAL '#${syncInterval.toDays.toString} days')
               WHERE
-                (sync_time.last_synced IS NULL AND evt.event_id IS NOT NULL)
+                sync_time.last_synced IS NULL 
                 OR  (($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '#${syncInterval.toDays.toString} days')
               ORDER BY proj.latest_event_date DESC
               LIMIT 1"""
           .query(projectDecoder ~ lastSyncedDateDecoder.opt)
           .map { case project ~ lastSyncedDate => (project, lastSyncedDate) }
       )
-      .arguments(categoryName ~ lastSyncDate ~ lastSyncDate)
+      .arguments(categoryName ~ lastSyncDate)
       .build(_.option)
   }
 

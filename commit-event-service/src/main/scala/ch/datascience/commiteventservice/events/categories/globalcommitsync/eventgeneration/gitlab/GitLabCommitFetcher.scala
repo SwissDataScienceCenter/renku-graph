@@ -122,7 +122,7 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[Interpretation[_]: Concu
   }
 
   private implicit val commitIdDecoder: EntityDecoder[Interpretation, List[CommitId]] =
-    jsonOf[Interpretation, List[CommitInfo]].map((_.map(_.id)))
+    jsonOf[Interpretation, List[CommitInfo]].map(_.map(_.id))
 
   private def addNextPage(
       baseUriString:            String,

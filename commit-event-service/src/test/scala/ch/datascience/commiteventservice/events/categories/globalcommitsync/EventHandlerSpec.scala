@@ -18,13 +18,13 @@
 
 package ch.datascience.commiteventservice.events.categories.globalcommitsync
 
-import cats.effect.concurrent.Deferred
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.commiteventservice.events.categories.globalcommitsync.Generators.globalCommitSyncEventsNonZero
 import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.GlobalCommitEventSynchronizer
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
-import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventRequestContent, EventSchedulingResult}
+import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
+import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventRequestContent}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{exceptions, jsons}
 import ch.datascience.interpreters.TestLogger
@@ -58,7 +58,14 @@ class EventHandlerSpec
         (commitEventSynchronizer.synchronizeEvents _)
           .expects(event)
           .returning(().pure[IO])
-        handler.handle(requestContent(event.asJson)).getResult shouldBe Accepted
+        handler
+          .createHandlingProcess(requestContent(event.asJson))
+          .unsafeRunSync()
+          .process
+          .value
+          .unsafeRunSync() shouldBe Right(
+          Accepted
+        )
 
         logger.loggedOnly(Info(s"${logMessageCommon(event)} -> $Accepted"))
       }
@@ -73,7 +80,14 @@ class EventHandlerSpec
           .expects(event)
           .returning(().pure[IO])
 
-        handler.handle(requestContent(event.asJson)).getResult shouldBe Accepted
+        handler
+          .createHandlingProcess(requestContent(event.asJson))
+          .unsafeRunSync()
+          .process
+          .value
+          .unsafeRunSync() shouldBe Right(
+          Accepted
+        )
 
         logger.loggedOnly(Info(s"${logMessageCommon(event)} -> $Accepted"))
       }
@@ -86,7 +100,12 @@ class EventHandlerSpec
         .expects(event)
         .returning(exceptions.generateOne.raiseError[IO, Unit])
 
-      handler.handle(requestContent(event.asJson)).getResult shouldBe Accepted
+      handler
+        .createHandlingProcess(requestContent(event.asJson))
+        .unsafeRunSync()
+        .process
+        .value
+        .unsafeRunSync() shouldBe Right(Accepted)
 
       logger.getMessages(Info).map(_.message) should contain only s"${logMessageCommon(event)} -> $Accepted"
 
@@ -103,7 +122,7 @@ class EventHandlerSpec
         }"""
       }
 
-      handler.handle(request).getResult shouldBe BadRequest
+      handler.createHandlingProcess(request).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(BadRequest)
 
       logger.expectNoLogs()
     }
@@ -115,10 +134,19 @@ class EventHandlerSpec
 
   private trait TestCase {
     val commitEventSynchronizer    = mock[GlobalCommitEventSynchronizer[IO]]
+    val subscriptionMechanism      = mock[SubscriptionMechanism[IO]]
     val concurrentProcessesLimiter = mock[ConcurrentProcessesLimiter[IO]]
     val logger                     = TestLogger[IO]()
+
+    (subscriptionMechanism.renewSubscription _).expects().returns(IO.unit)
+
     val handler =
-      new EventHandler[IO](categoryName, commitEventSynchronizer, concurrentProcessesLimiter, logger)
+      new EventHandler[IO](categoryName,
+                           commitEventSynchronizer,
+                           subscriptionMechanism,
+                           concurrentProcessesLimiter,
+                           logger
+      )
 
     def requestContent(event: Json): EventRequestContent = EventRequestContent(event, None)
   }
@@ -134,7 +162,4 @@ class EventHandlerSpec
       }"""
   }
 
-  private implicit class HandlerOps(handlerResult: IO[(Deferred[IO, Unit], IO[EventSchedulingResult])]) {
-    lazy val getResult = handlerResult.unsafeRunSync()._2.unsafeRunSync()
-  }
 }

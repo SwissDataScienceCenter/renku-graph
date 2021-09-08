@@ -19,7 +19,10 @@
 package ch.datascience.events.consumers
 
 import cats.Show
-import cats.implicits.showInterpolator
+import cats.data.EitherT
+import cats.effect.Concurrent
+import cats.effect.concurrent.Deferred
+import cats.syntax.all._
 import ch.datascience.graph.model.projects
 import io.circe.Json
 
@@ -39,8 +42,33 @@ object EventSchedulingResult {
   final case class SchedulingError(throwable: Throwable) extends EventSchedulingResult
 }
 
-case class EventRequestContent(event: Json, maybePayload: Option[String])
+final case class EventRequestContent(event: Json, maybePayload: Option[String])
 
 object EventRequestContent {
   def apply(event: Json): EventRequestContent = EventRequestContent(event, None)
+}
+
+class EventHandlingProcess[Interpretation[_]: Concurrent] private (
+    deferred:                Deferred[Interpretation, Unit],
+    val process:             EitherT[Interpretation, EventSchedulingResult, EventSchedulingResult],
+    val maybeReleaseProcess: Option[Interpretation[Unit]] = None
+) {
+  def waitToFinish(): Interpretation[Unit] = deferred.get
+}
+
+object EventHandlingProcess {
+  def withWaitingForCompletion[Interpretation[_]: Concurrent](
+      process:        Deferred[Interpretation, Unit] => EitherT[Interpretation, EventSchedulingResult, EventSchedulingResult],
+      releaseProcess: Interpretation[Unit]
+  ): Interpretation[EventHandlingProcess[Interpretation]] =
+    Deferred[Interpretation, Unit].map(deferred =>
+      new EventHandlingProcess[Interpretation](deferred, process(deferred), releaseProcess.some)
+    )
+
+  def apply[Interpretation[_]: Concurrent](
+      process: EitherT[Interpretation, EventSchedulingResult, EventSchedulingResult]
+  ): Interpretation[EventHandlingProcess[Interpretation]] = for {
+    deferred <- Deferred[Interpretation, Unit]
+    _        <- deferred.complete(())
+  } yield new EventHandlingProcess[Interpretation](deferred, process)
 }

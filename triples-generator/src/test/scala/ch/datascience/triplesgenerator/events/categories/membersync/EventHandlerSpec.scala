@@ -19,8 +19,7 @@
 package ch.datascience.triplesgenerator.events.categories.membersync
 
 import cats.effect.IO
-import cats.effect.concurrent.Deferred
-import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult}
+import ch.datascience.events.consumers.{EventHandlingProcess, EventRequestContent}
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -50,7 +49,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
         val request = requestContent(projectPath.asJson(eventEncoder))
 
-        handler.handle(request).getResult shouldBe Accepted
+        handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Right(Accepted)
 
         logger.loggedOnly(
           Info(
@@ -68,7 +67,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
         }
       }""")
 
-      handler.handle(request).getResult shouldBe BadRequest
+      handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Left(BadRequest)
 
       logger.expectNoLogs()
     }
@@ -94,7 +93,9 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
       }"""
     }
 
-  private implicit class HandlerOps(handlerResult: IO[(Deferred[IO, Unit], IO[EventSchedulingResult])]) {
-    lazy val getResult = handlerResult.unsafeRunSync()._2.unsafeRunSync()
+  private implicit class EventHandlingProcessOps(handlingProcess: IO[EventHandlingProcess[IO]]) {
+    def unsafeRunSyncProcess() =
+      handlingProcess.unsafeRunSync().process.value.unsafeRunSync()
   }
+
 }

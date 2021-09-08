@@ -66,17 +66,21 @@ class StatsFinderSpec
       upsertProject(compoundId3, projectPaths.generateOne, eventDate3)
       upsertLastSynced(compoundId3.projectId, membersync.categoryName, lastSynced3)
 
-      // MEMBER_SYNC should not see this one
       val compoundId4 = compoundEventIds.generateOne
-      val eventDate4  = EventDate(generateInstant(moreThanAgo = Duration.ofHours(25)))
-      val lastSynced4 = LastSyncedDate(generateInstant(lessThanAgo = Duration.ofHours(23)))
+      val eventDate4  = EventDate(generateInstant())
       upsertProject(compoundId4, projectPaths.generateOne, eventDate4)
-      upsertLastSynced(compoundId4.projectId, membersync.categoryName, lastSynced4)
+
+      // MEMBER_SYNC should not see this one
+      val compoundId5 = compoundEventIds.generateOne
+      val eventDate5  = EventDate(generateInstant(moreThanAgo = Duration.ofHours(25)))
+      val lastSynced5 = LastSyncedDate(generateInstant(lessThanAgo = Duration.ofHours(23)))
+      upsertProject(compoundId5, projectPaths.generateOne, eventDate5)
+      upsertLastSynced(compoundId5.projectId, membersync.categoryName, lastSynced5)
 
       stats.countEventsByCategoryName().unsafeRunSync() shouldBe Map(
-        membersync.categoryName       -> 3L,
-        commitsync.categoryName       -> 4L,
-        globalcommitsync.categoryName -> 0L
+        membersync.categoryName       -> 4L,
+        commitsync.categoryName       -> 5L,
+        globalcommitsync.categoryName -> 5L
       )
     }
 
@@ -95,17 +99,21 @@ class StatsFinderSpec
       upsertProject(compoundId2, projectPaths.generateOne, eventDate2)
       upsertLastSynced(compoundId2.projectId, commitsync.categoryName, lastSyncDate2)
 
-      // COMMIT_SYNC should not see this one
-      val compoundId3   = compoundEventIds.generateOne
-      val eventDate3    = EventDate(generateInstant(moreThanAgo = Duration.ofHours(7 * 24 + 1)))
-      val lastSyncDate3 = LastSyncedDate(generateInstant(lessThanAgo = Duration.ofHours(23)))
+      val compoundId3 = compoundEventIds.generateOne
+      val eventDate3  = EventDate(generateInstant())
       upsertProject(compoundId3, projectPaths.generateOne, eventDate3)
-      upsertLastSynced(compoundId3.projectId, commitsync.categoryName, lastSyncDate3)
+
+      // COMMIT_SYNC should not see this one
+      val compoundId4   = compoundEventIds.generateOne
+      val eventDate4    = EventDate(generateInstant(moreThanAgo = Duration.ofHours(7 * 24 + 1)))
+      val lastSyncDate4 = LastSyncedDate(generateInstant(lessThanAgo = Duration.ofHours(23)))
+      upsertProject(compoundId4, projectPaths.generateOne, eventDate4)
+      upsertLastSynced(compoundId4.projectId, commitsync.categoryName, lastSyncDate4)
 
       stats.countEventsByCategoryName().unsafeRunSync() shouldBe Map(
-        membersync.categoryName       -> 3L,
-        commitsync.categoryName       -> 2L,
-        globalcommitsync.categoryName -> 0L
+        membersync.categoryName       -> 4L,
+        commitsync.categoryName       -> 3L,
+        globalcommitsync.categoryName -> 4L
       )
     }
 
@@ -115,47 +123,23 @@ class StatsFinderSpec
       val compoundId1   = compoundEventIds.generateOne
       val eventDate1    = EventDate(generateInstant(lessThanAgo = Duration.ofDays(7)))
       val lastSyncDate1 = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofDays(7)))
-      storeEvent(compoundId1,
-                 eventStatuses.generateOne,
-                 executionDates.generateOne,
-                 eventDate1,
-                 eventBodies.generateOne
-      )
+      upsertProject(compoundId1, projectPaths.generateOne, eventDate1)
       upsertLastSynced(compoundId1.projectId, globalcommitsync.categoryName, lastSyncDate1)
 
       val compoundId2 = compoundEventIds.generateOne
-      val eventDate2  = EventDate(generateInstant(moreThanAgo = Duration.ofDays(8)))
-      storeEvent(compoundId2,
-                 eventStatuses.generateOne,
-                 executionDates.generateOne,
-                 eventDate2,
-                 eventBodies.generateOne
-      )
+      val eventDate2  = EventDate(generateInstant())
+      upsertProject(compoundId2, projectPaths.generateOne, eventDate2)
 
       // GLOBAL_COMMIT_SYNC should not see this one
       val compoundId3   = compoundEventIds.generateOne
       val eventDate3    = EventDate(generateInstant(moreThanAgo = Duration.ofDays(7)))
       val lastSyncDate3 = LastSyncedDate(generateInstant(lessThanAgo = Duration.ofDays(7)))
-      storeEvent(compoundId3,
-                 eventStatuses.generateOne,
-                 executionDates.generateOne,
-                 eventDate3,
-                 eventBodies.generateOne
-      )
+      upsertProject(compoundId3, projectPaths.generateOne, eventDate3)
       upsertLastSynced(compoundId3.projectId, globalcommitsync.categoryName, lastSyncDate3)
 
-      val compoundId4 = compoundEventIds.generateOne
-      val eventDate4  = EventDate(generateInstant(lessThanAgo = Duration.ofDays(7)))
-      storeEvent(compoundId4,
-                 eventStatuses.generateOne,
-                 executionDates.generateOne,
-                 eventDate4,
-                 eventBodies.generateOne
-      )
-
       stats.countEventsByCategoryName().unsafeRunSync() shouldBe Map(
-        membersync.categoryName       -> 4L,
-        commitsync.categoryName       -> 4L,
+        membersync.categoryName       -> 3L,
+        commitsync.categoryName       -> 3L,
         globalcommitsync.categoryName -> 2L
       )
     }

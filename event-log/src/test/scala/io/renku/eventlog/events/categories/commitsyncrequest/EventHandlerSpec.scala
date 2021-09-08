@@ -19,9 +19,8 @@
 package io.renku.eventlog.events.categories.commitsyncrequest
 
 import cats.effect.IO
-import cats.effect.concurrent.Deferred
 import cats.syntax.all._
-import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult}
+import ch.datascience.events.consumers.EventRequestContent
 import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{exceptions, jsons}
@@ -58,7 +57,14 @@ class EventHandlerSpec
           .expects(projectId, projectPath)
           .returning(().pure[IO])
 
-        handler.handle(requestContent((projectId -> projectPath).asJson)).getResult shouldBe Accepted
+        handler
+          .createHandlingProcess(requestContent((projectId -> projectPath).asJson))
+          .unsafeRunSync()
+          .process
+          .value
+          .unsafeRunSync() shouldBe Right(
+          Accepted
+        )
 
         eventually {
           logger.loggedOnly(
@@ -80,10 +86,13 @@ class EventHandlerSpec
         .returning(exception.raiseError[IO, Unit])
 
       handler
-        .handle(
+        .createHandlingProcess(
           requestContent((projectId -> projectPath).asJson)
         )
-        .getResult shouldBe SchedulingError(exception)
+        .unsafeRunSync()
+        .process
+        .value
+        .unsafeRunSync() shouldBe Left(SchedulingError(exception))
 
       eventually {
         logger.loggedOnly(
@@ -103,7 +112,7 @@ class EventHandlerSpec
         }"""
       }
 
-      handler.handle(request).getResult shouldBe BadRequest
+      handler.createHandlingProcess(request).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(BadRequest)
 
       logger.expectNoLogs()
     }
@@ -116,10 +125,6 @@ class EventHandlerSpec
     val handler          = new EventHandler[IO](categoryName, commitSyncForcer, logger)
 
     def requestContent(event: Json): EventRequestContent = EventRequestContent(event, maybePayload = None)
-  }
-
-  private implicit class HandlerOps(handlerResult: IO[(Deferred[IO, Unit], IO[EventSchedulingResult])]) {
-    lazy val getResult = handlerResult.unsafeRunSync()._2.unsafeRunSync()
   }
 
   private implicit lazy val eventEncoder: Encoder[(projects.Id, projects.Path)] =

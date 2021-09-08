@@ -19,10 +19,11 @@
 package ch.datascience.events.consumers
 
 import cats.MonadThrow
-import cats.effect.concurrent.{Deferred, Semaphore}
+import cats.data.EitherT
+import cats.effect.concurrent.Semaphore
 import cats.effect.{Concurrent, ContextShift, IO}
 import cats.syntax.all._
-import ch.datascience.events.consumers.EventSchedulingResult.Busy
+import ch.datascience.events.consumers.EventSchedulingResult.{Busy, SchedulingError}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
 
@@ -30,9 +31,7 @@ import scala.util.control.NonFatal
 
 trait ConcurrentProcessesLimiter[Interpretation[_]] {
 
-  def tryExecuting(process:             Interpretation[(Deferred[Interpretation, Unit], Interpretation[EventSchedulingResult])],
-                   maybeReleaseProcess: Option[Interpretation[Unit]] = None
-  ): Interpretation[EventSchedulingResult]
+  def tryExecuting(scheduledProcess: EventHandlingProcess[Interpretation]): Interpretation[EventSchedulingResult]
 }
 
 object ConcurrentProcessesLimiter {
@@ -46,19 +45,19 @@ object ConcurrentProcessesLimiter {
   def withoutLimit[Interpretation[_]: MonadThrow: Concurrent]: ConcurrentProcessesLimiter[Interpretation] =
     new ConcurrentProcessesLimiter[Interpretation] {
       override def tryExecuting(
-          process:             Interpretation[(Deferred[Interpretation, Unit], Interpretation[EventSchedulingResult])],
-          maybeReleaseProcess: Option[Interpretation[Unit]] = None
+          scheduledProcess: EventHandlingProcess[Interpretation]
       ): Interpretation[EventSchedulingResult] =
-        process.flatMap(
-          _._2
-            .flatTap(_ => releaseIfNecessary(maybeReleaseProcess))
-            .recoverWith { case NonFatal(error) =>
-              releaseIfNecessary(maybeReleaseProcess).map(_ => EventSchedulingResult.SchedulingError(error))
-            }
-        )
+        scheduledProcess.process.merge.flatTap(_ =>
+          releaseIfNecessary(scheduledProcess.maybeReleaseProcess)
+        ) recoverWith { case NonFatal(error) =>
+          releaseIfNecessary(scheduledProcess.maybeReleaseProcess).map(_ =>
+            EventSchedulingResult.SchedulingError(error)
+          )
+        }
 
       private def releaseIfNecessary(maybeReleaseProcess: Option[Interpretation[Unit]]): Interpretation[Unit] =
         maybeReleaseProcess
+          .map(Concurrent[Interpretation].start(_).void)
           .getOrElse(().pure[Interpretation])
           .recover { case NonFatal(_) => () }
 
@@ -70,41 +69,49 @@ class ConcurrentProcessesLimiterImpl[Interpretation[_]: MonadThrow: ContextShift
     semaphore:      Semaphore[Interpretation]
 ) extends ConcurrentProcessesLimiter[Interpretation] {
 
-  def tryExecuting(process:             Interpretation[(Deferred[Interpretation, Unit], Interpretation[EventSchedulingResult])],
-                   maybeReleaseProcess: Option[Interpretation[Unit]] = None
+  def tryExecuting(
+      process: EventHandlingProcess[Interpretation]
   ): Interpretation[EventSchedulingResult] =
     semaphore.available >>= {
       case 0 => Busy.pure[Interpretation].widen[EventSchedulingResult]
       case _ =>
         {
           for {
-            _                  <- semaphore.acquire
-            processWithDoneRef <- process
-            (done, eventHandlerProcess) = processWithDoneRef
-            _ <- ContextShift[Interpretation].shift *> Concurrent[Interpretation].start(
-                   waitForRelease(done, maybeReleaseProcess)
-                 )
-            result <- eventHandlerProcess recoverWith releaseOnError(maybeReleaseProcess)
+            _      <- semaphore.acquire
+            result <- startProcess(process)
           } yield result
         } recoverWith releasingSemaphore
     }
 
-  private def waitForRelease(done: Deferred[Interpretation, Unit], maybeReleaseProcess: Option[Interpretation[Unit]]) =
-    for {
-      _ <- done.get
-      _ <- releaseAndNotify(maybeReleaseProcess)
-    } yield ()
+  private def startProcess(process: EventHandlingProcess[Interpretation]): Interpretation[EventSchedulingResult] = {
+    process.process.semiflatTap { _ =>
+      Concurrent[Interpretation].start(waitForRelease(process))
+    } recoverWith releaseOnLeft
+  }.merge recoverWith releaseOnError
 
-  private def releaseOnError(
-      maybeReleaseProcess: Option[Interpretation[Unit]]
-  ): PartialFunction[Throwable, Interpretation[EventSchedulingResult]] = { case NonFatal(error) =>
-    releaseAndNotify(maybeReleaseProcess).map(_ => EventSchedulingResult.SchedulingError(error))
+  private def waitForRelease(process: EventHandlingProcess[Interpretation]) =
+    process.waitToFinish() >> releaseAndNotify(process).void
+
+  private lazy val releaseOnLeft: PartialFunction[EventSchedulingResult,
+                                                  EitherT[Interpretation, EventSchedulingResult, EventSchedulingResult]
+  ] = { case eventSchedulingResult =>
+    EitherT.left(semaphore.release.map(_ => eventSchedulingResult))
   }
 
-  private def releaseAndNotify(maybeReleaseProcess: Option[Interpretation[Unit]]): Interpretation[Unit] = for {
-    _ <- semaphore.release
-    _ <- maybeReleaseProcess.getOrElse(().pure[Interpretation]).recover { case NonFatal(_) => () }
-  } yield ()
+  private lazy val releaseOnError: PartialFunction[Throwable, Interpretation[EventSchedulingResult]] = {
+    case NonFatal(error) => semaphore.release.map(_ => SchedulingError(error))
+  }
+
+  private def releaseAndNotify(scheduledProcess: EventHandlingProcess[Interpretation]): Interpretation[Unit] =
+    for {
+      _ <- semaphore.release
+      _ <- scheduledProcess.maybeReleaseProcess
+             .map(Concurrent[Interpretation].start(_).void)
+             .getOrElse(().pure[Interpretation])
+             .recover { case NonFatal(_) =>
+               ()
+             }
+    } yield ()
 
   private def releasingSemaphore[O]: PartialFunction[Throwable, Interpretation[O]] = { case NonFatal(exception) =>
     semaphore.available flatMap {

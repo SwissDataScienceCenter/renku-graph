@@ -65,7 +65,7 @@ class StatsFinderImpl[Interpretation[_]: Sync: BracketThrow](
     val (eventDate, lastSyncedDate) = (EventDate.apply _ &&& LastSyncedDate.apply _) (now())
     SqlStatement(name = "category name events count").select[CategoryName ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~
       CategoryName ~ CategoryName ~ CategoryName ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ CategoryName ~
-      CategoryName ~ CategoryName  ~ LastSyncedDate ~ CategoryName ~ CategoryName ~ EventDate, (CategoryName, Long)](
+      CategoryName ~ CategoryName  ~ LastSyncedDate ~ CategoryName ~ CategoryName, (CategoryName, Long)](
       sql"""
           SELECT all_counts.category_name, SUM(all_counts.count)
           FROM (
@@ -114,19 +114,19 @@ class StatsFinderImpl[Interpretation[_]: Sync: BracketThrow](
             ) UNION ALL (
               SELECT $categoryNameEncoder AS category_name, COUNT(DISTINCT proj.project_id) AS count
               FROM project proj
-              LEFT JOIN subscription_category_sync_time sync_time
-                ON proj.project_id = sync_time.project_id AND sync_time.category_name = $categoryNameEncoder
-              LEFT JOIN event evt
-                ON proj.project_id = evt.project_id AND (($eventDateEncoder - evt.event_date) > INTERVAL '7 days')
-              WHERE
-                sync_time.last_synced IS NULL AND evt.event_id IS NOT NULL
+              WHERE proj.project_id NOT IN (
+                SELECT project_id
+                FROM subscription_category_sync_time
+                WHERE category_name = $categoryNameEncoder
+              ) 
             )
           ) all_counts
           GROUP BY all_counts.category_name
           """.query(categoryNameDecoder ~ numeric).map { case categoryName ~ (count: BigDecimal) => (categoryName, count.longValue) }
     ).arguments(membersync.categoryName ~ eventDate ~ lastSyncedDate ~ eventDate ~ lastSyncedDate ~ eventDate ~
       lastSyncedDate ~ membersync.categoryName ~ membersync.categoryName ~ commitsync.categoryName ~ eventDate ~
-      lastSyncedDate ~ eventDate ~ lastSyncedDate ~ commitsync.categoryName ~ commitsync.categoryName ~ globalcommitsync.categoryName ~ lastSyncedDate ~ globalcommitsync.categoryName ~ globalcommitsync.categoryName ~ eventDate).build(_.toList)
+      lastSyncedDate ~ eventDate ~ lastSyncedDate ~ commitsync.categoryName ~ commitsync.categoryName ~ 
+      globalcommitsync.categoryName ~ lastSyncedDate ~ globalcommitsync.categoryName ~ globalcommitsync.categoryName).build(_.toList)
   }
 
   override def statuses(): Interpretation[Map[EventStatus, Long]] = sessionResource.useK { 

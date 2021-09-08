@@ -29,7 +29,7 @@ import ch.datascience.control.Throttler
 import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
-import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventRequestContent, EventSchedulingResult, Project}
+import ch.datascience.events.consumers._
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventBody}
 import ch.datascience.metrics.MetricsRegistry
@@ -56,34 +56,32 @@ private[events] class EventHandler[Interpretation[_]: ConcurrentEffect: MonadThr
 
   private type IdAndBody = (CompoundEventId, EventBody)
 
-  override def maybeReleaseProcess: Option[Interpretation[Unit]] =
-    Concurrent[Interpretation].start(subscriptionMechanism.renewSubscription()).void.some
-
-  override def handle(
+  override def createHandlingProcess(
       request: EventRequestContent
-  ): Interpretation[(Deferred[Interpretation, Unit], Interpretation[EventSchedulingResult])] =
-    Deferred[Interpretation, Unit].map(done => done -> startProcessingEvent(request, done))
+  ): Interpretation[EventHandlingProcess[Interpretation]] =
+    EventHandlingProcess.withWaitingForCompletion[Interpretation](
+      deferred => startProcessingEvent(request, deferred),
+      subscriptionMechanism.renewSubscription()
+    )
 
-  private def startProcessingEvent(request: EventRequestContent, done: Deferred[Interpretation, Unit]) = {
-    for {
-      eventId <- fromEither(request.event.getEventId)
-      project <- fromEither(request.event.getProject)
-      eventBodyJson <-
-        fromOption[Interpretation](request.maybePayload.flatMap(str => parser.parse(str).toOption), BadRequest)
-      eventBodyAndSchema <- fromEither(eventBodyJson.as[(EventBody, SchemaVersion)]).leftMap(_ => BadRequest)
-      (eventBody, schemaVersion) = eventBodyAndSchema
-      triplesGeneratedEvent <-
-        eventBodyDeserializer
-          .toTriplesGeneratedEvent(eventId, project, schemaVersion, eventBody)
-          .toRightT(recoverTo = BadRequest)
-      result <- (ContextShift[Interpretation].shift *> Concurrent[Interpretation]
-                  .start(eventProcessor.process(triplesGeneratedEvent).flatMap(_ => done.complete(())))).toRightT
-                  .map(_ => Accepted)
-                  .semiflatTap(logger.log(eventId -> triplesGeneratedEvent.project))
-                  .leftSemiflatTap(logger.log(eventId -> triplesGeneratedEvent.project))
+  private def startProcessingEvent(request: EventRequestContent, deferred: Deferred[Interpretation, Unit]) = for {
+    eventId <- fromEither(request.event.getEventId)
+    project <- fromEither(request.event.getProject)
+    eventBodyJson <-
+      fromOption[Interpretation](request.maybePayload.flatMap(str => parser.parse(str).toOption), BadRequest)
+    eventBodyAndSchema <- fromEither(eventBodyJson.as[(EventBody, SchemaVersion)]).leftMap(_ => BadRequest)
+    (eventBody, schemaVersion) = eventBodyAndSchema
+    triplesGeneratedEvent <-
+      eventBodyDeserializer
+        .toTriplesGeneratedEvent(eventId, project, schemaVersion, eventBody)
+        .toRightT(recoverTo = BadRequest)
+    result <- (ContextShift[Interpretation].shift *> Concurrent[Interpretation]
+                .start(eventProcessor.process(triplesGeneratedEvent).flatMap(_ => deferred.complete(())))).toRightT
+                .map(_ => Accepted: EventSchedulingResult)
+                .semiflatTap(logger.log(eventId -> triplesGeneratedEvent.project))
+                .leftSemiflatTap(logger.log(eventId -> triplesGeneratedEvent.project))
 
-    } yield result
-  }.merge
+  } yield result
 
   private implicit lazy val eventInfoToString: ((CompoundEventId, Project)) => String = { case (eventId, project) =>
     s"$eventId, projectPath = ${project.path}"

@@ -18,7 +18,8 @@
 
 package ch.datascience.events.consumers
 
-import cats.effect.concurrent.Deferred
+import cats.data.EitherT
+import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
 import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.generators.Generators.Implicits._
@@ -29,7 +30,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.Try
+import scala.concurrent.ExecutionContext.global
 
 class EventHandlerSpec extends AnyWordSpec with should.Matchers with MockFactory {
 
@@ -37,14 +38,16 @@ class EventHandlerSpec extends AnyWordSpec with should.Matchers with MockFactory
 
     Set(Accepted, Busy, BadRequest, SchedulingError(exceptions.generateOne)).foreach { result =>
       s"return $result if handler can support the request" in new TestCase {
-        val resultInContext = result.pure[Try]
-        handleFunction.expects().returning(resultInContext)
 
-        (processesLimiter.tryExecuting _)
-          .expects((deferredDone -> resultInContext).pure[Try], None)
-          .returning(resultInContext)
-
-        handler.tryHandling(eventRequestContent) shouldBe result.pure[Try]
+        (for {
+          process <- EventHandlingProcess[IO](EitherT.rightT[IO, EventSchedulingResult](result))
+          _ <- (processesLimiter.tryExecuting _)
+                 .expects(process)
+                 .returning(result.pure[IO])
+                 .pure[IO]
+          result <-
+            handlerWithProcess(process).tryHandling(eventRequestContent)
+        } yield result).unsafeRunSync() shouldBe result
       }
     }
 
@@ -54,25 +57,28 @@ class EventHandlerSpec extends AnyWordSpec with should.Matchers with MockFactory
         nonEmptyStrings().generateOption
       )
 
-      handler.tryHandling(unsupportedEvent) shouldBe UnsupportedEventType.pure[Try]
+      (for {
+        process <- EventHandlingProcess[IO](EitherT.rightT[IO, EventSchedulingResult](Accepted))
+        result  <- handlerWithProcess(process).tryHandling(unsupportedEvent)
+      } yield result).unsafeRunSync() shouldBe UnsupportedEventType
     }
   }
 
+  private implicit val cs: ContextShift[IO] = IO.contextShift(global)
+
   private trait TestCase {
-    val processesLimiter = mock[ConcurrentProcessesLimiter[Try]]
+    val processesLimiter = mock[ConcurrentProcessesLimiter[IO]]
     val anyCategoryName  = nonEmptyStrings().generateOne
-    val handleFunction   = mockFunction[Try[EventSchedulingResult]]
-    val deferredDone     = mock[Deferred[Try, Unit]]
 
     val eventRequestContent =
       EventRequestContent(json"""{ "categoryName": $anyCategoryName }""", nonEmptyStrings().generateOption)
-    val handler: EventHandler[Try] = new EventHandlerWithProcessLimiter[Try](processesLimiter) {
-      override val categoryName: events.CategoryName = anyCategoryName
 
-      protected override def handle(
-          request: EventRequestContent
-      ): Try[(Deferred[Try, Unit], Try[EventSchedulingResult])] =
-        (deferredDone -> handleFunction()).pure[Try]
-    }
+    def handlerWithProcess(process: EventHandlingProcess[IO]): EventHandlerWithProcessLimiter[IO] =
+      new EventHandlerWithProcessLimiter[IO](processesLimiter) {
+        override val categoryName: events.CategoryName = anyCategoryName
+
+        protected override def createHandlingProcess(request: EventRequestContent): IO[EventHandlingProcess[IO]] =
+          IO(process)
+      }
   }
 }

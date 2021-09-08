@@ -20,13 +20,12 @@ package io.renku.eventlog.events.categories.creation
 
 import cats.MonadThrow
 import cats.data.EitherT.fromEither
-import cats.effect.concurrent.Deferred
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
-import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventRequestContent, EventSchedulingResult, Project}
+import ch.datascience.events.consumers._
 import ch.datascience.graph.model.events.{BatchDate, CategoryName, EventBody, EventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
@@ -47,21 +46,19 @@ private class EventHandler[Interpretation[_]: MonadThrow: Concurrent](
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import eventPersister._
 
-  override def handle(
+  override def createHandlingProcess(
       request: EventRequestContent
-  ): Interpretation[(Deferred[Interpretation, Unit], Interpretation[EventSchedulingResult])] =
-    Deferred[Interpretation, Unit].map(_ -> storeEvent(request))
+  ): Interpretation[EventHandlingProcess[Interpretation]] =
+    EventHandlingProcess[Interpretation](storeEvent(request))
 
-  private def storeEvent(request: EventRequestContent): Interpretation[EventSchedulingResult] = {
-    for {
-      event <-
-        fromEither[Interpretation](request.event.as[Event].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult])
-      result <- storeNewEvent(event).toRightT
-                  .map(_ => Accepted)
-                  .semiflatTap(logger.log(event))
-                  .leftSemiflatTap(logger.log(event))
-    } yield result
-  }.merge
+  private def storeEvent(request: EventRequestContent) = for {
+    event <-
+      fromEither[Interpretation](request.event.as[Event].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult])
+    result <- storeNewEvent(event).toRightT
+                .map(_ => Accepted: EventSchedulingResult)
+                .semiflatTap(logger.log(event))
+                .leftSemiflatTap(logger.log(event))
+  } yield result
 
   private implicit lazy val eventInfoToString: Event => String = { event =>
     s"${event.compoundEventId}, projectPath = ${event.project.path}, status = ${event.status}"

@@ -28,7 +28,8 @@ import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
-import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventRequestContent, EventSchedulingResult, Project}
+import ch.datascience.events.consumers._
+import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
 import ch.datascience.graph.model.events.{CategoryName, CommitId}
 import ch.datascience.logging.ExecutionTimeRecorder
 import eu.timepit.refined.api.Refined
@@ -42,6 +43,7 @@ import scala.util.control.NonFatal
 private[events] class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurrent](
     override val categoryName:  CategoryName,
     commitEventSynchronizer:    GlobalCommitEventSynchronizer[Interpretation],
+    subscriptionMechanism:      SubscriptionMechanism[Interpretation],
     concurrentProcessesLimiter: ConcurrentProcessesLimiter[Interpretation],
     logger:                     Logger[Interpretation]
 ) extends consumers.EventHandlerWithProcessLimiter[Interpretation](concurrentProcessesLimiter) {
@@ -49,12 +51,15 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow: ContextShift: 
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import commitEventSynchronizer._
 
-  override def handle(
+  override def createHandlingProcess(
       request: EventRequestContent
-  ): Interpretation[(Deferred[Interpretation, Unit], Interpretation[EventSchedulingResult])] =
-    Deferred[Interpretation, Unit].map(done => done -> startSynchronizingEvents(request, done))
+  ): Interpretation[EventHandlingProcess[Interpretation]] =
+    EventHandlingProcess.withWaitingForCompletion[Interpretation](
+      deferred => startEventProcessing(request, deferred),
+      subscriptionMechanism.renewSubscription()
+    )
 
-  private def startSynchronizingEvents(request: EventRequestContent, done: Deferred[Interpretation, Unit]) = {
+  private def startEventProcessing(request: EventRequestContent, deferred: Deferred[Interpretation, Unit]) =
     for {
       event <-
         fromEither[Interpretation](
@@ -64,14 +69,13 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow: ContextShift: 
         (ContextShift[Interpretation].shift *> Concurrent[Interpretation]
           .start(
             synchronizeEvents(event)
-              .flatMap(_ => done.complete(()))
-              .recoverWith(finishProcessAndLogError(done, event))
+              .flatMap(_ => deferred.complete(()))
+              .recoverWith(finishProcessAndLogError(deferred, event))
           )).toRightT
           .map(_ => Accepted: EventSchedulingResult)
           .semiflatTap(logger log event)
           .leftSemiflatTap(logger log event)
     } yield result
-  }.merge
 
   private implicit val eventDecoder: Decoder[GlobalCommitSyncEvent] =
     cursor =>
@@ -88,10 +92,10 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow: ContextShift: 
 
   private implicit lazy val eventInfoToString: GlobalCommitSyncEvent => String = _.toString
 
-  private def finishProcessAndLogError(done:  Deferred[Interpretation, Unit],
-                                       event: GlobalCommitSyncEvent
+  private def finishProcessAndLogError(deferred: Deferred[Interpretation, Unit],
+                                       event:    GlobalCommitSyncEvent
   ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    done.complete(()) >> logger.logError(event, exception) >> exception.raiseError[Interpretation, Unit]
+    deferred.complete(()) >> logger.logError(event, exception) >> exception.raiseError[Interpretation, Unit]
   }
 }
 
@@ -101,6 +105,7 @@ private[events] object EventHandler {
   val processesLimit: Int Refined Positive = 1
 
   def apply(
+      subscriptionMechanism: SubscriptionMechanism[IO],
       gitLabThrottler:       Throttler[IO, GitLab],
       executionTimeRecorder: ExecutionTimeRecorder[IO],
       logger:                Logger[IO]
@@ -111,5 +116,10 @@ private[events] object EventHandler {
   ): IO[EventHandler[IO]] = for {
     concurrentProcessesLimiter    <- ConcurrentProcessesLimiter(processesLimit)
     globalCommitEventSynchronizer <- GlobalCommitEventSynchronizer(gitLabThrottler, executionTimeRecorder, logger)
-  } yield new EventHandler[IO](categoryName, globalCommitEventSynchronizer, concurrentProcessesLimiter, logger)
+  } yield new EventHandler[IO](categoryName,
+                               globalCommitEventSynchronizer,
+                               subscriptionMechanism,
+                               concurrentProcessesLimiter,
+                               logger
+  )
 }

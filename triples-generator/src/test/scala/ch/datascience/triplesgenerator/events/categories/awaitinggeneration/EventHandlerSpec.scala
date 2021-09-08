@@ -20,11 +20,10 @@ package ch.datascience.triplesgenerator.events.categories.awaitinggeneration
 
 import cats.data.NonEmptyList
 import cats.effect.IO
-import cats.effect.concurrent.Deferred
 import cats.syntax.all._
 import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
-import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventRequestContent, EventSchedulingResult}
+import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventRequestContent}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
@@ -43,7 +42,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
-  "handle" should {
+  "createHandlingProcess" should {
 
     "decode an event from the request, " +
       "schedule triples generation " +
@@ -60,7 +59,9 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
         val requestContent: EventRequestContent = requestContent(eventId.asJson(eventEncoder), eventBody.value.some)
 
-        handler.handle(requestContent).getResult shouldBe Accepted
+        handler.createHandlingProcess(requestContent).unsafeRunSyncProcess() shouldBe Right(
+          Accepted
+        )
 
         logger.loggedOnly(
           Info(
@@ -77,7 +78,9 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
         .expects(eventBody)
         .returning(exceptions.generateOne.raiseError[IO, NonEmptyList[CommitEvent]])
 
-      handler.handle(requestContent).getResult shouldBe BadRequest
+      handler.createHandlingProcess(requestContent).unsafeRunSyncProcess() shouldBe Left(
+        BadRequest
+      )
 
       logger.expectNoLogs()
     }
@@ -86,7 +89,9 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
       val requestContent: EventRequestContent = requestContent(eventId.asJson(eventEncoder), None)
 
-      handler.handle(requestContent).getResult shouldBe BadRequest
+      handler.createHandlingProcess(requestContent).unsafeRunSyncProcess() shouldBe Left(
+        BadRequest
+      )
 
       logger.expectNoLogs()
     }
@@ -104,7 +109,9 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
       val requestContent: EventRequestContent = requestContent(eventId.asJson(eventEncoder), eventBody.value.some)
 
-      handler.handle(requestContent).getResult shouldBe Accepted
+      handler.createHandlingProcess(requestContent).unsafeRunSyncProcess() shouldBe Right(
+        Accepted
+      )
 
       logger.loggedOnly(
         Info(
@@ -125,6 +132,9 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     val subscriptionMechanism      = mock[SubscriptionMechanism[IO]]
     val renkuVersionPair           = renkuVersionPairs.generateOne
     val logger                     = TestLogger[IO]()
+
+    (subscriptionMechanism.renewSubscription _).expects().returns(IO.unit)
+
     val handler = new EventHandler[IO](categoryName,
                                        eventProcessor,
                                        eventBodyDeserializer,
@@ -152,7 +162,8 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     lazy val toCommitEvents: NonEmptyList[CommitEvent] = commitEvents.generateNonEmptyList()
   }
 
-  private implicit class HandlerOps(handlerResult: IO[(Deferred[IO, Unit], IO[EventSchedulingResult])]) {
-    lazy val getResult = handlerResult.unsafeRunSync()._2.unsafeRunSync()
+  private implicit class EventHandlingProcessOps(handlingProcess: IO[EventHandlingProcess[IO]]) {
+    def unsafeRunSyncProcess() =
+      handlingProcess.unsafeRunSync().process.value.unsafeRunSync()
   }
 }

@@ -20,7 +20,6 @@ package ch.datascience.commiteventservice.events.categories.commitsync
 
 import cats.MonadThrow
 import cats.data.EitherT.fromEither
-import cats.effect.concurrent.Deferred
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer
@@ -28,7 +27,7 @@ import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
-import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventRequestContent, EventSchedulingResult, Project}
+import ch.datascience.events.consumers._
 import ch.datascience.graph.model.events.{CategoryName, CommitId, LastSyncedDate}
 import ch.datascience.logging.ExecutionTimeRecorder
 import io.circe.Decoder
@@ -47,24 +46,22 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow: ContextShift: 
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import commitEventSynchronizer._
 
-  override def handle(
+  override def createHandlingProcess(
       request: EventRequestContent
-  ): Interpretation[(Deferred[Interpretation, Unit], Interpretation[EventSchedulingResult])] =
-    Deferred[Interpretation, Unit].map(_ -> startSynchronizingEvents(request))
+  ): Interpretation[EventHandlingProcess[Interpretation]] =
+    EventHandlingProcess[Interpretation](startSynchronizingEvents(request))
 
-  private def startSynchronizingEvents(request: EventRequestContent) = {
-    for {
-      event <-
-        fromEither[Interpretation](
-          request.event.as[CommitSyncEvent].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult]
-        )
-      result <- (ContextShift[Interpretation].shift *> Concurrent[Interpretation]
-                  .start(synchronizeEvents(event) recoverWith logError(event))).toRightT
-                  .map(_ => Accepted)
-                  .semiflatTap(logger log event)
-                  .leftSemiflatTap(logger log event)
-    } yield result
-  }.merge
+  private def startSynchronizingEvents(request: EventRequestContent) = for {
+    event <-
+      fromEither[Interpretation](
+        request.event.as[CommitSyncEvent].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult]
+      )
+    result <- (ContextShift[Interpretation].shift *> Concurrent[Interpretation]
+                .start(synchronizeEvents(event) recoverWith logError(event))).toRightT
+                .map(_ => Accepted: EventSchedulingResult)
+                .semiflatTap(logger log event)
+                .leftSemiflatTap(logger log event)
+  } yield result
 
   private implicit lazy val eventInfoToString: CommitSyncEvent => String = _.toString
 

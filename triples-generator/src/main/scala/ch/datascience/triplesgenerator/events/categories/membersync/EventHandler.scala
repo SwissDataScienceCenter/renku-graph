@@ -20,14 +20,13 @@ package ch.datascience.triplesgenerator.events.categories.membersync
 
 import cats.MonadThrow
 import cats.data.EitherT.fromEither
-import cats.effect.concurrent.Deferred
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventSchedulingResult.Accepted
-import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventRequestContent, EventSchedulingResult}
+import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventRequestContent, EventSchedulingResult}
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
@@ -43,21 +42,19 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow: ContextShift: 
   import ch.datascience.graph.model.projects
   import membersSynchronizer._
 
-  override def handle(
+  override def createHandlingProcess(
       request: EventRequestContent
-  ): Interpretation[(Deferred[Interpretation, Unit], Interpretation[EventSchedulingResult])] =
-    Deferred[Interpretation, Unit].map(_ -> startSynchronizingMember(request))
+  ): Interpretation[EventHandlingProcess[Interpretation]] =
+    EventHandlingProcess[Interpretation](startSynchronizingMember(request))
 
-  private def startSynchronizingMember(request: EventRequestContent) = {
-    for {
-      projectPath <- fromEither[Interpretation](request.event.getProjectPath)
-      result <- (ContextShift[Interpretation].shift *> Concurrent[Interpretation]
-                  .start(synchronizeMembers(projectPath))).toRightT
-                  .map(_ => Accepted)
-                  .semiflatTap(logger.log(projectPath))
-                  .leftSemiflatTap(logger.log(projectPath))
-    } yield result
-  }.merge
+  private def startSynchronizingMember(request: EventRequestContent) = for {
+    projectPath <- fromEither[Interpretation](request.event.getProjectPath)
+    result <- (ContextShift[Interpretation].shift *> Concurrent[Interpretation]
+                .start(synchronizeMembers(projectPath))).toRightT
+                .map(_ => Accepted: EventSchedulingResult)
+                .semiflatTap(logger.log(projectPath))
+                .leftSemiflatTap(logger.log(projectPath))
+  } yield result
 
   private implicit lazy val eventInfoToString: projects.Path => String = { path =>
     s"projectPath = $path"

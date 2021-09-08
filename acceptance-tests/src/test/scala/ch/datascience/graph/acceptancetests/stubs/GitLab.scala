@@ -122,12 +122,17 @@ object GitLab {
           }  
           """
 
-    if (commitIds.size == 1)
+    stubFor {
+      get(s"/api/v4/projects/$projectId/repository/commits").withAccessTokenInHeader
+        .willReturn(okJson(Json.arr(commitIds.map(commitAsJson): _*).noSpaces))
+    }
+
+    if (commitIds.size == 1) {
       stubFor {
         getLatestCommit
           .willReturn(okJson(Json.arr(commitAsJson(commitIds.head)).noSpaces))
       }
-    else {
+    } else {
       val getLatestCommitWithScenario = getLatestCommit.inScenario(s"fetch latest commit for $projectId")
 
       commitIds.zipWithIndex foreach { case (commitId, idx) =>
@@ -137,12 +142,9 @@ object GitLab {
             .willSetStateTo(s"call ${idx + 1}")
             .willReturn(okJson(Json.arr(commitAsJson(commitId)).noSpaces))
         }
-      }
-    }
 
-    stubFor {
-      get(s"/api/v4/projects/$projectId/repository/commits").withAccessTokenInHeader
-        .willReturn(okJson(Json.arr(commitIds.map(commitAsJson): _*).noSpaces))
+      }
+
     }
 
   }

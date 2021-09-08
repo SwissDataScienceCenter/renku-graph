@@ -56,23 +56,26 @@ class GlobalCommitSyncEventFinderSpec
 
   "popEvent" should {
 
-    "return None " +
-      s"when the subscription_category_sync_times table does not have rows for the $categoryName " +
-      "and the oldest event date is *LESS* than a week ago" in new TestCase {
+    "return the event with the latest eventDate" +
+      s"when the subscription_category_sync_times table does not have rows for the $categoryName " in new TestCase {
         currentTime.expects().returning(now)
         finder.popEvent().unsafeRunSync() shouldBe None
 
-        val project0 = projectsGen.generateOne
-        val event0Date =
-          relativeTimestamps(lessThanAgo = syncInterval, moreThanAgo = Duration.ofHours(5)).generateAs(EventDate)
-        addEvent(genCompoundEventId(project0.id), event0Date, project0.path)
+        val project0                 = projectsGen.generateOne
+        val (eventId0, oldEventDate) = genCommitIdAndDate(olderThanAWeek = true, project0.id)
+        addEvent(eventId0, oldEventDate, project0.path)
 
-        val project1   = projectsGen.generateOne
-        val event1Date = EventDate(event0Date.value.plus(2, ChronoUnit.HOURS))
-        addEvent(genCompoundEventId(project1.id), event1Date, project1.path)
+        val project1                     = projectsGen.generateOne
+        val (eventId1, lastestEventDate) = genCommitIdAndDate(olderThanAWeek = false, project1.id)
+        addEvent(eventId1, lastestEventDate, project1.path)
+
+        givenTheLastSyncedDateIsUpdated(project1)
 
         currentTime.expects().returning(now)
-        finder.popEvent().unsafeRunSync() shouldBe None
+        finder.popEvent().unsafeRunSync() shouldBe GlobalCommitSyncEvent(project1,
+                                                                         List(CommitId(eventId1.id.value)),
+                                                                         None
+        ).some
       }
 
     "return an event with all commits " +
