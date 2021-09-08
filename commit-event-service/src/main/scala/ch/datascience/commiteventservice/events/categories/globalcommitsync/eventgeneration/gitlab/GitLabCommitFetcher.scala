@@ -93,8 +93,8 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[Interpretation[_]: Concu
       maybeAccessToken: Option[AccessToken]
   ): Interpretation[List[CommitId]] =
     for {
-      pagePart     <- maybePage.map(page => s"?page=$page").getOrElse("").pure[Interpretation]
-      uri          <- validateUri(s"$uriWithoutPage$pagePart")
+      pagePart     <- maybePage.getOrElse(1).pure[Interpretation]
+      uri          <- validateUri(s"$uriWithoutPage").map(_.withQueryParam("page", pagePart.toString))
       responsePair <- send(request(GET, uri, maybeAccessToken))(mapCommitResponse)
       allCommitIds <- addNextPage(uriWithoutPage,
                                   previouslyFetchedCommits,

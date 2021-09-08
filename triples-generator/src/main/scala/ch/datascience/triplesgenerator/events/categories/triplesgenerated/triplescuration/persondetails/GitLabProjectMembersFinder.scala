@@ -85,14 +85,16 @@ private class IOGitLabProjectMembersFinder(
   )(implicit
       maybeAccessToken: Option[AccessToken]
   ): EitherT[IO, ProcessingRecoverableError, Set[GitLabProjectMember]] = for {
-    uri <- validateUri(merge(url, maybePage)).toRightT
+    uri <- merge(url, maybePage).toRightT
     fetchedUsersAndNextPage <-
       EitherT(send(request(GET, uri, maybeAccessToken))(mapResponse) recoverWith maybeRecoverableError)
     allUsers <- addNextPage(url, allUsers, fetchedUsersAndNextPage)
   } yield allUsers
 
-  private def merge(url: String, maybePage: Option[Int] = None) =
-    maybePage map (page => s"$url?page=$page") getOrElse url
+  private def merge(url: String, maybePage: Option[Int] = None) = maybePage match {
+    case Some(page) => validateUri(url).map(_.withQueryParam("page", page.toString))
+    case None       => validateUri(url)
+  }
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[
     Either[ProcessingRecoverableError, (Set[GitLabProjectMember], Option[Int])]

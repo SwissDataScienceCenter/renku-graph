@@ -1,6 +1,7 @@
 # commit-event-service
 
 This is a microservice which:
+
 - listens to notification from the Event Log,
 - generates events for commits the Event Log missed
 
@@ -44,6 +45,38 @@ or
     "id": 12,
     "path": "project/path"
   }
+}
+```
+
+- **GLOBAL_COMMIT_SYNC**
+
+**Request**
+
+```json
+{
+  "categoryName": "GLOBAL_COMMIT_SYNC",
+  "subscriber": {
+    "url": "http://host/path",
+    "id": "20210302140653-8641"
+  }
+}
+```
+
+**Event example**
+
+`event` part:
+
+```json
+{
+  "categoryName": "GLOBAL_COMMIT_SYNC",
+  "project": {
+    "id": 12,
+    "path": "project/path"
+  },
+  "commits": [
+    "commitId1",
+    "commitId2"
+  ]
 }
 ```
 

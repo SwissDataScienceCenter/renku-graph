@@ -118,17 +118,17 @@ class EventsProcessingStatusSpec
 
     val allCommitIds = commitIds.generateNonEmptyList(minElements = numberOfEvents, maxElements = numberOfEvents).toList
 
-    givenAccessTokenPresentFor(project)
-
     `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project.id,
                                                                                         allCommitIds.head,
                                                                                         allCommitIds.tail.toSet
     )
 
-    `GET <gitlabApi>/projects/:id/repository/commits returning OK with a commit`(project.id, allCommitIds.head)
+    `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(project.id, allCommitIds.head)
 
     // assuring there's project info in GitLab for the triples curation process
     `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
+
+    givenAccessTokenPresentFor(project)
 
     allCommitIds foreach { commitId =>
       // GitLab to return commit info about all the parent commits

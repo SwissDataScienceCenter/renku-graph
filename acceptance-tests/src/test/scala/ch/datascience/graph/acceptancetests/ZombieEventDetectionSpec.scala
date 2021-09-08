@@ -92,7 +92,7 @@ class ZombieEventDetectionSpec
     givenAccessTokenPresentFor(project)
 
     And("the event classified as zombie is the latest commit in GitLab")
-    `GET <gitlabApi>/projects/:id/repository/commits returning OK with a commit`(projectId, commitId)
+    `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(projectId, commitId)
 
     And("an event that should be classified as zombie is in the EventLog DB")
     insertProjectToDB(project, eventDate) shouldBe 1

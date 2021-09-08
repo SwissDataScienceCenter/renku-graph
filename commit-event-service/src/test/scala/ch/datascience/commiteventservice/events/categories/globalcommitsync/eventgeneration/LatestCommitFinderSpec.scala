@@ -29,7 +29,7 @@ import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
-import com.github.tomakehurst.wiremock.client.WireMock.{equalTo, get, okJson, stubFor}
+import com.github.tomakehurst.wiremock.client.WireMock.{equalTo, get, okJson, stubFor, urlPathEqualTo}
 import io.circe.Json
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -46,7 +46,8 @@ class LatestCommitFinderSpec extends AnyWordSpec with MockFactory with ExternalS
       val personalAccessToken = personalAccessTokens.generateOne
 
       stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits?per_page=1")
+        get(urlPathEqualTo(s"/api/v4/projects/$projectId/repository/commits"))
+          .withQueryParam("per_page", equalTo("1"))
           .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
           .willReturn(okJson(commitsJson(from = commitId)))
       }

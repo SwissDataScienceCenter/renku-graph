@@ -90,7 +90,7 @@ class WebhookCreationSpec
       givenAccessTokenPresentFor(project)
       val commitId  = commitIds.generateOne
       val committer = persons.generateOne
-      `GET <gitlabApi>/projects/:id/repository/commits returning OK with a commit`(projectId, commitId)
+      `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(projectId, commitId)
       `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
 
       // making the triples generation be happy and not throwing exceptions to the logs

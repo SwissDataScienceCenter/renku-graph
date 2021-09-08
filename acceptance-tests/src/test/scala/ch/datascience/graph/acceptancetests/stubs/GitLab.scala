@@ -101,15 +101,34 @@ object GitLab {
     ()
   }
 
-  def `GET <gitlabApi>/projects/:id/repository/commits returning OK with a commit`(
+  def `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(
       projectId:          Id,
       commitIds:          CommitId*
-  )(implicit accessToken: AccessToken): Any = {
+  )(implicit accessToken: AccessToken): Unit = {
+    commitIds.zipWithIndex foreach { case (commitId, idx) =>
+      stubFor {
+        get(urlPathEqualTo(s"/api/v4/projects/$projectId/repository/commits"))
+          .atPriority(1)
+          .withQueryParam("per_page", equalTo("1"))
+          .withQueryParam("page", equalTo((idx + 1).toString))
+          .inScenario(s"fetch latest commit for $projectId")
+          .whenScenarioStateIs(if (idx == 0) Scenario.STARTED else s"call $idx")
+          .willSetStateTo(s"call ${idx + 1}")
+          .willReturn(okJson(Json.arr(commitAsJson(commitId)).noSpaces))
+          .withAccessTokenInHeader
+      }
+    }
+    stubFor {
+      get(urlPathEqualTo(s"/api/v4/projects/$projectId/repository/commits"))
+        .atPriority(2)
+        .willReturn(okJson(commitIds.map(commitAsJson).asJson.noSpaces))
+        .withAccessTokenInHeader
+    }
+    ()
+  }
 
-    val getLatestCommit = get(s"/api/v4/projects/$projectId/repository/commits?per_page=1").withAccessTokenInHeader
-
-    def commitAsJson(commitId: CommitId) =
-      json"""
+  private def commitAsJson(commitId: CommitId) =
+    json"""
         {
             "id":              ${commitId.value},
             "author_name":     ${nonEmptyStrings().generateOne},
@@ -121,33 +140,6 @@ object GitLab {
             "parent_ids":      []
           }  
           """
-
-    stubFor {
-      get(s"/api/v4/projects/$projectId/repository/commits").withAccessTokenInHeader
-        .willReturn(okJson(Json.arr(commitIds.map(commitAsJson): _*).noSpaces))
-    }
-
-    if (commitIds.size == 1) {
-      stubFor {
-        getLatestCommit
-          .willReturn(okJson(Json.arr(commitAsJson(commitIds.head)).noSpaces))
-      }
-    } else {
-      val getLatestCommitWithScenario = getLatestCommit.inScenario(s"fetch latest commit for $projectId")
-
-      commitIds.zipWithIndex foreach { case (commitId, idx) =>
-        stubFor {
-          getLatestCommitWithScenario
-            .whenScenarioStateIs(if (idx == 0) Scenario.STARTED else s"call $idx")
-            .willSetStateTo(s"call ${idx + 1}")
-            .willReturn(okJson(Json.arr(commitAsJson(commitId)).noSpaces))
-        }
-
-      }
-
-    }
-
-  }
 
   def `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(
       projectId:          Id,
@@ -267,23 +259,14 @@ object GitLab {
         )
         .noSpaces
     )
+
     stubFor {
-      get(s"/api/v4/projects/${urlEncode(project.path.value)}?statistics=true").withAccessTokenInHeader
+      get(urlPathEqualTo(s"/api/v4/projects/${urlEncode(project.path.value)}")).withAccessTokenInHeader
         .willReturn(returnedJson)
     }
 
     stubFor {
-      get(s"/api/v4/projects/${urlEncode(project.path.value)}").withAccessTokenInHeader
-        .willReturn(returnedJson)
-    }
-
-    stubFor {
-      get(s"/api/v4/projects/${project.id.value}?statistics=true").withAccessTokenInHeader
-        .willReturn(returnedJson)
-    }
-
-    stubFor {
-      get(s"/api/v4/projects/${project.id.value}").withAccessTokenInHeader
+      get(urlPathEqualTo(s"/api/v4/projects/${project.id.value}")).withAccessTokenInHeader
         .willReturn(returnedJson)
     }
 
