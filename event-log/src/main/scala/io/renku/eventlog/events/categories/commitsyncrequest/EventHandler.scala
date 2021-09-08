@@ -55,7 +55,7 @@ private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurre
         request.event.as[(projects.Id, projects.Path)].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult]
       )
     result <- forceCommitSync(event._1, event._2).toRightT
-                .map(_ => Accepted: EventSchedulingResult)
+                .map(_ => Accepted)
                 .semiflatTap(logger.log(event))
                 .leftSemiflatTap(logger.log(event))
   } yield result

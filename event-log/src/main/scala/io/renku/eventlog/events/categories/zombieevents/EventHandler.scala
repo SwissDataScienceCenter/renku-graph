@@ -61,7 +61,7 @@ private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurre
              )
     result <- (ContextShift[Interpretation].shift *> Concurrent[Interpretation]
                 .start(cleanZombieStatus(event))).toRightT
-                .map(_ => Accepted: EventSchedulingResult)
+                .map(_ => Accepted)
                 .semiflatTap(logger.log(event))
                 .leftSemiflatTap(logger.log(event))
   } yield result

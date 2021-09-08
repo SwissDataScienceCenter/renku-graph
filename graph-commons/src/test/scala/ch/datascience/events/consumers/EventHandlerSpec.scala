@@ -36,11 +36,23 @@ class EventHandlerSpec extends AnyWordSpec with should.Matchers with MockFactory
 
   "tryHandling" should {
 
-    Set(Accepted, Busy, BadRequest, SchedulingError(exceptions.generateOne)).foreach { result =>
-      s"return $result if handler can support the request" in new TestCase {
+    s"return $Accepted if handler can support the request" in new TestCase {
 
+      (for {
+        process <- EventHandlingProcess[IO](EitherT.rightT[IO, EventSchedulingResult](Accepted))
+        _ <- (processesLimiter.tryExecuting _)
+               .expects(process)
+               .returning(Accepted.pure[IO])
+               .pure[IO]
+        result <-
+          handlerWithProcess(process).tryHandling(eventRequestContent)
+      } yield result).unsafeRunSync() shouldBe Accepted
+    }
+
+    Set(BadRequest, SchedulingError(exceptions.generateOne)).foreach { result =>
+      s"return $result if handler can support the request but an error occurs" in new TestCase {
         (for {
-          process <- EventHandlingProcess[IO](EitherT.rightT[IO, EventSchedulingResult](result))
+          process <- EventHandlingProcess[IO](EitherT.leftT[IO, Accepted](result))
           _ <- (processesLimiter.tryExecuting _)
                  .expects(process)
                  .returning(result.pure[IO])

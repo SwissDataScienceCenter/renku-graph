@@ -77,7 +77,7 @@ private[events] class EventHandler[Interpretation[_]: ConcurrentEffect: MonadThr
         .toRightT(recoverTo = BadRequest)
     result <- (ContextShift[Interpretation].shift *> Concurrent[Interpretation]
                 .start(eventProcessor.process(triplesGeneratedEvent).flatMap(_ => deferred.complete(())))).toRightT
-                .map(_ => Accepted: EventSchedulingResult)
+                .map(_ => Accepted)
                 .semiflatTap(logger.log(eventId -> triplesGeneratedEvent.project))
                 .leftSemiflatTap(logger.log(eventId -> triplesGeneratedEvent.project))
 

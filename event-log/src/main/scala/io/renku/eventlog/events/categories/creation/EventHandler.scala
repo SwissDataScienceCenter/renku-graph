@@ -55,7 +55,7 @@ private class EventHandler[Interpretation[_]: MonadThrow: Concurrent](
     event <-
       fromEither[Interpretation](request.event.as[Event].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult])
     result <- storeNewEvent(event).toRightT
-                .map(_ => Accepted: EventSchedulingResult)
+                .map(_ => Accepted)
                 .semiflatTap(logger.log(event))
                 .leftSemiflatTap(logger.log(event))
   } yield result

@@ -52,7 +52,7 @@ class ConcurrentProcessesLimiterSpec
       tryExecuting(
         (deferred: Deferred[IO, Unit]) =>
           EitherT
-            .rightT[IO, EventSchedulingResult](Accepted: EventSchedulingResult)
+            .rightT[IO, EventSchedulingResult](Accepted)
             .semiflatTap(_ => deferred.complete(())),
         IO.delay(releaseFunctionWasCalled.set(true))
       ).unsafeRunSync() shouldBe Accepted
@@ -70,7 +70,7 @@ class ConcurrentProcessesLimiterSpec
       val releaseFunctionWasCalled = new AtomicBoolean(false)
 
       tryExecuting(
-        _ => EitherT.leftT[IO, EventSchedulingResult](BadRequest: EventSchedulingResult),
+        _ => EitherT.leftT[IO, Accepted](BadRequest),
         IO.delay(releaseFunctionWasCalled.set(true))
       ).unsafeRunSync() shouldBe BadRequest
 
@@ -91,7 +91,7 @@ class ConcurrentProcessesLimiterSpec
       tryExecuting(
         _ =>
           EitherT.right(
-            IO.delay(releaseFunctionWasCalled.set(true)) >> exception.raiseError[IO, EventSchedulingResult]
+            IO.delay(releaseFunctionWasCalled.set(true)) >> exception.raiseError[IO, Accepted]
           ),
         IO.delay(releaseFunctionWasCalled.set(false))
       ).unsafeRunSync() shouldBe SchedulingError(exception)
@@ -110,7 +110,7 @@ class ConcurrentProcessesLimiterSpec
       tryExecuting(
         (deferred: Deferred[IO, Unit]) =>
           EitherT
-            .rightT[IO, EventSchedulingResult](Accepted: EventSchedulingResult)
+            .rightT[IO, EventSchedulingResult](Accepted)
             .semiflatTap(_ => deferred.complete(())),
         IO.delay(releaseFunctionWasCalled.set(true)) >> exceptions.generateOne.raiseError[IO, Unit]
       ).unsafeRunSync() shouldBe Accepted
@@ -124,7 +124,7 @@ class ConcurrentProcessesLimiterSpec
       (() => semaphore.available).expects().returning(0L.pure[IO])
 
       tryExecuting(
-        _ => EitherT.rightT[IO, EventSchedulingResult](Accepted: EventSchedulingResult),
+        _ => EitherT.rightT[IO, EventSchedulingResult](Accepted),
         IO.unit
       ).unsafeRunSync() shouldBe Busy
     }
@@ -136,7 +136,7 @@ class ConcurrentProcessesLimiterSpec
 
       intercept[Exception] {
         tryExecuting(
-          _ => EitherT.rightT[IO, EventSchedulingResult](Accepted: EventSchedulingResult),
+          _ => EitherT.rightT[IO, EventSchedulingResult](Accepted),
           IO.unit
         ).unsafeRunSync()
       }.getMessage shouldBe exception.getMessage
@@ -153,30 +153,31 @@ class ConcurrentProcessesLimiterSpec
 
       intercept[Exception] {
         tryExecuting(
-          _ => EitherT.rightT[IO, EventSchedulingResult](Accepted: EventSchedulingResult),
+          _ => EitherT.rightT[IO, EventSchedulingResult](Accepted),
           IO.unit
         ).unsafeRunSync()
       }.getMessage shouldBe exception.getMessage
     }
 
-  }
+    s"execute a process and return the result $Accepted" in new TestCase {
+      withoutLimit
+        .tryExecuting(resultWithoutLimit(EitherT.rightT(Accepted)))
+        .unsafeRunSync() shouldBe Accepted
+    }
 
-  "withoutLimit" should {
-    Set(Accepted, BadRequest).foreach { result =>
-      s"execute a process and return the result $result" in new TestCase {
-        withoutLimit
-          .tryExecuting(resultWithoutLimit(IO(result)))
-          .unsafeRunSync() shouldBe result
-      }
+    s"execute a process and return the result $BadRequest" in new TestCase {
+      withoutLimit
+        .tryExecuting(resultWithoutLimit(EitherT.leftT(BadRequest)))
+        .unsafeRunSync() shouldBe BadRequest
     }
 
     "return a SchedulingError if the process fails" in new TestCase {
 
       val exception = exceptions.generateOne
-      val process   = exception.raiseError[IO, EventSchedulingResult]
+      val process   = exception.raiseError[IO, Accepted]
 
       withoutLimit
-        .tryExecuting(resultWithoutLimit(process))
+        .tryExecuting(resultWithoutLimit(EitherT.right(process)))
         .unsafeRunSync() shouldBe SchedulingError(exception)
     }
   }
@@ -190,10 +191,10 @@ class ConcurrentProcessesLimiterSpec
     val limiter      = new ConcurrentProcessesLimiterImpl[IO](processesCount, semaphore)
     val withoutLimit = ConcurrentProcessesLimiter.withoutLimit[IO]
 
-    def resultWithoutLimit(result: IO[EventSchedulingResult]): EventHandlingProcess[IO] =
-      EventHandlingProcess[IO](EitherT.right(result)).unsafeRunSync()
+    def resultWithoutLimit(result: EitherT[IO, EventSchedulingResult, Accepted]): EventHandlingProcess[IO] =
+      EventHandlingProcess[IO](result).unsafeRunSync()
 
-    def tryExecuting(process:        Deferred[IO, Unit] => EitherT[IO, EventSchedulingResult, EventSchedulingResult],
+    def tryExecuting(process:        Deferred[IO, Unit] => EitherT[IO, EventSchedulingResult, Accepted],
                      releaseProcess: IO[Unit]
     ): IO[EventSchedulingResult] =
       for {

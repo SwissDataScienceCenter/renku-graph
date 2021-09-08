@@ -19,6 +19,7 @@
 package ch.datascience.commiteventservice.events.categories.commitsync
 
 import cats.MonadThrow
+import cats.data.EitherT
 import cats.data.EitherT.fromEither
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
@@ -51,17 +52,20 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow: ContextShift: 
   ): Interpretation[EventHandlingProcess[Interpretation]] =
     EventHandlingProcess[Interpretation](startSynchronizingEvents(request))
 
-  private def startSynchronizingEvents(request: EventRequestContent) = for {
-    event <-
-      fromEither[Interpretation](
-        request.event.as[CommitSyncEvent].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult]
-      )
-    result <- (ContextShift[Interpretation].shift *> Concurrent[Interpretation]
-                .start(synchronizeEvents(event) recoverWith logError(event))).toRightT
-                .map(_ => Accepted: EventSchedulingResult)
-                .semiflatTap(logger log event)
-                .leftSemiflatTap(logger log event)
-  } yield result
+  private def startSynchronizingEvents(
+      request: EventRequestContent
+  ): EitherT[Interpretation, EventSchedulingResult, Accepted] =
+    for {
+      event <-
+        fromEither[Interpretation](
+          request.event.as[CommitSyncEvent].leftMap(_ => BadRequest)
+        )
+      result <- (ContextShift[Interpretation].shift *> Concurrent[Interpretation]
+                  .start(synchronizeEvents(event) recoverWith logError(event))).toRightT
+                  .map(_ => Accepted)
+                  .semiflatTap(logger log event)
+                  .leftSemiflatTap(logger log event)
+    } yield result
 
   private implicit lazy val eventInfoToString: CommitSyncEvent => String = _.toString
 

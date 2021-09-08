@@ -63,7 +63,7 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow: ContextShift: 
     for {
       event <-
         fromEither[Interpretation](
-          request.event.as[GlobalCommitSyncEvent].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult]
+          request.event.as[GlobalCommitSyncEvent].leftMap(_ => BadRequest)
         )
       result <-
         (ContextShift[Interpretation].shift *> Concurrent[Interpretation]
@@ -72,7 +72,7 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow: ContextShift: 
               .flatMap(_ => deferred.complete(()))
               .recoverWith(finishProcessAndLogError(deferred, event))
           )).toRightT
-          .map(_ => Accepted: EventSchedulingResult)
+          .map(_ => Accepted)
           .semiflatTap(logger log event)
           .leftSemiflatTap(logger log event)
     } yield result

@@ -23,7 +23,7 @@ import cats.data.EitherT
 import cats.effect.concurrent.Semaphore
 import cats.effect.{Concurrent, ContextShift, IO}
 import cats.syntax.all._
-import ch.datascience.events.consumers.EventSchedulingResult.{Busy, SchedulingError}
+import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, Busy, SchedulingError}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
 
@@ -47,9 +47,10 @@ object ConcurrentProcessesLimiter {
       override def tryExecuting(
           scheduledProcess: EventHandlingProcess[Interpretation]
       ): Interpretation[EventSchedulingResult] =
-        scheduledProcess.process.merge.flatTap(_ =>
-          releaseIfNecessary(scheduledProcess.maybeReleaseProcess)
-        ) recoverWith { case NonFatal(error) =>
+        scheduledProcess.process
+          .widen[EventSchedulingResult]
+          .merge
+          .flatTap(_ => releaseIfNecessary(scheduledProcess.maybeReleaseProcess)) recoverWith { case NonFatal(error) =>
           releaseIfNecessary(scheduledProcess.maybeReleaseProcess).map(_ =>
             EventSchedulingResult.SchedulingError(error)
           )
@@ -87,15 +88,15 @@ class ConcurrentProcessesLimiterImpl[Interpretation[_]: MonadThrow: ContextShift
     process.process.semiflatTap { _ =>
       Concurrent[Interpretation].start(waitForRelease(process))
     } recoverWith releaseOnLeft
-  }.merge recoverWith releaseOnError
+  }.widen[EventSchedulingResult].merge recoverWith releaseOnError
 
   private def waitForRelease(process: EventHandlingProcess[Interpretation]) =
     process.waitToFinish() >> releaseAndNotify(process).void
 
-  private lazy val releaseOnLeft: PartialFunction[EventSchedulingResult,
-                                                  EitherT[Interpretation, EventSchedulingResult, EventSchedulingResult]
-  ] = { case eventSchedulingResult =>
-    EitherT.left(semaphore.release.map(_ => eventSchedulingResult))
+  private lazy val releaseOnLeft
+      : PartialFunction[EventSchedulingResult, EitherT[Interpretation, EventSchedulingResult, Accepted]] = {
+    case eventSchedulingResult =>
+      EitherT.left(semaphore.release.map(_ => eventSchedulingResult))
   }
 
   private lazy val releaseOnError: PartialFunction[Throwable, Interpretation[EventSchedulingResult]] = {

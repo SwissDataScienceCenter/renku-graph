@@ -28,7 +28,7 @@ import cats.syntax.all._
 import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
-import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventRequestContent, EventSchedulingResult}
+import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventRequestContent}
 import ch.datascience.graph.model.RenkuVersionPair
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventBody}
 import ch.datascience.metrics.MetricsRegistry
@@ -70,7 +70,7 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow: ConcurrentEffe
             eventProcessor.process(eventId, commitEvents, schemaVersion) >> deferred.complete(())
           )
           .toRightT
-          .map(_ => Accepted: EventSchedulingResult)
+          .map(_ => Accepted)
           .semiflatTap(logger.log(eventId -> commitEvents))
           .leftSemiflatTap(logger.log(eventId -> commitEvents))
     } yield result

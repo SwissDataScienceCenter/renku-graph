@@ -35,6 +35,7 @@ object Project {
 sealed trait EventSchedulingResult extends Product with Serializable
 
 object EventSchedulingResult {
+  type Accepted = Accepted.type
   case object Accepted             extends EventSchedulingResult
   case object Busy                 extends EventSchedulingResult
   case object UnsupportedEventType extends EventSchedulingResult
@@ -48,9 +49,11 @@ object EventRequestContent {
   def apply(event: Json): EventRequestContent = EventRequestContent(event, None)
 }
 
+import EventSchedulingResult._
+
 class EventHandlingProcess[Interpretation[_]: Concurrent] private (
     deferred:                Deferred[Interpretation, Unit],
-    val process:             EitherT[Interpretation, EventSchedulingResult, EventSchedulingResult],
+    val process:             EitherT[Interpretation, EventSchedulingResult, Accepted],
     val maybeReleaseProcess: Option[Interpretation[Unit]] = None
 ) {
   def waitToFinish(): Interpretation[Unit] = deferred.get
@@ -58,7 +61,7 @@ class EventHandlingProcess[Interpretation[_]: Concurrent] private (
 
 object EventHandlingProcess {
   def withWaitingForCompletion[Interpretation[_]: Concurrent](
-      process:        Deferred[Interpretation, Unit] => EitherT[Interpretation, EventSchedulingResult, EventSchedulingResult],
+      process:        Deferred[Interpretation, Unit] => EitherT[Interpretation, EventSchedulingResult, Accepted],
       releaseProcess: Interpretation[Unit]
   ): Interpretation[EventHandlingProcess[Interpretation]] =
     Deferred[Interpretation, Unit].map(deferred =>
@@ -66,7 +69,7 @@ object EventHandlingProcess {
     )
 
   def apply[Interpretation[_]: Concurrent](
-      process: EitherT[Interpretation, EventSchedulingResult, EventSchedulingResult]
+      process: EitherT[Interpretation, EventSchedulingResult, Accepted]
   ): Interpretation[EventHandlingProcess[Interpretation]] = for {
     deferred <- Deferred[Interpretation, Unit]
     _        <- deferred.complete(())
