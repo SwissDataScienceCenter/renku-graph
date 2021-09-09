@@ -101,7 +101,7 @@ class ProjectDatasetsFinderSpec
 
       loadToStore(originalProject, project)
 
-      datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() shouldBe List(
+      datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() should contain theSameElementsAs List(
         (dataset1.identification.identifier,
          InitialVersion(dataset1.identification.identifier),
          dataset1.identification.title,
@@ -116,7 +116,7 @@ class ProjectDatasetsFinderSpec
          dataset2.provenance.sameAs.asLeft,
          original.additionalInfo.images
         )
-      ).sortBy(_._3)
+      )
     }
 
     "return None if there are no datasets in the project" in new TestCase {

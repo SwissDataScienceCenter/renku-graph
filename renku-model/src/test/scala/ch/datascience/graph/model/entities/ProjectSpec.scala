@@ -25,7 +25,6 @@ import ch.datascience.graph.model.Schemas.{prov, renku, schema}
 import ch.datascience.graph.model._
 import ch.datascience.graph.model.entities.Project.ProjectMember
 import ch.datascience.graph.model.testentities._
-import ch.datascience.graph.model.testentities.generators.EntitiesGenerators.{datasetEntities, provenanceImportedExternal, provenanceInternal, provenanceModified}
 import io.circe.DecodingFailure
 import io.renku.jsonld.JsonLDDecoder._
 import io.renku.jsonld.JsonLDEncoder.encodeOption

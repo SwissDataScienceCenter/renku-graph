@@ -46,8 +46,8 @@ object GraphModelGenerators {
     .map(_.mkString("."))
     .map(CliVersion.apply)
 
-  implicit val usernames:        Gen[users.Username]    = nonEmptyStrings() map Username.apply
-  implicit val userAffiliations: Gen[users.Affiliation] = nonEmptyStrings() map Affiliation.apply
+  implicit val usernames:        Gen[users.Username]    = nonBlankStrings(minLength = 5).map(v => Username(v.value))
+  implicit val userAffiliations: Gen[users.Affiliation] = nonBlankStrings(minLength = 4).map(v => Affiliation(v.value))
 
   implicit val userEmails: Gen[users.Email] = {
     val firstCharGen    = frequency(6 -> alphaChar, 2 -> numChar, 1 -> oneOf("!#$%&*+-/=?_~".toList))
@@ -64,8 +64,14 @@ object GraphModelGenerators {
   }
 
   implicit val userNames: Gen[users.Name] = for {
-    first  <- nonEmptyStrings(charsGenerator = frequency(9 -> alphaChar, 1 -> oneOf('-', '_', '\\', '/', '`')))
-    second <- nonEmptyStrings(charsGenerator = frequency(9 -> alphaChar, 1 -> oneOf('-', '_', '\\', '/', '`')))
+    first <- nonBlankStrings(
+               minLength = 3,
+               charsGenerator = frequency(9 -> alphaChar, 1 -> oneOf('-', '_', '\\', '/', '`'))
+             )
+    second <- nonBlankStrings(
+                minLength = 3,
+                charsGenerator = frequency(9 -> alphaChar, 1 -> oneOf('-', '_', '\\', '/', '`'))
+              )
   } yield Name(s"$first $second")
 
   implicit val userResourceIds: Gen[users.ResourceId] = userResourceIds(userEmails.toGeneratorOfOptions)
