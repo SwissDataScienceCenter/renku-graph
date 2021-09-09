@@ -31,7 +31,6 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.ExecutionContext
 
 trait RenkuVersionPairUpdater[Interpretation[_]] {
-
   def update(versionPair: RenkuVersionPair): Interpretation[Unit]
 }
 
@@ -50,6 +49,7 @@ private class RenkuVersionPairUpdaterImpl(rdfStoreConfig: RdfStoreConfig,
 )(implicit executionContext:                              ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
     with RenkuVersionPairUpdater[IO] {
+
   override def update(versionPair: RenkuVersionPair): IO[Unit] = updateWithNoResult {
     val entityId = (renkuBaseUrl / "version-pair").showAs[RdfResource]
     SparqlQuery.of(

@@ -18,8 +18,8 @@
 
 package ch.datascience.triplesgenerator.reprovisioning
 
-import cats.MonadError
-import cats.data.{NonEmptyList, OptionT}
+import cats.MonadThrow
+import cats.data.NonEmptyList
 import cats.effect.Timer
 import cats.syntax.all._
 import ch.datascience.graph.config.RenkuBaseUrlLoader
@@ -38,7 +38,7 @@ trait ReProvisioning[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
-class ReProvisioningImpl[Interpretation[_]](
+class ReProvisioningImpl[Interpretation[_]: MonadThrow: Timer](
     renkuVersionPairFinder:    RenkuVersionPairFinder[Interpretation],
     versionCompatibilityPairs: NonEmptyList[RenkuVersionPair],
     reprovisionJudge:          ReProvisionJudge,
@@ -49,42 +49,38 @@ class ReProvisioningImpl[Interpretation[_]](
     executionTimeRecorder:     ExecutionTimeRecorder[Interpretation],
     logger:                    Logger[Interpretation],
     sleepWhenBusy:             FiniteDuration
-)(implicit ME:                 MonadError[Interpretation, Throwable], timer: Timer[Interpretation])
-    extends ReProvisioning[Interpretation] {
+) extends ReProvisioning[Interpretation] {
 
   import eventsReScheduler._
   import executionTimeRecorder._
   import reprovisionJudge.isReProvisioningNeeded
   import triplesRemover._
 
-  override def run(): Interpretation[Unit] =
-    (for {
-      currentVersionPair <- OptionT(renkuVersionPairFinder.find() recoverWith tryAgain(renkuVersionPairFinder.find()))
-      _                  <- OptionT.liftF(decideIfReProvisioningRequired(currentVersionPair))
-    } yield ()).value.void
+  override def run(): Interpretation[Unit] = for {
+    maybeVersionPairInKG <- renkuVersionPairFinder.find() recoverWith tryAgain(renkuVersionPairFinder.find())
+    _                    <- decideIfReProvisioningRequired(maybeVersionPairInKG)
+  } yield ()
 
-  private def decideIfReProvisioningRequired(currentVersionPair: RenkuVersionPair) =
-    if (isReProvisioningNeeded(currentVersionPair, versionCompatibilityPairs)) {
+  private def decideIfReProvisioningRequired(maybeVersionPairInKG: Option[RenkuVersionPair]) =
+    if (isReProvisioningNeeded(maybeVersionPairInKG, versionCompatibilityPairs))
       triggerReProvisioning recoverWith tryAgain(triggerReProvisioning)
-    } else {
+    else
       renkuVersionPairUpdater
         .update(versionCompatibilityPairs.head)
         .flatMap(_ => logger.info("All projects' triples up to date"))
-    }
 
-  private def triggerReProvisioning =
-    measureExecutionTime {
-      for {
-        _ <- logger.info("The triples are not up to date - re-provisioning is clearing DB")
-        _ <- reProvisioningStatus.setRunning() recoverWith tryAgain(reProvisioningStatus.setRunning())
-        _ <- renkuVersionPairUpdater.update(versionCompatibilityPairs.head) recoverWith tryAgain(
-               renkuVersionPairUpdater.update(versionCompatibilityPairs.head)
-             )
-        _ <- removeAllTriples() recoverWith tryAgain(removeAllTriples())
-        _ <- triggerEventsReScheduling() recoverWith tryAgain(triggerEventsReScheduling())
-        _ <- reProvisioningStatus.clear() recoverWith tryAgain(reProvisioningStatus.clear())
-      } yield ()
-    } flatMap logSummary
+  private def triggerReProvisioning = measureExecutionTime {
+    for {
+      _ <- logger.info("The triples are not up to date - re-provisioning is clearing DB")
+      _ <- reProvisioningStatus.setRunning() recoverWith tryAgain(reProvisioningStatus.setRunning())
+      _ <- renkuVersionPairUpdater.update(versionCompatibilityPairs.head) recoverWith tryAgain(
+             renkuVersionPairUpdater.update(versionCompatibilityPairs.head)
+           )
+      _ <- removeAllTriples() recoverWith tryAgain(removeAllTriples())
+      _ <- triggerEventsReScheduling() recoverWith tryAgain(triggerEventsReScheduling())
+      _ <- reProvisioningStatus.clear() recoverWith tryAgain(reProvisioningStatus.clear())
+    } yield ()
+  } flatMap logSummary
 
   private def logSummary: ((ElapsedTime, Unit)) => Interpretation[Unit] = { case (elapsedTime, _) =>
     logger.info(s"Clearing DB finished in ${elapsedTime}ms - re-processing all the events")
@@ -95,7 +91,7 @@ class ReProvisioningImpl[Interpretation[_]](
       {
         for {
           _      <- logger.error(exception)("Re-provisioning failure")
-          _      <- timer sleep sleepWhenBusy
+          _      <- Timer[Interpretation] sleep sleepWhenBusy
           result <- step
         } yield result
       } recoverWith tryAgain(step)

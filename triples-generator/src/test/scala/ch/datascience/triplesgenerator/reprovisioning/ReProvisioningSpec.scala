@@ -22,11 +22,11 @@ import cats.effect.{IO, Timer}
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.RenkuVersionPair
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.triplesgenerator.generators.VersionGenerators._
-import ch.datascience.graph.model.RenkuVersionPair
 import eu.timepit.refined.auto._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -45,10 +45,10 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       inSequence {
         (renkuVersionPairFinder.find _)
           .expects()
-          .returning(IO(currentVersionCompatibilityPair.some))
+          .returning(IO(maybeCurrentVersionCompatibilityPair))
 
         (reprovisionJudge.isReProvisioningNeeded _)
-          .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
+          .expects(maybeCurrentVersionCompatibilityPair, versionCompatibilityPairs)
           .returning(true)
 
         (reProvisioningStatus.setRunning _)
@@ -83,10 +83,10 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
     "do nothing if there all RDF store is up to date" in new TestCase {
       (renkuVersionPairFinder.find _)
         .expects()
-        .returning(IO(currentVersionCompatibilityPair.some))
+        .returning(IO(maybeCurrentVersionCompatibilityPair))
 
       (reprovisionJudge.isReProvisioningNeeded _)
-        .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
+        .expects(maybeCurrentVersionCompatibilityPair, versionCompatibilityPairs)
         .returning(false)
 
       (renkuVersionPairUpdater.update _)
@@ -102,17 +102,16 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       val exception = exceptions.generateOne
 
       inSequence {
-
         (renkuVersionPairFinder.find _)
           .expects()
           .returning(exception.raiseError[IO, Option[RenkuVersionPair]])
 
         (renkuVersionPairFinder.find _)
           .expects()
-          .returning(currentVersionCompatibilityPair.some.pure[IO])
+          .returning(maybeCurrentVersionCompatibilityPair.pure[IO])
 
         (reprovisionJudge.isReProvisioningNeeded _)
-          .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
+          .expects(maybeCurrentVersionCompatibilityPair, versionCompatibilityPairs)
           .returning(false)
 
         (renkuVersionPairUpdater.update _)
@@ -134,10 +133,10 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       inSequence {
         (renkuVersionPairFinder.find _)
           .expects()
-          .returning(currentVersionCompatibilityPair.some.pure[IO])
+          .returning(maybeCurrentVersionCompatibilityPair.pure[IO])
 
         (reprovisionJudge.isReProvisioningNeeded _)
-          .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
+          .expects(maybeCurrentVersionCompatibilityPair, versionCompatibilityPairs)
           .returning(true)
 
         (reProvisioningStatus.setRunning _)
@@ -181,10 +180,10 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
 
         (renkuVersionPairFinder.find _)
           .expects()
-          .returning(currentVersionCompatibilityPair.some.pure[IO])
+          .returning(maybeCurrentVersionCompatibilityPair.pure[IO])
 
         (reprovisionJudge.isReProvisioningNeeded _)
-          .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
+          .expects(maybeCurrentVersionCompatibilityPair, versionCompatibilityPairs)
           .returning(true)
 
         (reProvisioningStatus.setRunning _)
@@ -228,10 +227,10 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
 
         (renkuVersionPairFinder.find _)
           .expects()
-          .returning(currentVersionCompatibilityPair.some.pure[IO])
+          .returning(maybeCurrentVersionCompatibilityPair.pure[IO])
 
         (reprovisionJudge.isReProvisioningNeeded _)
-          .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
+          .expects(maybeCurrentVersionCompatibilityPair, versionCompatibilityPairs)
           .returning(true)
 
         (reProvisioningStatus.setRunning _)
@@ -276,10 +275,10 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
 
         (renkuVersionPairFinder.find _)
           .expects()
-          .returning(currentVersionCompatibilityPair.some.pure[IO])
+          .returning(maybeCurrentVersionCompatibilityPair.pure[IO])
 
         (reprovisionJudge.isReProvisioningNeeded _)
-          .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
+          .expects(maybeCurrentVersionCompatibilityPair, versionCompatibilityPairs)
           .returning(true)
 
         (reProvisioningStatus.setRunning _)
@@ -328,10 +327,10 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
 
         (renkuVersionPairFinder.find _)
           .expects()
-          .returning(currentVersionCompatibilityPair.some.pure[IO])
+          .returning(maybeCurrentVersionCompatibilityPair.pure[IO])
 
         (reprovisionJudge.isReProvisioningNeeded _)
-          .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
+          .expects(maybeCurrentVersionCompatibilityPair, versionCompatibilityPairs)
           .returning(true)
 
         (reProvisioningStatus.setRunning _)
@@ -367,22 +366,21 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
         Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
     }
-
   }
 
   private implicit val timer: Timer[IO] = IO.timer(global)
 
   private trait TestCase {
-    val versionCompatibilityPairs       = renkuVersionPairs.generateNonEmptyList(2)
-    val currentVersionCompatibilityPair = renkuVersionPairs.generateOne
-    val renkuVersionPairFinder          = mock[RenkuVersionPairFinder[IO]]
-    val reprovisionJudge                = mock[ReProvisionJudge]
-    val triplesRemover                  = mock[TriplesRemover[IO]]
-    val eventsReScheduler               = mock[EventsReScheduler[IO]]
-    val renkuVersionPairUpdater         = mock[RenkuVersionPairUpdater[IO]]
-    val reProvisioningStatus            = mock[ReProvisioningStatus[IO]]
-    val logger                          = TestLogger[IO]()
-    val executionTimeRecorder           = TestExecutionTimeRecorder(logger)
+    val versionCompatibilityPairs            = renkuVersionPairs.generateNonEmptyList(2)
+    val maybeCurrentVersionCompatibilityPair = renkuVersionPairs.generateOption
+    val renkuVersionPairFinder               = mock[RenkuVersionPairFinder[IO]]
+    val reprovisionJudge                     = mock[ReProvisionJudge]
+    val triplesRemover                       = mock[TriplesRemover[IO]]
+    val eventsReScheduler                    = mock[EventsReScheduler[IO]]
+    val renkuVersionPairUpdater              = mock[RenkuVersionPairUpdater[IO]]
+    val reProvisioningStatus                 = mock[ReProvisioningStatus[IO]]
+    val logger                               = TestLogger[IO]()
+    val executionTimeRecorder                = TestExecutionTimeRecorder(logger)
     val reProvisioning = new ReProvisioningImpl[IO](
       renkuVersionPairFinder,
       versionCompatibilityPairs,
@@ -393,7 +391,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       reProvisioningStatus,
       executionTimeRecorder,
       logger,
-      5 millis
+      250 millis
     )
   }
 }
