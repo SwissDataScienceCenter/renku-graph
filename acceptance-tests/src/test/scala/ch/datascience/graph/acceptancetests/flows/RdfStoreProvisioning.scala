@@ -28,6 +28,7 @@ import ch.datascience.graph.acceptancetests.tooling.GraphServices._
 import ch.datascience.graph.acceptancetests.tooling.ModelImplicits
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.model.EventsGenerators.commitIds
+import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
 import ch.datascience.webhookservice.model.HookToken
@@ -41,10 +42,10 @@ object RdfStoreProvisioning extends ModelImplicits with Eventually with Acceptan
 
   def `data in the RDF store`(
       project:            data.Project,
-      triples:            JsonLD
+      triples:            JsonLD,
+      commitId:           CommitId = commitIds.generateOne
   )(implicit accessToken: AccessToken): Assertion = {
     val projectId = project.id
-    val commitId  = commitIds.generateOne
 
     givenAccessTokenPresentFor(project)
 

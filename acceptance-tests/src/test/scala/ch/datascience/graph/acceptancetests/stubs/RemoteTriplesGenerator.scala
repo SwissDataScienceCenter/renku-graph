@@ -18,15 +18,11 @@
 
 package ch.datascience.graph.acceptancetests.stubs
 
-import cats.syntax.all._
-import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.data
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.tooling.TestLogger
 import ch.datascience.graph.model._
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.testentities.generators.EntitiesGenerators._
-import ch.datascience.graph.model.testentities.{ExecutionPlanner, Person, Plan}
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.client.{MappingBuilder, WireMock}
@@ -37,7 +33,6 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
-import org.scalatest.Assertions.fail
 
 object RemoteTriplesGenerator extends RdfStoreData {
 
@@ -46,21 +41,12 @@ object RemoteTriplesGenerator extends RdfStoreData {
 
   def `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(
       project:             data.Project,
-      commitId:            CommitId,
-      author:              Person,
-      cliVersion:          CliVersion = currentVersionPair.cliVersion
+      commitId:            CommitId
   )(implicit gitLabApiUrl: GitLabApiUrl, renkuBaseUrl: RenkuBaseUrl): Unit =
     `GET <triples-generator>/projects/:id/commits/:id returning OK`(
       project,
       commitId,
-      ExecutionPlanner(
-        Plan(planNames.generateOne, planCommands.generateOne, commandParameterFactories = Nil),
-        (activities.StartTime(project.entitiesProject.dateCreated.value), author, cliVersion),
-        parametersValueOverrides = Nil,
-        inputsValueOverrides = Nil,
-        outputsValueOverrides = Nil,
-        project.entitiesProject.dateCreated
-      ).buildProvenanceGraph.fold(errors => fail(errors.intercalate("\n")), identity).asJsonLD
+      project.entitiesProject.asJsonLD.flatten.fold(throw _, identity)
     )
 
   def `GET <triples-generator>/projects/:id/commits/:id returning OK`(

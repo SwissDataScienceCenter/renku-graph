@@ -132,8 +132,7 @@ class EventsProcessingStatusSpec
         `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project.id, commitId)
 
       // making the triples generation process happy and not throwing exceptions to the logs
-      val committer = personEntities.generateOne
-      `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId, committer)
+      `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
       `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project)
     }
 

@@ -70,11 +70,10 @@ class ZombieEventDetectionSpec
     val project   = dataProjects(projectEntities(visibilityPublic)).generateOne
     val projectId = project.id
     val commitId  = commitIds.generateOne
-    val committer = personEntities.generateOne
     val eventDate = eventDates.generateOne
 
     Given("Triples generation is successful")
-    `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId, committer)
+    `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
 
     And("project members/users exists in GitLab")
     `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project)

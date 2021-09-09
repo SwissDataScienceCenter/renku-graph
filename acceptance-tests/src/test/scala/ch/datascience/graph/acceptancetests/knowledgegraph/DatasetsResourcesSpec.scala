@@ -41,7 +41,6 @@ import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import eu.timepit.refined.auto._
 import io.circe.literal._
 import io.circe.{Encoder, Json}
-import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
@@ -75,7 +74,7 @@ class DatasetsResourcesSpec
     Scenario("As a user I would like to find project's datasets by calling a REST endpoint") {
 
       Given("some data in the RDF Store")
-      `data in the RDF store`(project, JsonLD.arr(dataset1.asJsonLD, dataset2.asJsonLD, dataset2Modified.asJsonLD))
+      `data in the RDF store`(project, testEntitiesProject.asJsonLD)
       `wait for events to be processed`(project.id)
 
       And("the project exists in GitLab")
@@ -302,9 +301,7 @@ class DatasetsResourcesSpec
     }
 
     def pushToStore(project: testentities.Project)(implicit accessToken: AccessToken): Unit = {
-      val dataProject = dataProjects(project).generateOne
-      `data in the RDF store`(dataProject, project.asJsonLD)
-      `wait for events to be processed`(dataProject.id)
+      `data in the RDF store`(dataProjects(project).generateOne, project.asJsonLD)
       ()
     }
   }

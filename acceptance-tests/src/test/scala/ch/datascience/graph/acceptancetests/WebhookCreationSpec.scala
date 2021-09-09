@@ -84,14 +84,13 @@ class WebhookCreationSpec
 
       Given("some Commit exists for the project in GitLab")
       givenAccessTokenPresentFor(project)
-      val commitId  = commitIds.generateOne
-      val committer = personEntities.generateOne
+      val commitId = commitIds.generateOne
       `GET <gitlabApi>/projects/:id/repository/commits returning OK with a commit`(projectId, commitId)
       `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
 
       // making the triples generation be happy and not throwing exceptions to the logs
       `GET <gitlabApi>/projects/:path returning OK with`(project)
-      `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId, committer)
+      `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
       `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project)
 
       When("user does POST webhook-service/projects/:id/webhooks")

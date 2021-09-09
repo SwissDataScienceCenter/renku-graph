@@ -34,7 +34,6 @@ import ch.datascience.graph.model.{SchemaVersion, testentities}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.triplesgenerator
 import io.circe.Json
-import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 import org.http4s.Response
 import org.http4s.Status.Ok
@@ -45,7 +44,7 @@ import org.scalatest.concurrent.Eventually.eventually
 import org.scalatest.enablers.Retrying
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
-import org.scalatest.time.{Millis, Minutes, Span}
+import org.scalatest.time.{Minutes, Seconds, Span}
 
 class ReProvisioningSpec
     extends AnyFeatureSpec
@@ -67,7 +66,7 @@ class ReProvisioningSpec
       val project  = dataProjects(testEntitiesProject).generateOne
       val commitId = commitIds.generateOne
 
-      `data in the RDF store`(project, JsonLD.arr(activity.asJsonLD))
+      `data in the RDF store`(project, project.entitiesProject.asJsonLD, commitId)
 
       `GET <gitlabApi>/projects/:path returning OK with`(project, withStatistics = true)
       val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)
@@ -75,19 +74,18 @@ class ReProvisioningSpec
       projectDetailsResponseIsValid(projectDetailsResponse, initialProjectSchemaVersion)
 
       val newSchemaVersion = SchemaVersion(nonEmptyStrings().generateOne)
-      val newActivity = executionPlanners(
-        planEntities(),
-        projectEntities(visibilityPublic).map(_.copy(version = newSchemaVersion)).generateOne
-      ).generateOne
-        .buildProvenanceUnsafe()
+      val testEntitiesProjectWithNewSchemaVersion = project.entitiesProject match {
+        case p: testentities.ProjectWithParent    => p.copy(version = newSchemaVersion)
+        case p: testentities.ProjectWithoutParent => p.copy(version = newSchemaVersion)
+      }
 
       `GET <triples-generator>/projects/:id/commits/:id returning OK`(project,
                                                                       commitId,
-                                                                      JsonLD.arr(newActivity.asJsonLD)
+                                                                      testEntitiesProjectWithNewSchemaVersion.asJsonLD
       )
 
       When("The compatibility matrix is updated and the TG is restarted")
-      restartTGWithNewCompatMatrix("application-re-provisioning.conf")
+      restartTGWithNewCompatMatrix()
 
       Then("Re-provisioning is triggered")
       And("The new data can be queried in Jena")
@@ -95,7 +93,6 @@ class ReProvisioningSpec
       `GET <gitlabApi>/projects/:path returning OK with`(project, withStatistics = true)
 
       eventually {
-
         val updatedProjectDetailsResponse =
           knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)
         projectDetailsResponseIsValid(updatedProjectDetailsResponse, newSchemaVersion)
@@ -109,12 +106,13 @@ class ReProvisioningSpec
     implicit val accessToken: AccessToken = accessTokens.generateOne
     val initialProjectSchemaVersion = SchemaVersion("8")
 
-    val testEntitiesProject = projectEntities(visibilityPublic).generateOne.copy(version = initialProjectSchemaVersion)
-    val activity: testentities.Activity =
-      executionPlanners(planEntities(), testEntitiesProject).generateOne.buildProvenanceUnsafe()
+    val testEntitiesProject = projectEntities(visibilityPublic)
+      .map(_.copy(version = initialProjectSchemaVersion))
+      .withActivities(activityEntities(planEntities()))
+      .generateOne
 
     val patience: org.scalatest.concurrent.Eventually.PatienceConfig =
-      Eventually.PatienceConfig(timeout = Span(20, Minutes), interval = Span(30000, Millis))
+      Eventually.PatienceConfig(timeout = Span(20, Minutes), interval = Span(10, Seconds))
   }
 
   private def projectDetailsResponseIsValid(projectDetailsResponse:       Response[IO],
@@ -126,15 +124,14 @@ class ReProvisioningSpec
     projectSchemaVersion shouldBe expectedProjectSchemaVersion.value
   }
 
-  private def restartTGWithNewCompatMatrix(configFilename: String): Unit = {
+  private def restartTGWithNewCompatMatrix(): Unit = {
     val newTriplesGenerator = ServiceRun(
       "triples-generator",
       service = triplesgenerator.Microservice,
       serviceClient = triplesGeneratorClient,
-      serviceArgsList = List(() => configFilename)
+      serviceArgsList = List(() => "application-re-provisioning.conf")
     )
     stop(newTriplesGenerator.name)
     GraphServices.run(newTriplesGenerator)
   }
-
 }
