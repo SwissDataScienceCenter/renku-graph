@@ -18,11 +18,15 @@
 
 package io.renku.eventlog.subscriptions.membersync
 
+import cats.Show
+import cats.implicits.showInterpolator
 import ch.datascience.graph.model.projects
 import io.renku.eventlog.subscriptions.EventEncoder
 
-private final case class MemberSyncEvent(projectPath: projects.Path) {
-  override lazy val toString: String = s"$MemberSyncEvent projectPath = $projectPath"
+private final case class MemberSyncEvent(projectPath: projects.Path)
+
+private object MemberSyncEvent {
+  implicit lazy val show: Show[MemberSyncEvent] = Show.show(event => show"MemberSyncEvent ${event.projectPath}")
 }
 
 private object MemberSyncEventEncoder extends EventEncoder[MemberSyncEvent] {

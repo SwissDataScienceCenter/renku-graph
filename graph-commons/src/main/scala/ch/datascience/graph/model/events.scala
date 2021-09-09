@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.model
 
+import cats.Show
 import cats.syntax.all._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
@@ -33,10 +34,16 @@ import java.time.{Clock, Duration, Instant}
 object events {
 
   final class CategoryName private (val value: String) extends AnyVal with StringTinyType
-  implicit object CategoryName extends TinyTypeFactory[CategoryName](new CategoryName(_)) with NonBlank
+  implicit object CategoryName extends TinyTypeFactory[CategoryName](new CategoryName(_)) with NonBlank {
+    implicit lazy val show: Show[CategoryName] = Show.show(_.value)
+  }
 
   final case class CompoundEventId(id: EventId, projectId: projects.Id) {
     override lazy val toString: String = s"id = $id, projectId = $projectId"
+  }
+
+  object CompoundEventId {
+    implicit lazy val show: Show[CompoundEventId] = Show.show(id => show"${id.id}, ${id.projectId}")
   }
 
   final case class EventDetails(id: EventId, projectId: projects.Id, eventBody: EventBody) {
@@ -62,7 +69,9 @@ object events {
   }
 
   final class EventId private (val value: String) extends AnyVal with StringTinyType
-  implicit object EventId extends TinyTypeFactory[EventId](new EventId(_)) with NonBlank
+  implicit object EventId extends TinyTypeFactory[EventId](new EventId(_)) with NonBlank {
+    implicit lazy val show: Show[EventId] = Show.show(id => show"id = ${id.value}")
+  }
 
   final class EventBody private (val value: String) extends AnyVal with StringTinyType
   implicit object EventBody extends TinyTypeFactory[EventBody](new EventBody(_)) with NonBlank {
@@ -138,31 +147,45 @@ object events {
 
     sealed trait FailureStatus extends EventStatus
 
+    type GenerationRecoverableFailure = GenerationRecoverableFailure.type
     final case object GenerationRecoverableFailure extends FailureStatus {
       override val value: String = "GENERATION_RECOVERABLE_FAILURE"
     }
-    type GenerationRecoverableFailure = GenerationRecoverableFailure.type
 
+    type GenerationNonRecoverableFailure = GenerationNonRecoverableFailure.type
     final case object GenerationNonRecoverableFailure extends FailureStatus with FinalStatus {
       override val value: String = "GENERATION_NON_RECOVERABLE_FAILURE"
     }
-    type GenerationNonRecoverableFailure = GenerationNonRecoverableFailure.type
 
+    type TransformationRecoverableFailure = TransformationRecoverableFailure.type
     final case object TransformationRecoverableFailure extends FailureStatus {
       override val value: String = "TRANSFORMATION_RECOVERABLE_FAILURE"
     }
-    type TransformationRecoverableFailure = TransformationRecoverableFailure.type
 
+    type TransformationNonRecoverableFailure = TransformationNonRecoverableFailure.type
     final case object TransformationNonRecoverableFailure extends FailureStatus with FinalStatus {
       override val value: String = "TRANSFORMATION_NON_RECOVERABLE_FAILURE"
     }
-    type TransformationNonRecoverableFailure = TransformationNonRecoverableFailure.type
 
     implicit val eventStatusDecoder: Decoder[EventStatus] = decodeString.emap { value =>
       Either.fromOption(
         EventStatus.all.find(_.value == value),
         ifNone = s"'$value' unknown EventStatus"
       )
+    }
+
+    implicit lazy val show: Show[EventStatus] = Show.show {
+      case New                                 => show"status = ${New.value}"
+      case GeneratingTriples                   => show"status = ${GeneratingTriples.value}"
+      case TriplesGenerated                    => show"status = ${TriplesGenerated.value}"
+      case TransformingTriples                 => show"status = ${TransformingTriples.value}"
+      case GenerationRecoverableFailure        => show"status = ${GenerationRecoverableFailure.value}"
+      case GenerationNonRecoverableFailure     => show"status = ${GenerationNonRecoverableFailure.value}"
+      case TransformationRecoverableFailure    => show"status = ${TransformationRecoverableFailure.value}"
+      case TransformationNonRecoverableFailure => show"status = ${TransformationNonRecoverableFailure.value}"
+      case TriplesStore                        => show"status = ${TriplesStore.value}"
+      case Skipped                             => show"status = ${Skipped.value}"
+      case AwaitingDeletion                    => show"status = ${AwaitingDeletion.value}"
     }
   }
 
@@ -193,5 +216,7 @@ object events {
   final class LastSyncedDate private (val value: Instant) extends AnyVal with InstantTinyType
   object LastSyncedDate extends TinyTypeFactory[LastSyncedDate](new LastSyncedDate(_)) with InstantNotInTheFuture {
     implicit val decoder: Decoder[LastSyncedDate] = instantDecoder(LastSyncedDate)
+
+    implicit lazy val show: Show[LastSyncedDate] = Show.show(date => show"lastSynced = ${date.value.toString}")
   }
 }

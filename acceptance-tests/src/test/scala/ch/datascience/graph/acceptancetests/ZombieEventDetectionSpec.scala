@@ -35,6 +35,7 @@ import ch.datascience.graph.model.projects._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators.projects
 import ch.datascience.knowledgegraph.projects.model.Project
+import ch.datascience.knowledgegraph.projects.model.Statistics.CommitsCount
 import ch.datascience.microservices.MicroserviceIdentifier
 import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
 import io.circe.literal._
@@ -82,13 +83,19 @@ class ZombieEventDetectionSpec
     )
 
     And("project exists in GitLab")
-    `GET <gitlabApi>/projects/:path returning OK with`(project)
+    `GET <gitlabApi>/projects/:path AND :id returning OK with`(
+      project,
+      maybeCommitsCount = CommitsCount(1).some
+    )
+
+    And("the event commit in GitLab")
+    `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
 
     And("access token is present")
     givenAccessTokenPresentFor(project)
 
     And("the event classified as zombie is the latest commit in GitLab")
-    `GET <gitlabApi>/projects/:id/repository/commits returning OK with a commit`(projectId, commitId)
+    `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(projectId, commitId)
 
     And("an event that should be classified as zombie is in the EventLog DB")
     insertProjectToDB(project, eventDate) shouldBe 1

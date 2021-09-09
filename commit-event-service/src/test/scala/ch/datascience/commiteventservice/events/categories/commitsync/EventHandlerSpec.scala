@@ -57,7 +57,14 @@ class EventHandlerSpec
           .expects(event)
           .returning(().pure[IO])
 
-        handler.handle(requestContent(event.asJson)).unsafeRunSync() shouldBe Accepted
+        handler
+          .createHandlingProcess(requestContent(event.asJson))
+          .unsafeRunSync()
+          .process
+          .value
+          .unsafeRunSync() shouldBe Right(
+          Accepted
+        )
 
         logger.loggedOnly(Info(s"${logMessageCommon(event)} -> $Accepted"))
       }
@@ -72,7 +79,14 @@ class EventHandlerSpec
           .expects(event)
           .returning(().pure[IO])
 
-        handler.handle(requestContent(event.asJson)).unsafeRunSync() shouldBe Accepted
+        handler
+          .createHandlingProcess(requestContent(event.asJson))
+          .unsafeRunSync()
+          .process
+          .value
+          .unsafeRunSync() shouldBe Right(
+          Accepted
+        )
 
         logger.loggedOnly(Info(s"${logMessageCommon(event)} -> $Accepted"))
       }
@@ -85,20 +99,18 @@ class EventHandlerSpec
         .expects(event)
         .returning(exceptions.generateOne.raiseError[IO, Unit])
 
-      handler.handle(requestContent(event.asJson)).unsafeRunSync() shouldBe Accepted
+      handler
+        .createHandlingProcess(requestContent(event.asJson))
+        .unsafeRunSync()
+        .process
+        .value
+        .unsafeRunSync() shouldBe Right(Accepted)
 
       logger.getMessages(Info).map(_.message) should contain only s"${logMessageCommon(event)} -> $Accepted"
 
       eventually {
         logger.getMessages(Error).map(_.message) should contain only s"${logMessageCommon(event)} -> Failure"
       }
-    }
-
-    s"return $UnsupportedEventType if event is of wrong category" in new TestCase {
-
-      handler.handle(requestContent(jsons.generateOne.asJson)).unsafeRunSync() shouldBe UnsupportedEventType
-
-      logger.expectNoLogs()
     }
 
     s"return $BadRequest if event is malformed" in new TestCase {
@@ -109,7 +121,7 @@ class EventHandlerSpec
         }"""
       }
 
-      handler.handle(request).unsafeRunSync() shouldBe BadRequest
+      handler.createHandlingProcess(request).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(BadRequest)
 
       logger.expectNoLogs()
     }
@@ -145,4 +157,5 @@ class EventHandlerSpec
         }
       }"""
   }
+
 }

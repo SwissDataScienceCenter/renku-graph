@@ -34,7 +34,7 @@ object EventContentGenerators {
 
   lazy val newEvents: Gen[NewEvent] = for {
     eventId   <- eventIds
-    project   <- projects
+    project   <- projectsGen
     date      <- eventDates
     batchDate <- batchDates
     body      <- eventBodies
@@ -42,7 +42,7 @@ object EventContentGenerators {
 
   lazy val skippedEvents: Gen[SkippedEvent] = for {
     eventId   <- eventIds
-    project   <- projects
+    project   <- projectsGen
     date      <- eventDates
     batchDate <- batchDates
     body      <- eventBodies

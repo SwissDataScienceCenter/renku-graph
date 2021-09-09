@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.acceptancetests
 
+import cats.implicits.catsSyntaxOptionId
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.flows.AccessTokenPresence.givenAccessTokenPresentFor
@@ -26,11 +27,11 @@ import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import ch.datascience.graph.model.EventsGenerators.commitIds
-import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.graph.model.projects.Visibility.Public
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators.projects
+import ch.datascience.knowledgegraph.projects.model.Statistics.CommitsCount
 import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
 import io.circe.literal._
 import org.http4s.Status._
@@ -49,20 +50,20 @@ class WebhookCreationSpec
 
     Scenario("Graph Services hook is present on the project in GitLab") {
 
-      val projectId = projectIds.generateOne
+      val project = projects.generateOne.copy(visibility = Public)
 
       implicit val accessToken: AccessToken = accessTokens.generateOne
       Given("api user is authenticated")
       `GET <gitlabApi>/user returning OK`()
 
       Given("project is present in GitLab")
-      `GET <gitlabApi>/projects/:id returning OK`(projectId, projectVisibility = Public)
+      `GET <gitlabApi>/projects/:path AND :id returning OK with`(project, maybeCommitsCount = CommitsCount(0).some)
 
       Given("project has Graph Services hook in GitLab")
-      `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(projectId)
+      `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(project.id)
 
       When("user does POST webhook-service/projects/:id/webhooks")
-      val response = webhookServiceClient.POST(s"projects/$projectId/webhooks", Some(accessToken))
+      val response = webhookServiceClient.POST(s"projects/${project.id}/webhooks", Some(accessToken))
 
       Then("he should get OK response back")
       response.status shouldBe Ok
@@ -70,14 +71,14 @@ class WebhookCreationSpec
 
     Scenario("No Graph Services webhook on the project in GitLab") {
 
-      val project   = projects.generateOne
+      val project   = projects.generateOne.copy(visibility = Public)
       val projectId = project.id
       implicit val accessToken: AccessToken = accessTokens.generateOne
       Given("api user is authenticated")
       `GET <gitlabApi>/user returning OK`()
 
       Given("project is present in GitLab")
-      `GET <gitlabApi>/projects/:id returning OK`(projectId, projectVisibility = Public)
+      `GET <gitlabApi>/projects/:path AND :id returning OK with`(project, maybeCommitsCount = CommitsCount(1).some)
 
       Given("project does not have Graph Services hook in GitLab")
       `GET <gitlabApi>/projects/:id/hooks returning OK with no hooks`(projectId)
@@ -89,11 +90,10 @@ class WebhookCreationSpec
       givenAccessTokenPresentFor(project)
       val commitId  = commitIds.generateOne
       val committer = persons.generateOne
-      `GET <gitlabApi>/projects/:id/repository/commits returning OK with a commit`(projectId, commitId)
+      `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(projectId, commitId)
       `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
 
       // making the triples generation be happy and not throwing exceptions to the logs
-      `GET <gitlabApi>/projects/:path returning OK with`(project)
       `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId, committer)
       `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(
         project.path,

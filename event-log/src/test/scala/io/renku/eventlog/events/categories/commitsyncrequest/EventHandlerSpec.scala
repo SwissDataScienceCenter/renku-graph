@@ -57,7 +57,14 @@ class EventHandlerSpec
           .expects(projectId, projectPath)
           .returning(().pure[IO])
 
-        handler.handle(requestContent((projectId -> projectPath).asJson)).unsafeRunSync() shouldBe Accepted
+        handler
+          .createHandlingProcess(requestContent((projectId -> projectPath).asJson))
+          .unsafeRunSync()
+          .process
+          .value
+          .unsafeRunSync() shouldBe Right(
+          Accepted
+        )
 
         eventually {
           logger.loggedOnly(
@@ -79,10 +86,13 @@ class EventHandlerSpec
         .returning(exception.raiseError[IO, Unit])
 
       handler
-        .handle(
+        .createHandlingProcess(
           requestContent((projectId -> projectPath).asJson)
         )
-        .unsafeRunSync() shouldBe SchedulingError(exception)
+        .unsafeRunSync()
+        .process
+        .value
+        .unsafeRunSync() shouldBe Left(SchedulingError(exception))
 
       eventually {
         logger.loggedOnly(
@@ -94,13 +104,6 @@ class EventHandlerSpec
       }
     }
 
-    s"return $UnsupportedEventType if event is of wrong category" in new TestCase {
-
-      handler.handle(requestContent(jsons.generateOne.asJson)).unsafeRunSync() shouldBe UnsupportedEventType
-
-      logger.expectNoLogs()
-    }
-
     s"return $BadRequest if event is malformed" in new TestCase {
 
       val request = requestContent {
@@ -109,7 +112,7 @@ class EventHandlerSpec
         }"""
       }
 
-      handler.handle(request).unsafeRunSync() shouldBe BadRequest
+      handler.createHandlingProcess(request).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(BadRequest)
 
       logger.expectNoLogs()
     }

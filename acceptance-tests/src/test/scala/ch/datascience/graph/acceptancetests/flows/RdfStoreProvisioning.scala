@@ -31,6 +31,7 @@ import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.{projects, users}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.projects.model.Project
+import ch.datascience.knowledgegraph.projects.model.Statistics.CommitsCount
 import ch.datascience.rdfstore.entities.Person
 import ch.datascience.webhookservice.model.HookToken
 import io.renku.jsonld.JsonLD
@@ -50,26 +51,36 @@ object RdfStoreProvisioning extends ModelImplicits with Eventually with Acceptan
       members: NonEmptyList[(users.GitLabId, users.Username, users.Name)] = committer.asMembersList()
   )(implicit
       accessToken: AccessToken
-  ): Assertion = {
+  ): Project = {
     val projectId = project.id
 
-    givenAccessTokenPresentFor(project)
+    val projectWithStatistics = project.copy(statistics =
+      project.statistics.copy(commitsCount =
+        CommitsCount(
+          triples.asArray.map(_.size).getOrElse(throw new Exception("Could not get commits count"))
+        )
+      )
+    )
 
     `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
 
-    `GET <gitlabApi>/projects/:id/repository/commits returning OK with a commit`(projectId, commitId)
+    `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(projectId, commitId)
 
-    `GET <gitlabApi>/projects/:path returning OK with`(project, maybeCreator = Some(committer))
+    `GET <gitlabApi>/projects/:path AND :id returning OK with`(projectWithStatistics, maybeCreator = Some(committer))
 
-    `GET <triples-generator>/projects/:id/commits/:id returning OK`(project, commitId, triples)
+    `GET <triples-generator>/projects/:id/commits/:id returning OK`(projectWithStatistics, commitId, triples)
 
     `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project.path, members)
 
+    givenAccessTokenPresentFor(projectWithStatistics)
+
     webhookServiceClient
-      .POST("webhooks/events", HookToken(projectId), data.GitLab.pushEvent(project, commitId))
+      .POST("webhooks/events", HookToken(projectId), data.GitLab.pushEvent(projectWithStatistics, commitId))
       .status shouldBe Accepted
 
     `wait for events to be processed`(projectId)
+
+    projectWithStatistics
   }
 
   def `wait for events to be processed`(projectId: projects.Id): Assertion = eventually {

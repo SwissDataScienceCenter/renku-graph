@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.acceptancetests
 
+import cats.implicits.catsSyntaxOptionId
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.flows.AccessTokenPresence.givenAccessTokenPresentFor
@@ -30,6 +31,7 @@ import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
+import ch.datascience.knowledgegraph.projects.model.Statistics.CommitsCount
 import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
 import ch.datascience.webhookservice.model.HookToken
 import io.renku.eventlog.TypeSerializers
@@ -70,9 +72,9 @@ class CommitSyncFlowsSpec
       `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(projectId, nonMissedCommitId)
 
       And("fetch latest commit endpoint returns the non missed and later the missed commit")
-      `GET <gitlabApi>/projects/:id/repository/commits returning OK with a commit`(projectId,
-                                                                                   nonMissedCommitId,
-                                                                                   missedCommitId
+      `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(projectId,
+                                                                                            nonMissedCommitId,
+                                                                                            missedCommitId
       )
       `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(projectId, missedCommitId)
 
@@ -86,8 +88,8 @@ class CommitSyncFlowsSpec
                                                                                         committer
       )
 
-      And("access token is present")
-      givenAccessTokenPresentFor(project)
+      And("project exists in GitLab")
+      `GET <gitlabApi>/projects/:path AND :id returning OK with`(project, maybeCommitsCount = CommitsCount(2).some)
 
       And("project members/users exists in GitLab")
       `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(
@@ -95,8 +97,8 @@ class CommitSyncFlowsSpec
         committer.asMembersList()
       )
 
-      And("project exists in GitLab")
-      `GET <gitlabApi>/projects/:path returning OK with`(project)
+      And("access token is present")
+      givenAccessTokenPresentFor(project)
 
       When("a Push Event arrives for the non missed event")
       webhookServiceClient

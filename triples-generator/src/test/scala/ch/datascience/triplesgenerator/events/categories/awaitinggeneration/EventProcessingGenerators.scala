@@ -30,7 +30,7 @@ private object EventProcessingGenerators {
 
   implicit val commitEvents: Gen[CommitEvent] = for {
     commitId      <- commitIds
-    project       <- projects
+    project       <- projectsGen
     maybeParentId <- Gen.option(commitIds)
   } yield maybeParentId match {
     case None           => CommitEventWithoutParent(EventId(commitId.value), project, commitId)

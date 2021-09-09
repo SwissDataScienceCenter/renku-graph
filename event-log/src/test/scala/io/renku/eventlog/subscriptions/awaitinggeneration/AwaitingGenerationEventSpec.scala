@@ -21,14 +21,15 @@ package io.renku.eventlog.subscriptions.awaitinggeneration
 import ch.datascience.generators.Generators.Implicits._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import cats.implicits.toShow
 
 class AwaitingGenerationEventSpec extends AnyWordSpec with should.Matchers {
 
-  "toString" should {
+  "show" should {
 
     "print out the id and projectPath" in {
       val event = awaitingGenerationEvents.generateOne
-      event.toString shouldBe s"AwaitingGenerationEvent ${event.id}, projectPath = ${event.projectPath}"
+      event.show shouldBe s"AwaitingGenerationEvent ${event.id}, projectPath = ${event.projectPath}"
     }
   }
 }

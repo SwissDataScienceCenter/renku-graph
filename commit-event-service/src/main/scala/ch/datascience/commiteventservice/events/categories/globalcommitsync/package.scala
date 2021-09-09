@@ -24,8 +24,8 @@ package object globalcommitsync {
   val categoryName: CategoryName = CategoryName("GLOBAL_COMMIT_SYNC")
 
   private[globalcommitsync] val logMessageCommon: GlobalCommitSyncEvent => String = {
-    case GlobalCommitSyncEvent(project, lastSynced, commits) =>
-      s"$categoryName: projectId = ${project.id}, projectPath = ${project.path}, lastSynced = $lastSynced, numberOfCommits = ${commits.length}"
+    case GlobalCommitSyncEvent(project, commits) =>
+      s"$categoryName: projectId = ${project.id}, projectPath = ${project.path}, numberOfCommits = ${commits.length}"
   }
 
 }

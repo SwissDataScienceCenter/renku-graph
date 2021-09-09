@@ -18,21 +18,40 @@
 
 package ch.datascience.events.consumers
 
-import cats.MonadError
 import cats.data.EitherT
+import cats.data.EitherT.fromEither
 import cats.syntax.all._
+import cats.{Monad, MonadError}
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, SchedulingError, UnsupportedEventType}
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventId}
 import ch.datascience.graph.model.projects
-import org.typelevel.log4cats.Logger
 import io.circe.{Decoder, DecodingFailure, Json}
+import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
 trait EventHandler[Interpretation[_]] {
+  def tryHandling(request: EventRequestContent): Interpretation[EventSchedulingResult]
+
+  protected def createHandlingProcess(
+      request: EventRequestContent
+  ): Interpretation[EventHandlingProcess[Interpretation]]
+}
+
+abstract class EventHandlerWithProcessLimiter[Interpretation[_]: Monad](
+    processesLimiter: ConcurrentProcessesLimiter[Interpretation]
+) extends EventHandler[Interpretation] {
   val categoryName: CategoryName
 
-  def handle(request: EventRequestContent): Interpretation[EventSchedulingResult]
+  final override def tryHandling(request: EventRequestContent): Interpretation[EventSchedulingResult] = (for {
+    _                    <- fromEither[Interpretation](request.event.validateCategoryName)
+    eventHandlingProcess <- EitherT.right(createHandlingProcess(request))
+    r                    <- EitherT.right[EventSchedulingResult](processesLimiter tryExecuting eventHandlingProcess)
+  } yield r).merge
+
+  protected def createHandlingProcess(
+      request: EventRequestContent
+  ): Interpretation[EventHandlingProcess[Interpretation]]
 
   implicit class JsonOps(json: Json) {
 
@@ -53,8 +72,7 @@ trait EventHandler[Interpretation[_]] {
 
     private lazy val checkCategoryName: CategoryName => Decoder.Result[CategoryName] = {
       case name @ `categoryName` => Right(name)
-      case other =>
-        Left(DecodingFailure(s"$other not supported by $categoryName", Nil))
+      case other                 => Left(DecodingFailure(s"$other not supported by $categoryName", Nil))
     }
 
     private implicit val projectDecoder: Decoder[Project] = { implicit cursor =>

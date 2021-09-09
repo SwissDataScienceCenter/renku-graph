@@ -31,7 +31,7 @@ import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.graph.tokenrepository.AccessTokenFinder.projectPathToPath
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.JsonLDTriples
-import ch.datascience.events.consumers.ConsumersModelGenerators.projects
+import ch.datascience.events.consumers.ConsumersModelGenerators.projectsGen
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CuratedTriples.CurationUpdatesGroup
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CurationGenerators._
@@ -170,7 +170,7 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
     implicit lazy val renkuBaseUrl = renkuBaseUrls.generateOne
     implicit lazy val gitLabApiUrl = gitLabUrls.generateOne.apiV4
 
-    val project        = projects.generateOne
+    val project        = projectsGen.generateOne
     val curatedTriples = curatedTriplesObjects[Try].generateOne
     val trimmedPersons = persons.generateSet()
     val eventId        = eventIds.generateOne

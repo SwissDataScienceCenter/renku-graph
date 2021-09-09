@@ -18,6 +18,8 @@
 
 package io.renku.eventlog.subscriptions
 
+import cats.Show
+import cats.implicits.showInterpolator
 import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import ch.datascience.graph.model.projects
 import ch.datascience.tinytypes._
@@ -42,11 +44,13 @@ private trait SubscriptionInfo extends Product with Serializable {
   }
 
   override def hashCode(): Int = subscriberUrl.hashCode()
+}
 
-  override lazy val toString = {
-    val capacityAsString = maybeCapacity.map(capacity => s" with capacity $capacity").getOrElse("")
-    s"$subscriberUrl, id = $subscriberId$capacityAsString"
-  }
+private object SubscriptionInfo {
+  implicit def showInfo[T <: SubscriptionInfo]: Show[T] =
+    Show.show(info => show"${info.subscriberUrl}, ${info.subscriberId}${info.maybeCapacity}")
+  private implicit lazy val showCapacity: Show[Option[Capacity]] =
+    Show.show(maybeCapacity => maybeCapacity.map(capacity => show" with capacity ${capacity.value}").getOrElse(""))
 }
 
 private final class SourceUrl private (val value: String) extends AnyVal with StringTinyType

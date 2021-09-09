@@ -157,17 +157,11 @@ class ProjectsResourcesSpec
           datasetImages = dataset.images
         )
       )
-      `data in the RDF store`(project, dataset1CommitId, dataset1Committer, jsonLDTriples)(
+      val projectWithStatistics = `data in the RDF store`(project, dataset1CommitId, dataset1Committer, jsonLDTriples)(
         NonEmptyList.of(dataset1Committer, persons.generateOne.copy(maybeGitLabId = user.id.some)).map(_.asMember())
       )
 
       `wait for events to be processed`(project.id)
-
-      And("the project exists in GitLab")
-      `GET <gitlabApi>/projects/:path returning OK with`(project,
-                                                         maybeCreator = dataset1Committer.some,
-                                                         withStatistics = true
-      )
 
       When("user fetches project's details with GET knowledge-graph/projects/<namespace>/<name>")
       val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)
@@ -175,7 +169,7 @@ class ProjectsResourcesSpec
       Then("he should get OK response with project's details")
       projectDetailsResponse.status shouldBe Ok
       val Right(projectDetails) = projectDetailsResponse.bodyAsJson.as[Json]
-      projectDetails shouldBe fullJson(project)
+      projectDetails shouldBe fullJson(projectWithStatistics)
 
       When("user then fetches project's datasets using the link from the response")
       val datasetsLink     = projectDetails._links.get(Rel("datasets")) getOrFail (message = "No link with rel 'datasets'")

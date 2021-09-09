@@ -18,7 +18,6 @@
 
 package ch.datascience.graph.acceptancetests.flows
 
-import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices.tokenRepositoryClient
 import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.projects.model.Project
@@ -29,12 +28,8 @@ import org.scalatest.matchers.should
 
 object AccessTokenPresence extends should.Matchers {
 
-  def givenAccessTokenPresentFor(project: Project)(implicit accessToken: AccessToken): Assertion = {
-
-    `GET <gitlabApi>/projects/:id returning OK`(project)
-
+  def givenAccessTokenPresentFor(project: Project)(implicit accessToken: AccessToken): Assertion =
     tokenRepositoryClient
       .PUT(s"projects/${project.id}/tokens", accessToken.asJson, None)
       .status shouldBe NoContent
-  }
 }

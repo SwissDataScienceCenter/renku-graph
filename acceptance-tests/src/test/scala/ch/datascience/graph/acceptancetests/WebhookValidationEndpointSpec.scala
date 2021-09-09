@@ -18,15 +18,17 @@
 
 package ch.datascience.graph.acceptancetests
 
+import cats.implicits.catsSyntaxOptionId
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TokenRepositoryClient._
-import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.graph.model.projects.Visibility.{Private, Public}
 import ch.datascience.http.client.AccessToken
+import ch.datascience.knowledgegraph.projects.ProjectsGenerators.projects
+import ch.datascience.knowledgegraph.projects.model.Statistics.CommitsCount
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
@@ -38,19 +40,19 @@ class WebhookValidationEndpointSpec extends AnyFeatureSpec with GivenWhenThen wi
 
     Scenario("There's a Graph Services hook on a Public project in GitLab") {
 
-      val projectId = projectIds.generateOne
+      val project = projects.generateOne.copy(visibility = Public)
       implicit val accessToken: AccessToken = accessTokens.generateOne
       Given("api user is authenticated")
       `GET <gitlabApi>/user returning OK`()
 
       Given("project is present in GitLab")
-      `GET <gitlabApi>/projects/:id returning OK`(projectId, projectVisibility = Public)
+      `GET <gitlabApi>/projects/:path AND :id returning OK with`(project, maybeCommitsCount = CommitsCount(0).some)
 
       Given("project has Graph Services hook in GitLab")
-      `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(projectId)
+      `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(project.id)
 
       When("user does POST webhook-service/projects/:id/webhooks/validation")
-      val response = webhookServiceClient.POST(s"projects/$projectId/webhooks/validation", Some(accessToken))
+      val response = webhookServiceClient.POST(s"projects/${project.id}/webhooks/validation", Some(accessToken))
 
       Then("he should get OK response back")
       response.status shouldBe Ok
@@ -58,19 +60,19 @@ class WebhookValidationEndpointSpec extends AnyFeatureSpec with GivenWhenThen wi
 
     Scenario("There's no Graph Services hook on a Public project in GitLab") {
 
-      val projectId = projectIds.generateOne
+      val project = projects.generateOne.copy(visibility = Public)
       implicit val accessToken: AccessToken = accessTokens.generateOne
       Given("api user is authenticated")
       `GET <gitlabApi>/user returning OK`()
 
       Given("project is present in GitLab")
-      `GET <gitlabApi>/projects/:id returning OK`(projectId, projectVisibility = Public)
+      `GET <gitlabApi>/projects/:path AND :id returning OK with`(project, maybeCommitsCount = CommitsCount(0).some)
 
       Given("project does not have Graph Services hook in GitLab")
-      `GET <gitlabApi>/projects/:id/hooks returning OK with no hooks`(projectId)
+      `GET <gitlabApi>/projects/:id/hooks returning OK with no hooks`(project.id)
 
       When("user does POST webhook-service/projects/:id/webhooks/validation")
-      val response = webhookServiceClient.POST(s"projects/$projectId/webhooks/validation", Some(accessToken))
+      val response = webhookServiceClient.POST(s"projects/${project.id}/webhooks/validation", Some(accessToken))
 
       Then("he should get NOT_FOUND response back")
       response.status shouldBe NotFound
@@ -78,13 +80,14 @@ class WebhookValidationEndpointSpec extends AnyFeatureSpec with GivenWhenThen wi
 
     Scenario("There's a Graph Services hook on a non-public project in GitLab") {
 
-      val projectId = projectIds.generateOne
+      val project   = projects.generateOne.copy(visibility = Private)
+      val projectId = project.id
       implicit val accessToken: AccessToken = accessTokens.generateOne
       Given("api user is authenticated")
       `GET <gitlabApi>/user returning OK`()
 
       Given("project is present in GitLab")
-      `GET <gitlabApi>/projects/:id returning OK`(projectId, projectVisibility = Private)
+      `GET <gitlabApi>/projects/:path AND :id returning OK with`(project, maybeCommitsCount = CommitsCount(0).some)
 
       Given("project has Graph Services hook in GitLab")
       `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(projectId)

@@ -20,7 +20,7 @@ package ch.datascience.events.consumers
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import cats.{MonadError, Parallel}
+import cats.{MonadThrow, Parallel}
 import ch.datascience.events.consumers.EventSchedulingResult.UnsupportedEventType
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
 import ch.datascience.graph.model.events.CategoryName
@@ -33,12 +33,11 @@ trait EventConsumersRegistry[Interpretation[_]] {
   def run():                   Interpretation[Unit]
 }
 
-class EventConsumersRegistryImpl[Interpretation[_]](eventHandlers:           List[EventHandler[Interpretation]],
-                                                    subscriptionsMechanisms: List[SubscriptionMechanism[Interpretation]]
-)(implicit
-    ME:       MonadError[Interpretation, Throwable],
-    parallel: Parallel[Interpretation]
+class EventConsumersRegistryImpl[Interpretation[_]: MonadThrow: Parallel](
+    eventHandlers:           List[EventHandler[Interpretation]],
+    subscriptionsMechanisms: List[SubscriptionMechanism[Interpretation]]
 ) extends EventConsumersRegistry[Interpretation] {
+
   override def handle(requestContent: EventRequestContent): Interpretation[EventSchedulingResult] =
     tryNextHandler(requestContent, eventHandlers)
 
@@ -47,7 +46,7 @@ class EventConsumersRegistryImpl[Interpretation[_]](eventHandlers:           Lis
   ): Interpretation[EventSchedulingResult] =
     handlers.headOption match {
       case Some(handler) =>
-        handler.handle(requestContent).flatMap {
+        handler.tryHandling(requestContent) >>= {
           case UnsupportedEventType => tryNextHandler(requestContent, handlers.tail)
           case otherResult          => otherResult.pure[Interpretation]
         }
@@ -58,8 +57,11 @@ class EventConsumersRegistryImpl[Interpretation[_]](eventHandlers:           Lis
   def subscriptionMechanism(categoryName: CategoryName): Interpretation[SubscriptionMechanism[Interpretation]] =
     subscriptionsMechanisms
       .find(_.categoryName == categoryName)
-      .map(ME.pure)
-      .getOrElse(ME.raiseError(new IllegalStateException(s"No SubscriptionMechanism for $categoryName")))
+      .map(_.pure[Interpretation])
+      .getOrElse(
+        new IllegalStateException(s"No SubscriptionMechanism for $categoryName")
+          .raiseError[Interpretation, SubscriptionMechanism[Interpretation]]
+      )
 
   def run(): Interpretation[Unit] = subscriptionsMechanisms.map(_.run()).parSequence.void
 

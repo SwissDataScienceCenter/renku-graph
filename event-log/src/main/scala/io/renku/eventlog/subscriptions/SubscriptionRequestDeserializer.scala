@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.MonadError
+import cats.{MonadError, MonadThrow}
 import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import ch.datascience.graph.model.events.CategoryName
 import io.circe.{Decoder, Json}
@@ -32,14 +32,13 @@ private object SubscriptionRequestDeserializer {
 
   type PayloadFactory[SubscriptionInfoType] = (SubscriberUrl, SubscriberId, Option[Capacity]) => SubscriptionInfoType
 
-  def apply[Interpretation[_], SubscriptionInfoType <: SubscriptionInfo](
+  def apply[Interpretation[_]: MonadThrow, SubscriptionInfoType <: SubscriptionInfo](
       categoryName:   CategoryName,
       payloadFactory: PayloadFactory[SubscriptionInfoType]
-  )(implicit
-      monadError: MonadError[Interpretation, Throwable]
-  ): Interpretation[SubscriptionRequestDeserializer[Interpretation, SubscriptionInfoType]] = monadError.catchNonFatal {
-    new SubscriptionRequestDeserializerImpl(categoryName, payloadFactory)
-  }
+  ): Interpretation[SubscriptionRequestDeserializer[Interpretation, SubscriptionInfoType]] =
+    MonadThrow[Interpretation].catchNonFatal {
+      new SubscriptionRequestDeserializerImpl(categoryName, payloadFactory)
+    }
 }
 
 private class SubscriptionRequestDeserializerImpl[Interpretation[_], SubscriptionInfoType <: SubscriptionInfo](

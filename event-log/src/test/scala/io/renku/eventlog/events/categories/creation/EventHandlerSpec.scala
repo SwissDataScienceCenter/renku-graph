@@ -19,7 +19,7 @@
 package io.renku.eventlog.events.categories.creation
 
 import cats.MonadError
-import cats.effect.IO
+import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
 import ch.datascience.events.consumers.ConsumersModelGenerators._
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, SchedulingError}
@@ -40,9 +40,11 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import scala.concurrent.ExecutionContext.global
+
 class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
-  "handle" should {
+  "createHandlingProcess" should {
 
     List(Created, Existed).foreach { successfulResponse =>
       s"return $Accepted if the creation of the event returns $successfulResponse" in new TestCase {
@@ -52,7 +54,9 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
         (eventPersister.storeNewEvent _).expects(event).returning(successfulResponse.pure[IO])
 
-        handler.handle(requestContent).unsafeRunSync() shouldBe Accepted
+        handler.createHandlingProcess(requestContent).unsafeRunSync().process.value.unsafeRunSync() shouldBe Right(
+          Accepted
+        )
 
         logger.loggedOnly(
           Info(
@@ -67,7 +71,9 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
       val requestContent = eventRequestContents.generateOne.copy(event)
 
-      handler.handle(requestContent).unsafeRunSync() shouldBe BadRequest
+      handler.createHandlingProcess(requestContent).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(
+        BadRequest
+      )
 
       logger.expectNoLogs()
     }
@@ -77,7 +83,9 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
       val requestContent = eventRequestContents.generateOne.copy(event)
 
-      handler.handle(requestContent).unsafeRunSync() shouldBe BadRequest
+      handler.createHandlingProcess(requestContent).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(
+        BadRequest
+      )
 
       logger.expectNoLogs()
     }
@@ -89,7 +97,9 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
         val requestContent = eventRequestContents.generateOne.copy(event)
 
-        handler.handle(requestContent).unsafeRunSync() shouldBe BadRequest
+        handler.createHandlingProcess(requestContent).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(
+          BadRequest
+        )
 
         logger.expectNoLogs()
       }
@@ -102,9 +112,10 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
       val requestContent = EventRequestContent(event = event.asJson, None)
 
       (eventPersister.storeNewEvent _).expects(event).returning(context.raiseError(exception))
-      val expectedError = SchedulingError(exception)
 
-      handler.handle(requestContent).unsafeRunSync() shouldBe expectedError
+      handler.createHandlingProcess(requestContent).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(
+        SchedulingError(exception)
+      )
 
       logger.loggedOnly(
         Error(
@@ -114,6 +125,8 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
       )
     }
   }
+
+  private implicit val cs: ContextShift[IO] = IO.contextShift(global)
 
   private trait TestCase {
 
@@ -149,7 +162,5 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     case event: NewEvent     => toJson(event)
     case event: SkippedEvent => toJson(event) deepMerge json"""{ "message":    ${event.message.value} }"""
   }
-
-//}
 
 }

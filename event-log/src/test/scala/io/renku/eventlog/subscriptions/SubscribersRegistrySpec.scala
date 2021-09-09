@@ -200,10 +200,14 @@ class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.M
       (endTime.toEpochMilli - startTime.toEpochMilli) should be > busySleep.toMillis
       (endTime.toEpochMilli - startTime.toEpochMilli) should be < (busySleep + checkupInterval + (300 millis)).toMillis
 
+      val withCapacity =
+        subscriptionInfo.maybeCapacity.map(capacity => s" with capacity ${capacity.value}").getOrElse("")
       eventually {
         logger.loggedOnly(
           Info(s"$categoryName: all 1 subscriber(s) are busy; waiting for one to become available"),
-          Debug(s"$categoryName: $subscriptionInfo taken from busy state")
+          Debug(
+            s"$categoryName: url = ${subscriptionInfo.subscriberUrl}, id = ${subscriptionInfo.subscriberId}$withCapacity taken from busy state"
+          )
         )
       }
     }

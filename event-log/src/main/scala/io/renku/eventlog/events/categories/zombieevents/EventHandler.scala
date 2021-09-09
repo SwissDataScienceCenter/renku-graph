@@ -21,11 +21,11 @@ package io.renku.eventlog.events.categories.zombieevents
 import cats.data.EitherT.fromEither
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
-import cats.{Applicative, MonadError}
+import cats.{Applicative, MonadThrow}
 import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
-import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult}
+import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventRequestContent, EventSchedulingResult}
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventId, EventStatus}
 import ch.datascience.graph.model.projects
@@ -37,7 +37,7 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-private class EventHandler[Interpretation[_]](
+private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurrent](
     override val categoryName:          CategoryName,
     zombieStatusCleaner:                ZombieStatusCleaner[Interpretation],
     awaitingTriplesGenerationGauge:     LabeledGauge[Interpretation, projects.Path],
@@ -45,29 +45,26 @@ private class EventHandler[Interpretation[_]](
     awaitingTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
     underTriplesTransformationGauge:    LabeledGauge[Interpretation, projects.Path],
     logger:                             Logger[Interpretation]
-)(implicit
-    ME:           MonadError[Interpretation, Throwable],
-    contextShift: ContextShift[Interpretation],
-    concurrent:   Concurrent[Interpretation]
-) extends consumers.EventHandler[Interpretation] {
+) extends consumers.EventHandlerWithProcessLimiter[Interpretation](ConcurrentProcessesLimiter.withoutLimit) {
 
   import ch.datascience.graph.model.projects
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-  override def handle(request: EventRequestContent): Interpretation[EventSchedulingResult] = {
-    for {
-      _ <- fromEither[Interpretation](request.event.validateCategoryName)
-      event <- fromEither[Interpretation](
-                 request.event.as[ZombieEvent].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult]
-               )
+  override def createHandlingProcess(
+      request: EventRequestContent
+  ): Interpretation[EventHandlingProcess[Interpretation]] =
+    EventHandlingProcess[Interpretation](startCleanZombieEvents(request))
 
-      result <- (contextShift.shift *> concurrent
-                  .start(cleanZombieStatus(event))).toRightT
-                  .map(_ => Accepted)
-                  .semiflatTap(logger.log(event))
-                  .leftSemiflatTap(logger.log(event))
-    } yield result
-  }.merge
+  private def startCleanZombieEvents(request: EventRequestContent) = for {
+    event <- fromEither[Interpretation](
+               request.event.as[ZombieEvent].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult]
+             )
+    result <- (ContextShift[Interpretation].shift *> Concurrent[Interpretation]
+                .start(cleanZombieStatus(event))).toRightT
+                .map(_ => Accepted)
+                .semiflatTap(logger.log(event))
+                .leftSemiflatTap(logger.log(event))
+  } yield result
 
   private def cleanZombieStatus(event: ZombieEvent): Interpretation[Unit] = {
     for {
