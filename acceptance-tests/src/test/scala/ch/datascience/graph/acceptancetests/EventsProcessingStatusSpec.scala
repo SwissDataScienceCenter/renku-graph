@@ -20,8 +20,8 @@ package ch.datascience.graph.acceptancetests
 
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.acceptancetests.data.Project.Statistics.CommitsCount
 import ch.datascience.graph.acceptancetests.data._
-import ch.datascience.graph.acceptancetests.db.EventLog
 import ch.datascience.graph.acceptancetests.flows.AccessTokenPresence.givenAccessTokenPresentFor
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
@@ -30,7 +30,6 @@ import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TokenRepositoryClient._
 import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import ch.datascience.graph.model.EventsGenerators.commitIds
-import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.webhookservice.model.HookToken
 import eu.timepit.refined.api.Refined
@@ -58,7 +57,7 @@ class EventsProcessingStatusSpec
     Scenario("As a user I would like to see progress of events processing for my project") {
 
       implicit val accessToken: AccessToken = accessTokens.generateOne
-      val project = dataProjects(projectEntities(visibilityPublic)).generateOne
+      val project = dataProjects(projectEntities(visibilityPublic), CommitsCount(numberOfEvents.value)).generateOne
 
       When("there's no webhook for a given project in GitLab")
       Then("the status endpoint should return NOT_FOUND")
@@ -91,11 +90,6 @@ class EventsProcessingStatusSpec
         total shouldBe numberOfEvents.value
         val Right(progress) = responseJson.downField("progress").as[Double]
         progress should be <= 100d
-      }
-
-      // wait for the Event Log to be emptied
-      eventually {
-        EventLog.findEvents(project.id, status = New) shouldBe List.empty
       }
     }
   }
