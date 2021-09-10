@@ -30,6 +30,7 @@ import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult.{DeliverySuccess, InvalidUpdatesFailure, RecoverableFailure}
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
 import com.github.tomakehurst.wiremock.client.WireMock._
+import com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER
 import eu.timepit.refined.auto._
 import org.http4s.Status
 import org.scalatest.matchers.should
@@ -71,17 +72,12 @@ class UpdatesUploaderSpec extends AnyWordSpec with ExternalServiceStubbing with 
 
     s"return $RecoverableFailure for connectivity issues" in new TestCase {
 
-      val fusekiBaseUrl = localHttpUrls.map(FusekiBaseUrl.apply).generateOne
-      override val rdfStoreConfig = rdfStoreConfigs.generateOne.copy(
-        fusekiBaseUrl = fusekiBaseUrl
-      )
-      val connectionExceptionMessage =
-        s"Error connecting to $fusekiBaseUrl using address ${fusekiBaseUrl.toString.replaceFirst("http[s]?://", "")} (unresolved: false)"
-      updater
-        .send(query)
-        .unsafeRunSync() shouldBe RecoverableFailure(
-        s"POST $fusekiBaseUrl/${rdfStoreConfig.datasetName}/update error: $connectionExceptionMessage"
-      )
+      givenStore(forUpdate = query, returning = aResponse.withFault(CONNECTION_RESET_BY_PEER))
+
+      val failure = updater.send(query).unsafeRunSync()
+
+      failure       shouldBe a[RecoverableFailure]
+      failure.message should startWith(s"POST $externalServiceBaseUrl/${rdfStoreConfig.datasetName}/update error")
     }
   }
 
@@ -89,12 +85,11 @@ class UpdatesUploaderSpec extends AnyWordSpec with ExternalServiceStubbing with 
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
-    val query                = sparqlQueries.generateOne
-    val logger               = TestLogger[IO]()
+    val query = sparqlQueries.generateOne
+
+    private val logger       = TestLogger[IO]()
     private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
-    val rdfStoreConfig = rdfStoreConfigs.generateOne.copy(
-      fusekiBaseUrl = FusekiBaseUrl(externalServiceBaseUrl)
-    )
+    lazy val rdfStoreConfig  = rdfStoreConfigs.generateOne.copy(fusekiBaseUrl = FusekiBaseUrl(externalServiceBaseUrl))
     lazy val updater = new UpdatesUploaderImpl[IO](
       rdfStoreConfig,
       logger,
@@ -103,14 +98,12 @@ class UpdatesUploaderSpec extends AnyWordSpec with ExternalServiceStubbing with 
       maxRetries = 1
     )
 
-    def givenStore(forUpdate: SparqlQuery, returning: ResponseDefinitionBuilder) =
-      stubFor {
-        post(s"/${rdfStoreConfig.datasetName}/update")
-          .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
-          .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
-          .withRequestBody(equalTo(s"update=${urlEncode(forUpdate.toString)}"))
-          .willReturn(returning)
-      }
+    def givenStore(forUpdate: SparqlQuery, returning: ResponseDefinitionBuilder) = stubFor {
+      post(s"/${rdfStoreConfig.datasetName}/update")
+        .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
+        .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
+        .withRequestBody(equalTo(s"update=${urlEncode(forUpdate.toString)}"))
+        .willReturn(returning)
+    }
   }
-
 }
