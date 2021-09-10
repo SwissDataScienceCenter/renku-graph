@@ -57,7 +57,7 @@ private class RenkuVersionPairFinderImpl[Interpretation[_]: ConcurrentEffect: Ti
           |}
           |""".stripMargin
     )
-  }.flatMap {
+  } >>= {
     case Nil         => Option.empty[RenkuVersionPair].pure[Interpretation]
     case head :: Nil => head.some.pure[Interpretation]
     case versionPairs =>

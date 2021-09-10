@@ -58,19 +58,18 @@ private[triplescuration] class DatasetTransformerImpl[Interpretation[_]: MonadTh
         .recoverWith(maybeToRecoverableError)
     }
 
-  private def updateTopmostSameAs(resultData: ResultData) =
-    findInternallyImportedDatasets(resultData.project)
-      .foldLeft(resultData.pure[Interpretation]) { (resultDataF, dataset) =>
-        for {
-          resultData               <- resultDataF
-          maybeParentTopmostSameAs <- findParentTopmostSameAs(dataset.provenance.sameAs)
-          maybeKGTopmostSameAs     <- findTopmostSameAs(dataset.identification.resourceId)
-          updatedDataset = maybeParentTopmostSameAs.map(dataset.update).getOrElse(dataset)
-        } yield ResultData(
-          project = update(dataset, updatedDataset)(resultData.project),
-          queries = resultData.queries ::: updatesCreator.prepareUpdates(dataset, maybeKGTopmostSameAs)
-        )
-      }
+  private def updateTopmostSameAs(resultData: ResultData) = findInternallyImportedDatasets(resultData.project)
+    .foldLeft(resultData.pure[Interpretation]) { (resultDataF, dataset) =>
+      for {
+        resultData               <- resultDataF
+        maybeParentTopmostSameAs <- findParentTopmostSameAs(dataset.provenance.sameAs)
+        maybeKGTopmostSameAs     <- findTopmostSameAs(dataset.identification.resourceId)
+        updatedDataset = maybeParentTopmostSameAs.map(dataset.update) getOrElse dataset
+      } yield ResultData(
+        project = update(dataset, updatedDataset)(resultData.project),
+        queries = resultData.queries ::: updatesCreator.prepareUpdates(dataset, maybeKGTopmostSameAs)
+      )
+    }
 
   private def updateTopmostDerivedFrom(resultData: ResultData) =
     findModifiedDatasets(resultData.project)
@@ -79,7 +78,7 @@ private[triplescuration] class DatasetTransformerImpl[Interpretation[_]: MonadTh
           resultData                    <- resultDataF
           maybeParentTopmostDerivedFrom <- findParentTopmostDerivedFrom(dataset.provenance.derivedFrom)
           maybeKGTopmostDerivedFrom     <- findTopmostDerivedFrom(dataset.identification.resourceId)
-          updatedDataset = maybeParentTopmostDerivedFrom.map(dataset.update).getOrElse(dataset)
+          updatedDataset = maybeParentTopmostDerivedFrom.map(dataset.update) getOrElse dataset
         } yield ResultData(
           project = update(dataset, updatedDataset)(resultData.project),
           queries = resultData.queries ::: updatesCreator.prepareUpdates(dataset, maybeKGTopmostDerivedFrom)

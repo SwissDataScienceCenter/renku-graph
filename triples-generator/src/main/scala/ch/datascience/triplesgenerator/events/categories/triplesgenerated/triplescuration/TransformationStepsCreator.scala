@@ -39,11 +39,11 @@ private[triplesgenerated] class TransformationStepsCreatorImpl[Interpretation[_]
     datasetTransformer: DatasetTransformer[Interpretation]
 ) extends TransformationStepsCreator[Interpretation] {
 
-  override def createSteps: List[TransformationStep[Interpretation]] =
-    List(personTransformer.createTransformationStep,
-         projectTransformer.createTransformationStep,
-         datasetTransformer.createTransformationStep
-    )
+  override def createSteps: List[TransformationStep[Interpretation]] = List(
+    personTransformer.createTransformationStep,
+    projectTransformer.createTransformationStep,
+    datasetTransformer.createTransformationStep
+  )
 }
 
 private[triplesgenerated] object TriplesCurator {

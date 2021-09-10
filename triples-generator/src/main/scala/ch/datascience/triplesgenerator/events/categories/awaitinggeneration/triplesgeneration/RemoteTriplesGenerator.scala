@@ -35,8 +35,6 @@ import io.circe.Json
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
-import scala.language.postfixOps
 
 // This TriplesGenerator supposed to be used by the acceptance-tests only
 
@@ -82,7 +80,7 @@ private[awaitinggeneration] class RemoteTriplesGenerator(
         triples       <- IO.fromEither(JsonLDTriples from triplesInJson)
       } yield triples.asRight[ProcessingRecoverableError]
     } recoverWith { case UnauthorizedException =>
-      Timer[IO].sleep(2 seconds) >> GenerationRecoverableError("Unauthorized exception").asLeft[JsonLDTriples].pure[IO]
+      GenerationRecoverableError("Unauthorized exception").asLeft[JsonLDTriples].pure[IO]
     }
   }
 

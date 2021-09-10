@@ -76,13 +76,12 @@ private class TriplesUploaderImpl[Interpretation[_]: ConcurrentEffect: Timer](
     } yield uploadResult
   } recover withUploadingError
 
-  private def uploadRequest(uploadUri: Uri, triples: JsonLD) =
-    HttpRequest(
-      request(POST, uploadUri, rdfStoreConfig.authCredentials)
-        .withEntity(triples.toJson)
-        .putHeaders(`Content-Type`(`ld+json`)),
-      name = "json-ld upload"
-    )
+  private def uploadRequest(uploadUri: Uri, triples: JsonLD) = HttpRequest(
+    request(POST, uploadUri, rdfStoreConfig.authCredentials)
+      .withEntity(triples.toJson)
+      .putHeaders(`Content-Type`(`ld+json`)),
+    name = "json-ld upload"
+  )
 
   private lazy val mapResponse: PartialFunction[(Status, Request[Interpretation], Response[Interpretation]),
                                                 Interpretation[TriplesUploadResult]

@@ -65,17 +65,15 @@ class ReProvisioningImpl[Interpretation[_]: MonadThrow: Timer](
     if (isReProvisioningNeeded(maybeVersionPairInKG, versionCompatibilityPairs))
       triggerReProvisioning recoverWith tryAgain(triggerReProvisioning)
     else
-      renkuVersionPairUpdater
-        .update(versionCompatibilityPairs.head)
-        .flatMap(_ => logger.info("All projects' triples up to date"))
+      renkuVersionPairUpdater.update(versionCompatibilityPairs.head) >> logger.info("All projects' triples up to date")
 
   private def triggerReProvisioning = measureExecutionTime {
     for {
       _ <- logger.info("The triples are not up to date - re-provisioning is clearing DB")
       _ <- reProvisioningStatus.setRunning() recoverWith tryAgain(reProvisioningStatus.setRunning())
-      _ <- renkuVersionPairUpdater.update(versionCompatibilityPairs.head) recoverWith tryAgain(
-             renkuVersionPairUpdater.update(versionCompatibilityPairs.head)
-           )
+      _ <- renkuVersionPairUpdater
+             .update(versionCompatibilityPairs.head)
+             .recoverWith(tryAgain(renkuVersionPairUpdater.update(versionCompatibilityPairs.head)))
       _ <- removeAllTriples() recoverWith tryAgain(removeAllTriples())
       _ <- triggerEventsReScheduling() recoverWith tryAgain(triggerEventsReScheduling())
       _ <- reProvisioningStatus.clear() recoverWith tryAgain(reProvisioningStatus.clear())

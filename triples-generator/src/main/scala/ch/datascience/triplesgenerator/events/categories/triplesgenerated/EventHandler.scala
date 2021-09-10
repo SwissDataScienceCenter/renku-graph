@@ -53,6 +53,7 @@ private[events] class EventHandler[Interpretation[_]: ConcurrentEffect: MonadThr
 
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import eventBodyDeserializer._
+  import eventProcessor._
   import io.circe.Decoder
 
   private type IdAndBody = (CompoundEventId, EventBody)
@@ -61,11 +62,11 @@ private[events] class EventHandler[Interpretation[_]: ConcurrentEffect: MonadThr
       request: EventRequestContent
   ): Interpretation[EventHandlingProcess[Interpretation]] =
     EventHandlingProcess.withWaitingForCompletion[Interpretation](
-      deferred => startProcessingEvent(request, deferred),
-      subscriptionMechanism.renewSubscription()
+      processing => startProcessingEvent(request, processing),
+      releaseProcess = subscriptionMechanism.renewSubscription()
     )
 
-  private def startProcessingEvent(request: EventRequestContent, deferred: Deferred[Interpretation, Unit]) = for {
+  private def startProcessingEvent(request: EventRequestContent, processing: Deferred[Interpretation, Unit]) = for {
     eventId            <- fromEither(request.event.getEventId)
     project            <- fromEither(request.event.getProject)
     eventBodyString    <- fromOption(request.maybePayload, BadRequest)
@@ -73,11 +74,10 @@ private[events] class EventHandler[Interpretation[_]: ConcurrentEffect: MonadThr
     eventBodyAndSchema <- fromEither(eventBodyJson.as[(EventBody, SchemaVersion)]).leftMap(_ => BadRequest)
     event              <- toEvent(eventId, project, eventBodyAndSchema).toRightT(recoverTo = BadRequest)
     result <- (ContextShift[Interpretation].shift *> Concurrent[Interpretation]
-                .start(eventProcessor.process(event) >> deferred.complete(()))).toRightT
+                .start(process(event) >> processing.complete(()))).toRightT
                 .map(_ => Accepted)
                 .semiflatTap(logger.log(eventId -> event.project))
                 .leftSemiflatTap(logger.log(eventId -> event.project))
-
   } yield result
 
   private implicit lazy val eventInfoShow: Show[(CompoundEventId, Project)] = Show.show { case (eventId, project) =>
