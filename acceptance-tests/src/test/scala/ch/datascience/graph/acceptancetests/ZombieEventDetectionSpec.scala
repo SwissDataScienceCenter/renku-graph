@@ -79,13 +79,16 @@ class ZombieEventDetectionSpec
     `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project)
 
     And("project exists in GitLab")
-    `GET <gitlabApi>/projects/:path returning OK with`(project)
+    `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
+
+    And("the event commit in GitLab")
+    `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
 
     And("access token is present")
     givenAccessTokenPresentFor(project)
 
     And("the event classified as zombie is the latest commit in GitLab")
-    `GET <gitlabApi>/projects/:id/repository/commits returning OK with a commit`(projectId, commitId)
+    `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(projectId, commitId)
 
     And("an event that should be classified as zombie is in the EventLog DB")
     insertProjectToDB(project, eventDate) shouldBe 1

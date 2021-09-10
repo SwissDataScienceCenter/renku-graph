@@ -20,11 +20,11 @@ package ch.datascience.commiteventservice.events.categories.globalcommitsync
 
 import cats.Show
 import ch.datascience.events.consumers.Project
-import ch.datascience.graph.model.events.{CommitId, LastSyncedDate}
+import ch.datascience.graph.model.events.CommitId
 
-private final case class GlobalCommitSyncEvent(project: Project, lastSynced: LastSyncedDate, commits: List[CommitId]) {
+private final case class GlobalCommitSyncEvent(project: Project, commits: List[CommitId]) {
   override lazy val toString: String =
-    s"projectId = ${project.id}, projectPath = ${project.path}, lastSynced = $lastSynced, numberOfCommits = ${commits.length}"
+    s"projectId = ${project.id}, projectPath = ${project.path}, numberOfCommits = ${commits.length}"
 }
 
 private object GlobalCommitSyncEvent {

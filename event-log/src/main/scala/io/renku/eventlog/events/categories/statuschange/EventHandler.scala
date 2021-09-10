@@ -19,15 +19,14 @@
 package io.renku.eventlog.events.categories.statuschange
 
 import cats.data.EitherT
-import cats.data.EitherT.fromEither
 import cats.effect.{Concurrent, ContextShift, IO}
 import cats.syntax.all._
 import cats.{MonadThrow, Show}
 import ch.datascience.db.SqlStatement.Name
 import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.events.{EventRequestContent, consumers}
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
-import ch.datascience.events.consumers.EventSchedulingResult
+import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
+import ch.datascience.events.{EventRequestContent, consumers}
 import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples, _}
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.{SchemaVersion, projects}
@@ -44,14 +43,16 @@ private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurre
     statusChanger:             StatusChanger[Interpretation],
     queriesExecTimes:          LabeledHistogram[Interpretation, SqlStatement.Name],
     logger:                    Logger[Interpretation]
-) extends consumers.EventHandler[Interpretation] {
+) extends consumers.EventHandlerWithProcessLimiter[Interpretation](ConcurrentProcessesLimiter.withoutLimit) {
 
   import EventHandler._
 
   private implicit lazy val execTimes: LabeledHistogram[Interpretation, SqlStatement.Name] = queriesExecTimes
 
-  override def handle(request: EventRequestContent): Interpretation[EventSchedulingResult] = {
-    fromEither[Interpretation](request.event.validateCategoryName) >> tryHandle(
+  override def createHandlingProcess(
+      request: EventRequestContent
+  ): Interpretation[EventHandlingProcess[Interpretation]] = EventHandlingProcess[Interpretation] {
+    tryHandle(
       requestAs[ToTriplesGenerated],
       requestAs[ToTriplesStore],
       requestAs[ToFailure[ProcessingStatus, FailureStatus]],
@@ -60,20 +61,20 @@ private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurre
       requestAs[ToAwaitingDeletion],
       requestAs[AllEventsToNew]
     )(request)
-  }.merge
+  }
 
   private def tryHandle(
-      options: EventRequestContent => EitherT[Interpretation, EventSchedulingResult, EventSchedulingResult]*
-  ): EventRequestContent => EitherT[Interpretation, EventSchedulingResult, EventSchedulingResult] = request =>
+      options: EventRequestContent => EitherT[Interpretation, EventSchedulingResult, Accepted]*
+  ): EventRequestContent => EitherT[Interpretation, EventSchedulingResult, Accepted] = request =>
     options.foldLeft(
-      EitherT.left[EventSchedulingResult](UnsupportedEventType.pure[Interpretation].widen[EventSchedulingResult])
+      EitherT.left[Accepted](UnsupportedEventType.pure[Interpretation].widen[EventSchedulingResult])
     ) { case (previousOptionResult, option) => previousOptionResult orElse option(request) }
 
   private def requestAs[E <: StatusChangeEvent](request: EventRequestContent)(implicit
       updaterFactory:                                    LabeledHistogram[Interpretation, SqlStatement.Name] => DBUpdater[Interpretation, E],
       show:                                              Show[E],
       decoder:                                           EventRequestContent => Either[DecodingFailure, E]
-  ): EitherT[Interpretation, EventSchedulingResult, EventSchedulingResult] = EitherT(
+  ): EitherT[Interpretation, EventSchedulingResult, Accepted] = EitherT(
     decode[E](request)
       .map(startUpdate)
       .leftMap(_ => BadRequest)
@@ -84,11 +85,10 @@ private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurre
   private def startUpdate[E <: StatusChangeEvent](implicit
       updaterFactory: LabeledHistogram[Interpretation, Name] => DBUpdater[Interpretation, E],
       show:           Show[E]
-  ): E => Interpretation[EventSchedulingResult] = event =>
+  ): E => Interpretation[Accepted] = event =>
     (ContextShift[Interpretation].shift *> Concurrent[Interpretation]
       .start(executeUpdate(event)))
       .map(_ => Accepted)
-      .widen[EventSchedulingResult]
       .flatTap(logger.log(event.show))
 
   private def executeUpdate[E <: StatusChangeEvent](
@@ -124,8 +124,7 @@ private object EventHandler {
 
   private def decode[E <: StatusChangeEvent](request: EventRequestContent)(implicit
       decoder:                                        EventRequestContent => Either[DecodingFailure, E]
-  ) =
-    decoder(request)
+  ) = decoder(request)
 
   private implicit lazy val eventTriplesGeneratedDecoder
       : EventRequestContent => Either[DecodingFailure, ToTriplesGenerated] = {

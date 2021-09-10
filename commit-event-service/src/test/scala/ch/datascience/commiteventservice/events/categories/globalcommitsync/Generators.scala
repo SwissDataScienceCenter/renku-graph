@@ -23,7 +23,7 @@ import ch.datascience.commiteventservice.events.categories.globalcommitsync.even
 import ch.datascience.events.consumers.Project
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators.{commitIds, lastSyncedDates}
+import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects
@@ -44,19 +44,15 @@ private object Generators {
       )
     )
 
+  lazy val commitCounts: Gen[CommitCount] = positiveInts().map(_.value).toGeneratorOf(CommitCount)
+
   def globalCommitSyncEvents(projectIdGen: Gen[projects.Id] = projectIds,
                              commitIdsGen: Gen[List[CommitId]] = listOf(commitIds)
   ): Gen[GlobalCommitSyncEvent] = for {
-    projectId      <- projectIdGen
-    projectPath    <- projectPaths
-    lastSyncedDate <- lastSyncedDates
-    commitIds      <- commitIdsGen
-  } yield GlobalCommitSyncEvent(Project(projectId, projectPath), lastSyncedDate, commitIds)
-
-  lazy val projectsGen: Gen[Project] = for {
-    projectId   <- projectIds
+    projectId   <- projectIdGen
     projectPath <- projectPaths
-  } yield Project(projectId, projectPath)
+    commitIds   <- commitIdsGen
+  } yield GlobalCommitSyncEvent(Project(projectId, projectPath), commitIds)
 
   def projectCommitStats(commitId:    CommitId): Gen[ProjectCommitStats] = projectCommitStats(Gen.const(Some(commitId)))
   def projectCommitStats(commitIdGen: Gen[Option[CommitId]] = commitIds.toGeneratorOfOptions): Gen[ProjectCommitStats] =

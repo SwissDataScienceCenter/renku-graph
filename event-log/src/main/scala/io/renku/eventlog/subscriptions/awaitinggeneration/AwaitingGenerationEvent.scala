@@ -18,13 +18,17 @@
 
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
+import cats.Show
 import cats.syntax.all._
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.graph.model.projects
 import io.renku.eventlog.subscriptions.EventEncoder
 
-private final case class AwaitingGenerationEvent(id: CompoundEventId, projectPath: projects.Path, body: EventBody) {
-  override lazy val toString: String = s"$AwaitingGenerationEvent $id, projectPath = $projectPath"
+private final case class AwaitingGenerationEvent(id: CompoundEventId, projectPath: projects.Path, body: EventBody)
+
+private object AwaitingGenerationEvent {
+  implicit lazy val show: Show[AwaitingGenerationEvent] =
+    Show.show(event => show"AwaitingGenerationEvent ${event.id}, projectPath = ${event.projectPath}")
 }
 
 private object AwaitingGenerationEventEncoder extends EventEncoder[AwaitingGenerationEvent] {

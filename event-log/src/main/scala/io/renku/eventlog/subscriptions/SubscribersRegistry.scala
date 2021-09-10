@@ -92,7 +92,7 @@ private class SubscribersRegistry(
   } yield ()
 
   private def logNoFreeSubscribersInfo: IO[Unit] = logger.info(
-    s"$categoryName: all ${subscriberCount()} subscriber(s) are busy; waiting for one to become available"
+    show"$categoryName: all ${subscriberCount()} subscriber(s) are busy; waiting for one to become available"
   )
 
   def delete(subscriberUrl: SubscriberUrl): IO[Boolean] = IO {
@@ -128,10 +128,10 @@ private class SubscribersRegistry(
     (checkupTime.value compareTo now()) <= 0
   }
 
-  private def bringToAvailable(subscribers: List[SubscriptionInfo]): IO[List[Unit]] = subscribers.map { subscriberUrl =>
+  private def bringToAvailable(subscribers: List[SubscriptionInfo]): IO[List[Unit]] = subscribers.map { subscription =>
     for {
-      wasAdded <- add(subscriberUrl)
-      _        <- whenA(wasAdded)(logger.debug(s"$categoryName: $subscriberUrl taken from busy state"))
+      wasAdded <- add(subscription)
+      _        <- whenA(wasAdded)(logger.debug(show"$categoryName: $subscription taken from busy state"))
     } yield ()
   }.sequence
 

@@ -44,6 +44,6 @@ object SubscriptionFactory {
                                categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort, Microservice.Identifier),
                                logger
                              )
-    handler <- EventHandler(gitLabThrottler, executionTimeRecorder, logger)
+    handler <- EventHandler(subscriptionMechanism, gitLabThrottler, executionTimeRecorder, logger)
   } yield handler -> subscriptionMechanism
 }

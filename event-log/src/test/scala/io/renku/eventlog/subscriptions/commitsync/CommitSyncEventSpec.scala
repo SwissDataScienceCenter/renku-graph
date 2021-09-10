@@ -22,22 +22,23 @@ import ch.datascience.generators.Generators.Implicits._
 import io.renku.eventlog.subscriptions.commitsync.Generators.{fullCommitSyncEvents, minimalCommitSyncEvents}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import cats.implicits.toShow
 
 class CommitSyncEventSpec extends AnyWordSpec with should.Matchers {
 
-  "FullCommitSyncEvent.toString" should {
+  "FullCommitSyncEvent.show" should {
 
     "print out the eventId, projectPath, and lastSynced" in {
       val event = fullCommitSyncEvents.generateOne
-      event.toString shouldBe s"CommitSyncEvent ${event.id}, projectPath = ${event.projectPath}, lastSynced = ${event.lastSyncedDate}"
+      event.show shouldBe s"CommitSyncEvent ${event.id}, projectPath = ${event.projectPath}, lastSynced = ${event.lastSyncedDate}"
     }
   }
 
-  "MinimalCommitSyncEvent.toString" should {
+  "MinimalCommitSyncEvent.show" should {
 
     "print out the eventId, projectPath, and lastSynced" in {
       val event = minimalCommitSyncEvents.generateOne
-      event.toString shouldBe s"CommitSyncEvent projectId = ${event.projectId}, projectPath = ${event.projectPath}"
+      event.show shouldBe s"CommitSyncEvent projectId = ${event.project.id}, projectPath = ${event.project.path}"
     }
   }
 }

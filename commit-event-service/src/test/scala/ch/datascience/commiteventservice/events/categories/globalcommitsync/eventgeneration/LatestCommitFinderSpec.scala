@@ -46,7 +46,8 @@ class LatestCommitFinderSpec extends AnyWordSpec with MockFactory with ExternalS
       val personalAccessToken = personalAccessTokens.generateOne
 
       stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits?per_page=1")
+        get(urlPathEqualTo(s"/api/v4/projects/$projectId/repository/commits"))
+          .withQueryParam("per_page", equalTo("1"))
           .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
           .willReturn(okJson(commitsJson(from = commitId)))
       }

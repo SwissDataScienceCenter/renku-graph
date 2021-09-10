@@ -155,9 +155,9 @@ private class CommitEventProcessor[Interpretation[_]: MonadThrow](
 
   private def rollbackEvent(commit: CommitEvent): PartialFunction[Throwable, Interpretation[Option[AccessToken]]] = {
     case NonFatal(exception) =>
-      statusUpdater.rollback[EventStatus.New](commit.compoundEventId, commit.project.path) >>
-        new Exception(s"$categoryName: processing failure -> Event rolled back", exception)
-          .raiseError[Interpretation, Option[AccessToken]]
+      statusUpdater
+        .rollback[EventStatus.New](commit.compoundEventId, commit.project.path)
+        .flatMap(_ => new Exception(s"$categoryName: processing failure -> Event rolled back", exception).raiseError)
   }
 
   private sealed trait TriplesGenerationResult extends Product with Serializable {

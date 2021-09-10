@@ -11,7 +11,7 @@
         <appender-ref ref="STDOUT"/>
     </appender>
 
-    <logger name="application" level="ERROR" additivity="false">
+    <logger name="application" level="INFO" additivity="false">
         <appender-ref ref="ASYNC_STDOUT"/>
     </logger>
 

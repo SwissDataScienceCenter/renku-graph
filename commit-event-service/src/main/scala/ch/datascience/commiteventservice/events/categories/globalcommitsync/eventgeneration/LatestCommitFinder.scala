@@ -62,8 +62,8 @@ private class LatestCommitFinderImpl[Interpretation[_]: ConcurrentEffect: Timer]
       maybeAccessToken: Option[AccessToken]
   ): OptionT[Interpretation, CommitId] = OptionT {
     for {
-      stringUri     <- s"$gitLabUrl/api/v4/projects/$projectId/repository/commits?per_page=1".pure[Interpretation]
-      uri           <- validateUri(stringUri)
+      stringUri     <- s"$gitLabUrl/api/v4/projects/$projectId/repository/commits".pure[Interpretation]
+      uri           <- validateUri(stringUri) map (_.withQueryParam("per_page", "1"))
       maybeCommitId <- send(request(GET, uri, maybeAccessToken))(mapResponse)
     } yield maybeCommitId
   }

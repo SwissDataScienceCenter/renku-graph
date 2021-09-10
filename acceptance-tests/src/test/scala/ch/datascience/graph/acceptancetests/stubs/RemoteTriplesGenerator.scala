@@ -97,6 +97,8 @@ object RemoteTriplesGenerator extends RdfStoreData {
     newServer
   }
 
+  def reset(): Unit = server.resetAll()
+
   def shutdown(): Unit = {
     server.stop()
     server.shutdownServer()

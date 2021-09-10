@@ -22,14 +22,15 @@ import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import ch.datascience.generators.Generators.Implicits._
+import cats.implicits.toShow
 
 class MemberSyncEventSpec extends AnyWordSpec with should.Matchers {
 
-  "toString" should {
+  "show" should {
 
     "print out the projectPath" in {
       val event = MemberSyncEvent(projectPaths.generateOne)
-      event.toString shouldBe s"MemberSyncEvent projectPath = ${event.projectPath}"
+      event.show shouldBe s"MemberSyncEvent projectPath = ${event.projectPath}"
     }
   }
 }

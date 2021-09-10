@@ -29,7 +29,7 @@ private object EventProcessingGenerators {
 
   implicit val commitEvents: Gen[CommitEvent] = for {
     commitId <- commitIds
-    project  <- projects
+    project  <- projectsGen
   } yield CommitEvent(EventId(commitId.value), project, commitId)
 
   lazy val generationRecoverableErrors: Gen[GenerationRecoverableError] = for {

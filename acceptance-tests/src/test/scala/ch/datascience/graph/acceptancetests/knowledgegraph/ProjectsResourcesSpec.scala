@@ -88,16 +88,11 @@ class ProjectsResourcesSpec
 
       Given("some data in the RDF Store")
 
-      val jsonLDParentProjectTriples = parentProject.entitiesProject.asJsonLD
-
-      `data in the RDF store`(parentProject, jsonLDParentProjectTriples)
+      `data in the RDF store`(parentProject, parentProject.entitiesProject.asJsonLD)
       `wait for events to be processed`(parentProject.id)
 
       `data in the RDF store`(project, JsonLD.arr(dataset.asJsonLD, project.entitiesProject.asJsonLD))
       `wait for events to be processed`(project.id)
-
-      And("the project exists in GitLab")
-      `GET <gitlabApi>/projects/:path returning OK with`(project, withStatistics = true)
 
       When("user fetches project's details with GET knowledge-graph/projects/<namespace>/<name>")
       val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)

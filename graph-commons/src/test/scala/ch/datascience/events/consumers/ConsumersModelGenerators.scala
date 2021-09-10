@@ -18,12 +18,20 @@
 
 package ch.datascience.events.consumers
 
+import ch.datascience.events.EventRequestContent
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators.{jsons, nonEmptyStrings}
 import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import org.scalacheck.Gen
 
 object ConsumersModelGenerators {
 
-  implicit lazy val projects: Gen[Project] = for {
+  implicit val eventRequestContents: Gen[EventRequestContent] = for {
+    event        <- jsons
+    maybePayload <- nonEmptyStrings().toGeneratorOfOptions
+  } yield EventRequestContent(event, maybePayload)
+
+  implicit lazy val projectsGen: Gen[Project] = for {
     projectId <- projectIds
     path      <- projectPaths
   } yield Project(projectId, path)

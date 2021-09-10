@@ -19,45 +19,58 @@
 package ch.datascience.triplesgenerator
 package events.categories.awaitinggeneration
 
-import cats.data.EitherT.{fromEither, fromOption}
-import cats.effect.{ContextShift, Effect, IO, Timer}
+import cats.data.EitherT.fromOption
+import cats.effect.concurrent.Deferred
+import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, IO, Timer}
+import cats.syntax.all._
 import cats.{MonadThrow, Show}
-import ch.datascience.events.consumers.EventSchedulingResult
 import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
+import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
 import ch.datascience.events.{EventRequestContent, consumers}
 import ch.datascience.graph.model.RenkuVersionPair
 import ch.datascience.graph.model.events.{CategoryName, EventBody}
 import ch.datascience.metrics.MetricsRegistry
+import com.typesafe.config.{Config, ConfigFactory}
+import eu.timepit.refined.api.Refined
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private[events] class EventHandler[Interpretation[_]: Effect: MonadThrow](
-    override val categoryName: CategoryName,
-    eventsProcessingRunner:    EventsProcessingRunner[Interpretation],
-    eventBodyDeserializer:     EventBodyDeserializer[Interpretation],
-    currentVersionPair:        RenkuVersionPair,
-    logger:                    Logger[Interpretation]
-) extends consumers.EventHandler[Interpretation] {
+private[events] class EventHandler[Interpretation[_]: MonadThrow: ConcurrentEffect: ContextShift](
+    override val categoryName:  CategoryName,
+    eventProcessor:             EventProcessor[Interpretation],
+    eventBodyDeserializer:      EventBodyDeserializer[Interpretation],
+    subscriptionMechanism:      SubscriptionMechanism[Interpretation],
+    concurrentProcessesLimiter: ConcurrentProcessesLimiter[Interpretation],
+    currentVersionPair:         RenkuVersionPair,
+    logger:                     Logger[Interpretation]
+) extends consumers.EventHandlerWithProcessLimiter[Interpretation](concurrentProcessesLimiter) {
 
   import currentVersionPair.schemaVersion
   import eventBodyDeserializer.toCommitEvent
-  import eventsProcessingRunner.scheduleForProcessing
 
-  override def handle(requestContent: EventRequestContent): Interpretation[EventSchedulingResult] = {
-    for {
-      _           <- fromEither[Interpretation](requestContent.event.validateCategoryName)
-      eventBody   <- fromOption[Interpretation](requestContent.maybePayload.map(EventBody.apply), BadRequest)
-      commitEvent <- toCommitEvent(eventBody).toRightT(recoverTo = BadRequest)
-      result <- scheduleForProcessing(commitEvent, schemaVersion).toRightT
-                  .semiflatTap(logger.log(commitEvent))
-                  .leftSemiflatTap(logger.log(commitEvent))
-    } yield result
-  }.merge
+  override def createHandlingProcess(
+      requestContent: EventRequestContent
+  ): Interpretation[EventHandlingProcess[Interpretation]] =
+    EventHandlingProcess.withWaitingForCompletion[Interpretation](
+      deferred => startProcessEvent(requestContent, deferred),
+      subscriptionMechanism.renewSubscription()
+    )
+
+  private def startProcessEvent(requestContent: EventRequestContent, deferred: Deferred[Interpretation, Unit]) = for {
+    eventBody   <- fromOption[Interpretation](requestContent.maybePayload.map(EventBody.apply), BadRequest)
+    commitEvent <- toCommitEvent(eventBody).toRightT(recoverTo = BadRequest)
+    result <- Concurrent[Interpretation]
+                .start(eventProcessor.process(commitEvent, schemaVersion) >> deferred.complete(()))
+                .toRightT
+                .map(_ => Accepted)
+                .semiflatTap(logger.log(commitEvent))
+                .leftSemiflatTap(logger.log(commitEvent))
+  } yield result
 
   private implicit lazy val eventInfoToString: Show[CommitEvent] = Show.show { event =>
-    s"${event.compoundEventId}, projectPath = ${event.project.path}"
+    show"${event.compoundEventId}, projectPath = ${event.project.path}"
   }
 }
 
@@ -67,13 +80,22 @@ object EventHandler {
       currentVersionPair:    RenkuVersionPair,
       metricsRegistry:       MetricsRegistry[IO],
       subscriptionMechanism: SubscriptionMechanism[IO],
-      logger:                Logger[IO]
+      logger:                Logger[IO],
+      config:                Config = ConfigFactory.load()
   )(implicit
       contextShift:     ContextShift[IO],
       executionContext: ExecutionContext,
       timer:            Timer[IO]
   ): IO[EventHandler[IO]] = for {
-    processingRunner <-
-      IOEventsProcessingRunner(metricsRegistry, subscriptionMechanism, logger)
-  } yield new EventHandler[IO](categoryName, processingRunner, EventBodyDeserializer(), currentVersionPair, logger)
+    eventProcessor           <- IOCommitEventProcessor(metricsRegistry, logger)
+    generationProcesses      <- GenerationProcessesNumber[IO](config)
+    concurrentProcessLimiter <- ConcurrentProcessesLimiter(Refined.unsafeApply(generationProcesses.value))
+  } yield new EventHandler[IO](categoryName,
+                               eventProcessor,
+                               EventBodyDeserializer(),
+                               subscriptionMechanism,
+                               concurrentProcessLimiter,
+                               currentVersionPair,
+                               logger
+  )
 }

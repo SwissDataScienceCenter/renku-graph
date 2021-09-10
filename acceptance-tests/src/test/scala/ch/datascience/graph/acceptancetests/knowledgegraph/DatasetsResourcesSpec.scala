@@ -77,9 +77,6 @@ class DatasetsResourcesSpec
       `data in the RDF store`(project, testEntitiesProject.asJsonLD)
       `wait for events to be processed`(project.id)
 
-      And("the project exists in GitLab")
-      `GET <gitlabApi>/projects/:path returning OK with`(project, withStatistics = true)
-
       When("user fetches project's datasets with GET knowledge-graph/projects/<project-name>/datasets")
       val projectDatasetsResponse = knowledgeGraphClient GET s"knowledge-graph/projects/${project.path}/datasets"
 

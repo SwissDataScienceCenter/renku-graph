@@ -24,7 +24,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.nonEmptyStrings
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning.`data in the RDF store`
-import ch.datascience.graph.acceptancetests.stubs.GitLab.`GET <gitlabApi>/projects/:path returning OK with`
+import ch.datascience.graph.acceptancetests.stubs.GitLab.`GET <gitlabApi>/projects/:path AND :id returning OK with`
 import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator.`GET <triples-generator>/projects/:id/commits/:id returning OK`
 import ch.datascience.graph.acceptancetests.tooling.GraphServices._
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools.ResponseOps
@@ -68,7 +68,7 @@ class ReProvisioningSpec
 
       `data in the RDF store`(project, project.entitiesProject.asJsonLD, commitId)
 
-      `GET <gitlabApi>/projects/:path returning OK with`(project, withStatistics = true)
+      `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
       val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)
 
       projectDetailsResponseIsValid(projectDetailsResponse, initialProjectSchemaVersion)
@@ -90,7 +90,7 @@ class ReProvisioningSpec
       Then("Re-provisioning is triggered")
       And("The new data can be queried in Jena")
 
-      `GET <gitlabApi>/projects/:path returning OK with`(project, withStatistics = true)
+      `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
 
       eventually {
         val updatedProjectDetailsResponse =

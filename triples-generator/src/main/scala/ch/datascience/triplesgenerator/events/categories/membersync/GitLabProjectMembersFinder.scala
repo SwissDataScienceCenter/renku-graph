@@ -73,13 +73,15 @@ private class IOGitLabProjectMembersFinder(
   )(implicit
       maybeAccessToken: Option[AccessToken]
   ): IO[Set[GitLabProjectMember]] = for {
-    uri                     <- validateUri(merge(url, maybePage))
+    uri                     <- addPageToUrl(url, maybePage)
     fetchedUsersAndNextPage <- send(request(GET, uri, maybeAccessToken))(mapResponse)
     allUsers                <- addNextPage(url, allUsers, fetchedUsersAndNextPage)
   } yield allUsers
 
-  private def merge(url: String, maybePage: Option[Int] = None) =
-    maybePage map (page => s"$url?page=$page") getOrElse url
+  private def addPageToUrl(url: String, maybePage: Option[Int] = None) = maybePage match {
+    case Some(page) => validateUri(url).map(_.withQueryParam("page", page.toString))
+    case None       => validateUri(url)
+  }
 
   private lazy val mapResponse
       : PartialFunction[(Status, Request[IO], Response[IO]), IO[(Set[GitLabProjectMember], Option[Int])]] = {

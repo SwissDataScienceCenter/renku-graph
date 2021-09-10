@@ -23,6 +23,5 @@ import ch.datascience.events.EventRequestContent
 import io.circe.Json
 
 package object categories {
-
   def requestContent(event: Json): EventRequestContent = events.EventRequestContent(event, None)
 }

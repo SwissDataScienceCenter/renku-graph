@@ -23,8 +23,8 @@ import cats.Show
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
 import ch.datascience.db.SqlStatement
-import ch.datascience.events
-import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
+import ch.datascience.events.EventRequestContent
+import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.SchemaVersion
@@ -80,7 +80,12 @@ class EventHandlerSpec
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
           .map(event => event -> None)
       ).map(_.generateOne) foreach { case ((event, eventAsString), maybePayload) =>
-        handler.handle(events.EventRequestContent(event.asJson, maybePayload)).unsafeRunSync() shouldBe Accepted
+        handler
+          .createHandlingProcess(EventRequestContent(event.asJson, maybePayload))
+          .unsafeRunSync()
+          .process
+          .value
+          .unsafeRunSync() shouldBe Right(Accepted)
 
         eventually {
           logger.loggedOnly(Info(s"$categoryName: $eventAsString -> Processed"),
@@ -93,25 +98,22 @@ class EventHandlerSpec
 
     s"log an error if the events updater fails" in new TestCase {
       val exception = exceptions.generateOne
-      val (event, eventAsString) =
-        toTripleStoreEvents
-          .map(stubUpdateStatuses(updateResult = exception.raiseError[IO, Unit]))
-          .generateOne
+      val (event, eventAsString) = toTripleStoreEvents
+        .map(stubUpdateStatuses(updateResult = exception.raiseError[IO, Unit]))
+        .generateOne
 
-      handler.handle(requestContent(event.asJson)).unsafeRunSync() shouldBe Accepted
+      handler
+        .createHandlingProcess(requestContent(event.asJson))
+        .unsafeRunSync()
+        .process
+        .value
+        .unsafeRunSync() shouldBe Right(Accepted)
 
       eventually {
         logger.loggedOnly(Error(s"$categoryName: $eventAsString -> Failure", exception),
                           Info(s"$categoryName: $eventAsString -> $Accepted")
         )
       }
-    }
-
-    s"return $UnsupportedEventType if event is of wrong category" in new TestCase {
-
-      handler.handle(requestContent(jsons.generateOne.asJson)).unsafeRunSync() shouldBe UnsupportedEventType
-
-      logger.expectNoLogs()
     }
 
     s"return $BadRequest if event is malformed" in new TestCase {
@@ -122,7 +124,12 @@ class EventHandlerSpec
         }"""
       }
 
-      handler.handle(request).unsafeRunSync() shouldBe BadRequest
+      handler
+        .createHandlingProcess(request)
+        .unsafeRunSync()
+        .process
+        .value
+        .unsafeRunSync() shouldBe Left(BadRequest)
 
       logger.expectNoLogs()
     }

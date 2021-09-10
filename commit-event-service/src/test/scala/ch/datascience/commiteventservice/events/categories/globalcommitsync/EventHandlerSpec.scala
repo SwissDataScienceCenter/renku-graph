@@ -23,7 +23,9 @@ import cats.syntax.all._
 import ch.datascience.commiteventservice.events.categories.globalcommitsync.Generators.globalCommitSyncEventsNonZero
 import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.GlobalCommitEventSynchronizer
 import ch.datascience.events.EventRequestContent
-import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
+import ch.datascience.events.consumers.ConcurrentProcessesLimiter
+import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
+import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{exceptions, jsons}
 import ch.datascience.interpreters.TestLogger
@@ -57,7 +59,14 @@ class EventHandlerSpec
         (commitEventSynchronizer.synchronizeEvents _)
           .expects(event)
           .returning(().pure[IO])
-        handler.handle(requestContent(event.asJson)).unsafeRunSync() shouldBe Accepted
+        handler
+          .createHandlingProcess(requestContent(event.asJson))
+          .unsafeRunSync()
+          .process
+          .value
+          .unsafeRunSync() shouldBe Right(
+          Accepted
+        )
 
         logger.loggedOnly(Info(s"${logMessageCommon(event)} -> $Accepted"))
       }
@@ -72,7 +81,14 @@ class EventHandlerSpec
           .expects(event)
           .returning(().pure[IO])
 
-        handler.handle(requestContent(event.asJson)).unsafeRunSync() shouldBe Accepted
+        handler
+          .createHandlingProcess(requestContent(event.asJson))
+          .unsafeRunSync()
+          .process
+          .value
+          .unsafeRunSync() shouldBe Right(
+          Accepted
+        )
 
         logger.loggedOnly(Info(s"${logMessageCommon(event)} -> $Accepted"))
       }
@@ -85,20 +101,18 @@ class EventHandlerSpec
         .expects(event)
         .returning(exceptions.generateOne.raiseError[IO, Unit])
 
-      handler.handle(requestContent(event.asJson)).unsafeRunSync() shouldBe Accepted
+      handler
+        .createHandlingProcess(requestContent(event.asJson))
+        .unsafeRunSync()
+        .process
+        .value
+        .unsafeRunSync() shouldBe Right(Accepted)
 
       logger.getMessages(Info).map(_.message) should contain only s"${logMessageCommon(event)} -> $Accepted"
 
       eventually {
         logger.getMessages(Error).map(_.message) should contain only s"${logMessageCommon(event)} -> Failure"
       }
-    }
-
-    s"return $UnsupportedEventType if event is of wrong category" in new TestCase {
-
-      handler.handle(requestContent(jsons.generateOne.asJson)).unsafeRunSync() shouldBe UnsupportedEventType
-
-      logger.expectNoLogs()
     }
 
     s"return $BadRequest if event is malformed" in new TestCase {
@@ -109,7 +123,7 @@ class EventHandlerSpec
         }"""
       }
 
-      handler.handle(request).unsafeRunSync() shouldBe BadRequest
+      handler.createHandlingProcess(request).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(BadRequest)
 
       logger.expectNoLogs()
     }
@@ -120,22 +134,33 @@ class EventHandlerSpec
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
-    val commitEventSynchronizer = mock[GlobalCommitEventSynchronizer[IO]]
-    val logger                  = TestLogger[IO]()
-    val handler                 = new EventHandler[IO](categoryName, commitEventSynchronizer, logger)
+    val commitEventSynchronizer    = mock[GlobalCommitEventSynchronizer[IO]]
+    val subscriptionMechanism      = mock[SubscriptionMechanism[IO]]
+    val concurrentProcessesLimiter = mock[ConcurrentProcessesLimiter[IO]]
+    val logger                     = TestLogger[IO]()
+
+    (subscriptionMechanism.renewSubscription _).expects().returns(IO.unit)
+
+    val handler =
+      new EventHandler[IO](categoryName,
+                           commitEventSynchronizer,
+                           subscriptionMechanism,
+                           concurrentProcessesLimiter,
+                           logger
+      )
 
     def requestContent(event: Json): EventRequestContent = EventRequestContent(event, None)
   }
 
   private implicit def eventEncoder[E <: GlobalCommitSyncEvent]: Encoder[E] = Encoder.instance[E] {
-    case GlobalCommitSyncEvent(project, lastSynced, commitIds) => json"""{
+    case GlobalCommitSyncEvent(project, commitIds) => json"""{
         "categoryName": "GLOBAL_COMMIT_SYNC",
         "project": {
           "id":         ${project.id.value},
           "path":       ${project.path.value}
         },
-        "lastSynced":   ${lastSynced.value},
-        "commitIds":    ${Json.arr(commitIds.map(_.asJson): _*)}
+        "commits":    ${Json.arr(commitIds.map(_.asJson): _*)}
       }"""
   }
+
 }

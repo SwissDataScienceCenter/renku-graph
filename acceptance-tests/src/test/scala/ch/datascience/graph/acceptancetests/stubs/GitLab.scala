@@ -102,39 +102,35 @@ object GitLab {
     ()
   }
 
-  def `GET <gitlabApi>/projects/:id/repository/commits returning OK with a commit`(
+  def `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(
       projectId:          Id,
       commitIds:          CommitId*
-  )(implicit accessToken: AccessToken): Any = {
-
-    val getLatestCommit = get(s"/api/v4/projects/$projectId/repository/commits?per_page=1").withAccessTokenInHeader
-
-    if (commitIds.size == 1)
+  )(implicit accessToken: AccessToken): Unit = {
+    commitIds.zipWithIndex foreach { case (commitId, idx) =>
       stubFor {
-        getLatestCommit
-          .willReturn(okJson(json"""[
-          {
-            "id":              ${commitIds.head.value},
-            "author_name":     ${nonEmptyStrings().generateOne},
-            "author_email":    ${userEmails.generateOne.value},
-            "committer_name":  ${nonEmptyStrings().generateOne},
-            "committer_email": ${userEmails.generateOne.value},
-            "message":         ${nonEmptyStrings().generateOne},
-            "committed_date":  ${committedDates.generateOne.value.toString},
-            "parent_ids":      []
-          }                         
-        ]""".noSpaces))
+        get(urlPathEqualTo(s"/api/v4/projects/$projectId/repository/commits"))
+          .atPriority(1)
+          .withQueryParam("per_page", equalTo("1"))
+          .withQueryParam("page", equalTo((idx + 1).toString))
+          .inScenario(s"fetch latest commit for $projectId")
+          .whenScenarioStateIs(if (idx == 0) Scenario.STARTED else s"call $idx")
+          .willSetStateTo(s"call ${idx + 1}")
+          .willReturn(okJson(Json.arr(commitAsJson(commitId)).noSpaces))
+          .withAccessTokenInHeader
       }
-    else {
-      val getLatestCommitWithScenario = getLatestCommit.inScenario(s"fetch latest commit for $projectId")
+    }
+    stubFor {
+      get(urlPathEqualTo(s"/api/v4/projects/$projectId/repository/commits"))
+        .atPriority(2)
+        .willReturn(okJson(commitIds.map(commitAsJson).asJson.noSpaces))
+        .withAccessTokenInHeader
+    }
+    ()
+  }
 
-      commitIds.zipWithIndex foreach { case (commitId, idx) =>
-        stubFor {
-          getLatestCommitWithScenario
-            .whenScenarioStateIs(if (idx == 0) Scenario.STARTED else s"call $idx")
-            .willSetStateTo(s"call ${idx + 1}")
-            .willReturn(okJson(json"""[
-          {
+  private def commitAsJson(commitId: CommitId) =
+    json"""
+        {
             "id":              ${commitId.value},
             "author_name":     ${nonEmptyStrings().generateOne},
             "author_email":    ${userEmails.generateOne.value},
@@ -143,12 +139,8 @@ object GitLab {
             "message":         ${nonEmptyStrings().generateOne},
             "committed_date":  ${committedDates.generateOne.value.toString},
             "parent_ids":      []
-          }                         
-        ]""".noSpaces))
-        }
-      }
-    }
-  }
+          }  
+          """
 
   def `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(
       projectId:          Id,
@@ -193,23 +185,8 @@ object GitLab {
     ()
   }
 
-  def `GET <gitlabApi>/projects/:id returning OK`(project: data.Project)(implicit accessToken: AccessToken): Unit = {
-    stubFor {
-      get(s"/api/v4/projects/${project.id}").withAccessTokenInHeader
-        .willReturn(okJson(json"""{
-          "id":                  ${project.id.value}, 
-          "visibility":          ${project.entitiesProject.visibility.value},
-          "name":                ${project.name.value},
-          "path_with_namespace": ${project.path.value},
-          "created_at":          ${project.entitiesProject.dateCreated.value}
-        }""".noSpaces))
-    }
-    ()
-  }
-
-  def `GET <gitlabApi>/projects/:path returning OK with`(
-      project:            data.Project,
-      withStatistics:     Boolean = false
+  def `GET <gitlabApi>/projects/:path AND :id returning OK with`(
+      project:            data.Project
   )(implicit accessToken: AccessToken): Unit = {
 
     implicit class PermissionsOps(permissions: Permissions) {
@@ -233,12 +210,8 @@ object GitLab {
       }"""
     }
 
-    val queryParams = if (withStatistics) "?statistics=true" else ""
-    stubFor {
-      get(s"/api/v4/projects/${urlEncode(project.path.value)}$queryParams").withAccessTokenInHeader
-        .willReturn(
-          okJson(
-            json"""{
+    val returnedJson = okJson(
+      json"""{
               "id":                   ${project.id.value},
               "name":                 ${project.name.value},
               "description":          ${project.maybeDescription.map(_.value)},
@@ -263,16 +236,30 @@ object GitLab {
                 "job_artifacts_size": ${project.statistics.jobArtifactsSize.value}
               }
             }"""
-              .deepMerge(
-                project.entitiesProject match {
-                  case withParent: ProjectWithParent =>
-                    json"""{"forked_from_project":  {"path_with_namespace": ${withParent.parent.path.value}} }"""
-                  case _ => Json.obj()
-                }
-              )
-              .noSpaces
-          )
+        .deepMerge(
+          project.entitiesProject match {
+            case withParent: ProjectWithParent =>
+              json"""{"forked_from_project":  {"path_with_namespace": ${withParent.parent.path.value}} }"""
+            case _ => Json.obj()
+          }
         )
+        .deepMerge(
+          project.entitiesProject.maybeCreator
+            .flatMap(_.maybeGitLabId)
+            .map(creatorId => json"""{"creator_id": ${creatorId.value}}""")
+            .getOrElse(Json.obj())
+        )
+        .noSpaces
+    )
+
+    stubFor {
+      get(urlPathEqualTo(s"/api/v4/projects/${urlEncode(project.path.value)}")).withAccessTokenInHeader
+        .willReturn(returnedJson)
+    }
+
+    stubFor {
+      get(urlPathEqualTo(s"/api/v4/projects/${project.id.value}")).withAccessTokenInHeader
+        .willReturn(returnedJson)
     }
 
     (project.entitiesProject.maybeCreator -> project.entitiesProject.maybeCreator.flatMap(_.maybeGitLabId)) mapN {
@@ -293,19 +280,17 @@ object GitLab {
 
   def `GET <gitlabApi>/projects/:path returning BadRequest`(
       project:            data.Project
-  )(implicit accessToken: AccessToken): StubMapping =
-    stubFor {
-      get(s"/api/v4/projects/${urlEncode(project.path.value)}").withAccessTokenInHeader
-        .willReturn(badRequest())
-    }
+  )(implicit accessToken: AccessToken): StubMapping = stubFor {
+    get(s"/api/v4/projects/${urlEncode(project.path.value)}").withAccessTokenInHeader
+      .willReturn(badRequest())
+  }
 
   def `GET <gitlabApi>/projects/:path having connectivity issues`(
       project:            data.Project
-  )(implicit accessToken: AccessToken): StubMapping =
-    stubFor {
-      get(s"/api/v4/projects/${urlEncode(project.path.value)}").withAccessTokenInHeader
-        .willReturn(aResponse() withFault CONNECTION_RESET_BY_PEER)
-    }
+  )(implicit accessToken: AccessToken): StubMapping = stubFor {
+    get(s"/api/v4/projects/${urlEncode(project.path.value)}").withAccessTokenInHeader
+      .willReturn(aResponse() withFault CONNECTION_RESET_BY_PEER)
+  }
 
   private implicit class MappingBuilderOps(builder: MappingBuilder) {
     def withAccessTokenInHeader(implicit accessToken: AccessToken): MappingBuilder = accessToken match {

@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.init
 
-import ch.datascience.events.consumers.ConsumersModelGenerators.projects
+import ch.datascience.events.consumers.ConsumersModelGenerators.projectsGen
 import ch.datascience.generators.Generators.Implicits.GenOps
 import ch.datascience.graph.model.EventsGenerators.{batchDates, eventBodies, eventIds, eventStatuses}
 import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages}
@@ -28,7 +28,7 @@ import org.scalacheck.Gen
 private object Generators {
   lazy val events: Gen[Event] = for {
     eventId      <- eventIds
-    project      <- projects
+    project      <- projectsGen
     date         <- eventDates
     batchDate    <- batchDates
     body         <- eventBodies

@@ -112,8 +112,8 @@ object RDFStore extends RdfStoreData {
       _ <- newJena.start()
       _ <- maybeVersionPair
              .map { currentVersionPair =>
-               jenaReference.read.map { jena =>
-                 jena.connection
+               jenaReference.read.map {
+                 _.connection
                    .update(s"""
             INSERT DATA{
               <${EntityId

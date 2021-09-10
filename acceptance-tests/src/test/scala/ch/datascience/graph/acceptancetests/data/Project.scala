@@ -150,7 +150,10 @@ object Project {
 
   object Statistics {
     final class CommitsCount private (val value: Long) extends AnyVal with LongTinyType
-    implicit object CommitsCount extends TinyTypeFactory[CommitsCount](new CommitsCount(_)) with NonNegativeLong
+    implicit object CommitsCount extends TinyTypeFactory[CommitsCount](new CommitsCount(_)) with NonNegativeLong {
+      val zero: CommitsCount = CommitsCount(0)
+      val one:  CommitsCount = CommitsCount(1)
+    }
 
     final class StorageSize private (val value: Long) extends AnyVal with LongTinyType
     implicit object StorageSize extends TinyTypeFactory[StorageSize](new StorageSize(_)) with NonNegativeLong

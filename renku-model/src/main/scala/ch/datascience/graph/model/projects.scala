@@ -18,9 +18,9 @@
 
 package ch.datascience.graph.model
 
+import cats.syntax.all._
 import ch.datascience.graph.model.views.{EntityIdJsonLdOps, TinyTypeJsonLDOps, UrlResourceRenderer}
 import ch.datascience.tinytypes._
-import cats.syntax.all._
 import ch.datascience.tinytypes.constraints._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
@@ -37,6 +37,7 @@ object projects {
   implicit object Path extends TinyTypeFactory[Path](new Path(_)) with RelativePath with TinyTypeJsonLDOps[Path] {
     private val allowedFirstChar         = ('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9') :+ '_'
     private[projects] val regexValidator = "^([\\w.-]+)(\\/([\\w.-]+))+$"
+
     addConstraint(
       check = v => (v contains "/") && (allowedFirstChar contains v.head) && (v matches regexValidator),
       message = (value: String) => s"'$value' is not a valid $typeName"

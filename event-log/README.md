@@ -128,7 +128,7 @@ Changes the status of events. The events for which the status will be changed ar
   "categoryName": "EVENTS_STATUS_CHANGE",
   "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
-    "id":   12,
+    "id": 12,
     "path": "namespace/project-name"
   },
   "message" : "<failure message>",
@@ -352,8 +352,8 @@ All events are sent as multipart requests
 {
   "categoryName": "AWAITING_GENERATION",
   "subscriber": {
-    "url":      "http://host/path",
-    "id":       "20210302140653-8641",
+    "url": "http://host/path",
+    "id": "20210302140653-8641",
     "capacity": 4
   }
 }
@@ -387,8 +387,8 @@ All events are sent as multipart requests
 {
   "categoryName": "TRIPLES_GENERATED",
   "subscriber": {
-    "url":      "http://host/path",
-    "id":       "20210302140653-8641"
+    "url": "http://host/path",
+    "id": "20210302140653-8641"
   }
 }
 ```
@@ -425,8 +425,8 @@ All events are sent as multipart requests
 {
   "categoryName": "MEMBER_SYNC",
   "subscriber": {
-    "url":      "http://host/path",
-    "id":       "20210302140653-8641"
+    "url": "http://host/path",
+    "id": "20210302140653-8641"
   }
 }
 ```
@@ -452,8 +452,8 @@ All events are sent as multipart requests
 {
   "categoryName": "COMMIT_SYNC",
   "subscriber": {
-    "url":      "http://host/path",
-    "id":       "20210302140653-8641"
+    "url": "http://host/path",
+    "id": "20210302140653-8641"
   }
 }
 ```
@@ -486,6 +486,38 @@ or
 }
 ```
 
+- **GLOBAL_COMMIT_SYNC**
+
+**Request**
+
+```json
+{
+  "categoryName": "GLOBAL_COMMIT_SYNC",
+  "subscriber": {
+    "url": "http://host/path",
+    "id": "20210302140653-8641"
+  }
+}
+```
+
+**Event example**
+
+`event` part:
+
+```json
+{
+  "categoryName": "GLOBAL_COMMIT_SYNC",
+  "project": {
+    "id": 12,
+    "path": "project/path"
+  },
+  "commits": [
+    "commitId1",
+    "commitId2"
+  ]
+}
+```
+
 - **ZOMBIE_CHASING**
 
 **Request**
@@ -494,8 +526,8 @@ or
 {
   "categoryName": "ZOMBIE_CHASING",
   "subscriber": {
-    "url":      "http://host/path",
-    "id":       "20210302140653-8641"
+    "url": "http://host/path",
+    "id": "20210302140653-8641"
   }
 }
 ```

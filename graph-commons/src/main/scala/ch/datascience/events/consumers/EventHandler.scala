@@ -19,8 +19,9 @@
 package ch.datascience.events.consumers
 
 import cats.data.EitherT
+import cats.data.EitherT.fromEither
 import cats.syntax.all._
-import cats.{MonadError, Show}
+import cats.{Monad, MonadError, Show}
 import ch.datascience.events.EventRequestContent
 import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventId}
@@ -31,9 +32,27 @@ import org.typelevel.log4cats.Logger
 import scala.util.control.NonFatal
 
 trait EventHandler[Interpretation[_]] {
+  def tryHandling(request: EventRequestContent): Interpretation[EventSchedulingResult]
+
+  protected def createHandlingProcess(
+      request: EventRequestContent
+  ): Interpretation[EventHandlingProcess[Interpretation]]
+}
+
+abstract class EventHandlerWithProcessLimiter[Interpretation[_]: Monad](
+    processesLimiter: ConcurrentProcessesLimiter[Interpretation]
+) extends EventHandler[Interpretation] {
   val categoryName: CategoryName
 
-  def handle(request: EventRequestContent): Interpretation[EventSchedulingResult]
+  final override def tryHandling(request: EventRequestContent): Interpretation[EventSchedulingResult] = (for {
+    _                    <- fromEither[Interpretation](request.event.validateCategoryName)
+    eventHandlingProcess <- EitherT.right(createHandlingProcess(request))
+    r                    <- EitherT.right[EventSchedulingResult](processesLimiter tryExecuting eventHandlingProcess)
+  } yield r).merge
+
+  protected def createHandlingProcess(
+      request: EventRequestContent
+  ): Interpretation[EventHandlingProcess[Interpretation]]
 
   implicit class JsonOps(json: Json) {
 
@@ -54,8 +73,7 @@ trait EventHandler[Interpretation[_]] {
 
     private lazy val checkCategoryName: CategoryName => Decoder.Result[CategoryName] = {
       case name @ `categoryName` => Right(name)
-      case other =>
-        Left(DecodingFailure(s"$other not supported by $categoryName", Nil))
+      case other                 => Left(DecodingFailure(s"$other not supported by $categoryName", Nil))
     }
 
     private implicit val projectDecoder: Decoder[Project] = { implicit cursor =>
@@ -81,19 +99,20 @@ trait EventHandler[Interpretation[_]] {
         eventInfo: EventInfo
     )(result:      EventSchedulingResult)(implicit show: Show[EventInfo]): Interpretation[Unit] =
       result match {
-        case Accepted => logger.info(s"$categoryName: ${eventInfo.show} -> $result")
-        case SchedulingError(exception) =>
-          logger.error(exception)(s"$categoryName: ${eventInfo.show} -> $SchedulingError")
+        case Accepted =>
+          logger.info(show"$categoryName: $eventInfo -> $result")
+        case error @ SchedulingError(exception) =>
+          logger.error(exception)(show"$categoryName: $eventInfo -> $error")
         case _ => ME.unit
       }
 
     def logInfo[EventInfo](eventInfo: EventInfo, message: String)(implicit
         show:                         Show[EventInfo]
-    ): Interpretation[Unit] = logger.info(s"$categoryName: ${eventInfo.show} -> $message")
+    ): Interpretation[Unit] = logger.info(show"$categoryName: $eventInfo -> $message")
 
     def logError[EventInfo](eventInfo: EventInfo, exception: Throwable)(implicit
         show:                          Show[EventInfo]
-    ): Interpretation[Unit] = logger.error(exception)(s"$categoryName: ${eventInfo.show} -> Failure")
+    ): Interpretation[Unit] = logger.error(exception)(show"$categoryName: $eventInfo -> Failure")
   }
 
   protected implicit class EitherTOps[T](

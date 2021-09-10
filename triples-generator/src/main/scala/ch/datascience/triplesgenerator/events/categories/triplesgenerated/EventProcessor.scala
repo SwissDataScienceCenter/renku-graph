@@ -44,9 +44,7 @@ import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 private trait EventProcessor[Interpretation[_]] {
-  def process(
-      triplesGeneratedEvent: TriplesGeneratedEvent
-  ): Interpretation[Unit]
+  def process(triplesGeneratedEvent: TriplesGeneratedEvent): Interpretation[Unit]
 }
 
 private class EventProcessorImpl[Interpretation[_]: MonadThrow](

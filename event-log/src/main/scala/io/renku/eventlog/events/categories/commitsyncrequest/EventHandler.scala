@@ -18,14 +18,14 @@
 
 package io.renku.eventlog.events.categories.commitsyncrequest
 
-import cats.{MonadError, Show}
 import cats.data.EitherT.fromEither
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
+import cats.{MonadThrow, Show}
 import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.events.{EventRequestContent, consumers}
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
-import ch.datascience.events.consumers.EventSchedulingResult
+import ch.datascience.events.consumers._
+import ch.datascience.events.{EventRequestContent, consumers}
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.metrics.LabeledHistogram
 import io.circe.Decoder
@@ -34,35 +34,34 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private class EventHandler[Interpretation[_]: MonadError[*[_], Throwable]](
+private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurrent](
     override val categoryName: CategoryName,
     commitSyncForcer:          CommitSyncForcer[Interpretation],
     logger:                    Logger[Interpretation]
-)(implicit
-    contextShift: ContextShift[Interpretation],
-    concurrent:   Concurrent[Interpretation]
-) extends consumers.EventHandler[Interpretation] {
+) extends consumers.EventHandlerWithProcessLimiter[Interpretation](ConcurrentProcessesLimiter.withoutLimit) {
 
   import ch.datascience.graph.model.projects
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import commitSyncForcer._
 
-  override def handle(request: EventRequestContent): Interpretation[EventSchedulingResult] = {
-    for {
-      _ <- fromEither[Interpretation](request.event.validateCategoryName)
-      event <-
-        fromEither[Interpretation](
-          request.event.as[(projects.Id, projects.Path)].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult]
-        )
-      result <- forceCommitSync(event._1, event._2).toRightT
-                  .map(_ => Accepted)
-                  .semiflatTap(logger.log(event))
-                  .leftSemiflatTap(logger.log(event))
-    } yield result
-  }.merge
+  override def createHandlingProcess(
+      request: EventRequestContent
+  ): Interpretation[EventHandlingProcess[Interpretation]] =
+    EventHandlingProcess[Interpretation](startForceCommitSync(request))
+
+  private def startForceCommitSync(request: EventRequestContent) = for {
+    event <-
+      fromEither[Interpretation](
+        request.event.as[(projects.Id, projects.Path)].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult]
+      )
+    result <- forceCommitSync(event._1, event._2).toRightT
+                .map(_ => Accepted)
+                .semiflatTap(logger.log(event))
+                .leftSemiflatTap(logger.log(event))
+  } yield result
 
   private implicit lazy val eventInfoToString: Show[(projects.Id, projects.Path)] = Show.show {
-    case (projectId, projectPath) => s"projectId = $projectId, projectPath = $projectPath"
+    case (projectId, projectPath) => show"projectId = $projectId, projectPath = $projectPath"
   }
 
   private implicit val eventDecoder: Decoder[(projects.Id, projects.Path)] = { cursor =>

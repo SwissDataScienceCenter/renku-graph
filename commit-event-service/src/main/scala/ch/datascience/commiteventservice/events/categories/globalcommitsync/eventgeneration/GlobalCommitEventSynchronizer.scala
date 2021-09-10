@@ -88,9 +88,7 @@ private[globalcommitsync] class GlobalCommitEventSynchronizerImpl[Interpretation
   private def logSummary(
       project: Project
   ): ((ElapsedTime, SynchronizationSummary)) => Interpretation[Unit] = { case (elapsedTime, summary) =>
-    logger.info(
-      show"$categoryName: projectId = ${project.id}, projectPath = ${project.path} -> events generation result: $summary in ${elapsedTime}ms"
-    )
+    logger.info(show"$categoryName: $project -> events generation result: $summary in ${elapsedTime}ms")
   }
 }
 

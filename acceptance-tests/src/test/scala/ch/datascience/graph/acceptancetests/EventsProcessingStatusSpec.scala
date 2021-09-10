@@ -57,19 +57,18 @@ class EventsProcessingStatusSpec
 
     Scenario("As a user I would like to see progress of events processing for my project") {
 
-      val project   = dataProjects(projectEntities(visibilityPublic)).generateOne
-      val projectId = project.id
       implicit val accessToken: AccessToken = accessTokens.generateOne
+      val project = dataProjects(projectEntities(visibilityPublic)).generateOne
 
       When("there's no webhook for a given project in GitLab")
       Then("the status endpoint should return NOT_FOUND")
-      webhookServiceClient.GET(s"projects/$projectId/events/status").status shouldBe NotFound
+      webhookServiceClient.GET(s"projects/${project.id}/events/status").status shouldBe NotFound
 
       When("there is a webhook but no events in the Event Log")
       givenHookValidationToHookExists(project)
 
       Then("the status endpoint should return OK with done = total = 0")
-      val noEventsResponse = webhookServiceClient GET s"projects/$projectId/events/status"
+      val noEventsResponse = webhookServiceClient GET s"projects/${project.id}/events/status"
       noEventsResponse.status shouldBe Ok
       val noEventsResponseJson = noEventsResponse.bodyAsJson.hcursor
       noEventsResponseJson.downField("done").as[Int]        shouldBe Right(0)
@@ -81,7 +80,7 @@ class EventsProcessingStatusSpec
 
       Then("the status endpoint should return OK with some progress info")
       eventually {
-        val response = webhookServiceClient GET s"projects/$projectId/events/status"
+        val response = webhookServiceClient GET s"projects/${project.id}/events/status"
 
         response.status shouldBe Ok
 
@@ -96,17 +95,18 @@ class EventsProcessingStatusSpec
 
       // wait for the Event Log to be emptied
       eventually {
-        EventLog.findEvents(projectId, status = New) shouldBe List.empty
+        EventLog.findEvents(project.id, status = New) shouldBe List.empty
       }
     }
   }
 
   private def givenHookValidationToHookExists(project: data.Project)(implicit accessToken: AccessToken): Unit = {
-    `GET <gitlabApi>/projects/:id returning OK`(project)
+    `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
+
     tokenRepositoryClient
       .PUT(s"projects/${project.id}/tokens", accessToken.toJson, maybeAccessToken = None)
       .status shouldBe NoContent
-    `GET <gitlabApi>/projects/:id returning OK`(project)
+
     `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(project.id)
   }
 
@@ -114,17 +114,17 @@ class EventsProcessingStatusSpec
 
     val allCommitIds = commitIds.generateNonEmptyList(minElements = numberOfEvents, maxElements = numberOfEvents).toList
 
-    givenAccessTokenPresentFor(project)
-
     `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project.id,
                                                                                         allCommitIds.head,
                                                                                         allCommitIds.tail.toSet
     )
 
-    `GET <gitlabApi>/projects/:id/repository/commits returning OK with a commit`(project.id, allCommitIds.head)
+    `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(project.id, allCommitIds.head)
 
     // assuring there's project info in GitLab for the triples curation process
-    `GET <gitlabApi>/projects/:path returning OK with`(project)
+    `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
+
+    givenAccessTokenPresentFor(project)
 
     allCommitIds foreach { commitId =>
       // GitLab to return commit info about all the parent commits

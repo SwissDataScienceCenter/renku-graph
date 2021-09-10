@@ -92,8 +92,7 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[Interpretation[_]: Concu
       maybeAccessToken: Option[AccessToken]
   ): Interpretation[List[CommitId]] =
     for {
-      pagePart     <- maybePage.map(page => s"?page=$page").getOrElse("").pure[Interpretation]
-      uri          <- validateUri(s"$uriWithoutPage$pagePart")
+      uri          <- addPageToUrl(uriWithoutPage, maybePage)
       responsePair <- send(request(GET, uri, maybeAccessToken))(mapCommitResponse)
       allCommitIds <- addNextPage(uriWithoutPage,
                                   previouslyFetchedCommits,
@@ -101,6 +100,11 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[Interpretation[_]: Concu
                                   maybeNextPage = responsePair._2
                       )
     } yield allCommitIds
+
+  private def addPageToUrl(url: String, maybePage: Option[Int]) = maybePage match {
+    case Some(page) => validateUri(s"$url").map(_.withQueryParam("page", page.toString))
+    case None       => validateUri(url)
+  }
 
   private implicit lazy val mapCommitResponse
       : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[

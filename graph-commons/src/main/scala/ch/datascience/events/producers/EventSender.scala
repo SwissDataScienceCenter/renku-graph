@@ -31,7 +31,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import org.http4s.Method.POST
 import org.http4s.Status.{Accepted, BadGateway, GatewayTimeout, NotFound, ServiceUnavailable}
-import org.http4s.{Request, Response, Status, Uri}
+import org.http4s._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext

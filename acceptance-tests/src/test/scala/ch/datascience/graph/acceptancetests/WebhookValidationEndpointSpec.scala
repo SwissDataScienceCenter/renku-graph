@@ -20,6 +20,7 @@ package ch.datascience.graph.acceptancetests
 
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.acceptancetests.data.Project.Statistics.CommitsCount
 import ch.datascience.graph.acceptancetests.data.dataProjects
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
@@ -36,13 +37,13 @@ class WebhookValidationEndpointSpec extends AnyFeatureSpec with GivenWhenThen wi
   Feature("Existence of a Graph Services hook can be validated") {
 
     Scenario("There's a Graph Services hook on a Public project in GitLab") {
-      val project = dataProjects(projectEntities(visibilityPublic)).generateOne
+      val project = dataProjects(projectEntities(visibilityPublic), CommitsCount.zero).generateOne
       implicit val accessToken: AccessToken = accessTokens.generateOne
       Given("api user is authenticated")
       `GET <gitlabApi>/user returning OK`()
 
       Given("project is present in GitLab")
-      `GET <gitlabApi>/projects/:id returning OK`(project)
+      `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
 
       Given("project has Graph Services hook in GitLab")
       `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(project.id)
@@ -56,13 +57,13 @@ class WebhookValidationEndpointSpec extends AnyFeatureSpec with GivenWhenThen wi
 
     Scenario("There's no Graph Services hook on a Public project in GitLab") {
 
-      val project = dataProjects(projectEntities(visibilityPublic)).generateOne
+      val project = dataProjects(projectEntities(visibilityPublic), CommitsCount.zero).generateOne
       implicit val accessToken: AccessToken = accessTokens.generateOne
       Given("api user is authenticated")
       `GET <gitlabApi>/user returning OK`()
 
       Given("project is present in GitLab")
-      `GET <gitlabApi>/projects/:id returning OK`(project)
+      `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
 
       Given("project does not have Graph Services hook in GitLab")
       `GET <gitlabApi>/projects/:id/hooks returning OK with no hooks`(project.id)
@@ -82,7 +83,7 @@ class WebhookValidationEndpointSpec extends AnyFeatureSpec with GivenWhenThen wi
       `GET <gitlabApi>/user returning OK`()
 
       Given("project is present in GitLab")
-      `GET <gitlabApi>/projects/:id returning OK`(project)
+      `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
 
       Given("project has Graph Services hook in GitLab")
       `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(project.id)

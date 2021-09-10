@@ -90,19 +90,19 @@ private class CommitSyncEventFinderImpl[Interpretation[_]: BracketThrow](
               ORDER BY proj.latest_event_date DESC
               LIMIT 1"""
           .query(
-            eventIdDecoder.opt ~ eventStatusDecoder.opt ~ projectIdDecoder ~ projectPathDecoder ~ lastSyncedDateDecoder.opt ~ eventDateDecoder
+            eventIdDecoder.opt ~ eventStatusDecoder.opt ~ projectDecoder ~ lastSyncedDateDecoder.opt ~ eventDateDecoder
           )
           .map {
-            case Some(eventId) ~ maybeEventStatus ~ projectId ~ projectPath ~ maybeLastSyncDate ~ latestEventDate =>
-              (FullCommitSyncEvent(CompoundEventId(eventId, projectId),
-                                   projectPath,
+            case Some(eventId) ~ maybeEventStatus ~ project ~ maybeLastSyncDate ~ latestEventDate =>
+              (FullCommitSyncEvent(CompoundEventId(eventId, project.id),
+                                   project.path,
                                    maybeLastSyncDate getOrElse LastSyncedDate(latestEventDate.value)
                ),
                maybeLastSyncDate,
                maybeEventStatus
               )
-            case None ~ _ ~ projectId ~ projectPath ~ maybeLastSyncDate ~ _ =>
-              (MinimalCommitSyncEvent(projectId, projectPath), maybeLastSyncDate, None)
+            case None ~ _ ~ project ~ maybeLastSyncDate ~ _ =>
+              (MinimalCommitSyncEvent(project), maybeLastSyncDate, None)
           }
       )
       .arguments(categoryName ~ eventDate ~ lastSyncDate ~ eventDate ~ lastSyncDate)
@@ -150,8 +150,8 @@ private class CommitSyncEventFinderImpl[Interpretation[_]: BracketThrow](
 
   private implicit class SyncEventOps(commitSyncEvent: CommitSyncEvent) {
     lazy val projectId: projects.Id = commitSyncEvent match {
-      case FullCommitSyncEvent(eventId, _, _)   => eventId.projectId
-      case MinimalCommitSyncEvent(projectId, _) => projectId
+      case FullCommitSyncEvent(eventId, _, _) => eventId.projectId
+      case MinimalCommitSyncEvent(project)    => project.id
     }
   }
 

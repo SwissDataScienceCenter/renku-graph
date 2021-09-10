@@ -47,17 +47,17 @@ object RdfStoreProvisioning extends ModelImplicits with Eventually with Acceptan
   )(implicit accessToken: AccessToken): Assertion = {
     val projectId = project.id
 
-    givenAccessTokenPresentFor(project)
-
     `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
 
-    `GET <gitlabApi>/projects/:id/repository/commits returning OK with a commit`(projectId, commitId)
+    `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(projectId, commitId)
 
-    `GET <gitlabApi>/projects/:path returning OK with`(project)
+    `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
 
     `GET <triples-generator>/projects/:id/commits/:id returning OK`(project, commitId, triples)
 
     `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project)
+
+    givenAccessTokenPresentFor(project)
 
     webhookServiceClient
       .POST("webhooks/events", HookToken(projectId), data.GitLab.pushEvent(project, commitId))

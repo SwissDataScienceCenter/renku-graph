@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.subscriptions.triplesgenerated
 
+import cats.Show
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.{SchemaVersion, projects}
 import cats.syntax.all._
@@ -29,9 +30,12 @@ private final case class TriplesGeneratedEvent(id:            CompoundEventId,
                                                payload:       EventPayload,
                                                schemaVersion: SchemaVersion
 ) {
-  override lazy val toString: String =
-    s"$TriplesGeneratedEvent $id, projectPath = $projectPath"
+  override lazy val toString: String = s"$TriplesGeneratedEvent $id, projectPath = $projectPath"
+}
 
+private object TriplesGeneratedEvent {
+  implicit lazy val show: Show[TriplesGeneratedEvent] =
+    Show.show(event => show"TriplesGeneratedEvent ${event.id}, projectPath = ${event.projectPath}")
 }
 
 private object TriplesGeneratedEventEncoder extends EventEncoder[TriplesGeneratedEvent] {

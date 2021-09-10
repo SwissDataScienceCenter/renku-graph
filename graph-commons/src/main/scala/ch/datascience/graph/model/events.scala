@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.model
 
+import cats.Show
 import cats.syntax.all._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
@@ -37,6 +38,10 @@ object events {
 
   final case class CompoundEventId(id: EventId, projectId: projects.Id) {
     override lazy val toString: String = s"id = $id, projectId = $projectId"
+  }
+
+  object CompoundEventId {
+    implicit lazy val show: Show[CompoundEventId] = Show.show(id => show"id = ${id.id}, projectId = ${id.projectId}")
   }
 
   final case class EventDetails(id: EventId, projectId: projects.Id, eventBody: EventBody) {
@@ -141,25 +146,25 @@ object events {
 
     sealed trait FailureStatus extends EventStatus
 
+    type GenerationRecoverableFailure = GenerationRecoverableFailure.type
     final case object GenerationRecoverableFailure extends FailureStatus {
       override val value: String = "GENERATION_RECOVERABLE_FAILURE"
     }
-    type GenerationRecoverableFailure = GenerationRecoverableFailure.type
 
+    type GenerationNonRecoverableFailure = GenerationNonRecoverableFailure.type
     final case object GenerationNonRecoverableFailure extends FailureStatus with FinalStatus {
       override val value: String = "GENERATION_NON_RECOVERABLE_FAILURE"
     }
-    type GenerationNonRecoverableFailure = GenerationNonRecoverableFailure.type
 
+    type TransformationRecoverableFailure = TransformationRecoverableFailure.type
     final case object TransformationRecoverableFailure extends FailureStatus {
       override val value: String = "TRANSFORMATION_RECOVERABLE_FAILURE"
     }
-    type TransformationRecoverableFailure = TransformationRecoverableFailure.type
 
+    type TransformationNonRecoverableFailure = TransformationNonRecoverableFailure.type
     final case object TransformationNonRecoverableFailure extends FailureStatus with FinalStatus {
       override val value: String = "TRANSFORMATION_NON_RECOVERABLE_FAILURE"
     }
-    type TransformationNonRecoverableFailure = TransformationNonRecoverableFailure.type
 
     implicit val eventStatusJsonDecoder: Decoder[EventStatus] = decodeString.emap { value =>
       Either.fromOption(

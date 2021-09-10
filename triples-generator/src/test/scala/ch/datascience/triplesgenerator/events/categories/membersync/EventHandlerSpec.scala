@@ -19,10 +19,9 @@
 package ch.datascience.triplesgenerator.events.categories.membersync
 
 import cats.effect.IO
-import ch.datascience.events
 import ch.datascience.events.EventRequestContent
-import ch.datascience.events.Generators._
-import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
+import ch.datascience.events.consumers.EventHandlingProcess
+import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
@@ -51,7 +50,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
         val request = requestContent(projectPath.asJson(eventEncoder))
 
-        handler.handle(request).unsafeRunSync() shouldBe Accepted
+        handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Right(Accepted)
 
         logger.loggedOnly(
           Info(
@@ -59,15 +58,6 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
           )
         )
       }
-
-    s"return $UnsupportedEventType if event is of wrong category" in new TestCase {
-
-      val request = eventRequestContents.generateOne.copy(event = jsons.generateOne.asJson)
-
-      handler.handle(request).unsafeRunSync() shouldBe UnsupportedEventType
-
-      logger.expectNoLogs()
-    }
 
     s"return $BadRequest if project path is malformed" in new TestCase {
 
@@ -78,7 +68,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
         }
       }""")
 
-      handler.handle(request).unsafeRunSync() shouldBe BadRequest
+      handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Left(BadRequest)
 
       logger.expectNoLogs()
     }
@@ -91,7 +81,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     val logger              = TestLogger[IO]()
     val handler             = new EventHandler[IO](categoryName, membersSynchronizer, logger)
 
-    def requestContent(event: Json): EventRequestContent = events.EventRequestContent(event, None)
+    def requestContent(event: Json): EventRequestContent = EventRequestContent(event, None)
   }
 
   implicit lazy val eventEncoder: Encoder[projects.Path] =
@@ -103,4 +93,9 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
         }
       }"""
     }
+
+  private implicit class EventHandlingProcessOps(handlingProcess: IO[EventHandlingProcess[IO]]) {
+    def unsafeRunSyncProcess() =
+      handlingProcess.unsafeRunSync().process.value.unsafeRunSync()
+  }
 }

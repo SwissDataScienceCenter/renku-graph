@@ -18,8 +18,8 @@
 
 package io.renku.eventlog.subscriptions
 
+import cats.{MonadThrow, Show}
 import cats.syntax.all._
-import cats.{MonadError, MonadThrow}
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.events.CategoryName
 import org.typelevel.log4cats.Logger
@@ -38,8 +38,8 @@ private object LoggingDispatchRecovery {
   def apply[Interpretation[_]: MonadThrow, CategoryEvent](
       categoryName: CategoryName,
       logger:       Logger[Interpretation]
-  ): Interpretation[DispatchRecovery[Interpretation, CategoryEvent]] =
-    implicitly[MonadError[Interpretation, Throwable]].catchNonFatal {
+  )(implicit show:  Show[CategoryEvent]): Interpretation[DispatchRecovery[Interpretation, CategoryEvent]] =
+    MonadThrow[Interpretation].catchNonFatal {
       new DispatchRecovery[Interpretation, CategoryEvent] {
 
         override def returnToQueue(event: CategoryEvent): Interpretation[Unit] = ().pure[Interpretation]
@@ -47,7 +47,7 @@ private object LoggingDispatchRecovery {
         override def recover(url:   SubscriberUrl,
                              event: CategoryEvent
         ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-          logger.error(exception)(s"$categoryName: $event, url = $url failed")
+          logger.error(exception)(show"$categoryName: $event, url = $url failed")
         }
       }
     }

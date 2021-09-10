@@ -20,6 +20,7 @@ package ch.datascience.graph.acceptancetests
 
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.acceptancetests.data.Project.Statistics.CommitsCount
 import ch.datascience.graph.acceptancetests.data.dataProjects
 import ch.datascience.graph.acceptancetests.flows.AccessTokenPresence.givenAccessTokenPresentFor
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
@@ -46,14 +47,14 @@ class WebhookCreationSpec
 
     Scenario("Graph Services hook is present on the project in GitLab") {
 
-      val project = dataProjects(projectEntities(visibilityPublic)).generateOne
+      val project = dataProjects(projectEntities(visibilityPublic), CommitsCount.zero).generateOne
 
       implicit val accessToken: AccessToken = accessTokens.generateOne
       Given("api user is authenticated")
       `GET <gitlabApi>/user returning OK`()
 
       Given("project is present in GitLab")
-      `GET <gitlabApi>/projects/:id returning OK`(project)
+      `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
 
       Given("project has Graph Services hook in GitLab")
       `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(project.id)
@@ -67,34 +68,33 @@ class WebhookCreationSpec
 
     Scenario("No Graph Services webhook on the project in GitLab") {
 
-      val project   = dataProjects(projectEntities(visibilityPublic)).generateOne
-      val projectId = project.id
       implicit val accessToken: AccessToken = accessTokens.generateOne
+      val project = dataProjects(projectEntities(visibilityPublic), CommitsCount.one).generateOne
+
       Given("api user is authenticated")
       `GET <gitlabApi>/user returning OK`()
 
       Given("project is present in GitLab")
-      `GET <gitlabApi>/projects/:id returning OK`(project)
+      `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
 
       Given("project does not have Graph Services hook in GitLab")
-      `GET <gitlabApi>/projects/:id/hooks returning OK with no hooks`(projectId)
+      `GET <gitlabApi>/projects/:id/hooks returning OK with no hooks`(project.id)
 
       Given("project creation in GitLab returning CREATED")
-      `POST <gitlabApi>/projects/:id/hooks returning CREATED`(projectId)
+      `POST <gitlabApi>/projects/:id/hooks returning CREATED`(project.id)
 
       Given("some Commit exists for the project in GitLab")
       givenAccessTokenPresentFor(project)
       val commitId = commitIds.generateOne
-      `GET <gitlabApi>/projects/:id/repository/commits returning OK with a commit`(projectId, commitId)
-      `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
+      `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(project.id, commitId)
+      `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project.id, commitId)
 
       // making the triples generation be happy and not throwing exceptions to the logs
-      `GET <gitlabApi>/projects/:path returning OK with`(project)
       `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
       `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project)
 
       When("user does POST webhook-service/projects/:id/webhooks")
-      val response = webhookServiceClient.POST(s"projects/$projectId/webhooks", Some(accessToken))
+      val response = webhookServiceClient.POST(s"projects/${project.id}/webhooks", Some(accessToken))
 
       Then("he should get CREATED response back")
       response.status shouldBe Created
@@ -105,7 +105,7 @@ class WebhookCreationSpec
         case PersonalAccessToken(token) => json"""{"personalAccessToken": $token}"""
       }
       tokenRepositoryClient
-        .GET(s"projects/$projectId/tokens")
+        .GET(s"projects/${project.id}/tokens")
         .bodyAsJson shouldBe expectedAccessTokenJson
     }
   }

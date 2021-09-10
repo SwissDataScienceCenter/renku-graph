@@ -20,7 +20,7 @@ package io.renku.eventlog
 
 import ch.datascience.events.consumers.Project
 import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
-import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus}
+import ch.datascience.graph.model.events.{BatchDate, CommitId, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.{SchemaVersion, projects}
 import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}
 import skunk.codec.all._
@@ -34,6 +34,9 @@ trait TypeSerializers {
 
   val eventIdDecoder: Decoder[EventId] = varchar.map(EventId.apply)
   val eventIdEncoder: Encoder[EventId] = varchar.values.contramap(_.value)
+
+  val commitIdDecoder: Decoder[CommitId] = varchar.map(CommitId.apply)
+  val commitIdEncoder: Encoder[CommitId] = varchar.values.contramap(_.value)
 
   val projectIdDecoder: Decoder[projects.Id] = int4.map(projects.Id.apply)
   val projectIdEncoder: Encoder[projects.Id] = int4.values.contramap(_.value)

@@ -18,10 +18,10 @@
 
 package ch.datascience.events.consumers
 
+import ConsumersModelGenerators._
 import cats.Parallel
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
-import ch.datascience.events.Generators._
 import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
 import ch.datascience.generators.Generators.Implicits._
@@ -79,11 +79,11 @@ class EventConsumersRegistrySpec extends AnyWordSpec with should.Matchers with M
 
   "handle" should {
     s"return $Accepted if one of the handlers accepts the given payload" in new TestCase {
-      (handler0.handle _)
+      (handler0.tryHandling _)
         .expects(requestContent)
         .returning(EventSchedulingResult.UnsupportedEventType.pure[IO])
 
-      (handler1.handle _)
+      (handler1.tryHandling _)
         .expects(requestContent)
         .returning(EventSchedulingResult.Accepted.pure[IO])
 
@@ -92,11 +92,11 @@ class EventConsumersRegistrySpec extends AnyWordSpec with should.Matchers with M
 
     s"return $UnsupportedEventType if none of the handlers supports the given payload" in new TestCase {
 
-      (handler0.handle _)
+      (handler0.tryHandling _)
         .expects(requestContent)
         .returning(EventSchedulingResult.UnsupportedEventType.pure[IO])
 
-      (handler1.handle _)
+      (handler1.tryHandling _)
         .expects(requestContent)
         .returning(EventSchedulingResult.UnsupportedEventType.pure[IO])
 
@@ -105,7 +105,7 @@ class EventConsumersRegistrySpec extends AnyWordSpec with should.Matchers with M
     }
 
     s"return $BadRequest if one of the handlers supports the given payload but it's malformed" in new TestCase {
-      (handler0.handle _)
+      (handler0.tryHandling _)
         .expects(requestContent)
         .returning(EventSchedulingResult.BadRequest.pure[IO])
 
@@ -114,7 +114,7 @@ class EventConsumersRegistrySpec extends AnyWordSpec with should.Matchers with M
 
     s"return $Busy if the handler returns $Busy" in new TestCase {
 
-      (handler0.handle _)
+      (handler0.tryHandling _)
         .expects(requestContent)
         .returning(EventSchedulingResult.Busy.pure[IO])
 
@@ -124,7 +124,7 @@ class EventConsumersRegistrySpec extends AnyWordSpec with should.Matchers with M
 
     s"return ${EventSchedulingResult.SchedulingError} if the handler returns ${EventSchedulingResult.SchedulingError}" in new TestCase {
       val exception = exceptions.generateOne
-      (handler0.handle _)
+      (handler0.tryHandling _)
         .expects(requestContent)
         .returning(SchedulingError(exception).pure[IO])
 
@@ -135,7 +135,7 @@ class EventConsumersRegistrySpec extends AnyWordSpec with should.Matchers with M
     s"return an exception if the handler fails" in new TestCase {
 
       val exception: Exception = exceptions.generateOne
-      (handler0.handle _)
+      (handler0.tryHandling _)
         .expects(requestContent)
         .returning(exception.raiseError[IO, EventSchedulingResult])
 
@@ -151,10 +151,10 @@ class EventConsumersRegistrySpec extends AnyWordSpec with should.Matchers with M
   private trait TestCase {
     val requestContent = eventRequestContents.generateOne
 
-    val handler0               = mock[EventHandler[IO]]
-    val subscriptionMechanism0 = mock[SubscriptionMechanism[IO]]
+    val handler0 = mock[EventHandler[IO]]
+    val handler1 = mock[EventHandler[IO]]
 
-    val handler1               = mock[EventHandler[IO]]
+    val subscriptionMechanism0 = mock[SubscriptionMechanism[IO]]
     val subscriptionMechanism1 = mock[SubscriptionMechanism[IO]]
 
     val registry =

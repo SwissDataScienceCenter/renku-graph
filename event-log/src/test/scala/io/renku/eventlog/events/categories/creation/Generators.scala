@@ -18,16 +18,17 @@
 
 package io.renku.eventlog.events.categories.creation
 
-import ch.datascience.events.consumers.ConsumersModelGenerators.projects
+import ch.datascience.events.consumers.ConsumersModelGenerators.projectsGen
 import ch.datascience.graph.model.EventsGenerators.{batchDates, eventBodies, eventIds}
 import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages}
 import io.renku.eventlog.events.categories.creation.Event.{NewEvent, SkippedEvent}
 import org.scalacheck.Gen
 
 private object Generators {
+
   lazy val newEvents: Gen[NewEvent] = for {
     eventId   <- eventIds
-    project   <- projects
+    project   <- projectsGen
     date      <- eventDates
     batchDate <- batchDates
     body      <- eventBodies
@@ -35,7 +36,7 @@ private object Generators {
 
   lazy val skippedEvents: Gen[SkippedEvent] = for {
     eventId   <- eventIds
-    project   <- projects
+    project   <- projectsGen
     date      <- eventDates
     batchDate <- batchDates
     body      <- eventBodies

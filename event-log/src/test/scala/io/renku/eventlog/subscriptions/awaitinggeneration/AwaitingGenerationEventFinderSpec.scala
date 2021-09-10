@@ -192,10 +192,8 @@ private class AwaitingGenerationEventFinderSpec
         .generateNonEmptyList(minElements = 3, maxElements = 6)
         .toList
         .flatMap { status =>
-          val projectId   = projectIds.generateOne
-          val projectPath = projectPaths.generateOne
           (1 to positiveInts(max = 2).generateOne.value)
-            .map(_ => createEvent(status, projectId = projectId, projectPath = projectPath))
+            .map(_ => createEvent(status, projectId = projectIds.generateOne, projectPath = projectPaths.generateOne))
         }
 
       findEvents(EventStatus.GeneratingTriples) shouldBe List.empty

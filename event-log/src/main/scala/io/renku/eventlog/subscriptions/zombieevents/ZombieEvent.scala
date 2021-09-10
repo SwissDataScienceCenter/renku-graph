@@ -18,13 +18,14 @@
 
 package io.renku.eventlog.subscriptions.zombieevents
 
+import cats.Show
+import cats.implicits.showInterpolator
 import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.renku.eventlog.subscriptions.EventEncoder
 
 private final class ZombieEventProcess private (val value: String) extends AnyVal with StringTinyType
-
 private object ZombieEventProcess extends TinyTypeFactory[ZombieEventProcess](new ZombieEventProcess(_))
 
 private case class ZombieEvent(generatedBy: ZombieEventProcess,
@@ -34,6 +35,12 @@ private case class ZombieEvent(generatedBy: ZombieEventProcess,
 ) {
   override lazy val toString: String =
     s"$ZombieEvent $generatedBy $eventId, projectPath = $projectPath, status = $status"
+}
+
+private object ZombieEvent {
+  implicit lazy val show: Show[ZombieEvent] = Show.show(event =>
+    show"ZombieEvent ${event.generatedBy} ${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status}"
+  )
 }
 
 private object ZombieEventEncoder extends EventEncoder[ZombieEvent] {
