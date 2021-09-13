@@ -19,12 +19,12 @@
 package ch.datascience.graph.acceptancetests.testing
 
 import org.scalatest.concurrent.AbstractPatienceConfiguration
-import org.scalatest.time.{Minute, Second, Span}
+import org.scalatest.time.{Minutes, Second, Span}
 
 trait AcceptanceTestPatience extends AbstractPatienceConfiguration {
 
   implicit override val patienceConfig: PatienceConfig = PatienceConfig(
-    timeout = scaled(Span(1, Minute)),
+    timeout = scaled(Span(2, Minutes)),
     interval = scaled(Span(1, Second))
   )
 }
