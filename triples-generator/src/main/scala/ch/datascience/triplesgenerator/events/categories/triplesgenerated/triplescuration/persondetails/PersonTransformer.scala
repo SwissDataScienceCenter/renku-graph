@@ -56,12 +56,12 @@ private class PersonTransformerImpl[Interpretation[_]: MonadThrow](
         .foldLeft(ResultData(project, List.empty).pure[Interpretation]) { (previousResultsF, person) =>
           for {
             previousResults   <- previousResultsF
-            maybeKGPerson     <- kgPersonFinder.find(person)
+            maybeKGPerson     <- kgPersonFinder find person
             maybeMergedPerson <- maybeKGPerson.map(personMerger.merge(person, _)).sequence
           } yield (maybeKGPerson, maybeMergedPerson)
             .mapN { (kgPerson, mergedPerson) =>
               val updatedProjectMetadata = update(person, mergedPerson)(previousResults.project)
-              val queries                = updatesCreator.prepareUpdates(kgPerson)
+              val queries                = updatesCreator.prepareUpdates(kgPerson, mergedPerson)
               ResultData(updatedProjectMetadata, previousResults.queries ::: queries)
             }
             .getOrElse(previousResults)

@@ -65,7 +65,7 @@ class PersonTransformerSpec extends AnyWordSpec with should.Matchers with MockFa
                   .expects(person, kgPerson, *)
                   .returning(mergedPerson.pure[Try])
                 val queries = sparqlQueries.generateList()
-                (updatesCreator.prepareUpdates _).expects(kgPerson).returning(queries)
+                (updatesCreator.prepareUpdates _).expects(kgPerson, mergedPerson).returning(queries)
                 ResultData(update(person, mergedPerson)(resultData.project), resultData.queries ::: queries)
               case None => resultData
             }

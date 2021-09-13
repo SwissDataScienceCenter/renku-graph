@@ -22,6 +22,7 @@ package persondetails
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.entities
 import ch.datascience.graph.model.testentities._
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.rdfstore.InMemoryRdfStore
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -32,34 +33,82 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
 
   "prepareUpdates" should {
 
-    "generate queries which delete person's name, email and gitLabId" in {
+    "generate queries which delete person's name, email, affiliation and gitLabId " +
+      "in case all of them were changed" in {
 
-      val person = personEntities(withGitLabId, withEmail).generateOne.to[entities.Person]
-
-      loadToStore(person)
-
-      findPersons shouldBe Set(
-        (person.resourceId.value,
-         Some(person.name.value),
-         person.maybeEmail.map(_.value),
-         person.maybeGitLabId.map(_.value)
+        val kgPerson = personEntities(withGitLabId, withEmail)
+          .map(_.copy(maybeAffiliation = userAffiliations.generateSome))
+          .generateOne
+          .to[entities.Person]
+        val mergedPerson = kgPerson.copy(name = userNames.generateOne,
+                                         maybeEmail = userEmails.generateSome,
+                                         maybeAffiliation = userAffiliations.generateSome,
+                                         maybeGitLabId = userGitLabIds.generateSome
         )
-      )
 
-      val queries = prepareUpdates(person)
+        loadToStore(kgPerson)
 
-      queries.runAll.unsafeRunSync()
+        findPersons shouldBe Set(
+          (kgPerson.resourceId.value,
+           Some(kgPerson.name.value),
+           kgPerson.maybeEmail.map(_.value),
+           kgPerson.maybeAffiliation.map(_.value),
+           kgPerson.maybeGitLabId.map(_.value)
+          )
+        )
 
-      findPersons shouldBe Set((person.resourceId.value, None, None, None))
+        val queries = prepareUpdates(kgPerson, mergedPerson)
+
+        queries.runAll.unsafeRunSync()
+
+        findPersons shouldBe Set((kgPerson.resourceId.value, None, None, None, None))
+      }
+
+    "generate queries which delete person's name, email, affiliation and gitLabId " +
+      "in case they are removed" in {
+
+        val kgPerson = personEntities(withGitLabId, withEmail)
+          .map(_.copy(maybeAffiliation = userAffiliations.generateSome))
+          .generateOne
+          .to[entities.Person]
+        val mergedPerson = kgPerson.copy(maybeEmail = None, maybeAffiliation = None, maybeGitLabId = None)
+
+        loadToStore(kgPerson)
+
+        findPersons shouldBe Set(
+          (kgPerson.resourceId.value,
+           Some(kgPerson.name.value),
+           kgPerson.maybeEmail.map(_.value),
+           kgPerson.maybeAffiliation.map(_.value),
+           kgPerson.maybeGitLabId.map(_.value)
+          )
+        )
+
+        val queries = prepareUpdates(kgPerson, mergedPerson)
+
+        queries.runAll.unsafeRunSync()
+
+        findPersons shouldBe Set((kgPerson.resourceId.value, Some(kgPerson.name.value), None, None, None))
+      }
+
+    "generate no queries when person's name, email, affiliation and gitLabId are the same" in {
+
+      val kgPerson = personEntities(withGitLabId, withEmail)
+        .map(_.copy(maybeAffiliation = userAffiliations.generateSome))
+        .generateOne
+        .to[entities.Person]
+
+      prepareUpdates(kgPerson, kgPerson).isEmpty shouldBe true
     }
   }
 
-  private def findPersons: Set[(String, Option[String], Option[String], Option[Int])] =
-    runQuery(s"""|SELECT ?id ?name ?email ?sameAsId ?gitlabId
+  private def findPersons: Set[(String, Option[String], Option[String], Option[String], Option[Int])] =
+    runQuery(s"""|SELECT ?id ?name ?email ?affiliation ?sameAsId ?gitlabId
                  |WHERE {
                  |  ?id a schema:Person .
                  |  OPTIONAL { ?id schema:name ?name } .
                  |  OPTIONAL { ?id schema:email ?email } .
+                 |  OPTIONAL { ?id schema:affiliation ?affiliation } .
                  |  OPTIONAL { ?id schema:sameAs ?sameAsId } .
                  |  OPTIONAL { ?sameAsId schema:identifier ?gitlabId;
                  |                       a schema:URL;
@@ -68,6 +117,8 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
                  |}
                  |""".stripMargin)
       .unsafeRunSync()
-      .map(row => (row("id"), row.get("name"), row.get("email"), row.get("gitlabId").map(_.toInt)))
+      .map(row =>
+        (row("id"), row.get("name"), row.get("email"), row.get("affiliation"), row.get("gitlabId").map(_.toInt))
+      )
       .toSet
 }
