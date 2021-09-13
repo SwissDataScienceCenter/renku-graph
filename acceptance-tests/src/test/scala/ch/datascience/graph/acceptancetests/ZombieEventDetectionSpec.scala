@@ -75,9 +75,6 @@ class ZombieEventDetectionSpec
     Given("Triples generation is successful")
     `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
 
-    And("project members/users exists in GitLab")
-    `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project)
-
     And("project exists in GitLab")
     `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
 

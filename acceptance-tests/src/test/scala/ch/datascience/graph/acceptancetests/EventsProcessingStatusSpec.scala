@@ -106,7 +106,7 @@ class EventsProcessingStatusSpec
 
     val allCommitIds = commitIds.generateNonEmptyList(minElements = numberOfEvents, maxElements = numberOfEvents).toList
 
-    `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(project.id, allCommitIds.head)
+    `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(project.id, allCommitIds: _*)
 
     allCommitIds.foldLeft(Option.empty[CommitId]) { (maybePreviousCommitId, commitId) =>
       // GitLab to return commit info about all the parent commits
@@ -122,7 +122,7 @@ class EventsProcessingStatusSpec
     }
 
     webhookServiceClient
-      .POST("webhooks/events", HookToken(project.id), data.GitLab.pushEvent(project, allCommitIds.head))
+      .POST("webhooks/events", HookToken(project.id), data.GitLab.pushEvent(project, allCommitIds.last))
       .status shouldBe Accepted
   }
 }

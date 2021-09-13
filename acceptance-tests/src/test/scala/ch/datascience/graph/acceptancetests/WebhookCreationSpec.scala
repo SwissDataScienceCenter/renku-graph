@@ -91,7 +91,6 @@ class WebhookCreationSpec
 
       // making the triples generation be happy and not throwing exceptions to the logs
       `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
-      `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project)
 
       When("user does POST webhook-service/projects/:id/webhooks")
       val response = webhookServiceClient.POST(s"projects/${project.id}/webhooks", Some(accessToken))

@@ -84,9 +84,6 @@ class CommitSyncFlowsSpec
       And("project exists in GitLab")
       `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
 
-      And("project members/users exists in GitLab")
-      `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project)
-
       And("access token is present")
       givenAccessTokenPresentFor(project)
 

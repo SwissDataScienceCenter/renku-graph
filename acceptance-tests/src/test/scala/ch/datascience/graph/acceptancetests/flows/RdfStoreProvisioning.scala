@@ -38,6 +38,10 @@ import org.scalatest.Assertion
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
 
+import java.lang.Thread.sleep
+import scala.concurrent.duration._
+import scala.language.postfixOps
+
 object RdfStoreProvisioning extends ModelImplicits with Eventually with AcceptanceTestPatience with should.Matchers {
 
   def `data in the RDF store`(
@@ -45,25 +49,23 @@ object RdfStoreProvisioning extends ModelImplicits with Eventually with Acceptan
       triples:            JsonLD,
       commitId:           CommitId = commitIds.generateOne
   )(implicit accessToken: AccessToken): Assertion = {
-    val projectId = project.id
+    `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(project.id, commitId)
 
-    `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
-
-    `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(projectId, commitId)
+    `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project.id, commitId)
 
     `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
 
     `GET <triples-generator>/projects/:id/commits/:id returning OK`(project, commitId, triples)
 
-    `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project)
-
     givenAccessTokenPresentFor(project)
 
     webhookServiceClient
-      .POST("webhooks/events", HookToken(projectId), data.GitLab.pushEvent(project, commitId))
+      .POST("webhooks/events", HookToken(project.id), data.GitLab.pushEvent(project, commitId))
       .status shouldBe Accepted
 
-    `wait for events to be processed`(projectId)
+    sleep((3 second).toMillis)
+
+    `wait for events to be processed`(project.id)
   }
 
   def `wait for events to be processed`(projectId: projects.Id): Assertion = eventually {

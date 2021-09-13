@@ -41,7 +41,7 @@ import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.client.{MappingBuilder, WireMock}
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration
 import com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER
-import com.github.tomakehurst.wiremock.stubbing.{Scenario, StubMapping}
+import com.github.tomakehurst.wiremock.stubbing.StubMapping
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
@@ -107,30 +107,14 @@ object GitLab {
       commitIds:          CommitId*
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
-      get(urlPathEqualTo(s"/api/v4/projects/$projectId/repository/commits"))
-        .atPriority(1)
+      get(urlEqualTo(s"/api/v4/projects/$projectId/repository/commits"))
         .willReturn(okJson(commitIds.map(commitAsJson).asJson.noSpaces))
         .withAccessTokenInHeader
     }
     stubFor {
-      get(urlPathEqualTo(s"/api/v4/projects/$projectId/repository/commits"))
-        .atPriority(2)
-        .withQueryParam("per_page", equalTo("1"))
+      get(urlEqualTo(s"/api/v4/projects/$projectId/repository/commits?per_page=1"))
         .willReturn(okJson(Json.arr(commitAsJson(commitIds.last)).noSpaces))
         .withAccessTokenInHeader
-    }
-    commitIds.reverse.tail.zipWithIndex foreach { case (commitId, idx) =>
-      stubFor {
-        get(urlPathEqualTo(s"/api/v4/projects/$projectId/repository/commits"))
-          .atPriority(3)
-          .withQueryParam("per_page", equalTo("1"))
-          .withQueryParam("page", equalTo((idx + 1).toString))
-          .inScenario(s"fetch latest commit for $projectId")
-          .whenScenarioStateIs(if (idx == 0) Scenario.STARTED else s"call $idx")
-          .willSetStateTo(s"call ${idx + 1}")
-          .willReturn(okJson(Json.arr(commitAsJson(commitId)).noSpaces))
-          .withAccessTokenInHeader
-      }
     }
     ()
   }
