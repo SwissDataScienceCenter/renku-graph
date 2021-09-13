@@ -41,6 +41,8 @@ import org.scalatest.concurrent.Eventually
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 
+import java.time.Instant
+
 class EventsProcessingStatusSpec
     extends AnyFeatureSpec
     with ModelImplicits
@@ -85,11 +87,9 @@ class EventsProcessingStatusSpec
 
         val responseJson = response.bodyAsJson.hcursor
         val Right(done)  = responseJson.downField("done").as[Int]
-        done should be <= numberOfEvents.value
-        val Right(total) = responseJson.downField("total").as[Int]
-        total shouldBe numberOfEvents.value
-        val Right(progress) = responseJson.downField("progress").as[Double]
-        progress should be <= 100d
+        done                                            should be <= numberOfEvents.value
+        responseJson.downField("total").as[Int]       shouldBe Right(numberOfEvents.value)
+        responseJson.downField("progress").as[Double] shouldBe Right(100d)
       }
     }
   }
@@ -108,11 +108,13 @@ class EventsProcessingStatusSpec
 
     `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(project.id, allCommitIds: _*)
 
+    val theMostRecentEventDate = Instant.now()
     allCommitIds.foldLeft(Option.empty[CommitId]) { (maybePreviousCommitId, commitId) =>
       // GitLab to return commit info about all the parent commits
       `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project.id,
                                                                                           commitId,
-                                                                                          maybePreviousCommitId.toSet
+                                                                                          maybePreviousCommitId.toSet,
+                                                                                          theMostRecentEventDate
       )
 
       // making the triples generation process happy and not throwing exceptions to the logs

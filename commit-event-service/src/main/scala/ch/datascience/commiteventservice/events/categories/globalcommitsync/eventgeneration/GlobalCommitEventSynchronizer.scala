@@ -61,9 +61,8 @@ private[globalcommitsync] class GlobalCommitEventSynchronizerImpl[Interpretation
     maybeAccessToken <- findAccessToken(event.project.id)
     commitStats      <- fetchCommitStats(event.project.id)(maybeAccessToken)
     commitsInSync    <- commitsInSync(event, commitStats).pure[Interpretation]
-    _ <- if (!commitsInSync) {
-           syncCommitsAndLogSummary(event)(maybeAccessToken)
-         } else measureExecutionTime(SynchronizationSummary().pure[Interpretation]) >>= logSummary(event.project)
+    _ <- if (!commitsInSync) syncCommitsAndLogSummary(event)(maybeAccessToken)
+         else measureExecutionTime(SynchronizationSummary().pure[Interpretation]) >>= logSummary(event.project)
   } yield ()).recoverWith { case NonFatal(error) =>
     logger.error(error)(s"$categoryName - Failed to sync commits for project ${event.project}")
     error.raiseError[Interpretation, Unit]
@@ -80,7 +79,7 @@ private[globalcommitsync] class GlobalCommitEventSynchronizerImpl[Interpretation
   private def syncCommits(
       event:                   GlobalCommitSyncEvent
   )(implicit maybeAccessToken: Option[AccessToken]): Interpretation[SynchronizationSummary] = for {
-    commitsInGL     <- fetchGitLabCommits(event.project.id)(maybeAccessToken)
+    commitsInGL     <- fetchGitLabCommits(event.project.id)
     deletionSummary <- deleteExtraneousCommits(event.project, event.commits.filterNot(commitsInGL.contains))
     creationSummary <- createMissingCommits(event.project, commitsInGL.filterNot(event.commits.contains))
   } yield deletionSummary combine creationSummary

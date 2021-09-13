@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.events.categories.statuschange
 
+import cats.data.Kleisli
 import cats.effect.{BracketThrow, Sync}
 import cats.syntax.all._
 import ch.datascience.db.implicits._
@@ -30,9 +31,10 @@ import eu.timepit.refined.auto._
 import io.renku.eventlog.ExecutionDate
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.ToTriplesStore
+import skunk.SqlState.DeadlockDetected
 import skunk.data.Completion
 import skunk.implicits._
-import skunk.~
+import skunk.{Session, ~}
 
 import java.time.Instant
 
@@ -46,7 +48,7 @@ private class ToTriplesStoreUpdater[Interpretation[_]: BracketThrow: Sync](
       event: ToTriplesStore
   ): UpdateResult[Interpretation] = for {
     updateResults          <- updateEvent(event)
-    ancestorsUpdateResults <- updateAncestorsStatus(event)
+    ancestorsUpdateResults <- updateAncestorsStatus(event) recoverWith retryOnDeadlock(event)
   } yield updateResults combine ancestorsUpdateResults
 
   private def updateEvent(event: ToTriplesStore) = for {
@@ -93,6 +95,13 @@ private class ToTriplesStoreUpdater[Interpretation[_]: BracketThrow: Sync](
   }
 
   private def updateAncestorsStatus(event: ToTriplesStore) = measureExecutionTime {
+    val statusesToUpdate = Set(New,
+                               GeneratingTriples,
+                               GenerationRecoverableFailure,
+                               TriplesGenerated,
+                               TransformingTriples,
+                               TransformationRecoverableFailure
+    )
     SqlStatement(name = "to_triples_store - ancestors update")
       .select[ExecutionDate ~ projects.Id ~ projects.Id ~ EventId ~ EventId, EventStatus](
         sql"""UPDATE event evt
@@ -103,7 +112,7 @@ private class ToTriplesStoreUpdater[Interpretation[_]: BracketThrow: Sync](
                 SELECT event_id, project_id, status 
                 FROM event
                 WHERE project_id = $projectIdEncoder
-                  AND #${`status IN`(Set(TriplesGenerated, TransformingTriples, TransformationRecoverableFailure))}
+                  AND #${`status IN`(statusesToUpdate)}
                   AND event_date <= (
                     SELECT event_date
                     FROM event
@@ -129,6 +138,12 @@ private class ToTriplesStoreUpdater[Interpretation[_]: BracketThrow: Sync](
           decrementedStatuses + incrementedStatuses
         )
       }
+  }
+
+  private def retryOnDeadlock(
+      event: ToTriplesStore
+  ): PartialFunction[Throwable, Kleisli[Interpretation, Session[Interpretation], DBUpdateResults.ForProjects]] = {
+    case DeadlockDetected(_) => updateAncestorsStatus(event)
   }
 
   private def `status IN`(statuses: Set[EventStatus]) =

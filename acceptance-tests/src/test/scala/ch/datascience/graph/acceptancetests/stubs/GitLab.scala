@@ -26,7 +26,6 @@ import ch.datascience.graph.acceptancetests.data.Project.Permissions
 import ch.datascience.graph.acceptancetests.data.Project.Permissions._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices.webhookServiceClient
 import ch.datascience.graph.acceptancetests.tooling.TestLogger
-import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.Id
@@ -48,6 +47,8 @@ import eu.timepit.refined.numeric.Positive
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
+
+import java.time.Instant
 
 object GitLab {
 
@@ -106,36 +107,38 @@ object GitLab {
       projectId:          Id,
       commitIds:          CommitId*
   )(implicit accessToken: AccessToken): Unit = {
+    val theMostRecentEventDate = Instant.now()
     stubFor {
-      get(urlEqualTo(s"/api/v4/projects/$projectId/repository/commits"))
-        .willReturn(okJson(commitIds.map(commitAsJson).asJson.noSpaces))
+      get(s"/api/v4/projects/$projectId/repository/commits")
+        .willReturn(okJson(commitIds.map(commitAsJson(_, theMostRecentEventDate)).asJson.noSpaces))
         .withAccessTokenInHeader
     }
     stubFor {
-      get(urlEqualTo(s"/api/v4/projects/$projectId/repository/commits?per_page=1"))
-        .willReturn(okJson(Json.arr(commitAsJson(commitIds.last)).noSpaces))
+      get(s"/api/v4/projects/$projectId/repository/commits?per_page=1")
+        .willReturn(okJson(Json.arr(commitAsJson(commitIds.last, theMostRecentEventDate)).noSpaces))
         .withAccessTokenInHeader
     }
     ()
   }
 
-  private def commitAsJson(commitId: CommitId) = json"""{
+  private def commitAsJson(commitId: CommitId, theMostRecentEventDate: Instant) = json"""{
     "id":              ${commitId.value},
     "author_name":     ${nonEmptyStrings().generateOne},
     "author_email":    ${userEmails.generateOne.value},
     "committer_name":  ${nonEmptyStrings().generateOne},
     "committer_email": ${userEmails.generateOne.value},
     "message":         ${nonEmptyStrings().generateOne},
-    "committed_date":  ${committedDates.generateOne.value.toString},
+    "committed_date":  ${theMostRecentEventDate.toString},
     "parent_ids":      []
   }  
   """
 
   def `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(
-      projectId:          Id,
-      commitId:           CommitId,
-      parentIds:          Set[CommitId] = Set.empty
-  )(implicit accessToken: AccessToken): Unit = {
+      projectId:              Id,
+      commitId:               CommitId,
+      parentIds:              Set[CommitId] = Set.empty,
+      theMostRecentEventDate: Instant = Instant.now()
+  )(implicit accessToken:     AccessToken): Unit = {
     stubFor {
       get(s"/api/v4/projects/$projectId/repository/commits/$commitId").withAccessTokenInHeader
         .willReturn(okJson(json"""{
@@ -145,7 +148,7 @@ object GitLab {
           "committer_name":  ${nonEmptyStrings().generateOne},
           "committer_email": ${userEmails.generateOne.value},
           "message":         ${nonEmptyStrings().generateOne},
-          "committed_date":  ${committedDates.generateOne.value.toString},
+          "committed_date":  ${theMostRecentEventDate.toString},
           "parent_ids":      ${parentIds.map(_.value).toList}
         }""".noSpaces))
     }

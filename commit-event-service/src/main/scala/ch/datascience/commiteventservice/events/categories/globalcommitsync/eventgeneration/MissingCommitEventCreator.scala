@@ -48,9 +48,8 @@ private[eventgeneration] class MissingCommitEventCreatorImpl[Interpretation[_]: 
   override def createMissingCommits(project: Project, commitsToCreate: List[CommitId])(implicit
       maybeAccessToken:                      Option[AccessToken]
   ): Interpretation[SynchronizationSummary] = for {
-    commitInfos <-
-      commitsToCreate.map(findCommitInfo(project.id, _)).sequence
-    results <- commitInfos.map(commitToEventLog.storeCommitInEventLog(project, _, BatchDate(clock))).sequence
+    commitInfos <- commitsToCreate.map(findCommitInfo(project.id, _)).sequence
+    results     <- commitInfos.map(commitToEventLog.storeCommitInEventLog(project, _, BatchDate(clock))).sequence
     summary <- results
                  .foldLeft(SynchronizationSummary())(_.incrementCount(_))
                  .pure[Interpretation]

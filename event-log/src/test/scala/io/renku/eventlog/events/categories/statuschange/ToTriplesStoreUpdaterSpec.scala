@@ -46,11 +46,17 @@ class ToTriplesStoreUpdaterSpec
 
   "updateDB" should {
 
-    "change the status of all TRIPLES_GENERATED events up to the current event with the status TRIPLES_STORE" in new TestCase {
+    "change the status of all events in statuses before TRIPLES_STORE up to the current event with the status TRIPLES_STORE" in new TestCase {
       val eventDate = eventDates.generateOne
 
-      val statusesToUpdate = Set(TriplesGenerated, TransformingTriples, TransformationRecoverableFailure)
-      val eventsToUpdate   = statusesToUpdate.map(addEvent(_, timestamps(max = eventDate.value).generateAs(EventDate)))
+      val statusesToUpdate = Set(New,
+                                 GeneratingTriples,
+                                 GenerationRecoverableFailure,
+                                 TriplesGenerated,
+                                 TransformingTriples,
+                                 TransformationRecoverableFailure
+      )
+      val eventsToUpdate = statusesToUpdate.map(addEvent(_, timestamps(max = eventDate.value).generateAs(EventDate)))
       val eventsToSkip = EventStatus.all
         .diff(statusesToUpdate)
         .map(addEvent(_, timestamps(max = eventDate.value).generateAs(EventDate))) +
