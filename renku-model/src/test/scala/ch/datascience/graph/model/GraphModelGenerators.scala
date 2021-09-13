@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.model
 
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.datasets._
@@ -25,10 +26,11 @@ import ch.datascience.graph.model.projects.{FilePath, Id, Path, ResourceId, Visi
 import ch.datascience.graph.model.users.{Affiliation, Email, Name, Username}
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
-import org.scalacheck.Gen.{alphaChar, choose, const, frequency, numChar, oneOf, uuid}
-import cats.syntax.all._
+import org.scalacheck.Gen.{alphaChar, const, frequency, numChar, oneOf, uuid}
+
 import java.time.{Instant, LocalDate, ZoneOffset}
 import java.util.UUID
+import scala.util.Random
 
 object GraphModelGenerators {
 
@@ -85,11 +87,7 @@ object GraphModelGenerators {
 
   implicit val userGitLabIds: Gen[users.GitLabId] = nonNegativeInts().map(users.GitLabId(_))
 
-  implicit val projectIds: Gen[Id] = for {
-    min <- choose(1, 1000)
-    max <- choose(1001, 100000)
-    id  <- choose(min, max)
-  } yield Id(id)
+  implicit val projectIds:          Gen[Id]                   = Gen.uuid.map(_ => Id(Random.nextInt(1000000) + 1))
   implicit val projectNames:        Gen[projects.Name]        = nonBlankStrings(minLength = 5) map (n => projects.Name(n.value))
   implicit val projectDescriptions: Gen[projects.Description] = paragraphs() map (v => projects.Description(v.value))
   implicit val projectVisibilities: Gen[Visibility]           = Gen.oneOf(Visibility.all.toList)
