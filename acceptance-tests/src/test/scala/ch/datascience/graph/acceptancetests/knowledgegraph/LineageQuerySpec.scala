@@ -121,6 +121,7 @@ class LineageQuerySpec
   Feature("GraphQL query to find lineage with authentication") {
     val user = authUsers.generateOne
     implicit val accessToken: AccessToken = user.accessToken
+
     Scenario("As an authenticated user I would like to find lineage of project I am a member of with a GraphQL query") {
 
       val accessibleExemplarData = LineageExemplarData(
@@ -135,36 +136,24 @@ class LineageQuerySpec
                               accessibleExemplarData.project.asJsonLD
       )
 
-      And("a project I am not a member of")
-
-      val privateExemplarData = LineageExemplarData(
-        projectEntities(visibilityNonPublic).generateOne.copy(
-          path = model.projects.Path("private/secret-project")
-        )
-      )
-      `data in the RDF store`(dataProjects(privateExemplarData.project).generateOne,
-                              privateExemplarData.project.asJsonLD
-      )
-
       And("I am authenticated")
       `GET <gitlabApi>/user returning OK`(user)
 
       When("user posts a graphql query to fetch lineage of the project he is a member of")
-      val response =
-        knowledgeGraphClient.POST(
-          namedLineageQuery,
-          variables = Map(
-            "projectPath" -> projectEntities(visibilityNonPublic).generateOne
-              .copy(
-                path = model.projects.Path("accessible/member-project"),
-                members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some))
-              )
-              .path
-              .toString,
-            "filePath" -> accessibleExemplarData.`grid_plot entity`.location
-          ),
-          maybeAccessToken = accessToken.some
-        )
+      val response = knowledgeGraphClient.POST(
+        namedLineageQuery,
+        variables = Map(
+          "projectPath" -> projectEntities(visibilityNonPublic).generateOne
+            .copy(
+              path = model.projects.Path("accessible/member-project"),
+              members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some))
+            )
+            .path
+            .toString,
+          "filePath" -> accessibleExemplarData.`grid_plot entity`.location
+        ),
+        maybeAccessToken = accessToken.some
+      )
 
       Then("he should get OK response with project lineage in Json")
       response.status shouldBe Ok
@@ -172,17 +161,32 @@ class LineageQuerySpec
       val lineageJson = response.bodyAsJson.hcursor.downField("data").downField("lineage")
       lineageJson.downField("edges").as[List[Json]].map(_.toSet) shouldBe theExpectedEdges(accessibleExemplarData)
       lineageJson.downField("nodes").as[List[Json]].map(_.toSet) shouldBe theExpectedNodes(accessibleExemplarData)
+    }
+
+    Scenario("As an authenticated user I should not be able to find lineage of project I am not a member of") {
+
+      val privateExemplarData = LineageExemplarData(
+        projectEntities(visibilityNonPublic).generateOne.copy(
+          path = model.projects.Path("private/secret-project"),
+          members = Set.empty
+        )
+      )
+      `data in the RDF store`(dataProjects(privateExemplarData.project).generateOne,
+                              privateExemplarData.project.asJsonLD
+      )
+
+      Given("I am authenticated")
+      `GET <gitlabApi>/user returning OK`(user)
 
       When("user posts a graphql query to fetch lineage of the project he is not a member of")
-      val privateProjectResponse =
-        knowledgeGraphClient.POST(
-          namedLineageQuery,
-          variables = Map(
-            "projectPath" -> privateExemplarData.project.path.toString,
-            "filePath"    -> privateExemplarData.`grid_plot entity`.location
-          ),
-          maybeAccessToken = accessToken.some
-        )
+      val privateProjectResponse = knowledgeGraphClient.POST(
+        namedLineageQuery,
+        variables = Map(
+          "projectPath" -> privateExemplarData.project.path.toString,
+          "filePath"    -> privateExemplarData.`grid_plot entity`.location
+        ),
+        maybeAccessToken = accessToken.some
+      )
 
       Then("he should get an OK response without lineage")
       privateProjectResponse.status shouldBe Ok
