@@ -27,9 +27,9 @@ import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
-import ch.datascience.graph.acceptancetests.tooling.TokenRepositoryClient._
 import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import ch.datascience.graph.model.EventsGenerators.commitIds
+import ch.datascience.graph.model.events.CommitId
 import ch.datascience.http.client.AccessToken
 import ch.datascience.webhookservice.model.HookToken
 import eu.timepit.refined.api.Refined
@@ -97,9 +97,7 @@ class EventsProcessingStatusSpec
   private def givenHookValidationToHookExists(project: data.Project)(implicit accessToken: AccessToken): Unit = {
     `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
 
-    tokenRepositoryClient
-      .PUT(s"projects/${project.id}/tokens", accessToken.toJson, maybeAccessToken = None)
-      .status shouldBe NoContent
+    givenAccessTokenPresentFor(project)
 
     `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(project.id)
   }
@@ -108,26 +106,19 @@ class EventsProcessingStatusSpec
 
     val allCommitIds = commitIds.generateNonEmptyList(minElements = numberOfEvents, maxElements = numberOfEvents).toList
 
-    `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project.id,
-                                                                                        allCommitIds.head,
-                                                                                        allCommitIds.tail.toSet
-    )
-
     `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(project.id, allCommitIds.head)
 
-    // assuring there's project info in GitLab for the triples curation process
-    `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
-
-    givenAccessTokenPresentFor(project)
-
-    allCommitIds foreach { commitId =>
+    allCommitIds.foldLeft(Option.empty[CommitId]) { (maybePreviousCommitId, commitId) =>
       // GitLab to return commit info about all the parent commits
-      if (commitId != allCommitIds.head)
-        `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project.id, commitId)
+      `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project.id,
+                                                                                          commitId,
+                                                                                          maybePreviousCommitId.toSet
+      )
 
       // making the triples generation process happy and not throwing exceptions to the logs
       `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
-      `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project)
+
+      Some(commitId)
     }
 
     webhookServiceClient

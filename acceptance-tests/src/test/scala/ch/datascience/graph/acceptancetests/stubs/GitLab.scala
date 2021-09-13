@@ -106,10 +106,23 @@ object GitLab {
       projectId:          Id,
       commitIds:          CommitId*
   )(implicit accessToken: AccessToken): Unit = {
-    commitIds.zipWithIndex foreach { case (commitId, idx) =>
+    stubFor {
+      get(urlPathEqualTo(s"/api/v4/projects/$projectId/repository/commits"))
+        .atPriority(1)
+        .willReturn(okJson(commitIds.map(commitAsJson).asJson.noSpaces))
+        .withAccessTokenInHeader
+    }
+    stubFor {
+      get(urlPathEqualTo(s"/api/v4/projects/$projectId/repository/commits"))
+        .atPriority(2)
+        .withQueryParam("per_page", equalTo("1"))
+        .willReturn(okJson(Json.arr(commitAsJson(commitIds.last)).noSpaces))
+        .withAccessTokenInHeader
+    }
+    commitIds.reverse.tail.zipWithIndex foreach { case (commitId, idx) =>
       stubFor {
         get(urlPathEqualTo(s"/api/v4/projects/$projectId/repository/commits"))
-          .atPriority(1)
+          .atPriority(3)
           .withQueryParam("per_page", equalTo("1"))
           .withQueryParam("page", equalTo((idx + 1).toString))
           .inScenario(s"fetch latest commit for $projectId")
@@ -119,28 +132,20 @@ object GitLab {
           .withAccessTokenInHeader
       }
     }
-    stubFor {
-      get(urlPathEqualTo(s"/api/v4/projects/$projectId/repository/commits"))
-        .atPriority(2)
-        .willReturn(okJson(commitIds.map(commitAsJson).asJson.noSpaces))
-        .withAccessTokenInHeader
-    }
     ()
   }
 
-  private def commitAsJson(commitId: CommitId) =
-    json"""
-        {
-            "id":              ${commitId.value},
-            "author_name":     ${nonEmptyStrings().generateOne},
-            "author_email":    ${userEmails.generateOne.value},
-            "committer_name":  ${nonEmptyStrings().generateOne},
-            "committer_email": ${userEmails.generateOne.value},
-            "message":         ${nonEmptyStrings().generateOne},
-            "committed_date":  ${committedDates.generateOne.value.toString},
-            "parent_ids":      []
-          }  
-          """
+  private def commitAsJson(commitId: CommitId) = json"""{
+    "id":              ${commitId.value},
+    "author_name":     ${nonEmptyStrings().generateOne},
+    "author_email":    ${userEmails.generateOne.value},
+    "committer_name":  ${nonEmptyStrings().generateOne},
+    "committer_email": ${userEmails.generateOne.value},
+    "message":         ${nonEmptyStrings().generateOne},
+    "committed_date":  ${committedDates.generateOne.value.toString},
+    "parent_ids":      []
+  }  
+  """
 
   def `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(
       projectId:          Id,
@@ -275,7 +280,8 @@ object GitLab {
             )
         }
     }
-    ()
+
+    `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project)
   }
 
   def `GET <gitlabApi>/projects/:path returning BadRequest`(

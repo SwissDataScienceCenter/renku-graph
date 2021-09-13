@@ -85,12 +85,11 @@ private[commitsync] class CommitEventSynchronizerImpl[Interpretation[_]: MonadTh
 
   private def processCommitsAndLogSummary(commitId: CommitId, project: Project)(implicit
       maybeAccessToken:                             Option[AccessToken]
-  ) =
-    measureExecutionTime(
-      processCommits(List(commitId), project, BatchDate(clock)).run(SynchronizationSummary())
-    ) flatMap { case (elapsedTime: ElapsedTime, summary) =>
-      logSummary(commitId, project)(elapsedTime, summary._2)
-    }
+  ) = measureExecutionTime(
+    processCommits(List(commitId), project, BatchDate(clock)).run(SynchronizationSummary())
+  ) flatMap { case (elapsedTime: ElapsedTime, summary) =>
+    logSummary(commitId, project)(elapsedTime, summary._2)
+  }
 
   private val DontCareCommitId = CommitId("0000000000000000000000000000000000000000")
 
