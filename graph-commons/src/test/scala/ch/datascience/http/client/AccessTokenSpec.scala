@@ -29,8 +29,12 @@ import io.circe.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import java.nio.charset.StandardCharsets.UTF_8
+
+import java.util.Base64
 
 class AccessTokenSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+  val base64Encoder = Base64.getEncoder
 
   "PersonalAccessToken" should {
 
@@ -73,13 +77,15 @@ class AccessTokenSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
   "accessToken json decoder" should {
 
     "decode OAuthAccessToken" in {
-      val accessToken = oauthAccessTokens.generateOne
-      json"""{"oauthAccessToken": ${accessToken.value}}""".as[AccessToken] shouldBe Right(accessToken)
+      val accessToken  = oauthAccessTokens.generateOne
+      val encodedToken = new String(base64Encoder.encode(accessToken.value.getBytes(UTF_8)), UTF_8)
+      json"""{"oauthAccessToken": $encodedToken}""".as[AccessToken] shouldBe Right(accessToken)
     }
 
     "decode PersonalAccessToken" in {
-      val accessToken = personalAccessTokens.generateOne
-      json"""{"personalAccessToken": ${accessToken.value}}""".as[AccessToken] shouldBe Right(accessToken)
+      val accessToken  = personalAccessTokens.generateOne
+      val encodedToken = new String(base64Encoder.encode(accessToken.value.getBytes(UTF_8)), UTF_8)
+      json"""{"personalAccessToken": $encodedToken}""".as[AccessToken] shouldBe Right(accessToken)
     }
 
     "fail for a invalid access token json" in {
@@ -92,12 +98,14 @@ class AccessTokenSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
 
     "encode OAuthAccessToken" in {
       val accessToken: AccessToken = oauthAccessTokens.generateOne
-      accessToken.asJson shouldBe json"""{"oauthAccessToken": ${accessToken.value}}"""
+      val encodedToken = new String(base64Encoder.encode(accessToken.value.getBytes(UTF_8)), UTF_8)
+      accessToken.asJson shouldBe json"""{"oauthAccessToken": $encodedToken}"""
     }
 
     "encode PersonalAccessToken" in {
       val accessToken: AccessToken = personalAccessTokens.generateOne
-      accessToken.asJson shouldBe json"""{"personalAccessToken": ${accessToken.value}}"""
+      val encodedToken = new String(base64Encoder.encode(accessToken.value.getBytes(UTF_8)), UTF_8)
+      accessToken.asJson shouldBe json"""{"personalAccessToken": $encodedToken}"""
     }
   }
 }
