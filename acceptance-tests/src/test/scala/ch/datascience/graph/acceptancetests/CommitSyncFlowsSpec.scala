@@ -96,7 +96,9 @@ class CommitSyncFlowsSpec
       `wait for events to be processed`(project.id)
 
       Then("the non missed events should be in the RDF Store")
-      EventLog.findEvents(project.id) should contain(EventId(nonMissedCommitId.value) -> TriplesStore)
+      eventually {
+        EventLog.findEvents(project.id) should contain(EventId(nonMissedCommitId.value) -> TriplesStore)
+      }
 
       When("commit synchronisation process kicks-off")
       db.EventLog.execute { session =>
@@ -112,10 +114,12 @@ class CommitSyncFlowsSpec
       `wait for events to be processed`(project.id)
 
       Then("triples for both of the project's commits should be in the RDF Store")
-      EventLog.findEvents(project.id) should contain theSameElementsAs List(
-        EventId(nonMissedCommitId.value) -> TriplesStore,
-        EventId(missedCommitId.value)    -> TriplesStore
-      )
+      eventually {
+        EventLog.findEvents(project.id) should contain theSameElementsAs List(
+          EventId(nonMissedCommitId.value) -> TriplesStore,
+          EventId(missedCommitId.value)    -> TriplesStore
+        )
+      }
     }
   }
 }

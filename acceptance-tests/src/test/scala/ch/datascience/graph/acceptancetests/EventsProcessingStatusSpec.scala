@@ -87,8 +87,9 @@ class EventsProcessingStatusSpec
 
         val responseJson = response.bodyAsJson.hcursor
         val Right(done)  = responseJson.downField("done").as[Int]
-        done                                            should be <= numberOfEvents.value
-        responseJson.downField("total").as[Int]       shouldBe Right(numberOfEvents.value)
+        val Right(total) = responseJson.downField("total").as[Int]
+        done                                            should (be <= numberOfEvents.value and be >= 1)
+        total                                           should (be <= numberOfEvents.value and be >= 1)
         responseJson.downField("progress").as[Double] shouldBe Right(100d)
       }
     }
