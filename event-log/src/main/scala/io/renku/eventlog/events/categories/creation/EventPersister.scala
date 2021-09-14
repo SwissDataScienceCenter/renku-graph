@@ -37,11 +37,11 @@ import skunk.implicits._
 
 import java.time.Instant
 
-trait EventPersister[Interpretation[_]] {
+private trait EventPersister[Interpretation[_]] {
   def storeNewEvent(event: Event): Interpretation[Result]
 }
 
-class EventPersisterImpl[Interpretation[_]: BracketThrow](
+private class EventPersisterImpl[Interpretation[_]: BracketThrow](
     sessionResource:    SessionResource[Interpretation, EventLogDB],
     waitingEventsGauge: LabeledGauge[Interpretation, projects.Path],
     queriesExecTimes:   LabeledHistogram[Interpretation, SqlStatement.Name],
@@ -58,12 +58,16 @@ class EventPersisterImpl[Interpretation[_]: BracketThrow](
         result <- insertIfNotDuplicate(event)(session) recoverWith { case error =>
                     transaction.rollback(sp) >> error.raiseError[Interpretation, Result]
                   }
-        _ <-
-          Applicative[Interpretation].whenA(result == Created && event.status == New)(
-            waitingEventsGauge.increment(event.project.path)
-          )
+        _ <- Applicative[Interpretation].whenA(aNewEventIsCreated(result))(
+               waitingEventsGauge.increment(event.project.path)
+             )
       } yield result
     }
+  }
+
+  private lazy val aNewEventIsCreated: Result => Boolean = {
+    case Created(event) if event.status == New => true
+    case _                                     => false
   }
 
   private def insertIfNotDuplicate(event: Event) =
@@ -73,14 +77,37 @@ class EventPersisterImpl[Interpretation[_]: BracketThrow](
     }
 
   private def persist(event: Event): Kleisli[Interpretation, Session[Interpretation], Result] = for {
-    updatedCommitEvent <- eventuallyAddToExistingBatch(event)
+    updatedCommitEvent <- eventuallyAddToExistingBatch(event) >>= eventuallyUpdateStatus
     _                  <- upsertProject(updatedCommitEvent)
     _                  <- insert(updatedCommitEvent)
-  } yield Created
+  } yield Created(updatedCommitEvent)
 
   private def eventuallyAddToExistingBatch(event: Event) =
     findBatchInQueue(event)
       .map(_.map(event.withBatchDate).getOrElse(event))
+
+  private lazy val eventuallyUpdateStatus: Event => Kleisli[Interpretation, Session[Interpretation], Event] = {
+    case event: NewEvent =>
+      findNewerEventStatus(event).map {
+        case Some(newerStatus) => event.copy(status = newerStatus)
+        case None              => event
+      }
+    case event => Kleisli.pure(event)
+  }
+
+  private def findNewerEventStatus(event: Event) = measureExecutionTime(
+    SqlStatement(name = "new - find newer event status")
+      .select[projects.Id ~ EventStatus ~ EventDate, EventStatus](
+        sql"""SELECT status
+              FROM event
+              WHERE project_id = $projectIdEncoder AND status = $eventStatusEncoder
+                    AND event_date >= $eventDateEncoder
+              LIMIT 1
+          """.query(eventStatusDecoder)
+      )
+      .arguments(event.project.id ~ TriplesStore ~ event.date)
+      .build(_.option)
+  )
 
   private def checkIfPersisted(event: Event) = measureExecutionTime(
     SqlStatement(name = "new - check existence")
@@ -113,7 +140,7 @@ class EventPersisterImpl[Interpretation[_]: BracketThrow](
   )
 
   private lazy val insert: Event => Kleisli[Interpretation, Session[Interpretation], Unit] = {
-    case NewEvent(id, project, date, batchDate, body) =>
+    case NewEvent(id, project, date, batchDate, body, status) =>
       val (createdDate, executionDate) = (CreatedDate.apply _ &&& ExecutionDate.apply)(now())
       measureExecutionTime(
         SqlStatement(name = "new - create (NEW)")
@@ -124,7 +151,7 @@ class EventPersisterImpl[Interpretation[_]: BracketThrow](
                 VALUES ($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $createdDateEncoder, $executionDateEncoder, $eventDateEncoder, $batchDateEncoder, $eventBodyEncoder)
               """.command
           )
-          .arguments(id ~ project.id ~ New ~ createdDate ~ executionDate ~ date ~ batchDate ~ body)
+          .arguments(id ~ project.id ~ status ~ createdDate ~ executionDate ~ date ~ batchDate ~ body)
           .build
           .void
       )
@@ -168,17 +195,17 @@ class EventPersisterImpl[Interpretation[_]: BracketThrow](
     s"status IN (${NonEmptyList.of(status, otherStatuses: _*).map(el => s"'$el'").toList.mkString(",")})"
 }
 
-object EventPersister {
+private object EventPersister {
 
   sealed trait Result extends Product with Serializable
 
   object Result {
-    case object Created extends Result
+    case class Created(event: Event) extends Result
     case object Existed extends Result
   }
 }
 
-object IOEventPersister {
+private object IOEventPersister {
   def apply(
       sessionResource:    SessionResource[IO, EventLogDB],
       waitingEventsGauge: LabeledGauge[IO, projects.Path],

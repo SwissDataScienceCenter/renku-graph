@@ -41,9 +41,9 @@ private object Event {
       project:   Project,
       date:      EventDate,
       batchDate: BatchDate,
-      body:      EventBody
+      body:      EventBody,
+      status:    EventStatus = EventStatus.New
   ) extends Event {
-    val status: EventStatus = EventStatus.New
 
     override def withBatchDate(batchDate: BatchDate): Event = this.copy(batchDate = batchDate)
 

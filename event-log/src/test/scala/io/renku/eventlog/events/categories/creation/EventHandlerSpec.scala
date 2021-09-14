@@ -41,16 +41,22 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.global
+import org.scalatest.prop.TableDrivenPropertyChecks
 
-class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class EventHandlerSpec extends AnyWordSpec with MockFactory with TableDrivenPropertyChecks with should.Matchers {
 
   "createHandlingProcess" should {
 
-    List(Created, Existed).foreach { successfulResponse =>
-      s"return $Accepted if the creation of the event returns $successfulResponse" in new TestCase {
+    val scenarios = Table(
+      "status"  -> "resultFactory",
+      "Created" -> ((event: Event) => Created(event)),
+      "Existed" -> ((_: Event) => Existed)
+    )
+    forAll(scenarios) { case (status, resultFactory) =>
+      s"return $Accepted if the creation of the event returns $status" in new TestCase {
         val event = newOrSkippedEvents.generateOne
 
-        (eventPersister.storeNewEvent _).expects(event).returning(successfulResponse.pure[IO])
+        (eventPersister.storeNewEvent _).expects(event).returning(resultFactory(event).pure[IO])
 
         handler
           .createHandlingProcess(requestContent(event.asJson))
