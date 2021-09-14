@@ -31,6 +31,7 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
 import io.circe.Json
 import io.circe.literal._
+import io.circe.syntax.EncoderOps
 import org.http4s._
 import org.http4s.implicits._
 import org.http4s.headers.`Content-Type`
@@ -44,14 +45,14 @@ class AssociateTokenEndpointSpec extends AnyWordSpec with MockFactory with shoul
 
     "respond with NO_CONTENT if the Personal Access Token association was successful" in new TestCase {
 
-      val accessToken = personalAccessTokens.generateOne
+      val accessToken: AccessToken = personalAccessTokens.generateOne
       (tokensAssociator
         .associate(_: Id, _: AccessToken))
         .expects(projectId, accessToken)
         .returning(context.pure(()))
 
       val request = Request(Method.PUT, uri"projects" / projectId.toString / "tokens")
-        .withEntity(json"""{"personalAccessToken": ${accessToken.value}}""")
+        .withEntity(accessToken.asJson)
 
       val response = associateToken(projectId, request).unsafeRunSync()
 
@@ -63,7 +64,7 @@ class AssociateTokenEndpointSpec extends AnyWordSpec with MockFactory with shoul
 
     "respond with NO_CONTENT if the OAuth Access Token association was successful" in new TestCase {
 
-      val accessToken = oauthAccessTokens.generateOne
+      val accessToken: AccessToken = oauthAccessTokens.generateOne
 
       (tokensAssociator
         .associate(_: Id, _: AccessToken))
@@ -71,7 +72,7 @@ class AssociateTokenEndpointSpec extends AnyWordSpec with MockFactory with shoul
         .returning(context.pure(()))
 
       val request = Request(Method.PUT, uri"projects" / projectId.toString / "tokens")
-        .withEntity(json"""{"oauthAccessToken": ${accessToken.value}}""")
+        .withEntity(accessToken.asJson)
 
       val response = associateToken(projectId, request).unsafeRunSync()
 
@@ -98,7 +99,7 @@ class AssociateTokenEndpointSpec extends AnyWordSpec with MockFactory with shoul
 
     "respond with INTERNAL_SERVER_ERROR if Access Token association fails" in new TestCase {
 
-      val accessToken = personalAccessTokens.generateOne
+      val accessToken: AccessToken = personalAccessTokens.generateOne
 
       val exception = exceptions.generateOne
       (tokensAssociator
@@ -107,7 +108,7 @@ class AssociateTokenEndpointSpec extends AnyWordSpec with MockFactory with shoul
         .returning(context.raiseError(exception))
 
       val request = Request(Method.PUT, uri"projects" / projectId.toString / "tokens")
-        .withEntity(json"""{"personalAccessToken": ${accessToken.value}}""")
+        .withEntity(accessToken.asJson)
 
       val response = associateToken(projectId, request).unsafeRunSync()
 

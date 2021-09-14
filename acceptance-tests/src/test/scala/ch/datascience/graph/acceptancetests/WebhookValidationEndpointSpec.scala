@@ -25,8 +25,8 @@ import ch.datascience.graph.acceptancetests.data.dataProjects
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
-import ch.datascience.graph.acceptancetests.tooling.TokenRepositoryClient._
 import ch.datascience.http.client.AccessToken
+import io.circe.syntax.EncoderOps
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
@@ -97,7 +97,7 @@ class WebhookValidationEndpointSpec extends AnyFeatureSpec with GivenWhenThen wi
       And("the Access Token used in the POST should be added to the token repository")
       tokenRepositoryClient
         .GET(s"projects/${project.id}/tokens")
-        .bodyAsJson shouldBe accessToken.toJson
+        .bodyAsJson shouldBe accessToken.asJson
 
       And("when the hook get deleted from GitLab")
       `GET <gitlabApi>/projects/:id/hooks returning OK with no hooks`(project.id)

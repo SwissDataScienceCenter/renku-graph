@@ -27,14 +27,14 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.AccessToken
-import ch.datascience.http.client.UrlEncoder.urlEncode
+import ch.datascience.http.client.AccessToken._
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
 import io.circe.Json
+import io.circe.syntax.EncoderOps
 import org.http4s._
 import org.http4s.headers.`Content-Type`
-import org.http4s.implicits._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -46,21 +46,19 @@ class FetchTokenEndpointSpec extends AnyWordSpec with MockFactory with should.Ma
     "respond with OK with the oauth token if one is found in the repository" in new TestCase {
       import endpoint._
 
-      val accessToken = oauthAccessTokens.generateOne
-      val projectId   = projectIds.generateOne
+      val accessToken: AccessToken = oauthAccessTokens.generateOne
+      val projectId = projectIds.generateOne
 
       (tokensFinder
         .findToken(_: Id))
         .expects(projectId)
         .returning(OptionT.some[IO](accessToken))
 
-      val request = Request[IO](Method.GET, uri"projects" / projectId.toString / "tokens")
-
       val response = fetchToken(projectId).unsafeRunSync()
 
       response.status                   shouldBe Status.Ok
       response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync() shouldBe Json.obj("oauthAccessToken" -> Json.fromString(accessToken.value))
+      response.as[Json].unsafeRunSync() shouldBe accessToken.asJson
 
       logger.expectNoLogs()
     }
@@ -68,21 +66,19 @@ class FetchTokenEndpointSpec extends AnyWordSpec with MockFactory with should.Ma
     "respond with OK with the personal access token if one is found in the repository" in new TestCase {
       import endpoint._
 
-      val accessToken = personalAccessTokens.generateOne
-      val projectId   = projectIds.generateOne
+      val accessToken: AccessToken = personalAccessTokens.generateOne
+      val projectId = projectIds.generateOne
 
       (tokensFinder
         .findToken(_: Id))
         .expects(projectId)
         .returning(OptionT.some[IO](accessToken))
 
-      val request = Request[IO](Method.GET, uri"projects" / projectId.toString / "tokens")
-
       val response = fetchToken(projectId).unsafeRunSync()
 
       response.status                   shouldBe Status.Ok
       response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync() shouldBe Json.obj("personalAccessToken" -> Json.fromString(accessToken.value))
+      response.as[Json].unsafeRunSync() shouldBe accessToken.asJson
 
       logger.expectNoLogs()
     }
@@ -90,7 +86,7 @@ class FetchTokenEndpointSpec extends AnyWordSpec with MockFactory with should.Ma
     "respond with OK with the token if one is found in the repository for the given project path" in new TestCase {
       import endpoint._
 
-      val accessToken = oauthAccessTokens.generateOne
+      val accessToken: AccessToken = oauthAccessTokens.generateOne
       val projectPath = projectPaths.generateOne
 
       (tokensFinder
@@ -98,13 +94,11 @@ class FetchTokenEndpointSpec extends AnyWordSpec with MockFactory with should.Ma
         .expects(projectPath)
         .returning(OptionT.some[IO](accessToken))
 
-      val request = Request[IO](Method.GET, uri"projects" / urlEncode(projectPath.toString) / "tokens")
-
       val response = fetchToken(projectPath).unsafeRunSync()
 
       response.status                   shouldBe Status.Ok
       response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync() shouldBe Json.obj("oauthAccessToken" -> Json.fromString(accessToken.value))
+      response.as[Json].unsafeRunSync() shouldBe accessToken.asJson
 
       logger.expectNoLogs()
     }
@@ -112,15 +106,12 @@ class FetchTokenEndpointSpec extends AnyWordSpec with MockFactory with should.Ma
     "respond with NOT_FOUND if there is no token in the repository" in new TestCase {
       import endpoint._
 
-      val accessToken = personalAccessTokens.generateOne
-      val projectId   = projectIds.generateOne
+      val projectId = projectIds.generateOne
 
       (tokensFinder
         .findToken(_: Id))
         .expects(projectId)
         .returning(OptionT.none[IO, AccessToken])
-
-      val request = Request[IO](Method.GET, uri"projects" / projectId.toString / "tokens")
 
       val response = fetchToken(projectId).unsafeRunSync()
 
@@ -136,16 +127,13 @@ class FetchTokenEndpointSpec extends AnyWordSpec with MockFactory with should.Ma
     "respond with INTERNAL_SERVER_ERROR if finding token in the repository fails" in new TestCase {
       import endpoint._
 
-      val accessToken = personalAccessTokens.generateOne
-      val projectId   = projectIds.generateOne
+      val projectId = projectIds.generateOne
 
       val exception = exceptions.generateOne
       (tokensFinder
         .findToken(_: Id))
         .expects(projectId)
         .returning(OptionT(IO.raiseError[Option[AccessToken]](exception)))
-
-      val request = Request[IO](Method.GET, uri"projects" / projectId.toString / "tokens")
 
       val response = fetchToken(projectId).unsafeRunSync()
 

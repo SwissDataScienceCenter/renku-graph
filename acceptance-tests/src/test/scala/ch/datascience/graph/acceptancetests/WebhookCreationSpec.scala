@@ -29,8 +29,7 @@ import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.http.client.AccessToken
-import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
-import io.circe.literal._
+import io.circe.syntax.EncoderOps
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
@@ -99,10 +98,9 @@ class WebhookCreationSpec
       response.status shouldBe Created
 
       And("the Access Token used in the POST should be added to the token repository")
-      val expectedAccessTokenJson = accessToken match {
-        case OAuthAccessToken(token)    => json"""{"oauthAccessToken": $token}"""
-        case PersonalAccessToken(token) => json"""{"personalAccessToken": $token}"""
-      }
+
+      val expectedAccessTokenJson = accessToken.asJson
+
       tokenRepositoryClient
         .GET(s"projects/${project.id}/tokens")
         .bodyAsJson shouldBe expectedAccessTokenJson

@@ -26,11 +26,9 @@ import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.ErrorMessage
 import ch.datascience.http.ErrorMessage._
 import ch.datascience.http.client.AccessToken
-import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
-import io.circe.literal._
 import io.circe.syntax._
 import org.http4s.Status
 import org.scalamock.scalatest.MockFactory
@@ -47,12 +45,12 @@ class AccessTokenAssociatorImplSpec
 
   "associate" should {
 
-    personalAccessTokens.generateOne +: oauthAccessTokens.generateOne +: Nil foreach { accessToken =>
+    List[AccessToken](personalAccessTokens.generateOne, oauthAccessTokens.generateOne) foreach { accessToken =>
       s"succeed if association projectId with a ${accessToken.getClass.getSimpleName} on a remote is successful" in new TestCase {
 
         stubFor {
           put(s"/projects/$projectId/tokens")
-            .withRequestBody(equalToJson(toJson(accessToken)))
+            .withRequestBody(equalToJson(accessToken.asJson.noSpaces))
             .willReturn(noContent())
         }
 
@@ -67,7 +65,7 @@ class AccessTokenAssociatorImplSpec
       val responseBody = ErrorMessage("some error").asJson.noSpaces
       stubFor {
         put(s"/projects/$projectId/tokens")
-          .withRequestBody(equalToJson(toJson(accessToken)))
+          .withRequestBody(equalToJson(accessToken.asJson.noSpaces))
           .willReturn(badRequest.withBody(responseBody))
       }
 
@@ -86,10 +84,5 @@ class AccessTokenAssociatorImplSpec
     val projectId          = projectIds.generateOne
 
     val associator = new AccessTokenAssociatorImpl[IO](tokenRepositoryUrl, TestLogger())
-  }
-
-  private lazy val toJson: AccessToken => String = {
-    case PersonalAccessToken(token) => json"""{"personalAccessToken": $token}""".noSpaces
-    case OAuthAccessToken(token)    => json"""{"oauthAccessToken": $token}""".noSpaces
   }
 }
