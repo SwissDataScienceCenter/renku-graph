@@ -156,6 +156,20 @@ class GlobalCommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers
       )
     }
 
+    "succeed and delete all Event Log commits if the call for commits stats returns a 404" in new TestCase {
+      val event = globalCommitSyncEventsNonZero.generateOne
+
+      givenAccessTokenIsFound(event.project.id)
+      givenNotCommitStatsExistsInGL404(event.project.id)
+      expectEventsDeletedSuccessfully(event.project, event.commits)
+
+      commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
+
+      logger.loggedOnly(
+        logSummary(event.project, executionTimeRecorder.elapsedTime, deleted = event.commits.length)
+      )
+    }
+
   }
 
   private trait TestCase {
@@ -187,7 +201,7 @@ class GlobalCommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers
       (gitLabCommitStatFetcher
         .fetchCommitStats(_: projects.Id)(_: Option[AccessToken]))
         .expects(projectId, maybeAccessToken)
-        .returning(Success(ProjectCommitStats(None, 0)))
+        .returning(Success(Some(ProjectCommitStats(None, 0))))
 
       (gitLabCommitFetcher
         .fetchGitLabCommits(_: projects.Id)(_: Option[AccessToken]))
@@ -202,7 +216,13 @@ class GlobalCommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers
       (gitLabCommitStatFetcher
         .fetchCommitStats(_: projects.Id)(_: Option[AccessToken]))
         .expects(projectId, maybeAccessToken)
-        .returning(Success(ProjectCommitStats(Some(commits.head), commits.length)))
+        .returning(Success(Some(ProjectCommitStats(Some(commits.head), commits.length))))
+
+    def givenNotCommitStatsExistsInGL404(projectId: Id) =
+      (gitLabCommitStatFetcher
+        .fetchCommitStats(_: projects.Id)(_: Option[AccessToken]))
+        .expects(projectId, maybeAccessToken)
+        .returning(Success(None))
 
     def givenCommitsInGL(projectId: Id, commits: List[CommitId]) =
       (gitLabCommitFetcher

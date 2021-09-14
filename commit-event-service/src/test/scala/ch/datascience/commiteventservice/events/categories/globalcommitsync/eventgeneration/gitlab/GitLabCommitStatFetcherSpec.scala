@@ -61,11 +61,29 @@ class GitLabCommitStatFetcherSpec
             .willReturn(okJson(jsonCommitCount(commitCount)))
         }
 
-        gitLabCommitStatFetcher.fetchCommitStats(projectId).unsafeRunSync() shouldBe ProjectCommitStats(
-          maybeLatestCommit,
-          commitCount
+        gitLabCommitStatFetcher.fetchCommitStats(projectId).unsafeRunSync() shouldBe Some(
+          ProjectCommitStats(
+            maybeLatestCommit,
+            commitCount
+          )
         )
       }
+
+    }
+
+    "return None if the gitlab API returns a NotFound" in new TestCase {
+      val maybeLatestCommit = commitIds.generateOption
+      (gitLabCommitFetcher
+        .fetchLatestGitLabCommit(_: projects.Id)(_: Option[AccessToken]))
+        .expects(projectId, maybeAccessToken)
+        .returning(maybeLatestCommit.pure[IO])
+
+      stubFor {
+        get(s"/api/v4/projects/$projectId?statistics=true")
+          .willReturn(notFound())
+      }
+
+      gitLabCommitStatFetcher.fetchCommitStats(projectId).unsafeRunSync() shouldBe None
 
     }
 

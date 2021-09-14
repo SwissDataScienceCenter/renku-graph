@@ -18,6 +18,8 @@
 
 package ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.gitlab
 
+import cats.Monad
+import cats.data.OptionT
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.ProjectCommitStats
@@ -32,7 +34,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.circe.Decoder
 import org.http4s.Method.GET
-import org.http4s.Status.{Ok, Unauthorized}
+import org.http4s.Status.{NotFound, Ok, Unauthorized}
 import org.http4s.circe.jsonOf
 import org.http4s._
 import org.typelevel.log4cats.Logger
@@ -43,10 +45,10 @@ import scala.concurrent.duration.{Duration, FiniteDuration}
 private[globalcommitsync] trait GitLabCommitStatFetcher[Interpretation[_]] {
   def fetchCommitStats(projectId: projects.Id)(implicit
       maybeAccessToken:           Option[AccessToken]
-  ): Interpretation[ProjectCommitStats]
+  ): Interpretation[Option[ProjectCommitStats]]
 }
 
-private[globalcommitsync] class GitLabCommitStatFetcherImpl[Interpretation[_]: ConcurrentEffect: Timer](
+private[globalcommitsync] class GitLabCommitStatFetcherImpl[Interpretation[_]: ConcurrentEffect: Timer: Monad](
     gitLabCommitFetcher:     GitLabCommitFetcher[Interpretation],
     gitLabApiUrl:            GitLabApiUrl,
     gitLabThrottler:         Throttler[Interpretation, GitLab],
@@ -67,10 +69,10 @@ private[globalcommitsync] class GitLabCommitStatFetcherImpl[Interpretation[_]: C
 
   override def fetchCommitStats(projectId: projects.Id)(implicit
       maybeAccessToken:                    Option[AccessToken]
-  ): Interpretation[ProjectCommitStats] = for {
-    maybeLatestCommitId <- fetchLatestGitLabCommit(projectId)
-    commitCount         <- fetchCommitCount(projectId)
-  } yield ProjectCommitStats(maybeLatestCommitId, commitCount)
+  ): Interpretation[Option[ProjectCommitStats]] = (for {
+    maybeLatestCommitId <- OptionT.liftF(fetchLatestGitLabCommit(projectId))
+    commitCount         <- OptionT(fetchCommitCount(projectId))
+  } yield ProjectCommitStats(maybeLatestCommitId, commitCount)).value
 
   private def fetchCommitCount(projectId: projects.Id)(implicit maybeAccessToken: Option[AccessToken]) = for {
     uri         <- validateUri(s"$gitLabApiUrl/projects/$projectId?statistics=true")
@@ -78,8 +80,11 @@ private[globalcommitsync] class GitLabCommitStatFetcherImpl[Interpretation[_]: C
   } yield commitCount
 
   private implicit lazy val mapCountResponse
-      : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[CommitCount]] = {
-    case (Ok, _, response)    => response.as[CommitCount]
+      : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[
+        Option[CommitCount]
+      ]] = {
+    case (Ok, _, response)    => response.as[CommitCount].map(_.some)
+    case (NotFound, _, _)     => Option.empty[CommitCount].pure[Interpretation]
     case (Unauthorized, _, _) => UnauthorizedException.raiseError
   }
 

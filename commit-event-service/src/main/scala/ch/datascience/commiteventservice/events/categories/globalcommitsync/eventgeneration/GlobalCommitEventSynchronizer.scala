@@ -59,17 +59,26 @@ private[globalcommitsync] class GlobalCommitEventSynchronizerImpl[Interpretation
 
   override def synchronizeEvents(event: GlobalCommitSyncEvent): Interpretation[Unit] = (for {
     maybeAccessToken <- findAccessToken(event.project.id)
-    commitStats      <- fetchCommitStats(event.project.id)(maybeAccessToken)
-    commitsInSync    <- commitsInSync(event, commitStats).pure[Interpretation]
-    _ <- if (!commitsInSync) syncCommitsAndLogSummary(event)(maybeAccessToken)
-         else measureExecutionTime(SynchronizationSummary().pure[Interpretation]) >>= logSummary(event.project)
+    maybeCommitStats <- fetchCommitStats(event.project.id)(maybeAccessToken)
+    _                <- syncOrDeleteCommits(event, maybeCommitStats)(maybeAccessToken)
   } yield ()).recoverWith { case NonFatal(error) =>
-    logger.error(error)(s"$categoryName - Failed to sync commits for project ${event.project}")
-    error.raiseError[Interpretation, Unit]
+    logger.error(error)(s"$categoryName - Failed to sync commits for project ${event.project}") >>
+      error.raiseError[Interpretation, Unit]
   }
 
-  private def commitsInSync(event: GlobalCommitSyncEvent, commitStats: ProjectCommitStats): Boolean =
-    event.commits.length == commitStats.commitCount.value && event.commits.headOption == commitStats.maybeLatestCommit
+  private def syncOrDeleteCommits(event: GlobalCommitSyncEvent, maybeCommitStats: Option[ProjectCommitStats])(implicit
+      maybeAccessToken:                  Option[AccessToken]
+  ): Interpretation[Unit] =
+    maybeCommitStats match {
+      case Some(commitStats) =>
+        val commitsInSync = event.commits.length == commitStats.commitCount.value &&
+          event.commits.headOption == commitStats.maybeLatestCommit
+
+        if (!commitsInSync) syncCommitsAndLogSummary(event)(maybeAccessToken)
+        else measureExecutionTime(SynchronizationSummary().pure[Interpretation]) >>= logSummary(event.project)
+      case None =>
+        measureExecutionTime(deleteExtraneousCommits(event.project, event.commits)) >>= logSummary(event.project)
+    }
 
   private def syncCommitsAndLogSummary(
       event:                   GlobalCommitSyncEvent
