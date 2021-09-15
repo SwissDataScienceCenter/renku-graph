@@ -6,16 +6,49 @@ This is a microservice which provides CRUD operations for Event Log DB.
 
 | Method | Path                                    | Description                                                    |
 |--------|-----------------------------------------|----------------------------------------------------------------|
-|  GET   | ```/events/:event-id/:project-id```     | Retrieve chosen event's data                                   |
-|  POST  | ```/events```                           | Send an event for processing                                   |
+|  GET   | ```/events```                           | Returns info about events                                      |
+|  GET   | ```/events/:event-id/:project-id```     | Returns info about event with the given `id` and `project-id`  |
+|  POST  | ```/events```                           | Sends an event for processing                                  |
 |  GET   | ```/metrics```                          | Returns Prometheus metrics of the service                      |
 |  GET   | ```/ping```                             | Verifies service health                                        |
 |  GET   | ```/processing-status?project-id=:id``` | Finds processing status of events belonging to a project       |
 |  POST  | ```/subscriptions```                    | Adds a subscription for events                                 |
 
+#### GET /events?projectPath=\<projectPath\>`
+
+Returns information about the selected events.
+
+NOTES:
+
+* the `projectPath` query parameter is mandatory, has to be url-encoded and cannot be blank;
+* the returned events are sorted by the `event_date`.
+
+**Response**
+
+| Status                     | Description                     |
+|----------------------------|---------------------------------|
+| OK (200)                   | If finding events is successful |
+| INTERNAL SERVER ERROR (500)| When there are problems         |
+
+Response body example:
+
+```json
+[
+  {
+    "id":      "df654c3b1bd105a29d658f78f6380a842feac879",
+    "status":  "NEW"
+  },  
+  {
+    "id":      "df654c3b1bd105a29d658f78f6380a842feac879",
+    "status":  "GENERATION_NON_RECOVERABLE_FAILURE",
+    "message": "detailed info about the cause of the failure"
+  }  
+]
+```
+
 #### GET /events/:event-id/:project-id`
 
-Find event details.
+Finds event details.
 
 **Response**
 
@@ -36,6 +69,7 @@ Response body example:
   "body": "JSON payload"
 }
 ```
+
 #### POST /events
 
 Accepts an event as multipart requests.
