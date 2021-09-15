@@ -79,7 +79,7 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
         .as[List[entities.Activity]]
 
       error              shouldBe a[DecodingFailure]
-      error.getMessage() shouldBe s"No Usage found for InputParameterValue with $location"
+      error.getMessage() shouldBe s"No Usage found for CommandInputValue with $location"
     }
 
     "fail if there are Output Parameter Values for non-existing Generation Entities" in {
@@ -113,7 +113,7 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
         .as[List[entities.Activity]]
 
       error              shouldBe a[DecodingFailure]
-      error.getMessage() shouldBe s"No Generation found for OutputParameterValue with $location"
+      error.getMessage() shouldBe s"No Generation found for CommandOutputValue with $location"
     }
 
     "fail if there is no Agent entity" in {

@@ -114,7 +114,7 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
         )
 
       failure         shouldBe a[DecodingFailure]
-      failure.message shouldBe s"VariableParameterValue points to a non-existing command parameter ${activity.plan.to[entities.Plan].parameters.map(_.resourceId).head}"
+      failure.message shouldBe s"ParameterValue points to a non-existing command parameter ${activity.plan.to[entities.Plan].parameters.map(_.resourceId).head}"
     }
 
     "fail if there are InputParameterValue for non-existing InputParameters" in {
@@ -134,7 +134,7 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
         )
 
       failure         shouldBe a[DecodingFailure]
-      failure.message shouldBe s"PathParameterValue points to a non-existing command parameter ${activity.plan.to[entities.Plan].inputs.map(_.resourceId).head}"
+      failure.message shouldBe s"ParameterValue points to a non-existing command parameter ${activity.plan.to[entities.Plan].inputs.map(_.resourceId).head}"
     }
 
     "fail if there are OutputParameterValue for non-existing OutputParameters" in {
@@ -152,7 +152,7 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
         )
 
       failure         shouldBe a[DecodingFailure]
-      failure.message shouldBe s"PathParameterValue points to a non-existing command parameter ${activity.plan.to[entities.Plan].outputs.map(_.resourceId).head}"
+      failure.message shouldBe s"ParameterValue points to a non-existing command parameter ${activity.plan.to[entities.Plan].outputs.map(_.resourceId).head}"
     }
   }
 }
