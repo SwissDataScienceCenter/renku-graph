@@ -23,8 +23,8 @@ import ch.datascience.tinytypes.constraints.{NonBlank, Url}
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
 object agents {
-  final class Label private (val value: String) extends AnyVal with StringTinyType
-  implicit object Label extends TinyTypeFactory[Label](new Label(_)) with NonBlank with TinyTypeJsonLDOps[Label]
+  final class Name private (val value: String) extends AnyVal with StringTinyType
+  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank with TinyTypeJsonLDOps[Name]
 
   class ResourceId private (val value: String) extends AnyVal with StringTinyType
   implicit object ResourceId

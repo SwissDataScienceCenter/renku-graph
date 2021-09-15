@@ -57,7 +57,6 @@ object Person {
         entityTypes,
         schema / "email"       -> person.maybeEmail.asJsonLD,
         schema / "name"        -> person.name.asJsonLD,
-        rdfs / "label"         -> person.name.asJsonLD,
         schema / "affiliation" -> person.maybeAffiliation.asJsonLD,
         schema / "sameAs"      -> person.maybeGitLabId.asJsonLD(encodeOption(gitLabIdEncoder))
       )

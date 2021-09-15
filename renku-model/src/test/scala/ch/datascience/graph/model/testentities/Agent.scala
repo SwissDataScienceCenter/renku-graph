@@ -19,7 +19,7 @@
 package ch.datascience.graph.model.testentities
 
 import cats.syntax.all._
-import ch.datascience.graph.model.agents.Label
+import ch.datascience.graph.model.agents.Name
 import ch.datascience.graph.model.{CliVersion, agents, entities}
 
 final case class Agent(cliVersion: CliVersion)
@@ -30,7 +30,7 @@ object Agent {
   import io.renku.jsonld.syntax._
 
   implicit lazy val toEntitiesAgent: Agent => entities.Agent = agent =>
-    entities.Agent(agents.ResourceId(agent.asEntityId.show), Label(s"renku ${agent.cliVersion}"))
+    entities.Agent(agents.ResourceId(agent.asEntityId.show), Name(s"renku ${agent.cliVersion}"))
 
   implicit lazy val encoder: JsonLDEncoder[Agent] = JsonLDEncoder.instance {
     _.to[entities.Agent].asJsonLD

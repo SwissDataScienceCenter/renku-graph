@@ -18,11 +18,11 @@
 
 package ch.datascience.graph.model.entities
 
-import ch.datascience.graph.model.Schemas.{prov, rdfs, wfprov}
+import ch.datascience.graph.model.Schemas.{prov, schema, wfprov}
 import ch.datascience.graph.model.agents._
 import io.renku.jsonld._
 
-final case class Agent(resourceId: ResourceId, label: Label)
+final case class Agent(resourceId: ResourceId, name: Name)
 
 object Agent {
 
@@ -35,14 +35,14 @@ object Agent {
     JsonLD.entity(
       agent.resourceId.asEntityId,
       entityTypes,
-      rdfs / "label" -> agent.label.asJsonLD
+      schema / "name" -> agent.name.asJsonLD
     )
   }
 
   implicit lazy val decoder: JsonLDDecoder[Agent] = JsonLDDecoder.entity(entityTypes) { cursor =>
     for {
       resourceId <- cursor.downEntityId.as[ResourceId]
-      label      <- cursor.downField(rdfs / "label").as[Label]
+      label      <- cursor.downField(schema / "name").as[Name]
     } yield Agent(resourceId, label)
   }
 }

@@ -62,8 +62,7 @@ object CommandParameterBase {
             schema / "name"         -> name.asJsonLD,
             schema / "description"  -> maybeDescription.asJsonLD,
             renku / "prefix"        -> maybePrefix.asJsonLD,
-            schema / "defaultValue" -> defaultValue.asJsonLD,
-            rdfs / "label"          -> s"""Command Parameter "$defaultValue"""".asJsonLD
+            schema / "defaultValue" -> defaultValue.asJsonLD
           )
       }
 
@@ -131,8 +130,7 @@ object CommandParameterBase {
           renku / "prefix"          -> maybePrefix.asJsonLD,
           schema / "defaultValue"   -> defaultValue.asJsonLD,
           renku / "isTemporary"     -> temporary.asJsonLD,
-          schema / "encodingFormat" -> maybeEncodingFormat.asJsonLD,
-          rdfs / "label"            -> s"""Command Input Template "$defaultValue"""".asJsonLD
+          schema / "encodingFormat" -> maybeEncodingFormat.asJsonLD
         )
       case MappedCommandInput(resourceId,
                               position,
@@ -154,8 +152,7 @@ object CommandParameterBase {
           schema / "defaultValue"   -> defaultValue.asJsonLD,
           renku / "isTemporary"     -> temporary.asJsonLD,
           schema / "encodingFormat" -> maybeEncodingFormat.asJsonLD,
-          renku / "mappedTo"        -> mappedTo.asJsonLD,
-          rdfs / "label"            -> s"""Command Input Template "$defaultValue"""".asJsonLD
+          renku / "mappedTo"        -> mappedTo.asJsonLD
         )
     }
 
@@ -252,8 +249,7 @@ object CommandParameterBase {
             schema / "defaultValue"   -> defaultValue.asJsonLD,
             renku / "isTemporary"     -> temporary.asJsonLD,
             renku / "createFolder"    -> folderCreation.asJsonLD,
-            schema / "encodingFormat" -> maybeEncodingFormat.asJsonLD,
-            rdfs / "label"            -> s"""Command Output Template "$defaultValue"""".asJsonLD
+            schema / "encodingFormat" -> maybeEncodingFormat.asJsonLD
           )
         case MappedCommandOutput(resourceId,
                                  position,
@@ -277,8 +273,7 @@ object CommandParameterBase {
             renku / "mappedTo"        -> mappedTo.asJsonLD,
             renku / "isTemporary"     -> temporary.asJsonLD,
             renku / "createFolder"    -> folderCreation.asJsonLD,
-            schema / "encodingFormat" -> maybeEncodingFormat.asJsonLD,
-            rdfs / "label"            -> s"""Command Output Template "$defaultValue"""".asJsonLD
+            schema / "encodingFormat" -> maybeEncodingFormat.asJsonLD
           )
       }
 

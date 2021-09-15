@@ -462,7 +462,6 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         entities.Person.entityTypes,
         schema / "email"       -> person.maybeEmail.asJsonLD,
         schema / "name"        -> ((person.alternativeNames - person.name).toList ::: person.name :: Nil).asJsonLD,
-        rdfs / "label"         -> person.name.asJsonLD,
         schema / "affiliation" -> person.maybeAffiliation.asJsonLD,
         schema / "sameAs"      -> person.maybeGitLabId.asJsonLD(encodeOption(entities.Person.gitLabIdEncoder))
       )
