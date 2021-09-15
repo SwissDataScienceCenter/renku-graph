@@ -353,7 +353,6 @@ object Dataset {
   }
 
   final case class AdditionalInfo(
-      url:              Url,
       maybeDescription: Option[Description],
       keywords:         List[Keyword],
       images:           List[Image],
@@ -364,9 +363,8 @@ object Dataset {
   object AdditionalInfo {
 
     private[Dataset] implicit lazy val encoder: AdditionalInfo => Map[Property, JsonLD] = {
-      case AdditionalInfo(url, maybeDescription, keywords, images, maybeLicense, maybeVersion) =>
+      case AdditionalInfo(maybeDescription, keywords, images, maybeLicense, maybeVersion) =>
         Map(
-          schema / "url"         -> url.asJsonLD,
           schema / "description" -> maybeDescription.asJsonLD,
           schema / "keywords"    -> keywords.asJsonLD,
           schema / "image"       -> images.asJsonLD,
@@ -378,13 +376,12 @@ object Dataset {
     private[Dataset] implicit lazy val decoder: JsonLDDecoder[AdditionalInfo] = JsonLDDecoder.entity(entityTypes) {
       cursor =>
         for {
-          url              <- cursor.downField(schema / "url").as[Url]
           maybeDescription <- cursor.downField(schema / "description").as[Option[Description]]
           keywords         <- cursor.downField(schema / "keywords").as[List[Keyword]].map(_.sorted)
           images           <- cursor.downField(schema / "image").as[List[Image]].map(_.sortBy(_.position))
           maybeLicense     <- cursor.downField(schema / "license").as[Option[License]]
           maybeVersion     <- cursor.downField(schema / "version").as[Option[Version]]
-        } yield AdditionalInfo(url, maybeDescription, keywords, images, maybeLicense, maybeVersion)
+        } yield AdditionalInfo(maybeDescription, keywords, images, maybeLicense, maybeVersion)
     }
   }
 

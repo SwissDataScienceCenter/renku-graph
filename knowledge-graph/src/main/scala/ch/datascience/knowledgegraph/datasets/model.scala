@@ -26,10 +26,10 @@ import ch.datascience.graph.model.users.{Affiliation, Email, Name => UserName}
 object model {
 
   sealed trait Dataset extends Product with Serializable {
+    val resourceId:       ResourceId
     val id:               Identifier
     val title:            Title
     val name:             Name
-    val url:              Url
     val maybeDescription: Option[Description]
     val creators:         Set[DatasetCreator]
     val date:             Date
@@ -42,10 +42,10 @@ object model {
 
   }
 
-  final case class NonModifiedDataset(id:               Identifier,
+  final case class NonModifiedDataset(resourceId:       ResourceId,
+                                      id:               Identifier,
                                       title:            Title,
                                       name:             Name,
-                                      url:              Url,
                                       sameAs:           SameAs,
                                       versions:         DatasetVersions,
                                       maybeDescription: Option[Description],
@@ -58,10 +58,10 @@ object model {
                                       images:           List[ImageUri]
   ) extends Dataset
 
-  final case class ModifiedDataset(id:               Identifier,
+  final case class ModifiedDataset(resourceId:       ResourceId,
+                                   id:               Identifier,
                                    title:            Title,
                                    name:             Name,
-                                   url:              Url,
                                    derivedFrom:      DerivedFrom,
                                    versions:         DatasetVersions,
                                    maybeDescription: Option[Description],

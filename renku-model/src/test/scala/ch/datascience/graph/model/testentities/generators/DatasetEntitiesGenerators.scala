@@ -22,7 +22,7 @@ package generators
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{nonEmptyStrings, sentences, timestamps}
-import ch.datascience.graph.model.GraphModelGenerators.{datasetCreatedDates, datasetDerivedFroms, datasetDescriptions, datasetExternalSameAs, datasetIdentifiers, datasetImageUris, datasetInitialVersions, datasetInternalSameAs, datasetKeywords, datasetLicenses, datasetNames, datasetPartExternals, datasetPartSources, datasetPublishedDates, datasetTitles, datasetUrls, datasetVersions, projectCreatedDates}
+import ch.datascience.graph.model.GraphModelGenerators.{datasetCreatedDates, datasetDerivedFroms, datasetDescriptions, datasetExternalSameAs, datasetIdentifiers, datasetImageUris, datasetInitialVersions, datasetInternalSameAs, datasetKeywords, datasetLicenses, datasetNames, datasetPartExternals, datasetPartSources, datasetPublishedDates, datasetTitles, datasetVersions, projectCreatedDates}
 import ch.datascience.graph.model._
 import ch.datascience.graph.model.datasets.{DerivedFrom, ExternalSameAs, Identifier, InitialVersion, PartId, TopmostDerivedFrom, TopmostSameAs}
 import ch.datascience.graph.model.publicationEvents.AboutEvent
@@ -208,13 +208,12 @@ trait DatasetEntitiesGenerators {
       )
 
   val datasetAdditionalInfos: Gen[Dataset.AdditionalInfo] = for {
-    url              <- datasetUrls
     maybeDescription <- datasetDescriptions.toGeneratorOfOptions
     keywords         <- datasetKeywords.toGeneratorOfList()
     images           <- datasetImageUris.toGeneratorOfList()
     maybeLicense     <- datasetLicenses.toGeneratorOfOptions
     maybeVersion     <- datasetVersions.toGeneratorOfOptions
-  } yield Dataset.AdditionalInfo(url, maybeDescription, keywords, images, maybeLicense, maybeVersion)
+  } yield Dataset.AdditionalInfo(maybeDescription, keywords, images, maybeLicense, maybeVersion)
 
   def datasetPartEntities(minDateCreated: Instant): Gen[DatasetPart] = for {
     external    <- datasetPartExternals

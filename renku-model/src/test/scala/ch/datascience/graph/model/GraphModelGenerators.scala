@@ -130,7 +130,6 @@ object GraphModelGenerators {
   implicit val datasetTitles:          Gen[datasets.Title] = nonEmptyStrings() map datasets.Title.apply
   implicit val datasetNames:           Gen[datasets.Name]  = nonEmptyStrings() map datasets.Name.apply
   implicit val datasetDescriptions:    Gen[Description]    = paragraphs() map (_.value) map Description.apply
-  implicit val datasetUrls:            Gen[Url]            = validatedUrls map (_.value) map Url.apply
   implicit val datasetImageUris:       Gen[ImageUri]       = Gen.oneOf(relativePaths(), httpUrls()) map ImageUri.apply
   implicit val datasetExternalSameAs: Gen[ExternalSameAs] =
     validatedUrls map SameAs.external map (_.fold(throw _, identity))

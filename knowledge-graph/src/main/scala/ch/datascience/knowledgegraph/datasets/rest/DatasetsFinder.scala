@@ -166,7 +166,7 @@ private class DatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer: Par
         |                   renku:topmostSameAs ?sameAs;
         |                   schema:identifier ?identifier;
         |                   schema:name ?name;
-        |                   schema:alternateName ?alternateName;
+        |                   renku:slug ?slug;
         |                   ^renku:hasDataset ?exemplarProjectId.
         |      ?exemplarProjectId schema:dateCreated ?minProjectDate;
         |                         renku:projectPath ?exemplarProjectPath.
@@ -181,7 +181,6 @@ private class DatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer: Par
         |      OPTIONAL { ?dsIdExample schema:datePublished ?maybePublishedDate }
         |      OPTIONAL { ?dsIdExample schema:dateCreated ?maybeDateCreated }
         |      OPTIONAL { ?dsIdExample prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }
-        |      OPTIONAL { ?dsIdExample schema:url ?maybeUrl }
         |      BIND (IF(BOUND(?maybePublishedDate), ?maybePublishedDate, ?maybeDateCreated) AS ?date)
         |      FILTER NOT EXISTS {
         |        ?someId prov:wasDerivedFrom/schema:url ?dsIdExample;

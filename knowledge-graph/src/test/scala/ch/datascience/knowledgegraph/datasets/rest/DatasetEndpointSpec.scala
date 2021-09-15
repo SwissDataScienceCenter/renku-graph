@@ -182,7 +182,7 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       id               <- cursor.downField("identifier").as[Identifier]
       title            <- cursor.downField("title").as[Title]
       name             <- cursor.downField("name").as[Name]
-      url              <- cursor.downField("url").as[Url]
+      resourceId       <- cursor.downField("url").as[ResourceId]
       maybeDescription <- cursor.downField("description").as[Option[Description]]
       published        <- cursor.downField("published").as[(Set[DatasetCreator], Option[DatePublished])]
       maybeDateCreated <- cursor.downField("created").as[Option[DateCreated]]
@@ -202,10 +202,10 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
           .getOrElse(DecodingFailure("No date found", Nil).asLeft)
     } yield (maybeSameAs, maybeDateCreated, maybeDerivedFrom) match {
       case (Some(sameAs), _, None) =>
-        NonModifiedDataset(id,
+        NonModifiedDataset(resourceId,
+                           id,
                            title,
                            name,
-                           url,
                            sameAs,
                            versions,
                            maybeDescription,
@@ -218,10 +218,10 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
                            images
         )
       case (None, Some(dateCreated), Some(derivedFrom)) =>
-        ModifiedDataset(id,
+        ModifiedDataset(resourceId,
+                        id,
                         title,
                         name,
-                        url,
                         derivedFrom,
                         versions,
                         maybeDescription,

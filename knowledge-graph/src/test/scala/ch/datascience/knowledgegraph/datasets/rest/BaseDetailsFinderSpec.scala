@@ -21,11 +21,13 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.datasets.ResourceId
 import ch.datascience.graph.model.testentities._
-import ch.datascience.graph.model.{datasets, testentities}
+import ch.datascience.graph.model.{RenkuBaseUrl, datasets, testentities}
 import ch.datascience.knowledgegraph.datasets.model
 import ch.datascience.tinytypes.json.TinyTypeEncoders
 import io.circe.literal._
+import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -96,12 +98,12 @@ class BaseDetailsFinderSpec
   private def nonModifiedToResultSet(project:     testentities.Project,
                                      dataset:     testentities.Dataset[testentities.Dataset.Provenance.NonModified],
                                      description: String
-  ) = {
+  )(implicit renkuBaseUrl:                        RenkuBaseUrl) = {
     val binding = json"""{
+      "datasetId":          {"value": ${ResourceId(dataset.asEntityId.show)}},
       "identifier":         {"value": ${dataset.identifier}},
       "name":               {"value": ${dataset.identification.title}},
       "slug":               {"value": ${dataset.identification.name}},
-      "url":                {"value": ${dataset.additionalInfo.url}},
       "description":        {"value": $description},
       "topmostSameAs":      {"value": ${dataset.provenance.topmostSameAs}},
       "initialVersion":     {"value": ${dataset.provenance.initialVersion}},
@@ -126,10 +128,10 @@ class BaseDetailsFinderSpec
                                   description: String
   ) = {
     val binding = json"""{
+      "datasetId":        {"value": ${ResourceId(dataset.asEntityId.show)}},
       "identifier":       {"value": ${dataset.identifier}},
       "name":             {"value": ${dataset.identification.title}},
       "slug":             {"value": ${dataset.identification.name}},
-      "url":              {"value": ${dataset.additionalInfo.url}},
       "description":      {"value": $description},
       "topmostSameAs":    {"value": ${dataset.provenance.topmostSameAs} },
       "maybeDerivedFrom": {"value": ${dataset.provenance.derivedFrom}},

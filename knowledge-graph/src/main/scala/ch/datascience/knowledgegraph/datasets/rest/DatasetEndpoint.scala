@@ -86,7 +86,7 @@ class DatasetEndpoint[Interpretation[_]: Effect](
         ("identifier" -> dataset.id.asJson).some,
         ("name" -> dataset.name.asJson).some,
         ("title" -> dataset.title.asJson).some,
-        ("url" -> dataset.url.asJson).some,
+        ("url" -> dataset.resourceId.asJson).some,
         dataset match {
           case ds: NonModifiedDataset => ("sameAs" -> ds.sameAs.asJson).some
           case ds: ModifiedDataset    => ("derivedFrom" -> ds.derivedFrom.asJson).some

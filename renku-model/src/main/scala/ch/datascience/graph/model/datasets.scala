@@ -84,9 +84,6 @@ object datasets {
   final class Keyword private (val value: String) extends AnyVal with StringTinyType
   implicit object Keyword extends TinyTypeFactory[Keyword](new Keyword(_)) with NonBlank with TinyTypeJsonLDOps[Keyword]
 
-  final class Url private (val value: String) extends AnyVal with StringTinyType
-  implicit object Url extends TinyTypeFactory[Url](new Url(_)) with constraints.Url with TinyTypeJsonLDOps[Url]
-
   class ImageResourceId private (val value: String) extends AnyVal with StringTinyType
   implicit object ImageResourceId
       extends TinyTypeFactory[ImageResourceId](new ImageResourceId(_))

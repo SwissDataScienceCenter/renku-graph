@@ -213,7 +213,6 @@ object Dataset {
   }
 
   final case class AdditionalInfo(
-      url:              Url,
       maybeDescription: Option[Description],
       keywords:         List[Keyword],
       images:           List[ImageUri],
@@ -334,7 +333,6 @@ object Dataset {
       identification,
       dataset.provenance.to(convert(identification)),
       entities.Dataset.AdditionalInfo(
-        dataset.additionalInfo.url,
         dataset.additionalInfo.maybeDescription,
         dataset.additionalInfo.keywords.sorted,
         dataset.additionalInfo.images.zipWithIndex.map { case (url, idx) =>

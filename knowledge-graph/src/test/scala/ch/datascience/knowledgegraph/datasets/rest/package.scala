@@ -18,14 +18,16 @@
 
 package ch.datascience.knowledgegraph.datasets
 
+import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.sortBys
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.datasets._
-import ch.datascience.graph.model.{RenkuBaseUrl, testentities}
 import ch.datascience.graph.model.testentities.{Dataset, HavingInvalidationTime, Person, Project}
+import ch.datascience.graph.model.{RenkuBaseUrl, testentities}
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import eu.timepit.refined.auto._
+import io.renku.jsonld.syntax._
 import org.scalacheck.Gen
 
 package object rest {
@@ -41,10 +43,10 @@ package object rest {
   def internalToNonModified(dataset: Dataset[Dataset.Provenance.Internal], project: Project)(implicit
       renkuBaseUrl:                  RenkuBaseUrl
   ): NonModifiedDataset = NonModifiedDataset(
+    ResourceId(dataset.asEntityId.show),
     dataset.identification.identifier,
     dataset.identification.title,
     dataset.identification.name,
-    dataset.additionalInfo.url,
     SameAs(dataset.entityId),
     DatasetVersions(dataset.provenance.initialVersion),
     dataset.additionalInfo.maybeDescription,
@@ -60,10 +62,10 @@ package object rest {
   def importedExternalToNonModified(dataset: Dataset[Dataset.Provenance.ImportedExternal], project: Project)(implicit
       renkuBaseUrl:                          RenkuBaseUrl
   ): NonModifiedDataset = NonModifiedDataset(
+    ResourceId(dataset.asEntityId.show),
     dataset.identification.identifier,
     dataset.identification.title,
     dataset.identification.name,
-    dataset.additionalInfo.url,
     dataset.provenance.sameAs,
     DatasetVersions(dataset.provenance.initialVersion),
     dataset.additionalInfo.maybeDescription,
@@ -79,10 +81,10 @@ package object rest {
   def importedInternalToNonModified(dataset: Dataset[Dataset.Provenance.ImportedInternal], project: Project)(implicit
       renkuBaseUrl:                          RenkuBaseUrl
   ): NonModifiedDataset = NonModifiedDataset(
+    ResourceId(dataset.asEntityId.show),
     dataset.identification.identifier,
     dataset.identification.title,
     dataset.identification.name,
-    dataset.additionalInfo.url,
     dataset.provenance.sameAs,
     DatasetVersions(dataset.provenance.initialVersion),
     dataset.additionalInfo.maybeDescription,
@@ -98,10 +100,10 @@ package object rest {
   def modifiedToModified(dataset: Dataset[Dataset.Provenance.Modified], project: Project)(implicit
       renkuBaseUrl:               RenkuBaseUrl
   ): ModifiedDataset = ModifiedDataset(
+    ResourceId(dataset.asEntityId.show),
     dataset.identifier,
     dataset.identification.title,
     dataset.identification.name,
-    dataset.additionalInfo.url,
     dataset.provenance.derivedFrom,
     DatasetVersions(dataset.provenance.initialVersion),
     dataset.additionalInfo.maybeDescription,

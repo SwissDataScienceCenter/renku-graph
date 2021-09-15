@@ -48,7 +48,7 @@ private class BaseDetailsFinder[Interpretation[_]: ConcurrentEffect: Timer](
   private def queryForDatasetDetails(identifier: Identifier) = SparqlQuery.of(
     name = "ds by id - details",
     Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema"),
-    s"""|SELECT DISTINCT ?identifier ?name ?maybeDateCreated ?slug ?url ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?maybeDatePublished ?projectPath ?projectName
+    s"""|SELECT DISTINCT ?datasetId ?identifier ?name ?maybeDateCreated ?slug ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?maybeDatePublished ?projectPath ?projectName
         |WHERE {        
         |  {
         |    SELECT ?projectId ?projectPath ?projectName
@@ -76,7 +76,6 @@ private class BaseDetailsFinder[Interpretation[_]: ConcurrentEffect: Timer](
         |             schema:identifier ?identifier;
         |             a schema:Dataset;
         |             ^renku:hasDataset  ?projectId;   
-        |             schema:url ?url;
         |             schema:name ?name;
         |             renku:slug ?slug;
         |             renku:topmostSameAs ?topmostSameAs;
@@ -137,10 +136,10 @@ private object BaseDetailsFinder {
   import ch.datascience.knowledgegraph.datasets.model._
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-  private lazy val createDataset: (Identifier,
+  private lazy val createDataset: (ResourceId,
+                                   Identifier,
                                    Title,
                                    Name,
-                                   Url,
                                    Option[DerivedFrom],
                                    SameAs,
                                    InitialVersion,
@@ -148,12 +147,12 @@ private object BaseDetailsFinder {
                                    Option[Description],
                                    DatasetProject
   ) => Result[Dataset] = {
-    case (id, title, name, url, Some(derived), _, initialVersion, dates: DateCreated, maybeDesc, project) =>
+    case (resourceId, id, title, name, Some(derived), _, initialVersion, dates: DateCreated, maybeDesc, project) =>
       ModifiedDataset(
+        resourceId,
         id,
         title,
         name,
-        url,
         derived,
         DatasetVersions(initialVersion),
         maybeDesc,
@@ -165,12 +164,12 @@ private object BaseDetailsFinder {
         keywords = List.empty,
         images = List.empty
       ).asRight[DecodingFailure]
-    case (identifier, title, name, url, None, sameAs, initialVersion, date, maybeDescription, project) =>
+    case (resourceId, identifier, title, name, None, sameAs, initialVersion, date, maybeDescription, project) =>
       NonModifiedDataset(
+        resourceId,
         identifier,
         title,
         name,
-        url,
         sameAs,
         DatasetVersions(initialVersion),
         maybeDescription,
@@ -192,10 +191,10 @@ private object BaseDetailsFinder {
   private[rest] implicit lazy val datasetsDecoder: Decoder[List[Dataset]] = {
     val dataset: Decoder[Dataset] = { implicit cursor =>
       for {
+        resourceId       <- extract[ResourceId]("datasetId")
         identifier       <- extract[Identifier]("identifier")
         title            <- extract[Title]("name")
         name             <- extract[Name]("slug")
-        url              <- extract[Url]("url")
         maybeDerivedFrom <- extract[Option[DerivedFrom]]("maybeDerivedFrom")
         sameAs           <- extract[SameAs]("topmostSameAs")
         initialVersion   <- extract[InitialVersion]("initialVersion")
@@ -214,10 +213,10 @@ private object BaseDetailsFinder {
                               .flatMap(toOption[Description])
         projectPath <- extract[projects.Path]("projectPath")
         projectName <- extract[projects.Name]("projectName")
-        dataset <- createDataset(identifier,
+        dataset <- createDataset(resourceId,
+                                 identifier,
                                  title,
                                  name,
-                                 url,
                                  maybeDerivedFrom,
                                  sameAs,
                                  initialVersion,
