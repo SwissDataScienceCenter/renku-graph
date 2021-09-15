@@ -48,7 +48,7 @@ private class BaseDetailsFinder[Interpretation[_]: ConcurrentEffect: Timer](
   private def queryForDatasetDetails(identifier: Identifier) = SparqlQuery.of(
     name = "ds by id - details",
     Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema"),
-    s"""|SELECT DISTINCT ?identifier ?name ?maybeDateCreated ?alternateName ?url ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?maybeDatePublished ?projectPath ?projectName
+    s"""|SELECT DISTINCT ?identifier ?name ?maybeDateCreated ?slug ?url ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?maybeDatePublished ?projectPath ?projectName
         |WHERE {        
         |  {
         |    SELECT ?projectId ?projectPath ?projectName
@@ -78,7 +78,7 @@ private class BaseDetailsFinder[Interpretation[_]: ConcurrentEffect: Timer](
         |             ^renku:hasDataset  ?projectId;   
         |             schema:url ?url;
         |             schema:name ?name;
-        |             schema:alternateName ?alternateName;
+        |             renku:slug ?slug;
         |             renku:topmostSameAs ?topmostSameAs;
         |             renku:topmostDerivedFrom/schema:identifier ?initialVersion .
         |  OPTIONAL { ?datasetId prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }.
@@ -194,7 +194,7 @@ private object BaseDetailsFinder {
       for {
         identifier       <- extract[Identifier]("identifier")
         title            <- extract[Title]("name")
-        name             <- extract[Name]("alternateName")
+        name             <- extract[Name]("slug")
         url              <- extract[Url]("url")
         maybeDerivedFrom <- extract[Option[DerivedFrom]]("maybeDerivedFrom")
         sameAs           <- extract[SameAs]("topmostSameAs")

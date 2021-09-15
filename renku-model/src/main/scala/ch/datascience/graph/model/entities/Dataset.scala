@@ -110,9 +110,9 @@ object Dataset {
     private[Dataset] implicit lazy val encoder: Identification => Map[Property, JsonLD] = {
       case Identification(_, identifier, title, name) =>
         Map(
-          schema / "identifier"    -> identifier.asJsonLD,
-          schema / "name"          -> title.asJsonLD,
-          schema / "alternateName" -> name.asJsonLD
+          schema / "identifier" -> identifier.asJsonLD,
+          schema / "name"       -> title.asJsonLD,
+          renku / "slug"        -> name.asJsonLD
         )
     }
 
@@ -122,7 +122,7 @@ object Dataset {
           resourceId <- cursor.downEntityId.as[ResourceId]
           identifier <- cursor.downField(schema / "identifier").as[Identifier]
           title      <- cursor.downField(schema / "name").as[Title]
-          name       <- cursor.downField(schema / "alternateName").as[Name]
+          name       <- cursor.downField(renku / "slug").as[Name]
         } yield Identification(resourceId, identifier, title, name)
     }
   }

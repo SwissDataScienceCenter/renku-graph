@@ -100,7 +100,7 @@ class BaseDetailsFinderSpec
     val binding = json"""{
       "identifier":         {"value": ${dataset.identifier}},
       "name":               {"value": ${dataset.identification.title}},
-      "alternateName":      {"value": ${dataset.identification.name}},
+      "slug":               {"value": ${dataset.identification.name}},
       "url":                {"value": ${dataset.additionalInfo.url}},
       "description":        {"value": $description},
       "topmostSameAs":      {"value": ${dataset.provenance.topmostSameAs}},
@@ -128,7 +128,7 @@ class BaseDetailsFinderSpec
     val binding = json"""{
       "identifier":       {"value": ${dataset.identifier}},
       "name":             {"value": ${dataset.identification.title}},
-      "alternateName":    {"value": ${dataset.identification.name}},
+      "slug":             {"value": ${dataset.identification.name}},
       "url":              {"value": ${dataset.additionalInfo.url}},
       "description":      {"value": $description},
       "topmostSameAs":    {"value": ${dataset.provenance.topmostSameAs} },

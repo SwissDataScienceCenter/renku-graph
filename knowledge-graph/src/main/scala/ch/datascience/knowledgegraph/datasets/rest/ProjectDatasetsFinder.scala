@@ -66,14 +66,14 @@ private class ProjectDatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Tim
   private def query(path: Path) = SparqlQuery.of(
     name = "ds projects",
     Prefixes.of(renku -> "renku", schema -> "schema", prov -> "prov"),
-    s"""|SELECT ?identifier ?name ?alternateName ?topmostSameAs ?maybeDerivedFrom ?initialVersion (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
+    s"""|SELECT ?identifier ?name ?slug ?topmostSameAs ?maybeDerivedFrom ?initialVersion (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
         |WHERE {
         |    ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]} a schema:Project;
         |                                                          renku:hasDataset ?datasetId.
         |    ?datasetId a schema:Dataset;
         |               schema:identifier ?identifier;
         |               schema:name ?name;
-        |               schema:alternateName  ?alternateName;
+        |               renku:slug ?slug;
         |               renku:topmostSameAs ?topmostSameAs;
         |               renku:topmostDerivedFrom/schema:identifier ?initialVersion.
         |    OPTIONAL { ?datasetId prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }.
@@ -86,7 +86,7 @@ private class ProjectDatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Tim
         |      BIND(CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
         |    }
         |}
-        |GROUP BY ?identifier ?name ?alternateName ?topmostSameAs ?maybeDerivedFrom ?initialVersion 
+        |GROUP BY ?identifier ?name ?slug ?topmostSameAs ?maybeDerivedFrom ?initialVersion 
         |ORDER BY ?name
         |""".stripMargin
   )
@@ -122,7 +122,7 @@ private object ProjectDatasetsFinderImpl {
       for {
         id               <- cursor.downField("identifier").downField("value").as[Identifier]
         title            <- cursor.downField("name").downField("value").as[Title]
-        name             <- cursor.downField("alternateName").downField("value").as[Name]
+        name             <- cursor.downField("slug").downField("value").as[Name]
         sameAs           <- cursor.downField("topmostSameAs").downField("value").as[SameAs]
         maybeDerivedFrom <- cursor.downField("maybeDerivedFrom").downField("value").as[Option[DerivedFrom]]
         initialVersion   <- cursor.downField("initialVersion").downField("value").as[InitialVersion]

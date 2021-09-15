@@ -55,7 +55,7 @@ object RDFStore extends RdfStoreData {
         val definition = new EntityDefinition("uri", "name")
         definition.setPrimaryPredicate(NodeFactory.createURI((schema / "name").show))
         definition.set("description", NodeFactory.createURI((schema / "description").show))
-        definition.set("alternateName", NodeFactory.createURI((schema / "alternateName").show))
+        definition.set("slug", NodeFactory.createURI((renku / "slug").show))
         definition.set("keywords", NodeFactory.createURI((schema / "keywords").show))
         definition
       }

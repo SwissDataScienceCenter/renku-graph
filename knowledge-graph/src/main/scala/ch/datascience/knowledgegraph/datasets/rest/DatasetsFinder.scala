@@ -120,10 +120,10 @@ private class DatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer: Par
 
   private def sparqlQuery(phrase: Phrase, sort: Sort.By, maybeUser: Option[AuthUser]): SparqlQuery = SparqlQuery.of(
     name = "ds free-text search",
-    Prefixes.of(prov -> "prov", rdfs -> "rdfs", renku -> "renku", schema -> "schema", text -> "text"),
-    s"""|SELECT ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?exemplarProjectPath ?projectsCount (GROUP_CONCAT(?keyword; separator='|') AS ?keywords) ?images
+    Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema", text -> "text"),
+    s"""|SELECT ?identifier ?name ?slug ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?exemplarProjectPath ?projectsCount (GROUP_CONCAT(?keyword; separator='|') AS ?keywords) ?images
         |WHERE {        
-        |  SELECT ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?exemplarProjectPath ?projectsCount ?keyword (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
+        |  SELECT ?identifier ?name ?slug ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?exemplarProjectPath ?projectsCount ?keyword (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
         |  WHERE {
         |    {
         |      SELECT ?sameAs (COUNT(DISTINCT ?projectId) AS ?projectsCount) (MIN(?projectDate) AS ?minProjectDate)
@@ -133,7 +133,7 @@ private class DatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer: Par
         |          WHERE {
         |            {
         |              SELECT DISTINCT ?id
-        |              WHERE { ?id text:query (schema:name schema:description schema:alternateName schema:keywords '$phrase') }
+        |              WHERE { ?id text:query (schema:name schema:description renku:slug schema:keywords '$phrase') }
         |            } {
         |              ?id a schema:Dataset;
         |              	   renku:topmostSameAs ?sameAs.
@@ -189,9 +189,9 @@ private class DatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer: Par
         |      }
         |    }
         |  }
-        |  GROUP BY ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?exemplarProjectPath ?projectsCount ?keyword
+        |  GROUP BY ?identifier ?name ?slug ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?exemplarProjectPath ?projectsCount ?keyword
         |}
-        |GROUP BY ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?exemplarProjectPath ?projectsCount ?images
+        |GROUP BY ?identifier ?name ?slug ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?exemplarProjectPath ?projectsCount ?images
         |${`ORDER BY`(sort)}
         |""".stripMargin
   )
@@ -244,7 +244,7 @@ private object DatasetsFinderImpl {
     for {
       id                  <- cursor.downField("identifier").downField("value").as[Identifier]
       title               <- cursor.downField("name").downField("value").as[Title]
-      name                <- cursor.downField("alternateName").downField("value").as[Name]
+      name                <- cursor.downField("slug").downField("value").as[Name]
       maybeDateCreated    <- cursor.downField("maybeDateCreated").downField("value").as[Option[DateCreated]]
       maybePublishedDate  <- cursor.downField("maybePublishedDate").downField("value").as[Option[DatePublished]]
       projectsCount       <- cursor.downField("projectsCount").downField("value").as[ProjectsCount]
