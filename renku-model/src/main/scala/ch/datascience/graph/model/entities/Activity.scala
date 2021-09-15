@@ -21,7 +21,7 @@ package ch.datascience.graph.model.entities
 import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
 import ch.datascience.graph.model.activities.{EndTime, Order, ResourceId, StartTime}
-import ch.datascience.graph.model.entities.ParameterValue.{InputParameterValue, OutputParameterValue}
+import ch.datascience.graph.model.entities.ParameterValue.{CommandInputValue, CommandOutputValue}
 import io.circe.DecodingFailure
 
 final case class Activity(resourceId:  ResourceId,
@@ -80,22 +80,22 @@ object Activity {
   private[Activity] def validateUsages(usages:     List[Usage],
                                        parameters: List[ParameterValue]
   ): ValidatedNel[String, Unit] = parameters.foldLeft(Validated.validNel[String, Unit](())) {
-    case (result, param: InputParameterValue) =>
+    case (result, param: CommandInputValue) =>
       result |+| usages
-        .find(_.entity.location == param.location)
+        .find(_.entity.location == param.value)
         .void
-        .toValidNel(s"No Usage found for InputParameterValue with ${param.location}")
+        .toValidNel(s"No Usage found for CommandInputValue with ${param.value}")
     case (result, _) => result
   }
 
   private[Activity] def validateGenerations(generations: List[Generation],
                                             parameters:  List[ParameterValue]
   ): ValidatedNel[String, Unit] = parameters.foldLeft(Validated.validNel[String, Unit](())) {
-    case (result, param: OutputParameterValue) =>
+    case (result, param: CommandOutputValue) =>
       result |+| generations
-        .find(_.entity.location == param.location)
+        .find(_.entity.location == param.value)
         .void
-        .toValidNel(s"No Generation found for OutputParameterValue with ${param.location}")
+        .toValidNel(s"No Generation found for CommandOutputValue with ${param.value}")
     case (result, _) => result
   }
 

@@ -29,8 +29,8 @@ import ch.datascience.graph.model.testentities.CommandParameterBase.CommandInput
 import ch.datascience.graph.model.testentities.CommandParameterBase.CommandOutput.{LocationCommandOutput, MappedCommandOutput}
 import ch.datascience.graph.model.testentities.CommandParameterBase._
 import ch.datascience.graph.model.testentities.Entity.InputEntity
-import ch.datascience.graph.model.testentities.ParameterValue.PathParameterValue.{InputParameterValue, OutputParameterValue}
-import ch.datascience.graph.model.testentities.ParameterValue.VariableParameterValue
+import ch.datascience.graph.model.testentities.ParameterValue.LocationParameterValue.{CommandInputValue, CommandOutputValue}
+import ch.datascience.graph.model.testentities.ParameterValue.CommandParameterValue
 import ch.datascience.graph.model.testentities.Plan.CommandParameters
 import io.renku.jsonld.syntax.JsonEncoderOps
 
@@ -223,9 +223,9 @@ object NodeDef {
   }
 
   private implicit lazy val parameterValueShow: Show[ParameterValue] = Show.show {
-    case value: VariableParameterValue => (value.valueReference -> value.value).show
-    case value: InputParameterValue    => (value.valueReference -> value.location).show
-    case value: OutputParameterValue   => (value.valueReference -> value.location).show
+    case value: CommandParameterValue => (value.valueReference -> value.value).show
+    case value: CommandInputValue     => (value.valueReference -> value.value).show
+    case value: CommandOutputValue    => (value.valueReference -> value.value).show
   }
 
   private implicit lazy val variableParameterValueShow: Show[(CommandParameter, parameterValues.ValueOverride)] =

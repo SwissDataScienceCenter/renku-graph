@@ -26,45 +26,47 @@ import ch.datascience.graph.model.entities.CommandParameterBase._
 import ch.datascience.graph.model.entityModel.{Location, LocationLike}
 import ch.datascience.graph.model.parameterValues._
 import io.circe.DecodingFailure
-import io.renku.jsonld.{JsonLDDecoder, JsonLDEntityDecoder}
+import io.renku.jsonld.JsonLDDecoder
 
-sealed trait ParameterValue {
+sealed trait ParameterValue extends Product with Serializable {
   type ValueReference <: CommandParameterBase
+  type Value
+
   val resourceId:     ResourceId
   val name:           Name
+  val value:          Value
   val valueReference: ValueReference
 }
 
 object ParameterValue {
 
-  sealed trait PathParameterValue extends ParameterValue with Product with Serializable {
+  sealed trait LocationParameterValue extends ParameterValue with Product with Serializable {
     override type ValueReference <: CommandInputOrOutput
-    val resourceId: ResourceId
-    val name:       Name
-    val location:   LocationLike
+    override type Value = LocationLike
   }
 
-  final case class VariableParameterValue(resourceId:     ResourceId,
-                                          name:           Name,
-                                          value:          ValueOverride,
-                                          valueReference: CommandParameter
+  final case class CommandParameterValue(resourceId:     ResourceId,
+                                         name:           Name,
+                                         value:          ValueOverride,
+                                         valueReference: CommandParameter
   ) extends ParameterValue {
     type ValueReference = CommandParameter
+    type Value          = ValueOverride
   }
 
-  final case class InputParameterValue(resourceId:     ResourceId,
-                                       name:           Name,
-                                       location:       LocationLike,
-                                       valueReference: CommandInput
-  ) extends PathParameterValue {
+  final case class CommandInputValue(resourceId:     ResourceId,
+                                     name:           Name,
+                                     value:          LocationLike,
+                                     valueReference: CommandInput
+  ) extends LocationParameterValue {
     type ValueReference = CommandInput
   }
 
-  final case class OutputParameterValue(resourceId:     ResourceId,
-                                        name:           Name,
-                                        location:       LocationLike,
-                                        valueReference: CommandOutput
-  ) extends PathParameterValue {
+  final case class CommandOutputValue(resourceId:     ResourceId,
+                                      name:           Name,
+                                      value:          LocationLike,
+                                      valueReference: CommandOutput
+  ) extends LocationParameterValue {
     type ValueReference = CommandOutput
   }
 
@@ -72,75 +74,79 @@ object ParameterValue {
   import io.renku.jsonld.syntax._
   import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 
-  private val pathParameterTypes     = EntityTypes of (renku / "ParameterValue", renku / "PathParameterValue")
-  private val variableParameterTypes = EntityTypes of (renku / "ParameterValue", renku / "VariableParameterValue")
+  private val parameterValueTypes = EntityTypes of (renku / "ParameterValue")
 
   implicit def encoder[PV <: ParameterValue]: JsonLDEncoder[PV] =
     JsonLDEncoder.instance {
-      case InputParameterValue(resourceId, name, location, valueReference) =>
+      case CommandInputValue(resourceId, name, value, valueReference) =>
         JsonLD.entity(
           resourceId.asEntityId,
-          pathParameterTypes,
+          parameterValueTypes,
           schema / "name"           -> name.asJsonLD,
-          prov / "atLocation"       -> location.asJsonLD,
+          schema / "value"          -> value.asJsonLD,
           schema / "valueReference" -> valueReference.resourceId.asEntityId.asJsonLD
         )
-      case OutputParameterValue(resourceId, name, location, valueReference) =>
+      case CommandOutputValue(resourceId, name, value, valueReference) =>
         JsonLD.entity(
           resourceId.asEntityId,
-          pathParameterTypes,
+          parameterValueTypes,
           schema / "name"           -> name.asJsonLD,
-          prov / "atLocation"       -> location.asJsonLD,
+          schema / "value"          -> value.asJsonLD,
           schema / "valueReference" -> valueReference.resourceId.asEntityId.asJsonLD
         )
-      case VariableParameterValue(resourceId, name, valueOverride, valueReference) =>
+      case CommandParameterValue(resourceId, name, valueOverride, valueReference) =>
         JsonLD.entity(
           resourceId.asEntityId,
-          variableParameterTypes,
+          parameterValueTypes,
           schema / "name"           -> name.asJsonLD,
           schema / "value"          -> valueOverride.asJsonLD,
           schema / "valueReference" -> valueReference.resourceId.asEntityId.asJsonLD
         )
     }
 
-  def decoder(plan: Plan): JsonLDDecoder[ParameterValue] =
-    variableParameterDecoder(plan)
-      .orElse(pathParameterDecoder(plan).widen[ParameterValue])
+  def decoder(plan: Plan): JsonLDDecoder[ParameterValue] = JsonLDDecoder.entity(parameterValueTypes) { cursor =>
+    def maybeCommandParameter(resourceId: ResourceId, name: Name, valueReferenceId: commandParameters.ResourceId) = plan
+      .findParameter(valueReferenceId)
+      .map(parameter =>
+        cursor
+          .downField(schema / "value")
+          .as[ValueOverride]
+          .map(value => CommandParameterValue(resourceId, name, value, parameter))
+      )
 
-  private def pathParameterDecoder(plan: Plan): JsonLDEntityDecoder[PathParameterValue] =
-    JsonLDDecoder.entity(pathParameterTypes) { cursor =>
-      for {
-        resourceId       <- cursor.downEntityId.as[ResourceId]
-        name             <- cursor.downField(schema / "name").as[Name]
-        location         <- cursor.downField(prov / "atLocation").as[Location.FileOrFolder]
-        valueReferenceId <- cursor.downField(schema / "valueReference").downEntityId.as[commandParameters.ResourceId]
-        parameterValue <-
-          Either.fromOption(
-            plan
-              .findInput(valueReferenceId)
-              .map(InputParameterValue(resourceId, name, location, _))
-              .orElse(
-                plan
-                  .findOutput(valueReferenceId)
-                  .map(OutputParameterValue(resourceId, name, location, _))
-              ),
-            DecodingFailure(s"PathParameterValue points to a non-existing command parameter $valueReferenceId", Nil)
-          )
-      } yield parameterValue
-    }
+    def maybeCommandInput(resourceId: ResourceId, name: Name, valueReferenceId: commandParameters.ResourceId) =
+      plan
+        .findInput(valueReferenceId)
+        .map(input =>
+          cursor
+            .downField(schema / "value")
+            .as[Location.FileOrFolder]
+            .map(value => CommandInputValue(resourceId, name, value, input))
+        )
 
-  private def variableParameterDecoder(plan: Plan): JsonLDEntityDecoder[VariableParameterValue] =
-    JsonLDDecoder.entity(variableParameterTypes) { cursor =>
-      for {
-        resourceId       <- cursor.downEntityId.as[ResourceId]
-        name             <- cursor.downField(schema / "name").as[Name]
-        valueOverride    <- cursor.downField(schema / "value").as[ValueOverride]
-        valueReferenceId <- cursor.downField(schema / "valueReference").downEntityId.as[commandParameters.ResourceId]
-        commandParameter <-
-          Either.fromOption(
-            plan.findParameter(valueReferenceId),
-            DecodingFailure(s"VariableParameterValue points to a non-existing command parameter $valueReferenceId", Nil)
-          )
-      } yield VariableParameterValue(resourceId, name, valueOverride, commandParameter)
-    }
+    def maybeCommandOutput(resourceId: ResourceId, name: Name, valueReferenceId: commandParameters.ResourceId) =
+      plan
+        .findOutput(valueReferenceId)
+        .map(output =>
+          cursor
+            .downField(schema / "value")
+            .as[Location.FileOrFolder]
+            .map(value => CommandOutputValue(resourceId, name, value, output))
+        )
+
+    for {
+      resourceId       <- cursor.downEntityId.as[ResourceId]
+      name             <- cursor.downField(schema / "name").as[Name]
+      valueReferenceId <- cursor.downField(schema / "valueReference").downEntityId.as[commandParameters.ResourceId]
+      parameterValue <-
+        List(maybeCommandParameter _, maybeCommandInput _, maybeCommandOutput _)
+          .flatMap(_.apply(resourceId, name, valueReferenceId)) match {
+          case Nil =>
+            DecodingFailure(s"ParameterValue points to a non-existing command parameter $valueReferenceId", Nil).asLeft
+          case value :: Nil => value
+          case _ =>
+            DecodingFailure(s"ParameterValue points to multiple command parameters with $valueReferenceId", Nil).asLeft
+        }
+    } yield parameterValue
+  }
 }

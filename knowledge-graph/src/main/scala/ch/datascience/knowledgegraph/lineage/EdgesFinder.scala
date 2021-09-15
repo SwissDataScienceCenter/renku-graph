@@ -82,9 +82,9 @@ private class EdgesFinderImpl(
         |          ^renku:hasPlan ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
         |          ^(prov:qualifiedAssociation/prov:hadPlan) ?activity.
         |    ?activity prov:startedAtTime ?date.
-        |    ?paramValue a renku:PathParameterValue;
+        |    ?paramValue a renku:ParameterValue;
         |                schema:valueReference ?input;
-        |                prov:atLocation ?sourceEntityLocation.
+        |                schema:value ?sourceEntityLocation.
         |  } UNION {
         |    ${projectMemberFilterQuery(ResourceId(renkuBaseUrl, path).showAs[RdfResource])(maybeUser)}
         |    ?plan a renku:Plan;
@@ -92,9 +92,9 @@ private class EdgesFinderImpl(
         |          ^renku:hasPlan ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
         |          ^(prov:qualifiedAssociation/prov:hadPlan) ?activity.
         |    ?activity prov:startedAtTime ?date.
-        |    ?paramValue a renku:PathParameterValue;
+        |    ?paramValue a renku:ParameterValue;
         |                schema:valueReference ?output;
-        |                prov:atLocation ?targetEntityLocation.
+        |                schema:value ?targetEntityLocation.
         |  }
         |}
         |ORDER BY ASC(?date)

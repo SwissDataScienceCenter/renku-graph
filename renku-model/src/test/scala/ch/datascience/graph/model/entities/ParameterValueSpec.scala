@@ -52,7 +52,7 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
             )
 
           parameterValues           shouldBe activity.parameters
-          parameterValues.foreach(_ shouldBe a[entities.ParameterValue.VariableParameterValue])
+          parameterValues.foreach(_ shouldBe a[entities.ParameterValue.CommandParameterValue])
       }
     }
 
@@ -73,7 +73,7 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
           )
 
         parameterValues           shouldBe activity.parameters
-        parameterValues.foreach(_ shouldBe a[entities.ParameterValue.InputParameterValue])
+        parameterValues.foreach(_ shouldBe a[entities.ParameterValue.CommandInputValue])
       }
     }
 
@@ -93,7 +93,7 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
           )
 
         parameterValues           shouldBe activity.parameters
-        parameterValues.foreach(_ shouldBe a[entities.ParameterValue.OutputParameterValue])
+        parameterValues.foreach(_ shouldBe a[entities.ParameterValue.CommandOutputValue])
       }
     }
 

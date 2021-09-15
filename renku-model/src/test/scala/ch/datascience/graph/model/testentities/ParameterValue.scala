@@ -23,95 +23,96 @@ import ch.datascience.graph.model.commandParameters.Name
 import ch.datascience.graph.model.entityModel.LocationLike
 import ch.datascience.graph.model.parameterValues.ValueOverride
 import ch.datascience.graph.model.testentities.CommandParameterBase._
-import ch.datascience.graph.model.testentities.ParameterValue.PathParameterValue.{InputParameterValue, OutputParameterValue}
+import ch.datascience.graph.model.testentities.ParameterValue.LocationParameterValue.{CommandInputValue, CommandOutputValue}
 import ch.datascience.graph.model.testentities.ParameterValue._
 import ch.datascience.graph.model.{RenkuBaseUrl, entities, parameterValues}
 import ch.datascience.tinytypes.constraints.UUID
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
-import io.renku.jsonld.syntax._
 import io.renku.jsonld._
+import io.renku.jsonld.syntax._
 
 sealed trait ParameterValue {
   type ValueReference <: CommandParameterBase
+  type Value
+
   val id:             Id
   val name:           Name
   val valueReference: ValueReference
+  val value:          Value
   val activity:       Activity
 }
 
 object ParameterValue {
 
-  sealed trait PathParameterValue extends ParameterValue {
+  sealed trait LocationParameterValue extends ParameterValue {
     override type ValueReference <: CommandInputOrOutput
-    val id:       Id
-    val name:     Name
-    val location: LocationLike
-    val activity: Activity
+    override type Value = LocationLike
   }
 
   implicit def toEntitiesParameterValue(implicit
       renkuBaseUrl: RenkuBaseUrl
   ): ParameterValue => entities.ParameterValue = {
-    case p: VariableParameterValue =>
-      entities.ParameterValue.VariableParameterValue(parameterValues.ResourceId(p.asEntityId.show),
-                                                     p.name,
-                                                     p.value,
-                                                     p.valueReference.to[entities.CommandParameterBase.CommandParameter]
+    case p: CommandParameterValue =>
+      entities.ParameterValue.CommandParameterValue(parameterValues.ResourceId(p.asEntityId.show),
+                                                    p.name,
+                                                    p.value,
+                                                    p.valueReference.to[entities.CommandParameterBase.CommandParameter]
       )
-    case p: OutputParameterValue =>
-      entities.ParameterValue.OutputParameterValue(parameterValues.ResourceId(p.asEntityId.show),
-                                                   p.name,
-                                                   p.location,
-                                                   p.valueReference.to[entities.CommandParameterBase.CommandOutput]
+    case p: CommandOutputValue =>
+      entities.ParameterValue.CommandOutputValue(parameterValues.ResourceId(p.asEntityId.show),
+                                                 p.name,
+                                                 p.value,
+                                                 p.valueReference.to[entities.CommandParameterBase.CommandOutput]
       )
-    case p: InputParameterValue =>
-      entities.ParameterValue.InputParameterValue(parameterValues.ResourceId(p.asEntityId.show),
-                                                  p.name,
-                                                  p.location,
-                                                  p.valueReference.to[entities.CommandParameterBase.CommandInput]
+    case p: CommandInputValue =>
+      entities.ParameterValue.CommandInputValue(parameterValues.ResourceId(p.asEntityId.show),
+                                                p.name,
+                                                p.value,
+                                                p.valueReference.to[entities.CommandParameterBase.CommandInput]
       )
   }
 
-  object PathParameterValue {
+  object LocationParameterValue {
 
-    def factory(location: LocationLike, valueReference: CommandInput): Activity => PathParameterValue =
-      InputParameterValue(Id.generate, valueReference.name, location, valueReference, _)
+    def factory(location: LocationLike, valueReference: CommandInput): Activity => LocationParameterValue =
+      CommandInputValue(Id.generate, valueReference.name, location, valueReference, _)
 
-    def factory(location: LocationLike, valueReference: CommandOutput): Activity => PathParameterValue =
-      OutputParameterValue(Id.generate, valueReference.name, location, valueReference, _)
+    def factory(location: LocationLike, valueReference: CommandOutput): Activity => LocationParameterValue =
+      CommandOutputValue(Id.generate, valueReference.name, location, valueReference, _)
 
-    final case class InputParameterValue(id:             Id,
-                                         name:           Name,
-                                         location:       LocationLike,
-                                         valueReference: CommandInput,
-                                         activity:       Activity
-    ) extends PathParameterValue {
+    final case class CommandInputValue(id:             Id,
+                                       name:           Name,
+                                       value:          LocationLike,
+                                       valueReference: CommandInput,
+                                       activity:       Activity
+    ) extends LocationParameterValue {
       type ValueReference = CommandInput
     }
 
-    final case class OutputParameterValue(id:             Id,
-                                          name:           Name,
-                                          location:       LocationLike,
-                                          valueReference: CommandOutput,
-                                          activity:       Activity
-    ) extends PathParameterValue {
+    final case class CommandOutputValue(id:             Id,
+                                        name:           Name,
+                                        value:          LocationLike,
+                                        valueReference: CommandOutput,
+                                        activity:       Activity
+    ) extends LocationParameterValue {
       type ValueReference = CommandOutput
     }
   }
 
-  final case class VariableParameterValue(id:             Id,
-                                          name:           Name,
-                                          value:          ValueOverride,
-                                          valueReference: CommandParameter,
-                                          activity:       Activity
+  final case class CommandParameterValue(id:             Id,
+                                         name:           Name,
+                                         value:          ValueOverride,
+                                         valueReference: CommandParameter,
+                                         activity:       Activity
   ) extends ParameterValue {
     type ValueReference = CommandParameter
+    override type Value = ValueOverride
   }
 
-  object VariableParameterValue {
+  object CommandParameterValue {
 
-    def factory(value: ValueOverride, valueReference: CommandParameter): Activity => VariableParameterValue =
-      VariableParameterValue(Id.generate, valueReference.name, value, valueReference, _)
+    def factory(value: ValueOverride, valueReference: CommandParameter): Activity => CommandParameterValue =
+      CommandParameterValue(Id.generate, valueReference.name, value, valueReference, _)
   }
 
   implicit def encoder[PV <: ParameterValue](implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[PV] =

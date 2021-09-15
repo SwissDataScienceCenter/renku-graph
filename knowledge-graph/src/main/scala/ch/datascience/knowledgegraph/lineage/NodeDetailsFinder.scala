@@ -163,33 +163,33 @@ private object NodeDetailsFinder {
           |     WHERE {
           |      { # inputs
           |        <$runId> renku:hasInputs ?input .
-          |        ?paramValue a renku:PathParameterValue ;
+          |        ?paramValue a renku:ParameterValue ;
           |                    schema:valueReference ?input .
-          |        ?paramValue prov:atLocation ?location .
+          |        ?paramValue schema:value ?value .
           |        OPTIONAL { ?input renku:mappedTo/renku:streamType ?maybeStreamType. }
           |        ?input renku:position ?position.
           |        OPTIONAL { ?input renku:prefix ?maybePrefix }
           |        BIND (IF(bound(?maybeStreamType), ?maybeStreamType, '') AS ?streamType).
           |        BIND (IF(?streamType = 'stdin', '< ', '') AS ?streamOperator).
           |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix).
-          |        BIND (CONCAT(?prefix, ?streamOperator, STR(?location)) AS ?commandParameter) .
+          |        BIND (CONCAT(?prefix, ?streamOperator, STR(?value)) AS ?commandParameter) .
           |      } UNION { # outputs
           |        <$runId> renku:hasOutputs ?output .
-          |        ?paramValue a renku:PathParameterValue ;
+          |        ?paramValue a renku:ParameterValue ;
           |                    schema:valueReference ?output .
-          |        ?paramValue prov:atLocation ?location .
+          |        ?paramValue schema:value ?value .
           |        ?output renku:position ?position.
           |        OPTIONAL { ?output renku:mappedTo/renku:streamType ?maybeStreamType. }
           |        OPTIONAL { ?output renku:prefix ?maybePrefix }
           |        BIND (IF(bound(?maybeStreamType), ?maybeStreamType, '') AS ?streamType).
           |        BIND (IF(?streamType = 'stdout', '> ', IF(?streamType = 'stderr', '2> ', '')) AS ?streamOperator).
           |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .
-          |        BIND (CONCAT(?prefix, ?streamOperator, STR(?location)) AS ?commandParameter) .
+          |        BIND (CONCAT(?prefix, ?streamOperator, STR(?value)) AS ?commandParameter) .
           |      } UNION { # parameters
           |        <$runId> renku:hasArguments ?parameter .
-          |        ?paramValue a renku:VariableParameterValue;
+          |        ?paramValue a renku:ParameterValue;
           |                    schema:valueReference ?parameter .
-          |        ?paramValue schema:Value ?value .
+          |        ?paramValue schema:value ?value .
           |        ?parameter renku:position ?position .
           |        OPTIONAL { ?parameter renku:prefix ?maybePrefix }
           |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .

@@ -31,7 +31,7 @@ import ch.datascience.graph.model.testentities.CommandParameterBase.CommandOutpu
 import ch.datascience.graph.model.testentities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
 import ch.datascience.graph.model.testentities.Entity.{InputEntity, OutputEntity}
 import ch.datascience.graph.model.testentities.ExecutionPlanner.ActivityData
-import ch.datascience.graph.model.testentities.ParameterValue.{PathParameterValue, VariableParameterValue}
+import ch.datascience.graph.model.testentities.ParameterValue.{CommandParameterValue, LocationParameterValue}
 
 final case class ExecutionPlanner(plan:                     Plan,
                                   activityData:             ActivityData,
@@ -158,7 +158,7 @@ final case class ExecutionPlanner(plan:                     Plan,
       .foldMapK {
         case (defaultValue, valueOverride) =>
           Option.when(defaultValue == planParameter.defaultValue)(
-            VariableParameterValue.factory(valueOverride, planParameter)
+            CommandParameterValue.factory(valueOverride, planParameter)
           )
         case _ => Option.empty[Activity => ParameterValue]
       }
@@ -170,7 +170,7 @@ final case class ExecutionPlanner(plan:                     Plan,
       .foldMapK {
         case (defaultValue, entity) =>
           Option.when(defaultValue == planInput.defaultValue)(
-            PathParameterValue.factory(entity.location, planInput)
+            LocationParameterValue.factory(entity.location, planInput)
           )
         case _ => Option.empty[Activity => ParameterValue]
       }
@@ -184,7 +184,7 @@ final case class ExecutionPlanner(plan:                     Plan,
       .getOrElse(planOutput.defaultValue.value)
 
     Validated.validNel[String, Activity => ParameterValue] {
-      PathParameterValue.factory(location, planOutput)
+      LocationParameterValue.factory(location, planOutput)
     }
   }
 
