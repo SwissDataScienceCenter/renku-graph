@@ -170,25 +170,6 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         }
       }
 
-    "return a DecodingFailure when given projectInfo is for a different project" in {
-      val projectInfo       = gitLabProjectInfos.map(_.copy(maybeParentPath = None)).generateOne
-      val projectResourceId = projectResourceIds.generateOne
-      val jsonLD = cliLikeJsonLD(
-        projectResourceId,
-        cliVersions.generateOne,
-        projectSchemaVersions.generateOne,
-        activities = Nil,
-        datasets = Nil,
-        persons = Set(personEntities.generateOne.to[entities.Person])
-      )
-
-      val Left(error) = jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo)))
-
-      error shouldBe a[DecodingFailure]
-      error.getMessage() shouldBe s"Project '${projectResourceId.toUnsafe[projects.Path]}' " +
-        s"found in JsonLD does not match '${projectInfo.path}'"
-    }
-
     "return a DecodingFailure when there's a Person entity that cannot be decoded" in {
       val projectInfo = gitLabProjectInfos.map(_.copy(maybeParentPath = None)).generateOne
       val resourceId  = projects.ResourceId(renkuBaseUrl, projectInfo.path)

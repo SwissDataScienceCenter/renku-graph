@@ -20,36 +20,23 @@ package ch.datascience.graph.model.entities
 
 import cats.syntax.all._
 import ch.datascience.graph.model.Schemas.schema
+import ch.datascience.graph.model._
 import ch.datascience.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember, entityTypes}
 import ch.datascience.graph.model.projects.ResourceId
-import ch.datascience.graph.model._
 import io.circe.DecodingFailure
 import io.renku.jsonld.{Cursor, JsonLDDecoder}
-
-import scala.util.Try
 
 object ProjectJsonLDDecoder {
 
   def apply(gitLabInfo: GitLabProjectInfo)(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDDecoder[Project] =
     JsonLDDecoder.entity(entityTypes) { implicit cursor =>
-      def checkProjectsMatching(resourceId: ResourceId) = resourceId
-        .as[Try, projects.Path]
-        .toEither
-        .leftMap(_ => DecodingFailure(s"Cannot extract project path from $resourceId", Nil))
-        .flatMap {
-          case path if path == gitLabInfo.path => ().asRight
-          case path =>
-            DecodingFailure(s"Project '$path' found in JsonLD does not match '${gitLabInfo.path}'", Nil).asLeft
-        }
-
       for {
-        resourceId       <- cursor.downEntityId.as[ResourceId]
         agent            <- cursor.downField(schema / "agent").as[CliVersion]
         schemaVersion    <- cursor.downField(schema / "schemaVersion").as[SchemaVersion]
         allJsonLdPersons <- findAllPersons(gitLabInfo)
         activities       <- findAllActivities(gitLabInfo)
         datasets         <- findAllDatasets(gitLabInfo)
-        _                <- checkProjectsMatching(resourceId)
+        resourceId       <- ResourceId(renkuBaseUrl, gitLabInfo.path).asRight
         project          <- newProject(gitLabInfo, resourceId, agent, schemaVersion, allJsonLdPersons, activities, datasets)
       } yield project
     }

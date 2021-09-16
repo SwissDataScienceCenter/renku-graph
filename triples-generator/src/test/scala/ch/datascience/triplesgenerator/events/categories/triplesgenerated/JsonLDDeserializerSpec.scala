@@ -33,9 +33,8 @@ import ch.datascience.graph.model.testentities.generators.EntitiesGenerators.Act
 import ch.datascience.http.client.AccessToken
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
-import io.circe.DecodingFailure
-import io.renku.jsonld.{EntityId, JsonLD, Property}
 import io.renku.jsonld.syntax._
+import io.renku.jsonld.{EntityId, JsonLD, Property}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -164,33 +163,7 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
         .value
 
       error            shouldBe a[IllegalStateException]
-      error.getMessage shouldBe s"Finding Project entity in the JsonLD for ${eventProject.show} failed"
-      error.getCause   shouldBe a[DecodingFailure]
-    }
-
-    "fail if there the JsonLD payload is for a different project" in new TestCase {
-      val project = anyProjectEntities.generateOne
-
-      givenFindProjectInfo(project.path)
-        .returning(EitherT.rightT[Try, ProcessingRecoverableError](gitLabProjectInfo(project).some))
-
-      val eventProject = consumers.Project(projectIds.generateOne, project.path)
-      val otherProject = anyProjectEntities.generateOne
-
-      val Failure(error) = deserializer
-        .deserializeToModel(
-          triplesGeneratedEvents.generateOne.copy(
-            project = eventProject,
-            triples = JsonLD
-              .arr(otherProject.asJsonLD)
-              .flatten
-              .fold(throw _, identity)
-          )
-        )
-        .value
-
-      error            shouldBe a[IllegalStateException]
-      error.getMessage shouldBe s"Finding Project entity in the JsonLD for ${eventProject.show} failed"
+      error.getMessage shouldBe show"2 Project entities found in the JsonLD for $eventProject"
     }
 
     "fail if the payload is invalid" in new TestCase {
