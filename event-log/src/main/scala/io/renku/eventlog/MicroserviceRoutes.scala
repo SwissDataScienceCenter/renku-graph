@@ -55,13 +55,25 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
 
   // format: off
   lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
+    case GET  -> Root / "events"   :? `project-id`(maybeProjectId)                     => withProjectIdQueryParameter(maybeProjectId)(thenCall = getEvents)
     case request @ POST  -> Root / "events"                                            => processEvent(request)
     case           GET   -> Root / "events"/ EventId(eventId) / ProjectId(projectId)   => getDetails(CompoundEventId(eventId, projectId))
-    case           GET   -> Root / "processing-status" :? `project-id`(maybeProjectId) => maybeFindProcessingStatus(maybeProjectId)
+    case           GET   -> Root / "processing-status" :? `project-id`(maybeProjectId) => withProjectIdQueryParameter(maybeProjectId)(thenCall = findProcessingStatus)
     case           GET   -> Root / "ping"                                              => Ok("pong")
     case request @ POST  -> Root / "subscriptions"                                     => addSubscription(request)
   }.withMetrics
   
+  private def withProjectIdQueryParameter(
+      maybeProjectId: Option[ValidatedNel[ParseFailure, projects.Id]]
+  )(thenCall:         projects.Id => F[Response[F]]): F[Response[F]] = maybeProjectId match {
+    case None =>
+      NotFound(ErrorMessage(s"No '${`project-id`}' parameter"))
+    case Some(validatedProjectId) =>
+      validatedProjectId.fold(
+        errors => BadRequest(ErrorMessage(errors.map(_.getMessage()).toList.mkString("; "))),
+        thenCall
+      )
+  }
 
   // format: on
   private object LatestPerProjectParameter {
@@ -93,17 +105,5 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
       val parameterName:     String = "project-id"
       override val toString: String = parameterName
     }
-  }
-
-  private def maybeFindProcessingStatus(
-      maybeProjectId: Option[ValidatedNel[ParseFailure, projects.Id]]
-  ): F[Response[F]] = maybeProjectId match {
-    case None =>
-      NotFound(ErrorMessage(s"No '${`project-id`}' parameter"))
-    case Some(validatedProjectId) =>
-      validatedProjectId.fold(
-        errors => BadRequest(ErrorMessage(errors.map(_.getMessage()).toList.mkString("; "))),
-        findProcessingStatus
-      )
   }
 }

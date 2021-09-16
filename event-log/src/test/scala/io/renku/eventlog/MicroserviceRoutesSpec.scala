@@ -51,7 +51,19 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
 
   "routes" should {
 
-    "define a GET /events/:event-id/:project-:id endpoint" in new TestCase {
+    "define a GET /events?project-id=* endpoint" in new TestCase {
+      val projectId = projectIds.generateOne
+
+      val request = Request[IO](method = GET, uri"events".withQueryParam("project-id", projectId.value))
+
+      (eventEndpoint.getEvents _).expects(projectId).returning(Response[IO](Ok).pure[IO])
+
+      val response = routes.call(request)
+
+      response.status shouldBe Ok
+    }
+
+    "define a GET /events/:event-id/:project-id endpoint" in new TestCase {
       val eventId = compoundEventIds.generateOne
 
       val request = Request[IO](
