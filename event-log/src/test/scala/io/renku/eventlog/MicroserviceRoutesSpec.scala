@@ -21,17 +21,18 @@ package io.renku.eventlog
 import cats.effect.{Clock, IO}
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators.nonEmptyStrings
 import ch.datascience.graph.model.EventsGenerators.compoundEventIds
-import ch.datascience.graph.model.GraphModelGenerators.projectIds
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.http.ErrorMessage.ErrorMessage
 import ch.datascience.http.InfoMessage.InfoMessage
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.interpreters.TestRoutesMetrics
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
-import io.renku.eventlog.events.EventEndpoint
-import io.renku.eventlog.processingstatus.{ProcessingStatusEndpoint, ProcessingStatusFinder}
-import io.renku.eventlog.subscriptions.{EventProducersRegistry, SubscriptionsEndpoint}
+import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
+import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
+import io.renku.eventlog.subscriptions.SubscriptionsEndpoint
 import org.http4s.MediaType.application
 import org.http4s.Method.{GET, POST}
 import org.http4s.Status._
@@ -42,7 +43,6 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.language.reflectiveCalls
@@ -51,16 +51,32 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
 
   "routes" should {
 
-    "define a GET /events?project-id=* endpoint" in new TestCase {
-      val projectId = projectIds.generateOne
+    "define a GET /events?project-path=* endpoint" in new TestCase {
+      val projectPath = projectPaths.generateOne
 
-      val request = Request[IO](method = GET, uri"events".withQueryParam("project-id", projectId.value))
+      val request = Request[IO](method = GET, uri"events".withQueryParam("project-path", projectPath.value))
 
-      (eventEndpoint.getEvents _).expects(projectId).returning(Response[IO](Ok).pure[IO])
+      (eventsEndpoint.findEvents _).expects(projectPath).returning(Response[IO](Ok).pure[IO])
 
       val response = routes.call(request)
 
       response.status shouldBe Ok
+    }
+
+    s"define a GET /events?project-path=* returning $BadRequest for invalid project path" in new TestCase {
+      val request = Request[IO](method = GET, uri"events".withQueryParam("project-path", nonEmptyStrings().generateOne))
+
+      val response = routes.call(request)
+
+      response.status shouldBe BadRequest
+    }
+
+    "define a GET /events?project-path=* not finding the endpoint when no project-path parameter is present" in new TestCase {
+      val request = Request[IO](method = GET, uri"events")
+
+      val response = routes.call(request)
+
+      response.status shouldBe ServiceUnavailable
     }
 
     "define a GET /events/:event-id/:project-id endpoint" in new TestCase {
@@ -153,24 +169,18 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
 
   private trait TestCase {
     val eventEndpoint            = mock[EventEndpoint[IO]]
-    val processingStatusEndpoint = mock[TestProcessingStatusEndpoint]
-    val routesMetrics            = TestRoutesMetrics()
-    val subscriptionsEndpoint    = mock[TestSubscriptionEndpoint]
+    val eventsEndpoint           = mock[EventsEndpoint[IO]]
+    val processingStatusEndpoint = mock[ProcessingStatusEndpoint[IO]]
+    val subscriptionsEndpoint    = mock[SubscriptionsEndpoint[IO]]
     val eventDetailsEndpoint     = mock[EventDetailsEndpoint[IO]]
+    val routesMetrics            = TestRoutesMetrics()
     val routes = new MicroserviceRoutes[IO](
       eventEndpoint,
+      eventsEndpoint,
       processingStatusEndpoint,
       subscriptionsEndpoint,
       eventDetailsEndpoint,
       routesMetrics
     ).routes.map(_.or(notAvailableResponse))
   }
-
-  class TestProcessingStatusEndpoint(processingStatusFinder: ProcessingStatusFinder[IO], logger: Logger[IO])
-      extends ProcessingStatusEndpoint[IO](processingStatusFinder, logger)
-
-  class TestSubscriptionEndpoint(
-      subscriptionCategoryRegistry: EventProducersRegistry[IO],
-      logger:                       Logger[IO]
-  ) extends SubscriptionsEndpoint[IO](subscriptionCategoryRegistry, logger)
 }

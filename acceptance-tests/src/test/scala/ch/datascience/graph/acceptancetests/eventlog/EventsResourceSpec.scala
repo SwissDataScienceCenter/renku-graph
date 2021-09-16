@@ -33,7 +33,7 @@ class EventsResourceSpec
     with Eventually
     with EntitiesGenerators {
 
-  Feature("GET /events?projectPath=<path> to return info about all the project events") {
+  Feature("GET /events?project-path=<path> to return info about all the project events") {
 
     Scenario("As a user I would like to see all events from the project with the given path") {
       val commits = commitIds.generateNonEmptyList(maxElements = 6).toList
@@ -41,15 +41,15 @@ class EventsResourceSpec
       val project = dataProjects(projectEntities(anyVisibility), CommitsCount(commits.size)).generateOne
 
       When("there are no events for the given project in EL")
-      Then("the resource should return OK with an emtpy array")
-      val noEventsResponse = eventLogClient.GET(s"events?projectPath=${urlEncode(project.path.show)}")
+      Then("the resource should return OK with an empty array")
+      val noEventsResponse = eventLogClient.GET(s"events?project-path=${urlEncode(project.path.show)}")
       noEventsResponse.status                    shouldBe Ok
       noEventsResponse.bodyAsJson.as[List[Json]] shouldBe Nil.asRight
 
       commits foreach `data in the RDF store`(project, project.entitiesProject.asJsonLD, _)
 
       eventually {
-        val eventsResponse = eventLogClient.GET(s"events?projectPath=${urlEncode(project.path.show)}")
+        val eventsResponse = eventLogClient.GET(s"events?project-path=${urlEncode(project.path.show)}")
         eventsResponse.status shouldBe Ok
         val Right(events) = noEventsResponse.bodyAsJson.as[List[EventInfo]]
         events.size               shouldBe commits.size

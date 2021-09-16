@@ -25,7 +25,6 @@ import cats.effect.Effect
 import cats.syntax.all._
 import ch.datascience.events.EventRequestContent
 import ch.datascience.events.consumers.{EventConsumersRegistry, EventSchedulingResult}
-import ch.datascience.graph.model.projects
 import ch.datascience.http.InfoMessage._
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import io.circe.Json
@@ -37,8 +36,6 @@ import scala.util.control.NonFatal
 
 trait EventEndpoint[Interpretation[_]] {
   def processEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]]
-
-  def getEvents(projectId: projects.Id): Interpretation[Response[Interpretation]]
 }
 
 class EventEndpointImpl[Interpretation[_]: Effect: MonadThrow](
@@ -102,8 +99,6 @@ class EventEndpointImpl[Interpretation[_]: Effect: MonadThrow](
       }
       .getOrElse(Option.empty[String].asRight[Response[Interpretation]].pure[Interpretation])
   }
-
-  override def getEvents(projectId: projects.Id): Interpretation[Response[Interpretation]] = ???
 }
 
 object EventEndpoint {

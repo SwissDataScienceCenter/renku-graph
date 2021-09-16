@@ -28,7 +28,7 @@ import ch.datascience.http.ErrorMessage
 import ch.datascience.http.ErrorMessage._
 import ch.datascience.metrics.RoutesMetrics
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
-import io.renku.eventlog.events.EventEndpoint
+import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
 import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
 import io.renku.eventlog.subscriptions.SubscriptionsEndpoint
 import org.http4s._
@@ -38,6 +38,7 @@ import scala.util.Try
 
 private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     eventEndpoint:            EventEndpoint[F],
+    eventsEndpoint:           EventsEndpoint[F],
     processingStatusEndpoint: ProcessingStatusEndpoint[F],
     subscriptionsEndpoint:    SubscriptionsEndpoint[F],
     eventDetailsEndpoint:     EventDetailsEndpoint[F],
@@ -46,50 +47,26 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     extends Http4sDsl[F] {
 
   import ProjectIdParameter._
+  import ProjectPathParameter._
   import eventDetailsEndpoint._
   import eventEndpoint._
   import org.http4s.HttpRoutes
   import processingStatusEndpoint._
   import routesMetrics._
   import subscriptionsEndpoint._
+  import eventsEndpoint._
 
   // format: off
   lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
-    case GET  -> Root / "events"   :? `project-id`(maybeProjectId)                     => withProjectIdQueryParameter(maybeProjectId)(thenCall = getEvents)
+    case           GET   -> Root / "events":? `project-path`(validatedProjectPath)     => maybeFindEvents(validatedProjectPath)
     case request @ POST  -> Root / "events"                                            => processEvent(request)
     case           GET   -> Root / "events"/ EventId(eventId) / ProjectId(projectId)   => getDetails(CompoundEventId(eventId, projectId))
-    case           GET   -> Root / "processing-status" :? `project-id`(maybeProjectId) => withProjectIdQueryParameter(maybeProjectId)(thenCall = findProcessingStatus)
+    case           GET   -> Root / "processing-status" :? `project-id`(maybeProjectId) => maybeFindProcessingStatus(maybeProjectId)
     case           GET   -> Root / "ping"                                              => Ok("pong")
     case request @ POST  -> Root / "subscriptions"                                     => addSubscription(request)
   }.withMetrics
   
-  private def withProjectIdQueryParameter(
-      maybeProjectId: Option[ValidatedNel[ParseFailure, projects.Id]]
-  )(thenCall:         projects.Id => F[Response[F]]): F[Response[F]] = maybeProjectId match {
-    case None =>
-      NotFound(ErrorMessage(s"No '${`project-id`}' parameter"))
-    case Some(validatedProjectId) =>
-      validatedProjectId.fold(
-        errors => BadRequest(ErrorMessage(errors.map(_.getMessage()).toList.mkString("; "))),
-        thenCall
-      )
-  }
-
   // format: on
-  private object LatestPerProjectParameter {
-
-    private implicit val queryParameterDecoder: QueryParamDecoder[Boolean] =
-      (value: QueryParameterValue) =>
-        Try(value.value.toBoolean).toEither
-          .leftMap(_ => ParseFailure(s"'${`latest-per-project`}' parameter with invalid value", ""))
-          .toValidatedNel
-
-    object `latest-per-project` extends OptionalValidatingQueryParamDecoderMatcher[Boolean]("latest-per-project") {
-      val parameterName:     String = "latest-per-project"
-      override val toString: String = parameterName
-    }
-  }
-
   private object ProjectIdParameter {
 
     private implicit val queryParameterDecoder: QueryParamDecoder[projects.Id] =
@@ -105,5 +82,37 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
       val parameterName:     String = "project-id"
       override val toString: String = parameterName
     }
+  }
+
+  private object ProjectPathParameter {
+    private implicit val queryParameterDecoder: QueryParamDecoder[projects.Path] =
+      (value: QueryParameterValue) =>
+        projects.Path
+          .from(value.value)
+          .leftMap(_ => ParseFailure(s"'${`project-path`}' parameter with invalid value", ""))
+          .toValidatedNel
+
+    object `project-path` extends ValidatingQueryParamDecoderMatcher[projects.Path]("project-path") {
+      val parameterName:     String = "project-path"
+      override val toString: String = parameterName
+    }
+  }
+
+  private def maybeFindEvents(validatedProjectPath: ValidatedNel[ParseFailure, projects.Path]): F[Response[F]] =
+    validatedProjectPath.fold(
+      errors => BadRequest(ErrorMessage(errors.map(_.getMessage()).toList.mkString("; "))),
+      findEvents
+    )
+
+  private def maybeFindProcessingStatus(
+      maybeProjectId: Option[ValidatedNel[ParseFailure, projects.Id]]
+  ): F[Response[F]] = maybeProjectId match {
+    case None =>
+      NotFound(ErrorMessage(s"No '${`project-id`}' parameter"))
+    case Some(validatedProjectId) =>
+      validatedProjectId.fold(
+        errors => BadRequest(ErrorMessage(errors.map(_.getMessage()).toList.mkString("; "))),
+        findProcessingStatus
+      )
   }
 }

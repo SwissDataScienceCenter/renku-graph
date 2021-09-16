@@ -25,8 +25,8 @@ import cats.{Functor, Monad}
 import ch.datascience.db.SqlStatement.Name
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
+import skunk._
 import skunk.data.Completion
-import skunk.{Query, _}
 
 final case class SqlStatement[Interpretation[_], ResultType](
     queryExecution: Kleisli[Interpretation, Session[Interpretation], ResultType],

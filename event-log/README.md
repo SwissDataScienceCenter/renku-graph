@@ -14,13 +14,13 @@ This is a microservice which provides CRUD operations for Event Log DB.
 |  GET   | ```/processing-status?project-id=:id``` | Finds processing status of events belonging to a project       |
 |  POST  | ```/subscriptions```                    | Adds a subscription for events                                 |
 
-#### GET /events?projectPath=\<projectPath\>`
+#### GET /events?project-path=\<projectPath\>`
 
 Returns information about the selected events.
 
 NOTES:
 
-* the `projectPath` query parameter is mandatory, has to be url-encoded and cannot be blank;
+* the `project-path` query parameter is mandatory, has to be url-encoded and cannot be blank;
 * the returned events are sorted by the `event_date`.
 
 **Response**
@@ -35,14 +35,14 @@ Response body example:
 ```json
 [
   {
-    "id":      "df654c3b1bd105a29d658f78f6380a842feac879",
-    "status":  "NEW"
-  },  
+    "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+    "status": "NEW"
+  },
   {
-    "id":      "df654c3b1bd105a29d658f78f6380a842feac879",
-    "status":  "GENERATION_NON_RECOVERABLE_FAILURE",
+    "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+    "status": "GENERATION_NON_RECOVERABLE_FAILURE",
     "message": "detailed info about the cause of the failure"
-  }  
+  }
 ]
 ```
 
@@ -121,9 +121,10 @@ In the case of a *SKIPPED* event. Note that a non-blank `message` is required.
 
 - **EVENTS_STATUS_CHANGE**
 
-Changes the status of events. The events for which the status will be changed are defined within the event as well as the new status.
+Changes the status of events. The events for which the status will be changed are defined within the event as well as
+the new status.
 
-####Changing status of the specified event from `GENERATING_TRIPLES` to `NEW`
+#### Changing status of the specified event from `GENERATING_TRIPLES` to `NEW`
 
 **Multipart Request**
 
@@ -132,16 +133,16 @@ Changes the status of events. The events for which the status will be changed ar
 ```json
 {
   "categoryName": "EVENTS_STATUS_CHANGE",
-  "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
+  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
-    "id":   12,
+    "id": 12,
     "path": "namespace/project-name"
   },
   "newStatus": "NEW"
 }
 ```
 
-####Changing status of the specified event from processing statuses to failure statuses
+#### Changing status of the specified event from processing statuses to failure statuses
 
 **Allowed combinations**
 
@@ -152,7 +153,6 @@ Changes the status of events. The events for which the status will be changed ar
 | TRANSFORMING_TRIPLES | TRANSFORMATION_NON_RECOVERABLE_FAILURE |
 | TRANSFORMING_TRIPLES | TRANSFORMATION_RECOVERABLE_FAILURE     |
 
-
 **Multipart Request**
 
 `event` part:
@@ -160,17 +160,17 @@ Changes the status of events. The events for which the status will be changed ar
 ```json
 {
   "categoryName": "EVENTS_STATUS_CHANGE",
-  "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
+  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
     "id": 12,
     "path": "namespace/project-name"
   },
-  "message" : "<failure message>",
+  "message": "<failure message>",
   "newStatus": "<failure status>"
 }
 ```
 
-####Changing status of the specified event from `TRANSFORMING_TRIPLES` to `TRIPLES_GENERATED`
+#### Changing status of the specified event from `TRANSFORMING_TRIPLES` to `TRIPLES_GENERATED`
 
 **Multipart Request**
 
@@ -179,16 +179,16 @@ Changes the status of events. The events for which the status will be changed ar
 ```json
 {
   "categoryName": "EVENTS_STATUS_CHANGE",
-  "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
+  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
-    "id":   12,
+    "id": 12,
     "path": "namespace/project-name"
   },
   "newStatus": "TRIPLES_GENERATED"
 }
 ```
 
-####Changing status of the specified event to `AWAITING_DELETION`
+#### Changing status of the specified event to `AWAITING_DELETION`
 
 **Multipart Request**
 
@@ -197,16 +197,16 @@ Changes the status of events. The events for which the status will be changed ar
 ```json
 {
   "categoryName": "EVENTS_STATUS_CHANGE",
-  "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
+  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
-    "id":   12,
+    "id": 12,
     "path": "namespace/project-name"
   },
   "newStatus": "AWAITING_DELETION"
 }
 ```
 
-####Changing status of all project events older than the given one to `TRIPLES_GENERATED`
+#### Changing status of all project events older than the given one to `TRIPLES_GENERATED`
 
 **Multipart Request**
 
@@ -215,9 +215,9 @@ Changes the status of events. The events for which the status will be changed ar
 ```json
 {
   "categoryName": "EVENTS_STATUS_CHANGE",
-  "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
+  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
-    "id":   12,
+    "id": 12,
     "path": "namespace/project-name"
   },
   "newStatus": "TRIPLES_GENERATED",
@@ -234,7 +234,7 @@ Changes the status of events. The events for which the status will be changed ar
 }
 ```
 
-####Changing status of all project events older than the given one to `TRIPLES_STORE`
+#### Changing status of all project events older than the given one to `TRIPLES_STORE`
 
 **Multipart Request**
 
@@ -243,9 +243,9 @@ Changes the status of events. The events for which the status will be changed ar
 ```json
 {
   "categoryName": "EVENTS_STATUS_CHANGE",
-  "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
+  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
-    "id":   12,
+    "id": 12,
     "path": "namespace/project-name"
   },
   "newStatus": "TRIPLES_STORE",
@@ -253,7 +253,7 @@ Changes the status of events. The events for which the status will be changed ar
 }
 ```
 
-####Changing status of all events to `NEW`
+#### Changing status of all events to `NEW`
 
 **Multipart Request**
 
@@ -262,7 +262,7 @@ Changes the status of events. The events for which the status will be changed ar
 ```json
 {
   "categoryName": "EVENTS_STATUS_CHANGE",
-  "newStatus":    "NEW"
+  "newStatus": "NEW"
 }
 ```
 
@@ -298,7 +298,7 @@ Forces issuing a commit sync event for the given project
 {
   "categoryName": "COMMIT_SYNC_REQUEST",
   "project": {
-    "id":   12,
+    "id": 12,
     "path": "namespace/project-name"
   }
 }

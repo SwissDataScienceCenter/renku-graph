@@ -18,7 +18,6 @@
 
 package ch.datascience.webhookservice.eventprocessing
 
-import cats.MonadError
 import cats.data.OptionT
 import cats.effect._
 import cats.syntax.all._
@@ -33,13 +32,13 @@ import ch.datascience.webhookservice.eventprocessing.ProcessingStatusFetcher.Pro
 import ch.datascience.webhookservice.hookvalidation.HookValidator
 import ch.datascience.webhookservice.hookvalidation.HookValidator.{HookValidationResult, NoAccessTokenException}
 import ch.datascience.webhookservice.model.ProjectHookUrl
-import org.typelevel.log4cats.Logger
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import org.http4s.Response
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
@@ -48,17 +47,16 @@ trait ProcessingStatusEndpoint[Interpretation[_]] {
   def fetchProcessingStatus(projectId: Id): Interpretation[Response[Interpretation]]
 }
 
-class ProcessingStatusEndpointImpl[Interpretation[_]: Effect](
+class ProcessingStatusEndpointImpl[Interpretation[_]: Effect: MonadThrow](
     hookValidator:           HookValidator[Interpretation],
     processingStatusFetcher: ProcessingStatusFetcher[Interpretation],
     executionTimeRecorder:   ExecutionTimeRecorder[Interpretation],
     logger:                  Logger[Interpretation]
-)(implicit ME:               MonadError[Interpretation, Throwable])
-    extends Http4sDsl[Interpretation]
+) extends Http4sDsl[Interpretation]
     with ProcessingStatusEndpoint[Interpretation] {
 
   import HookValidationResult._
-  import ProcessingStatusEndpoint._
+  import ProcessingStatusEndpointImpl._
   import executionTimeRecorder._
 
   def fetchProcessingStatus(projectId: Id): Interpretation[Response[Interpretation]] = measureExecutionTime {
@@ -99,7 +97,7 @@ class ProcessingStatusEndpointImpl[Interpretation[_]: Effect](
   }
 }
 
-private object ProcessingStatusEndpoint {
+private object ProcessingStatusEndpointImpl {
 
   implicit val processingStatusEncoder: Encoder[ProcessingStatus] = { case ProcessingStatus(done, total, progress) =>
     json"""
@@ -118,7 +116,7 @@ private object ProcessingStatusEndpoint {
       }"""
 }
 
-object IOProcessingStatusEndpoint {
+object ProcessingStatusEndpoint {
   def apply(
       projectHookUrl:        ProjectHookUrl,
       gitLabThrottler:       Throttler[IO, GitLab],

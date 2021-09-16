@@ -109,7 +109,7 @@ class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with sho
 
     val statusFinder         = mock[ProcessingStatusFinder[IO]]
     val logger               = TestLogger[IO]()
-    val findProcessingStatus = new ProcessingStatusEndpoint[IO](statusFinder, logger).findProcessingStatus _
+    val findProcessingStatus = new ProcessingStatusEndpointImpl[IO](statusFinder, logger).findProcessingStatus _
   }
 
   private implicit val processingStatusDecoder: Decoder[ProcessingStatus] = cursor =>
