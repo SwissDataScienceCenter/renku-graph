@@ -23,7 +23,7 @@ import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.jsonld.generators.Generators.Implicits._
 import io.renku.jsonld.generators.Generators.{localDates, nonEmptyStrings, timestamps}
-import io.renku.jsonld.generators.JsonLDGenerators._
+import io.renku.jsonld.generators.JsonLDGenerators.{entityIds, entityTypesObject, jsonLDEntities, jsonLDValues, properties}
 import io.renku.jsonld.syntax._
 import org.scalacheck.Arbitrary._
 import org.scalacheck.Gen
@@ -332,6 +332,30 @@ class JsonLDDecoderSpec
         .fold(throw _, identity)
         .cursor
         .as(decodeList(decoder)) shouldBe List(child).asRight
+    }
+
+    "decode entities with reverse" in {
+
+      val childEncoder = JsonLDEncoder.instance[Child](child =>
+        JsonLD.entity(
+          EntityId.of(s"child/${child.name}"),
+          EntityTypes.of(schema / "Child"),
+          Reverse.fromListUnsafe(List(schema / "child" -> parent1.id.asJsonLD)),
+          schema / "name" -> child.name.asJsonLD
+        )
+      )
+
+      val parentEncoder = JsonLDEncoder.instance[Parent](parent =>
+        JsonLD.entity(parent.id, parent.types, schema / "name" -> parent.name.asJsonLD)
+      )
+
+      JsonLD
+        .arr(parent1.asJsonLD(parentEncoder), parent1.child.asJsonLD(childEncoder))
+        .flatten
+        .fold(fail(_), identity)
+        .cursor
+        .as[List[Parent]] shouldBe List(parent1).asRight
+
     }
   }
 

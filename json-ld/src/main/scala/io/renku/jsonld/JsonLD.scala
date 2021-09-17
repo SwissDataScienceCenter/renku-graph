@@ -20,13 +20,13 @@ package io.renku.jsonld
 
 import cats.syntax.all._
 import io.circe.{Encoder, Json, JsonNumber}
-import io.renku.jsonld.JsonLD.MalformedJsonLD
-import io.renku.jsonld.flatten.{JsonLDArrayFlatten, JsonLDEntityFlatten}
+import io.renku.jsonld.flatten.{JsonLDArrayFlatten, JsonLDEntityFlatten, JsonLDFlatten}
+import io.renku.jsonld.merge.{JsonLDArrayMerge, JsonLDMerge}
 
 import java.io.Serializable
 import java.time.{Instant, LocalDate}
 
-abstract class JsonLD extends Product with Serializable {
+abstract class JsonLD extends JsonLDMerge with JsonLDFlatten with Product with Serializable {
   def toJson: Json
 
   def entityId: Option[EntityId]
@@ -37,7 +37,6 @@ abstract class JsonLD extends Product with Serializable {
 
   def asArray: Option[Vector[JsonLD]]
 
-  def flatten: Either[MalformedJsonLD, JsonLD]
 }
 
 object JsonLD {
@@ -124,9 +123,10 @@ object JsonLD {
       }
     }
 
-    override lazy val entityId:    Option[EntityId]       = Some(id)
-    override lazy val entityTypes: Option[EntityTypes]    = Some(types)
-    override lazy val asArray:     Option[Vector[JsonLD]] = Some(Vector(this))
+    override lazy val entityId:    Option[EntityId]                = Some(id)
+    override lazy val entityTypes: Option[EntityTypes]             = Some(types)
+    override lazy val asArray:     Option[Vector[JsonLD]]          = Some(Vector(this))
+    override lazy val merge:       Either[MalformedJsonLD, JsonLD] = this.asRight
   }
 
   private[jsonld] final case class JsonLDEdge(source: EntityId, property: Property, target: EntityId) extends JsonLD {
@@ -140,6 +140,7 @@ object JsonLD {
     override lazy val entityTypes: Option[EntityTypes]             = None
     override lazy val asArray:     Option[Vector[JsonLD]]          = Some(Vector(this))
     override lazy val flatten:     Either[MalformedJsonLD, JsonLD] = this.asRight
+    override lazy val merge:       Either[MalformedJsonLD, JsonLD] = this.asRight
   }
 
   private[jsonld] final case class JsonLDValue[V](
@@ -153,12 +154,11 @@ object JsonLD {
       case Some(t) => Json.obj("@type" -> t.asJson, "@value" -> value.asJson)
     }
 
-    override lazy val entityId:    Option[EntityId]    = None
-    override lazy val entityTypes: Option[EntityTypes] = None
-
-    override lazy val asArray: Option[Vector[JsonLD]] = Some(Vector(this))
-
-    override lazy val flatten: Either[MalformedJsonLD, JsonLD] = this.asRight
+    override lazy val entityId:    Option[EntityId]                = None
+    override lazy val entityTypes: Option[EntityTypes]             = None
+    override lazy val asArray:     Option[Vector[JsonLD]]          = Some(Vector(this))
+    override lazy val flatten:     Either[MalformedJsonLD, JsonLD] = this.asRight
+    override lazy val merge:       Either[MalformedJsonLD, JsonLD] = this.asRight
   }
 
   private[jsonld] object JsonLDValue {
@@ -184,6 +184,7 @@ object JsonLD {
     override lazy val entityTypes: Option[EntityTypes]             = None
     override lazy val asArray:     Option[Vector[JsonLD]]          = None
     override lazy val flatten:     Either[MalformedJsonLD, JsonLD] = this.asRight
+    override lazy val merge:       Either[MalformedJsonLD, JsonLD] = this.asRight
   }
 
   private[jsonld] final case object JsonLDOptionValue {
@@ -194,9 +195,12 @@ object JsonLD {
       }
   }
 
-  private[jsonld] final case class JsonLDArray(jsons: Seq[JsonLD]) extends JsonLD with JsonLDArrayFlatten {
+  private[jsonld] final case class JsonLDArray(jsons: Seq[JsonLD])
+      extends JsonLD
+      with JsonLDArrayFlatten
+      with JsonLDArrayMerge {
 
-    override def hashCode(): Int = jsons.size.hashCode() + jsons.toSet.hashCode()
+    override lazy val hashCode: Int = jsons.size.hashCode() + jsons.toSet.hashCode()
 
     override def equals(that: Any): Boolean = that match {
       case JsonLDArray(otherJsons) => (otherJsons.size == jsons.size) && (otherJsons.toSet == jsons.toSet)
@@ -215,6 +219,7 @@ object JsonLD {
     override lazy val entityTypes: Option[EntityTypes]             = None
     override lazy val asArray:     Option[Vector[JsonLD]]          = Some(Vector(this))
     override lazy val flatten:     Either[MalformedJsonLD, JsonLD] = this.asRight
+    override lazy val merge:       Either[MalformedJsonLD, JsonLD] = this.asRight
   }
 
   final case class MalformedJsonLD(message: String) extends RuntimeException(message)

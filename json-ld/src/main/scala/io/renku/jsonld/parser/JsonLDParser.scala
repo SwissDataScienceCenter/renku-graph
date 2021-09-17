@@ -36,7 +36,9 @@ private class JsonLDParser() extends Parser {
     jsonBoolean = JsonLD.fromBoolean(_).asRight[ParsingFailure],
     jsonNumber = JsonLD.fromNumber(_).asRight[ParsingFailure],
     jsonString = JsonLD.fromString(_).asRight[ParsingFailure],
-    jsonArray = _.map(parse).toList.sequence.map(JsonLD.arr(_: _*)),
+    jsonArray = _.map(parse).toList.sequence
+      .map(JsonLD.arr(_: _*))
+      .flatMap(_.merge.leftMap(err => ParsingFailure(err.getMessage, err))),
     jsonObject = parseObject
   )
 

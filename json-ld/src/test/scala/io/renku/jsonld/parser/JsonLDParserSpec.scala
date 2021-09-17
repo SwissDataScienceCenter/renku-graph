@@ -100,7 +100,7 @@ class JsonLDParserSpec extends AnyWordSpec with should.Matchers {
       parser.parse(entity.toJson) shouldBe Right(entity)
     }
 
-    "successfully parse an object with a single reverse property on singly entity" in {
+    "successfully parse an object with a single reverse property on single entity" in {
       val nestedEntity = jsonLDEntities.generateOne
       val entity = JsonLD.entity(
         entityIds.generateOne,
@@ -113,8 +113,7 @@ class JsonLDParserSpec extends AnyWordSpec with should.Matchers {
 
       parsedJsonLD.asArray.sequence.flatten should contain theSameElementsAs List(
         entity.copy(reverse = Reverse.empty),
-        nestedEntity,
-        JsonLD.edge(nestedEntity.id, schema / "reversedProperty", entity.id)
+        nestedEntity.copy(properties = nestedEntity.properties + (schema / "reversedProperty" -> entity.id.asJsonLD))
       )
     }
 
@@ -141,11 +140,11 @@ class JsonLDParserSpec extends AnyWordSpec with should.Matchers {
       )
 
       parsedJsonLD.asArray.sequence.flatten should contain theSameElementsAs List(
-        entity,
+        entity.copy(properties =
+          entity.properties + (property -> JsonLD.arr(nestedEntity1.id.asJsonLD, nestedEntity2.id.asJsonLD))
+        ),
         nestedEntity1,
-        nestedEntity2,
-        JsonLD.edge(entity.id, property, nestedEntity1.id),
-        JsonLD.edge(entity.id, property, nestedEntity2.id)
+        nestedEntity2
       )
     }
 
@@ -173,11 +172,11 @@ class JsonLDParserSpec extends AnyWordSpec with should.Matchers {
       )
 
       parsedJsonLD.asArray.sequence.flatten should contain theSameElementsAs List(
-        entity,
+        entity.copy(properties =
+          entity.properties + (property1 -> nestedEntity1.id.asJsonLD) + (property2 -> nestedEntity2.id.asJsonLD)
+        ),
         nestedEntity1,
-        nestedEntity2,
-        JsonLD.edge(entity.id, property1, nestedEntity1.id),
-        JsonLD.edge(entity.id, property2, nestedEntity2.id)
+        nestedEntity2
       )
     }
 

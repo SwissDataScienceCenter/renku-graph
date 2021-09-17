@@ -31,7 +31,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.util.Random
 
-class FlattenerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class JsonLDFlattenSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "flatten" should {
 
@@ -243,10 +243,8 @@ class FlattenerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
         val Right(flattened) = parent.flatten
         flattened.asArray.sequence.flatten should contain theSameElementsAs List(
           parent.copy(reverse = Reverse.empty),
-          child0,
-          child1,
-          JsonLD.edge(child0.id, reverseProperty, parent.id),
-          JsonLD.edge(child1.id, reverseProperty, parent.id)
+          child0.copy(properties = child0.properties + (reverseProperty -> parent.id.asJsonLD)),
+          child1.copy(properties = child1.properties + (reverseProperty -> parent.id.asJsonLD))
         )
       }
     }
@@ -275,11 +273,11 @@ class FlattenerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
           .flatten
 
         flattened.asArray.sequence.flatten should contain theSameElementsAs List(
-          entity,
+          entity.copy(properties =
+            entity.properties + (reverseProperty -> JsonLD.arr(child0.id.asJsonLD, child1.id.asJsonLD))
+          ),
           child0,
-          child1,
-          JsonLD.edge(entity.id, reverseProperty, child0.id),
-          JsonLD.edge(entity.id, reverseProperty, child1.id)
+          child1
         )
       }
     }
@@ -310,11 +308,9 @@ class FlattenerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
           val Right(flattened) = parent0.flatten
 
           flattened.asArray.sequence.flatten should contain theSameElementsAs List(
-            entity0,
-            entity1,
-            child2,
-            JsonLD.edge(parent1.id, property0, parent0.id),
-            JsonLD.edge(child2.id, property1, parent1.id)
+            parent0.copy(reverse = Reverse.empty),
+            parent1.copy(reverse = Reverse.empty, properties = parent1.properties + (property0 -> parent0.id.asJsonLD)),
+            child2.copy(properties = child2.properties + (property1 -> parent1.id.asJsonLD))
           )
       }
     }

@@ -16,20 +16,13 @@
  * limitations under the License.
  */
 
-package io.renku.jsonld.flatten
+package io.renku.jsonld.merge
 
 import io.renku.jsonld.JsonLD
-import io.renku.jsonld.JsonLD.{JsonLDEntity, MalformedJsonLD}
+import io.renku.jsonld.JsonLD.MalformedJsonLD
 
-private object IDValidation {
+trait JsonLDMerge {
+  self: JsonLD =>
 
-  def checkForUniqueIds(flattenedJsons: List[JsonLD]): Either[MalformedJsonLD, List[JsonLD]] =
-    if (areIdsUnique(flattenedJsons)) Right(flattenedJsons)
-    else Left(MalformedJsonLD("Some entities share an ID even though they're not the same"))
-
-  private def areIdsUnique(jsons: List[JsonLD]): Boolean =
-    jsons
-      .collect { case entity: JsonLDEntity => entity }
-      .groupBy(entity => entity.id)
-      .forall { case (_, entitiesPerId) => entitiesPerId.forall(_ == entitiesPerId.head) }
+  def merge: Either[MalformedJsonLD, JsonLD]
 }

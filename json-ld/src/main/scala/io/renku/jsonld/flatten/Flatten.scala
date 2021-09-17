@@ -24,24 +24,23 @@ import io.renku.jsonld.{EntityId, JsonLD, Property, Reverse}
 
 import scala.annotation.tailrec
 
-private[jsonld] trait Flatten extends IDValidation {
+private object Flatten {
 
   @tailrec
-  protected[flatten] final def deNest(toProcess:        List[JsonLD],
-                                      topLevelEntities: List[JsonLD]
-  ): Either[MalformedJsonLD, List[JsonLD]] = toProcess match {
-    case (entity: JsonLDEntity) :: leftToProcess =>
-      val processNext =
-        extractEntityProperties(entity.properties) ++ extractReverseProperties(entity.reverse.properties)
-      val (currentEntityDeNested, edges) = transformEntityProperties(entity)
-      deNest(processNext ::: leftToProcess, topLevelEntities ::: currentEntityDeNested :: edges)
-    case JsonLDArray(jsons) :: leftToProcess =>
-      deNest(jsons.toList ::: leftToProcess, topLevelEntities)
-    case _ :: leftToProcess =>
-      deNest(leftToProcess, topLevelEntities)
-    case Nil =>
-      topLevelEntities.asRight
-  }
+  final def deNest(toProcess: List[JsonLD], topLevelEntities: List[JsonLD]): Either[MalformedJsonLD, List[JsonLD]] =
+    toProcess match {
+      case (entity: JsonLDEntity) :: leftToProcess =>
+        val processNext =
+          extractEntityProperties(entity.properties) ++ extractReverseProperties(entity.reverse.properties)
+        val (currentEntityDeNested, edges) = transformEntityProperties(entity)
+        deNest(processNext ::: leftToProcess, topLevelEntities ::: currentEntityDeNested :: edges)
+      case JsonLDArray(jsons) :: leftToProcess =>
+        deNest(jsons.toList ::: leftToProcess, topLevelEntities)
+      case _ :: leftToProcess =>
+        deNest(leftToProcess, topLevelEntities)
+      case Nil =>
+        topLevelEntities.asRight
+    }
 
   private def extractEntityProperties(properties: Map[Property, JsonLD]) =
     properties.foldLeft(List.empty[JsonLDEntity]) {

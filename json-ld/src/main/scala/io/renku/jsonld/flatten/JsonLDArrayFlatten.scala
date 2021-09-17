@@ -22,8 +22,10 @@ import io.renku.jsonld.JsonLD
 import io.renku.jsonld.JsonLD.{JsonLDArray, JsonLDEntity, MalformedJsonLD}
 import cats.syntax.all._
 
-trait JsonLDArrayFlatten extends Flatten {
+trait JsonLDArrayFlatten extends JsonLDFlatten {
   self: JsonLDArray =>
+  import Flatten._
+  import IDValidation._
 
   override lazy val flatten: Either[MalformedJsonLD, JsonLD] = for {
     flattened <- jsons.foldLeft(Either.right[MalformedJsonLD, List[JsonLD]](List.empty[JsonLD])) {
@@ -34,5 +36,6 @@ trait JsonLDArrayFlatten extends Flatten {
                    case (flattened, other) => flattened.map(_ ::: other :: Nil)
                  }
     validated <- checkForUniqueIds(flattened.distinct)
-  } yield JsonLD.arr(validated: _*)
+    merged    <- JsonLD.arr(validated: _*).merge
+  } yield merged
 }

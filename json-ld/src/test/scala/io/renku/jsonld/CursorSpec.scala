@@ -21,7 +21,7 @@ package io.renku.jsonld
 import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.jsonld.generators.Generators.Implicits._
-import io.renku.jsonld.generators.JsonLDGenerators._
+import io.renku.jsonld.generators.JsonLDGenerators.{entityIds, entityTypes, entityTypesObject, jsonLDValues, schemas, valuesProperties}
 import io.renku.jsonld.syntax._
 import org.scalacheck.Arbitrary
 import org.scalatest.matchers.should
