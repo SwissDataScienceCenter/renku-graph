@@ -27,6 +27,7 @@ import io.renku.jsonld.generators.JsonLDGenerators._
 import io.renku.jsonld.{JsonLD, Property, Reverse}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import io.renku.jsonld.syntax._
 
 import scala.util.Random
 
@@ -86,6 +87,87 @@ class JsonLDParserSpec extends AnyWordSpec with should.Matchers {
       )
 
       parser.parse(entity.toJson) shouldBe Right(entity)
+    }
+
+    "successfully parse an object with a single reverse property on singly entity" in {
+      val nestedEntity = jsonLDEntities.generateOne
+      val entity = JsonLD.entity(
+        entityIds.generateOne,
+        entityTypesObject.generateOne,
+        Reverse.ofJsonLDsUnsafe((schema / "reversedProperty") -> nestedEntity),
+        Map.empty[Property, JsonLD]
+      )
+
+      val Right(parsedJsonLD) = parser.parse(entity.flatten.fold(throw _, identity).toJson)
+
+      parsedJsonLD.asArray.sequence.flatten should contain theSameElementsAs List(
+        entity.copy(reverse = Reverse.empty),
+        nestedEntity,
+        JsonLD.edge(nestedEntity.id, schema / "reversedProperty", entity.id)
+      )
+    }
+
+    "successfully parse an object with a single reverse property on multiple entities" in {
+      val nestedEntity1 = jsonLDEntities.generateOne
+      val nestedEntity2 = jsonLDEntities.generateOne
+      val property      = properties.generateOne
+      val entity = JsonLD.entity(
+        entityIds.generateOne,
+        entityTypesObject.generateOne,
+        Map.empty[Property, JsonLD]
+      )
+
+      val Right(parsedJsonLD) = parser.parse(
+        JsonLD
+          .arr(
+            nestedEntity1.copy(reverse = Reverse.fromListUnsafe(List(property -> entity.id.asJsonLD))),
+            nestedEntity2.copy(reverse = Reverse.fromListUnsafe(List(property -> entity.id.asJsonLD))),
+            entity
+          )
+          .flatten
+          .fold(throw _, identity)
+          .toJson
+      )
+
+      parsedJsonLD.asArray.sequence.flatten should contain theSameElementsAs List(
+        entity,
+        nestedEntity1,
+        nestedEntity2,
+        JsonLD.edge(entity.id, property, nestedEntity1.id),
+        JsonLD.edge(entity.id, property, nestedEntity2.id)
+      )
+    }
+
+    "successfully parse an object with a multiple reverse properties" in {
+      val nestedEntity1 = jsonLDEntities.generateOne
+      val nestedEntity2 = jsonLDEntities.generateOne
+      val property1     = properties.generateOne
+      val property2     = properties.generateOne
+      val entity = JsonLD.entity(
+        entityIds.generateOne,
+        entityTypesObject.generateOne,
+        Map.empty[Property, JsonLD]
+      )
+
+      val Right(parsedJsonLD) = parser.parse(
+        JsonLD
+          .arr(
+            nestedEntity1.copy(reverse = Reverse.fromListUnsafe(List(property1 -> entity.id.asJsonLD))),
+            nestedEntity2.copy(reverse = Reverse.fromListUnsafe(List(property2 -> entity.id.asJsonLD))),
+            entity
+          )
+          .flatten
+          .fold(throw _, identity)
+          .toJson
+      )
+
+      parsedJsonLD.asArray.sequence.flatten should contain theSameElementsAs List(
+        entity,
+        nestedEntity1,
+        nestedEntity2,
+        JsonLD.edge(entity.id, property1, nestedEntity1.id),
+        JsonLD.edge(entity.id, property2, nestedEntity2.id)
+      )
     }
 
     "return a ParsingFailure when a object has no @id" in {

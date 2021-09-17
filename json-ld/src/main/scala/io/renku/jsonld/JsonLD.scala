@@ -95,6 +95,9 @@ object JsonLD {
       properties: Map[Property, JsonLD]
   ): JsonLDEntity = JsonLDEntity(id, types, properties, reverse)
 
+  def edge(source: EntityId, property: Property, target: EntityId): JsonLDEdge =
+    JsonLDEdge(source, property, target)
+
   private[jsonld] final case class JsonLDEntity(id:         EntityId,
                                                 types:      EntityTypes,
                                                 properties: Map[Property, JsonLD],
@@ -124,7 +127,19 @@ object JsonLD {
     override lazy val entityId:    Option[EntityId]       = Some(id)
     override lazy val entityTypes: Option[EntityTypes]    = Some(types)
     override lazy val asArray:     Option[Vector[JsonLD]] = Some(Vector(this))
+  }
 
+  private[jsonld] final case class JsonLDEdge(source: EntityId, property: Property, target: EntityId) extends JsonLD {
+
+    override lazy val toJson: Json = Json.obj(
+      "@id"        -> source.asJson,
+      property.url -> JsonLD.fromEntityId(target).toJson
+    )
+
+    override lazy val entityId:    Option[EntityId]                = Some(source)
+    override lazy val entityTypes: Option[EntityTypes]             = None
+    override lazy val asArray:     Option[Vector[JsonLD]]          = Some(Vector(this))
+    override lazy val flatten:     Either[MalformedJsonLD, JsonLD] = this.asRight
   }
 
   private[jsonld] final case class JsonLDValue[V](

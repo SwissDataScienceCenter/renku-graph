@@ -43,13 +43,14 @@ private class JsonLDParser() extends Parser {
   private def parseObject(jsonObject: JsonObject): Either[ParsingFailure, JsonLD] = {
     val propsMap = jsonObject.toMap
     (propsMap.get("@id"), propsMap.get("@type"), propsMap.get("@reverse"), propsMap.get("@value")) match {
-      case (Some(entityId), Some(types), maybeReverse, None) => jsonObject.toJsonLdEntity(entityId, types, maybeReverse)
-      case (Some(entityId), None, None, None)                => toJsonLDEntityId(entityId)
-      case (None, maybeTypes, None, Some(value))             => toJsonLDValue(maybeTypes, value)
-      case (Some(_), None, Some(_), None)                    => ParsingFailure("Entity with reverse but no type").asLeft[JsonLD]
-      case (None, _, _, _)                                   => ParsingFailure("Entity without @id").asLeft[JsonLD]
-      case (Some(_), Some(_), _, Some(_))                    => ParsingFailure("Invalid entity").asLeft[JsonLD]
-      case (Some(_), None, _, Some(_))                       => ParsingFailure("Entity with @id and @value but no @type").asLeft[JsonLD]
+      case (Some(entityId), Some(types), maybeReverse, None)                             => jsonObject.toJsonLdEntity(entityId, types, maybeReverse)
+      case (Some(entityId), None, None, None) if !propsMap.view.keys.exists(notReserved) => toJsonLDEntityId(entityId)
+      case (Some(entityId), None, None, None)                                            => toJsonLDEdge(entityId, propsMap)
+      case (None, maybeTypes, None, Some(value))                                         => toJsonLDValue(maybeTypes, value)
+      case (Some(_), None, Some(_), None)                                                => ParsingFailure("Entity with reverse but no type").asLeft[JsonLD]
+      case (None, _, _, _)                                                               => ParsingFailure("Entity without @id").asLeft[JsonLD]
+      case (Some(_), Some(_), _, Some(_))                                                => ParsingFailure("Invalid entity").asLeft[JsonLD]
+      case (Some(_), None, _, Some(_))                                                   => ParsingFailure("Entity with @id and @value but no @type").asLeft[JsonLD]
     }
   }
 
@@ -97,7 +98,7 @@ private class JsonLDParser() extends Parser {
 
     private def parseReverseObject(jsonObject: JsonObject): Either[ParsingFailure, Reverse] =
       jsonObject.toMap.view
-        .filterKeys(key => key != "@id" && key != "@type" && key != "@reverse" && key != "@value")
+        .filterKeys(notReserved)
         .toList match {
         case Nil => ParsingFailure("Malformed entity's @reverse property - no properties defined").asLeft[Reverse]
         case props =>
@@ -113,10 +114,40 @@ private class JsonLDParser() extends Parser {
     }
   }
 
-  private def toJsonLDEntityId(entityId: Json) =
+  private lazy val notReserved: String => Boolean =
+    key => key != "@id" && key != "@type" && key != "@reverse" && key != "@value"
+
+  private def toJsonLDEntityId(entityId: Json) = toEntityId(entityId).map(JsonLD.fromEntityId)
+
+  private def toEntityId(entityId: Json) =
     entityId
       .as[EntityId]
-      .bimap(ParsingFailure(s"Could not parse @id: $entityId", _), JsonLD.fromEntityId)
+      .bimap(ParsingFailure(s"Could not parse @id: $entityId", _), identity)
+
+  private def toJsonLDEdge(entityId: Json, props: Map[String, Json]): Either[ParsingFailure, JsonLD] = {
+    val propsWithoutId = props.view.filterKeys(_ != "@id")
+
+    def extractId(id: EntityId)(json: Json) = json.asObject
+      .flatMap(_.toMap.get("@id"))
+      .map(toEntityId)
+      .getOrElse(ParsingFailure(s"Edge $id has invalid target").asLeft)
+
+    for {
+      id <- toEntityId(entityId)
+      _ <- if (propsWithoutId.size != 1) ParsingFailure(s"Edge $id with ${propsWithoutId.size} properties").asLeft
+           else ().asRight[ParsingFailure]
+      property <- Property(propsWithoutId.head._1).asRight
+      targets <- propsWithoutId.head._2 match {
+                   case target if target.isObject => extractId(id)(target).map(List(_))
+                   case target if target.isArray =>
+                     target.asArray.sequence.flatten.map(extractId(id)).toList.sequence
+                   case _ => ParsingFailure(s"Edge $id has invalid target(s)").asLeft
+                 }
+    } yield targets match {
+      case target :: Nil => JsonLD.edge(id, property, target)
+      case targets       => JsonLD.arr(targets.map(JsonLD.edge(id, property, _)): _*)
+    }
+  }
 
   private def toJsonLDValue(maybeTypes: Option[Json], value: Json) = {
 

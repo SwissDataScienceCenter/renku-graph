@@ -23,7 +23,6 @@ import io.circe.{Encoder, Json}
 import io.renku.jsonld.JsonLD.{JsonLDArray, JsonLDEntity, JsonLDEntityId}
 
 final case class Reverse(properties: Map[Property, JsonLD]) {
-
   override lazy val toString: String = s"Reverse($properties)"
 }
 
