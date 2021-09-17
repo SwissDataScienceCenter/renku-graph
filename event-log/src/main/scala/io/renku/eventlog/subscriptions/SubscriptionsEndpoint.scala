@@ -24,23 +24,29 @@ import ch.datascience.http.ErrorMessage
 import io.circe.Json
 import io.renku.eventlog.subscriptions.EventProducersRegistry.{SubscriptionResult, UnsupportedPayload}
 import org.http4s.dsl.Http4sDsl
+import org.http4s.{Request, Response}
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-class SubscriptionsEndpoint[Interpretation[_]: Effect: MonadThrow](
+trait SubscriptionsEndpoint[Interpretation[_]] {
+  def addSubscription(request: Request[Interpretation]): Interpretation[Response[Interpretation]]
+}
+
+class SubscriptionsEndpointImpl[Interpretation[_]: Effect: MonadThrow](
     subscriptionCategoryRegistry: EventProducersRegistry[Interpretation],
     logger:                       Logger[Interpretation]
-) extends Http4sDsl[Interpretation] {
+) extends Http4sDsl[Interpretation]
+    with SubscriptionsEndpoint[Interpretation] {
 
-  import SubscriptionsEndpoint._
+  import SubscriptionsEndpointImpl._
   import cats.syntax.all._
   import ch.datascience.http.InfoMessage
   import ch.datascience.http.InfoMessage._
   import org.http4s.circe._
   import org.http4s.{Request, Response}
 
-  def addSubscription(request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
+  override def addSubscription(request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
     for {
       json         <- request.asJson recoverWith badRequest
       eitherResult <- subscriptionCategoryRegistry register json
@@ -70,24 +76,21 @@ class SubscriptionsEndpoint[Interpretation[_]: Effect: MonadThrow](
       logger.error(exception)(errorMessage.value)
       InternalServerError(errorMessage)
   }
-
 }
 
-object SubscriptionsEndpoint {
+private object SubscriptionsEndpointImpl {
+
+  private case object NotFoundError extends Throwable
 
   private sealed trait BadRequestError extends Throwable
-
   private object BadRequestError {
     def apply(message: String): BadRequestError = new Exception(message) with BadRequestError
 
     def apply(cause: Throwable): BadRequestError = new Exception(cause) with BadRequestError
   }
-
-  private case object NotFoundError extends Throwable
-
 }
 
-object IOSubscriptionsEndpoint {
+object SubscriptionsEndpoint {
 
   import cats.effect.{ContextShift, IO}
 
@@ -95,6 +98,6 @@ object IOSubscriptionsEndpoint {
       subscriptionCategoryRegistry: EventProducersRegistry[IO],
       logger:                       Logger[IO]
   )(implicit contextShift:          ContextShift[IO]): IO[SubscriptionsEndpoint[IO]] = IO {
-    new SubscriptionsEndpoint[IO](subscriptionCategoryRegistry, logger)
+    new SubscriptionsEndpointImpl[IO](subscriptionCategoryRegistry, logger)
   }
 }

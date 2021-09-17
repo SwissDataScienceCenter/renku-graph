@@ -53,4 +53,5 @@ object EventsGenerators {
     javaDurations(min = Duration ofMinutes 10).map(EventProcessingTime.apply)
 
   implicit lazy val lastSyncedDates: Gen[LastSyncedDate] = timestampsNotInTheFuture.toGeneratorOf(LastSyncedDate)
+
 }

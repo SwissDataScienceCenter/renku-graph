@@ -93,7 +93,7 @@ private object MicroserviceRoutes {
     hookCreatorEndpoint <-
       IOHookCreationEndpoint(projectHookUrl, gitLabThrottler, hookTokenCrypto, logger)
     processingStatusEndpoint <-
-      IOProcessingStatusEndpoint(projectHookUrl, gitLabThrottler, executionTimeRecorder, logger)
+      ProcessingStatusEndpoint(projectHookUrl, gitLabThrottler, executionTimeRecorder, logger)
     hookValidationEndpoint <- IOHookValidationEndpoint(projectHookUrl, gitLabThrottler, logger)
     authenticator          <- GitLabAuthenticator(gitLabThrottler, logger)
     authMiddleware         <- Authentication.middleware(authenticator)

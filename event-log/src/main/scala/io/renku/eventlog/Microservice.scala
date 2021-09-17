@@ -32,10 +32,10 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
-import io.renku.eventlog.events.EventEndpoint
+import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
 import io.renku.eventlog.init.DbInitializer
 import io.renku.eventlog.metrics._
-import io.renku.eventlog.processingstatus.IOProcessingStatusEndpoint
+import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
 import io.renku.eventlog.subscriptions._
 import natchez.Trace.Implicits.noop
 import pureconfig.ConfigSource
@@ -117,7 +117,7 @@ object Microservice extends IOMicroservice {
                                     statusChangeEventSubscription
                                   )
         eventEndpoint            <- EventEndpoint(eventConsumersRegistry)
-        processingStatusEndpoint <- IOProcessingStatusEndpoint(sessionResource, queriesExecTimes, ApplicationLogger)
+        processingStatusEndpoint <- ProcessingStatusEndpoint(sessionResource, queriesExecTimes, ApplicationLogger)
         eventProducersRegistry <- EventProducersRegistry(
                                     sessionResource,
                                     awaitingGenerationGauge,
@@ -127,10 +127,12 @@ object Microservice extends IOMicroservice {
                                     queriesExecTimes,
                                     ApplicationLogger
                                   )
-        subscriptionsEndpoint <- IOSubscriptionsEndpoint(eventProducersRegistry, ApplicationLogger)
+        subscriptionsEndpoint <- SubscriptionsEndpoint(eventProducersRegistry, ApplicationLogger)
         eventDetailsEndpoint  <- EventDetailsEndpoint(sessionResource, queriesExecTimes, ApplicationLogger)
+        eventsEndpoint        <- EventsEndpoint(sessionResource, queriesExecTimes, ApplicationLogger)
         microserviceRoutes = new MicroserviceRoutes[IO](
                                eventEndpoint,
+                               eventsEndpoint,
                                processingStatusEndpoint,
                                subscriptionsEndpoint,
                                eventDetailsEndpoint,

@@ -18,20 +18,26 @@
 
 package io.renku.eventlog.processingstatus
 
-import cats.MonadError
+import cats.MonadThrow
 import ch.datascience.db.{SessionResource, SqlStatement}
+import ch.datascience.graph.model.projects
 import ch.datascience.http.ErrorMessage
 import ch.datascience.metrics.LabeledHistogram
+import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-class ProcessingStatusEndpoint[Interpretation[_]](
+trait ProcessingStatusEndpoint[Interpretation[_]] {
+  def findProcessingStatus(projectId: projects.Id): Interpretation[Response[Interpretation]]
+}
+
+class ProcessingStatusEndpointImpl[Interpretation[_]: MonadThrow](
     processingStatusFinder: ProcessingStatusFinder[Interpretation],
     logger:                 Logger[Interpretation]
-)(implicit ME:              MonadError[Interpretation, Throwable])
-    extends Http4sDsl[Interpretation] {
+) extends Http4sDsl[Interpretation]
+    with ProcessingStatusEndpoint[Interpretation] {
 
   import cats.syntax.all._
   import ch.datascience.graph.model.projects
@@ -44,7 +50,7 @@ class ProcessingStatusEndpoint[Interpretation[_]](
   import org.http4s.circe._
   import processingStatusFinder._
 
-  def findProcessingStatus(projectId: projects.Id): Interpretation[Response[Interpretation]] = {
+  override def findProcessingStatus(projectId: projects.Id): Interpretation[Response[Interpretation]] = {
     for {
       maybeProcessingStatus <- fetchStatus(projectId).value
       response              <- maybeProcessingStatus.toResponse
@@ -77,7 +83,7 @@ class ProcessingStatusEndpoint[Interpretation[_]](
   }
 }
 
-object IOProcessingStatusEndpoint {
+object ProcessingStatusEndpoint {
 
   import cats.effect.{ContextShift, IO}
   import io.renku.eventlog.EventLogDB
@@ -86,8 +92,7 @@ object IOProcessingStatusEndpoint {
       sessionResource:     SessionResource[IO, EventLogDB],
       queriesExecTimes:    LabeledHistogram[IO, SqlStatement.Name],
       logger:              Logger[IO]
-  )(implicit contextShift: ContextShift[IO]): IO[ProcessingStatusEndpoint[IO]] =
-    for {
-      statusFinder <- IOProcessingStatusFinder(sessionResource, queriesExecTimes)
-    } yield new ProcessingStatusEndpoint[IO](statusFinder, logger)
+  )(implicit contextShift: ContextShift[IO]): IO[ProcessingStatusEndpoint[IO]] = for {
+    statusFinder <- IOProcessingStatusFinder(sessionResource, queriesExecTimes)
+  } yield new ProcessingStatusEndpointImpl[IO](statusFinder, logger)
 }
