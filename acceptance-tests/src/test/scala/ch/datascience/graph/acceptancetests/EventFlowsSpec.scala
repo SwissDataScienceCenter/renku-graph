@@ -42,8 +42,8 @@ class EventFlowsSpec
     with ModelImplicits
     with GivenWhenThen
     with GraphServices
-    with AcceptanceTestPatience
     with Eventually
+    with AcceptanceTestPatience
     with should.Matchers {
 
   Feature("Push events from GitLab should be translated into triples in the RDF Store") {

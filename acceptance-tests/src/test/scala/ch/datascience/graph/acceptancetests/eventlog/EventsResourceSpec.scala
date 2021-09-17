@@ -10,6 +10,7 @@ import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.model.EventsGenerators.commitIds
+import ch.datascience.graph.model.events
 import ch.datascience.graph.model.events.{EventId, EventStatus}
 import ch.datascience.graph.model.testentities.generators.EntitiesGenerators
 import ch.datascience.http.client.AccessToken
@@ -27,17 +28,17 @@ class EventsResourceSpec
     extends AnyFeatureSpec
     with GivenWhenThen
     with GraphServices
-    with AcceptanceTestPatience
     with RdfStoreData
     with should.Matchers
     with Eventually
+    with AcceptanceTestPatience
     with EntitiesGenerators {
 
   Feature("GET /events?project-path=<path> to return info about all the project events") {
 
     Scenario("As a user I would like to see all events from the project with the given path") {
-      val commits = commitIds.generateNonEmptyList(maxElements = 6).toList
-      implicit val accessToken: AccessToken = accessTokens.generateOne
+      val commits:              List[events.CommitId] = commitIds.generateNonEmptyList(maxElements = 6).toList
+      implicit val accessToken: AccessToken           = accessTokens.generateOne
       val project = dataProjects(projectEntities(anyVisibility), CommitsCount(commits.size)).generateOne
 
       When("there are no events for the given project in EL")
@@ -46,7 +47,7 @@ class EventsResourceSpec
       noEventsResponse.status                    shouldBe Ok
       noEventsResponse.bodyAsJson.as[List[Json]] shouldBe Nil.asRight
 
-      commits foreach `data in the RDF store`(project, project.entitiesProject.asJsonLD, _)
+      commits foreach { commitId => `data in the RDF store`(project, project.entitiesProject.asJsonLD, commitId) }
 
       eventually {
         val eventsResponse = eventLogClient.GET(s"events?project-path=${urlEncode(project.path.show)}")
@@ -58,7 +59,7 @@ class EventsResourceSpec
     }
   }
 
-  private final case class EventInfo(eventId: EventId, status: EventStatus, maybeMessage: Option[String])
+  private case class EventInfo(eventId: EventId, status: EventStatus, maybeMessage: Option[String])
 
   private implicit lazy val infoDecoder: Decoder[EventInfo] = cursor => {
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
