@@ -23,7 +23,7 @@ import io.circe.{Json, JsonNumber, JsonObject}
 import io.renku.jsonld.JsonLD.{JsonLDInstantValue, JsonLDLocalDateValue, JsonLDValue}
 import io.renku.jsonld._
 
-import java.time.{Instant, LocalDate}
+import java.time.{Instant, LocalDate, OffsetDateTime}
 import scala.util.Try
 
 private class JsonLDParser() extends Parser {
@@ -164,10 +164,11 @@ private class JsonLDParser() extends Parser {
 
     def stringToJsonLDValue(string: String): Option[EntityTypes] => Either[ParsingFailure, JsonLD] = {
       case Some(JsonLDInstantValue.entityTypes) =>
-        Try(Instant.parse(string)).toEither.bimap(
-          e => ParsingFailure(s"Could not parse $string to instant", e),
-          JsonLDInstantValue.from
-        )
+        (Try(Instant.parse(string)) orElse Try(OffsetDateTime.parse(string).toInstant)).toEither
+          .bimap(
+            e => ParsingFailure(s"Could not parse $string to instant", e),
+            JsonLDInstantValue.from
+          )
       case Some(JsonLDLocalDateValue.entityTypes) =>
         Try(LocalDate.parse(string)).toEither.bimap(
           e => ParsingFailure(s"Could not parse $string to local date", e),

@@ -19,16 +19,19 @@
 package io.renku.jsonld.parser
 
 import cats.syntax.all._
+import io.circe
 import io.circe.Json
 import io.circe.literal.JsonStringContext
+import io.renku.jsonld.JsonLD.JsonLDInstantValue
 import io.renku.jsonld.generators.Generators.Implicits._
 import io.renku.jsonld.generators.Generators.{localDates, nonEmptyStrings, timestamps}
 import io.renku.jsonld.generators.JsonLDGenerators._
+import io.renku.jsonld.syntax._
 import io.renku.jsonld.{JsonLD, Property, Reverse}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import io.renku.jsonld.syntax._
 
+import java.time.{OffsetDateTime, ZoneOffset}
 import scala.util.Random
 
 class JsonLDParserSpec extends AnyWordSpec with should.Matchers {
@@ -49,8 +52,16 @@ class JsonLDParserSpec extends AnyWordSpec with should.Matchers {
           nonEmptyStrings().generateNonEmptyList().map(JsonLD.fromString).toList: _*
         )
       )
+      val offsetDateTime = {
+        val timestamp = timestamps.generateOne
+        OffsetDateTime.ofInstant(timestamp, timestamp.atOffset(ZoneOffset.UTC).toZonedDateTime.getZone)
+      }
 
-      parser.parse(entity.toJson) shouldBe Right(entity)
+      parser.parse(entity.toJson.deepMerge(offsetDateTimeProperty(offsetDateTime))) shouldBe entity
+        .copy(
+          properties = entity.properties + (schema / "zonedDateTime" -> JsonLD.fromInstant(offsetDateTime.toInstant))
+        )
+        .asRight
     }
 
     "successfully parse a json object with nested objects" in {
@@ -240,4 +251,15 @@ class JsonLDParserSpec extends AnyWordSpec with should.Matchers {
 
   private lazy val schema = schemas.generateOne
   private lazy val parser = new JsonLDParser()
+
+  private def offsetDateTimeProperty(value: OffsetDateTime) = circe.parser
+    .parse {
+      s"""{
+            "${schema / "zonedDateTime"}": {
+              "@type": "${JsonLDInstantValue.entityTypes.show}",
+              "@value": "$value"
+            }                                              
+          }"""
+    }
+    .fold(fail(_), identity)
 }
