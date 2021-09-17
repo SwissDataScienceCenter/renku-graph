@@ -52,7 +52,7 @@ class EventsResourceSpec
       eventually {
         val eventsResponse = eventLogClient.GET(s"events?project-path=${urlEncode(project.path.show)}")
         eventsResponse.status shouldBe Ok
-        val Right(events) = noEventsResponse.bodyAsJson.as[List[EventInfo]]
+        val Right(events) = eventsResponse.bodyAsJson.as[List[EventInfo]]
         events.size               shouldBe commits.size
         events.map(_.eventId.value) should contain theSameElementsAs commits.map(_.value)
       }
