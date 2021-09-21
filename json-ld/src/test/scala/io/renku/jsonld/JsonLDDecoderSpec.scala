@@ -340,6 +340,27 @@ class JsonLDDecoderSpec
         .as(decodeList(decoder)) shouldBe List(child).asRight
     }
 
+    "decode an entity if it matches given predicate" in {
+
+      val matchingName = nonEmptyStrings().generateOne
+      val predicate: Cursor => JsonLDDecoder.Result[Boolean] = cursor =>
+        for {
+          types <- cursor.getEntityTypes
+          name  <- cursor.downField(schema / "name").as[String]
+        } yield types.contains(EntityTypes.of(schema / "Child")) && name == matchingName
+
+      val decoder: JsonLDEntityDecoder[Child] = JsonLDDecoder.entity(EntityTypes.of(schema / "Child"), predicate) {
+        _.downField(schema / "name").as[String] map Child.apply
+      }
+
+      JsonLD
+        .arr(Child(nonEmptyStrings().generateOne).asJsonLD, Child(matchingName).asJsonLD)
+        .flatten
+        .fold(fail(_), identity)
+        .cursor
+        .as[List[Child]](decodeList(decoder)) shouldBe List(Child(matchingName)).asRight
+    }
+
     "decode entities with reverse" in {
 
       val childEncoder = JsonLDEncoder.instance[Child](child =>

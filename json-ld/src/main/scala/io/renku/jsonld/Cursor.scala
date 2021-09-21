@@ -145,15 +145,22 @@ object Cursor {
     override lazy val delete: Cursor         = Empty()
     override lazy val top:    Option[JsonLD] = parent.top
 
-    def findEntity(entityTypes: EntityTypes): Option[JsonLDEntity] = jsonLD match {
+    def findEntity(entityTypes: EntityTypes,
+                   predicate:   Cursor => JsonLDDecoder.Result[Boolean]
+    ): Option[JsonLDDecoder.Result[JsonLDEntity]] = jsonLD match {
       case JsonLDEntityId(entityId) =>
-        allEntities.get(entityId) >>= {
-          case entity if entity.types contains entityTypes => Some(entity)
-          case _                                           => None
-        }
-      case entity @ JsonLDEntity(_, types, _, _) if types.contains(entityTypes) => Some(entity)
-      case _                                                                    => None
+        allEntities.get(entityId).filter(by(entityTypes)).findM(entity => predicate(entity.cursor)).sequence
+      case entity @ JsonLDEntity(_, types, _, _) if types contains entityTypes => check(predicate)(entity)
+      case _                                                                   => None
     }
+
+    private def by(entityTypes: EntityTypes): JsonLDEntity => Boolean =
+      _.types contains entityTypes
+
+    private def check(
+        predicate: Cursor => JsonLDDecoder.Result[Boolean]
+    ): JsonLDEntity => Option[JsonLDDecoder.Result[JsonLDEntity]] =
+      entity => predicate(entity.cursor).map(Option.when(_)(entity)).sequence
   }
 
   private[jsonld] final case class DeletedPropertyCursor(parent: Cursor, property: Property) extends Cursor {
