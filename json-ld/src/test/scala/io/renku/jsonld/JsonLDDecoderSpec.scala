@@ -21,6 +21,7 @@ package io.renku.jsonld
 import JsonLDDecoder._
 import cats.syntax.all._
 import io.circe.DecodingFailure
+import io.renku.jsonld.JsonLD.JsonLDValue
 import io.renku.jsonld.generators.Generators.Implicits._
 import io.renku.jsonld.generators.Generators.{localDates, nonEmptyStrings, timestamps}
 import io.renku.jsonld.generators.JsonLDGenerators.{entityIds, entityTypesObject, jsonLDEntities, jsonLDValues, properties}
@@ -68,18 +69,23 @@ class JsonLDDecoderSpec
       ("LocalDate", decodeLocalDate, localDates.map(v => v -> JsonLD.fromLocalDate(v)), JsonLD.fromInt(1))
     )
 
-    forAll(scenarios) { case (typeName, decoder, generator, illegalType) =>
-      s"allow to successfully decode $typeName JsonLDValues to $typeName" in {
-        forAll(generator) { case (value, jsonLD) =>
-          jsonLD.cursor.as(decoder) shouldBe Right(value)
+    forAll(scenarios) {
+      case (typeName, decoder, generator, illegalType: JsonLDValue[_]) =>
+        s"allow to successfully decode $typeName JsonLDValues to $typeName" in {
+          forAll(generator) { case (value, jsonLD) =>
+            jsonLD.cursor.as(decoder) shouldBe Right(value)
+          }
         }
-      }
 
-      s"fail to decode JsonLDValues of illegal type to $typeName" in {
-        forAll(generator) { case (_, _) =>
-          illegalType.cursor.as(decoder) shouldBe Left(DecodingFailure(s"Cannot decode $illegalType to $typeName", Nil))
+        s"fail to decode JsonLDValues of illegal type to $typeName" in {
+          forAll(generator) { case (_, _) =>
+            illegalType.cursor.as(decoder) shouldBe Left(
+              DecodingFailure(s"Cannot decode ${illegalType.value} to $typeName", Nil)
+            )
+          }
         }
-      }
+
+      case (_, _, _, illegalType) => fail(s"Missing tests for $illegalType")
     }
 
     "allow to successfully decode any JsonLD to JsonLD" in {

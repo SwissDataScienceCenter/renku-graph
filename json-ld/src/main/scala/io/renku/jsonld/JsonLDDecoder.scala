@@ -54,9 +54,7 @@ abstract class JsonLDEntityDecoder[A](val entityTypes: EntityTypes) extends Json
             .orElse(alternative.tryDecode(flattenedCursor))
             .getOrElse {
               DecodingFailure(
-                s"Cannot find neither an entity of type(s) ${self.entityTypes.list
-                  .map(_.show)
-                  .nonEmptyIntercalate("; ")} nor ${alternative.entityTypes.list.map(_.show).nonEmptyIntercalate("; ")}",
+                show"Cannot find neither an entity of type(s) ${self.entityTypes} nor ${alternative.entityTypes}",
                 Nil
               ).asLeft
             }
@@ -89,12 +87,8 @@ object JsonLDDecoder {
     new JsonLDEntityDecoder[A](entityTypes) {
       override def apply(cursor: Cursor): Result[A] = cursor match {
         case flattenedCursor: FlattenedJsonCursor =>
-          tryDecode(flattenedCursor) getOrElse {
-            DecodingFailure(
-              s"Cannot find an entity of type(s) ${entityTypes.list.map(_.show).nonEmptyIntercalate("; ")}",
-              Nil
-            ).asLeft
-          }
+          tryDecode(flattenedCursor)
+            .getOrElse(DecodingFailure(show"Cannot find an entity of type(s) $entityTypes", Nil).asLeft)
         case _ => goDownType(cursor)
       }
 
@@ -109,44 +103,50 @@ object JsonLDDecoder {
 
   implicit val decodeString: JsonLDDecoder[String] = _.jsonLD match {
     case JsonLDValue(value: String, _) => Right(value)
-    case json => DecodingFailure(s"Cannot decode $json to String", Nil).asLeft
+    case JsonLDValue(value, _) => DecodingFailure(s"Cannot decode $value to String", Nil).asLeft
+    case json                  => DecodingFailure(s"Cannot decode ${showTypeName(json)} to String", Nil).asLeft
   }
 
   implicit val decodeLong: JsonLDDecoder[Long] = _.jsonLD match {
-    case json @ JsonLDValue(value: JsonNumber, _) =>
-      value.toLong.map(_.asRight).getOrElse(DecodingFailure(s"Cannot decode $json to Long", Nil).asLeft)
-    case json => DecodingFailure(s"Cannot decode $json to Long", Nil).asLeft
+    case JsonLDValue(value: JsonNumber, _) =>
+      value.toLong.map(_.asRight).getOrElse(DecodingFailure(s"Cannot decode $value to Long", Nil).asLeft)
+    case JsonLDValue(value, _) => DecodingFailure(s"Cannot decode $value to Long", Nil).asLeft
+    case json                  => DecodingFailure(s"Cannot decode ${showTypeName(json)} to Long", Nil).asLeft
   }
 
   implicit val decodeInt: JsonLDDecoder[Int] = _.jsonLD match {
-    case json @ JsonLDValue(value: JsonNumber, _) =>
-      value.toInt.map(_.asRight).getOrElse(DecodingFailure(s"Cannot decode $json to Int", Nil).asLeft)
-    case json => DecodingFailure(s"Cannot decode $json to Int", Nil).asLeft
+    case JsonLDValue(value: JsonNumber, _) =>
+      value.toInt.map(_.asRight).getOrElse(DecodingFailure(s"Cannot decode $value to Int", Nil).asLeft)
+    case JsonLDValue(value, _) => DecodingFailure(s"Cannot decode $value to Int", Nil).asLeft
+    case json                  => DecodingFailure(s"Cannot decode ${showTypeName(json)} to Int", Nil).asLeft
   }
 
   implicit val decodeBoolean: JsonLDDecoder[Boolean] = _.jsonLD match {
     case JsonLDValue(value: Boolean, _) => Right(value)
-    case json => DecodingFailure(s"Cannot decode $json to Boolean", Nil).asLeft
+    case JsonLDValue(value, _) => DecodingFailure(s"Cannot decode $value to Boolean", Nil).asLeft
+    case json                  => DecodingFailure(s"Cannot decode ${showTypeName(json)} to Boolean", Nil).asLeft
   }
 
   implicit val decodeInstant: JsonLDDecoder[Instant] = _.jsonLD match {
     case JsonLDValue(value: Instant, Some(JsonLDInstantValue.entityTypes)) => Right(value)
-    case json => DecodingFailure(s"Cannot decode $json to Instant", Nil).asLeft
+    case JsonLDValue(value, _) => DecodingFailure(s"Cannot decode $value to Instant", Nil).asLeft
+    case json                  => DecodingFailure(s"Cannot decode ${showTypeName(json)} to Instant", Nil).asLeft
   }
 
   implicit val decodeLocalDate: JsonLDDecoder[LocalDate] = _.jsonLD match {
     case JsonLDValue(value: LocalDate, Some(JsonLDLocalDateValue.entityTypes)) => Right(value)
-    case json => DecodingFailure(s"Cannot decode $json to LocalDate", Nil).asLeft
+    case JsonLDValue(value, _) => DecodingFailure(s"Cannot decode $value to LocalDate", Nil).asLeft
+    case json                  => DecodingFailure(s"Cannot decode ${showTypeName(json)} to LocalDate", Nil).asLeft
   }
 
   implicit val decodeEntityId: JsonLDDecoder[EntityId] = _.jsonLD match {
     case JsonLDEntityId(value) => Right(value)
-    case json                  => DecodingFailure(s"Cannot decode $json to EntityId", Nil).asLeft
+    case json                  => DecodingFailure(s"Cannot decode ${showTypeName(json)} to EntityId", Nil).asLeft
   }
 
   implicit val decodeEntityTypes: JsonLDDecoder[EntityTypes] = _.jsonLD match {
     case JsonLDEntity(_, entityTypes, _, _) => Right(entityTypes)
-    case json                               => DecodingFailure(s"Cannot decode $json to EntityTypes", Nil).asLeft
+    case json                               => DecodingFailure(s"Cannot decode ${showTypeName(json)} to EntityTypes", Nil).asLeft
   }
 
   implicit def decodeOption[I](implicit valueDecoder: JsonLDDecoder[I]): JsonLDDecoder[Option[I]] = { cursor =>
@@ -202,12 +202,14 @@ object JsonLDDecoder {
         case entity @ JsonLDEntity(_, _, _, _) => entity.cursor.as[I].map(List(_))
         case value @ JsonLDValue(_, _)         => value.cursor.as[I].map(List(_))
         case JsonLDNull                        => List.empty[I].asRight
-        case json                              => DecodingFailure(s"Cannot decode $json to List", Nil).asLeft
+        case json                              => DecodingFailure(s"Cannot decode ${showTypeName(json)} to List", Nil).asLeft
       }
   }
 
   private implicit lazy val decodeJsonLDEntity: JsonLDDecoder[(EntityId, JsonLDEntity)] = _.jsonLD match {
     case entity @ JsonLDEntity(id, _, _, _) => Right(id -> entity)
-    case json                               => DecodingFailure(s"Cannot decode $json to JsonLDEntity", Nil).asLeft
+    case json                               => DecodingFailure(s"Cannot decode ${showTypeName(json)} to JsonLDEntity", Nil).asLeft
   }
+
+  private def showTypeName(json: JsonLD) = json.getClass.getSimpleName.replace("$", "")
 }
