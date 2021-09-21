@@ -18,6 +18,7 @@
 
 package io.renku.jsonld
 
+import cats.Show
 import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.jsonld.JsonLD._
@@ -46,7 +47,7 @@ abstract class Cursor {
           this match {
             case cursor @ FlattenedArrayCursor(_, _, allEntities) =>
               decoder(FlattenedJsonCursor(cursor, head, allEntities))
-            case _ => decoder(new ListItemCursor(this, head))
+            case _ => decoder(ListItemCursor(this, head))
           }
         case _ => failure
       }
@@ -58,76 +59,90 @@ abstract class Cursor {
   }
 
   def downEntityId: Cursor = jsonLD match {
-    case JsonLDEntity(entityId, _, _, _) => new PropertyCursor(this, Property("@id"), entityId.asJsonLD)
+    case JsonLDEntity(entityId, _, _, _) => PropertyCursor(this, Property("@id"), entityId.asJsonLD)
     case _: JsonLDEntityId[_] => this
-    case _ => Empty
+    case JsonLDArray(Seq(jsonLDEntityId @ JsonLDEntityId(_))) => PropertyCursor(this, Property("@id"), jsonLDEntityId)
+    case JsonLDArray(items) if items.size != 1                => Empty(s"Expected @id but got an array of size ${items.size}")
+    case jsonLD                                               => Empty(s"Expected @id but got a ${jsonLD.getClass.getSimpleName}")
   }
 
   def downType(searchedTypes: EntityTypes): Cursor = downType(searchedTypes.toList: _*)
 
   def downType(searchedTypes: EntityType*): Cursor = jsonLD match {
     case JsonLDEntity(_, types, _, _) if searchedTypes.diff(types.list.toList).isEmpty => this
-    case _                                                                             => Empty
+    case _                                                                             => Empty(s"Cannot find entity with ${searchedTypes.mkString("; ")} @type")
   }
 
   lazy val downArray: Cursor = jsonLD match {
     case array @ JsonLDArray(_) =>
       this match {
-        case cursor: FlattenedArrayCursor => FlattenedArrayCursor(cursor, array, cursor.allEntities)
-        case cursor: Cursor               => new ArrayCursor(cursor, array)
+        case cursor: FlattenedArrayCursor => cursor
+        case cursor: Cursor               => ArrayCursor(cursor, array)
       }
-    case _ => Empty
+    case jsonLD => Empty(s"Expected JsonLD Array but got ${jsonLD.getClass.getSimpleName}")
   }
 
-  def downField(name: Property): Cursor = jsonLD match {
+  def downField(property: Property): Cursor = jsonLD match {
     case JsonLDEntity(_, _, props, _) =>
       props
-        .find(_._1 == name)
-        .fold(Empty: Cursor) {
+        .find(_._1 == property)
+        .fold(Empty(show"Cannot find $property property"): Cursor) {
           case (name, entityId @ JsonLDEntityId(_)) =>
             this match {
               case cursor: FlattenedJsonCursor => FlattenedJsonCursor(cursor, entityId, cursor.allEntities)
-              case cursor => new PropertyCursor(cursor, name, entityId)
+              case cursor => PropertyCursor(cursor, name, entityId)
             }
-          case (name, value: JsonLDValue[_]) => new PropertyCursor(this, name, value)
-          case (name, entity: JsonLDEntity) => new PropertyCursor(this, name, entity)
+          case (name, value: JsonLDValue[_]) => PropertyCursor(this, name, value)
+          case (name, entity: JsonLDEntity) => PropertyCursor(this, name, entity)
           case (_, entities: JsonLDArray) =>
             this match {
               case cursor: FlattenedJsonCursor => FlattenedArrayCursor(cursor, entities, cursor.allEntities)
-              case cursor => new ArrayCursor(cursor, entities)
+              case cursor => ArrayCursor(cursor, entities)
             }
-          case _ => Empty
+          case (_, jsonLD) => Empty(s"$property property points to ${jsonLD.getClass.getSimpleName.replace("$", "")}")
         }
     case array @ JsonLDArray(_) =>
       this match {
         case cursor: FlattenedJsonCursor => FlattenedArrayCursor(cursor, array, cursor.allEntities)
-        case cursor => new ArrayCursor(cursor, array)
+        case cursor => ArrayCursor(cursor, array)
       }
-    case _ => Empty
+    case jsonLD => Empty(s"Expected JsonLD entity or array but got ${jsonLD.getClass.getSimpleName.replace("$", "")}")
   }
 }
 
 object Cursor {
-  def from(jsonLD: JsonLD): Cursor = new TopCursor(jsonLD)
+  def from(jsonLD: JsonLD): Cursor = TopCursor(jsonLD)
 
-  private[jsonld] type Empty = Empty.type
-  private[jsonld] object Empty extends Cursor {
+  private[jsonld] final case class Empty(maybeMessage: Option[String]) extends Cursor {
     override lazy val jsonLD: JsonLD         = JsonLD.JsonLDNull
     override lazy val delete: Cursor         = this
     override lazy val top:    Option[JsonLD] = None
   }
 
-  private[jsonld] class TopCursor(override val jsonLD: JsonLD) extends Cursor {
-    override lazy val delete: Cursor         = Empty
+  private[jsonld] object Empty {
+    val noMessage: Empty = Empty(None)
+
+    def apply(): Empty = noMessage
+
+    def apply(message: String): Empty = Empty(Some(message))
+
+    implicit val show: Show[Empty] = Show.show[Empty] {
+      case Empty(Some(message)) => s"Empty cursor cause by $message"
+      case Empty(None)          => s"Empty cursor"
+    }
+  }
+
+  private[jsonld] final case class TopCursor(jsonLD: JsonLD) extends Cursor {
+    override lazy val delete: Cursor         = Empty()
     override lazy val top:    Option[JsonLD] = Some(jsonLD)
   }
 
-  private[jsonld] case class FlattenedJsonCursor(
-      parent:              Cursor,
-      override val jsonLD: JsonLD,
-      allEntities:         Map[EntityId, JsonLDEntity]
+  private[jsonld] final case class FlattenedJsonCursor(
+      parent:      Cursor,
+      jsonLD:      JsonLD,
+      allEntities: Map[EntityId, JsonLDEntity]
   ) extends Cursor {
-    override lazy val delete: Cursor         = Empty
+    override lazy val delete: Cursor         = Empty()
     override lazy val top:    Option[JsonLD] = parent.top
 
     def findEntity(entityTypes: EntityTypes): Option[JsonLDEntity] = jsonLD match {
@@ -141,7 +156,7 @@ object Cursor {
     }
   }
 
-  private[jsonld] class DeletedPropertyCursor(parent: Cursor, property: Property) extends Cursor {
+  private[jsonld] final case class DeletedPropertyCursor(parent: Cursor, property: Property) extends Cursor {
     override lazy val jsonLD: JsonLD = JsonLD.JsonLDNull
     override lazy val delete: Cursor = this
     override lazy val top: Option[JsonLD] = parent.jsonLD match {
@@ -150,26 +165,26 @@ object Cursor {
     }
   }
 
-  private[jsonld] class PropertyCursor(parent: Cursor, property: Property, override val jsonLD: JsonLD) extends Cursor {
-    override lazy val delete: Cursor         = new DeletedPropertyCursor(parent, property)
+  private[jsonld] final case class PropertyCursor(parent: Cursor, property: Property, jsonLD: JsonLD) extends Cursor {
+    override lazy val delete: Cursor         = DeletedPropertyCursor(parent, property)
     override lazy val top:    Option[JsonLD] = parent.top
   }
 
-  private[jsonld] class ListItemCursor(parent: Cursor, override val jsonLD: JsonLD) extends Cursor {
-    override lazy val top: Option[JsonLD] = parent.top
-    override def delete:   Cursor         = Empty
+  private[jsonld] final case class ListItemCursor(parent: Cursor, jsonLD: JsonLD) extends Cursor {
+    override lazy val top:    Option[JsonLD] = parent.top
+    override lazy val delete: Cursor         = Empty()
   }
 
-  private[jsonld] class ArrayCursor(parent: Cursor, override val jsonLD: JsonLDArray) extends Cursor {
-    override lazy val top: Option[JsonLD] = parent.top
-    override def delete:   Cursor         = Empty
+  private[jsonld] final case class ArrayCursor(parent: Cursor, jsonLD: JsonLDArray) extends Cursor {
+    override lazy val top:    Option[JsonLD] = parent.top
+    override lazy val delete: Cursor         = Empty()
   }
 
-  private[jsonld] case class FlattenedArrayCursor(parent:              Cursor,
-                                                  override val jsonLD: JsonLDArray,
-                                                  allEntities:         Map[EntityId, JsonLDEntity]
+  private[jsonld] final case class FlattenedArrayCursor(parent:      Cursor,
+                                                        jsonLD:      JsonLDArray,
+                                                        allEntities: Map[EntityId, JsonLDEntity]
   ) extends Cursor {
-    override lazy val top: Option[JsonLD] = parent.top
-    override def delete:   Cursor         = Empty
+    override lazy val top:    Option[JsonLD] = parent.top
+    override lazy val delete: Cursor         = Empty()
   }
 }

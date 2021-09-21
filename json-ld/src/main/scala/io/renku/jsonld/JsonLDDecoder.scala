@@ -99,11 +99,8 @@ object JsonLDDecoder {
       }
 
       protected override def goDownType(cursor: Cursor) = cursor.downType(entityTypes.list.toList: _*) match {
-        case Cursor.Empty =>
-          DecodingFailure(
-            s"Cannot decode to an entity of type(s) ${entityTypes.list.map(_.show).nonEmptyIntercalate("; ")}",
-            Nil
-          ).asLeft
+        case cursor @ Cursor.Empty(_) =>
+          DecodingFailure(show"Cannot decode to an entity of type(s) $entityTypes$cursor", Nil).asLeft
         case c => f(c)
       }
     }

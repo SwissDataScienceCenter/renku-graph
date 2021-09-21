@@ -355,7 +355,6 @@ class JsonLDDecoderSpec
         .fold(fail(_), identity)
         .cursor
         .as[List[Parent]] shouldBe List(parent1).asRight
-
     }
   }
 
