@@ -33,6 +33,8 @@ import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
+import java.time.{Instant, ZoneOffset}
+
 class JsonLDDecoderSpec
     extends AnyWordSpec
     with ScalaCheckPropertyChecks
@@ -86,6 +88,16 @@ class JsonLDDecoderSpec
         }
 
       case (_, _, _, illegalType) => fail(s"Missing tests for $illegalType")
+    }
+
+    "allow to successfully decode Instant from String" in {
+      val instant = timestamps.generateOne
+      JsonLD.fromString(instant.toString).cursor.as[Instant] shouldBe Right(instant)
+    }
+
+    "allow to successfully decode OffsetDateTime from String" in {
+      val instant = timestamps.generateOne
+      JsonLD.fromString(instant.atOffset(ZoneOffset.ofHours(1)).toString).cursor.as[Instant] shouldBe Right(instant)
     }
 
     "allow to successfully decode any JsonLD to JsonLD" in {

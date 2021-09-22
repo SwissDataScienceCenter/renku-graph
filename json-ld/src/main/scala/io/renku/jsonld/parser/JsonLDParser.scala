@@ -166,7 +166,9 @@ private class JsonLDParser() extends Parser {
 
     def stringToJsonLDValue(string: String): Option[EntityTypes] => Either[ParsingFailure, JsonLD] = {
       case Some(JsonLDInstantValue.entityTypes) =>
-        (Try(Instant.parse(string)) orElse Try(OffsetDateTime.parse(string).toInstant)).toEither
+        Either
+          .catchNonFatal(Instant.parse(string))
+          .orElse(Either.catchNonFatal(OffsetDateTime.parse(string).toInstant))
           .bimap(
             e => ParsingFailure(s"Could not parse $string to instant", e),
             JsonLDInstantValue.from

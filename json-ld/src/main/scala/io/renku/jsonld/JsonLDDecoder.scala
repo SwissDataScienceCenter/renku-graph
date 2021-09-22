@@ -24,7 +24,7 @@ import io.renku.jsonld.Cursor._
 import io.renku.jsonld.JsonLD._
 import io.renku.jsonld.JsonLDDecoder.Result
 
-import java.time.{Instant, LocalDate}
+import java.time.{Instant, LocalDate, OffsetDateTime}
 
 /** A type class that provides a conversion from a [[Cursor]] to an object of type `A`
   */
@@ -139,6 +139,9 @@ object JsonLDDecoder {
 
   implicit val decodeInstant: JsonLDDecoder[Instant] = _.jsonLD match {
     case JsonLDValue(value: Instant, Some(JsonLDInstantValue.entityTypes)) => Right(value)
+    case JsonLDValue(value: String, _) =>
+      (Either.catchNonFatal(Instant.parse(value)) orElse Either.catchNonFatal(OffsetDateTime.parse(value).toInstant))
+        .leftMap(e => DecodingFailure(s"Could not parse $value to instant: ${e.getMessage}", Nil))
     case JsonLDValue(value, _) => DecodingFailure(s"Cannot decode $value to Instant", Nil).asLeft
     case json                  => DecodingFailure(s"Cannot decode ${showTypeName(json)} to Instant", Nil).asLeft
   }
