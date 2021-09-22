@@ -69,8 +69,8 @@ abstract class Cursor {
   def downType(searchedTypes: EntityTypes): Cursor = downType(searchedTypes.toList: _*)
 
   def downType(searchedTypes: EntityType*): Cursor = jsonLD match {
-    case JsonLDEntity(_, types, _, _) if searchedTypes.diff(types.list.toList).isEmpty => this
-    case _                                                                             => Empty(s"Cannot find entity with ${searchedTypes.mkString("; ")} @type")
+    case JsonLDEntity(_, types, _, _) if (searchedTypes diff types.list.toList).isEmpty => this
+    case _                                                                              => Empty(s"Cannot find entity of ${searchedTypes.map(_.show).mkString("; ")} type")
   }
 
   lazy val downArray: Cursor = jsonLD match {
@@ -127,7 +127,7 @@ object Cursor {
     def apply(message: String): Empty = Empty(Some(message))
 
     implicit val show: Show[Empty] = Show.show[Empty] {
-      case Empty(Some(message)) => s"Empty cursor cause by $message"
+      case Empty(Some(message)) => s"Empty cursor cause by: $message"
       case Empty(None)          => s"Empty cursor"
     }
   }

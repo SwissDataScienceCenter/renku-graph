@@ -42,7 +42,7 @@ class CursorSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
 
     "show as 'Empty Cursor' with the cause if it has a message" in {
       val message = nonEmptyStrings().generateOne
-      Cursor.Empty(message).show shouldBe s"Empty cursor cause by $message"
+      Cursor.Empty(message).show shouldBe s"Empty cursor cause by: $message"
     }
   }
 
@@ -147,7 +147,7 @@ class CursorSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
         JsonLD
           .entity(id, entityTypes, property)
           .cursor
-          .downType(searchedType) shouldBe Cursor.Empty(s"Cannot find entity with $searchedType @type")
+          .downType(searchedType) shouldBe Cursor.Empty(show"Cannot find entity of $searchedType type")
       }
     }
   }
