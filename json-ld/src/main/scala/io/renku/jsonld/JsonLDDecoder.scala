@@ -104,7 +104,7 @@ object JsonLDDecoder {
 
     protected override def goDownType(cursor: Cursor) = cursor.downType(entityTypes) match {
       case cursor @ Cursor.Empty(_) =>
-        DecodingFailure(show"Cannot decode to an entity of type(s) $entityTypes$cursor", Nil).asLeft
+        DecodingFailure(show"Cannot decode to an entity of type(s) $entityTypes $cursor", Nil).asLeft
       case c => f(c)
     }
   }
