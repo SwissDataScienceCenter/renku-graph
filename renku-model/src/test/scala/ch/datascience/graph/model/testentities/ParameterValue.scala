@@ -19,7 +19,6 @@
 package ch.datascience.graph.model.testentities
 
 import cats.syntax.all._
-import ch.datascience.graph.model.commandParameters.Name
 import ch.datascience.graph.model.entityModel.LocationLike
 import ch.datascience.graph.model.parameterValues.ValueOverride
 import ch.datascience.graph.model.testentities.CommandParameterBase._
@@ -36,7 +35,6 @@ sealed trait ParameterValue {
   type Value
 
   val id:             Id
-  val name:           Name
   val valueReference: ValueReference
   val value:          Value
   val activity:       Activity
@@ -54,19 +52,16 @@ object ParameterValue {
   ): ParameterValue => entities.ParameterValue = {
     case p: CommandParameterValue =>
       entities.ParameterValue.CommandParameterValue(parameterValues.ResourceId(p.asEntityId.show),
-                                                    p.name,
                                                     p.value,
                                                     p.valueReference.to[entities.CommandParameterBase.CommandParameter]
       )
     case p: CommandOutputValue =>
       entities.ParameterValue.CommandOutputValue(parameterValues.ResourceId(p.asEntityId.show),
-                                                 p.name,
                                                  p.value,
                                                  p.valueReference.to[entities.CommandParameterBase.CommandOutput]
       )
     case p: CommandInputValue =>
       entities.ParameterValue.CommandInputValue(parameterValues.ResourceId(p.asEntityId.show),
-                                                p.name,
                                                 p.value,
                                                 p.valueReference.to[entities.CommandParameterBase.CommandInput]
       )
@@ -75,32 +70,23 @@ object ParameterValue {
   object LocationParameterValue {
 
     def factory(location: LocationLike, valueReference: CommandInput): Activity => LocationParameterValue =
-      CommandInputValue(Id.generate, valueReference.name, location, valueReference, _)
+      CommandInputValue(Id.generate, location, valueReference, _)
 
     def factory(location: LocationLike, valueReference: CommandOutput): Activity => LocationParameterValue =
-      CommandOutputValue(Id.generate, valueReference.name, location, valueReference, _)
+      CommandOutputValue(Id.generate, location, valueReference, _)
 
-    final case class CommandInputValue(id:             Id,
-                                       name:           Name,
-                                       value:          LocationLike,
-                                       valueReference: CommandInput,
-                                       activity:       Activity
-    ) extends LocationParameterValue {
+    final case class CommandInputValue(id: Id, value: LocationLike, valueReference: CommandInput, activity: Activity)
+        extends LocationParameterValue {
       type ValueReference = CommandInput
     }
 
-    final case class CommandOutputValue(id:             Id,
-                                        name:           Name,
-                                        value:          LocationLike,
-                                        valueReference: CommandOutput,
-                                        activity:       Activity
-    ) extends LocationParameterValue {
+    final case class CommandOutputValue(id: Id, value: LocationLike, valueReference: CommandOutput, activity: Activity)
+        extends LocationParameterValue {
       type ValueReference = CommandOutput
     }
   }
 
   final case class CommandParameterValue(id:             Id,
-                                         name:           Name,
                                          value:          ValueOverride,
                                          valueReference: CommandParameter,
                                          activity:       Activity
@@ -112,7 +98,7 @@ object ParameterValue {
   object CommandParameterValue {
 
     def factory(value: ValueOverride, valueReference: CommandParameter): Activity => CommandParameterValue =
-      CommandParameterValue(Id.generate, valueReference.name, value, valueReference, _)
+      CommandParameterValue(Id.generate, value, valueReference, _)
   }
 
   implicit def encoder[PV <: ParameterValue](implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[PV] =
@@ -123,8 +109,6 @@ object ParameterValue {
 
   final class Id private (val value: String) extends AnyVal with StringTinyType
   implicit object Id extends TinyTypeFactory[Id](new Id(_)) with UUID {
-    def generate: Id = Id {
-      java.util.UUID.randomUUID.toString
-    }
+    def generate: Id = Id(java.util.UUID.randomUUID.toString)
   }
 }

@@ -54,7 +54,7 @@ object Plan {
   import io.renku.jsonld.syntax._
   import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 
-  private val entityTypes = EntityTypes.of(prov / "Plan", schema / "Action", schema / "CreativeWorks")
+  private val entityTypes = EntityTypes.of(prov / "Plan", schema / "Action", schema / "CreativeWork")
 
   implicit lazy val encoder: JsonLDEncoder[Plan] = JsonLDEncoder.instance { plan =>
     JsonLD.entity(

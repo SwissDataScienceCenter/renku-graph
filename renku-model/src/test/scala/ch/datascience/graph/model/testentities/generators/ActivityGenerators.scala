@@ -42,24 +42,24 @@ trait ActivityGenerators {
   val activityIds:        Gen[Activity.Id]          = Gen.uuid.map(uuid => Activity.Id(uuid.toString))
   val activityStartTimes: Gen[activities.StartTime] = timestampsNotInTheFuture.map(activities.StartTime.apply)
   def activityStartTimes(after: InstantTinyType): Gen[activities.StartTime] =
-    timestampsNotInTheFuture(after.value).map(activities.StartTime.apply)
+    timestampsNotInTheFuture(after.value).toGeneratorOf(activities.StartTime)
 
   val entityFileLocations:   Gen[Location.File]   = relativePaths() map Location.File.apply
   val entityFolderLocations: Gen[Location.Folder] = relativePaths() map Location.Folder.apply
   val entityLocations:       Gen[Location]        = Gen.oneOf(entityFileLocations, entityFolderLocations)
   val entityChecksums:       Gen[Checksum]        = nonBlankStrings(40, 40).map(_.value).map(Checksum.apply)
 
-  implicit val planNames: Gen[plans.Name] = nonBlankStrings().map(_.value).generateAs[plans.Name]
+  implicit val planNames: Gen[plans.Name] = nonBlankStrings().map(_.value).toGeneratorOf[plans.Name]
   implicit val planDescriptions: Gen[plans.Description] =
-    sentences().map(_.value).generateAs[plans.Description]
-  implicit val planCommands: Gen[plans.Command] = nonBlankStrings().map(_.value).generateAs[plans.Command]
+    sentences().map(_.value).toGeneratorOf[plans.Description]
+  implicit val planCommands: Gen[plans.Command] = nonBlankStrings().map(_.value).toGeneratorOf[plans.Command]
   implicit val planProgrammingLanguages: Gen[plans.ProgrammingLanguage] =
-    nonBlankStrings().map(_.value).generateAs[plans.ProgrammingLanguage]
+    nonBlankStrings().map(_.value).toGeneratorOf[plans.ProgrammingLanguage]
   implicit val planSuccessCodes: Gen[plans.SuccessCode] =
-    positiveInts().map(_.value).generateAs[plans.SuccessCode]
+    positiveInts().map(_.value).toGeneratorOf[plans.SuccessCode]
 
   implicit val commandParameterNames: Gen[commandParameters.Name] =
-    nonBlankStrings().map(_.value).generateAs[commandParameters.Name]
+    nonBlankStrings().map(_.value).toGeneratorOf[commandParameters.Name]
 
   implicit val commandParameterEncodingFormats: Gen[commandParameters.EncodingFormat] =
     Gen
