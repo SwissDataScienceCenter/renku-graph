@@ -20,8 +20,8 @@ package ch.datascience.graph.model
 
 import cats.syntax.all._
 import ch.datascience.graph.model.views.{EntityIdJsonLdOps, TinyTypeJsonLDOps}
-import ch.datascience.tinytypes.constraints.{BoundedInstant, PositiveInt, Url}
 import ch.datascience.tinytypes._
+import ch.datascience.tinytypes.constraints.{BoundedInstant, Url}
 
 import java.time.Instant
 
@@ -51,6 +51,4 @@ object activities {
     protected[this] override def maybeMax: Option[Instant] = instantNow.plus(24, HOURS).some
   }
 
-  final class Order private (val value: Int) extends AnyVal with IntTinyType
-  implicit object Order extends TinyTypeFactory[Order](new Order(_)) with PositiveInt with TinyTypeJsonLDOps[Order]
 }

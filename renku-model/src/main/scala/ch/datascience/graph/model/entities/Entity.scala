@@ -19,10 +19,12 @@
 package ch.datascience.graph.model.entities
 
 import cats.syntax.all._
-import ch.datascience.graph.model.Schemas.{prov, renku, wfprov}
+import ch.datascience.graph.model.Schemas.{prov, renku}
 import ch.datascience.graph.model.entityModel._
 import ch.datascience.graph.model.generations
-import io.renku.jsonld.{EntityTypes, JsonLDDecoder}
+import ch.datascience.graph.model.generations.ResourceId
+import io.renku.jsonld.JsonLDDecoder.Result
+import io.renku.jsonld.{Cursor, EntityTypes, JsonLDDecoder}
 
 sealed trait Entity {
   val resourceId: ResourceId
@@ -41,13 +43,13 @@ object Entity {
 
   import io.renku.jsonld.JsonLDEncoder
 
-  val fileEntityTypes:   EntityTypes = EntityTypes of (prov / "Entity", wfprov / "Artifact")
-  val folderEntityTypes: EntityTypes = EntityTypes of (prov / "Entity", wfprov / "Artifact", prov / "Collection")
+  val fileEntityTypes:   EntityTypes = EntityTypes of (prov / "Entity")
+  val folderEntityTypes: EntityTypes = EntityTypes of (prov / "Entity", prov / "Collection")
 
   implicit def encoder[E <: Entity]: JsonLDEncoder[E] = {
     import ch.datascience.graph.model.Schemas._
-    import io.renku.jsonld.syntax._
     import io.renku.jsonld._
+    import io.renku.jsonld.syntax._
 
     lazy val toEntityTypes: Entity => EntityTypes = { entity =>
       entity.location match {
@@ -78,7 +80,10 @@ object Entity {
   import io.renku.jsonld.JsonLDDecoder.decodeOption
 
   implicit lazy val entityDecoder: JsonLDDecoder[Entity] =
-    JsonLDDecoder.entity(fileEntityTypes) { cursor =>
+    JsonLDDecoder.entity(
+      fileEntityTypes,
+      withStrictEntityTypes
+    ) { cursor =>
       for {
         resourceId  <- cursor.downEntityId.as[ResourceId]
         entityTypes <- cursor.getEntityTypes
@@ -91,6 +96,28 @@ object Entity {
         case None               => InputEntity(resourceId, location, checksum)
       }
     }
+
+  def outputEntityDecoder(generationId: generations.ResourceId): JsonLDDecoder[OutputEntity] =
+    JsonLDDecoder.entity(
+      fileEntityTypes,
+      (withStrictEntityTypes &&& withSpecific(generationId)).fmap(_.mapN(_ && _))
+    ) { cursor =>
+      for {
+        resourceId   <- cursor.downEntityId.as[ResourceId]
+        entityTypes  <- cursor.getEntityTypes
+        location     <- cursor.downField(prov / "atLocation").as[Location](locationDecoder(entityTypes))
+        checksum     <- cursor.downField(renku / "checksum").as[Checksum]
+        generationId <- cursor.downField(prov / "qualifiedGeneration").downEntityId.as[generations.ResourceId]
+      } yield OutputEntity(resourceId, location, checksum, generationId)
+    }
+
+  private lazy val withStrictEntityTypes: Cursor => Result[Boolean] =
+    _.getEntityTypes.map(types => types == fileEntityTypes || types == folderEntityTypes)
+
+  private def withSpecific(generationId: generations.ResourceId): Cursor => Result[Boolean] =
+    _.downField(prov / "qualifiedGeneration").downEntityId
+      .as(decodeOption[generations.ResourceId])
+      .map(_.contains(generationId))
 
   private def locationDecoder(entityTypes: EntityTypes): JsonLDDecoder[Location] =
     JsonLDDecoder.decodeString.emap { value =>

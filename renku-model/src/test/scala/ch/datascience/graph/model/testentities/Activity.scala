@@ -20,7 +20,7 @@ package ch.datascience.graph.model.testentities
 
 import cats.syntax.all._
 import ch.datascience.graph.model._
-import ch.datascience.graph.model.activities.{EndTime, Order, StartTime}
+import ch.datascience.graph.model.activities.{EndTime, StartTime}
 import ch.datascience.graph.model.entityModel._
 import ch.datascience.graph.model.testentities.Activity._
 import ch.datascience.graph.model.testentities.Entity.OutputEntity
@@ -32,7 +32,6 @@ final case class Activity(id:                  Id,
                           endTime:             EndTime,
                           author:              Person,
                           agent:               Agent,
-                          order:               Order,
                           associationFactory:  Activity => Association,
                           usageFactories:      List[Activity => Usage],
                           generationFactories: List[Activity => Generation],
@@ -73,7 +72,6 @@ object Activity {
             startTime:           StartTime,
             author:              Person,
             agent:               Agent,
-            order:               Order,
             associationFactory:  Activity => Association,
             usageFactories:      List[Activity => Usage] = Nil,
             generationFactories: List[Activity => Generation] = Nil
@@ -82,7 +80,6 @@ object Activity {
                              EndTime(startTime.value),
                              author,
                              agent,
-                             order,
                              associationFactory,
                              usageFactories,
                              generationFactories,
@@ -99,7 +96,6 @@ object Activity {
       activity.endTime,
       activity.author.to[entities.Person],
       activity.agent.to[entities.Agent],
-      activity.order,
       activity.association.to[entities.Association],
       activity.usages.map(_.to[entities.Usage]),
       activity.generations.map(_.to[entities.Generation]),

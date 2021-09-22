@@ -131,8 +131,7 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
           prov / "wasAssociatedWith"    -> JsonLD.arr(entity.author.asJsonLD),
           prov / "qualifiedAssociation" -> entity.association.asJsonLD,
           prov / "qualifiedUsage"       -> entity.usages.asJsonLD,
-          renku / "parameter"           -> entity.parameters.asJsonLD,
-          renku / "order"               -> entity.order.asJsonLD
+          renku / "parameter"           -> entity.parameters.asJsonLD
         )
       }
 
@@ -162,8 +161,7 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
           prov / "wasAssociatedWith"    -> JsonLD.arr(entity.agent.asJsonLD),
           prov / "qualifiedAssociation" -> entity.association.asJsonLD,
           prov / "qualifiedUsage"       -> entity.usages.asJsonLD,
-          renku / "parameter"           -> entity.parameters.asJsonLD,
-          renku / "order"               -> entity.order.asJsonLD
+          renku / "parameter"           -> entity.parameters.asJsonLD
         )
       }
 

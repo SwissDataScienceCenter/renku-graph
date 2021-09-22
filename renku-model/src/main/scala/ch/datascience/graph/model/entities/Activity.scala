@@ -20,7 +20,7 @@ package ch.datascience.graph.model.entities
 
 import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
-import ch.datascience.graph.model.activities.{EndTime, Order, ResourceId, StartTime}
+import ch.datascience.graph.model.activities.{EndTime, ResourceId, StartTime}
 import ch.datascience.graph.model.entities.ParameterValue.{CommandInputValue, CommandOutputValue}
 import io.circe.DecodingFailure
 
@@ -29,7 +29,6 @@ final case class Activity(resourceId:  ResourceId,
                           endTime:     EndTime,
                           author:      Person,
                           agent:       Agent,
-                          order:       Order,
                           association: Association,
                           usages:      List[Usage],
                           generations: List[Generation],
@@ -49,7 +48,6 @@ object Activity {
            endTime:     EndTime,
            author:      Person,
            agent:       Agent,
-           order:       Order,
            association: Association,
            usages:      List[Usage],
            generations: List[Generation],
@@ -61,7 +59,6 @@ object Activity {
       endTime,
       author,
       agent,
-      order,
       association,
       usages,
       generations,
@@ -110,8 +107,7 @@ object Activity {
         prov / "wasAssociatedWith"    -> JsonLD.arr(activity.agent.asJsonLD, activity.author.asJsonLD),
         prov / "qualifiedAssociation" -> activity.association.asJsonLD,
         prov / "qualifiedUsage"       -> activity.usages.asJsonLD,
-        renku / "parameter"           -> activity.parameters.asJsonLD,
-        renku / "order"               -> activity.order.asJsonLD
+        renku / "parameter"           -> activity.parameters.asJsonLD
       )
   }
 
@@ -133,26 +129,16 @@ object Activity {
                   case author :: Nil => Right(author)
                   case _             => Left(DecodingFailure(s"Activity $resourceId without or with multiple authors", Nil))
                 }
-      order       <- cursor.downField(renku / "order").as[Order]
       association <- cursor.downField(prov / "qualifiedAssociation").as[Association]
       usages      <- cursor.downField(prov / "qualifiedUsage").as[List[Usage]]
       parameters <- cursor
                       .downField(renku / "parameter")
                       .as[List[ParameterValue]](decodeList(ParameterValue.decoder(association.plan)))
-      activity <- Activity
-                    .from(resourceId,
-                          startedAtTime,
-                          endedAtTime,
-                          author,
-                          agent,
-                          order,
-                          association,
-                          usages,
-                          generations,
-                          parameters
-                    )
-                    .leftMap(s => DecodingFailure(s.toList.mkString("; "), Nil))
-                    .toEither
+      activity <-
+        Activity
+          .from(resourceId, startedAtTime, endedAtTime, author, agent, association, usages, generations, parameters)
+          .leftMap(s => DecodingFailure(s.toList.mkString("; "), Nil))
+          .toEither
     } yield activity
   }
 }

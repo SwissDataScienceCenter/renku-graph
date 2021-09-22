@@ -18,12 +18,14 @@
 
 package ch.datascience.graph.model.entities
 
-import Generators._
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators.projectCreatedDates
+import ch.datascience.graph.model.GraphModelGenerators.{datasetCreatedDates, projectCreatedDates}
 import ch.datascience.graph.model.entities
+import ch.datascience.graph.model.entities.Generators._
 import ch.datascience.graph.model.testentities._
+import io.renku.jsonld.JsonLD
+import io.renku.jsonld.JsonLDDecoder._
 import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -46,12 +48,34 @@ class EntitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
       forAll(locationCommandOutputObjects) { commandOutput =>
         val activity = activityEntities(planEntities(commandOutput))(projectCreatedDates().generateOne).generateOne
 
-        activity.asJsonLD.flatten
+        val Right(decodedEntities) = JsonLD
+          .arr(activity.asJsonLD, datasetPartEntities(datasetCreatedDates().generateOne.value).generateOne.asJsonLD)
+          .flatten
           .fold(throw _, identity)
           .cursor
-          .as[List[entities.Entity]] shouldBe activity.generations
-          .map(_.entity.to[entities.Entity.OutputEntity])
-          .asRight
+          .as[List[entities.Entity]]
+
+        decodedEntities should contain allElementsOf activity.generations.map(
+          _.entity.to[entities.Entity.OutputEntity]
+        )
+      }
+    }
+
+    "turn JsonLD Output entity into the OutputEntity object for the given generation Id " in {
+      forAll(locationCommandOutputObjects) { commandOutput =>
+        val activity = activityEntities(planEntities(commandOutput))(projectCreatedDates().generateOne).generateOne
+          .to[entities.Activity]
+
+        val Right(decodedEntities) = JsonLD
+          .arr(activity.asJsonLD, datasetPartEntities(datasetCreatedDates().generateOne.value).generateOne.asJsonLD)
+          .flatten
+          .fold(throw _, identity)
+          .cursor
+          .as[List[entities.Entity.OutputEntity]](
+            decodeList(entities.Entity.outputEntityDecoder(activity.generations.head.resourceId))
+          )
+
+        decodedEntities should contain allElementsOf activity.generations.map(_.entity)
       }
     }
   }

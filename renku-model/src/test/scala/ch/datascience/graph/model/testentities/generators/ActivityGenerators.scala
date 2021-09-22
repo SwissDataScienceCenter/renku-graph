@@ -43,7 +43,6 @@ trait ActivityGenerators {
   val activityStartTimes: Gen[activities.StartTime] = timestampsNotInTheFuture.map(activities.StartTime.apply)
   def activityStartTimes(after: InstantTinyType): Gen[activities.StartTime] =
     timestampsNotInTheFuture(after.value).map(activities.StartTime.apply)
-  val activityOrders: Gen[activities.Order] = positiveInts(999999).map(_.value).map(activities.Order.apply)
 
   val entityFileLocations:   Gen[Location.File]   = relativePaths() map Location.File.apply
   val entityFolderLocations: Gen[Location.Folder] = relativePaths() map Location.Folder.apply

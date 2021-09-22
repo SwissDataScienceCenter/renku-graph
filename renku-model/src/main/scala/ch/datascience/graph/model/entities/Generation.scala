@@ -20,10 +20,11 @@ package ch.datascience.graph.model.entities
 
 import cats.syntax.all._
 import ch.datascience.graph.model.Schemas.prov
-import ch.datascience.graph.model.activities
 import ch.datascience.graph.model.entities.Entity.OutputEntity
 import ch.datascience.graph.model.generations.ResourceId
+import ch.datascience.graph.model.{activities, generations}
 import io.circe.DecodingFailure
+import io.renku.jsonld.JsonLDDecoder.decodeList
 import io.renku.jsonld._
 import io.renku.jsonld.syntax.JsonEncoderOps
 
@@ -44,30 +45,23 @@ object Generation {
     }
 
   implicit lazy val decoder: JsonLDDecoder[Generation] = JsonLDDecoder.entity(entityTypes) { cursor =>
-    def filterOutputEntities(resourceId: ResourceId): List[Entity] => List[OutputEntity] =
-      _.foldLeft(List.empty[OutputEntity]) {
-        case (entities, entity: OutputEntity) if entity.generationResourceId == resourceId =>
-          entity :: entities
-        case (entities, _) => entities
-      }
-
     val multipleToNone: List[OutputEntity] => Either[DecodingFailure, Option[OutputEntity]] = {
       case entity :: Nil => Right(Some(entity))
       case _             => Right(None)
     }
 
     for {
-      resourceId         <- cursor.downEntityId.as[ResourceId]
+      resourceId         <- cursor.downEntityId.as[generations.ResourceId]
       activityResourceId <- cursor.downField(prov / "activity").downEntityId.as[activities.ResourceId]
       entity <- cursor.top
                   .map {
                     _.cursor
-                      .as[List[Entity]]
-                      .map(filterOutputEntities(resourceId))
+                      .as[List[OutputEntity]](decodeList(Entity.outputEntityDecoder(resourceId)))
                       .flatMap(multipleToNone)
                   }
                   .flatMap(_.sequence)
                   .getOrElse(Left(DecodingFailure("Generation without or with multiple entities", Nil)))
     } yield Generation(resourceId, activityResourceId, entity)
   }
+
 }

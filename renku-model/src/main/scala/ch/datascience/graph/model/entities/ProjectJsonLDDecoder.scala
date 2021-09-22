@@ -57,7 +57,7 @@ object ProjectJsonLDDecoder {
     .map(_.cursor.as[List[Activity]])
     .sequence
     .map(_ getOrElse Nil)
-    .map(_.sortBy(_.order))
+    .map(_.sortBy(_.startTime))
     .leftMap(failure =>
       DecodingFailure(
         s"Finding Activity entities for project ${gitLabInfo.path} failed: ${failure.getMessage()}",

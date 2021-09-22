@@ -18,7 +18,7 @@
 
 package ch.datascience.graph.model.entities
 
-import ch.datascience.graph.model.Schemas.{prov, schema, wfprov}
+import ch.datascience.graph.model.Schemas.{prov, schema}
 import ch.datascience.graph.model.agents._
 import io.renku.jsonld._
 
@@ -26,7 +26,7 @@ final case class Agent(resourceId: ResourceId, name: Name)
 
 object Agent {
 
-  val entityTypes: EntityTypes = EntityTypes.of(prov / "SoftwareAgent", wfprov / "WorkflowEngine")
+  val entityTypes: EntityTypes = EntityTypes.of(prov / "SoftwareAgent")
 
   implicit lazy val encoder: JsonLDEncoder[Agent] = JsonLDEncoder.instance { agent =>
     import ch.datascience.graph.model.Schemas._
