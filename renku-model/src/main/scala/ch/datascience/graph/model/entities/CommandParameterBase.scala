@@ -82,7 +82,6 @@ object CommandParameterBase {
 
   sealed trait CommandInput extends CommandInputOrOutput {
     override type DefaultValue = InputDefaultValue
-    val temporary:           Temporary
     val maybeEncodingFormat: Option[EncodingFormat]
   }
 
@@ -92,7 +91,6 @@ object CommandParameterBase {
                                         maybeDescription:    Option[Description],
                                         maybePrefix:         Option[Prefix],
                                         defaultValue:        InputDefaultValue,
-                                        temporary:           Temporary,
                                         maybeEncodingFormat: Option[EncodingFormat]
   ) extends CommandInput
 
@@ -102,7 +100,6 @@ object CommandParameterBase {
                                       maybeDescription:    Option[Description],
                                       maybePrefix:         Option[Prefix],
                                       defaultValue:        InputDefaultValue,
-                                      temporary:           Temporary,
                                       maybeEncodingFormat: Option[EncodingFormat],
                                       mappedTo:            IOStream.In
   ) extends CommandInput
@@ -118,7 +115,6 @@ object CommandParameterBase {
                                 maybeDescription,
                                 maybePrefix,
                                 defaultValue,
-                                temporary,
                                 maybeEncodingFormat
           ) =>
         JsonLD.entity(
@@ -129,7 +125,6 @@ object CommandParameterBase {
           renku / "position"        -> position.asJsonLD,
           renku / "prefix"          -> maybePrefix.asJsonLD,
           schema / "defaultValue"   -> defaultValue.asJsonLD,
-          renku / "isTemporary"     -> temporary.asJsonLD,
           schema / "encodingFormat" -> maybeEncodingFormat.asJsonLD
         )
       case MappedCommandInput(resourceId,
@@ -138,7 +133,6 @@ object CommandParameterBase {
                               maybeDescription,
                               maybePrefix,
                               defaultValue,
-                              temporary,
                               maybeEncodingFormat,
                               mappedTo
           ) =>
@@ -150,7 +144,6 @@ object CommandParameterBase {
           schema / "description"    -> maybeDescription.asJsonLD,
           renku / "prefix"          -> maybePrefix.asJsonLD,
           schema / "defaultValue"   -> defaultValue.asJsonLD,
-          renku / "isTemporary"     -> temporary.asJsonLD,
           schema / "encodingFormat" -> maybeEncodingFormat.asJsonLD,
           renku / "mappedTo"        -> mappedTo.asJsonLD
         )
@@ -164,7 +157,6 @@ object CommandParameterBase {
         maybeDescription    <- cursor.downField(schema / "description").as[Option[Description]]
         maybePrefix         <- cursor.downField(renku / "prefix").as[Option[Prefix]]
         defaultValue        <- cursor.downField(schema / "defaultValue").as[InputDefaultValue]
-        temporary           <- cursor.downField(renku / "isTemporary").as[Temporary]
         maybeEncodingFormat <- cursor.downField(schema / "encodingFormat").as[Option[EncodingFormat]]
         maybeMappedTo       <- cursor.downField(renku / "mappedTo").as[Option[IOStream.In]]
       } yield maybeMappedTo match {
@@ -175,7 +167,6 @@ object CommandParameterBase {
                                maybeDescription,
                                maybePrefix,
                                defaultValue,
-                               temporary,
                                maybeEncodingFormat
           )
         case Some(mappedTo) =>
@@ -185,7 +176,6 @@ object CommandParameterBase {
                              maybeDescription,
                              maybePrefix,
                              defaultValue,
-                             temporary,
                              maybeEncodingFormat,
                              mappedTo
           )
@@ -195,7 +185,6 @@ object CommandParameterBase {
 
   sealed trait CommandOutput extends CommandInputOrOutput {
     override type DefaultValue = OutputDefaultValue
-    val temporary:           Temporary
     val maybeEncodingFormat: Option[EncodingFormat]
     val folderCreation:      FolderCreation
   }
@@ -207,7 +196,6 @@ object CommandParameterBase {
                                          maybePrefix:         Option[Prefix],
                                          defaultValue:        OutputDefaultValue,
                                          folderCreation:      FolderCreation,
-                                         temporary:           Temporary,
                                          maybeEncodingFormat: Option[EncodingFormat]
   ) extends CommandOutput
 
@@ -218,7 +206,6 @@ object CommandParameterBase {
                                        maybePrefix:         Option[Prefix],
                                        defaultValue:        OutputDefaultValue,
                                        folderCreation:      FolderCreation,
-                                       temporary:           Temporary,
                                        maybeEncodingFormat: Option[EncodingFormat],
                                        mappedTo:            IOStream.Out
   ) extends CommandOutput
@@ -236,7 +223,6 @@ object CommandParameterBase {
                                    maybePrefix,
                                    defaultValue,
                                    folderCreation,
-                                   temporary,
                                    maybeEncodingFormat
             ) =>
           JsonLD.entity(
@@ -247,7 +233,6 @@ object CommandParameterBase {
             schema / "description"    -> maybeDescription.asJsonLD,
             renku / "prefix"          -> maybePrefix.asJsonLD,
             schema / "defaultValue"   -> defaultValue.asJsonLD,
-            renku / "isTemporary"     -> temporary.asJsonLD,
             renku / "createFolder"    -> folderCreation.asJsonLD,
             schema / "encodingFormat" -> maybeEncodingFormat.asJsonLD
           )
@@ -258,7 +243,6 @@ object CommandParameterBase {
                                  maybePrefix,
                                  defaultValue,
                                  folderCreation,
-                                 temporary,
                                  maybeEncodingFormat,
                                  mappedTo
             ) =>
@@ -271,7 +255,6 @@ object CommandParameterBase {
             renku / "prefix"          -> maybePrefix.asJsonLD,
             schema / "defaultValue"   -> defaultValue.asJsonLD,
             renku / "mappedTo"        -> mappedTo.asJsonLD,
-            renku / "isTemporary"     -> temporary.asJsonLD,
             renku / "createFolder"    -> folderCreation.asJsonLD,
             schema / "encodingFormat" -> maybeEncodingFormat.asJsonLD
           )
@@ -280,36 +263,33 @@ object CommandParameterBase {
     implicit lazy val decoder: JsonLDDecoder[CommandOutput] = JsonLDDecoder.entity(entityTypes) { cursor =>
       for {
         resourceId          <- cursor.downEntityId.as[ResourceId]
-        position            <- cursor.downField(renku / "position").as[Position]
+        maybePosition       <- cursor.downField(renku / "position").as[Option[Position]]
         name                <- cursor.downField(schema / "name").as[Name]
         maybeDescription    <- cursor.downField(schema / "description").as[Option[Description]]
         maybePrefix         <- cursor.downField(renku / "prefix").as[Option[Prefix]]
         defaultValue        <- cursor.downField(schema / "defaultValue").as[OutputDefaultValue]
         folderCreation      <- cursor.downField(renku / "createFolder").as[FolderCreation]
-        temporary           <- cursor.downField(renku / "isTemporary").as[Temporary]
         maybeEncodingFormat <- cursor.downField(schema / "encodingFormat").as[Option[EncodingFormat]]
         maybeMappedTo       <- cursor.downField(renku / "mappedTo").as[Option[IOStream.Out]]
       } yield maybeMappedTo match {
         case None =>
           LocationCommandOutput(resourceId,
-                                position,
+                                maybePosition,
                                 name,
                                 maybeDescription,
                                 maybePrefix,
                                 defaultValue,
                                 folderCreation,
-                                temporary,
                                 maybeEncodingFormat
           )
         case Some(mappedTo) =>
           MappedCommandOutput(resourceId,
-                              position,
+                              maybePosition,
                               name,
                               maybeDescription,
                               maybePrefix,
                               defaultValue,
                               folderCreation,
-                              temporary,
                               maybeEncodingFormat,
                               mappedTo
           )

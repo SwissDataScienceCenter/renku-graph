@@ -87,7 +87,6 @@ object CommandParameterBase {
 
   sealed trait CommandInput extends CommandInputOrOutput {
     override type DefaultValue = InputDefaultValue
-    val temporary:           Temporary
     val maybeEncodingFormat: Option[EncodingFormat]
   }
 
@@ -108,7 +107,6 @@ object CommandParameterBase {
             maybeDescription = None,
             maybePrefix = None,
             defaultValue,
-            Temporary.nonTemporary,
             maybeEncodingFormat = None,
             plan
           )
@@ -122,7 +120,6 @@ object CommandParameterBase {
             maybeDescription = None,
             maybePrefix = None,
             defaultValue,
-            Temporary.nonTemporary,
             maybeEncodingFormat = None,
             plan
           )
@@ -132,7 +129,6 @@ object CommandParameterBase {
                                           maybeDescription:    Option[Description],
                                           maybePrefix:         Option[Prefix],
                                           defaultValue:        InputDefaultValue,
-                                          temporary:           Temporary,
                                           maybeEncodingFormat: Option[EncodingFormat],
                                           plan:                Plan
     ) extends CommandInput
@@ -142,7 +138,6 @@ object CommandParameterBase {
                                         maybeDescription:    Option[Description],
                                         maybePrefix:         Option[Prefix],
                                         defaultValue:        InputDefaultValue,
-                                        temporary:           Temporary,
                                         maybeEncodingFormat: Option[EncodingFormat],
                                         plan:                Plan
     )(implicit renkuBaseUrl:                                 RenkuBaseUrl)
@@ -161,7 +156,6 @@ object CommandParameterBase {
           parameter.maybeDescription,
           parameter.maybePrefix,
           parameter.defaultValue,
-          parameter.temporary,
           parameter.maybeEncodingFormat
         )
       case parameter: MappedCommandInput =>
@@ -172,7 +166,6 @@ object CommandParameterBase {
           parameter.maybeDescription,
           parameter.maybePrefix,
           parameter.defaultValue,
-          parameter.temporary,
           parameter.maybeEncodingFormat,
           parameter.mappedTo
         )
@@ -187,7 +180,6 @@ object CommandParameterBase {
 
   sealed trait CommandOutput extends CommandInputOrOutput {
     override type DefaultValue = OutputDefaultValue
-    val temporary:           Temporary
     val maybeEncodingFormat: Option[EncodingFormat]
     val folderCreation:      FolderCreation
   }
@@ -207,7 +199,6 @@ object CommandParameterBase {
             maybePrefix = None,
             defaultValue = defaultValue,
             FolderCreation.no,
-            Temporary.nonTemporary,
             maybeEncodingFormat = None,
             plan
           )
@@ -231,7 +222,6 @@ object CommandParameterBase {
             maybePrefix = None,
             defaultValue = defaultValue,
             FolderCreation.no,
-            Temporary.nonTemporary,
             maybeEncodingFormat = None,
             mappedTo = stream,
             plan
@@ -243,7 +233,6 @@ object CommandParameterBase {
                                            maybePrefix:         Option[Prefix],
                                            defaultValue:        OutputDefaultValue,
                                            folderCreation:      FolderCreation,
-                                           temporary:           Temporary,
                                            maybeEncodingFormat: Option[EncodingFormat],
                                            plan:                Plan
     ) extends CommandOutput
@@ -254,7 +243,6 @@ object CommandParameterBase {
                                          maybePrefix:         Option[Prefix],
                                          defaultValue:        OutputDefaultValue,
                                          folderCreation:      FolderCreation,
-                                         temporary:           Temporary,
                                          maybeEncodingFormat: Option[EncodingFormat],
                                          mappedTo:            IOStream.Out,
                                          plan:                Plan
@@ -272,7 +260,6 @@ object CommandParameterBase {
           parameter.maybePrefix,
           parameter.defaultValue,
           parameter.folderCreation,
-          parameter.temporary,
           parameter.maybeEncodingFormat
         )
       case parameter: MappedCommandOutput =>
@@ -284,7 +271,6 @@ object CommandParameterBase {
           parameter.maybePrefix,
           parameter.defaultValue,
           parameter.folderCreation,
-          parameter.temporary,
           parameter.maybeEncodingFormat,
           parameter.mappedTo
         )

@@ -60,8 +60,7 @@ trait ActivityGenerators {
 
   implicit val commandParameterNames: Gen[commandParameters.Name] =
     nonBlankStrings().map(_.value).generateAs[commandParameters.Name]
-  implicit val commandParameterTemporaries: Gen[commandParameters.Temporary] =
-    Gen.oneOf(commandParameters.Temporary.temporary, commandParameters.Temporary.nonTemporary)
+
   implicit val commandParameterEncodingFormats: Gen[commandParameters.EncodingFormat] =
     Gen
       .oneOf(UTF_8.name(), US_ASCII.name(), ISO_8859_1.name, UTF_16.name(), nonEmptyStrings().generateOne)

@@ -64,12 +64,6 @@ object commandParameters {
       with NonBlank
       with TinyTypeJsonLDOps[EncodingFormat]
 
-  final class Temporary private (val value: Boolean) extends AnyVal with BooleanTinyType
-  implicit object Temporary extends TinyTypeFactory[Temporary](new Temporary(_)) with TinyTypeJsonLDOps[Temporary] {
-    val temporary:    Temporary = Temporary(true)
-    val nonTemporary: Temporary = Temporary(false)
-  }
-
   final class Prefix private (val value: String) extends AnyVal with StringTinyType
   implicit object Prefix extends TinyTypeFactory[Prefix](new Prefix(_)) with NonBlank with TinyTypeJsonLDOps[Prefix]
 

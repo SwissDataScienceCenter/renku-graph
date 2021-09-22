@@ -43,38 +43,20 @@ private object Generators {
     maybeDescription    <- nonEmptyStrings().toGeneratorOf(Description).toGeneratorOfOptions
     maybePrefix         <- nonEmptyStrings().toGeneratorOf(Prefix).toGeneratorOfOptions
     defaultValue        <- entityLocations.map(InputDefaultValue(_))
-    temporary           <- commandParameterTemporaries
     maybeEncodingFormat <- commandParameterEncodingFormats.toGeneratorOfOptions
   } yield (position: Position) =>
     (plan: Plan) =>
-      LocationCommandInput(position,
-                           name,
-                           maybeDescription,
-                           maybePrefix,
-                           defaultValue,
-                           temporary,
-                           maybeEncodingFormat,
-                           plan
-      )
+      LocationCommandInput(position, name, maybeDescription, maybePrefix, defaultValue, maybeEncodingFormat, plan)
 
   implicit lazy val mappedCommandInputObjects: Gen[Position => Plan => MappedCommandInput] = for {
     name                <- commandParameterNames
     maybeDescription    <- nonEmptyStrings().toGeneratorOf(Description).toGeneratorOfOptions
     maybePrefix         <- nonEmptyStrings().toGeneratorOf(Prefix).toGeneratorOfOptions
     defaultValue        <- entityLocations.map(InputDefaultValue(_))
-    temporary           <- commandParameterTemporaries
     maybeEncodingFormat <- commandParameterEncodingFormats.toGeneratorOfOptions
   } yield (position: Position) =>
     (plan: Plan) =>
-      MappedCommandInput(position,
-                         name,
-                         maybeDescription,
-                         maybePrefix,
-                         defaultValue,
-                         temporary,
-                         maybeEncodingFormat,
-                         plan
-      )
+      MappedCommandInput(position, name, maybeDescription, maybePrefix, defaultValue, maybeEncodingFormat, plan)
 
   implicit lazy val locationCommandOutputObjects: Gen[Position => Plan => LocationCommandOutput] = for {
     name                <- commandParameterNames
@@ -82,7 +64,6 @@ private object Generators {
     maybePrefix         <- nonEmptyStrings().toGeneratorOf(Prefix).toGeneratorOfOptions
     defaultValue        <- entityLocations.map(OutputDefaultValue(_))
     folderCreation      <- commandParameterFolderCreation
-    temporary           <- commandParameterTemporaries
     maybeEncodingFormat <- commandParameterEncodingFormats.toGeneratorOfOptions
   } yield (position: Position) =>
     (plan: Plan) =>
@@ -92,7 +73,6 @@ private object Generators {
                             maybePrefix,
                             defaultValue,
                             folderCreation,
-                            temporary,
                             maybeEncodingFormat,
                             plan
       )
@@ -103,7 +83,6 @@ private object Generators {
     maybePrefix         <- nonEmptyStrings().toGeneratorOf(Prefix).toGeneratorOfOptions
     defaultValue        <- entityLocations.map(OutputDefaultValue(_))
     folderCreation      <- commandParameterFolderCreation
-    temporary           <- commandParameterTemporaries
     maybeEncodingFormat <- commandParameterEncodingFormats.toGeneratorOfOptions
     mappedTo            <- ioStreamOuts
   } yield (position: Position) =>
@@ -114,7 +93,6 @@ private object Generators {
                           maybePrefix,
                           defaultValue,
                           folderCreation,
-                          temporary,
                           maybeEncodingFormat,
                           mappedTo,
                           plan
