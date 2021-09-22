@@ -22,7 +22,6 @@ import cats.syntax.all._
 import ch.datascience.graph.model.Schemas.{prov, renku}
 import ch.datascience.graph.model.entityModel._
 import ch.datascience.graph.model.generations
-import ch.datascience.graph.model.generations.ResourceId
 import io.renku.jsonld.JsonLDDecoder.Result
 import io.renku.jsonld.{Cursor, EntityTypes, JsonLDDecoder}
 
