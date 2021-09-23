@@ -20,7 +20,7 @@ package ch.datascience.tinytypes
 
 import java.time.{Duration, Instant, LocalDate}
 
-private object TestTinyTypes {
+object TestTinyTypes {
 
   class StringTestType private (val value: String) extends AnyVal with StringTinyType
   implicit object StringTestType extends TinyTypeFactory[StringTestType](new StringTestType(_)) {

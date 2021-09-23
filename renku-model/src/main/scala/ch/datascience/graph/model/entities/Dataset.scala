@@ -262,6 +262,7 @@ object Dataset {
 
     private[Dataset] def decoder(identification: Identification): JsonLDDecoder[Provenance] =
       JsonLDDecoder.entity(entityTypes) { cursor =>
+        import ch.datascience.graph.model.views.StringTinyTypeJsonLDDecoders._
         for {
           creators           <- cursor.downField(schema / "creator").as[List[Person]]
           maybeDateCreated   <- cursor.downField(schema / "dateCreated").as[Option[DateCreated]]
@@ -375,6 +376,7 @@ object Dataset {
 
     private[Dataset] implicit lazy val decoder: JsonLDDecoder[AdditionalInfo] = JsonLDDecoder.entity(entityTypes) {
       cursor =>
+        import ch.datascience.graph.model.views.StringTinyTypeJsonLDDecoders._
         for {
           maybeDescription <- cursor.downField(schema / "description").as[Option[Description]]
           keywords         <- cursor.downField(schema / "keywords").as[List[Keyword]].map(_.sorted)

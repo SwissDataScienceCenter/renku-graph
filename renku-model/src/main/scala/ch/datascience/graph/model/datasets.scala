@@ -25,8 +25,8 @@ import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, LocalDateNotInTheFuture, NonBlank, NonNegativeInt, UUID, Url => UrlConstraint}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string
-import io.circe.syntax._
 import io.circe._
+import io.circe.syntax._
 import io.renku.jsonld.JsonLDDecoder.{decodeEntityId, decodeString}
 import io.renku.jsonld.JsonLDEncoder._
 import io.renku.jsonld._

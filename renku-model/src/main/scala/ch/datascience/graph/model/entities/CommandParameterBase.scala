@@ -69,6 +69,7 @@ object CommandParameterBase {
     }
 
     implicit lazy val decoder: JsonLDDecoder[CommandParameter] = JsonLDDecoder.entity(entityTypes) { cursor =>
+      import ch.datascience.graph.model.views.StringTinyTypeJsonLDDecoders._
       for {
         resourceId       <- cursor.downEntityId.as[ResourceId]
         position         <- cursor.downField(renku / "position").as[Position]

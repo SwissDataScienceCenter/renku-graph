@@ -250,12 +250,7 @@ private object DatasetsFinderImpl {
       exemplarProjectPath <- cursor.downField("exemplarProjectPath").downField("value").as[projects.Path]
       keywords            <- cursor.downField("keywords").downField("value").as[Option[String]].map(toListOfKeywords)
       images              <- cursor.downField("images").downField("value").as[Option[String]].map(toListOfImageUrls)
-      maybeDescription <- cursor
-                            .downField("maybeDescription")
-                            .downField("value")
-                            .as[Option[String]]
-                            .map(blankToNone)
-                            .flatMap(toOption[Description])
+      maybeDescription    <- cursor.downField("maybeDescription").downField("value").as[Option[Description]]
       date <- maybeDateCreated
                 .orElse(maybePublishedDate)
                 .map(_.asRight)

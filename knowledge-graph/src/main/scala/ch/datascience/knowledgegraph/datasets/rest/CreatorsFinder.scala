@@ -27,8 +27,7 @@ import ch.datascience.knowledgegraph.datasets.model.DatasetCreator
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
-import io.circe.Decoder.{Result, decodeList}
-import io.circe.HCursor
+import io.circe.Decoder.decodeList
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -70,14 +69,11 @@ private object CreatorsFinder {
   private[datasets] implicit val creatorsDecoder: Decoder[List[DatasetCreator]] = {
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-    def extract(property: String, from: HCursor): Result[Option[String]] =
-      from.downField(property).downField("value").as[Option[String]]
-
     val creator: Decoder[DatasetCreator] = { cursor =>
       for {
         maybeEmail       <- cursor.downField("email").downField("value").as[Option[Email]]
         name             <- cursor.downField("name").downField("value").as[UserName]
-        maybeAffiliation <- extract("affiliation", from = cursor).map(blankToNone).flatMap(toOption[Affiliation])
+        maybeAffiliation <- cursor.downField("affiliation").downField("value").as[Option[Affiliation]]
       } yield DatasetCreator(maybeEmail, name, maybeAffiliation)
     }
 

@@ -208,11 +208,9 @@ private object BaseDetailsFinder {
                       }
                       .widen[Date]
                 }
-        maybeDescription <- extract[Option[String]]("description")
-                              .map(blankToNone)
-                              .flatMap(toOption[Description])
-        projectPath <- extract[projects.Path]("projectPath")
-        projectName <- extract[projects.Name]("projectName")
+        maybeDescription <- extract[Option[Description]]("description")
+        projectPath      <- extract[projects.Path]("projectPath")
+        projectName      <- extract[projects.Name]("projectName")
         dataset <- createDataset(resourceId,
                                  identifier,
                                  title,

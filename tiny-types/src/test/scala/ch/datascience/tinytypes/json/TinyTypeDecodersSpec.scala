@@ -18,61 +18,48 @@
 
 package ch.datascience.tinytypes.json
 
-import java.time.ZoneOffset.UTC
-import java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME
-
-import ch.datascience.tinytypes.TestTinyTypes._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import eu.timepit.refined.api.Refined
+import ch.datascience.tinytypes.TestTinyTypes._
+import io.circe.Json
 import io.circe.literal._
 import org.scalacheck.Arbitrary
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import java.time.ZoneOffset.UTC
+import java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME
+
 class TinyTypeDecodersSpec extends AnyWordSpec with should.Matchers {
 
   import TinyTypeDecoders._
-
-  "blankToNone" should {
-
-    "map a non-blank String value to a NonBlank" in {
-      val value = nonEmptyStrings().generateOne
-      blankToNone(Some(value)).map(_.value) shouldBe Some(value)
-    }
-
-    "map a blank String value to None" in {
-      val value = blankStrings().generateOne
-      blankToNone(Some(value)) shouldBe None
-    }
-
-    "map None to None" in {
-      blankToNone(None) shouldBe None
-    }
-  }
-
-  "toOption" should {
-
-    "map a valid for the type non-blank value to an instance of that type" in {
-      val value: NonBlank = Refined.unsafeApply(nonEmptyStrings().generateOne)
-      toOption[StringTestType](StringTestType)(Option(value)) shouldBe Right(Some(StringTestType(value.toString())))
-    }
-
-    "map a non-valid for the type non-blank value to an error" in {
-      val value: NonBlank = Refined.unsafeApply(StringTestType.InvalidValue)
-      toOption[StringTestType](StringTestType)(Option(value)) shouldBe a[Left[_, _]]
-    }
-
-    "map None to None" in {
-      toOption[StringTestType](StringTestType)(None) shouldBe Right(None)
-    }
-  }
 
   "stringDecoder" should {
 
     "decode JSON String value" in {
       val value = nonEmptyStrings().generateOne
       json"""$value""".as[StringTestType] shouldBe Right(StringTestType(value))
+    }
+  }
+
+  "blankStringToNoneDecoder" should {
+
+    "map a non-blank String value to a NonBlank" in {
+      val value = nonEmptyStrings().generateOne
+      json"""$value""".as[Option[StringTestType]] shouldBe Right(Some(StringTestType(value)))
+    }
+
+    "map a blank String value to None" in {
+      val value = blankStrings().generateOne
+      json"""$value""".as[Option[StringTestType]] shouldBe Right(None)
+    }
+
+    "map None to None" in {
+      Json.Null.as[Option[StringTestType]] shouldBe Right(None)
+    }
+
+    "fail if the value is non-blank but invalid" in {
+      json"""${StringTestType.InvalidValue}""".as[Option[StringTestType]] shouldBe a[Left[_, _]]
     }
   }
 

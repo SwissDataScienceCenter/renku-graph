@@ -18,8 +18,6 @@
 
 package ch.datascience.tinytypes.json
 
-import java.time.ZoneOffset.UTC
-import java.time.{Duration, Instant, LocalDate, OffsetDateTime}
 import cats.syntax.all._
 import ch.datascience.tinytypes._
 import eu.timepit.refined.api.{RefType, Refined}
@@ -27,32 +25,12 @@ import eu.timepit.refined.collection.NonEmpty
 import io.circe.Decoder._
 import io.circe.{Decoder, DecodingFailure}
 
+import java.time.ZoneOffset.UTC
+import java.time._
+
 object TinyTypeDecoders {
 
   type NonBlank = String Refined NonEmpty
-
-  def blankToNone(maybeValue: Option[String]): Option[NonBlank] = maybeValue.map(_.trim).flatMap {
-    case "" => None
-    case nonBlank =>
-      RefType
-        .applyRef[NonBlank](nonBlank)
-        .fold(e => {
-                print(e); None
-              },
-              Option.apply
-        )
-  }
-
-  def toOption[TT <: TinyType { type V = String }](implicit
-      tinyTypeFactory: From[TT]
-  ): Option[NonBlank] => Either[DecodingFailure, Option[TT]] = {
-    case Some(nonBlank) =>
-      tinyTypeFactory
-        .from(nonBlank.value)
-        .map(Option.apply)
-        .leftMap(exception => DecodingFailure(exception.getMessage, Nil))
-    case None => Right(None)
-  }
 
   implicit def stringDecoder[TT <: StringTinyType](implicit tinyTypeFactory: From[TT]): Decoder[TT] =
     decodeString.emap { value =>
@@ -104,4 +82,23 @@ object TinyTypeDecoders {
         .flatMap(tinyTypeFactory.from)
         .leftMap(_.getMessage)
     }
+
+  implicit def blankStringToNoneDecoder[TT <: StringTinyType](implicit tinyTypeFactory: From[TT]): Decoder[Option[TT]] =
+    decodeOption(decodeString).emap((blankToNone andThen toOption[TT])(_).leftMap(_.getMessage()))
+
+  private lazy val blankToNone: Option[String] => Option[NonBlank] = _.map(_.trim) >>= {
+    case ""       => None
+    case nonBlank => RefType.applyRef[NonBlank](nonBlank).fold(_ => None, Option.apply)
+  }
+
+  private def toOption[TT <: TinyType { type V = String }](implicit
+      tinyTypeFactory: From[TT]
+  ): Option[NonBlank] => Either[DecodingFailure, Option[TT]] = {
+    case Some(nonBlank) =>
+      tinyTypeFactory
+        .from(nonBlank.value)
+        .map(Option.apply)
+        .leftMap(exception => DecodingFailure(exception.getMessage, Nil))
+    case None => Right(None)
+  }
 }

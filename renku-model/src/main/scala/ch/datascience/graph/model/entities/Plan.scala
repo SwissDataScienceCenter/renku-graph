@@ -74,6 +74,7 @@ object Plan {
   }
 
   implicit lazy val decoder: JsonLDDecoder[Plan] = JsonLDDecoder.entity(entityTypes) { cursor =>
+    import ch.datascience.graph.model.views.StringTinyTypeJsonLDDecoders._
     for {
       resourceId            <- cursor.downEntityId.as[ResourceId]
       name                  <- cursor.downField(schema / "name").as[Name]

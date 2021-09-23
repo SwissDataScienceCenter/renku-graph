@@ -76,12 +76,13 @@ object Person {
   }
 
   implicit lazy val decoder: JsonLDDecoder[Person] = JsonLDDecoder.entity(entityTypes) { cursor =>
+    import ch.datascience.graph.model.views.StringTinyTypeJsonLDDecoders._
     for {
       resourceId       <- cursor.downEntityId.as[ResourceId]
       names            <- cursor.downField(schema / "name").as[List[Name]]
       maybeEmail       <- cursor.downField(schema / "email").as[Option[Email]]
-      maybeAffiliation <- cursor.downField(schema / "affiliation").as[Option[Affiliation]]
       maybeGitLabId    <- cursor.downField(schema / "sameAs").as[Option[GitLabId]](decodeOption(gitLabIdDecoder))
+      maybeAffiliation <- cursor.downField(schema / "affiliation").as[Option[Affiliation]]
       name <- if (names.isEmpty) DecodingFailure(s"No name on Person $resourceId", Nil).asLeft
               else names.reverse.head.asRight
     } yield Person(resourceId, name, alternativeNames = names.toSet, maybeEmail, maybeAffiliation, maybeGitLabId)

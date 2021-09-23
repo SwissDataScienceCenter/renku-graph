@@ -36,21 +36,21 @@ object PublicationEvent {
 
   private val entityTypes = EntityTypes of schema / "PublicationEvent"
 
-  implicit val encoder: JsonLDEncoder[PublicationEvent] =
-    JsonLDEncoder.instance {
-      case PublicationEvent(resourceId, datasetResourceId, about, maybeDescription, name, startDate) =>
-        JsonLD.entity(
-          resourceId.asEntityId,
-          entityTypes,
-          (schema / "location")    -> datasetResourceId.asEntityId.asJsonLD,
-          (schema / "about")       -> about.asJsonLD,
-          (schema / "description") -> maybeDescription.asJsonLD,
-          (schema / "name")        -> name.asJsonLD,
-          (schema / "startDate")   -> startDate.asJsonLD
-        )
-    }
+  implicit val encoder: JsonLDEncoder[PublicationEvent] = JsonLDEncoder.instance {
+    case PublicationEvent(resourceId, datasetResourceId, about, maybeDescription, name, startDate) =>
+      JsonLD.entity(
+        resourceId.asEntityId,
+        entityTypes,
+        (schema / "location")    -> datasetResourceId.asEntityId.asJsonLD,
+        (schema / "about")       -> about.asJsonLD,
+        (schema / "description") -> maybeDescription.asJsonLD,
+        (schema / "name")        -> name.asJsonLD,
+        (schema / "startDate")   -> startDate.asJsonLD
+      )
+  }
 
   implicit lazy val decoder: JsonLDDecoder[PublicationEvent] = JsonLDDecoder.entity(entityTypes) { cursor =>
+    import ch.datascience.graph.model.views.StringTinyTypeJsonLDDecoders._
     for {
       resourceId       <- cursor.downEntityId.as[ResourceId]
       location         <- cursor.downField(schema / "location").downEntityId.as[datasets.ResourceId]
