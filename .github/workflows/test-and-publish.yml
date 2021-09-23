@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: rokroskar/workflow-run-cleanup-action@v0.3.0
         env:
-          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          GITHUB_TOKEN: "${{ secrets.RENKUBOT_GITHUB_TOKEN }}"
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -111,7 +111,7 @@ jobs:
         env:
           CHART_PATH: helm-chart/renku-graph
           CHART_NAME: renku-graph
-          GITHUB_TOKEN: ${{ secrets.RENKU_CI_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RENKUBOT_GITHUB_TOKEN }}
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       - name: Wait for chart to be available
@@ -120,4 +120,4 @@ jobs:
         uses: SwissDataScienceCenter/renku-actions/update-component-version@v0.2.0
         env:
           CHART_NAME: renku-graph
-          GITHUB_TOKEN: ${{ secrets.RENKU_CI_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RENKUBOT_GITHUB_TOKEN }}
