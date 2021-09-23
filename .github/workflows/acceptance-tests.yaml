@@ -16,7 +16,7 @@ jobs:
     steps:
     - uses: rokroskar/workflow-run-cleanup-action@v0.3.0
       env:
-        GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+        GITHUB_TOKEN: "${{ secrets.RENKUBOT_GITHUB_TOKEN }}"
   check-deploy:
     runs-on: ubuntu-20.04
     outputs:
