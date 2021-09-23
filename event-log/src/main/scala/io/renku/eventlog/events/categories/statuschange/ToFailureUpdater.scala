@@ -18,11 +18,13 @@
 
 package io.renku.eventlog.events.categories.statuschange
 
+import cats.data.Kleisli
 import cats.effect.{BracketThrow, Sync}
 import cats.syntax.all._
+import ch.datascience.db.implicits._
 import ch.datascience.db.{DbClient, SqlStatement}
 import ch.datascience.graph.model.events.EventId
-import ch.datascience.graph.model.events.EventStatus.{FailureStatus, ProcessingStatus}
+import ch.datascience.graph.model.events.EventStatus.{FailureStatus, New, ProcessingStatus, TransformationNonRecoverableFailure, TriplesGenerated}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
 import eu.timepit.refined.api.Refined
@@ -41,13 +43,15 @@ private class ToFailureUpdater[Interpretation[_]: BracketThrow: Sync](
 ) extends DbClient(Some(queriesExecTimes))
     with DBUpdater[Interpretation, ToFailure[ProcessingStatus, FailureStatus]] {
 
-  override def updateDB(event: ToFailure[ProcessingStatus, FailureStatus]): UpdateResult[Interpretation] =
-    measureExecutionTime {
-      SqlStatement[Interpretation](name =
-        Refined.unsafeApply(s"to_${event.newStatus.value.toLowerCase} - status update")
-      )
-        .command[FailureStatus ~ ExecutionDate ~ EventMessage ~ EventId ~ projects.Id ~ ProcessingStatus](
-          sql"""UPDATE event
+  override def updateDB(event: ToFailure[ProcessingStatus, FailureStatus]): UpdateResult[Interpretation] = for {
+    eventUpdateResult     <- updateEvent(event)
+    ancestorsUpdateResult <- maybeUpdateAncestors(event)
+  } yield ancestorsUpdateResult combine eventUpdateResult
+
+  private def updateEvent(event: ToFailure[ProcessingStatus, FailureStatus]) = measureExecutionTime {
+    SqlStatement[Interpretation](name = Refined.unsafeApply(s"to_${event.newStatus.value.toLowerCase} - status update"))
+      .command[FailureStatus ~ ExecutionDate ~ EventMessage ~ EventId ~ projects.Id ~ ProcessingStatus](
+        sql"""UPDATE event
                 SET status = $eventFailureStatusEncoder,
                   execution_date = $executionDateEncoder,
                   message = $eventMessageEncoder
@@ -55,25 +59,63 @@ private class ToFailureUpdater[Interpretation[_]: BracketThrow: Sync](
                   AND project_id = $projectIdEncoder 
                   AND status = $eventProcessingStatusEncoder
                  """.command
-        )
-        .arguments(
-          event.newStatus ~
-            ExecutionDate(now()) ~
-            event.message ~
-            event.eventId.id ~
-            event.eventId.projectId ~
-            event.currentStatus
-        )
-        .build
-        .flatMapResult {
-          case Completion.Update(1) =>
-            DBUpdateResults
-              .ForProjects(event.projectPath, Map(event.currentStatus -> -1, event.newStatus -> 1))
-              .pure[Interpretation]
-              .widen[DBUpdateResults]
-          case _ =>
-            new Exception(s"Could not update event ${event.eventId} to status ${event.newStatus}")
-              .raiseError[Interpretation, DBUpdateResults]
-        }
-    }
+      )
+      .arguments(
+        event.newStatus ~
+          ExecutionDate(now()) ~
+          event.message ~
+          event.eventId.id ~
+          event.eventId.projectId ~
+          event.currentStatus
+      )
+      .build
+      .flatMapResult {
+        case Completion.Update(1) =>
+          DBUpdateResults
+            .ForProjects(event.projectPath, Map(event.currentStatus -> -1, event.newStatus -> 1))
+            .pure[Interpretation]
+        case _ =>
+          new Exception(s"Could not update event ${event.eventId} to status ${event.newStatus}")
+            .raiseError[Interpretation, DBUpdateResults.ForProjects]
+      }
+  }
+
+  private def maybeUpdateAncestors(event: ToFailure[ProcessingStatus, FailureStatus]) = event.newStatus match {
+    case TransformationNonRecoverableFailure => updateAncestorsStatus(event)
+    case _                                   => Kleisli.pure(DBUpdateResults.ForProjects(event.projectPath, Map.empty))
+  }
+
+  private def updateAncestorsStatus(event: ToFailure[ProcessingStatus, FailureStatus]) = measureExecutionTime {
+    SqlStatement(name = Refined.unsafeApply(s"to_${event.newStatus.value.toLowerCase} - ancestors update"))
+      .select[ExecutionDate ~ projects.Id ~ projects.Id ~ EventId ~ EventId, EventId](
+        sql"""UPDATE event evt
+              SET status = '#${New.value}', 
+                  execution_date = $executionDateEncoder, 
+                  message = NULL
+              FROM (
+                SELECT event_id, project_id 
+                FROM event
+                WHERE project_id = $projectIdEncoder
+                  AND status = '#${TriplesGenerated.value}'
+                  AND event_date <= (
+                    SELECT event_date
+                    FROM event
+                    WHERE project_id = $projectIdEncoder
+                      AND event_id = $eventIdEncoder
+                  )
+                  AND event_id <> $eventIdEncoder
+                FOR UPDATE
+              ) old_evt
+              WHERE evt.event_id = old_evt.event_id AND evt.project_id = old_evt.project_id 
+              RETURNING evt.event_id
+           """.query(eventIdDecoder)
+      )
+      .arguments(
+        ExecutionDate(now()) ~ event.eventId.projectId ~ event.eventId.projectId ~ event.eventId.id ~ event.eventId.id
+      )
+      .build(_.toList)
+      .mapResult { ids =>
+        DBUpdateResults.ForProjects(event.projectPath, Map(New -> ids.size, TriplesGenerated -> -ids.size))
+      }
+  }
 }

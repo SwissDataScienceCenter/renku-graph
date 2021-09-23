@@ -21,7 +21,7 @@ package io.renku.eventlog.events.categories.statuschange
 import cats.effect.IO
 import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.timestampsNotInTheFuture
+import ch.datascience.generators.Generators.{timestamps, timestampsNotInTheFuture}
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventIds}
 import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
@@ -29,7 +29,7 @@ import EventStatus._
 import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
 import io.renku.eventlog._
-import EventContentGenerators.eventMessages
+import EventContentGenerators.{eventDates, eventMessages}
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.{AllowedCombination, ToFailure}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -50,7 +50,6 @@ class ToFailureUpdaterSpec
       Set(
         createFailureEvent(GeneratingTriples, GenerationNonRecoverableFailure),
         createFailureEvent(GeneratingTriples, GenerationRecoverableFailure),
-        createFailureEvent(TransformingTriples, TransformationNonRecoverableFailure),
         createFailureEvent(TransformingTriples, TransformationRecoverableFailure)
       ) foreach { statusChangeEvent =>
         sessionResource
@@ -65,6 +64,53 @@ class ToFailureUpdaterSpec
         updatedEvent.flatMap(_._3) shouldBe Some(statusChangeEvent.message)
       }
     }
+
+    "change status of the given event from TRANSFORMING_TRIPLES to TRANSFORMATION_NON_RECOVERABLE_FAILURE " +
+      "as well as all the older events which are TRIPLES_GENERATED status to NEW" in new TestCase {
+        val latestEventDate = eventDates.generateOne
+        val statusChangeEvent = ToFailure(
+          addEvent(compoundEventIds.generateOne.copy(projectId = projectId), TransformingTriples, latestEventDate),
+          projectPath,
+          eventMessages.generateOne,
+          TransformingTriples,
+          TransformationNonRecoverableFailure
+        )
+
+        val eventToUpdate = addEvent(
+          compoundEventIds.generateOne.copy(projectId = projectId),
+          TriplesGenerated,
+          timestamps(max = latestEventDate.value).generateAs(EventDate)
+        )
+
+        val eventsNotToUpdate = (EventStatus.all - TriplesGenerated).map { status =>
+          addEvent(
+            compoundEventIds.generateOne.copy(projectId = projectId),
+            status,
+            timestamps(max = latestEventDate.value).generateAs(EventDate)
+          ) -> status
+        } + (addEvent(
+          compoundEventIds.generateOne.copy(projectId = projectId),
+          TriplesGenerated,
+          timestamps(min = latestEventDate.value.plusSeconds(2), max = Instant.now()).generateAs(EventDate)
+        ) -> TriplesGenerated)
+
+        sessionResource
+          .useK(dbUpdater updateDB statusChangeEvent)
+          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
+          projectPath,
+          Map(statusChangeEvent.currentStatus -> -1, statusChangeEvent.newStatus -> 1, New -> 1, TriplesGenerated -> -1)
+        )
+
+        val updatedEvent = findEvent(statusChangeEvent.eventId)
+        updatedEvent.map(_._2)     shouldBe Some(statusChangeEvent.newStatus)
+        updatedEvent.flatMap(_._3) shouldBe Some(statusChangeEvent.message)
+
+        findEvent(eventToUpdate).map(_._2) shouldBe Some(New)
+
+        eventsNotToUpdate foreach { case (eventId, status) =>
+          findEvent(eventId).map(_._2) shouldBe Some(status)
+        }
+      }
 
     EventStatus.all.diff(Set(GeneratingTriples, TransformingTriples)) foreach { invalidStatus =>
       s"fail if the given event is in $invalidStatus" in new TestCase {
@@ -111,12 +157,15 @@ class ToFailureUpdaterSpec
       eventId
     }
 
-    def addEvent(eventId: CompoundEventId, status: EventStatus): CompoundEventId = {
+    def addEvent(eventId:   CompoundEventId,
+                 status:    EventStatus,
+                 eventDate: EventDate = timestampsNotInTheFuture.generateAs(EventDate)
+    ): CompoundEventId = {
       storeEvent(
         eventId,
         status,
         timestampsNotInTheFuture.generateAs(ExecutionDate),
-        timestampsNotInTheFuture.generateAs(EventDate),
+        eventDate,
         eventBodies.generateOne,
         projectPath = projectPath
       )
