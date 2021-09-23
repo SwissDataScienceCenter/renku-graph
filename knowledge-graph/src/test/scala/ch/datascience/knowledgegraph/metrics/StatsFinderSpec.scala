@@ -40,7 +40,7 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
         EntityLabel((schema / "Dataset").show)              -> Count(0L),
         EntityLabel((schema / "Project").show)              -> Count(0L),
         EntityLabel((prov / "Activity").show)               -> Count(0L),
-        EntityLabel((renku / "Plan").show)                  -> Count(0L),
+        EntityLabel((prov / "Plan").show)                   -> Count(0L),
         EntityLabel((schema / "Person").show)               -> Count(0L),
         EntityLabel((schema / "Person with GitLabId").show) -> Count(0L)
       )
@@ -61,7 +61,7 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
         .update(schema / "Dataset", projectsWithDatasets.size)
         .update(schema / "Project", projectsWithActivities.size + projectsWithDatasets.size)
         .update(prov / "Activity", projectsWithActivities.size)
-        .update(renku / "Plan", projectsWithActivities.size)
+        .update(prov / "Plan", projectsWithActivities.size)
         .update(schema / "Person", persons.size)
         .update(schema / "Person with GitLabId", persons.count(_.maybeGitLabId.isDefined))
 

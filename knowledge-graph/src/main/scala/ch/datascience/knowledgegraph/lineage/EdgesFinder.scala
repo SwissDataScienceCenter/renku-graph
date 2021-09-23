@@ -77,7 +77,7 @@ private class EdgesFinderImpl(
         |WHERE {
         |  {
         |    ${projectMemberFilterQuery(ResourceId(renkuBaseUrl, path).showAs[RdfResource])(maybeUser)}
-        |    ?plan a renku:Plan;
+        |    ?plan a prov:Plan;
         |          renku:hasInputs ?input;
         |          ^renku:hasPlan ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
         |          ^(prov:qualifiedAssociation/prov:hadPlan) ?activity.
@@ -87,7 +87,7 @@ private class EdgesFinderImpl(
         |                schema:value ?sourceEntityLocation.
         |  } UNION {
         |    ${projectMemberFilterQuery(ResourceId(renkuBaseUrl, path).showAs[RdfResource])(maybeUser)}
-        |    ?plan a renku:Plan;
+        |    ?plan a prov:Plan;
         |          renku:hasOutputs ?output;
         |          ^renku:hasPlan ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
         |          ^(prov:qualifiedAssociation/prov:hadPlan) ?activity.

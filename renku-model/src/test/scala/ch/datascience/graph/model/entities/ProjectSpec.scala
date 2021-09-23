@@ -78,7 +78,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       forAll(gitLabProjectInfos.map(_.copy(maybeParentPath = None)), cliVersions, projectSchemaVersions) {
         (projectInfo, cliVersion, schemaVersion) =>
           val resourceId   = projects.ResourceId(renkuBaseUrl, projectInfo.path)
-          val activities   = activityEntities(planEntities()).generateList(projectInfo.dateCreated)
+          val activities   = activityEntities(planEntities()).generateList(projectInfo.dateCreated).sortBy(_.startTime)
           val datasets     = datasetEntities(ofAnyProvenance).generateList(projectInfo.dateCreated)
           val maybeCreator = projectInfo.maybeCreator.map(_.toPayloadPerson)
           val members      = projectInfo.members.map(_.toPayloadPerson)
@@ -109,7 +109,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
              projectSchemaVersions
       ) { (projectInfo, cliVersion, schemaVersion) =>
         val resourceId   = projects.ResourceId(renkuBaseUrl, projectInfo.path)
-        val activities   = activityEntities(planEntities()).generateList(projectInfo.dateCreated)
+        val activities   = activityEntities(planEntities()).generateList(projectInfo.dateCreated).sortBy(_.startTime)
         val datasets     = datasetEntities(ofAnyProvenance).generateList(projectInfo.dateCreated)
         val maybeCreator = projectInfo.maybeCreator.map(_.toPayloadPerson)
         val members      = projectInfo.members.map(_.toPayloadPerson)
