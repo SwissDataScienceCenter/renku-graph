@@ -141,7 +141,7 @@ object JsonLDDecoder {
     case JsonLDValue(value: Instant, Some(JsonLDInstantValue.entityTypes)) => Right(value)
     case JsonLDValue(value: String, _) =>
       (Either.catchNonFatal(Instant.parse(value)) orElse Either.catchNonFatal(OffsetDateTime.parse(value).toInstant))
-        .leftMap(e => DecodingFailure(s"Could not parse $value to instant: ${e.getMessage}", Nil))
+        .leftMap(e => DecodingFailure(s"Cannot decode $value to Instant: ${e.getMessage}", Nil))
     case JsonLDValue(value, _) => DecodingFailure(s"Cannot decode $value to Instant", Nil).asLeft
     case json                  => DecodingFailure(s"Cannot decode ${showTypeName(json)} to Instant", Nil).asLeft
   }
