@@ -30,8 +30,8 @@ import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplici
 import ch.datascience.graph.model
 import ch.datascience.graph.model.Schemas._
 import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.testentities.{LineageExemplarData, NodeDef}
 import ch.datascience.graph.model.testentities.LineageExemplarData.ExemplarData
+import ch.datascience.graph.model.testentities.{LineageExemplarData, NodeDef}
 import ch.datascience.http.client.AccessToken
 import io.circe.Json
 import io.circe.literal._
@@ -70,14 +70,17 @@ class LineageQuerySpec
     }
 
     /**  ========================================== EXPECTED GRAPH  ==========================================
-      *  When looking for grid_plot of commit 9
-      *                                                   sha7 plot_data +--------------+
-      *                                                                                 |
-      *                                                                                 v                   ------------
-      * sha3 zhbikes+---------------> sha8 renku run +------->bikesParquet +------->sha9 renku run+------> | grid_plot |
-      *                                       ^                                                            ------------
-      *                                       |
-      * sha7 clean_data +--------------------+
+      *  When looking for the grid_plot file
+      *
+      * zhbikes folder   clean_data
+      *           \      /
+      *          run plan 1
+      *               \
+      *              bikesParquet   plot_data
+      *                       \     /
+      *                      run plan 2
+      *                       /
+      *                grid_plot
       */
 
     Scenario("As a user I would like to find project's lineage with a GraphQL query") {
@@ -268,20 +271,20 @@ class LineageQuerySpec
     import exemplarData._
     Right {
       Set(
-        json"""{"id": ${`zhbikes folder`.location},      "location": ${`zhbikes folder`.location},      "label": ${`zhbikes folder`.label},      "type": ${`zhbikes folder`.singleWordType}   }""",
+        json"""{"id": ${`zhbikes folder`.location},      "location": ${`zhbikes folder`.location},      "label": ${`zhbikes folder`.label},      "type": ${`zhbikes folder`.singleWordType}}""",
         json"""{"id": ${`activity3 plan1`.location},     "location": ${`activity3 plan1`.location},     "label": ${`activity3 plan1`.label},     "type": ${`activity3 plan1`.singleWordType}}""",
         json"""{"id": ${`clean_data entity`.location},   "location": ${`clean_data entity`.location},   "label": ${`clean_data entity`.label},   "type": ${`clean_data entity`.singleWordType}}""",
-        json"""{"id": ${`bikesparquet entity`.location}, "location": ${`bikesparquet entity`.location}, "label": ${`bikesparquet entity`.label}, "type": ${`bikesparquet entity`.singleWordType} }""",
-        json"""{"id": ${`plot_data entity`.location},    "location": ${`plot_data entity`.location},    "label": ${`plot_data entity`.label},    "type": ${`plot_data entity`.singleWordType} }""",
-        json"""{"id": ${`activity4 plan2`.location},     "location": ${`activity4 plan2`.location},     "label": ${`activity4 plan2`.label},     "type": ${`activity4 plan2`.singleWordType} }""",
-        json"""{"id": ${`grid_plot entity`.location},    "location": ${`grid_plot entity`.location},    "label": ${`grid_plot entity`.label},    "type": ${`grid_plot entity`.singleWordType} }"""
+        json"""{"id": ${`bikesparquet entity`.location}, "location": ${`bikesparquet entity`.location}, "label": ${`bikesparquet entity`.label}, "type": ${`bikesparquet entity`.singleWordType}}""",
+        json"""{"id": ${`plot_data entity`.location},    "location": ${`plot_data entity`.location},    "label": ${`plot_data entity`.label},    "type": ${`plot_data entity`.singleWordType}}""",
+        json"""{"id": ${`activity4 plan2`.location},     "location": ${`activity4 plan2`.location},     "label": ${`activity4 plan2`.label},     "type": ${`activity4 plan2`.singleWordType}}""",
+        json"""{"id": ${`grid_plot entity`.location},    "location": ${`grid_plot entity`.location},    "label": ${`grid_plot entity`.label},    "type": ${`grid_plot entity`.singleWordType}}"""
       )
     }
   }
 
   private implicit class NodeOps(node: NodeDef) {
 
-    private lazy val FileTypes = Set((prov / "Entity").show, (wfprov / "Artifact").show)
+    private lazy val FileTypes = Set((prov / "Entity").show)
 
     lazy val singleWordType: String = node.types match {
       case types if types contains (prov / "Activity").show   => "ProcessRun"

@@ -79,10 +79,7 @@ object Entity {
   import io.renku.jsonld.JsonLDDecoder.decodeOption
 
   implicit lazy val entityDecoder: JsonLDDecoder[Entity] =
-    JsonLDDecoder.entity(
-      fileEntityTypes,
-      withStrictEntityTypes
-    ) { cursor =>
+    JsonLDDecoder.entity(fileEntityTypes, withStrictEntityTypes) { cursor =>
       for {
         resourceId  <- cursor.downEntityId.as[ResourceId]
         entityTypes <- cursor.getEntityTypes

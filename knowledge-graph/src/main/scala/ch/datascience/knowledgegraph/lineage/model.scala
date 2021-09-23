@@ -22,7 +22,7 @@ import cats.MonadThrow
 import cats.syntax.all._
 import ch.datascience.knowledgegraph.lineage.model.Node.Location
 import ch.datascience.tinytypes.{InstantTinyType, TinyTypeFactory}
-import io.renku.jsonld.EntityId
+import io.renku.jsonld.{EntityId, EntityType}
 
 import java.time.Instant
 
@@ -103,25 +103,13 @@ object model {
     implicit class NodeOps(node: Node) {
 
       import SingleWordType._
+      import ch.datascience.graph.model.entities.{Activity, Entity}
 
-      private lazy val FileTypes = Set(
-        "http://www.w3.org/ns/prov#Entity",
-        "http://purl.org/wf4ever/wfprov#Artifact"
-      )
-      private lazy val DirectoryTypes = Set(
-        "http://www.w3.org/ns/prov#Entity",
-        "http://purl.org/wf4ever/wfprov#Artifact",
-        "http://www.w3.org/ns/prov#Collection"
-      )
-      private lazy val ProcessRunTypes = Set(
-        "http://www.w3.org/ns/prov#Activity"
-      )
-
-      lazy val singleWordType: Either[Exception, SingleWordType] = node.types.map(_.toString) match {
-        case types if (ProcessRunTypes diff types).isEmpty => Right(ProcessRun)
-        case types if (DirectoryTypes diff types).isEmpty  => Right(Directory)
-        case types if (FileTypes diff types).isEmpty       => Right(File)
-        case types                                         => Left(new Exception(s"${types.mkString(", ")} cannot be converted to a NodeType"))
+      lazy val singleWordType: Either[Exception, SingleWordType] = node.types.map(t => EntityType.of(t.show)) match {
+        case types if Activity.entityTypes.toList.toSet === types     => Right(ProcessRun)
+        case types if Entity.folderEntityTypes.toList.toSet === types => Right(Directory)
+        case types if Entity.fileEntityTypes.toList.toSet === types   => Right(File)
+        case types                                                    => Left(new Exception(s"${types.map(_.show).mkString(", ")} cannot be converted to a NodeType"))
       }
     }
   }
