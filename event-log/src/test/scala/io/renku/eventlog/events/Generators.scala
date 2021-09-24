@@ -36,7 +36,7 @@ private object Generators {
   } yield EventInfo(id, status, maybeMessage, processingTimes)
 
   def statusProcessingTimeObjects(lowerThan: EventStatus): Gen[StatusProcessingTime] = for {
-    status         <- eventStatuses.retryUntil(Ordering[EventStatus].lt(_, lowerThan))
+    status         <- Gen.oneOf(EventStatus.statusesOrdered.takeWhile(Ordering[EventStatus].lteq(_, lowerThan)))
     processingTime <- eventProcessingTimes
   } yield StatusProcessingTime(status, processingTime)
 }

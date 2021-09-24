@@ -107,7 +107,7 @@ object events {
       AwaitingDeletion
     )
 
-    private val statusesOrdered = List(
+    val statusesOrdered = List(
       Skipped,
       New,
       GeneratingTriples,
