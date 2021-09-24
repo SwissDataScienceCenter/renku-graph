@@ -23,7 +23,7 @@ import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.{EventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
-import io.renku.eventlog.events.EventsEndpoint.EventInfo
+import io.renku.eventlog.events.EventsEndpoint.{EventInfo, StatusProcessingTime}
 import io.renku.eventlog.{EventLogDB, EventMessage, TypeSerializers}
 
 private trait EventsFinder[Interpretation[_]] {
@@ -48,18 +48,34 @@ private class EventsFinderImpl[Interpretation[_]: BracketThrow: Concurrent](
   private def find(projectPath: projects.Path) =
     SqlStatement[Interpretation](name = "find event infos")
       .select[projects.Path, EventInfo](
-        sql"""SELECT evt.event_id, evt.status, evt.message
+        sql"""SELECT evt.event_id, evt.status, evt.message, times.status, times.processing_time
               FROM event evt
               JOIN project prj ON evt.project_id = prj.project_id AND prj.project_path = $projectPathEncoder
-              ORDER BY evt.event_date
+              LEFT JOIN status_processing_time times ON evt.event_id = times.event_id AND evt.project_id = times.project_id
+              ORDER BY evt.event_date DESC, evt.event_id
           """
-          .query(eventIdDecoder ~ eventStatusDecoder ~ eventMessageDecoder.opt)
-          .map { case (eventId: EventId) ~ (status: EventStatus) ~ (maybeMessage: Option[EventMessage]) =>
-            EventInfo(eventId, status, maybeMessage)
+          .query(eventIdDecoder ~ eventStatusDecoder ~ eventMessageDecoder.opt ~ statusProcessingTimesDecoder.opt)
+          .map {
+            case (eventId: EventId) ~
+                (status:   EventStatus) ~
+                (maybeMessage: Option[EventMessage]) ~
+                (maybeProcessingTimes: Option[StatusProcessingTime]) =>
+              EventInfo(eventId, status, maybeMessage, processingTimes = maybeProcessingTimes.toList)
           }
       )
       .arguments(projectPath)
       .build(_.toList)
+      .mapResult(_.foldLeft(List.empty[EventInfo]) {
+        case (Nil, info)                                             => info :: Nil
+        case (all @ last :: _, info) if last.eventId != info.eventId => info :: all
+        case (last :: grouped, info) =>
+          last.copy(
+            processingTimes = (last.processingTimes ::: info.processingTimes).sortBy(_.status)
+          ) :: grouped
+      })
+
+  private lazy val statusProcessingTimesDecoder: Decoder[StatusProcessingTime] =
+    (eventStatusDecoder ~ eventProcessingTimeDecoder).map((StatusProcessingTime.apply _).tupled.apply)
 }
 
 private object EventsFinder {

@@ -107,6 +107,22 @@ object events {
       AwaitingDeletion
     )
 
+    private val statusesOrdered = List(
+      Skipped,
+      New,
+      GeneratingTriples,
+      GenerationRecoverableFailure,
+      GenerationNonRecoverableFailure,
+      TriplesGenerated,
+      TransformingTriples,
+      TransformationRecoverableFailure,
+      TransformationNonRecoverableFailure,
+      TriplesStore,
+      AwaitingDeletion
+    )
+
+    implicit val ordering: Ordering[EventStatus] = Ordering.by(statusesOrdered.indexOf)
+
     type New = New.type
     final case object New extends EventStatus {
       override val value: String = "NEW"

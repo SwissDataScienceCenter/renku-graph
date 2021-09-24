@@ -11,7 +11,7 @@ import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.events
-import ch.datascience.graph.model.events.{EventId, EventStatus}
+import ch.datascience.graph.model.events.{EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.testentities.generators.EntitiesGenerators
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.UrlEncoder.urlEncode
@@ -59,15 +59,27 @@ class EventsResourceSpec
     }
   }
 
-  private case class EventInfo(eventId: EventId, status: EventStatus, maybeMessage: Option[String])
+  private case class EventInfo(eventId:         EventId,
+                               status:          EventStatus,
+                               maybeMessage:    Option[String],
+                               processingTimes: List[StatusProcessingTime]
+  )
+  private case class StatusProcessingTime(status: EventStatus, processingTime: EventProcessingTime)
 
   private implicit lazy val infoDecoder: Decoder[EventInfo] = cursor => {
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
+    implicit val statusProcessingTimeDecoder: Decoder[StatusProcessingTime] = cursor =>
+      for {
+        status         <- cursor.downField("status").as[EventStatus]
+        processingTime <- cursor.downField("processingTime").as[EventProcessingTime]
+      } yield StatusProcessingTime(status, processingTime)
+
     for {
-      id           <- cursor.downField("id").as[EventId]
-      status       <- cursor.downField("status").as[EventStatus]
-      maybeMessage <- cursor.downField("message").as[Option[String]]
-    } yield EventInfo(id, status, maybeMessage)
+      id              <- cursor.downField("id").as[EventId]
+      status          <- cursor.downField("status").as[EventStatus]
+      maybeMessage    <- cursor.downField("message").as[Option[String]]
+      processingTimes <- cursor.downField("processingTimes").as[List[StatusProcessingTime]]
+    } yield EventInfo(id, status, maybeMessage, processingTimes)
   }
 }

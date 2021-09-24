@@ -41,14 +41,18 @@ class EventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec with shou
       val infosAndDates = eventInfos.generateList(maxElements = 10).map(_ -> eventDates.generateOne)
 
       infosAndDates foreach { case (info, eventDate) =>
+        val eventId = CompoundEventId(info.eventId, projectId)
         storeEvent(
-          CompoundEventId(info.eventId, projectId),
+          eventId,
           info.status,
           executionDates.generateOne,
           eventDate,
           eventBodies.generateOne,
           projectPath = projectPath,
           maybeMessage = info.maybeMessage
+        )
+        info.processingTimes.foreach(processingTime =>
+          upsertProcessingTime(eventId, processingTime.status, processingTime.processingTime)
         )
       }
       storeGeneratedEvent(

@@ -36,12 +36,19 @@ Response body example:
 [
   {
     "id": "df654c3b1bd105a29d658f78f6380a842feac879",
-    "status": "NEW"
+    "status": "NEW",
+    "processingTimes": []
   },
   {
     "id": "df654c3b1bd105a29d658f78f6380a842feac879",
-    "status": "GENERATION_NON_RECOVERABLE_FAILURE",
+    "status": "TRANSFORMATION_NON_RECOVERABLE_FAILURE",
     "message": "detailed info about the cause of the failure"
+    "processingTimes": [
+      {
+        "status": "TRIPLES_GENERATED",
+        "processingTime": "PT20.345S"
+      }
+    ]
   }
 ]
 ```

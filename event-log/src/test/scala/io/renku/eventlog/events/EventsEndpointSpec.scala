@@ -25,7 +25,7 @@ import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.{EventId, EventStatus}
+import ch.datascience.graph.model.events.{EventId, EventProcessingTime, EventStatus}
 import ch.datascience.http.ErrorMessage
 import ch.datascience.http.ErrorMessage.ErrorMessage
 import ch.datascience.http.server.EndpointTester._
@@ -91,17 +91,24 @@ class EventsEndpointSpec extends AnyWordSpec with MockFactory with should.Matche
   private trait TestCase {
     val projectPath = projectPaths.generateOne
 
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val eventsFinder = mock[EventsFinder[IO]]
-    val logger       = TestLogger[IO]()
-    val endpoint     = new EventsEndpointImpl[IO](eventsFinder, logger)
+    val endpoint     = new EventsEndpointImpl[IO](eventsFinder)
   }
 
   private implicit val eventInfoDecoder: Decoder[EventInfo] = cursor =>
     for {
-      id           <- cursor.downField("id").as[EventId]
-      status       <- cursor.downField("status").as[EventStatus]
-      maybeMessage <- cursor.downField("message").as[Option[EventMessage]]
-    } yield EventInfo(id, status, maybeMessage)
+      id              <- cursor.downField("id").as[EventId]
+      status          <- cursor.downField("status").as[EventStatus]
+      maybeMessage    <- cursor.downField("message").as[Option[EventMessage]]
+      processingTimes <- cursor.downField("processingTimes").as[List[StatusProcessingTime]]
+    } yield EventInfo(id, status, maybeMessage, processingTimes)
+
+  private implicit val statusProcessingTimeDecoder: Decoder[StatusProcessingTime] = cursor =>
+    for {
+      status         <- cursor.downField("status").as[EventStatus]
+      processingTime <- cursor.downField("processingTime").as[EventProcessingTime]
+    } yield StatusProcessingTime(status, processingTime)
 
   private implicit val entityDecoder: EntityDecoder[IO, List[EventInfo]] =
     org.http4s.circe.jsonOf[IO, List[EventInfo]]

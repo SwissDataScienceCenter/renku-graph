@@ -21,7 +21,7 @@ package io.renku.eventlog.events
 import cats.MonadThrow
 import cats.effect.{ConcurrentEffect, Effect, IO}
 import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.graph.model.events.{EventId, EventStatus}
+import ch.datascience.graph.model.events.{EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.http.ErrorMessage
 import ch.datascience.metrics.LabeledHistogram
@@ -37,9 +37,8 @@ trait EventsEndpoint[Interpretation[_]] {
   def findEvents(projectPath: projects.Path): Interpretation[Response[Interpretation]]
 }
 
-class EventsEndpointImpl[Interpretation[_]: Effect: MonadThrow](eventsFinder: EventsFinder[Interpretation],
-                                                                logger: Logger[Interpretation]
-) extends Http4sDsl[Interpretation]
+class EventsEndpointImpl[Interpretation[_]: Effect: MonadThrow: Logger](eventsFinder: EventsFinder[Interpretation])
+    extends Http4sDsl[Interpretation]
     with EventsEndpoint[Interpretation] {
 
   import cats.syntax.all._
@@ -56,7 +55,7 @@ class EventsEndpointImpl[Interpretation[_]: Effect: MonadThrow](eventsFinder: Ev
   private def httpResponse(
       projectPath: projects.Path
   ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = { case NonFatal(exception) =>
-    logger.error(exception)(s"Finding events for project '$projectPath' failed")
+    Logger[Interpretation].error(exception)(s"Finding events for project '$projectPath' failed")
     InternalServerError(ErrorMessage(exception))
   }
 }
@@ -64,21 +63,33 @@ class EventsEndpointImpl[Interpretation[_]: Effect: MonadThrow](eventsFinder: Ev
 object EventsEndpoint {
 
   def apply(sessionResource:   SessionResource[IO, EventLogDB],
-            queriesExecTimes:  LabeledHistogram[IO, SqlStatement.Name],
-            logger:            Logger[IO]
-  )(implicit concurrentEffect: ConcurrentEffect[IO]): IO[EventsEndpoint[IO]] = for {
+            queriesExecTimes:  LabeledHistogram[IO, SqlStatement.Name]
+  )(implicit concurrentEffect: ConcurrentEffect[IO], logger: Logger[IO]): IO[EventsEndpoint[IO]] = for {
     eventsFinder <- EventsFinder(sessionResource, queriesExecTimes)
-  } yield new EventsEndpointImpl(eventsFinder, logger)
+  } yield new EventsEndpointImpl(eventsFinder)
 
-  final case class EventInfo(eventId: EventId, status: EventStatus, maybeMessage: Option[EventMessage])
+  final case class EventInfo(eventId:         EventId,
+                             status:          EventStatus,
+                             maybeMessage:    Option[EventMessage],
+                             processingTimes: List[StatusProcessingTime]
+  )
+  final case class StatusProcessingTime(status: EventStatus, processingTime: EventProcessingTime)
 
   object EventInfo {
+
     implicit lazy val infoEncoder: Encoder[EventInfo] = eventInfo => {
       import io.circe.literal._
+      import io.circe.syntax._
+
+      implicit val processingTimeEncoder: Encoder[StatusProcessingTime] = processingTime => json"""{
+        "status":         ${processingTime.status.value},
+        "processingTime": ${processingTime.processingTime.value}
+      }"""
 
       json"""{
-        "id":     ${eventInfo.eventId.value},      
-        "status": ${eventInfo.status.value}      
+        "id":              ${eventInfo.eventId.value},
+        "status":          ${eventInfo.status.value},
+        "processingTimes": ${eventInfo.processingTimes.map(_.asJson)}
       }""" deepMerge {
         eventInfo.maybeMessage.map(message => json"""{"message": ${message.value}}""").getOrElse(Json.obj())
       }

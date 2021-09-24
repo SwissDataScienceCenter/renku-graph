@@ -38,6 +38,7 @@ import io.renku.eventlog.metrics._
 import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
 import io.renku.eventlog.subscriptions._
 import natchez.Trace.Implicits.noop
+import org.typelevel.log4cats.Logger
 import pureconfig.ConfigSource
 
 import java.util.concurrent.ConcurrentHashMap
@@ -61,6 +62,7 @@ object Microservice extends IOMicroservice {
 
   private def runMicroservice(sessionPoolResource: Resource[IO, SessionResource[IO, EventLogDB]]) =
     sessionPoolResource.use { sessionResource =>
+      implicit val logger: Logger[IO] = ApplicationLogger
       for {
         certificateLoader           <- CertificateLoader[IO](ApplicationLogger)
         sentryInitializer           <- SentryInitializer[IO]()
@@ -129,7 +131,7 @@ object Microservice extends IOMicroservice {
                                   )
         subscriptionsEndpoint <- SubscriptionsEndpoint(eventProducersRegistry, ApplicationLogger)
         eventDetailsEndpoint  <- EventDetailsEndpoint(sessionResource, queriesExecTimes, ApplicationLogger)
-        eventsEndpoint        <- EventsEndpoint(sessionResource, queriesExecTimes, ApplicationLogger)
+        eventsEndpoint        <- EventsEndpoint(sessionResource, queriesExecTimes)
         microserviceRoutes = new MicroserviceRoutes[IO](
                                eventEndpoint,
                                eventsEndpoint,

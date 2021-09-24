@@ -19,9 +19,10 @@
 package io.renku.eventlog.events
 
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators.{eventIds, eventStatuses}
+import ch.datascience.graph.model.EventsGenerators.{eventIds, eventProcessingTimes, eventStatuses}
+import ch.datascience.graph.model.events.EventStatus
 import io.renku.eventlog.EventContentGenerators.eventMessages
-import io.renku.eventlog.events.EventsEndpoint.EventInfo
+import io.renku.eventlog.events.EventsEndpoint.{EventInfo, StatusProcessingTime}
 import org.scalacheck.Gen
 
 private object Generators {
@@ -30,5 +31,12 @@ private object Generators {
     id           <- eventIds
     status       <- eventStatuses
     maybeMessage <- eventMessages.toGeneratorOfOptions
-  } yield EventInfo(id, status, maybeMessage)
+    processingTimes <-
+      statusProcessingTimeObjects(status).toGeneratorOfList().map(_.sortBy(_.status)).map(_.distinctBy(_.status))
+  } yield EventInfo(id, status, maybeMessage, processingTimes)
+
+  def statusProcessingTimeObjects(lowerThan: EventStatus): Gen[StatusProcessingTime] = for {
+    status         <- eventStatuses.retryUntil(Ordering[EventStatus].lt(_, lowerThan))
+    processingTime <- eventProcessingTimes
+  } yield StatusProcessingTime(status, processingTime)
 }
