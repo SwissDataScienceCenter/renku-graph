@@ -315,7 +315,7 @@ object Dataset {
       Validated.condNel(
         test = (event.startDate.value compareTo minDate) >= 0,
         (),
-        s"Publication Event ${event.about} on dataset with id: $identifier is older than $dateLabel"
+        s"Publication Event ${event.name} on dataset with id: $identifier is older than $dateLabel"
       )
     }.combineAll
   } getOrElse Validated.validNel(())

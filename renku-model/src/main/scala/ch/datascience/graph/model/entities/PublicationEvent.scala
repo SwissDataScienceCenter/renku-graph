@@ -22,8 +22,7 @@ import ch.datascience.graph.model.datasets
 import ch.datascience.graph.model.publicationEvents._
 
 final case class PublicationEvent(resourceId:       ResourceId,
-                                  location:         datasets.ResourceId,
-                                  about:            AboutEvent,
+                                  about:            datasets.ResourceId,
                                   maybeDescription: Option[Description],
                                   name:             Name,
                                   startDate:        StartDate
@@ -37,12 +36,11 @@ object PublicationEvent {
   private val entityTypes = EntityTypes of schema / "PublicationEvent"
 
   implicit val encoder: JsonLDEncoder[PublicationEvent] = JsonLDEncoder.instance {
-    case PublicationEvent(resourceId, datasetResourceId, about, maybeDescription, name, startDate) =>
+    case PublicationEvent(resourceId, about, maybeDescription, name, startDate) =>
       JsonLD.entity(
         resourceId.asEntityId,
         entityTypes,
-        (schema / "location")    -> datasetResourceId.asEntityId.asJsonLD,
-        (schema / "about")       -> about.asJsonLD,
+        (schema / "about")       -> about.asEntityId.asJsonLD,
         (schema / "description") -> maybeDescription.asJsonLD,
         (schema / "name")        -> name.asJsonLD,
         (schema / "startDate")   -> startDate.asJsonLD
@@ -53,11 +51,10 @@ object PublicationEvent {
     import ch.datascience.graph.model.views.StringTinyTypeJsonLDDecoders._
     for {
       resourceId       <- cursor.downEntityId.as[ResourceId]
-      location         <- cursor.downField(schema / "location").downEntityId.as[datasets.ResourceId]
-      about            <- cursor.downField(schema / "about").as[AboutEvent]
+      about            <- cursor.downField(schema / "about").downEntityId.as[datasets.ResourceId]
       maybeDescription <- cursor.downField(schema / "description").as[Option[Description]]
       name             <- cursor.downField(schema / "name").as[Name]
       startDate        <- cursor.downField(schema / "startDate").as[StartDate]
-    } yield PublicationEvent(resourceId, location, about, maybeDescription, name, startDate)
+    } yield PublicationEvent(resourceId, about, maybeDescription, name, startDate)
   }
 }

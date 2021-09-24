@@ -92,9 +92,9 @@ object Dataset {
       identification:   Identification
   ): ValidatedNel[String, Unit] = publishingEvents
     .map {
-      case event if event.location == identification.resourceId => ().validNel[String]
+      case event if event.about == identification.resourceId => ().validNel[String]
       case event =>
-        s"PublishingEvent ${event.resourceId} refers to ${event.location} which is not ${identification.resourceId}".invalidNel
+        s"PublishingEvent ${event.resourceId} refers to ${event.about} which is not ${identification.resourceId}".invalidNel
     }
     .sequence
     .void
@@ -442,7 +442,7 @@ object Dataset {
       parts          <- cursor.downField(schema / "hasPart").as[List[DatasetPart]]
       publicationEvents <-
         cursor.top
-          .map(_.cursor.as[List[PublicationEvent]].map(_.filter(_.location == identification.resourceId)))
+          .map(_.cursor.as[List[PublicationEvent]].map(_.filter(_.about == identification.resourceId)))
           .sequence
           .map(_ getOrElse Nil)
       dataset <-

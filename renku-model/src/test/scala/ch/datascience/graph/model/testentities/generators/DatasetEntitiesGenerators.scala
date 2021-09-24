@@ -25,7 +25,6 @@ import ch.datascience.generators.Generators.{nonEmptyStrings, sentences, timesta
 import ch.datascience.graph.model.GraphModelGenerators.{datasetCreatedDates, datasetDerivedFroms, datasetDescriptions, datasetExternalSameAs, datasetIdentifiers, datasetImageUris, datasetInitialVersions, datasetInternalSameAs, datasetKeywords, datasetLicenses, datasetNames, datasetPartExternals, datasetPartSources, datasetPublishedDates, datasetTitles, datasetVersions, projectCreatedDates}
 import ch.datascience.graph.model._
 import ch.datascience.graph.model.datasets.{DerivedFrom, ExternalSameAs, Identifier, InitialVersion, PartId, TopmostDerivedFrom, TopmostSameAs}
-import ch.datascience.graph.model.publicationEvents.AboutEvent
 import ch.datascience.graph.model.testentities.Dataset.{AdditionalInfo, Identification, Provenance}
 import ch.datascience.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
 import ch.datascience.tinytypes.InstantTinyType
@@ -223,11 +222,10 @@ trait DatasetEntitiesGenerators {
   } yield DatasetPart(PartId.generate, external, entity, dateCreated, maybeSource)
 
   def publicationEventFactories(minDateCreated: Instant): Gen[Dataset[Provenance] => PublicationEvent] = for {
-    about            <- nonEmptyStrings() map AboutEvent.apply
     maybeDescription <- sentences().map(_.value).map(publicationEvents.Description.apply).toGeneratorOfOptions
     name             <- nonEmptyStrings() map publicationEvents.Name.apply
     startDate        <- timestamps(minDateCreated, max = Instant.now()) map publicationEvents.StartDate.apply
-  } yield PublicationEvent(_, about, maybeDescription, name, startDate)
+  } yield PublicationEvent(_, maybeDescription, name, startDate)
 
   implicit class DatasetGenFactoryOps[P <: Dataset.Provenance](factory: DatasetGenFactory[P])(implicit
       renkuBaseUrl:                                                     RenkuBaseUrl

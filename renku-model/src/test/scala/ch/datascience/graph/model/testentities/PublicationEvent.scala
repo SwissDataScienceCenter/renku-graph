@@ -21,10 +21,9 @@ package ch.datascience.graph.model.testentities
 import cats.syntax.all._
 import ch.datascience.graph.model.publicationEvents._
 import ch.datascience.graph.model.testentities.Dataset.Provenance
-import ch.datascience.graph.model.{RenkuBaseUrl, datasets, entities, publicationEvents}
+import ch.datascience.graph.model._
 
 final case class PublicationEvent(dataset:          Dataset[Provenance],
-                                  about:            AboutEvent,
                                   maybeDescription: Option[Description],
                                   name:             Name,
                                   startDate:        StartDate
@@ -41,7 +40,6 @@ object PublicationEvent {
     entities.PublicationEvent(
       publicationEvents.ResourceId(publicationEvent.asEntityId.show),
       datasets.ResourceId(publicationEvent.dataset.asEntityId.show),
-      publicationEvent.about,
       publicationEvent.maybeDescription,
       publicationEvent.name,
       publicationEvent.startDate
