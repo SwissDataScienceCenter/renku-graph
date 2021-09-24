@@ -88,6 +88,10 @@ object JsonLDDecoder {
 
   implicit val decodeLocalDate: JsonLDDecoder[LocalDate] = _.jsonLD match {
     case JsonLDValue(value: LocalDate, Some(JsonLDLocalDateValue.entityTypes)) => Right(value)
+    case JsonLDValue(value: String, _) =>
+      Either
+        .catchNonFatal(LocalDate.parse(value))
+        .leftMap(e => DecodingFailure(s"Cannot decode $value to LocalDate: ${e.getMessage}", Nil))
     case JsonLDValue(value, _) => DecodingFailure(s"Cannot decode $value to LocalDate", Nil).asLeft
     case json                  => DecodingFailure(s"Cannot decode ${ShowTypeName(json)} to LocalDate", Nil).asLeft
   }
