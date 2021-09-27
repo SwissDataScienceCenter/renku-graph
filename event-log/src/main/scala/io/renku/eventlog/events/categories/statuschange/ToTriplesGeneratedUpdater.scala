@@ -20,6 +20,7 @@ package io.renku.eventlog.events.categories.statuschange
 
 import cats.data.Kleisli
 import cats.effect.{BracketThrow, Sync}
+import cats.kernel.Monoid
 import cats.syntax.all._
 import ch.datascience.db.implicits._
 import ch.datascience.db.{DbClient, SqlStatement}
@@ -45,18 +46,18 @@ private class ToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow: Sync](
 
   private lazy val partitionSize = 50
 
-  override def updateDB(event: ToTriplesGenerated): UpdateResult[Interpretation] = for {
-    updateResults      <- updateEvent(event)
+  override def updateDB(event: ToTriplesGenerated): UpdateResult[Interpretation] = updateStatus(event) >>= {
+    case results if results.statusCounts.isEmpty => Kleisli.pure(results)
+    case results                                 => updateDependentData(event).map(_ combine results).widen[DBUpdateResults]
+  }
+
+  private def updateDependentData(event: ToTriplesGenerated) = for {
+    _                  <- updatePayload(event)
+    _                  <- updateProcessingTime(event)
     idsAndUpdateResult <- updateAncestorsStatus(event)
     (idsAndStatuses, ancestorsUpdateResults) = idsAndUpdateResult
     _ <- cleanUp(idsAndStatuses, event)
-  } yield ancestorsUpdateResults combine updateResults: DBUpdateResults
-
-  private def updateEvent(event: ToTriplesGenerated) = for {
-    updateResults <- updateStatus(event)
-    _             <- updatePayload(event)
-    _             <- updateProcessingTime(event)
-  } yield updateResults
+  } yield ancestorsUpdateResults
 
   private def updateStatus(event: ToTriplesGenerated) = measureExecutionTime {
     SqlStatement(name = "to_triples_generated - status update")
@@ -76,8 +77,10 @@ private class ToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow: Sync](
           DBUpdateResults
             .ForProjects(event.projectPath, Map(GeneratingTriples -> -1, TriplesGenerated -> 1))
             .pure[Interpretation]
-        case _ =>
-          new Exception(s"Could not update event ${event.eventId} to status $TriplesGenerated")
+        case Completion.Update(0) =>
+          Monoid[DBUpdateResults.ForProjects].empty.pure[Interpretation]
+        case completion =>
+          new Exception(s"Could not update event ${event.eventId} to status $TriplesGenerated: $completion")
             .raiseError[Interpretation, DBUpdateResults.ForProjects]
       }
   }
@@ -86,7 +89,7 @@ private class ToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow: Sync](
     SqlStatement(name = "to_triples_generated - payload upload")
       .command(
         sql"""INSERT INTO event_payload (event_id, project_id, payload, schema_version)
-              VALUES ($eventIdEncoder,  $projectIdEncoder, $eventPayloadEncoder, $schemaVersionEncoder)
+              VALUES ($eventIdEncoder, $projectIdEncoder, $eventPayloadEncoder, $schemaVersionEncoder)
               ON CONFLICT (event_id, project_id, schema_version)
               DO UPDATE SET payload = EXCLUDED.payload;""".command
       )

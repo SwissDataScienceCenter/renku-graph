@@ -24,6 +24,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.timestamps
 import ch.datascience.graph.model.EventsGenerators.eventProcessingTimes
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.metrics.TestLabeledHistogram
@@ -81,11 +82,11 @@ class ToTriplesGeneratedUpdaterSpec
           maybePayload  shouldBe Some(statusChangeEvent.payload)
           processingTimes should contain(statusChangeEvent.processingTime)
         }
-        .getOrElse(fail("No event found for main event"))
+        .getOrElse(fail("No event found for the main event"))
 
       eventsToUpdate.map {
-        case (eventId, AwaitingDeletion, _, _, _) => findFullEvent(CompoundEventId(eventId, projectId)) shouldBe None
-        case (eventId, status, _, _, _) =>
+        case (eventId, AwaitingDeletion, _, _, _, _) => findFullEvent(CompoundEventId(eventId, projectId)) shouldBe None
+        case (eventId, status, _, _, _, _) =>
           findFullEvent(CompoundEventId(eventId, projectId))
             .map { case (_, status, _, maybePayload, processingTimes) =>
               status          shouldBe TriplesGenerated
@@ -95,7 +96,7 @@ class ToTriplesGeneratedUpdaterSpec
             .getOrElse(fail(s"No event found with old $status status"))
       }
 
-      eventsToSkip.map { case (eventId, originalStatus, originalMessage, originalPayload, originalProcessingTimes) =>
+      eventsToSkip.map { case (eventId, originalStatus, originalMessage, originalPayload, _, originalProcessingTimes) =>
         findFullEvent(CompoundEventId(eventId, projectId))
           .map { case (_, status, maybeMessage, maybePayload, processingTimes) =>
             status          shouldBe originalStatus
@@ -105,6 +106,41 @@ class ToTriplesGeneratedUpdaterSpec
           }
           .getOrElse(fail(s"No event found with old $originalStatus status"))
       }
+    }
+
+    "do nothing if the event is already in the TRIPLES_GENERATED" in new TestCase {
+      val eventDate = eventDates.generateOne
+      val (olderEventId, olderEventStatus, _, _, _, _) =
+        addEvent(New, timestamps(max = eventDate.value).generateAs(EventDate))
+
+      val (eventId, _, _, existingPayload, Some(schemaVersion), _) = addEvent(TriplesGenerated, eventDate)
+
+      val statusChangeEvent = ToTriplesGenerated(CompoundEventId(eventId, projectId),
+                                                 projectPath,
+                                                 eventProcessingTimes.generateOne,
+                                                 eventPayloads.generateOne,
+                                                 schemaVersion
+      )
+
+      sessionResource
+        .useK(dbUpdater updateDB statusChangeEvent)
+        .unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
+
+      findFullEvent(CompoundEventId(eventId, projectId))
+        .map { case (_, status, _, maybePayload, processingTimes) =>
+          status        shouldBe TriplesGenerated
+          maybePayload  shouldBe existingPayload
+          processingTimes should not contain statusChangeEvent.processingTime
+        }
+        .getOrElse(fail("No event found for the main event"))
+
+      findFullEvent(CompoundEventId(olderEventId, projectId))
+        .map { case (_, status, _, maybePayload, processingTimes) =>
+          status          shouldBe olderEventStatus
+          processingTimes shouldBe Nil
+          maybePayload    shouldBe None
+        }
+        .getOrElse(fail(s"No event found with old $olderEventStatus status"))
     }
   }
 
@@ -120,16 +156,19 @@ class ToTriplesGeneratedUpdaterSpec
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()
 
-    def addEvent(status:    EventStatus,
-                 eventDate: EventDate
-    ): (EventId, EventStatus, Option[EventMessage], Option[EventPayload], List[EventProcessingTime]) =
-      storeGeneratedEvent(status, eventDate, projectId, projectPath)
+    def addEvent(status: EventStatus, eventDate: EventDate): (EventId,
+                                                              EventStatus,
+                                                              Option[EventMessage],
+                                                              Option[EventPayload],
+                                                              Option[SchemaVersion],
+                                                              List[EventProcessingTime]
+    ) = storeGeneratedEvent(status, eventDate, projectId, projectPath)
 
     def findFullEvent(eventId: CompoundEventId) = {
       val maybeEvent     = findEvent(eventId)
       val maybePayload   = findPayload(eventId).map(_._2)
       val processingTime = findProcessingTime(eventId)
-      maybeEvent.map { case (_, status, maybeMessage) =>
+      maybeEvent map { case (_, status, maybeMessage) =>
         (eventId.id, status, maybeMessage, maybePayload, processingTime.map(_._2))
       }
     }

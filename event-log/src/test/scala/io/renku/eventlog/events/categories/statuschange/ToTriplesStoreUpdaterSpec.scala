@@ -24,6 +24,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.timestamps
 import ch.datascience.graph.model.EventsGenerators.eventProcessingTimes
 import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.metrics.TestLabeledHistogram
@@ -85,7 +86,7 @@ class ToTriplesStoreUpdaterSpec
         }
         .getOrElse(fail("No event found for main event"))
 
-      eventsToUpdate.map { case (eventId, status, _, originalPayload, originalProcessingTimes) =>
+      eventsToUpdate.map { case (eventId, status, _, originalPayload, _, originalProcessingTimes) =>
         findFullEvent(CompoundEventId(eventId, projectId))
           .map { case (_, status, maybeMessage, maybePayload, processingTimes) =>
             status          shouldBe TriplesStore
@@ -96,7 +97,7 @@ class ToTriplesStoreUpdaterSpec
           .getOrElse(fail(s"No event found with old $status status"))
       }
 
-      eventsToSkip.map { case (eventId, originalStatus, originalMessage, originalPayload, originalProcessingTimes) =>
+      eventsToSkip.map { case (eventId, originalStatus, originalMessage, originalPayload, _, originalProcessingTimes) =>
         findFullEvent(CompoundEventId(eventId, projectId))
           .map { case (_, status, maybeMessage, maybePayload, processingTimes) =>
             status          shouldBe originalStatus
@@ -121,10 +122,13 @@ class ToTriplesStoreUpdaterSpec
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()
 
-    def addEvent(status:    EventStatus,
-                 eventDate: EventDate
-    ): (EventId, EventStatus, Option[EventMessage], Option[EventPayload], List[EventProcessingTime]) =
-      storeGeneratedEvent(status, eventDate, projectId, projectPath)
+    def addEvent(status: EventStatus, eventDate: EventDate): (EventId,
+                                                              EventStatus,
+                                                              Option[EventMessage],
+                                                              Option[EventPayload],
+                                                              Option[SchemaVersion],
+                                                              List[EventProcessingTime]
+    ) = storeGeneratedEvent(status, eventDate, projectId, projectPath)
 
     def findFullEvent(
         eventId: CompoundEventId

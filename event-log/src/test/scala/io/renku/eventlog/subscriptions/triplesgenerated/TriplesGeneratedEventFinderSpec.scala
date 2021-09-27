@@ -363,8 +363,8 @@ private class TriplesGeneratedEventFinderSpec
       eventBody,
       batchDate = batchDate,
       projectPath = projectPath,
-      payloadSchemaVersion = payloadSchemaVersion,
-      maybeEventPayload = eventPayload.some
+      maybeEventPayload = eventPayload.some,
+      maybeSchemaVersion = payloadSchemaVersion.some
     )
 
     (eventId, eventBody, eventDate, projectPath, eventPayload)

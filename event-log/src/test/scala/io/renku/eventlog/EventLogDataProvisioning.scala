@@ -19,6 +19,7 @@
 package io.renku.eventlog
 
 import cats.data.Kleisli
+import cats.syntax.all._
 import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl, subscriberIds, subscriberUrls}
 import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
 import ch.datascience.generators.Generators.Implicits._
@@ -44,7 +45,13 @@ trait EventLogDataProvisioning {
                                     eventDate:   EventDate,
                                     projectId:   projects.Id,
                                     projectPath: projects.Path
-  ): (EventId, EventStatus, Option[EventMessage], Option[EventPayload], List[EventProcessingTime]) = {
+  ): (EventId,
+      EventStatus,
+      Option[EventMessage],
+      Option[EventPayload],
+      Option[SchemaVersion],
+      List[EventProcessingTime]
+  ) = {
     val eventId = CompoundEventId(eventIds.generateOne, projectId)
     val maybeMessage = status match {
       case _: EventStatus.FailureStatus => eventMessages.generateSome
@@ -55,6 +62,7 @@ trait EventLogDataProvisioning {
       case AwaitingDeletion                                      => eventPayloads.generateOption
       case _                                                     => eventPayloads.generateNone
     }
+    val maybeSchemaVersion = maybePayload.map(_ => projectSchemaVersions.generateOne)
     storeEvent(
       eventId,
       status,
@@ -63,7 +71,8 @@ trait EventLogDataProvisioning {
       eventBodies.generateOne,
       projectPath = projectPath,
       maybeMessage = maybeMessage,
-      maybeEventPayload = maybePayload
+      maybeEventPayload = maybePayload,
+      maybeSchemaVersion = maybeSchemaVersion
     )
 
     val processingTimes = status match {
@@ -75,24 +84,24 @@ trait EventLogDataProvisioning {
     }
     processingTimes.foreach(upsertProcessingTime(eventId, status, _))
 
-    (eventId.id, status, maybeMessage, maybePayload, processingTimes)
+    (eventId.id, status, maybeMessage, maybePayload, maybeSchemaVersion, processingTimes)
   }
 
-  protected def storeEvent(compoundEventId:      CompoundEventId,
-                           eventStatus:          EventStatus,
-                           executionDate:        ExecutionDate,
-                           eventDate:            EventDate,
-                           eventBody:            EventBody,
-                           createdDate:          CreatedDate = CreatedDate(Instant.now),
-                           batchDate:            BatchDate = BatchDate(Instant.now),
-                           projectPath:          Path = projectPaths.generateOne,
-                           maybeMessage:         Option[EventMessage] = None,
-                           payloadSchemaVersion: SchemaVersion = projectSchemaVersions.generateOne,
-                           maybeEventPayload:    Option[EventPayload] = None
+  protected def storeEvent(compoundEventId:    CompoundEventId,
+                           eventStatus:        EventStatus,
+                           executionDate:      ExecutionDate,
+                           eventDate:          EventDate,
+                           eventBody:          EventBody,
+                           createdDate:        CreatedDate = CreatedDate(Instant.now),
+                           batchDate:          BatchDate = BatchDate(Instant.now),
+                           projectPath:        Path = projectPaths.generateOne,
+                           maybeMessage:       Option[EventMessage] = None,
+                           maybeEventPayload:  Option[EventPayload] = None,
+                           maybeSchemaVersion: Option[SchemaVersion] = None
   ): Unit = {
     upsertProject(compoundEventId, projectPath, eventDate)
     insertEvent(compoundEventId, eventStatus, executionDate, eventDate, eventBody, createdDate, batchDate, maybeMessage)
-    upsertEventPayload(compoundEventId, eventStatus, payloadSchemaVersion, maybeEventPayload)
+    upsertEventPayload(compoundEventId, eventStatus, maybeEventPayload, maybeSchemaVersion)
   }
 
   protected def insertEvent(compoundEventId: CompoundEventId,
@@ -159,29 +168,31 @@ trait EventLogDataProvisioning {
       }
     }
 
-  protected def upsertEventPayload(compoundEventId: CompoundEventId,
-                                   eventStatus:     EventStatus,
-                                   schemaVersion:   SchemaVersion,
-                                   maybePayload:    Option[EventPayload]
+  protected def upsertEventPayload(compoundEventId:    CompoundEventId,
+                                   eventStatus:        EventStatus,
+                                   maybePayload:       Option[EventPayload],
+                                   maybeSchemaVersion: Option[SchemaVersion]
   ): Unit = eventStatus match {
     case TriplesGenerated | TransformationRecoverableFailure | TransformingTriples | TriplesStore | AwaitingDeletion =>
-      maybePayload foreach { payload =>
-        execute[Unit] {
-          Kleisli { session =>
-            val query: Command[EventId ~ projects.Id ~ EventPayload ~ SchemaVersion] =
-              sql"""INSERT INTO
+      (maybePayload, maybeSchemaVersion)
+        .mapN { (payload, schemaVersion) =>
+          execute[Unit] {
+            Kleisli { session =>
+              val query: Command[EventId ~ projects.Id ~ EventPayload ~ SchemaVersion] =
+                sql"""INSERT INTO
                     event_payload (event_id, project_id, payload, schema_version)
                     VALUES ($eventIdEncoder, $projectIdEncoder, $eventPayloadEncoder, $schemaVersionEncoder)
                     ON CONFLICT (event_id, project_id, schema_version)
                     DO UPDATE SET payload = excluded.payload
               """.command
-            session
-              .prepare(query)
-              .use(_.execute(compoundEventId.id ~ compoundEventId.projectId ~ payload ~ schemaVersion))
-              .void
+              session
+                .prepare(query)
+                .use(_.execute(compoundEventId.id ~ compoundEventId.projectId ~ payload ~ schemaVersion))
+                .void
+            }
           }
         }
-      }
+        .getOrElse(())
     case _ => ()
   }
 

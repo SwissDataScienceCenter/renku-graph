@@ -30,6 +30,9 @@ private object DBUpdateResults {
   final case class ForProjects(statusCounts: Set[(projects.Path, Map[EventStatus, Int])]) extends DBUpdateResults
 
   object ForProjects {
+
+    lazy val empty: ForProjects = ForProjects(Set.empty)
+
     def apply(projectPath: projects.Path, statusCount: Map[EventStatus, Int]): ForProjects = ForProjects(
       Set(projectPath -> statusCount)
     )
@@ -46,6 +49,6 @@ private object DBUpdateResults {
           .toSet
       )
 
-    override def empty: ForProjects = ForProjects(Set.empty)
+    override def empty: ForProjects = ForProjects.empty
   }
 }
