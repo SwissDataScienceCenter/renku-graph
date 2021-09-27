@@ -62,7 +62,7 @@ class EventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec with shou
         projectPaths.generateOne
       )
 
-      eventsFinder.findEvents(projectPath).unsafeRunSync() shouldBe infosAndDates.sortBy(_._2).map(_._1)
+      eventsFinder.findEvents(projectPath).unsafeRunSync() shouldBe infosAndDates.sortBy(_._2).map(_._1).reverse
     }
 
     "return an empty List if there's no project with the given path" in new TestCase {

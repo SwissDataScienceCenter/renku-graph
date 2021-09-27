@@ -52,7 +52,7 @@ private class EventsFinderImpl[Interpretation[_]: BracketThrow: Concurrent](
               FROM event evt
               JOIN project prj ON evt.project_id = prj.project_id AND prj.project_path = $projectPathEncoder
               LEFT JOIN status_processing_time times ON evt.event_id = times.event_id AND evt.project_id = times.project_id
-              ORDER BY evt.event_date DESC, evt.event_id
+              ORDER BY evt.event_date ASC, evt.event_id
           """
           .query(eventIdDecoder ~ eventStatusDecoder ~ eventMessageDecoder.opt ~ statusProcessingTimesDecoder.opt)
           .map {
