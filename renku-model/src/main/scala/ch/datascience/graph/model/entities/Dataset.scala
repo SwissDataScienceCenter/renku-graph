@@ -344,7 +344,7 @@ object Dataset {
             s"internalSameAs: $maybeInternalSameAs, " +
             s"externalSameAs: $maybeExternalSameAs, " +
             s"derivedFrom: $maybeDerivedFrom, " +
-            s"initialVersion: $maybeInitialVersion" +
+            s"initialVersion: $maybeInitialVersion, " +
             s"maybeInvalidationTime: $maybeInvalidationTime",
           Nil
         ).asLeft
