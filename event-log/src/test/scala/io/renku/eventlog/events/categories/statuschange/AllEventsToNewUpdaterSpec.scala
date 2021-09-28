@@ -20,6 +20,8 @@ package io.renku.eventlog.events.categories.statuschange
 
 import cats.effect.IO
 import ch.datascience.db.SqlStatement
+import ch.datascience.events.consumers.subscriptions.{subscriberIds, subscriberUrls}
+import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{timestamps, timestampsNotInTheFuture}
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventProcessingTimes}
@@ -50,13 +52,14 @@ class AllEventsToNewUpdaterSpec
 
     "change the status of all events to NEW except SKIPPED events" in new TestCase {
 
-      val events = projectIdentifiers
+      val eventIds = projectIdentifiers
         .generateNonEmptyList(2)
         .flatMap { case (projectId, projectPath) =>
           Gen
             .oneOf(EventStatus.all.diff(Set(EventStatus.Skipped, EventStatus.AwaitingDeletion)))
             .generateNonEmptyList(2)
-            .map(addEvent(_, projectId, projectPath) -> projectId)
+            .map(addEvent(_, projectId, projectPath))
+            .map(CompoundEventId(_, projectId))
         }
         .toList
 
@@ -66,22 +69,28 @@ class AllEventsToNewUpdaterSpec
       val awaitingDeletionEventProjectId = projectIds.generateOne
       val awaitingDeletionEvent          = addEvent(EventStatus.AwaitingDeletion, skippedEventProjectId)
 
+      eventIds.foreach(upsertEventDelivery(_, subscriberId))
+
       sessionResource
         .useK(dbUpdater.updateDB(AllEventsToNew))
         .unsafeRunSync() shouldBe DBUpdateResults.ForAllProjects
 
-      events.flatMap { case (eventId, projectId) =>
-        findFullEvent(CompoundEventId(eventId, projectId))
-      } shouldBe events.map { case (eventId, _) =>
-        (eventId, EventStatus.New, None, None, List())
+      eventIds.flatMap(findFullEvent) shouldBe eventIds.map { eventId =>
+        (eventId.id, EventStatus.New, None, None, List())
       }
 
       findEvent(CompoundEventId(skippedEvent, skippedEventProjectId)).map(_._2)                   shouldBe Some(EventStatus.Skipped)
       findEvent(CompoundEventId(awaitingDeletionEvent, awaitingDeletionEventProjectId)).map(_._2) shouldBe None
+      findAllDeliveries                                                                           shouldBe Nil
     }
   }
 
   private trait TestCase {
+
+    val subscriberId          = subscriberIds.generateOne
+    private val subscriberUrl = subscriberUrls.generateOne
+    private val sourceUrl     = microserviceBaseUrls.generateOne
+    upsertSubscriber(subscriberId, subscriberUrl, sourceUrl)
 
     val currentTime      = mockFunction[Instant]
     val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")

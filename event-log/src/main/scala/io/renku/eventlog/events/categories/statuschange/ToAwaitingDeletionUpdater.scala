@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.events.categories.statuschange
 
+import cats.data.Kleisli
 import cats.effect.{BracketThrow, Sync}
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SqlStatement}
@@ -69,4 +70,6 @@ private class ToAwaitingDeletionUpdater[Interpretation[_]: BracketThrow: Sync](
             .raiseError[Interpretation, DBUpdateResults]
       }
   }
+
+  override def onRollback(event: ToAwaitingDeletion) = Kleisli.pure(())
 }

@@ -18,11 +18,12 @@
 
 package io.renku.eventlog.events.categories.statuschange
 
+import cats.data.Kleisli
 import cats.effect.IO
 import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.timestamps
-import ch.datascience.graph.model.EventsGenerators.eventProcessingTimes
+import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventProcessingTimes}
 import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.EventStatus._
@@ -68,6 +69,8 @@ class ToTriplesStoreUpdaterSpec
       val statusChangeEvent =
         ToTriplesStore(CompoundEventId(event._1, projectId), projectPath, eventProcessingTimes.generateOne)
 
+      (deliveryInfoRemover.deleteDelivery _).expects(statusChangeEvent.eventId).returning(Kleisli.pure(()))
+
       sessionResource.useK(dbUpdater updateDB statusChangeEvent).unsafeRunSync() shouldBe DBUpdateResults
         .ForProjects(
           projectPath,
@@ -110,14 +113,27 @@ class ToTriplesStoreUpdaterSpec
     }
   }
 
+  "onRollback" should {
+    "clean the delivery info for the event" in new TestCase {
+      val event = ToTriplesStore(compoundEventIds.generateOne, projectPath, eventProcessingTimes.generateOne)
+
+      (deliveryInfoRemover.deleteDelivery _).expects(event.eventId).returning(Kleisli.pure(()))
+
+      sessionResource
+        .useK(dbUpdater onRollback event)
+        .unsafeRunSync() shouldBe ()
+    }
+  }
+
   private trait TestCase {
 
     val projectId   = projectIds.generateOne
     val projectPath = projectPaths.generateOne
 
-    val currentTime      = mockFunction[Instant]
-    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val dbUpdater        = new ToTriplesStoreUpdater[IO](queriesExecTimes, currentTime)
+    val currentTime         = mockFunction[Instant]
+    val deliveryInfoRemover = mock[DeliveryInfoRemover[IO]]
+    val queriesExecTimes    = TestLabeledHistogram[SqlStatement.Name]("query_id")
+    val dbUpdater           = new ToTriplesStoreUpdater[IO](deliveryInfoRemover, queriesExecTimes, currentTime)
 
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()

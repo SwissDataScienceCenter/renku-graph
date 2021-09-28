@@ -247,8 +247,7 @@ trait EventLogDataProvisioning {
   ): Unit = execute[Unit] {
     Kleisli { session =>
       val query: Command[EventId ~ projects.Id ~ SubscriberId] =
-        sql"""INSERT INTO
-              event_delivery (event_id, project_id, delivery_id)
+        sql"""INSERT INTO event_delivery (event_id, project_id, delivery_id)
               VALUES ($eventIdEncoder, $projectIdEncoder, $subscriberIdEncoder)
               ON CONFLICT (event_id, project_id)
               DO NOTHING

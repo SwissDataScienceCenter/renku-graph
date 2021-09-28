@@ -38,15 +38,21 @@ import skunk.~
 import java.time.Instant
 
 private class ToFailureUpdater[Interpretation[_]: BracketThrow: Sync](
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
-    now:              () => Instant = () => Instant.now
+    deliveryInfoRemover: DeliveryInfoRemover[Interpretation],
+    queriesExecTimes:    LabeledHistogram[Interpretation, SqlStatement.Name],
+    now:                 () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with DBUpdater[Interpretation, ToFailure[ProcessingStatus, FailureStatus]] {
 
+  import deliveryInfoRemover._
+
   override def updateDB(event: ToFailure[ProcessingStatus, FailureStatus]): UpdateResult[Interpretation] = for {
+    _                     <- deleteDelivery(event.eventId)
     eventUpdateResult     <- updateEvent(event)
     ancestorsUpdateResult <- maybeUpdateAncestors(event)
   } yield ancestorsUpdateResult combine eventUpdateResult
+
+  override def onRollback(event: ToFailure[ProcessingStatus, FailureStatus]) = deleteDelivery(event.eventId)
 
   private def updateEvent(event: ToFailure[ProcessingStatus, FailureStatus]) = measureExecutionTime {
     SqlStatement[Interpretation](name = Refined.unsafeApply(s"to_${event.newStatus.value.toLowerCase} - status update"))

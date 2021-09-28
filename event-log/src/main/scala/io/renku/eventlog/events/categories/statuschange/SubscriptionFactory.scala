@@ -35,12 +35,12 @@ object SubscriptionFactory {
             underTriplesGenerationGauge:        LabeledGauge[IO, projects.Path],
             awaitingTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
             underTriplesTransformationGauge:    LabeledGauge[IO, projects.Path],
-            queriesExecTimes:                   LabeledHistogram[IO, SqlStatement.Name],
-            logger:                             Logger[IO]
+            queriesExecTimes:                   LabeledHistogram[IO, SqlStatement.Name]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
+      timer:            Timer[IO],
+      logger:           Logger[IO]
   ): IO[(EventHandler[IO], SubscriptionMechanism[IO])] = for {
     handler <- EventHandler(
                  sessionResource,
@@ -48,8 +48,7 @@ object SubscriptionFactory {
                  awaitingTriplesGenerationGauge,
                  underTriplesGenerationGauge,
                  awaitingTriplesTransformationGauge,
-                 underTriplesTransformationGauge,
-                 logger
+                 underTriplesTransformationGauge
                )
   } yield handler -> SubscriptionMechanism.noOpSubscriptionMechanism(categoryName)
 

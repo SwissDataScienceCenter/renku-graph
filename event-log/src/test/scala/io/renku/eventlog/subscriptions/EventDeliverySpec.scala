@@ -77,7 +77,6 @@ class EventDeliverySpec extends AnyWordSpec with InMemoryEventLogDbSpec with Moc
       delivery.registerSending(event, subscriberUrl).unsafeRunSync() shouldBe ()
 
       findAllDeliveries shouldBe List(event.compoundEventId -> newSubscriberId)
-
     }
   }
 

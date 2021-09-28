@@ -39,17 +39,21 @@ import skunk.{Session, ~}
 import java.time.Instant
 
 private class ToTriplesStoreUpdater[Interpretation[_]: BracketThrow: Sync](
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
-    now:              () => Instant = () => Instant.now
+    deliveryInfoRemover: DeliveryInfoRemover[Interpretation],
+    queriesExecTimes:    LabeledHistogram[Interpretation, SqlStatement.Name],
+    now:                 () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with DBUpdater[Interpretation, ToTriplesStore] {
 
-  override def updateDB(
-      event: ToTriplesStore
-  ): UpdateResult[Interpretation] = for {
+  import deliveryInfoRemover._
+
+  override def updateDB(event: ToTriplesStore): UpdateResult[Interpretation] = for {
+    _                      <- deleteDelivery(event.eventId)
     updateResults          <- updateEvent(event)
     ancestorsUpdateResults <- updateAncestorsStatus(event) recoverWith retryOnDeadlock(event)
   } yield updateResults combine ancestorsUpdateResults
+
+  override def onRollback(event: ToTriplesStore) = deleteDelivery(event.eventId)
 
   private def updateEvent(event: ToTriplesStore) = for {
     updateResults <- updateStatus(event)

@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.events.categories.statuschange
 
+import cats.data.Kleisli
 import cats.effect.{BracketThrow, Sync}
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SqlStatement}
@@ -64,4 +65,6 @@ private class RollbackToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow:
             .raiseError[Interpretation, DBUpdateResults]
       }
   }
+
+  override def onRollback(event: RollbackToTriplesGenerated) = Kleisli.pure(())
 }

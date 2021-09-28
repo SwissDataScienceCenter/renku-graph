@@ -30,6 +30,7 @@ import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
 import io.renku.eventlog._
 import EventContentGenerators.{eventDates, eventMessages}
+import cats.data.Kleisli
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.{AllowedCombination, ToFailure}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -52,6 +53,8 @@ class ToFailureUpdaterSpec
         createFailureEvent(GeneratingTriples, GenerationRecoverableFailure),
         createFailureEvent(TransformingTriples, TransformationRecoverableFailure)
       ) foreach { statusChangeEvent =>
+        (deliveryInfoRemover.deleteDelivery _).expects(statusChangeEvent.eventId).returning(Kleisli.pure(()))
+
         sessionResource
           .useK(dbUpdater updateDB statusChangeEvent)
           .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
@@ -94,6 +97,8 @@ class ToFailureUpdaterSpec
           timestamps(min = latestEventDate.value.plusSeconds(2), max = Instant.now()).generateAs(EventDate)
         ) -> TriplesGenerated)
 
+        (deliveryInfoRemover.deleteDelivery _).expects(statusChangeEvent.eventId).returning(Kleisli.pure(()))
+
         sessionResource
           .useK(dbUpdater updateDB statusChangeEvent)
           .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
@@ -124,6 +129,8 @@ class ToFailureUpdaterSpec
           ToFailure(eventId, projectPath, message, TransformingTriples, TransformationNonRecoverableFailure),
           ToFailure(eventId, projectPath, message, TransformingTriples, TransformationRecoverableFailure)
         ) foreach { statusChangeEvent =>
+          (deliveryInfoRemover.deleteDelivery _).expects(statusChangeEvent.eventId).returning(Kleisli.pure(()))
+
           intercept[Exception] {
             sessionResource.useK(dbUpdater.updateDB(statusChangeEvent)).unsafeRunSync()
           }.getMessage shouldBe s"Could not update event $eventId to status ${statusChangeEvent.newStatus}"
@@ -134,14 +141,32 @@ class ToFailureUpdaterSpec
     }
   }
 
+  "onRollback" should {
+    "clean the delivery info for the event" in new TestCase {
+      val event = ToFailure(compoundEventIds.generateOne,
+                            projectPath,
+                            eventMessages.generateOne,
+                            GeneratingTriples,
+                            GenerationNonRecoverableFailure
+      )
+
+      (deliveryInfoRemover.deleteDelivery _).expects(event.eventId).returning(Kleisli.pure(()))
+
+      sessionResource
+        .useK(dbUpdater onRollback event)
+        .unsafeRunSync() shouldBe ()
+    }
+  }
+
   private trait TestCase {
 
     val projectId   = projectIds.generateOne
     val projectPath = projectPaths.generateOne
 
-    val currentTime      = mockFunction[Instant]
-    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val dbUpdater        = new ToFailureUpdater[IO](queriesExecTimes, currentTime)
+    val currentTime         = mockFunction[Instant]
+    val deliveryInfoRemover = mock[DeliveryInfoRemover[IO]]
+    val queriesExecTimes    = TestLabeledHistogram[SqlStatement.Name]("query_id")
+    val dbUpdater           = new ToFailureUpdater[IO](deliveryInfoRemover, queriesExecTimes, currentTime)
 
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()

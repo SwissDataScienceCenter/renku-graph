@@ -47,16 +47,24 @@ private class StatusChangerImpl[Interpretation[_]: BracketThrow](
       {
         for {
           savepoint     <- Kleisli.liftF(transaction.savepoint)
-          updateResults <- dbUpdater.updateDB(event) recoverWith rollback(transaction)(savepoint)
+          updateResults <- dbUpdater.updateDB(event) recoverWith rollback(transaction)(savepoint)(event)
           _             <- Kleisli.liftF(updateGauges(updateResults)) recoverWith { case NonFatal(_) => Kleisli.pure(()) }
         } yield ()
       } run session
     }
   }
 
-  private def rollback(transaction: Transaction[Interpretation])(
-      savepoint:                    transaction.Savepoint
-  ): PartialFunction[Throwable, UpdateResult[Interpretation]] = { case NonFatal(e) =>
-    Kleisli.liftF(transaction.rollback(savepoint) >> e.raiseError[Interpretation, DBUpdateResults])
+  private def rollback[E <: StatusChangeEvent](transaction: Transaction[Interpretation])(
+      savepoint:                                            transaction.Savepoint
+  )(event:                                                  E)(implicit
+      dbUpdater:                                            DBUpdater[Interpretation, E]
+  ): PartialFunction[Throwable, UpdateResult[Interpretation]] = { case NonFatal(err) =>
+    Kleisli.liftF {
+      for {
+        _ <- transaction.rollback(savepoint)
+        _ <- sessionResource.useK(dbUpdater onRollback event)
+        _ <- err.raiseError[Interpretation, DBUpdateResults]
+      } yield DBUpdateResults.ForProjects.empty
+    }
   }
 }

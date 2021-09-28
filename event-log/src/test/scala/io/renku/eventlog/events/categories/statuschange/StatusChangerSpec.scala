@@ -23,6 +23,8 @@ import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SqlStatement}
+import ch.datascience.events.consumers.subscriptions.{subscriberIds, subscriberUrls}
+import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{exceptions, nonNegativeInts}
 import ch.datascience.graph.model.EventsGenerators._
@@ -40,6 +42,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk.implicits._
+import skunk.{Session, ~}
 
 class StatusChangerSpec
     extends AnyWordSpec
@@ -60,9 +63,10 @@ class StatusChangerSpec
       statusChanger.updateStatuses(event).unsafeRunSync() shouldBe ()
     }
 
-    "rollback and fails if db update raises an error" in new NonMockedTestCase {
+    "rollback, run the updater's onRollback and fail if db update raises an error" in new NonMockedTestCase {
 
       findEvent(eventId).map(_._2) shouldBe Some(initialStatus)
+      findAllDeliveries            shouldBe List(eventId -> subscriberId)
 
       val event: StatusChangeEvent = ToTriplesGenerated(eventId,
                                                         projectPaths.generateOne,
@@ -76,6 +80,7 @@ class StatusChangerSpec
       }
 
       findEvent(eventId).map(_._2) shouldBe Some(initialStatus)
+      findAllDeliveries            shouldBe Nil
     }
 
     "succeed if updating the gauge fails" in new MockedTestCase {
@@ -102,12 +107,18 @@ class StatusChangerSpec
 
   private trait NonMockedTestCase {
 
-    val eventId       = compoundEventIds.generateOne
-    val initialStatus = EventStatus.New
+    val eventId               = compoundEventIds.generateOne
+    val initialStatus         = EventStatus.New
+    val subscriberId          = subscriberIds.generateOne
+    private val subscriberUrl = subscriberUrls.generateOne
+    private val sourceUrl     = microserviceBaseUrls.generateOne
 
     storeEvent(eventId, initialStatus, executionDates.generateOne, eventDates.generateOne, eventBodies.generateOne)
+    upsertSubscriber(subscriberId, subscriberUrl, sourceUrl)
+    upsertEventDelivery(eventId, subscriberId)
 
     private class TestDbUpdater extends DbClient[IO](None) with DBUpdater[IO, StatusChangeEvent] {
+
       override def updateDB(event: StatusChangeEvent): UpdateResult[IO] = Kleisli { session =>
         val passingQuery = SqlStatement[IO](name = "passing dbUpdater query")
           .command[EventId](
@@ -134,6 +145,20 @@ class StatusChangerSpec
           .queryExecution
 
         passingQuery.run(session) >> failingQuery.run(session)
+      }
+
+      override def onRollback(event: StatusChangeEvent): Kleisli[IO, Session[IO], Unit] = Kleisli {
+        SqlStatement[IO](name = "onRollback dbUpdater query")
+          .command[EventId ~ projects.Id](
+            sql"""DELETE FROM event_delivery
+                  WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
+               """.command
+          )
+          .arguments(eventId.id ~ eventId.projectId)
+          .build
+          .void
+          .queryExecution
+          .run
       }
     }
 

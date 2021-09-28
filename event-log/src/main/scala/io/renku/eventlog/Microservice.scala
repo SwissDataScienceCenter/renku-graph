@@ -70,7 +70,7 @@ object Microservice extends IOMicroservice {
         metricsRegistry             <- MetricsRegistry()
         queriesExecTimes            <- QueriesExecutionTimes(metricsRegistry)
         statsFinder                 <- IOStatsFinder(sessionResource, queriesExecTimes)
-        eventLogMetrics             <- IOEventLogMetrics(statsFinder, ApplicationLogger, metricsRegistry)
+        eventLogMetrics             <- EventLogMetrics(metricsRegistry, statsFinder)
         awaitingGenerationGauge     <- AwaitingGenerationGauge(metricsRegistry, statsFinder)
         awaitingTransformationGauge <- AwaitingTransformationGauge(metricsRegistry, statsFinder)
         underTransformationGauge    <- UnderTransformationGauge(metricsRegistry, statsFinder)
@@ -109,8 +109,7 @@ object Microservice extends IOMicroservice {
                                            underTriplesGenerationGauge,
                                            awaitingTransformationGauge,
                                            underTransformationGauge,
-                                           queriesExecTimes,
-                                           ApplicationLogger
+                                           queriesExecTimes
                                          )
         eventConsumersRegistry <- consumers.EventConsumersRegistry(
                                     creationSubscription,

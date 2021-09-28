@@ -39,17 +39,23 @@ import skunk.{Session, ~}
 import java.time.Instant
 
 private class ToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow: Sync](
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
-    now:              () => Instant = () => Instant.now
+    deliveryInfoRemover: DeliveryInfoRemover[Interpretation],
+    queriesExecTimes:    LabeledHistogram[Interpretation, SqlStatement.Name],
+    now:                 () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with DBUpdater[Interpretation, ToTriplesGenerated] {
 
   private lazy val partitionSize = 50
 
-  override def updateDB(event: ToTriplesGenerated): UpdateResult[Interpretation] = updateStatus(event) >>= {
-    case results if results.statusCounts.isEmpty => Kleisli.pure(results)
-    case results                                 => updateDependentData(event).map(_ combine results).widen[DBUpdateResults]
-  }
+  import deliveryInfoRemover._
+
+  override def updateDB(event: ToTriplesGenerated): UpdateResult[Interpretation] =
+    deleteDelivery(event.eventId) >> updateStatus(event) >>= {
+      case results if results.statusCounts.isEmpty => Kleisli.pure(results)
+      case results                                 => updateDependentData(event).map(_ combine results).widen[DBUpdateResults]
+    }
+
+  override def onRollback(event: ToTriplesGenerated) = deleteDelivery(event.eventId)
 
   private def updateDependentData(event: ToTriplesGenerated) = for {
     _                  <- updatePayload(event)

@@ -18,48 +18,47 @@
 
 package io.renku.eventlog.events.categories.statuschange
 
+import cats.data.Kleisli
 import cats.effect.{BracketThrow, Sync}
 import ch.datascience.db.SqlStatement
 import ch.datascience.graph.model.events.EventStatus.{FailureStatus, ProcessingStatus}
 import ch.datascience.metrics.LabeledHistogram
-import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent._
+import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.{AllEventsToNew, _}
+import skunk.Session
 
 private trait DBUpdater[Interpretation[_], E <: StatusChangeEvent] {
-  def updateDB(event: E): UpdateResult[Interpretation]
+  def updateDB(event:   E): UpdateResult[Interpretation]
+  def onRollback(event: E): Kleisli[Interpretation, Session[Interpretation], Unit]
 }
 
 private object DBUpdater {
-  def apply[Interpretation[_]: BracketThrow: Sync, E <: StatusChangeEvent]()(implicit
-      queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
-      factory:          LabeledHistogram[Interpretation, SqlStatement.Name] => DBUpdater[Interpretation, E]
-  ) = factory(queriesExecTimes)
+
+  type EventUpdaterFactory[Interpretation[_], E <: StatusChangeEvent] =
+    (DeliveryInfoRemover[Interpretation],
+     LabeledHistogram[Interpretation, SqlStatement.Name]
+    ) => DBUpdater[Interpretation, E]
 
   implicit def factoryToTriplesGeneratorUpdater[Interpretation[_]: BracketThrow: Sync]
-      : LabeledHistogram[Interpretation, SqlStatement.Name] => DBUpdater[Interpretation, ToTriplesGenerated] =
-    new ToTriplesGeneratedUpdater(_)
+      : EventUpdaterFactory[Interpretation, ToTriplesGenerated] = new ToTriplesGeneratedUpdater(_, _)
 
   implicit def factoryToTriplesStoreUpdater[Interpretation[_]: BracketThrow: Sync]
-      : LabeledHistogram[Interpretation, SqlStatement.Name] => DBUpdater[Interpretation, ToTriplesStore] =
-    new ToTriplesStoreUpdater(_)
+      : EventUpdaterFactory[Interpretation, ToTriplesStore] = new ToTriplesStoreUpdater(_, _)
 
   implicit def factoryToFailureUpdater[Interpretation[_]: BracketThrow: Sync]
-      : LabeledHistogram[Interpretation, SqlStatement.Name] => DBUpdater[Interpretation,
-                                                                         ToFailure[ProcessingStatus, FailureStatus]
-      ] = new ToFailureUpdater(_)
+      : EventUpdaterFactory[Interpretation, ToFailure[ProcessingStatus, FailureStatus]] = new ToFailureUpdater(_, _)
 
   implicit def factoryRollbackToNewUpdater[Interpretation[_]: BracketThrow: Sync]
-      : LabeledHistogram[Interpretation, SqlStatement.Name] => DBUpdater[Interpretation, RollbackToNew] =
-    new RollbackToNewUpdater(_)
+      : EventUpdaterFactory[Interpretation, RollbackToNew] = (_, execTimes) => new RollbackToNewUpdater(execTimes)
 
   implicit def factoryRollbackToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow: Sync]
-      : LabeledHistogram[Interpretation, SqlStatement.Name] => DBUpdater[Interpretation, RollbackToTriplesGenerated] =
-    new RollbackToTriplesGeneratedUpdater(_)
+      : EventUpdaterFactory[Interpretation, RollbackToTriplesGenerated] = (_, execTimes) =>
+    new RollbackToTriplesGeneratedUpdater(execTimes)
 
   implicit def factoryToAwaitingDeletionUpdater[Interpretation[_]: BracketThrow: Sync]
-      : LabeledHistogram[Interpretation, SqlStatement.Name] => DBUpdater[Interpretation, ToAwaitingDeletion] =
-    new ToAwaitingDeletionUpdater(_)
+      : EventUpdaterFactory[Interpretation, ToAwaitingDeletion] = (_, execTimes) =>
+    new ToAwaitingDeletionUpdater(execTimes)
 
   implicit def factoryToAllEventsNewUpdater[Interpretation[_]: BracketThrow: Sync]
-      : LabeledHistogram[Interpretation, SqlStatement.Name] => DBUpdater[Interpretation, AllEventsToNew] =
-    new AllEventsToNewUpdater[Interpretation](_)
+      : EventUpdaterFactory[Interpretation, AllEventsToNew] = (_, execTimes) =>
+    new AllEventsToNewUpdater[Interpretation](execTimes)
 }

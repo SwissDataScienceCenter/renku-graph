@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.events.categories.statuschange
 
+import cats.data.Kleisli
 import cats.effect.{BracketThrow, Sync}
 import ch.datascience.db.{DbClient, SqlStatement}
 import ch.datascience.graph.model.events.EventStatus
@@ -40,8 +41,11 @@ private class AllEventsToNewUpdater[Interpretation[_]: BracketThrow: Sync](
     _ <- updateStatuses()
     _ <- removeAllProcessingTimes()
     _ <- removeAllPayloads()
+    _ <- removeAllDeliveryInfos()
     _ <- removeAwaitingDeletionEvents()
   } yield DBUpdateResults.ForAllProjects
+
+  override def onRollback(event: AllEventsToNew) = Kleisli.pure(())
 
   private def updateStatuses() = measureExecutionTime {
     SqlStatement(name = "all_to_new - status update")
@@ -83,6 +87,16 @@ private class AllEventsToNewUpdater[Interpretation[_]: BracketThrow: Sync](
         sql"""DELETE FROM event
               WHERE event_id = '#${EventStatus.AwaitingDeletion.value}'
         """.command
+      )
+      .arguments(skunk.Void)
+      .build
+      .void
+  }
+
+  private def removeAllDeliveryInfos() = measureExecutionTime {
+    SqlStatement(name = "all_to_new - delivery removal")
+      .command[skunk.Void](
+        sql"""TRUNCATE TABLE event_delivery""".command
       )
       .arguments(skunk.Void)
       .build

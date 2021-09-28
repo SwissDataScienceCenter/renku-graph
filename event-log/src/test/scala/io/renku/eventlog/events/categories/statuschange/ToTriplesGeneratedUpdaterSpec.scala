@@ -18,11 +18,12 @@
 
 package io.renku.eventlog.events.categories.statuschange
 
+import cats.data.Kleisli
 import cats.effect.IO
 import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.timestamps
-import ch.datascience.graph.model.EventsGenerators.eventProcessingTimes
+import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventProcessingTimes}
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.EventStatus._
@@ -56,14 +57,17 @@ class ToTriplesGeneratedUpdaterSpec
         .map(addEvent(_, timestamps(max = eventDate.value).generateAs(EventDate))) +
         addEvent(New, timestamps(min = eventDate.value, max = now).generateAs(EventDate))
 
-      val event = addEvent(GeneratingTriples, eventDate)
+      val event   = addEvent(GeneratingTriples, eventDate)
+      val eventId = CompoundEventId(event._1, projectId)
 
-      val statusChangeEvent = ToTriplesGenerated(CompoundEventId(event._1, projectId),
+      val statusChangeEvent = ToTriplesGenerated(eventId,
                                                  projectPath,
                                                  eventProcessingTimes.generateOne,
                                                  eventPayloads.generateOne,
                                                  projectSchemaVersions.generateOne
       )
+
+      (deliveryInfoRemover.deleteDelivery _).expects(eventId).returning(Kleisli.pure(()))
 
       sessionResource
         .useK(dbUpdater updateDB statusChangeEvent)
@@ -76,7 +80,7 @@ class ToTriplesGeneratedUpdaterSpec
           (TriplesGenerated  -> (eventsToUpdate.size + 1 /* for the event */ - 1 /* for the AwaitingDeletion */ ))
       )
 
-      findFullEvent(CompoundEventId(event._1, projectId))
+      findFullEvent(eventId)
         .map { case (_, status, _, maybePayload, processingTimes) =>
           status        shouldBe TriplesGenerated
           maybePayload  shouldBe Some(statusChangeEvent.payload)
@@ -108,7 +112,7 @@ class ToTriplesGeneratedUpdaterSpec
       }
     }
 
-    "do nothing if the event is already in the TRIPLES_GENERATED" in new TestCase {
+    "just clean the delivery info if the event is already in the TRIPLES_GENERATED" in new TestCase {
       val eventDate = eventDates.generateOne
       val (olderEventId, olderEventStatus, _, _, _, _) =
         addEvent(New, timestamps(max = eventDate.value).generateAs(EventDate))
@@ -122,11 +126,13 @@ class ToTriplesGeneratedUpdaterSpec
                                                  schemaVersion
       )
 
+      (deliveryInfoRemover.deleteDelivery _).expects(statusChangeEvent.eventId).returning(Kleisli.pure(()))
+
       sessionResource
         .useK(dbUpdater updateDB statusChangeEvent)
         .unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
 
-      findFullEvent(CompoundEventId(eventId, projectId))
+      findFullEvent(statusChangeEvent.eventId)
         .map { case (_, status, _, maybePayload, processingTimes) =>
           status        shouldBe TriplesGenerated
           maybePayload  shouldBe existingPayload
@@ -144,14 +150,32 @@ class ToTriplesGeneratedUpdaterSpec
     }
   }
 
+  "onRollback" should {
+    "clean the delivery info for the event" in new TestCase {
+      val event = ToTriplesGenerated(compoundEventIds.generateOne,
+                                     projectPath,
+                                     eventProcessingTimes.generateOne,
+                                     eventPayloads.generateOne,
+                                     projectSchemaVersions.generateOne
+      )
+
+      (deliveryInfoRemover.deleteDelivery _).expects(event.eventId).returning(Kleisli.pure(()))
+
+      sessionResource
+        .useK(dbUpdater onRollback event)
+        .unsafeRunSync() shouldBe ()
+    }
+  }
+
   private trait TestCase {
 
     val projectId   = projectIds.generateOne
     val projectPath = projectPaths.generateOne
 
-    val currentTime      = mockFunction[Instant]
-    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val dbUpdater        = new ToTriplesGeneratedUpdater[IO](queriesExecTimes, currentTime)
+    val currentTime         = mockFunction[Instant]
+    val deliveryInfoRemover = mock[DeliveryInfoRemover[IO]]
+    val queriesExecTimes    = TestLabeledHistogram[SqlStatement.Name]("query_id")
+    val dbUpdater           = new ToTriplesGeneratedUpdater[IO](deliveryInfoRemover, queriesExecTimes, currentTime)
 
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()

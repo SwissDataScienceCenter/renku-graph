@@ -138,10 +138,11 @@ class EventHandlerSpec
   private implicit val cs: ContextShift[IO] = IO.contextShift(global)
   private trait TestCase {
 
-    val logger        = TestLogger[IO]()
-    val statusChanger = mock[StatusChanger[IO]]
-    val queryExec     = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val handler       = new EventHandler[IO](categoryName, statusChanger, queryExec, logger)
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val statusChanger       = mock[StatusChanger[IO]]
+    val deliveryInfoRemover = mock[DeliveryInfoRemover[IO]]
+    val queryExec           = TestLabeledHistogram[SqlStatement.Name]("query_id")
+    val handler             = new EventHandler[IO](categoryName, statusChanger, deliveryInfoRemover, queryExec)
 
     def stubUpdateStatuses[E <: StatusChangeEvent](updateResult: IO[Unit])(implicit show: Show[E]): E => (E, String) =
       event => {
