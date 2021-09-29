@@ -45,12 +45,11 @@ private class CommitSyncEventFinderImpl[Interpretation[_]: BracketThrow](
 
   override def popEvent(): Interpretation[Option[CommitSyncEvent]] = sessionResource.useK(findEventAndMarkTaken)
 
-  private def findEventAndMarkTaken =
-    findEvent >>= {
-      case Some((event, maybeSyncDate)) =>
-        setSyncDate(event, maybeSyncDate) map toNoneIfEventAlreadyTaken(event)
-      case None => Kleisli.pure(Option.empty[CommitSyncEvent])
-    }
+  private def findEventAndMarkTaken = findEvent >>= {
+    case Some((event, maybeSyncDate)) =>
+      setSyncDate(event, maybeSyncDate) map toNoneIfEventAlreadyTaken(event)
+    case None => Kleisli.pure(Option.empty[CommitSyncEvent])
+  }
 
   private def findEvent = measureExecutionTime {
     val (eventDate, lastSyncDate) = (EventDate.apply _ &&& LastSyncedDate.apply _)(now())
