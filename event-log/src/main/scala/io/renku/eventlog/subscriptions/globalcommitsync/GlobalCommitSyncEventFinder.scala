@@ -51,13 +51,19 @@ private class GlobalCommitSyncEventFinderImpl[Interpretation[_]: BracketThrow: S
     sessionResource.useK(findEventAndMarkTaken)
 
   private def findEventAndMarkTaken =
-    findProject >>= findCommits >>= {
-      case Some(event) =>
-        Kleisli.liftF(
-          lastSyncedDateUpdater.run(event.project.id, LastSyncedDate(now()).some)
-        ) map toNoneIfEventAlreadyTaken(event)
-      case None => Kleisli.pure(Option.empty[GlobalCommitSyncEvent])
-    }
+    findProject >>= updateLastSyncDate >>= findCommits
+
+  private def updateLastSyncDate(
+      maybeProject: Option[(Project, Option[LastSyncedDate])]
+  ): Kleisli[Interpretation, Session[Interpretation], Option[(Project, Option[LastSyncedDate])]] = maybeProject match {
+    case Some(projectAndMaybeLastSync @ (project, _)) =>
+      Kleisli.liftF(
+        lastSyncedDateUpdater
+          .run(project.id, LastSyncedDate(now()).some)
+          .map(toNoneIfEventAlreadyTaken(projectAndMaybeLastSync)(_))
+      )
+    case None => Kleisli.pure(Option.empty[(Project, Option[LastSyncedDate])])
+  }
 
   private def findProject = measureExecutionTime {
     val lastSyncDate = LastSyncedDate(now())
@@ -105,8 +111,10 @@ private class GlobalCommitSyncEventFinderImpl[Interpretation[_]: BracketThrow: S
       case None => Kleisli.pure(Option.empty[GlobalCommitSyncEvent])
     }
 
-  private def toNoneIfEventAlreadyTaken(event: GlobalCommitSyncEvent): Completion => Option[GlobalCommitSyncEvent] = {
-    case Completion.Update(1) | Completion.Insert(1) => Some(event)
+  private def toNoneIfEventAlreadyTaken(
+      projectAndMaybeLastSync: (Project, Option[LastSyncedDate])
+  ): Completion => Option[(Project, Option[LastSyncedDate])] = {
+    case Completion.Update(1) | Completion.Insert(1) => Some(projectAndMaybeLastSync)
     case _                                           => None
   }
 
