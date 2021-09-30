@@ -92,7 +92,9 @@ class IOProcessingStatusFetcherSpec
 
       intercept[Exception] {
         fetcher.fetchProcessingStatus(projectId).value.unsafeRunSync()
-      }.getMessage shouldBe s"GET $eventLogUrl/processing-status?project-id=$projectId returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      }.getMessage should startWith(
+        s"GET $eventLogUrl/processing-status?project-id=$projectId returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      )
     }
 
     "return a RuntimeException if remote client responds with invalid body" in new TestCase {
@@ -104,7 +106,7 @@ class IOProcessingStatusFetcherSpec
 
       intercept[Exception] {
         fetcher.fetchProcessingStatus(projectId).value.unsafeRunSync()
-      }.getMessage shouldBe s"""GET $eventLogUrl/processing-status?project-id=$projectId returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {"done" : "1","total" : 2,"progress" : 3}"""
+      }.getMessage shouldBe s"""GET $eventLogUrl/processing-status?project-id=$projectId returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {"done" : "1","total" : 2,"progress" : 3}; ProcessingStatus's 'progress' is invalid"""
     }
   }
 

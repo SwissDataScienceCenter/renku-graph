@@ -22,7 +22,7 @@ import cats.syntax.all._
 import ch.datascience.graph.model.Schemas.schema
 import ch.datascience.graph.model._
 import ch.datascience.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember, entityTypes}
-import ch.datascience.graph.model.projects.ResourceId
+import ch.datascience.graph.model.projects.{DateCreated, ResourceId}
 import io.circe.DecodingFailure
 import io.renku.jsonld.{Cursor, JsonLDDecoder}
 
@@ -31,13 +31,16 @@ object ProjectJsonLDDecoder {
   def apply(gitLabInfo: GitLabProjectInfo)(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDDecoder[Project] =
     JsonLDDecoder.entity(entityTypes) { implicit cursor =>
       for {
-        agent            <- cursor.downField(schema / "agent").as[CliVersion]
-        schemaVersion    <- cursor.downField(schema / "schemaVersion").as[SchemaVersion]
+        agent         <- cursor.downField(schema / "agent").as[CliVersion]
+        schemaVersion <- cursor.downField(schema / "schemaVersion").as[SchemaVersion]
+        dateCreated   <- cursor.downField(schema / "dateCreated").as[DateCreated]
+        earliestDate = List(dateCreated, gitLabInfo.dateCreated).min
         allJsonLdPersons <- findAllPersons(gitLabInfo)
         activities       <- findAllActivities(gitLabInfo)
         datasets         <- findAllDatasets(gitLabInfo)
         resourceId       <- ResourceId(renkuBaseUrl, gitLabInfo.path).asRight
-        project          <- newProject(gitLabInfo, resourceId, agent, schemaVersion, allJsonLdPersons, activities, datasets)
+        project <-
+          newProject(gitLabInfo, resourceId, earliestDate, agent, schemaVersion, allJsonLdPersons, activities, datasets)
       } yield project
     }
 
@@ -94,6 +97,7 @@ object ProjectJsonLDDecoder {
 
   private def newProject(gitLabInfo:       GitLabProjectInfo,
                          resourceId:       ResourceId,
+                         dateCreated:      DateCreated,
                          agent:            CliVersion,
                          schemaVersion:    SchemaVersion,
                          allJsonLdPersons: Set[Person],
@@ -108,7 +112,7 @@ object ProjectJsonLDDecoder {
             gitLabInfo.path,
             gitLabInfo.name,
             agent,
-            gitLabInfo.dateCreated,
+            dateCreated,
             maybeCreator(allJsonLdPersons)(gitLabInfo),
             gitLabInfo.visibility,
             members(allJsonLdPersons)(gitLabInfo),
@@ -124,7 +128,7 @@ object ProjectJsonLDDecoder {
             gitLabInfo.path,
             gitLabInfo.name,
             agent,
-            gitLabInfo.dateCreated,
+            dateCreated,
             maybeCreator(allJsonLdPersons)(gitLabInfo),
             gitLabInfo.visibility,
             members(allJsonLdPersons)(gitLabInfo),

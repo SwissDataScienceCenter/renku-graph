@@ -144,7 +144,9 @@ class GitLabProjectFinderSpec
 
       intercept[Exception] {
         projectFinder.findProject(path, None).value.unsafeRunSync()
-      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/${urlEncode(path.toString)}?statistics=true returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      }.getMessage should startWith(
+        s"GET $gitLabUrl/api/v4/projects/${urlEncode(path.toString)}?statistics=true returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      )
     }
   }
 

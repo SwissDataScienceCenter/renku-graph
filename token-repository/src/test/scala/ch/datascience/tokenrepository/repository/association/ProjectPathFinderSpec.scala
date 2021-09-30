@@ -106,7 +106,9 @@ class ProjectPathFinderSpec extends AnyWordSpec with MockFactory with ExternalSe
 
       intercept[Exception] {
         pathFinder.findProjectPath(projectId, None).unsafeRunSync()
-      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      }.getMessage should startWith(
+        s"GET $gitLabUrl/api/v4/projects/$projectId returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      )
     }
   }
 

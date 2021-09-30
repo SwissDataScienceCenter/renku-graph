@@ -24,6 +24,7 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.Schemas.{prov, renku, schema}
 import ch.datascience.graph.model._
 import ch.datascience.graph.model.entities.Project.ProjectMember
+import ch.datascience.graph.model.projects.DateCreated
 import ch.datascience.graph.model.testentities._
 import io.circe.DecodingFailure
 import io.renku.jsonld.JsonLDDecoder._
@@ -83,7 +84,14 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           val maybeCreator = projectInfo.maybeCreator.map(_.toPayloadPerson)
           val members      = projectInfo.members.map(_.toPayloadPerson)
           val jsonLD =
-            cliLikeJsonLD(resourceId, cliVersion, schemaVersion, activities, datasets, (maybeCreator ++ members).toSet)
+            cliLikeJsonLD(resourceId,
+                          cliVersion,
+                          schemaVersion,
+                          projectInfo.dateCreated,
+                          activities,
+                          datasets,
+                          (maybeCreator ++ members).toSet
+            )
 
           jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo))) shouldBe List(
             entities.ProjectWithoutParent(
@@ -114,7 +122,14 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         val maybeCreator = projectInfo.maybeCreator.map(_.toPayloadPerson)
         val members      = projectInfo.members.map(_.toPayloadPerson)
         val jsonLD =
-          cliLikeJsonLD(resourceId, cliVersion, schemaVersion, activities, datasets, (maybeCreator ++ members).toSet)
+          cliLikeJsonLD(resourceId,
+                        cliVersion,
+                        schemaVersion,
+                        projectInfo.dateCreated,
+                        activities,
+                        datasets,
+                        (maybeCreator ++ members).toSet
+          )
 
         jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo))) shouldBe List(
           entities.ProjectWithParent(
@@ -147,6 +162,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
             val jsonLD = cliLikeJsonLD(resourceId,
                                        cliVersion,
                                        schemaVersion,
+                                       projectInfo.dateCreated,
                                        activities = Nil,
                                        datasets = Nil,
                                        potentialMembers.toSet
@@ -176,6 +192,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       val jsonLD = cliLikeJsonLD(resourceId,
                                  cliVersions.generateOne,
                                  projectSchemaVersions.generateOne,
+                                 projectInfo.dateCreated,
                                  activities = Nil,
                                  datasets = Nil,
                                  persons = Set.empty
@@ -203,6 +220,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       val jsonLD = cliLikeJsonLD(resourceId,
                                  cliVersions.generateOne,
                                  projectSchemaVersions.generateOne,
+                                 projectInfo.dateCreated,
                                  activities = Nil,
                                  datasets = Nil,
                                  persons = Set.empty
@@ -225,6 +243,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       val jsonLD = cliLikeJsonLD(resourceId,
                                  cliVersions.generateOne,
                                  projectSchemaVersions.generateOne,
+                                 projectInfo.dateCreated,
                                  activities = Nil,
                                  datasets = Nil,
                                  persons = Set.empty
@@ -249,6 +268,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         resourceId,
         cliVersions.generateOne,
         projectSchemaVersions.generateOne,
+        projectInfo.dateCreated,
         activities = List(activity),
         datasets = Nil,
         persons = Set.empty
@@ -269,6 +289,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         resourceId,
         cliVersions.generateOne,
         projectSchemaVersions.generateOne,
+        projectInfo.dateCreated,
         activities = Nil,
         datasets = List(dataset),
         persons = Set.empty
@@ -296,6 +317,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         resourceId,
         cliVersion,
         schemaVersion,
+        projectInfo.dateCreated,
         activities = Nil,
         datasets = List(dataset1, dataset2),
         persons = (maybeCreator ++ members).toSet
@@ -327,6 +349,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         resourceId,
         cliVersions.generateOne,
         projectSchemaVersions.generateOne,
+        projectInfo.dateCreated,
         activities = Nil,
         datasets = List(dataset),
         persons = Set.empty
@@ -356,6 +379,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         resourceId,
         cliVersion,
         schemaVersion,
+        projectInfo.dateCreated,
         activities = Nil,
         datasets = List(dataset1, dataset2, dataset3),
         persons = (maybeCreator ++ members).toSet
@@ -374,6 +398,44 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           schemaVersion,
           Nil,
           List(dataset1, dataset2, dataset3).map(_.to[entities.Dataset[entities.Dataset.Provenance]])
+        )
+      ).asRight
+    }
+
+    "decode project should pick the earliest dateCreated between gitlabProjectInfo and the CLI dateCreated " in {
+      val gitlabDate    = projectCreatedDates().generateOne
+      val cliDate       = projectCreatedDates().generateOne
+      val earliestDate  = List(gitlabDate, cliDate).min
+      val projectInfo   = gitLabProjectInfos.map(_.copy(maybeParentPath = None, dateCreated = gitlabDate)).generateOne
+      val cliVersion    = cliVersions.generateOne
+      val schemaVersion = projectSchemaVersions.generateOne
+      val resourceId    = projects.ResourceId(renkuBaseUrl, projectInfo.path)
+      val maybeCreator  = projectInfo.maybeCreator.map(_.toPayloadPerson)
+      val members       = projectInfo.members.map(_.toPayloadPerson)
+
+      val jsonLD = cliLikeJsonLD(
+        resourceId,
+        cliVersion,
+        schemaVersion,
+        cliDate,
+        activities = Nil,
+        datasets = Nil,
+        persons = (maybeCreator ++ members).toSet
+      )
+
+      jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo))) shouldBe List(
+        entities.ProjectWithoutParent(
+          resourceId,
+          projectInfo.path,
+          projectInfo.name,
+          cliVersion,
+          earliestDate,
+          maybeCreator.map(copyGitLabId(from = projectInfo.maybeCreator)),
+          projectInfo.visibility,
+          members.map(copyGitLabId(fromMatching = projectInfo.members)),
+          schemaVersion,
+          Nil,
+          Nil
         )
       ).asRight
     }
@@ -416,6 +478,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
   private def cliLikeJsonLD(resourceId:    projects.ResourceId,
                             cliVersion:    CliVersion,
                             schemaVersion: SchemaVersion,
+                            dateCreated:   DateCreated,
                             activities:    List[Activity],
                             datasets:      List[Dataset[Dataset.Provenance]],
                             persons:       Set[entities.Person]
@@ -426,6 +489,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         EntityTypes.of(prov / "Location", schema / "Project"),
         schema / "agent"         -> cliVersion.asJsonLD,
         schema / "schemaVersion" -> schemaVersion.asJsonLD,
+        schema / "dateCreated"   -> dateCreated.asJsonLD,
         renku / "hasActivity"    -> activities.asJsonLD,
         renku / "hasPlan"        -> activities.map(_.plan).distinct.asJsonLD,
         renku / "hasDataset"     -> datasets.asJsonLD

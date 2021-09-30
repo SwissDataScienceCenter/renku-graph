@@ -136,7 +136,9 @@ class LatestCommitFinderSpec extends AnyWordSpec with MockFactory with ExternalS
 
       intercept[Exception] {
         latestCommitFinder.findLatestCommit(projectId, maybeAccessToken = None).value.unsafeRunSync()
-      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId/repository/commits?per_page=1 returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      }.getMessage should startWith(
+        s"GET $gitLabUrl/api/v4/projects/$projectId/repository/commits?per_page=1 returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      )
     }
   }
 

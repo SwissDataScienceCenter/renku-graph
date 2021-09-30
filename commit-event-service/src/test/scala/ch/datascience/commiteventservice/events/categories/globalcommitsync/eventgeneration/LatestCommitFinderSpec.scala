@@ -19,6 +19,7 @@
 package ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration
 
 import cats.effect.{ConcurrentEffect, IO, Timer}
+import cats.syntax.all._
 import ch.datascience.commiteventservice.events.categories.common.CommitInfo
 import ch.datascience.commiteventservice.events.categories.common.Generators.commitInfos
 import ch.datascience.control.Throttler
@@ -52,9 +53,8 @@ class LatestCommitFinderSpec extends AnyWordSpec with MockFactory with ExternalS
           .willReturn(okJson(commitsJson(from = commitId)))
       }
 
-      latestCommitFinder.findLatestCommitId(projectId, Some(personalAccessToken)).value.unsafeRunSync() shouldBe Some(
-        commitId
-      )
+      latestCommitFinder.findLatestCommitId(projectId, Some(personalAccessToken)).value.unsafeRunSync() shouldBe
+        commitId.some
     }
   }
 

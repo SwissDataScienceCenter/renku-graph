@@ -109,7 +109,7 @@ class AccessTokenFinderSpec extends AnyWordSpec with ExternalServiceStubbing wit
 
       intercept[Exception] {
         accessTokenFinder.findAccessToken(projectId).unsafeRunSync()
-      }.getMessage shouldBe s"GET $tokenRepositoryUrl/projects/$projectId/tokens returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      }.getMessage shouldBe s"GET $tokenRepositoryUrl/projects/$projectId/tokens returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}; Access token cannot be deserialized"
     }
   }
 
@@ -183,7 +183,7 @@ class AccessTokenFinderSpec extends AnyWordSpec with ExternalServiceStubbing wit
 
       intercept[Exception] {
         accessTokenFinder.findAccessToken(projectPath).unsafeRunSync()
-      }.getMessage shouldBe s"GET $tokenRepositoryUrl/projects/${urlEncode(projectPath.toString)}/tokens returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      }.getMessage shouldBe s"GET $tokenRepositoryUrl/projects/${urlEncode(projectPath.toString)}/tokens returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}; Access token cannot be deserialized"
     }
   }
 

@@ -174,6 +174,9 @@ abstract class RestClient[Interpretation[_]: ConcurrentEffect: Timer, Throttling
                               response: Response[Interpretation]
   ): PartialFunction[Throwable, Interpretation[T]] = {
     case error: RestClientError => MonadThrow[Interpretation].raiseError(error)
+    case NonFatal(cause: InvalidMessageBodyFailure) =>
+      val exception = new Exception(List(cause, cause.getCause()).map(_.getMessage()).mkString("; "), cause)
+      MonadThrow[Interpretation].raiseError(MappingException(LogMessage(request, response, exception), exception))
     case NonFatal(cause) =>
       MonadThrow[Interpretation].raiseError(MappingException(LogMessage(request, response, cause), cause))
   }

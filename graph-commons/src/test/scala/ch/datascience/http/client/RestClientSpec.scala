@@ -35,11 +35,12 @@ import com.github.tomakehurst.wiremock.http.Fault._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
-import io.circe.Json
+import io.circe.{Decoder, DecodingFailure, Json}
 import io.prometheus.client.Histogram
 import org.http4s.MediaType._
 import org.http4s.Method.{GET, POST}
 import org.http4s.blaze.pipeline.{Command => Http4sCommand}
+import org.http4s.circe.jsonOf
 import org.http4s.client.ConnectionFailure
 import org.http4s.{multipart => _, _}
 import org.scalamock.scalatest.MockFactory
@@ -52,6 +53,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 import scala.language.postfixOps
+import scala.util.Random
 
 class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockFactory with should.Matchers {
 
@@ -67,7 +69,7 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
 
         verifyThrottling()
 
-        client.callRemote.unsafeRunSync() shouldBe 1
+        client.callRemote(mapResponseToInt).unsafeRunSync() shouldBe 1
 
         logger.loggedOnly(Warn(s"GET $hostUrl/resource finished${executionTimeRecorder.executionTimeInfo}"))
       }
@@ -84,7 +86,7 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
 
         override val client = new TestRestClient(hostUrl, throttler, logger, maybeTimeRecorder = None)
 
-        client.callRemote.unsafeRunSync() shouldBe 1
+        client.callRemote(mapResponseToInt).unsafeRunSync() shouldBe 1
 
         logger.expectNoLogs()
       }
@@ -134,7 +136,7 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
 
       override val histogram = Histogram.build("histogram", "help").create()
 
-      client.callRemote.unsafeRunSync() shouldBe 1
+      client.callRemote(mapResponseToInt).unsafeRunSync() shouldBe 1
 
       val Some(sample) = histogram.collect().asScala.flatMap(_.samples.asScala).lastOption
       sample.value                 should be >= 0d
@@ -156,7 +158,7 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
       verifyThrottling()
 
       intercept[UnexpectedResponseException] {
-        client.callRemote.unsafeRunSync()
+        client.callRemote(mapResponseToInt).unsafeRunSync()
       }.getMessage shouldBe s"GET $hostUrl/resource returned ${Status.NotFound}; body: some body"
     }
 
@@ -170,7 +172,7 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
       verifyThrottling()
 
       intercept[UnexpectedResponseException] {
-        client.callRemote.unsafeRunSync()
+        client.callRemote(mapResponseToInt).unsafeRunSync()
       }.getMessage shouldBe s"GET $hostUrl/resource returned ${Status.NoContent}; body: "
     }
 
@@ -185,7 +187,7 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
       verifyThrottling()
 
       intercept[BadRequestException] {
-        client.callRemote.unsafeRunSync()
+        client.callRemote(mapResponseToInt).unsafeRunSync()
       }.getMessage shouldBe s"GET $hostUrl/resource returned ${Status.BadRequest}; body: $responseBody"
     }
 
@@ -199,11 +201,38 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
       verifyThrottling()
 
       val exception = intercept[MappingException] {
-        client.callRemote.unsafeRunSync()
+        client.callRemote(mapResponseToInt).unsafeRunSync()
       }
 
       exception.getMessage shouldBe s"""GET $hostUrl/resource returned ${Status.Ok}; error: For input string: "non int""""
       exception.getCause   shouldBe a[NumberFormatException]
+    }
+
+    "fail if remote responds with a body which causes json parsing failures" in new TestCase {
+
+      val jsonBody = Json.fromBoolean(Random.nextBoolean()).noSpaces
+      stubFor {
+        get("/resource")
+          .willReturn(okJson(jsonBody))
+      }
+
+      verifyThrottling()
+
+      val customDecodingFailure = nonEmptyStrings().generateOne
+      implicit val decoder:       Decoder[Boolean]           = Decoder.instance(_ => DecodingFailure(customDecodingFailure, Nil).asLeft)
+      implicit val entityDecoder: EntityDecoder[IO, Boolean] = jsonOf[IO, Boolean]
+
+      lazy val mapResponseToBoolean: PartialFunction[(Status, Request[IO], Response[IO]), IO[Boolean]] = {
+        case (Status.Ok, _, response) => response.as[Boolean]
+      }
+
+      val exception = intercept[MappingException] {
+        client.callRemote(mapResponseToBoolean).unsafeRunSync()
+      }
+
+      exception.getMessage should startWith(s"""GET $hostUrl/resource returned ${Status.Ok}; error: """)
+      exception.getMessage should include(s" $jsonBody")
+      exception.getMessage should endWith(s" $customDecodingFailure")
     }
 
     "fail after retrying if there is a persistent connectivity problem" in {
@@ -213,7 +242,8 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
         "Error connecting to http://localhost:1024 using address localhost:1024 (unresolved: false)"
 
       val exception = intercept[ConnectivityException] {
-        new TestRestClient(ServiceUrl("http://localhost:1024"), Throttler.noThrottling, logger, None).callRemote
+        new TestRestClient(ServiceUrl("http://localhost:1024"), Throttler.noThrottling, logger, None)
+          .callRemote(mapResponseToInt)
           .unsafeRunSync()
       }
       exception.getMessage shouldBe s"GET http://localhost:1024/resource error: $exceptionMessage"
@@ -238,7 +268,7 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
         val exceptionMessage = Http4sCommand.EOF.toString
 
         val exception = intercept[ConnectivityException] {
-          client.callRemote.unsafeRunSync()
+          client.callRemote(mapResponseToInt).unsafeRunSync()
         }
         exception.getMessage shouldBe s"GET $hostUrl/resource error: $exceptionMessage"
         exception.getCause   shouldBe a[Http4sCommand.EOF.type]
@@ -265,7 +295,7 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
                            logger,
                            maybeTimeRecorder = None,
                            idleTimeoutOverride = idleTimeout.some
-        ).callRemote.unsafeRunSync()
+        ).callRemote(mapResponseToInt).unsafeRunSync()
       }
 
       exception          shouldBe a[ClientException]
@@ -288,7 +318,7 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
                            logger,
                            maybeTimeRecorder = None,
                            maybeRequestTimeoutOverride = requestTimeout.some
-        ).callRemote.unsafeRunSync()
+        ).callRemote(mapResponseToInt).unsafeRunSync()
       }
 
       exception          shouldBe a[ClientException]
@@ -349,6 +379,10 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
   private implicit val timer: Timer[IO]        = IO.timer(global)
   private lazy val hostUrl = ServiceUrl(externalServiceBaseUrl)
 
+  lazy val mapResponseToInt: PartialFunction[(Status, Request[IO], Response[IO]), IO[Int]] = {
+    case (Status.Ok, _, response) => response.as[String].map(_.toInt)
+  }
+
   private class TestRestClient(hostUrl:                     ServiceUrl,
                                throttler:                   Throttler[IO, Any],
                                logger:                      Logger[IO],
@@ -364,17 +398,15 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
                        maybeRequestTimeoutOverride
       ) {
 
-    def callRemote: IO[Int] =
-      for {
-        uri         <- validateUri(s"$hostUrl/resource")
-        accessToken <- send(request(GET, uri))(mapResponse)
-      } yield accessToken
+    def callRemote[O](mapping: PartialFunction[(Status, Request[IO], Response[IO]), IO[O]]): IO[O] = for {
+      uri         <- validateUri(s"$hostUrl/resource")
+      accessToken <- send(request(GET, uri))(mapping)
+    } yield accessToken
 
-    def callRemote(requestName: String Refined NonEmpty): IO[Int] =
-      for {
-        uri         <- validateUri(s"$hostUrl/resource")
-        accessToken <- send(HttpRequest(request(GET, uri), requestName))(mapResponse)
-      } yield accessToken
+    def callRemote(requestName: String Refined NonEmpty): IO[Int] = for {
+      uri         <- validateUri(s"$hostUrl/resource")
+      accessToken <- send(HttpRequest(request(GET, uri), requestName))(mapResponseToInt)
+    } yield accessToken
 
     def callMultipartEndpoint(jsonPart: (String, Json), textPart: (String, String)): IO[Int] = for {
       uri <- validateUri(s"$hostUrl/resource")
@@ -384,13 +416,7 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
             .addPart(jsonPart._1, jsonPart._2)
             .addPart(textPart._1, textPart._2)
             .build()
-        )(mapResponse)
+        )(mapResponseToInt)
     } yield response
-
-    private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Int]] = {
-      case (Status.Ok, _, response) =>
-        response.as[String].map(_.toInt)
-
-    }
   }
 }

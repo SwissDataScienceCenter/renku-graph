@@ -187,7 +187,7 @@ class GlobalCommitSyncEventFinderSpec
       }
 
     "return None " +
-      "when all events are AWAITING_DELETION" in new TestCase {
+      "when all events are AWAITING_DELETION but still update the last sync date of the project" in new TestCase {
         currentTime.expects().returning(now)
         finder.popEvent().unsafeRunSync() shouldBe None
 
@@ -199,6 +199,8 @@ class GlobalCommitSyncEventFinderSpec
         addEvent(project0Event0Id, project0Event0Date, project0.path, eventStatus = AwaitingDeletion)
         addEvent(project0Event1Id, project0Event1Date, project0.path, eventStatus = AwaitingDeletion)
         upsertLastSynced(project0.id, categoryName, project0LastSynced)
+
+        givenTheLastSyncedDateIsUpdated(project0)
 
         currentTime.expects().returning(now)
         finder.popEvent().unsafeRunSync() shouldBe None

@@ -172,7 +172,9 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with MockFactory with External
         gitLabCommitFetcher
           .fetchGitLabCommits(projectId)(maybeAccessToken = None)
           .unsafeRunSync()
-      }.getMessage shouldBe s"GET $gitLabApiUrl/projects/$projectId/repository/commits returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      }.getMessage should startWith(
+        s"GET $gitLabApiUrl/projects/$projectId/repository/commits returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      )
     }
   }
 

@@ -131,7 +131,9 @@ class IOProjectHookVerifierSpec extends AnyWordSpec with MockFactory with Extern
 
       intercept[Exception] {
         verifier.checkHookPresence(projectHookId, personalAccessToken).unsafeRunSync()
-      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId/hooks returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      }.getMessage should startWith(
+        s"GET $gitLabUrl/api/v4/projects/$projectId/hooks returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      )
     }
   }
 
