@@ -88,7 +88,7 @@ object ProjectJsonLDDecoder {
         person.alternativeNames.exists(matchByNameOrUsername(member))
 
   private def toPerson(projectMember: ProjectMember)(implicit renkuBaseUrl: RenkuBaseUrl): Person = Person(
-    users.ResourceId((renkuBaseUrl / "persons" / projectMember.name).show),
+    users.ResourceId(projectMember.gitLabId),
     projectMember.name,
     None,
     None,

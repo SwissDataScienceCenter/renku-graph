@@ -20,6 +20,7 @@ package ch.datascience.graph.model.entities
 
 import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
+import ch.datascience.graph.model.RenkuBaseUrl
 import ch.datascience.graph.model.activities.{EndTime, ResourceId, StartTime}
 import ch.datascience.graph.model.entities.ParameterValue.{CommandInputValue, CommandOutputValue}
 import io.circe.DecodingFailure
@@ -96,8 +97,8 @@ object Activity {
     case (result, _) => result
   }
 
-  implicit def encoder(implicit gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Activity] = JsonLDEncoder.instance {
-    activity =>
+  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Activity] =
+    JsonLDEncoder.instance { activity =>
       JsonLD.entity(
         activity.resourceId.asEntityId,
         entityTypes,
@@ -109,7 +110,7 @@ object Activity {
         prov / "qualifiedUsage"       -> activity.usages.asJsonLD,
         renku / "parameter"           -> activity.parameters.asJsonLD
       )
-  }
+    }
 
   implicit lazy val decoder: JsonLDDecoder[Activity] = JsonLDDecoder.entity(entityTypes) { cursor =>
     import io.renku.jsonld.JsonLDDecoder.decodeList

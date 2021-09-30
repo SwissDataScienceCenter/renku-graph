@@ -23,7 +23,7 @@ import cats.syntax.all._
 import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.entities.Dataset.Provenance.{ImportedInternal, ImportedInternalAncestorExternal, ImportedInternalAncestorInternal, Modified}
 import ch.datascience.graph.model.entities.Dataset._
-import ch.datascience.graph.model.{GitLabApiUrl, InvalidationTime}
+import ch.datascience.graph.model.{GitLabApiUrl, InvalidationTime, RenkuBaseUrl}
 import io.circe.DecodingFailure
 
 import java.time.Instant
@@ -205,7 +205,10 @@ object Dataset {
       override lazy val topmostSameAs: TopmostSameAs = TopmostSameAs(resourceId.asEntityId)
     }
 
-    private[Dataset] implicit def encoder(implicit gitLabApiUrl: GitLabApiUrl): Provenance => Map[Property, JsonLD] = {
+    private[Dataset] implicit def encoder(implicit
+        renkuBaseUrl: RenkuBaseUrl,
+        gitLabApiUrl: GitLabApiUrl
+    ): Provenance => Map[Property, JsonLD] = {
       case provenance @ Internal(_, _, date, creators) =>
         Map(
           schema / "dateCreated"       -> date.asJsonLD,
@@ -414,7 +417,10 @@ object Dataset {
 
   val entityTypes: EntityTypes = EntityTypes of (schema / "Dataset", prov / "Entity")
 
-  implicit def encoder[P <: Provenance](implicit gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Dataset[P]] = {
+  implicit def encoder[P <: Provenance](implicit
+      renkuBaseUrl: RenkuBaseUrl,
+      gitLabApiUrl: GitLabApiUrl
+  ): JsonLDEncoder[Dataset[P]] = {
     implicit class SerializationOps[T](obj: T) {
       def asJsonLDProperties(implicit encoder: T => Map[Property, JsonLD]): Map[Property, JsonLD] = encoder(obj)
     }

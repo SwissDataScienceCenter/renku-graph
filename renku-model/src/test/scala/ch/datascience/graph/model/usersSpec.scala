@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.model
 
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
@@ -95,6 +96,16 @@ class EmailSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Ma
 }
 
 class UsersResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+
+  "apply(GitLabId)" should {
+
+    "generate 'renkuBaseUrl/users/gitLabId' ResourceId" in {
+      implicit val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
+      val gitLabId = userGitLabIds.generateOne
+
+      ResourceId(gitLabId).show shouldBe (renkuBaseUrl / "users" / gitLabId).show
+    }
+  }
 
   "showAs[RdfResource]" should {
 

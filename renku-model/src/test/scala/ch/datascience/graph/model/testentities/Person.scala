@@ -53,6 +53,6 @@ object Person {
   implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[Person] =
     EntityIdEncoder.instance {
       case Person(_, Some(email), _, _) => EntityId of s"mailto:$email"
-      case Person(name, _, _, _)        => EntityId of (renkuBaseUrl / "persons" / name)
+      case Person(name, _, _, _)        => EntityId of (renkuBaseUrl / "users" / name)
     }
 }

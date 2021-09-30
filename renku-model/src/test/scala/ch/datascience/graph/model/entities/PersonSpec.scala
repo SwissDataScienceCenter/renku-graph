@@ -20,9 +20,9 @@ package ch.datascience.graph.model.entities
 
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators.userNames
+import ch.datascience.graph.model.GraphModelGenerators.{userGitLabIds, userNames}
 import ch.datascience.graph.model.Schemas.schema
-import ch.datascience.graph.model.entities
+import ch.datascience.graph.model.{entities, users}
 import ch.datascience.graph.model.entities.Person.entityTypes
 import ch.datascience.graph.model.testentities._
 import io.circe.DecodingFailure
@@ -34,6 +34,21 @@ import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+
+  "encode" should {
+
+    "use the Person resourceId if there's no GitLabId" in {
+      val person = personEntities(withoutGitLabId).generateOne
+      person.asJsonLD.cursor.downEntityId.as[users.ResourceId] shouldBe person.resourceId.asRight
+    }
+
+    "use the resourceId based on person's GitLabId if it exists" in {
+      val gitLabId = userGitLabIds.generateOne
+      forAll(personEntities().map(_.copy(maybeGitLabId = gitLabId.some))) { person =>
+        person.asJsonLD.cursor.downEntityId.as[users.ResourceId] shouldBe users.ResourceId(gitLabId).asRight
+      }
+    }
+  }
 
   "decode" should {
 

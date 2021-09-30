@@ -78,20 +78,24 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     "turn JsonLD Project entity without parent into the Project object" in {
       forAll(gitLabProjectInfos.map(_.copy(maybeParentPath = None)), cliVersions, projectSchemaVersions) {
         (projectInfo, cliVersion, schemaVersion) =>
-          val resourceId   = projects.ResourceId(renkuBaseUrl, projectInfo.path)
-          val activities   = activityEntities(planEntities()).generateList(projectInfo.dateCreated).sortBy(_.startTime)
-          val datasets     = datasetEntities(ofAnyProvenance).generateList(projectInfo.dateCreated)
+          val resourceId = projects.ResourceId(renkuBaseUrl, projectInfo.path)
+          val activities = activityEntities(planEntities())
+            .modify(_.copy(author = personEntities(withoutGitLabId).generateOne))
+            .generateList(projectInfo.dateCreated)
+            .sortBy(_.startTime)
+          val datasets = datasetEntities(ofAnyProvenance)
+            .modify(provenanceLens.modify(creatorsLens.modify(_ => Set(personEntities(withoutGitLabId).generateOne))))
+            .generateList(projectInfo.dateCreated)
           val maybeCreator = projectInfo.maybeCreator.map(_.toPayloadPerson)
           val members      = projectInfo.members.map(_.toPayloadPerson)
-          val jsonLD =
-            cliLikeJsonLD(resourceId,
-                          cliVersion,
-                          schemaVersion,
-                          projectInfo.dateCreated,
-                          activities,
-                          datasets,
-                          (maybeCreator ++ members).toSet
-            )
+          val jsonLD = cliLikeJsonLD(resourceId,
+                                     cliVersion,
+                                     schemaVersion,
+                                     projectInfo.dateCreated,
+                                     activities,
+                                     datasets,
+                                     (maybeCreator ++ members).toSet
+          )
 
           jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo))) shouldBe List(
             entities.ProjectWithoutParent(
@@ -116,20 +120,24 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
              cliVersions,
              projectSchemaVersions
       ) { (projectInfo, cliVersion, schemaVersion) =>
-        val resourceId   = projects.ResourceId(renkuBaseUrl, projectInfo.path)
-        val activities   = activityEntities(planEntities()).generateList(projectInfo.dateCreated).sortBy(_.startTime)
-        val datasets     = datasetEntities(ofAnyProvenance).generateList(projectInfo.dateCreated)
+        val resourceId = projects.ResourceId(renkuBaseUrl, projectInfo.path)
+        val activities = activityEntities(planEntities())
+          .modify(_.copy(author = personEntities(withoutGitLabId).generateOne))
+          .generateList(projectInfo.dateCreated)
+          .sortBy(_.startTime)
+        val datasets = datasetEntities(ofAnyProvenance)
+          .modify(provenanceLens.modify(creatorsLens.modify(_ => Set(personEntities(withoutGitLabId).generateOne))))
+          .generateList(projectInfo.dateCreated)
         val maybeCreator = projectInfo.maybeCreator.map(_.toPayloadPerson)
         val members      = projectInfo.members.map(_.toPayloadPerson)
-        val jsonLD =
-          cliLikeJsonLD(resourceId,
-                        cliVersion,
-                        schemaVersion,
-                        projectInfo.dateCreated,
-                        activities,
-                        datasets,
-                        (maybeCreator ++ members).toSet
-          )
+        val jsonLD = cliLikeJsonLD(resourceId,
+                                   cliVersion,
+                                   schemaVersion,
+                                   projectInfo.dateCreated,
+                                   activities,
+                                   datasets,
+                                   (maybeCreator ++ members).toSet
+        )
 
         jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo))) shouldBe List(
           entities.ProjectWithParent(
@@ -519,14 +527,13 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       .getOrElse(gitLabPerson.toPerson)
 
   private def copyGitLabId(from: Option[ProjectMember])(person: entities.Person): entities.Person =
-    person.copy(maybeGitLabId = from.map(_.gitLabId))
+    from
+      .map(member => person.copy(maybeGitLabId = member.gitLabId.some))
+      .getOrElse(person)
 
-  private def copyGitLabId(fromMatching: Set[ProjectMember])(person: entities.Person): entities.Person =
-    person.copy(
-      maybeGitLabId = fromMatching
-        .find(byNameOrUsername(person))
-        .map(_.gitLabId)
-    )
+  private def copyGitLabId(fromMatching: Set[ProjectMember])(
+      person:                            entities.Person
+  ): entities.Person = copyGitLabId(fromMatching.find(byNameOrUsername(person)))(person)
 
   private def byNameOrUsername(person: entities.Person): ProjectMember => Boolean =
     member => member.hasNameOrUsername(person.name) || person.alternativeNames.exists(member.hasNameOrUsername)
@@ -561,7 +568,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
 
     def toPerson: entities.Person = entities
       .Person(
-        users.ResourceId((renkuBaseUrl / "persons" / gitLabPerson.name).show),
+        users.ResourceId(gitLabPerson.gitLabId).show,
         name = gitLabPerson.name,
         maybeEmail = None,
         maybeAffiliation = None,

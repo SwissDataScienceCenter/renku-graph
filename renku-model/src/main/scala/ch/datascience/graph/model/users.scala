@@ -33,7 +33,10 @@ object users {
       with NonBlank
       with EntityIdJsonLdOps[ResourceId] {
 
-    def apply(id: EntityId): ResourceId = ResourceId(id.value.toString)
+    def apply(id:       EntityId): ResourceId = ResourceId(id.value.toString)
+    def apply(gitLabId: GitLabId)(implicit renkuBaseUrl: RenkuBaseUrl): ResourceId = ResourceId(
+      (renkuBaseUrl / "users" / gitLabId).show
+    )
 
     implicit object UsersResourceIdRdfResourceRenderer extends Renderer[RdfResource, ResourceId] {
       private val localPartExtractor = "^mailto:(.*)@.*$".r

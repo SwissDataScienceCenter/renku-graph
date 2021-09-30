@@ -23,6 +23,7 @@ import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.sparqlQueries
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.GraphModelGenerators.userNames
 import ch.datascience.graph.model.entities
 import ch.datascience.graph.model.testentities._
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
@@ -166,12 +167,13 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
 
       val step1Transformation = mockFunction[entities.Project, TransformationStepResult[Try]]
 
+      // preparing a project for which json-ld flattening fails
       val person = personEntities(withGitLabId).generateOne.to[entities.Person]
       val step1Project = projectEntities(anyVisibility).generateOne
         .to[entities.ProjectWithoutParent]
         .copy(
           maybeCreator = person.some,
-          members = Set(person.copy(maybeGitLabId = None))
+          members = Set(person.copy(name = userNames.generateOne))
         )
       val step1Queries = sparqlQueries.generateList()
       step1Transformation
@@ -226,6 +228,6 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
   private trait TestCase {
     val triplesUploader = mock[TriplesUploader[Try]]
     val updatesUploader = mock[UpdatesUploader[Try]]
-    val uploader        = new TransformationStepsRunnerImpl[Try](triplesUploader, updatesUploader, gitLabUrl)
+    val uploader        = new TransformationStepsRunnerImpl[Try](triplesUploader, updatesUploader, renkuBaseUrl, gitLabUrl)
   }
 }

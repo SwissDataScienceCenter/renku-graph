@@ -221,32 +221,34 @@ object Project {
 
   val entityTypes: EntityTypes = EntityTypes.of(prov / "Location", schema / "Project")
 
-  implicit def encoder[P <: Project](implicit gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[P] =
-    JsonLDEncoder.instance { project =>
-      val maybeDerivedFrom = project match {
-        case p: ProjectWithParent => p.parentResourceId.asEntityId.some
-        case _ => None
-      }
-      JsonLD.arr(
-        JsonLD.entity(
-          project.resourceId.asEntityId,
-          entityTypes,
-          schema / "name"             -> project.name.asJsonLD,
-          renku / "projectPath"       -> project.path.asJsonLD,
-          renku / "projectNamespaces" -> project.namespaces.asJsonLD,
-          schema / "agent"            -> project.agent.asJsonLD,
-          schema / "dateCreated"      -> project.dateCreated.asJsonLD,
-          schema / "creator"          -> project.maybeCreator.asJsonLD,
-          renku / "projectVisibility" -> project.visibility.asJsonLD,
-          schema / "member"           -> project.members.toList.asJsonLD,
-          schema / "schemaVersion"    -> project.version.asJsonLD,
-          renku / "hasActivity"       -> project.activities.asJsonLD,
-          renku / "hasPlan"           -> project.plans.toList.asJsonLD,
-          renku / "hasDataset"        -> project.datasets.asJsonLD,
-          prov / "wasDerivedFrom"     -> maybeDerivedFrom.asJsonLD
-        ) :: project.datasets.flatMap(_.publicationEvents.map(_.asJsonLD)): _*
-      )
+  implicit def encoder[P <: Project](implicit
+      renkuBaseUrl: RenkuBaseUrl,
+      gitLabApiUrl: GitLabApiUrl
+  ): JsonLDEncoder[P] = JsonLDEncoder.instance { project =>
+    val maybeDerivedFrom = project match {
+      case p: ProjectWithParent => p.parentResourceId.asEntityId.some
+      case _ => None
     }
+    JsonLD.arr(
+      JsonLD.entity(
+        project.resourceId.asEntityId,
+        entityTypes,
+        schema / "name"             -> project.name.asJsonLD,
+        renku / "projectPath"       -> project.path.asJsonLD,
+        renku / "projectNamespaces" -> project.namespaces.asJsonLD,
+        schema / "agent"            -> project.agent.asJsonLD,
+        schema / "dateCreated"      -> project.dateCreated.asJsonLD,
+        schema / "creator"          -> project.maybeCreator.asJsonLD,
+        renku / "projectVisibility" -> project.visibility.asJsonLD,
+        schema / "member"           -> project.members.toList.asJsonLD,
+        schema / "schemaVersion"    -> project.version.asJsonLD,
+        renku / "hasActivity"       -> project.activities.asJsonLD,
+        renku / "hasPlan"           -> project.plans.toList.asJsonLD,
+        renku / "hasDataset"        -> project.datasets.asJsonLD,
+        prov / "wasDerivedFrom"     -> maybeDerivedFrom.asJsonLD
+      ) :: project.datasets.flatMap(_.publicationEvents.map(_.asJsonLD)): _*
+    )
+  }
 
   def decoder(gitLabInfo: GitLabProjectInfo)(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDDecoder[Project] =
     ProjectJsonLDDecoder(gitLabInfo)

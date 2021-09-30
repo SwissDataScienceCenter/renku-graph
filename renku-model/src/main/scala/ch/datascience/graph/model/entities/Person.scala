@@ -19,7 +19,7 @@
 package ch.datascience.graph.model.entities
 
 import cats.syntax.all._
-import ch.datascience.graph.model.GitLabApiUrl
+import ch.datascience.graph.model.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.users.{Affiliation, Email, GitLabId, Name, ResourceId}
 import io.circe.DecodingFailure
 import io.renku.jsonld._
@@ -50,10 +50,10 @@ object Person {
 
   val entityTypes: EntityTypes = EntityTypes.of(prov / "Person", schema / "Person")
 
-  implicit def encoder(implicit gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Person] =
+  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Person] =
     JsonLDEncoder.instance { person =>
       JsonLD.entity(
-        person.resourceId.asEntityId,
+        person.maybeGitLabId.map(ResourceId(_)).getOrElse(person.resourceId).asEntityId,
         entityTypes,
         schema / "email"       -> person.maybeEmail.asJsonLD,
         schema / "name"        -> person.name.asJsonLD,

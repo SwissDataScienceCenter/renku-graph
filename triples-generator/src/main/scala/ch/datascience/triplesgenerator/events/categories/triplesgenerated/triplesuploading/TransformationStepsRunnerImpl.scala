@@ -22,9 +22,9 @@ import cats.MonadThrow
 import cats.data.EitherT
 import cats.effect.{ConcurrentEffect, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.config.GitLabUrlLoader
+import ch.datascience.graph.config.{GitLabUrlLoader, RenkuBaseUrlLoader}
 import ch.datascience.graph.model.entities.Project
-import ch.datascience.graph.model.{GitLabApiUrl, GitLabUrl}
+import ch.datascience.graph.model.{GitLabApiUrl, GitLabUrl, RenkuBaseUrl}
 import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TransformationStep
@@ -40,10 +40,12 @@ private[triplesgenerated] trait TransformationStepsRunner[Interpretation[_]] {
 private[triplesgenerated] class TransformationStepsRunnerImpl[Interpretation[_]: MonadThrow](
     triplesUploader: TriplesUploader[Interpretation],
     updatesUploader: UpdatesUploader[Interpretation],
+    renkuBaseUrl:    RenkuBaseUrl,
     gitLabUrl:       GitLabUrl
 ) extends TransformationStepsRunner[Interpretation] {
 
   private implicit val gitLabApiUrl: GitLabApiUrl = gitLabUrl.apiV4
+  private implicit val renkuUrl:     RenkuBaseUrl = renkuBaseUrl
 
   import TriplesUploadResult._
   import io.renku.jsonld.syntax._
@@ -120,9 +122,11 @@ private[triplesgenerated] object TransformationStepsRunner {
       timer:            Timer[IO]
   ): IO[TransformationStepsRunnerImpl[IO]] = for {
     rdfStoreConfig <- RdfStoreConfig[IO]()
+    renkuBaseUrl   <- RenkuBaseUrlLoader[IO]()
     gitlabUrl      <- GitLabUrlLoader[IO]()
   } yield new TransformationStepsRunnerImpl[IO](new TriplesUploaderImpl[IO](rdfStoreConfig, logger, timeRecorder),
                                                 new UpdatesUploaderImpl(rdfStoreConfig, logger, timeRecorder),
+                                                renkuBaseUrl,
                                                 gitlabUrl
   )
 }
