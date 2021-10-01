@@ -46,13 +46,15 @@ private class CommitSyncEventFinderImpl[Interpretation[_]: BracketThrow](
   override def popEvent(): Interpretation[Option[CommitSyncEvent]] = sessionResource.useK(findEventAndMarkTaken)
 
   private def findEventAndMarkTaken = findEvent >>= {
-    case Some((event, maybeSyncDate)) =>
+    case Some((event, maybeSyncDate, Some(eventStatus))) if eventStatus == AwaitingDeletion =>
+      setSyncDate(event, maybeSyncDate) map (_ => Option.empty[CommitSyncEvent])
+    case Some((event, maybeSyncDate, _)) =>
       setSyncDate(event, maybeSyncDate) map toNoneIfEventAlreadyTaken(event)
     case None => Kleisli.pure(Option.empty[CommitSyncEvent])
   }
 
   private def findEvent = measureExecutionTime {
-    val (eventDate, lastSyncDate) = (EventDate.apply _ &&& LastSyncedDate.apply _)(now())
+    val (eventDate, lastSyncDate) = (EventDate.apply _ &&& LastSyncedDate.apply)(now())
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find event"))
       .select[CategoryName ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate,
               (CommitSyncEvent, Option[LastSyncedDate], Option[EventStatus])
@@ -107,10 +109,10 @@ private class CommitSyncEventFinderImpl[Interpretation[_]: BracketThrow](
       .arguments(categoryName ~ eventDate ~ lastSyncDate ~ eventDate ~ lastSyncDate)
       .build(_.option)
       .mapResult {
-        case Some((event: FullCommitSyncEvent, maybeSyncDate, Some(eventStatus))) if eventStatus != AwaitingDeletion =>
-          Some((event, maybeSyncDate))
-        case Some((event: MinimalCommitSyncEvent, maybeSyncDate, _)) =>
-          Some((event, maybeSyncDate))
+        case Some((event: FullCommitSyncEvent, maybeSyncDate, maybeEventStatus)) =>
+          Some((event, maybeSyncDate, maybeEventStatus))
+        case Some((event: MinimalCommitSyncEvent, maybeSyncDate, maybeEventStatus)) =>
+          Some((event, maybeSyncDate, maybeEventStatus))
         case _ => None
       }
   }

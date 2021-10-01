@@ -181,7 +181,7 @@ class CommitSyncEventFinderSpec
       }
 
     "not return events for projects" +
-      "where event statuses are AWAITING_DELETION" in new TestCase {
+      "where event statuses are AWAITING_DELETION but still update the last sync date" in new TestCase {
 
         finder.popEvent().unsafeRunSync() shouldBe None
         val sharedProjectPath = projectPaths.generateOne
@@ -201,11 +201,13 @@ class CommitSyncEventFinderSpec
 
         finder.popEvent().unsafeRunSync() shouldBe None
 
-        val event2Id   = compoundEventIds.generateOne.copy(projectId = event0Id.projectId)
-        val event2Date = EventDate(event1Date.value.plus(1L, ChronoUnit.MINUTES))
-        addEvent(event2Id, event2Date, sharedProjectPath)
+        // This event should not be picked up as the last sync date was set to NOW()
+        addEvent(compoundEventIds.generateOne.copy(projectId = event0Id.projectId),
+                 eventDates.generateOne,
+                 sharedProjectPath
+        )
 
-        finder.popEvent().unsafeRunSync() shouldBe Some(FullCommitSyncEvent(event2Id, sharedProjectPath, lastSynced))
+        finder.popEvent().unsafeRunSync() shouldBe None
 
       }
   }
