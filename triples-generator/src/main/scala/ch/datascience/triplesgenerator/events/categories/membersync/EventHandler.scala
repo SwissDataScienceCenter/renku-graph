@@ -60,12 +60,12 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow: ContextShift: 
 }
 
 private[events] object EventHandler {
-  def apply(gitLabThrottler: Throttler[IO, GitLab], logger: Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])(
-      implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
+  def apply(gitLabThrottler: Throttler[IO, GitLab], timeRecorder: SparqlQueryTimeRecorder[IO])(implicit
+      executionContext:      ExecutionContext,
+      contextShift:          ContextShift[IO],
+      timer:                 Timer[IO],
+      logger:                Logger[IO]
   ): IO[EventHandler[IO]] = for {
-    membersSynchronizer <- MembersSynchronizer(gitLabThrottler, logger, timeRecorder)
+    membersSynchronizer <- MembersSynchronizer(gitLabThrottler, timeRecorder)
   } yield new EventHandler[IO](categoryName, membersSynchronizer, logger)
 }

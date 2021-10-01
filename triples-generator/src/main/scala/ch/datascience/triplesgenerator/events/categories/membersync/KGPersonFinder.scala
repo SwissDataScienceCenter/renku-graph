@@ -36,9 +36,8 @@ private trait KGPersonFinder[Interpretation[_]] {
 
 private class KGPersonFinderImpl(
     rdfStoreConfig:          RdfStoreConfig,
-    logger:                  Logger[IO],
     timeRecorder:            SparqlQueryTimeRecorder[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO], logger: Logger[IO])
     extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
     with KGPersonFinder[IO] {
 
@@ -83,11 +82,12 @@ private class KGPersonFinderImpl(
 }
 
 private object KGPersonFinder {
-  def apply(logger:     Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
+  def apply(timeRecorder: SparqlQueryTimeRecorder[IO])(implicit
+      executionContext:   ExecutionContext,
+      contextShift:       ContextShift[IO],
+      timer:              Timer[IO],
+      logger:             Logger[IO]
   ): IO[KGPersonFinderImpl] = for {
     rdfStoreConfig <- RdfStoreConfig[IO]()
-  } yield new KGPersonFinderImpl(rdfStoreConfig, logger, timeRecorder)
+  } yield new KGPersonFinderImpl(rdfStoreConfig, timeRecorder)
 }

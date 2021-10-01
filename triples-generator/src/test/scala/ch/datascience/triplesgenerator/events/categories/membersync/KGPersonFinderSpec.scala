@@ -51,8 +51,8 @@ class KGPersonFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
   }
 
   private trait TestCase {
-    private val logger       = TestLogger[IO]()
+    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
     private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
-    val finder               = new KGPersonFinderImpl(rdfStoreConfig, logger, timeRecorder)
+    val finder               = new KGPersonFinderImpl(rdfStoreConfig, timeRecorder)
   }
 }

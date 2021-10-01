@@ -70,11 +70,12 @@ class ProjectTransformerImpl[Interpretation[_]: MonadThrow](
 }
 
 object ProjectTransformer {
-  def apply(
-      timeRecorder:            SparqlQueryTimeRecorder[IO],
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[ProjectTransformer[IO]] =
-    for {
-      kgProjectFinder <- KGProjectFinder(timeRecorder, logger)
-    } yield new ProjectTransformerImpl[IO](kgProjectFinder, UpdatesCreator)
+  def apply(timeRecorder: SparqlQueryTimeRecorder[IO])(implicit
+      executionContext:   ExecutionContext,
+      cs:                 ContextShift[IO],
+      timer:              Timer[IO],
+      logger:             Logger[IO]
+  ): IO[ProjectTransformer[IO]] = for {
+    kgProjectFinder <- KGProjectFinder(timeRecorder)
+  } yield new ProjectTransformerImpl[IO](kgProjectFinder, UpdatesCreator)
 }

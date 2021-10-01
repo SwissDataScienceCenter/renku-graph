@@ -58,21 +58,18 @@ private[triplesgenerated] object TriplesCurator {
     def apply(message: String): TransformationRecoverableError = TransformationRecoverableError(message, null)
   }
 
-  def apply(
-      logger:       Logger[IO],
-      timeRecorder: SparqlQueryTimeRecorder[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      cs:               ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[TransformationStepsCreator[IO]] =
-    for {
-      personTransformer  <- PersonTransformer(timeRecorder, logger)
-      projectTransformer <- ProjectTransformer(timeRecorder, logger)
-      datasetTransformer <- DatasetTransformer(timeRecorder, logger)
-    } yield new TransformationStepsCreatorImpl[IO](
-      personTransformer,
-      projectTransformer,
-      datasetTransformer
-    )
+  def apply(timeRecorder: SparqlQueryTimeRecorder[IO])(implicit
+      executionContext:   ExecutionContext,
+      cs:                 ContextShift[IO],
+      timer:              Timer[IO],
+      logger:             Logger[IO]
+  ): IO[TransformationStepsCreator[IO]] = for {
+    personTransformer  <- PersonTransformer(timeRecorder, logger)
+    projectTransformer <- ProjectTransformer(timeRecorder)
+    datasetTransformer <- DatasetTransformer(timeRecorder, logger)
+  } yield new TransformationStepsCreatorImpl[IO](
+    personTransformer,
+    projectTransformer,
+    datasetTransformer
+  )
 }

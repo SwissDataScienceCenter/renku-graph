@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.model.testentities
 
+import cats.syntax.all._
 import ch.datascience.graph.model._
 import ch.datascience.graph.model.users.{Affiliation, Email, GitLabId, Name}
 
@@ -52,7 +53,8 @@ object Person {
 
   implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[Person] =
     EntityIdEncoder.instance {
-      case Person(_, Some(email), _, _) => EntityId of s"mailto:$email"
-      case Person(name, _, _, _)        => EntityId of (renkuBaseUrl / "users" / name)
+      case Person(_, _, _, Some(gitLabId)) => EntityId of users.ResourceId(gitLabId).show
+      case Person(_, Some(email), _, _)    => EntityId of s"mailto:$email"
+      case Person(name, _, _, _)           => EntityId of (renkuBaseUrl / "users" / name)
     }
 }

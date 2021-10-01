@@ -91,16 +91,16 @@ private class MembersSynchronizerImpl[Interpretation[_]: MonadThrow](
 }
 
 private object MembersSynchronizer {
-  def apply(gitLabThrottler: Throttler[IO, GitLab], logger: Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])(
-      implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
+  def apply(gitLabThrottler: Throttler[IO, GitLab], timeRecorder: SparqlQueryTimeRecorder[IO])(implicit
+      executionContext:      ExecutionContext,
+      contextShift:          ContextShift[IO],
+      timer:                 Timer[IO],
+      logger:                Logger[IO]
   ): IO[MembersSynchronizer[IO]] = for {
     accessTokenFinder          <- AccessTokenFinder(logger)
     gitLabProjectMembersFinder <- IOGitLabProjectMembersFinder(gitLabThrottler, logger)
     kGProjectMembersFinder     <- KGProjectMembersFinder(logger, timeRecorder)
-    kGPersonFinder             <- KGPersonFinder(logger, timeRecorder)
+    kGPersonFinder             <- KGPersonFinder(timeRecorder)
     updatesCreator             <- UpdatesCreator()
     rdfStoreConfig             <- RdfStoreConfig[IO]()
     querySender <- IO(new RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder) with QuerySender[IO] {

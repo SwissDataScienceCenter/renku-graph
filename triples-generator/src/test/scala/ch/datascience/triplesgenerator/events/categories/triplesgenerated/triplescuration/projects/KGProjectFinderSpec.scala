@@ -19,6 +19,7 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects
 
 import cats.effect.IO
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.entities
@@ -34,7 +35,7 @@ class KGProjectFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
 
   "find" should {
 
-    "return name, derivedFrom, visibility, and creator for a given project ResourceId" in new TestCase {
+    "return name, derivedFrom and visibility for a given project ResourceId" in new TestCase {
       forAll(anyProjectEntities.map(_.to[entities.Project])) { project =>
         val maybeParent = project match {
           case projectWithParent: entities.ProjectWithParent    => Some(projectWithParent.parentResourceId)
@@ -43,9 +44,7 @@ class KGProjectFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
 
         loadToStore(project)
 
-        finder.find(project.resourceId).unsafeRunSync() shouldBe Some(
-          (project.name, maybeParent, project.visibility, project.maybeCreator.map(_.resourceId))
-        )
+        finder.find(project.resourceId).unsafeRunSync() shouldBe (project.name, maybeParent, project.visibility).some
       }
     }
 
@@ -55,8 +54,8 @@ class KGProjectFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
   }
 
   private trait TestCase {
-    private val logger       = TestLogger[IO]()
+    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
     private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
-    val finder               = new KGProjectFinderImpl(rdfStoreConfig, logger, timeRecorder)
+    val finder               = new KGProjectFinderImpl(rdfStoreConfig, timeRecorder)
   }
 }

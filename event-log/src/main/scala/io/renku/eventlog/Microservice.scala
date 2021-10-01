@@ -54,6 +54,7 @@ object Microservice extends IOMicroservice {
 
   protected implicit override def contextShift: ContextShift[IO] = IO.contextShift(executionContext)
   protected implicit override def timer:        Timer[IO]        = IO.timer(executionContext)
+  private implicit val logger:                  Logger[IO]       = ApplicationLogger
 
   override def run(args: List[String]): IO[ExitCode] = for {
     sessionPoolResource <- new EventLogDbConfigProvider[IO]() map SessionPoolResource[IO, EventLogDB]
@@ -62,7 +63,6 @@ object Microservice extends IOMicroservice {
 
   private def runMicroservice(sessionPoolResource: Resource[IO, SessionResource[IO, EventLogDB]]) =
     sessionPoolResource.use { sessionResource =>
-      implicit val logger: Logger[IO] = ApplicationLogger
       for {
         certificateLoader           <- CertificateLoader[IO](ApplicationLogger)
         sentryInitializer           <- SentryInitializer[IO]()

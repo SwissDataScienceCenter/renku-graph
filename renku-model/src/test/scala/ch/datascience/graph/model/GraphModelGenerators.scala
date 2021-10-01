@@ -78,12 +78,11 @@ object GraphModelGenerators {
 
   implicit val userResourceIds: Gen[users.ResourceId] = userResourceIds(userEmails.toGeneratorOfOptions)
   def userResourceIds(maybeEmail:    Option[Email]): Gen[users.ResourceId] = userResourceIds(Gen.const(maybeEmail))
-  def userResourceIds(maybeEmailGen: Gen[Option[Email]]): Gen[users.ResourceId] =
-    for {
-      maybeEmail <- maybeEmailGen
-    } yield users.ResourceId
-      .from(maybeEmail.map(email => s"mailto:$email").getOrElse(s"_:${UUID.randomUUID()}"))
-      .fold(throw _, identity)
+  def userResourceIds(maybeEmailGen: Gen[Option[Email]]): Gen[users.ResourceId] = for {
+    maybeEmail <- maybeEmailGen
+  } yield users.ResourceId
+    .from(maybeEmail.map(email => s"mailto:$email").getOrElse(s"_:${UUID.randomUUID()}"))
+    .fold(throw _, identity)
 
   implicit val userGitLabIds: Gen[users.GitLabId] = nonNegativeInts().map(users.GitLabId(_))
 

@@ -302,12 +302,11 @@ class EventProcessorSpec
         .expects(eventsProcessingTimesBuilder, *)
         .returning(IO.pure(eventsProcessingTimes))
 
-      val logger = TestLogger[IO]()
+      implicit val logger: TestLogger[IO] = TestLogger[IO]()
       EventProcessor(
         metricsRegistry,
         Throttler.noThrottling,
-        new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger)),
-        logger
+        new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
       ).unsafeRunSync()
     }
   }

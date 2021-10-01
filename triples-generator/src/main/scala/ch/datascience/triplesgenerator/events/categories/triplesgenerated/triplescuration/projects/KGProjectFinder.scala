@@ -20,7 +20,8 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated.tripl
 
 import cats.MonadThrow
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.graph.model.{projects, users}
+import cats.syntax.all._
+import ch.datascience.graph.model.projects
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects.KGProjectFinder.KGProjectInfo
@@ -29,19 +30,17 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.ExecutionContext
 
 private trait KGProjectFinder[Interpretation[_]] {
-  def find(
-      resourceId: projects.ResourceId
-  ): Interpretation[Option[KGProjectInfo]]
+  def find(resourceId: projects.ResourceId): Interpretation[Option[KGProjectInfo]]
 }
 
 private class KGProjectFinderImpl(
     rdfStoreConfig: RdfStoreConfig,
-    logger:         Logger[IO],
     timeRecorder:   SparqlQueryTimeRecorder[IO]
 )(implicit
     executionContext: ExecutionContext,
     contextShift:     ContextShift[IO],
-    timer:            Timer[IO]
+    timer:            Timer[IO],
+    logger:           Logger[IO]
 ) extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
     with KGProjectFinder[IO] {
 
@@ -52,17 +51,16 @@ private class KGProjectFinderImpl(
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
   override def find(resourceId: projects.ResourceId): IO[Option[KGProjectInfo]] =
-    queryExpecting[List[KGProjectInfo]](using = query(resourceId)) flatMap toSingleResult(resourceId)
+    queryExpecting[List[KGProjectInfo]](using = query(resourceId)) >>= toSingleResult(resourceId)
 
   private def query(resourceId: projects.ResourceId) = SparqlQuery.of(
     name = "transformation - find project",
     Prefixes.of(schema -> "schema", renku -> "renku", prov -> "prov"),
-    s"""|SELECT DISTINCT ?name ?maybeParent ?visibility ?maybeCreator
+    s"""|SELECT DISTINCT ?name ?maybeParent ?visibility
         |WHERE {
         |  <$resourceId> a schema:Project;
         |                schema:name ?name;
         |                renku:projectVisibility ?visibility.
-        |  OPTIONAL { <$resourceId> schema:creator ?maybeCreator }            
         |  OPTIONAL { <$resourceId> prov:wasDerivedFrom ?maybeParent }            
         |}
         |""".stripMargin
@@ -71,11 +69,10 @@ private class KGProjectFinderImpl(
   private implicit lazy val recordsDecoder: Decoder[List[KGProjectInfo]] = {
     val rowDecoder = Decoder.instance(cursor =>
       for {
-        name         <- cursor.downField("name").downField("value").as[projects.Name]
-        maybeParent  <- cursor.downField("maybeParent").downField("value").as[Option[projects.ResourceId]]
-        visibility   <- cursor.downField("visibility").downField("value").as[projects.Visibility]
-        maybeCreator <- cursor.downField("maybeCreator").downField("value").as[Option[users.ResourceId]]
-      } yield (name, maybeParent, visibility, maybeCreator)
+        name        <- cursor.downField("name").downField("value").as[projects.Name]
+        maybeParent <- cursor.downField("maybeParent").downField("value").as[Option[projects.ResourceId]]
+        visibility  <- cursor.downField("visibility").downField("value").as[projects.Visibility]
+      } yield (name, maybeParent, visibility)
     )
     _.downField("results").downField("bindings").as(decodeList(rowDecoder))
   }
@@ -89,16 +86,14 @@ private class KGProjectFinderImpl(
 }
 
 private object KGProjectFinder {
-  def apply(
-      timeRecorder: SparqlQueryTimeRecorder[IO],
-      logger:       Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
+  def apply(timeRecorder: SparqlQueryTimeRecorder[IO])(implicit
+      executionContext:   ExecutionContext,
+      contextShift:       ContextShift[IO],
+      timer:              Timer[IO],
+      logger:             Logger[IO]
   ): IO[KGProjectFinder[IO]] = for {
     config <- RdfStoreConfig[IO]()
-  } yield new KGProjectFinderImpl(config, logger, timeRecorder)
+  } yield new KGProjectFinderImpl(config, timeRecorder)
 
-  type KGProjectInfo = (projects.Name, Option[projects.ResourceId], projects.Visibility, Option[users.ResourceId])
+  type KGProjectInfo = (projects.Name, Option[projects.ResourceId], projects.Visibility)
 }

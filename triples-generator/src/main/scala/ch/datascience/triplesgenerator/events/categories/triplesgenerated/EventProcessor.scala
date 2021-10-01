@@ -213,16 +213,16 @@ private object EventProcessor {
   def apply(
       metricsRegistry: MetricsRegistry[IO],
       gitLabThrottler: Throttler[IO, GitLab],
-      timeRecorder:    SparqlQueryTimeRecorder[IO],
-      logger:          Logger[IO]
+      timeRecorder:    SparqlQueryTimeRecorder[IO]
   )(implicit
       contextShift:     ContextShift[IO],
       executionContext: ExecutionContext,
-      timer:            Timer[IO]
+      timer:            Timer[IO],
+      logger:           Logger[IO]
   ): IO[EventProcessor[IO]] = for {
     uploader              <- TransformationStepsRunner(logger, timeRecorder)
     accessTokenFinder     <- AccessTokenFinder(logger)
-    triplesCurator        <- TriplesCurator(logger, timeRecorder)
+    triplesCurator        <- TriplesCurator(timeRecorder)
     eventStatusUpdater    <- EventStatusUpdater(categoryName, logger)
     eventsProcessingTimes <- metricsRegistry.register[Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
     executionTimeRecorder <- ExecutionTimeRecorder[IO](logger, maybeHistogram = Some(eventsProcessingTimes))

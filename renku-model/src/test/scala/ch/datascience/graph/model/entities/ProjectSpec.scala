@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.model.entities
 
+import cats.data.Validated
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
@@ -43,32 +44,59 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
   "from" should {
 
     "sync project's person entities across activities and datasets" in {
-      val onlyGLMember  = personEntities(withGitLabId, withoutEmail).generateOne
+      val onlyGLMember = personEntities(withGitLabId, withoutEmail).generateOne
+        .to[entities.Person]
+        .copy(resourceId = userResourceIds.generateOne)
       val gLAndKGMember = personEntities(withGitLabId, withEmail).generateOne
-      val creator       = personEntities(withGitLabId, withEmail).generateOne
+        .to[entities.Person]
+        .copy(resourceId = userResourceIds.generateOne)
+      val creator = personEntities(withGitLabId, withEmail).generateOne
+        .to[entities.Person]
+        .copy(resourceId = userResourceIds.generateOne)
+      val activities = activitiesWith(creator.copy(maybeGitLabId = None))
+      val datasets   = datasetsWith(Set(gLAndKGMember.copy(maybeGitLabId = None)))
 
       Set(
-        projectEntities(anyVisibility)
-          .modify(_.copy(maybeCreator = Some(creator), members = Set(onlyGLMember, gLAndKGMember))),
-        projectWithParentEntities(anyVisibility)
-          .modify(_.copy(maybeCreator = Some(creator), members = Set(onlyGLMember, gLAndKGMember)))
-      ) foreach { projectGen =>
-        val project = projectGen
-          .withActivities(activityEntities(planEntities()).modify(_.copy(author = creator.copy(maybeGitLabId = None))))
-          .withDatasets(
-            datasetEntities(ofAnyProvenance).modify(
-              provenanceLens.modify(creatorsLens.modify(_ => Set(gLAndKGMember.copy(maybeGitLabId = None))))
+        projectEntities(anyVisibility).map { project =>
+          entities.ProjectWithoutParent
+            .from(
+              project.resourceId,
+              project.path,
+              project.name,
+              project.agent,
+              project.dateCreated,
+              Some(creator),
+              project.visibility,
+              Set(onlyGLMember, gLAndKGMember),
+              project.version,
+              activities(project.dateCreated),
+              datasets(project.dateCreated)
             )
-          )
-          .generateOne
-          .to[entities.Project]
-
-        project.maybeCreator             shouldBe creator.to[entities.Person].some
-        project.members                  shouldBe Set(onlyGLMember, gLAndKGMember).map(_.to[entities.Person])
-        project.activities.map(_.author) shouldBe List(creator.to[entities.Person])
-        project.datasets.toSet.flatMap((ds: entities.Dataset[entities.Dataset.Provenance]) =>
-          ds.provenance.creators
-        ) shouldBe Set(gLAndKGMember.to[entities.Person])
+        }.generateOne,
+        projectWithParentEntities(anyVisibility).map { project =>
+          entities.ProjectWithParent
+            .from(
+              project.resourceId,
+              project.path,
+              project.name,
+              project.agent,
+              project.dateCreated,
+              Some(creator),
+              project.visibility,
+              Set(onlyGLMember, gLAndKGMember),
+              project.version,
+              activities(project.dateCreated),
+              datasets(project.dateCreated),
+              project.parent.resourceId
+            )
+        }.generateOne
+      ) foreach {
+        case Validated.Valid(entitiesProject) =>
+          entitiesProject.maybeCreator                                  shouldBe creator.some
+          entitiesProject.members                                       shouldBe Set(onlyGLMember, gLAndKGMember)
+          entitiesProject.activities.map(_.author)                      shouldBe List(creator)
+          entitiesProject.datasets.flatMap(_.provenance.creators).toSet shouldBe Set(gLAndKGMember)
+        case invalid => fail(invalid.toString)
       }
     }
   }
@@ -575,4 +603,24 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         maybeGitLabId = gitLabPerson.gitLabId.some
       )
   }
+
+  private def activitiesWith(author: entities.Person): projects.DateCreated => List[entities.Activity] = dateCreated =>
+    List(
+      activityEntities(planEntities())(dateCreated).generateOne.to[entities.Activity].copy(author = author)
+    )
+
+  private def datasetsWith(
+      creators: Set[entities.Person]
+  ): projects.DateCreated => List[entities.Dataset[entities.Dataset.Provenance]] = dateCreated =>
+    List {
+      val ds = datasetEntities(ofAnyProvenance)(renkuBaseUrl)(dateCreated).generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance]]
+      ds.copy(provenance = ds.provenance match {
+        case p: entities.Dataset.Provenance.Internal                         => p.copy(creators = creators)
+        case p: entities.Dataset.Provenance.ImportedExternal                 => p.copy(creators = creators)
+        case p: entities.Dataset.Provenance.ImportedInternalAncestorInternal => p.copy(creators = creators)
+        case p: entities.Dataset.Provenance.ImportedInternalAncestorExternal => p.copy(creators = creators)
+        case p: entities.Dataset.Provenance.Modified                         => p.copy(creators = creators)
+      })
+    }
 }

@@ -101,15 +101,15 @@ private[events] object EventHandler {
       gitLabThrottler:       Throttler[IO, GitLab],
       timeRecorder:          SparqlQueryTimeRecorder[IO],
       subscriptionMechanism: SubscriptionMechanism[IO],
-      logger:                Logger[IO],
       config:                Config = ConfigFactory.load()
   )(implicit
       contextShift:     ContextShift[IO],
       executionContext: ExecutionContext,
-      timer:            Timer[IO]
+      timer:            Timer[IO],
+      logger:           Logger[IO]
   ): IO[EventHandler[IO]] = for {
     generationProcesses        <- find[IO, Int Refined Positive]("transformation-processes-number", config)
-    eventProcessor             <- EventProcessor(metricsRegistry, gitLabThrottler, timeRecorder, logger)
+    eventProcessor             <- EventProcessor(metricsRegistry, gitLabThrottler, timeRecorder)
     concurrentProcessesLimiter <- ConcurrentProcessesLimiter(generationProcesses)
   } yield new EventHandler[IO](categoryName,
                                EventBodyDeserializer(),
