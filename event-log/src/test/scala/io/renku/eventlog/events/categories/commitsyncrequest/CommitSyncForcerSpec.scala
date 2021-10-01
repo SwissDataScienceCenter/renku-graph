@@ -26,10 +26,12 @@ import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventContentGenerators.eventDates
 import io.renku.eventlog.subscriptions._
-import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
+import io.renku.eventlog.{EventDate, InMemoryEventLogDbSpec, TypeSerializers}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+
+import java.time.Instant
 
 class CommitSyncForcerSpec
     extends AnyWordSpec
@@ -76,7 +78,7 @@ class CommitSyncForcerSpec
         forcer.forceCommitSync(projectId, projectPath).unsafeRunSync() shouldBe ()
 
         findSyncTime(projectId, commitsync.categoryName) shouldBe None
-        findProjects.map(proj => proj._1 -> proj._2) shouldBe List(projectId -> projectPath)
+        findProjects                                     shouldBe List((projectId, projectPath, EventDate(Instant.EPOCH)))
 
         queriesExecTimes.verifyExecutionTimeMeasured("commit_sync_request - delete last_synced")
         queriesExecTimes.verifyExecutionTimeMeasured("commit_sync_request - insert project")
