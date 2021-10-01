@@ -40,8 +40,7 @@ private trait CommitSyncForcer[Interpretation[_]] {
 
 private class CommitSyncForcerImpl[Interpretation[_]: BracketThrow](
     sessionResource:  SessionResource[Interpretation, EventLogDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
-    now:              () => Instant = () => Instant.now
+    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
 ) extends DbClient(Some(queriesExecTimes))
     with CommitSyncForcer[Interpretation]
     with TypeSerializers
@@ -78,7 +77,7 @@ private class CommitSyncForcerImpl[Interpretation[_]: BracketThrow](
           ON CONFLICT (project_id)
           DO NOTHING
       """.command)
-      .arguments(projectId ~ projectPath ~ EventDate(now()))
+      .arguments(projectId ~ projectPath ~ EventDate(Instant.EPOCH))
       .build
   }
 }
