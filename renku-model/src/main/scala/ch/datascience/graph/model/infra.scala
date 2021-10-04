@@ -21,23 +21,23 @@ package ch.datascience.graph.model
 import ch.datascience.graph.model.views.{TinyTypeJsonLDOps, UrlResourceRenderer}
 import ch.datascience.tinytypes.constraints.{NonBlank, Url, UrlOps}
 import ch.datascience.tinytypes.json.TinyTypeDecoders
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory, UrlTinyType}
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
 
-final class RenkuBaseUrl private (val value: String) extends AnyVal with StringTinyType
+final class RenkuBaseUrl private (val value: String) extends AnyVal with UrlTinyType
 object RenkuBaseUrl
     extends TinyTypeFactory[RenkuBaseUrl](new RenkuBaseUrl(_))
     with Url
     with UrlOps[RenkuBaseUrl]
     with UrlResourceRenderer[RenkuBaseUrl]
 
-final class GitLabUrl private (val value: String) extends AnyVal with StringTinyType {
+final class GitLabUrl private (val value: String) extends AnyVal with UrlTinyType {
   def apiV4: GitLabApiUrl = GitLabApiUrl(this)
 }
 object GitLabUrl extends TinyTypeFactory[GitLabUrl](new GitLabUrl(_)) with Url with UrlOps[GitLabUrl]
 
-final class GitLabApiUrl private (val value: String) extends AnyVal with StringTinyType
+final class GitLabApiUrl private (val value: String) extends AnyVal with UrlTinyType
 object GitLabApiUrl
     extends TinyTypeFactory[GitLabApiUrl](new GitLabApiUrl(_))
     with Url

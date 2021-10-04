@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.syntax.all._
 import ch.datascience.config.sentry.SentryConfig._
 import ch.datascience.tinytypes.constraints.{NonBlank, Url, UrlOps}
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory, UrlTinyType}
 import com.typesafe.config.{Config, ConfigFactory}
 
 import scala.util.control.NonFatal
@@ -61,7 +61,7 @@ object SentryConfig {
     }
   }
 
-  class SentryBaseUrl private (val value: String) extends AnyVal with StringTinyType
+  class SentryBaseUrl private (val value: String) extends AnyVal with UrlTinyType
   implicit object SentryBaseUrl
       extends TinyTypeFactory[SentryBaseUrl](new SentryBaseUrl(_))
       with Url

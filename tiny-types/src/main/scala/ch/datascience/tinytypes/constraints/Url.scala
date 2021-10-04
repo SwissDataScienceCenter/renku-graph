@@ -31,7 +31,7 @@ trait Url extends Constraints[String] {
   )
 }
 
-trait UrlOps[T <: StringTinyType] {
+trait UrlOps[T <: UrlTinyType] {
   self: TinyTypeFactory[T] with Url =>
 
   import UrlEncoder._
@@ -114,7 +114,7 @@ trait UrlOps[T <: StringTinyType] {
   implicit def toUrl(url: UrlWithQueryParam): T = url.value
 }
 
-trait BaseUrl[SourceType <: StringTinyType, DestinationType <: StringTinyType] {
+trait BaseUrl[SourceType <: UrlTinyType, DestinationType <: UrlTinyType] {
   self: TinyTypeFactory[SourceType] with Url =>
 
   import UrlEncoder._

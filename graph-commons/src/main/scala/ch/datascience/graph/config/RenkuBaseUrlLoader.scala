@@ -28,7 +28,7 @@ object RenkuBaseUrlLoader {
   import com.typesafe.config.{Config, ConfigFactory}
   import pureconfig.ConfigReader
 
-  private implicit val renkuBaseUrlReader: ConfigReader[RenkuBaseUrl] = stringTinyTypeReader(RenkuBaseUrl)
+  private implicit val renkuBaseUrlReader: ConfigReader[RenkuBaseUrl] = urlTinyTypeReader(RenkuBaseUrl)
 
   def apply[Interpretation[_]: MonadThrow](
       config: Config = ConfigFactory.load()

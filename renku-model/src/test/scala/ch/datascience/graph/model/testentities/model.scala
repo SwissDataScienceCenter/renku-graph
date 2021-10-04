@@ -25,7 +25,7 @@ import ch.datascience.tinytypes.constraints._
 import io.circe.Json
 import io.renku.jsonld.EntityId
 
-final case class UrlfiedEntityId(value: String) extends EntityId with StringTinyType {
+final case class UrlfiedEntityId(value: String) extends EntityId with UrlTinyType {
   override type Value = String
   override lazy val asJson:    Json         = Json.fromString(value)
   override lazy val valueShow: Show[String] = Show[String](_ => value)

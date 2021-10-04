@@ -20,7 +20,7 @@ package ch.datascience.config
 
 import cats.MonadError
 import cats.syntax.all._
-import ch.datascience.tinytypes.{IntTinyType, StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{IntTinyType, StringTinyType, TinyTypeFactory, UrlTinyType}
 import com.typesafe.config.Config
 import pureconfig._
 import pureconfig.error.{CannotConvert, ConfigReaderFailures}
@@ -54,6 +54,14 @@ object ConfigLoader {
     }
 
   implicit def stringTinyTypeReader[TT <: StringTinyType](implicit ttApply: TinyTypeFactory[TT]): ConfigReader[TT] =
+    ConfigReader
+      .fromString[TT] { value =>
+        ttApply
+          .from(value)
+          .leftMap(exception => CannotConvert(value, ttApply.getClass.toString, exception.getMessage))
+      }
+
+  implicit def urlTinyTypeReader[TT <: UrlTinyType](implicit ttApply: TinyTypeFactory[TT]): ConfigReader[TT] =
     ConfigReader
       .fromString[TT] { value =>
         ttApply

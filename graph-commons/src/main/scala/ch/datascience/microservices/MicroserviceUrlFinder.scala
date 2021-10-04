@@ -18,10 +18,10 @@
 
 package ch.datascience.microservices
 
-import cats.MonadError
+import cats.{MonadError, MonadThrow}
 import ch.datascience.tinytypes.constraints.{Url, UrlOps}
-import ch.datascience.tinytypes.json.TinyTypeDecoders.stringDecoder
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.json.TinyTypeDecoders.urlDecoder
+import ch.datascience.tinytypes.{TinyTypeFactory, UrlTinyType}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
 import io.circe.Decoder
@@ -30,7 +30,7 @@ trait MicroserviceUrlFinder[Interpretation[_]] {
   def findBaseUrl(): Interpretation[MicroserviceBaseUrl]
 }
 
-class MicroserviceUrlFinderImpl[Interpretation[_]: MonadError[*[_], Throwable]](
+class MicroserviceUrlFinderImpl[Interpretation[_]: MonadThrow](
     microservicePort: Int Refined Positive
 ) extends MicroserviceUrlFinder[Interpretation] {
 
@@ -67,10 +67,10 @@ object MicroserviceUrlFinder {
   }
 }
 
-final class MicroserviceBaseUrl private (val value: String) extends AnyVal with StringTinyType
+final class MicroserviceBaseUrl private (val value: String) extends AnyVal with UrlTinyType
 object MicroserviceBaseUrl
     extends TinyTypeFactory[MicroserviceBaseUrl](new MicroserviceBaseUrl(_))
     with Url
     with UrlOps[MicroserviceBaseUrl] {
-  implicit val decoder: Decoder[MicroserviceBaseUrl] = stringDecoder(MicroserviceBaseUrl)
+  implicit val decoder: Decoder[MicroserviceBaseUrl] = urlDecoder(MicroserviceBaseUrl)
 }

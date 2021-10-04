@@ -19,14 +19,20 @@
 package ch.datascience.graph.model.views
 
 import ch.datascience.tinytypes.constraints.Url
-import ch.datascience.tinytypes.{Renderer, StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{Renderer, StringTinyType, TinyTypeFactory, UrlTinyType}
 
 /*
  * This is a marker trait to be used with TinyTypes so they can be rendered as an RdfResource which is `<url>`
  */
 trait RdfResource
 
-trait UrlResourceRenderer[T <: StringTinyType] {
+trait UrlResourceRenderer[T <: UrlTinyType] {
+  self: TinyTypeFactory[T] with Url =>
+
+  implicit val rdfResourceRenderer: Renderer[RdfResource, T] = url => s"<$url>"
+}
+
+trait AnyResourceRenderer[T <: StringTinyType] {
   self: TinyTypeFactory[T] with Url =>
 
   implicit val rdfResourceRenderer: Renderer[RdfResource, T] = url => s"<$url>"

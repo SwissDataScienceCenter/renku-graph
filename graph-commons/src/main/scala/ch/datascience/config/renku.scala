@@ -18,13 +18,13 @@
 
 package ch.datascience.config
 
-import cats.MonadError
+import cats.MonadThrow
 import ch.datascience.tinytypes.constraints.{BaseUrl, Url, UrlOps}
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{TinyTypeFactory, UrlTinyType}
 
 object renku {
 
-  class ResourcesUrl private (val value: String) extends AnyVal with StringTinyType
+  class ResourcesUrl private (val value: String) extends AnyVal with UrlTinyType
   object ResourcesUrl
       extends TinyTypeFactory[ResourcesUrl](new ResourcesUrl(_))
       with Url
@@ -33,15 +33,15 @@ object renku {
     import com.typesafe.config.{Config, ConfigFactory}
     import pureconfig.ConfigReader
 
-    private implicit val configReader: ConfigReader[ResourcesUrl] = stringTinyTypeReader(this)
+    private implicit val configReader: ConfigReader[ResourcesUrl] = urlTinyTypeReader(this)
 
-    def apply[Interpretation[_]](
-        config:    Config = ConfigFactory.load()
-    )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[ResourcesUrl] =
+    def apply[Interpretation[_]: MonadThrow](
+        config: Config = ConfigFactory.load()
+    ): Interpretation[ResourcesUrl] =
       find[Interpretation, ResourcesUrl]("services.renku.resources-url", config)
 
   }
 
-  class ResourceUrl private (val value: String) extends AnyVal with StringTinyType
+  class ResourceUrl private (val value: String) extends AnyVal with UrlTinyType
   implicit object ResourceUrl extends TinyTypeFactory[ResourceUrl](new ResourceUrl(_)) with Url with UrlOps[ResourceUrl]
 }

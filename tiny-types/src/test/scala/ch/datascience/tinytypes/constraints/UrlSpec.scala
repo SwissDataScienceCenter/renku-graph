@@ -20,7 +20,7 @@ package ch.datascience.tinytypes.constraints
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{httpUrls, nonBlankStrings, relativePaths}
-import ch.datascience.tinytypes.{IntTinyType, StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{IntTinyType, StringTinyType, TinyTypeFactory, UrlTinyType}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -219,16 +219,16 @@ class BaseUrlSpec extends AnyWordSpec with should.Matchers {
 
 private object UrlTypes {
 
-  class UrlType private (val value: String) extends AnyVal with StringTinyType
+  class UrlType private (val value: String) extends AnyVal with UrlTinyType
   object UrlType extends TinyTypeFactory[UrlType](new UrlType(_)) with Url with UrlOps[UrlType]
 
-  class BaseUrlType private (val value: String) extends AnyVal with StringTinyType
+  class BaseUrlType private (val value: String) extends AnyVal with UrlTinyType
   object BaseUrlType
       extends TinyTypeFactory[BaseUrlType](new BaseUrlType(_))
       with Url
       with BaseUrl[BaseUrlType, ExtendedUrlType]
 
-  class ExtendedUrlType private (val value: String) extends AnyVal with StringTinyType
+  class ExtendedUrlType private (val value: String) extends AnyVal with UrlTinyType
   implicit object ExtendedUrlType
       extends TinyTypeFactory[ExtendedUrlType](new ExtendedUrlType(_))
       with Url

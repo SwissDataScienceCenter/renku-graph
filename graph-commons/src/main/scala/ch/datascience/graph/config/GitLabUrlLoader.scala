@@ -19,14 +19,14 @@
 package ch.datascience.graph.config
 
 import cats.MonadThrow
-import ch.datascience.config.ConfigLoader.{find, stringTinyTypeReader}
+import ch.datascience.config.ConfigLoader.{find, urlTinyTypeReader}
 import ch.datascience.graph.model.GitLabUrl
 import com.typesafe.config.{Config, ConfigFactory}
 import pureconfig.ConfigReader
 
 object GitLabUrlLoader {
 
-  private implicit val gitLabUrlReader: ConfigReader[GitLabUrl] = stringTinyTypeReader(GitLabUrl)
+  private implicit val gitLabUrlReader: ConfigReader[GitLabUrl] = urlTinyTypeReader(GitLabUrl)
 
   def apply[Interpretation[_]: MonadThrow](
       config: Config = ConfigFactory.load
