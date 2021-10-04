@@ -84,7 +84,7 @@ object GraphModelGenerators {
     .from(maybeEmail.map(email => s"mailto:$email").getOrElse(s"_:${UUID.randomUUID()}"))
     .fold(throw _, identity)
 
-  implicit val userGitLabIds: Gen[users.GitLabId] = nonNegativeInts().map(users.GitLabId(_))
+  implicit val userGitLabIds: Gen[users.GitLabId] = Gen.uuid.map(_ => users.GitLabId(Random.nextInt(100000000) + 1))
 
   implicit val projectIds:          Gen[Id]                   = Gen.uuid.map(_ => Id(Random.nextInt(1000000) + 1))
   implicit val projectNames:        Gen[projects.Name]        = nonBlankStrings(minLength = 5) map (n => projects.Name(n.value))
