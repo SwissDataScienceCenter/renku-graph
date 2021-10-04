@@ -18,6 +18,8 @@
 
 package ch.datascience.tinytypes
 
+import ch.datascience.tinytypes.constraints.{Url, UrlOps}
+
 import java.time.{Duration, Instant, LocalDate}
 
 object TestTinyTypes {
@@ -35,7 +37,7 @@ object TestTinyTypes {
   implicit object RelativePathTestType extends TinyTypeFactory[RelativePathTestType](new RelativePathTestType(_))
 
   class UrlTestType private (val value: String) extends AnyVal with UrlTinyType
-  implicit object UrlTestType extends TinyTypeFactory[UrlTestType](new UrlTestType(_))
+  implicit object UrlTestType extends TinyTypeFactory[UrlTestType](new UrlTestType(_)) with Url with UrlOps[UrlTestType]
 
   class IntTestType private (val value: Int) extends AnyVal with IntTinyType
   implicit object IntTestType extends TinyTypeFactory[IntTestType](new IntTestType(_))

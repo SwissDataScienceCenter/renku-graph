@@ -18,11 +18,11 @@
 
 package ch.datascience.http.rest.paging
 
-import ch.datascience.config.renku
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.rest.paging.model.{PerPage, Total}
+import ch.datascience.tinytypes.TestTinyTypes.UrlTestType
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
 import io.circe.Json
@@ -166,10 +166,10 @@ class PagingResponseSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
 
     "return Ok with response results in Json body and paging headers" in {
 
-      implicit lazy val renkuResourceUrl: renku.ResourceUrl = renkuResourceUrls().generateOne
+      implicit lazy val resourceUrl: UrlTestType = httpUrls().generateAs[UrlTestType]
       val response = pagingResponses(nonBlankStrings().map(_.value)).generateOne
 
-      val httpResponse = response.toHttpResponse[IO]
+      val httpResponse = response.toHttpResponse[IO, UrlTestType]
 
       httpResponse.status                         shouldBe Ok
       httpResponse.contentType                    shouldBe Some(`Content-Type`(application.json))

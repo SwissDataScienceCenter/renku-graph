@@ -20,19 +20,16 @@ package ch.datascience.http.rest.paging
 
 import cats.MonadThrow
 import cats.syntax.all._
-import ch.datascience.config.renku
 import ch.datascience.http.rest.paging.PagingResponse.PagingInfo
 import ch.datascience.http.rest.paging.model.Total
+import ch.datascience.tinytypes.UrlTinyType
+import ch.datascience.tinytypes.constraints.UrlOps
 
 final class PagingResponse[Result] private (val results: List[Result], val pagingInfo: PagingInfo) {
   override lazy val toString: String = s"PagingResponse(pagingInfo: $pagingInfo, results: $results)"
 }
 
 object PagingResponse {
-
-  final class PagingInfo private[PagingResponse] (val pagingRequest: PagingRequest, val total: Total) {
-    override lazy val toString: String = s"PagingInfo(request: $pagingRequest, total: $total)"
-  }
 
   def from[Interpretation[_]: MonadThrow, Result](
       results:       List[Result],
@@ -56,6 +53,10 @@ object PagingResponse {
       ).raiseError[Interpretation, PagingResponse[Result]]
   }
 
+  final class PagingInfo private[PagingResponse] (val pagingRequest: PagingRequest, val total: Total) {
+    override lazy val toString: String = s"PagingInfo(request: $pagingRequest, total: $total)"
+  }
+
   implicit class ResponseOps[Result](response: PagingResponse[Result]) {
 
     import cats.effect.Effect
@@ -71,9 +72,10 @@ object PagingResponse {
         new IllegalArgumentException("Cannot update Paging Results as there's different number of results")
           .raiseError[Interpretation, PagingResponse[Result]]
 
-    def toHttpResponse[Interpretation[_]: Effect](implicit
-        renkuResourceUrl: renku.ResourceUrl,
-        encoder:          Encoder[Result]
+    def toHttpResponse[Interpretation[_]: Effect, ResourceUrl <: UrlTinyType](implicit
+        resourceUrl:    ResourceUrl,
+        resourceUrlOps: UrlOps[ResourceUrl],
+        encoder:        Encoder[Result]
     ): Response[Interpretation] =
       Response(Status.Ok)
         .withEntity(response.results.asJson)
