@@ -18,7 +18,9 @@
 
 package io.renku.eventlog.events
 
+import cats.data.Kleisli
 import cats.effect.{BracketThrow, Concurrent, ConcurrentEffect, IO}
+import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.{EventId, EventStatus}
 import ch.datascience.graph.model.projects
@@ -40,39 +42,66 @@ private class EventsFinderImpl[Interpretation[_]: BracketThrow: Concurrent](
   import ch.datascience.db.implicits._
   import eu.timepit.refined.auto._
   import skunk._
+  import skunk.codec.numeric._
   import skunk.implicits._
 
   override def findEvents(projectPath: projects.Path): Interpretation[List[EventInfo]] =
-    sessionResource.useK(measureExecutionTime(find(projectPath)))
+    sessionResource.useK {
+      for {
+        infos               <- find(projectPath)
+        withProcessingTimes <- infos.map(addProcessingTimes(projectPath)).sequence
+      } yield withProcessingTimes
+    }
 
-  private def find(projectPath: projects.Path) =
+  private def addProcessingTimes(
+      projectPath: projects.Path
+  ): ((EventInfo, Long)) => Kleisli[Interpretation, Session[Interpretation], EventInfo] = {
+    case (info, 0L) => Kleisli.pure(info)
+    case (info, _) =>
+      findStatusProcessingTimes(projectPath, info)
+        .map(processingTimes => info.copy(processingTimes = processingTimes.sortBy(_.status)))
+  }
+
+  private def find(projectPath: projects.Path) = measureExecutionTime {
+
     SqlStatement[Interpretation](name = "find event infos")
-      .select[projects.Path, EventInfo](
-        sql"""SELECT evt.event_id, evt.status, evt.message, times.status, times.processing_time
+      .select[projects.Path, (EventInfo, Long)](
+        sql"""SELECT evt.event_id, evt.status, evt.message,  COUNT(times.status)
               FROM event evt
               JOIN project prj ON evt.project_id = prj.project_id AND prj.project_path = $projectPathEncoder
               LEFT JOIN status_processing_time times ON evt.event_id = times.event_id AND evt.project_id = times.project_id
-              ORDER BY evt.event_date ASC, evt.event_id
+              GROUP BY evt.event_id, evt.status, evt.message, evt.event_date
+              ORDER BY evt.event_date DESC, evt.event_id
           """
-          .query(eventIdDecoder ~ eventStatusDecoder ~ eventMessageDecoder.opt ~ statusProcessingTimesDecoder.opt)
+          .query(eventIdDecoder ~ eventStatusDecoder ~ eventMessageDecoder.opt ~ int8)
           .map {
             case (eventId: EventId) ~
                 (status:   EventStatus) ~
                 (maybeMessage: Option[EventMessage]) ~
-                (maybeProcessingTimes: Option[StatusProcessingTime]) =>
-              EventInfo(eventId, status, maybeMessage, processingTimes = maybeProcessingTimes.toList)
+                (processingTimesCount: Long) =>
+              EventInfo(eventId, status, maybeMessage, processingTimes = List.empty) -> processingTimesCount
           }
       )
       .arguments(projectPath)
       .build(_.toList)
-      .mapResult(_.foldLeft(List.empty[EventInfo]) {
-        case (Nil, info)                                             => info :: Nil
-        case (all @ last :: _, info) if last.eventId != info.eventId => info :: all
-        case (last :: grouped, info) =>
-          last.copy(
-            processingTimes = (last.processingTimes ::: info.processingTimes).sortBy(_.status)
-          ) :: grouped
-      })
+  }
+
+  private def findStatusProcessingTimes(projectPath: projects.Path, eventInfo: EventInfo) = measureExecutionTime {
+    SqlStatement[Interpretation](name = "find event processing times")
+      .select[EventId ~ projects.Path, StatusProcessingTime](
+        sql"""SELECT times.status, times.processing_time
+              FROM status_processing_time times
+              WHERE times.event_id = $eventIdEncoder AND times.project_id = (
+                SELECT project_id FROM project WHERE project_path = $projectPathEncoder
+                ORDER BY project_id DESC
+                LIMIT 1
+              )
+          """
+          .query(statusProcessingTimesDecoder)
+      )
+      .arguments(eventInfo.eventId, projectPath)
+      .build(_.toList)
+  }
 
   private lazy val statusProcessingTimesDecoder: Decoder[StatusProcessingTime] =
     (eventStatusDecoder ~ eventProcessingTimeDecoder).map((StatusProcessingTime.apply _).tupled.apply)
