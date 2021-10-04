@@ -21,6 +21,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.config.renku
+import ch.datascience.config.renku.ResourceUrl
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -72,7 +73,7 @@ class DatasetsSearchEndpointSpec
 
         response.status       shouldBe Ok
         response.contentType  shouldBe Some(`Content-Type`(application.json))
-        response.headers.toList should contain allElementsOf PagingHeaders.from(pagingResponse)
+        response.headers.toList should contain allElementsOf PagingHeaders.from[IO, ResourceUrl](pagingResponse)
         response
           .as[List[Json]]
           .unsafeRunSync() should contain theSameElementsAs (pagingResponse.results map toJson)
@@ -95,7 +96,7 @@ class DatasetsSearchEndpointSpec
       response.status                         shouldBe Ok
       response.contentType                    shouldBe Some(`Content-Type`(application.json))
       response.as[List[Json]].unsafeRunSync() shouldBe empty
-      response.headers.toList                   should contain allElementsOf PagingHeaders.from(pagingResponse)
+      response.headers.toList                   should contain allElementsOf PagingHeaders.from[IO, ResourceUrl](pagingResponse)
 
       logger.loggedOnly(warn(maybePhrase))
     }

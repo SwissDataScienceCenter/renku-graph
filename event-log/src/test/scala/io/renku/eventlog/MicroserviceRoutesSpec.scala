@@ -23,9 +23,11 @@ import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.nonEmptyStrings
 import ch.datascience.graph.model.EventsGenerators.compoundEventIds
+import ch.datascience.generators.CommonGraphGenerators.pagingRequests
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.http.ErrorMessage.ErrorMessage
 import ch.datascience.http.InfoMessage.InfoMessage
+import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.interpreters.TestRoutesMetrics
@@ -56,7 +58,26 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
 
       val request = Request[IO](method = GET, uri"events".withQueryParam("project-path", projectPath.value))
 
-      (eventsEndpoint.findEvents _).expects(projectPath).returning(Response[IO](Ok).pure[IO])
+      (eventsEndpoint.findEvents _).expects(projectPath, PagingRequest.default).returning(Response[IO](Ok).pure[IO])
+
+      val response = routes.call(request)
+
+      response.status shouldBe Ok
+    }
+
+    "define a GET /events?project-path=*&page=*&per_page=* endpoint" in new TestCase {
+      val projectPath   = projectPaths.generateOne
+      val pagingRequest = pagingRequests.generateOne
+
+      val request = Request[IO](
+        method = GET,
+        uri"events"
+          .withQueryParam("project-path", projectPath.value)
+          .withQueryParam("page", pagingRequest.page.value)
+          .withQueryParam("per_page", pagingRequest.perPage.value)
+      )
+
+      (eventsEndpoint.findEvents _).expects(projectPath, pagingRequest).returning(Response[IO](Ok).pure[IO])
 
       val response = routes.call(request)
 

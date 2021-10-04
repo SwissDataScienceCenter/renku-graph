@@ -22,6 +22,7 @@ import ch.datascience.events.consumers.Project
 import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import ch.datascience.graph.model.events.{BatchDate, CommitId, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.{SchemaVersion, projects}
+import ch.datascience.http.rest.paging.model.PerPage
 import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}
 import skunk.codec.all._
 import skunk.{Decoder, Encoder}
@@ -110,5 +111,7 @@ trait TypeSerializers {
 
   val microserviceUrlDecoder: Decoder[MicroserviceBaseUrl] = varchar.map(MicroserviceBaseUrl.apply)
   val microserviceUrlEncoder: Encoder[MicroserviceBaseUrl] = varchar.values.contramap(_.value)
+
+  val perPageEncoder: Encoder[PerPage] = int4.values.contramap(_.value)
 
 }

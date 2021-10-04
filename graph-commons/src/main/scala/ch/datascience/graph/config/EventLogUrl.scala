@@ -28,6 +28,8 @@ import pureconfig.ConfigReader
 final class EventLogUrl private (val value: String) extends AnyVal with UrlTinyType
 object EventLogUrl extends TinyTypeFactory[EventLogUrl](new EventLogUrl(_)) with Url with UrlOps[EventLogUrl] {
 
+  implicit val eventLogUrlOps: EventLogUrl.type = this
+
   private implicit val urlReader: ConfigReader[EventLogUrl] = urlTinyTypeReader(EventLogUrl)
 
   def apply[Interpretation[_]: MonadThrow](

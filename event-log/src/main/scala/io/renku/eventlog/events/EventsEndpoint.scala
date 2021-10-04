@@ -20,13 +20,18 @@ package io.renku.eventlog.events
 
 import cats.MonadThrow
 import cats.effect.{ConcurrentEffect, Effect, IO}
+import cats.syntax.all._
 import ch.datascience.db.{SessionResource, SqlStatement}
+import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.events.{EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.http.ErrorMessage
+import ch.datascience.http.rest.paging.PagingRequest
+import ch.datascience.http.rest.paging.PagingRequest.Decoders.{page, perPage}
 import ch.datascience.metrics.LabeledHistogram
 import io.circe.{Encoder, Json}
-import io.renku.eventlog.{EventDate, EventLogDB, EventMessage, ExecutionDate}
+import io.renku.eventlog._
+import io.renku.eventlog.events.EventsEndpoint.EventInfo
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
@@ -34,22 +39,22 @@ import org.typelevel.log4cats.Logger
 import scala.util.control.NonFatal
 
 trait EventsEndpoint[Interpretation[_]] {
-  def findEvents(projectPath: projects.Path): Interpretation[Response[Interpretation]]
+  def findEvents(projectPath: projects.Path, pagingRequest: PagingRequest): Interpretation[Response[Interpretation]]
 }
 
-class EventsEndpointImpl[Interpretation[_]: Effect: MonadThrow: Logger](eventsFinder: EventsFinder[Interpretation])
-    extends Http4sDsl[Interpretation]
+class EventsEndpointImpl[Interpretation[_]: Effect: MonadThrow: Logger](eventsFinder: EventsFinder[Interpretation],
+                                                                        eventLogUrl: EventLogUrl
+) extends Http4sDsl[Interpretation]
     with EventsEndpoint[Interpretation] {
 
-  import cats.syntax.all._
   import ch.datascience.http.ErrorMessage._
-  import io.circe.syntax._
-  import org.http4s.circe._
 
-  override def findEvents(projectPath: projects.Path): Interpretation[Response[Interpretation]] =
+  override def findEvents(projectPath:   projects.Path,
+                          pagingRequest: PagingRequest
+  ): Interpretation[Response[Interpretation]] =
     eventsFinder
-      .findEvents(projectPath)
-      .flatMap(events => Ok(events.asJson))
+      .findEvents(projectPath, pagingRequest)
+      .map(_.toHttpResponse(Effect[Interpretation], requestedUrl(pagingRequest), EventLogUrl, EventInfo.infoEncoder))
       .recoverWith(httpResponse(projectPath))
 
   private def httpResponse(
@@ -58,6 +63,9 @@ class EventsEndpointImpl[Interpretation[_]: Effect: MonadThrow: Logger](eventsFi
     Logger[Interpretation].error(exception)(s"Finding events for project '$projectPath' failed")
     InternalServerError(ErrorMessage(exception))
   }
+  private def requestedUrl(paging: PagingRequest): EventLogUrl =
+    (eventLogUrl / "events") ? (page.parameterName -> paging.page) & (perPage.parameterName -> paging.perPage)
+
 }
 
 object EventsEndpoint {
@@ -66,7 +74,8 @@ object EventsEndpoint {
             queriesExecTimes:  LabeledHistogram[IO, SqlStatement.Name]
   )(implicit concurrentEffect: ConcurrentEffect[IO], logger: Logger[IO]): IO[EventsEndpoint[IO]] = for {
     eventsFinder <- EventsFinder(sessionResource, queriesExecTimes)
-  } yield new EventsEndpointImpl(eventsFinder)
+    eventlogUrl  <- EventLogUrl()
+  } yield new EventsEndpointImpl(eventsFinder, eventlogUrl)
 
   final case class EventInfo(eventId:         EventId,
                              status:          EventStatus,

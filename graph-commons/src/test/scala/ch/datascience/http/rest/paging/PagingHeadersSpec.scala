@@ -134,6 +134,28 @@ class PagingHeadersSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
           )
         }
       }
+
+    s"generate $Total, $TotalPages, $PerPage, $Page and $Link headers " +
+      "if there's no results" in {
+
+        val perPage = positiveInts().map(_.value).generateAs(model.PerPage)
+        val page    = positiveInts().map(_.value).generateAs(model.Page)
+        val response = PagingResponse
+          .from[Try, NonBlank](Nil, PagingRequest(page, perPage), model.Total(0))
+          .fold(throw _, identity)
+
+        implicit val resourceUrl: UrlTestType = resourceUrlFrom(page, perPage)
+
+        PagingHeaders.from(response) should contain theSameElementsAs Set(
+          Header("Total", "0"),
+          Header("Total-Pages", "0"),
+          Header("Per-Page", perPage.toString),
+          Header("Page", page.toString),
+          Header("Link", s"""<${resourceUrl ? (pageParamName -> first.value)}>; rel="first""""),
+          Header("Link", s"""<${resourceUrl ? (pageParamName -> 1)}>; rel="last"""")
+        )
+
+      }
   }
 
   private lazy val currentPageNeitherFirstNorLast: Gen[PagingResponse[NonBlank]] =

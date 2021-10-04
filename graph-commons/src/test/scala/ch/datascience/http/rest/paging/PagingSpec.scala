@@ -103,7 +103,7 @@ class PagingSpec extends AnyWordSpec with should.Matchers {
   private class ResultsFinder(
       returning: Try[List[Int]]
   )(total:       Total = returning.map(_.size).map(Total(_)).getOrElse(Total(0)))
-      extends Paging[Try, Int] {
+      extends Paging[Int] {
 
     private implicit val resultsFinder: PagedResultsFinder[Try, Int] = new PagedResultsFinder[Try, Int] {
 
@@ -115,6 +115,6 @@ class PagingSpec extends AnyWordSpec with should.Matchers {
       override def findTotal(): Try[Total] = total.pure[Try]
     }
 
-    def find(paging: PagingRequest): Try[PagingResponse[Int]] = findPage(paging)
+    def find(paging: PagingRequest): Try[PagingResponse[Int]] = findPage[Try](paging)
   }
 }

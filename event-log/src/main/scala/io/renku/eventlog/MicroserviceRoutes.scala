@@ -26,6 +26,10 @@ import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.projects
 import ch.datascience.http.ErrorMessage
 import ch.datascience.http.ErrorMessage._
+import ch.datascience.http.rest.paging.PagingRequest
+import ch.datascience.http.rest.paging.PagingRequest.Decoders.{page, perPage}
+import ch.datascience.http.rest.paging.model.{Page, PerPage}
+import ch.datascience.http.server.QueryParameterTools.toBadRequest
 import ch.datascience.metrics.RoutesMetrics
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
@@ -58,7 +62,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
 
   // format: off
   lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
-    case           GET   -> Root / "events":? `project-path`(validatedProjectPath)     => maybeFindEvents(validatedProjectPath)
+    case           GET   -> Root / "events":? `project-path`(validatedProjectPath)  +& page(page) +& perPage(perPage)    => maybeFindEvents(validatedProjectPath, page, perPage)
     case request @ POST  -> Root / "events"                                            => processEvent(request)
     case           GET   -> Root / "events"/ EventId(eventId) / ProjectId(projectId)   => getDetails(CompoundEventId(eventId, projectId))
     case           GET   -> Root / "processing-status" :? `project-id`(maybeProjectId) => maybeFindProcessingStatus(maybeProjectId)
@@ -98,11 +102,13 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     }
   }
 
-  private def maybeFindEvents(validatedProjectPath: ValidatedNel[ParseFailure, projects.Path]): F[Response[F]] =
-    validatedProjectPath.fold(
-      errors => BadRequest(ErrorMessage(errors.map(_.getMessage()).toList.mkString("; "))),
-      findEvents
-    )
+  private def maybeFindEvents(validatedProjectPath: ValidatedNel[ParseFailure, projects.Path],
+                              maybePage:            Option[ValidatedNel[ParseFailure, Page]],
+                              maybePerPage:         Option[ValidatedNel[ParseFailure, PerPage]]
+  ): F[Response[F]] =
+    (validatedProjectPath, PagingRequest(maybePage, maybePerPage))
+      .mapN(findEvents)
+      .fold(toBadRequest(), identity)
 
   private def maybeFindProcessingStatus(
       maybeProjectId: Option[ValidatedNel[ParseFailure, projects.Id]]
