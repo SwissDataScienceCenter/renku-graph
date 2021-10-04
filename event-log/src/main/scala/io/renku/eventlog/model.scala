@@ -44,7 +44,9 @@ final class CreatedDate private (val value: Instant) extends AnyVal with Instant
 object CreatedDate extends TinyTypeFactory[CreatedDate](new CreatedDate(_)) with InstantNotInTheFuture
 
 final class ExecutionDate private (val value: Instant) extends AnyVal with InstantTinyType
-object ExecutionDate extends TinyTypeFactory[ExecutionDate](new ExecutionDate(_))
+object ExecutionDate extends TinyTypeFactory[ExecutionDate](new ExecutionDate(_)) {
+  implicit val decoder: Decoder[ExecutionDate] = instantDecoder(ExecutionDate)
+}
 
 final class EventMessage private (val value: String) extends AnyVal with StringTinyType
 object EventMessage extends TinyTypeFactory[EventMessage](new EventMessage(_)) with NonBlank {

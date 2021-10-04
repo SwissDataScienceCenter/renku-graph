@@ -37,18 +37,22 @@ Response body example:
   {
     "id": "df654c3b1bd105a29d658f78f6380a842feac879",
     "status": "NEW",
-    "processingTimes": []
+    "processingTimes": [],
+    "date": "2001-09-04T10:48:29.457Z",
+    "executionDate": "2001-09-04T10:48:29.457Z"
   },
   {
     "id": "df654c3b1bd105a29d658f78f6380a842feac879",
     "status": "TRANSFORMATION_NON_RECOVERABLE_FAILURE",
-    "message": "detailed info about the cause of the failure"
+    "message": "detailed info about the cause of the failure",
     "processingTimes": [
       {
         "status": "TRIPLES_GENERATED",
         "processingTime": "PT20.345S"
       }
-    ]
+    ],
+    "date": "2001-09-04T10:48:29.457Z",
+    "executionDate": "2001-09-04T10:48:29.457Z"
   }
 ]
 ```

@@ -25,8 +25,8 @@ import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.{EventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
+import io.renku.eventlog._
 import io.renku.eventlog.events.EventsEndpoint.{EventInfo, StatusProcessingTime}
-import io.renku.eventlog.{EventLogDB, EventMessage, TypeSerializers}
 
 private trait EventsFinder[Interpretation[_]] {
   def findEvents(projectPath: projects.Path): Interpretation[List[EventInfo]]
@@ -66,20 +66,30 @@ private class EventsFinderImpl[Interpretation[_]: BracketThrow: Concurrent](
 
     SqlStatement[Interpretation](name = "find event infos")
       .select[projects.Path, (EventInfo, Long)](
-        sql"""SELECT evt.event_id, evt.status, evt.message,  COUNT(times.status)
+        sql"""SELECT evt.event_id, evt.status, evt.event_date, evt.execution_date, evt.message,  COUNT(times.status)
               FROM event evt
               JOIN project prj ON evt.project_id = prj.project_id AND prj.project_path = $projectPathEncoder
               LEFT JOIN status_processing_time times ON evt.event_id = times.event_id AND evt.project_id = times.project_id
-              GROUP BY evt.event_id, evt.status, evt.message, evt.event_date
+              GROUP BY evt.event_id, evt.status, evt.event_date, evt.execution_date, evt.message
               ORDER BY evt.event_date DESC, evt.event_id
           """
-          .query(eventIdDecoder ~ eventStatusDecoder ~ eventMessageDecoder.opt ~ int8)
+          .query(
+            eventIdDecoder ~ eventStatusDecoder ~ eventDateDecoder ~ executionDateDecoder ~ eventMessageDecoder.opt ~ int8
+          )
           .map {
             case (eventId: EventId) ~
                 (status:   EventStatus) ~
+                (eventDate: EventDate) ~
+                (executionDate: ExecutionDate) ~
                 (maybeMessage: Option[EventMessage]) ~
                 (processingTimesCount: Long) =>
-              EventInfo(eventId, status, maybeMessage, processingTimes = List.empty) -> processingTimesCount
+              EventInfo(eventId,
+                        status,
+                        eventDate,
+                        executionDate,
+                        maybeMessage,
+                        processingTimes = List.empty
+              ) -> processingTimesCount
           }
       )
       .arguments(projectPath)

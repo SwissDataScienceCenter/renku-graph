@@ -18,8 +18,6 @@
 
 package io.renku.eventlog.events
 
-import EventsEndpoint._
-import Generators._
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
@@ -33,7 +31,9 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import io.circe.Decoder
-import io.renku.eventlog.EventMessage
+import io.renku.eventlog.events.EventsEndpoint._
+import io.renku.eventlog.events.Generators._
+import io.renku.eventlog.{EventDate, EventMessage, ExecutionDate}
 import org.http4s.EntityDecoder
 import org.http4s.MediaType._
 import org.http4s.Status.{InternalServerError, Ok}
@@ -100,9 +100,11 @@ class EventsEndpointSpec extends AnyWordSpec with MockFactory with should.Matche
     for {
       id              <- cursor.downField("id").as[EventId]
       status          <- cursor.downField("status").as[EventStatus]
+      eventDate       <- cursor.downField("date").as[EventDate]
+      executionDate   <- cursor.downField("executionDate").as[ExecutionDate]
       maybeMessage    <- cursor.downField("message").as[Option[EventMessage]]
       processingTimes <- cursor.downField("processingTimes").as[List[StatusProcessingTime]]
-    } yield EventInfo(id, status, maybeMessage, processingTimes)
+    } yield EventInfo(id, status, eventDate, executionDate, maybeMessage, processingTimes)
 
   private implicit val statusProcessingTimeDecoder: Decoder[StatusProcessingTime] = cursor =>
     for {

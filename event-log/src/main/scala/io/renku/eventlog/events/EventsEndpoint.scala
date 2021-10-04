@@ -26,7 +26,7 @@ import ch.datascience.graph.model.projects
 import ch.datascience.http.ErrorMessage
 import ch.datascience.metrics.LabeledHistogram
 import io.circe.{Encoder, Json}
-import io.renku.eventlog.{EventLogDB, EventMessage}
+import io.renku.eventlog.{EventDate, EventLogDB, EventMessage, ExecutionDate}
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
@@ -70,6 +70,8 @@ object EventsEndpoint {
 
   final case class EventInfo(eventId:         EventId,
                              status:          EventStatus,
+                             eventDate:       EventDate,
+                             executionDate:   ExecutionDate,
                              maybeMessage:    Option[EventMessage],
                              processingTimes: List[StatusProcessingTime]
   )
@@ -89,7 +91,9 @@ object EventsEndpoint {
       json"""{
         "id":              ${eventInfo.eventId.value},
         "status":          ${eventInfo.status.value},
-        "processingTimes": ${eventInfo.processingTimes.map(_.asJson)}
+        "processingTimes": ${eventInfo.processingTimes.map(_.asJson)},
+        "date" :           ${eventInfo.eventDate.value.asJson},
+        "executionDate":   ${eventInfo.executionDate.value.asJson}
       }""" deepMerge {
         eventInfo.maybeMessage.map(message => json"""{"message": ${message.value}}""").getOrElse(Json.obj())
       }

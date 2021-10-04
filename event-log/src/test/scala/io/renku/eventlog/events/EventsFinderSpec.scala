@@ -18,7 +18,6 @@
 
 package io.renku.eventlog.events
 
-import Generators._
 import cats.effect.IO
 import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
@@ -29,6 +28,7 @@ import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.InMemoryEventLogDbSpec
+import io.renku.eventlog.events.Generators._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -37,16 +37,16 @@ class EventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec with shou
   "findEvents" should {
 
     "return the List of events of the project the given path" in new TestCase {
-      val projectId     = projectIds.generateOne
-      val infosAndDates = eventInfos.generateList(maxElements = 10).map(_ -> eventDates.generateOne)
+      val projectId = projectIds.generateOne
+      val infos     = eventInfos.generateList(maxElements = 10)
 
-      infosAndDates foreach { case (info, eventDate) =>
+      infos foreach { info =>
         val eventId = CompoundEventId(info.eventId, projectId)
         storeEvent(
           eventId,
           info.status,
-          executionDates.generateOne,
-          eventDate,
+          info.executionDate,
+          info.eventDate,
           eventBodies.generateOne,
           projectPath = projectPath,
           maybeMessage = info.maybeMessage
@@ -62,7 +62,7 @@ class EventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec with shou
         projectPaths.generateOne
       )
 
-      eventsFinder.findEvents(projectPath).unsafeRunSync() shouldBe infosAndDates.sortBy(_._2).map(_._1).reverse
+      eventsFinder.findEvents(projectPath).unsafeRunSync() shouldBe infos.sortBy(_.eventDate).reverse
     }
 
     "return an empty List if there's no project with the given path" in new TestCase {
