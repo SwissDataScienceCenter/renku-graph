@@ -138,10 +138,9 @@ object GitLab {
       commitId:               CommitId,
       parentIds:              Set[CommitId] = Set.empty,
       theMostRecentEventDate: Instant = Instant.now()
-  )(implicit accessToken:     AccessToken): Unit = {
-    stubFor {
-      get(s"/api/v4/projects/$projectId/repository/commits/$commitId").withAccessTokenInHeader
-        .willReturn(okJson(json"""{
+  )(implicit accessToken:     AccessToken): StubMapping = stubFor {
+    get(s"/api/v4/projects/$projectId/repository/commits/$commitId").withAccessTokenInHeader
+      .willReturn(okJson(json"""{
           "id":              ${commitId.value},
           "author_name":     ${nonEmptyStrings().generateOne},
           "author_email":    ${userEmails.generateOne.value},
@@ -151,8 +150,6 @@ object GitLab {
           "committed_date":  ${theMostRecentEventDate.toString},
           "parent_ids":      ${parentIds.map(_.value).toList}
         }""".noSpaces))
-    }
-    ()
   }
 
   def `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(
@@ -204,44 +201,41 @@ object GitLab {
 
     val returnedJson = okJson(
       json"""{
-              "id":                   ${project.id.value},
-              "name":                 ${project.name.value},
-              "description":          ${project.maybeDescription.map(_.value)},
-              "visibility":           ${project.entitiesProject.visibility.value},
-              "path_with_namespace":  ${project.path.value},
-              "ssh_url_to_repo":      ${project.urls.ssh.value},
-              "http_url_to_repo":     ${project.urls.http.value},
-              "web_url":              ${project.urls.web.value},
-              "readme_url":           ${project.urls.maybeReadme.map(_.value)},
-              "forks_count":          ${project.entitiesProject.forksCount.value},
-              "tag_list":             ${project.tags.map(_.value).toList},
-              "star_count":           ${project.starsCount.value},
-              "created_at":           ${project.entitiesProject.dateCreated.value},
-              "creator_id":           ${project.entitiesProject.maybeCreator.flatMap(_.maybeGitLabId.map(_.value))},
-              "last_activity_at":     ${project.updatedAt.value},
-              "permissions":          ${project.permissions.toJson},
-              "statistics": {
-                "commit_count":       ${project.statistics.commitsCount.value},
-                "storage_size":       ${project.statistics.storageSize.value},
-                "repository_size":    ${project.statistics.repositorySize.value},
-                "lfs_objects_size":   ${project.statistics.lsfObjectsSize.value},
-                "job_artifacts_size": ${project.statistics.jobArtifactsSize.value}
-              }
-            }"""
-        .deepMerge(
-          project.entitiesProject match {
-            case withParent: ProjectWithParent =>
-              json"""{"forked_from_project":  {"path_with_namespace": ${withParent.parent.path.value}} }"""
-            case _ => Json.obj()
-          }
-        )
-        .deepMerge(
-          project.entitiesProject.maybeCreator
-            .flatMap(_.maybeGitLabId)
-            .map(creatorId => json"""{"creator_id": ${creatorId.value}}""")
-            .getOrElse(Json.obj())
-        )
-        .noSpaces
+      "id":                   ${project.id.value},
+      "name":                 ${project.name.value},
+      "description":          ${project.maybeDescription.map(_.value)},
+      "visibility":           ${project.entitiesProject.visibility.value},
+      "path_with_namespace":  ${project.path.value},
+      "ssh_url_to_repo":      ${project.urls.ssh.value},
+      "http_url_to_repo":     ${project.urls.http.value},
+      "web_url":              ${project.urls.web.value},
+      "readme_url":           ${project.urls.maybeReadme.map(_.value)},
+      "forks_count":          ${project.entitiesProject.forksCount.value},
+      "tag_list":             ${project.tags.map(_.value).toList},
+      "star_count":           ${project.starsCount.value},
+      "created_at":           ${project.entitiesProject.dateCreated.value},
+      "creator_id":           ${project.entitiesProject.maybeCreator.flatMap(_.maybeGitLabId.map(_.value))},
+      "last_activity_at":     ${project.updatedAt.value},
+      "permissions":          ${project.permissions.toJson},
+      "statistics": {
+        "commit_count":       ${project.statistics.commitsCount.value},
+        "storage_size":       ${project.statistics.storageSize.value},
+        "repository_size":    ${project.statistics.repositorySize.value},
+        "lfs_objects_size":   ${project.statistics.lsfObjectsSize.value},
+        "job_artifacts_size": ${project.statistics.jobArtifactsSize.value}
+      }
+    }""".deepMerge(
+        project.entitiesProject match {
+          case withParent: ProjectWithParent =>
+            json"""{"forked_from_project":  {"path_with_namespace": ${withParent.parent.path.value}} }"""
+          case _ => Json.obj()
+        }
+      ).deepMerge(
+        project.entitiesProject.maybeCreator
+          .flatMap(_.maybeGitLabId)
+          .map(creatorId => json"""{"creator_id": ${creatorId.value}}""")
+          .getOrElse(Json.obj())
+      ).noSpaces
     )
 
     stubFor {
@@ -260,10 +254,10 @@ object GitLab {
           get(s"/api/v4/users/$creatorId").withAccessTokenInHeader
             .willReturn(
               okJson(json"""{
-              "id":   ${creatorId.value},
-              "username": ${creator.name.value},
-              "name": ${creator.name.value}
-            }""".noSpaces)
+                "id":   ${creatorId.value},
+                "username": ${creator.name.value},
+                "name": ${creator.name.value}
+              }""".noSpaces)
             )
         }
     }

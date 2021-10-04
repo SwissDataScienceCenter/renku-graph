@@ -177,7 +177,6 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
       s"""|SELECT DISTINCT ?gitLabId
           |WHERE {
           |  ${projects.ResourceId(renkuBaseUrl, path).showAs[RdfResource]} schema:member ?memberId.
-          |                                                        
           |  ?memberId  rdf:type      schema:Person;
           |             schema:sameAs ?sameAsId. 
           |             

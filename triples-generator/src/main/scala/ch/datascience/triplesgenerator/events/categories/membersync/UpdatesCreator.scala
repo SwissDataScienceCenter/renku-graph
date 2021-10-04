@@ -89,9 +89,8 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApi
     membersCreations ::: linksCreations
   }
 
-  private def generateResourceId(gitLabId: GitLabId): users.ResourceId = users.ResourceId(
-    (renkuBaseUrl / "persons" / s"gitlabid$gitLabId").toString
-  )
+  private def generateResourceId(gitLabId: GitLabId): users.ResourceId =
+    users.ResourceId(gitLabId)(renkuBaseUrl)
 
   private def createMemberLinks(projectPath:        projects.Path,
                                 membersAlreadyInKG: List[(GitLabProjectMember, users.ResourceId)]
