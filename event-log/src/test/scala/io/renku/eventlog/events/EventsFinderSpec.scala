@@ -172,6 +172,39 @@ class EventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec with shou
       pagedResults.results                  shouldBe expectedResult.sortBy(_.eventDate).reverse
     }
 
+    "return the List of events with the same id present on more than one project and the given the status filter" in new TestCase {
+      val id          = eventIds.generateOne
+      val eventStatus = eventStatuses.generateOne
+      val info1       = eventInfos().generateOne.copy(eventId = id, status = eventStatus)
+      val info2       = eventInfos().generateOne.copy(eventId = id, status = eventStatus)
+
+      List(info1, info2) foreach { info =>
+        val eventId = CompoundEventId(info.eventId, projectIds.generateOne)
+        storeEvent(
+          eventId,
+          info.status,
+          info.executionDate,
+          info.eventDate,
+          eventBodies.generateOne,
+          projectPath = info.projectPath,
+          maybeMessage = info.maybeMessage
+        )
+        info.processingTimes.foreach(processingTime =>
+          upsertProcessingTime(eventId, processingTime.status, processingTime.processingTime)
+        )
+      }
+
+      val pagingRequest: PagingRequest = PagingRequest(Page(2), PerPage(1))
+
+      val pagedResults = eventsFinder
+        .findEvents(EventsEndpoint.Request.EventsWithStatus(eventStatus, pagingRequest))
+        .unsafeRunSync()
+
+      pagedResults.pagingInfo.total.value   shouldBe 2
+      pagedResults.pagingInfo.pagingRequest shouldBe pagingRequest
+      pagedResults.results                  shouldBe List(List(info1, info2).sortBy(_.eventDate).reverse.last)
+    }
+
     "return an empty List if there's no project with the given path" in new TestCase {
       eventsFinder
         .findEvents(EventsEndpoint.Request.ProjectEvents(projectPath, None, PagingRequest.default))
