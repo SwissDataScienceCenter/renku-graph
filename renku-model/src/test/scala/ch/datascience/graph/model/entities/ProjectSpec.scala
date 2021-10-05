@@ -399,7 +399,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         s"date ${dataset.provenance.date} is older than project ${projectInfo.dateCreated}"
     }
 
-    "decode project when there's a Dataset (not internal or modified) created before project creation" in {
+    "decode project when there's a Dataset (not internal nor modified) created before project creation" in {
       val projectInfo   = gitLabProjectInfos.map(_.copy(maybeParentPath = None)).generateOne
       val cliVersion    = cliVersions.generateOne
       val schemaVersion = projectSchemaVersions.generateOne
@@ -438,7 +438,35 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       ).asRight
     }
 
-    "decode project should pick the earliest dateCreated between gitlabProjectInfo and the CLI dateCreated " in {
+    "return a DecodingFailure when there's a modified Dataset that is derived from a non-existing dataset" in {
+      Set(
+        gitLabProjectInfos.map(_.copy(maybeParentPath = None)).generateOne,
+        gitLabProjectInfos.map(_.copy(maybeParentPath = projectPaths.generateSome)).generateOne
+      ) foreach { projectInfo =>
+        val resourceId      = projects.ResourceId(renkuBaseUrl, projectInfo.path)
+        val originalDataset = datasetEntities(provenanceInternal)(renkuBaseUrl)(projectInfo.dateCreated).generateOne
+        val modifiedDataset =
+          modifiedDatasetEntities(originalDataset)(renkuBaseUrl)(projectInfo.dateCreated).generateOne
+        val brokenDataset = datasetEntities(provenanceModified)(renkuBaseUrl)(projectInfo.dateCreated).generateOne
+        val jsonLD = cliLikeJsonLD(
+          resourceId,
+          cliVersions.generateOne,
+          projectSchemaVersions.generateOne,
+          projectInfo.dateCreated,
+          activities = Nil,
+          datasets = List(originalDataset, modifiedDataset, brokenDataset),
+          persons = Set.empty
+        )
+
+        val Left(error) = jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo)))
+
+        error shouldBe a[DecodingFailure]
+        error.getMessage() shouldBe
+          show"Dataset ${brokenDataset.identification.identifier} is derived from non-existing dataset ${brokenDataset.provenance.derivedFrom}"
+      }
+    }
+
+    "decode project should pick the earliest from dateCreated found in gitlabProjectInfo and the CLI" in {
       val gitlabDate    = projectCreatedDates().generateOne
       val cliDate       = projectCreatedDates().generateOne
       val earliestDate  = List(gitlabDate, cliDate).min

@@ -34,13 +34,13 @@ object ProjectJsonLDDecoder {
         agent         <- cursor.downField(schema / "agent").as[CliVersion]
         schemaVersion <- cursor.downField(schema / "schemaVersion").as[SchemaVersion]
         dateCreated   <- cursor.downField(schema / "dateCreated").as[DateCreated]
+        allPersons    <- findAllPersons(gitLabInfo)
+        activities    <- findAllActivities(gitLabInfo)
+        datasets      <- findAllDatasets(gitLabInfo)
+        resourceId    <- ResourceId(renkuBaseUrl, gitLabInfo.path).asRight
         earliestDate = List(dateCreated, gitLabInfo.dateCreated).min
-        allJsonLdPersons <- findAllPersons(gitLabInfo)
-        activities       <- findAllActivities(gitLabInfo)
-        datasets         <- findAllDatasets(gitLabInfo)
-        resourceId       <- ResourceId(renkuBaseUrl, gitLabInfo.path).asRight
         project <-
-          newProject(gitLabInfo, resourceId, earliestDate, agent, schemaVersion, allJsonLdPersons, activities, datasets)
+          newProject(gitLabInfo, resourceId, earliestDate, agent, schemaVersion, allPersons, activities, datasets)
       } yield project
     }
 

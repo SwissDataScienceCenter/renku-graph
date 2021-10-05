@@ -18,7 +18,7 @@
 
 package ch.datascience.graph.model.entities
 
-import cats.data.ValidatedNel
+import cats.data.{NonEmptyList, ValidatedNel}
 import cats.syntax.all._
 import ch.datascience.graph.model
 import ch.datascience.graph.model._
@@ -71,8 +71,8 @@ object ProjectWithoutParent extends ProjectFactory {
            activities:   List[Activity],
            datasets:     List[Dataset[Dataset.Provenance]]
   ): ValidatedNel[String, ProjectWithoutParent] =
-    validateDates(dateCreated, activities, datasets)
-      .map { _ =>
+    (validateDates(dateCreated, activities, datasets), validateDatasets(datasets))
+      .mapN { (_, _) =>
         val (syncedActivities, syncedDatasets) =
           syncPersons(projectPersons = members ++ maybeCreator, activities, datasets)
         ProjectWithoutParent(resourceId,
@@ -146,7 +146,7 @@ object ProjectWithParent extends ProjectFactory {
            activities:       List[Activity],
            datasets:         List[Dataset[Dataset.Provenance]],
            parentResourceId: ResourceId
-  ): ValidatedNel[String, ProjectWithParent] = {
+  ): ValidatedNel[String, ProjectWithParent] = validateDatasets(datasets) map { _ =>
     val (syncedActivities, syncedDatasets) =
       syncPersons(projectPersons = members ++ maybeCreator, activities, datasets)
     ProjectWithParent(resourceId,
@@ -161,15 +161,38 @@ object ProjectWithParent extends ProjectFactory {
                       syncedActivities,
                       syncedDatasets,
                       parentResourceId
-    ).validNel
+    )
   }
 }
 
 trait ProjectFactory {
 
-  def syncPersons(projectPersons: Set[Person],
-                  activities:     List[Activity],
-                  datasets:       List[Dataset[Provenance]]
+  protected def validateDatasets(datasets: List[Dataset[Provenance]]): ValidatedNel[String, Unit] = {
+    val toDatasetsWithBrokenDerivedFrom: Dataset[Provenance] => Option[Dataset[Provenance.Modified]] = dataset =>
+      dataset.provenance match {
+        case prov: Dataset.Provenance.Modified =>
+          datasets.find(_.resourceId.value == prov.derivedFrom.value) match {
+            case Some(_) => Option.empty[Dataset[Provenance.Modified]]
+            case _       => dataset.asInstanceOf[Dataset[Provenance.Modified]].some
+          }
+        case _ => Option.empty[Dataset[Provenance.Modified]]
+      }
+
+    datasets flatMap toDatasetsWithBrokenDerivedFrom match {
+      case Nil => ().validNel[String]
+      case first :: other =>
+        NonEmptyList
+          .of(first, other: _*)
+          .map(ds =>
+            show"Dataset ${ds.identification.identifier} is derived from non-existing dataset ${ds.provenance.derivedFrom}"
+          )
+          .invalid[Unit]
+    }
+  }
+
+  protected def syncPersons(projectPersons: Set[Person],
+                            activities:     List[Activity],
+                            datasets:       List[Dataset[Provenance]]
   ): (List[Activity], List[Dataset[Provenance]]) =
     activities.updateAuthors(from = projectPersons) -> datasets.updateCreators(from = projectPersons)
 
