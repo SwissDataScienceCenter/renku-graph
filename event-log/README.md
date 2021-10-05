@@ -14,13 +14,16 @@ This is a microservice which provides CRUD operations for Event Log DB.
 |  GET   | ```/processing-status?project-id=:id``` | Finds processing status of events belonging to a project       |
 |  POST  | ```/subscriptions```                    | Adds a subscription for events                                 |
 
-#### GET /events?project-path=\<projectPath\>`
+#### GET /events?project-path=\<projectPath\>&status=\<status\>&page=\<page\>&per_page=\<per_page\>`
 
 Returns information about the selected events.
 
 NOTES:
 
-* the `project-path` query parameter is mandatory, has to be url-encoded and cannot be blank;
+* the `project-path` query parameter is mandatory, has to be url-encoded and cannot be blank.
+* the `status` query parameter is optional. Which allows filtering events by status.
+* the `page` query parameter is optional and defaults to `1`.
+* the `per_page` query parameter is optional and defaults to `20`.
 * the returned events are sorted by the `event_date`.
 
 **Response**
