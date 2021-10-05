@@ -52,7 +52,7 @@ class TinyTypeEncodersSpec extends AnyWordSpec with should.Matchers {
   "urlEncoder" should {
 
     "encode UrlTinyType to Json" in {
-      val value = nonEmptyStrings().generateOne
+      val value = httpUrls().generateOne
       UrlTestType(value).asJson shouldBe Json.fromString(value)
     }
   }

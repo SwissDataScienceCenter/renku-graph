@@ -78,27 +78,11 @@ private class DatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer: Par
 )(implicit executionContext: ExecutionContext)
     extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
     with DatasetsFinder[Interpretation]
-    with Paging[Interpretation, DatasetSearchResult] {
+    with Paging[DatasetSearchResult] {
 
   import DatasetsFinderImpl._
   import cats.syntax.all._
   import creatorsFinder._
-
-  override def findDatasets(maybePhrase:   Option[Phrase],
-                            sort:          Sort.By,
-                            pagingRequest: PagingRequest,
-                            maybeUser:     Option[AuthUser]
-  ): Interpretation[PagingResponse[DatasetSearchResult]] = {
-    val phrase = maybePhrase getOrElse Phrase("*")
-    implicit val resultsFinder: PagedResultsFinder[Interpretation, DatasetSearchResult] = pagedResultsFinder(
-      sparqlQuery(phrase, sort, maybeUser)
-    )
-    for {
-      page                 <- findPage(pagingRequest)
-      datasetsWithCreators <- (page.results map addCreators).parSequence
-      updatedPage          <- page.updateResults[Interpretation](datasetsWithCreators)
-    } yield updatedPage
-  }
 
   private lazy val projectMemberFilterQuery: Option[AuthUser] => String = {
     case Some(user) =>
@@ -116,6 +100,26 @@ private class DatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer: Par
       s"""|?projectId renku:projectVisibility ?visibility .
           |FILTER(?visibility = '${Visibility.Public.value}')
           |""".stripMargin
+  }
+  private lazy val addCreators: DatasetSearchResult => Interpretation[DatasetSearchResult] =
+    dataset =>
+      findCreators(dataset.id)
+        .map(creators => dataset.copy(creators = creators))
+
+  override def findDatasets(maybePhrase:   Option[Phrase],
+                            sort:          Sort.By,
+                            pagingRequest: PagingRequest,
+                            maybeUser:     Option[AuthUser]
+  ): Interpretation[PagingResponse[DatasetSearchResult]] = {
+    val phrase = maybePhrase getOrElse Phrase("*")
+    implicit val resultsFinder: PagedResultsFinder[Interpretation, DatasetSearchResult] = pagedResultsFinder(
+      sparqlQuery(phrase, sort, maybeUser)
+    )
+    for {
+      page                 <- findPage[Interpretation](pagingRequest)
+      datasetsWithCreators <- (page.results map addCreators).parSequence
+      updatedPage          <- page.updateResults[Interpretation](datasetsWithCreators)
+    } yield updatedPage
   }
 
   private def sparqlQuery(phrase: Phrase, sort: Sort.By, maybeUser: Option[AuthUser]): SparqlQuery = SparqlQuery.of(
@@ -201,11 +205,6 @@ private class DatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer: Par
     case Sort.DatePublishedProperty => s"ORDER BY ${sort.direction}(?maybePublishedDate)"
     case Sort.ProjectsCountProperty => s"ORDER BY ${sort.direction}(?projectsCount)"
   }
-
-  private lazy val addCreators: DatasetSearchResult => Interpretation[DatasetSearchResult] =
-    dataset =>
-      findCreators(dataset.id)
-        .map(creators => dataset.copy(creators = creators))
 }
 
 private object DatasetsFinderImpl {
