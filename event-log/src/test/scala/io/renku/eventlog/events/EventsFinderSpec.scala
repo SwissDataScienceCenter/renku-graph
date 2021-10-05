@@ -19,6 +19,7 @@
 package io.renku.eventlog.events
 
 import cats.effect.IO
+import cats.syntax.all._
 import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
@@ -33,6 +34,8 @@ import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.eventlog.events.Generators._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+
+import scala.util.Random
 
 class EventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec with should.Matchers {
 
@@ -64,7 +67,7 @@ class EventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec with shou
         projectPaths.generateOne
       )
 
-      val pagedResults = eventsFinder.findEvents(projectPath, PagingRequest.default).unsafeRunSync()
+      val pagedResults = eventsFinder.findEvents(projectPath, None, PagingRequest.default).unsafeRunSync()
 
       pagedResults.pagingInfo.total.value   shouldBe infos.size
       pagedResults.pagingInfo.pagingRequest shouldBe PagingRequest.default
@@ -92,20 +95,53 @@ class EventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec with shou
       }
 
       val pagingRequest: PagingRequest = PagingRequest(Page(2), PerPage(1))
-      val pagedResults = eventsFinder.findEvents(projectPath, pagingRequest).unsafeRunSync()
+      val pagedResults = eventsFinder.findEvents(projectPath, None, pagingRequest).unsafeRunSync()
 
       pagedResults.pagingInfo.total.value   shouldBe infos.size
       pagedResults.pagingInfo.pagingRequest shouldBe pagingRequest
       pagedResults.results                  shouldBe List(infos.sortBy(_.eventDate).reverse.tail.head)
     }
 
+    "return the List of events of the project the given path and the given the status filter" in new TestCase {
+      val projectId = projectIds.generateOne
+      val infos     = eventInfos.generateList(minElements = 3, maxElements = 10)
+
+      infos foreach { info =>
+        val eventId = CompoundEventId(info.eventId, projectId)
+        storeEvent(
+          eventId,
+          info.status,
+          info.executionDate,
+          info.eventDate,
+          eventBodies.generateOne,
+          projectPath = projectPath,
+          maybeMessage = info.maybeMessage
+        )
+        info.processingTimes.foreach(processingTime =>
+          upsertProcessingTime(eventId, processingTime.status, processingTime.processingTime)
+        )
+      }
+
+      val eventStatusFilter = Random.shuffle(infos.map(_.status)).head
+
+      val expectedResult = infos.filter(_.status == eventStatusFilter)
+
+      val pagedResults = eventsFinder
+        .findEvents(projectPath, eventStatusFilter.some, PagingRequest.default)
+        .unsafeRunSync()
+
+      pagedResults.pagingInfo.total.value   shouldBe expectedResult.size
+      pagedResults.pagingInfo.pagingRequest shouldBe PagingRequest.default
+      pagedResults.results                  shouldBe expectedResult.sortBy(_.eventDate).reverse
+    }
+
     "return an empty List if there's no project with the given path" in new TestCase {
-      eventsFinder.findEvents(projectPath, PagingRequest.default).unsafeRunSync().results shouldBe Nil
+      eventsFinder.findEvents(projectPath, None, PagingRequest.default).unsafeRunSync().results shouldBe Nil
     }
 
     "return an empty List if there are no events for the project with the given path" in new TestCase {
       upsertProject(projectIds.generateOne, projectPaths.generateOne, eventDates.generateOne)
-      eventsFinder.findEvents(projectPath, PagingRequest.default).unsafeRunSync().results shouldBe Nil
+      eventsFinder.findEvents(projectPath, None, PagingRequest.default).unsafeRunSync().results shouldBe Nil
     }
   }
 

@@ -39,7 +39,10 @@ import org.typelevel.log4cats.Logger
 import scala.util.control.NonFatal
 
 trait EventsEndpoint[Interpretation[_]] {
-  def findEvents(projectPath: projects.Path, pagingRequest: PagingRequest): Interpretation[Response[Interpretation]]
+  def findEvents(projectPath:       projects.Path,
+                 maybeStatusFilter: Option[EventStatus],
+                 pagingRequest:     PagingRequest
+  ): Interpretation[Response[Interpretation]]
 }
 
 class EventsEndpointImpl[Interpretation[_]: Effect: MonadThrow: Logger](eventsFinder: EventsFinder[Interpretation],
@@ -49,12 +52,19 @@ class EventsEndpointImpl[Interpretation[_]: Effect: MonadThrow: Logger](eventsFi
 
   import ch.datascience.http.ErrorMessage._
 
-  override def findEvents(projectPath:   projects.Path,
-                          pagingRequest: PagingRequest
+  override def findEvents(projectPath:       projects.Path,
+                          maybeStatusFilter: Option[EventStatus],
+                          pagingRequest:     PagingRequest
   ): Interpretation[Response[Interpretation]] =
     eventsFinder
-      .findEvents(projectPath, pagingRequest)
-      .map(_.toHttpResponse(Effect[Interpretation], requestedUrl(pagingRequest), EventLogUrl, EventInfo.infoEncoder))
+      .findEvents(projectPath, maybeStatusFilter, pagingRequest)
+      .map(
+        _.toHttpResponse(Effect[Interpretation],
+                         requestedUrl(maybeStatusFilter, pagingRequest),
+                         EventLogUrl,
+                         EventInfo.infoEncoder
+        )
+      )
       .recoverWith(httpResponse(projectPath))
 
   private def httpResponse(
@@ -63,8 +73,14 @@ class EventsEndpointImpl[Interpretation[_]: Effect: MonadThrow: Logger](eventsFi
     Logger[Interpretation].error(exception)(s"Finding events for project '$projectPath' failed")
     InternalServerError(ErrorMessage(exception))
   }
-  private def requestedUrl(paging: PagingRequest): EventLogUrl =
-    (eventLogUrl / "events") ? (page.parameterName -> paging.page) & (perPage.parameterName -> paging.perPage)
+
+  private def requestedUrl(maybeStatusFilter: Option[EventStatus], paging: PagingRequest): EventLogUrl =
+    maybeStatusFilter match {
+      case Some(status) =>
+        (eventLogUrl / "events") ? ("status" -> status) & (page.parameterName -> paging.page) & (perPage.parameterName -> paging.perPage)
+      case None =>
+        (eventLogUrl / "events") ? (page.parameterName -> paging.page) & (perPage.parameterName -> paging.perPage)
+    }
 
 }
 

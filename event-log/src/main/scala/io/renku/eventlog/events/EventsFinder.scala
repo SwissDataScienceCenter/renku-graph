@@ -32,7 +32,10 @@ import io.renku.eventlog._
 import io.renku.eventlog.events.EventsEndpoint.{EventInfo, StatusProcessingTime}
 
 private trait EventsFinder[Interpretation[_]] {
-  def findEvents(projectPath: projects.Path, pagingRequest: PagingRequest): Interpretation[PagingResponse[EventInfo]]
+  def findEvents(projectPath:       projects.Path,
+                 maybeStatusFilter: Option[EventStatus],
+                 pagingRequest:     PagingRequest
+  ): Interpretation[PagingResponse[EventInfo]]
 }
 
 private class EventsFinderImpl[Interpretation[_]: BracketThrow: Concurrent](
@@ -47,15 +50,21 @@ private class EventsFinderImpl[Interpretation[_]: BracketThrow: Concurrent](
   import skunk._
   import skunk.codec.numeric._
   import skunk.implicits._
+  import skunk.AppliedFragment._
 
-  override def findEvents(projectPath:   projects.Path,
-                          pagingRequest: PagingRequest
+  override def findEvents(projectPath:       projects.Path,
+                          maybeStatusFilter: Option[EventStatus],
+                          pagingRequest:     PagingRequest
   ): Interpretation[PagingResponse[EventInfo]] = {
-    implicit val finder: PagedResultsFinder[Interpretation, EventInfo] = createFinder(projectPath, pagingRequest)
+    implicit val finder: PagedResultsFinder[Interpretation, EventInfo] =
+      createFinder(projectPath, pagingRequest, maybeStatusFilter)
     findPage(pagingRequest)
   }
 
-  private def createFinder(projectPath: projects.Path, pagingRequest: PagingRequest) =
+  private def createFinder(projectPath:       projects.Path,
+                           pagingRequest:     PagingRequest,
+                           maybeStatusFilter: Option[EventStatus]
+  ) =
     new PagedResultsFinder[Interpretation, EventInfo] with TypeSerializers {
       override def findResults(paging: PagingRequest): Interpretation[List[EventInfo]] =
         sessionResource.useK {
@@ -66,17 +75,38 @@ private class EventsFinderImpl[Interpretation[_]: BracketThrow: Concurrent](
         }
 
       private def find() = measureExecutionTime {
-        SqlStatement[Interpretation](name = "find event infos")
-          .select[projects.Path ~ Int ~ PerPage, (EventInfo, Long)](
-            sql"""SELECT evt.event_id, evt.status, evt.event_date, evt.execution_date, evt.message,  COUNT(times.status)
+
+        val selectStatement: Fragment[projects.Path] =
+          sql"""
+              SELECT evt.event_id, evt.status, evt.event_date, evt.execution_date, evt.message,  COUNT(times.status)
               FROM event evt
               JOIN project prj ON evt.project_id = prj.project_id AND prj.project_path = $projectPathEncoder
               LEFT JOIN status_processing_time times ON evt.event_id = times.event_id AND evt.project_id = times.project_id
+              """
+
+        val filterStatus: Fragment[EventStatus] =
+          sql""" evt.status = $eventStatusEncoder """
+
+        val join: Fragment[Int ~ PerPage] =
+          sql""" 
               GROUP BY evt.event_id, evt.status, evt.event_date, evt.execution_date, evt.message
               ORDER BY evt.event_date DESC, evt.event_id
               OFFSET $int4
               LIMIT $perPageEncoder
           """
+
+        val condition: List[AppliedFragment] = List(maybeStatusFilter.map(filterStatus)).flatten
+        val filter =
+          if (condition.isEmpty) AppliedFragment.empty
+          else condition.foldSmash(void" WHERE ", AppliedFragment.empty, AppliedFragment.empty)
+
+        val query: AppliedFragment = selectStatement(projectPath) |+| filter |+| join(
+          ((pagingRequest.page.value - 1) * pagingRequest.perPage.value) ~ pagingRequest.perPage
+        )
+
+        SqlStatement[Interpretation](name = "find event infos")
+          .select[query.A, (EventInfo, Long)](
+            query.fragment
               .query(
                 eventIdDecoder ~ eventStatusDecoder ~ eventDateDecoder ~ executionDateDecoder ~ eventMessageDecoder.opt ~ int8
               )
@@ -96,9 +126,7 @@ private class EventsFinderImpl[Interpretation[_]: BracketThrow: Concurrent](
                   ) -> processingTimesCount
               }
           )
-          .arguments(
-            projectPath ~ ((pagingRequest.page.value - 1) * pagingRequest.perPage.value) ~ pagingRequest.perPage
-          )
+          .arguments(query.argument)
           .build(_.toList)
       }
 

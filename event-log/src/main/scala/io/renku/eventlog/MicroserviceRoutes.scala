@@ -22,7 +22,7 @@ import cats.data.ValidatedNel
 import cats.effect.{Clock, ConcurrentEffect, ContextShift, Resource}
 import cats.syntax.all._
 import ch.datascience.graph.http.server.binders._
-import ch.datascience.graph.model.events.CompoundEventId
+import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.http.ErrorMessage
 import ch.datascience.http.ErrorMessage._
@@ -59,11 +59,12 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   import routesMetrics._
   import subscriptionsEndpoint._
   import eventsEndpoint._
+  import EventStatusParameter._
 
   // format: off
   lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
-    case           GET   -> Root / "events":? `project-path`(validatedProjectPath)  +& page(page) +& perPage(perPage)    => maybeFindEvents(validatedProjectPath, page, perPage)
-    case request @ POST  -> Root / "events"                                            => processEvent(request)
+    case GET -> Root / "events" :? `project-path`(validatedProjectPath) +& status(status) +& page(page) +& perPage(perPage) => maybeFindEvents(validatedProjectPath, status, page, perPage)
+    case request@POST -> Root / "events" => processEvent(request)
     case           GET   -> Root / "events"/ EventId(eventId) / ProjectId(projectId)   => getDetails(CompoundEventId(eventId, projectId))
     case           GET   -> Root / "processing-status" :? `project-id`(maybeProjectId) => maybeFindProcessingStatus(maybeProjectId)
     case           GET   -> Root / "ping"                                              => Ok("pong")
@@ -102,11 +103,25 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     }
   }
 
+  private object EventStatusParameter {
+    private implicit val queryParameterDecoder: QueryParamDecoder[EventStatus] =
+      (value: QueryParameterValue) =>
+        Try(EventStatus(value.value)).toEither
+          .leftMap(_ => ParseFailure(s"'$status' parameter with invalid value", ""))
+          .toValidatedNel
+
+    object status extends OptionalValidatingQueryParamDecoderMatcher[EventStatus]("status") {
+      val parameterName:     String = "status"
+      override val toString: String = parameterName
+    }
+  }
+
   private def maybeFindEvents(validatedProjectPath: ValidatedNel[ParseFailure, projects.Path],
+                              maybeStatus:          Option[ValidatedNel[ParseFailure, EventStatus]],
                               maybePage:            Option[ValidatedNel[ParseFailure, Page]],
                               maybePerPage:         Option[ValidatedNel[ParseFailure, PerPage]]
   ): F[Response[F]] =
-    (validatedProjectPath, PagingRequest(maybePage, maybePerPage))
+    (validatedProjectPath, maybeStatus.sequence, PagingRequest(maybePage, maybePerPage))
       .mapN(findEvents)
       .fold(toBadRequest(), identity)
 
