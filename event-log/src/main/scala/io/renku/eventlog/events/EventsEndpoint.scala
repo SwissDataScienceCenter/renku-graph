@@ -18,9 +18,9 @@
 
 package io.renku.eventlog.events
 
-import cats.MonadThrow
 import cats.effect.{ConcurrentEffect, Effect, IO}
 import cats.syntax.all._
+import cats.{MonadThrow, Show}
 import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.events.{EventId, EventProcessingTime, EventStatus}
@@ -39,10 +39,7 @@ import org.typelevel.log4cats.Logger
 import scala.util.control.NonFatal
 
 trait EventsEndpoint[Interpretation[_]] {
-  def findEvents(projectPath:       projects.Path,
-                 maybeStatusFilter: Option[EventStatus],
-                 pagingRequest:     PagingRequest
-  ): Interpretation[Response[Interpretation]]
+  def findEvents(request: EventsEndpoint.Request): Interpretation[Response[Interpretation]]
 }
 
 class EventsEndpointImpl[Interpretation[_]: Effect: MonadThrow: Logger](eventsFinder: EventsFinder[Interpretation],
@@ -52,36 +49,27 @@ class EventsEndpointImpl[Interpretation[_]: Effect: MonadThrow: Logger](eventsFi
 
   import ch.datascience.http.ErrorMessage._
 
-  override def findEvents(projectPath:       projects.Path,
-                          maybeStatusFilter: Option[EventStatus],
-                          pagingRequest:     PagingRequest
-  ): Interpretation[Response[Interpretation]] =
+  override def findEvents(request: EventsEndpoint.Request): Interpretation[Response[Interpretation]] =
     eventsFinder
-      .findEvents(projectPath, maybeStatusFilter, pagingRequest)
-      .map(
-        _.toHttpResponse(Effect[Interpretation],
-                         requestedUrl(maybeStatusFilter, pagingRequest),
-                         EventLogUrl,
-                         EventInfo.infoEncoder
-        )
-      )
-      .recoverWith(httpResponse(projectPath))
+      .findEvents(request)
+      .map(_.toHttpResponse(Effect[Interpretation], requestedUrl(request), EventLogUrl, EventInfo.infoEncoder))
+      .recoverWith(httpResponse(request))
 
   private def httpResponse(
-      projectPath: projects.Path
+      request: EventsEndpoint.Request
   ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = { case NonFatal(exception) =>
-    Logger[Interpretation].error(exception)(s"Finding events for project '$projectPath' failed")
+    Logger[Interpretation].error(exception)(show"Finding events for project '$request' failed")
     InternalServerError(ErrorMessage(exception))
   }
 
-  private def requestedUrl(maybeStatusFilter: Option[EventStatus], paging: PagingRequest): EventLogUrl =
-    maybeStatusFilter match {
-      case Some(status) =>
-        (eventLogUrl / "events") ? ("status" -> status) & (page.parameterName -> paging.page) & (perPage.parameterName -> paging.perPage)
-      case None =>
-        (eventLogUrl / "events") ? (page.parameterName -> paging.page) & (perPage.parameterName -> paging.perPage)
-    }
-
+  private def requestedUrl(request: EventsEndpoint.Request): EventLogUrl = request match {
+    case EventsEndpoint.Request.ProjectEvents(path, Some(status), paging) =>
+      (eventLogUrl / "events") ? ("project-path" -> path.show) & ("status" -> status) & (page.parameterName -> paging.page) & (perPage.parameterName -> paging.perPage)
+    case EventsEndpoint.Request.ProjectEvents(path, None, paging) =>
+      (eventLogUrl / "events") ? ("project-path" -> path.show) & (page.parameterName -> paging.page) & (perPage.parameterName -> paging.perPage)
+    case EventsEndpoint.Request.EventsWithStatus(status, paging) =>
+      (eventLogUrl / "events") ? ("status" -> status) & (page.parameterName -> paging.page) & (perPage.parameterName -> paging.perPage)
+  }
 }
 
 object EventsEndpoint {
@@ -92,6 +80,21 @@ object EventsEndpoint {
     eventsFinder <- EventsFinder(sessionResource, queriesExecTimes)
     eventlogUrl  <- EventLogUrl()
   } yield new EventsEndpointImpl(eventsFinder, eventlogUrl)
+
+  sealed trait Request { val pagingRequest: PagingRequest }
+  object Request {
+    final case class ProjectEvents(projectPath:   projects.Path,
+                                   maybeStatus:   Option[EventStatus],
+                                   pagingRequest: PagingRequest
+    ) extends Request
+    final case class EventsWithStatus(status: EventStatus, pagingRequest: PagingRequest) extends Request
+
+    implicit val show: Show[Request] = Show.show {
+      case EventsEndpoint.Request.ProjectEvents(path, Some(status), _) => show"project-path: $path; status: $status"
+      case EventsEndpoint.Request.ProjectEvents(path, None, _)         => show"project-path: $path"
+      case EventsEndpoint.Request.EventsWithStatus(status, _)          => show"status: $status"
+    }
+  }
 
   final case class EventInfo(eventId:         EventId,
                              status:          EventStatus,

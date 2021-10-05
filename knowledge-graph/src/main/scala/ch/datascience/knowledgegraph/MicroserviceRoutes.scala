@@ -98,7 +98,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
       .mapN { case (maybePhrase, sort, paging) =>
         datasetsSearchEndpoint.searchForDatasets(maybePhrase, sort, paging, maybeAuthUser)
       }
-      .fold(toBadRequest(), identity)
+      .fold(toBadRequest, identity)
 
   private def routeToProjectsEndpoints(
       path:          Path,

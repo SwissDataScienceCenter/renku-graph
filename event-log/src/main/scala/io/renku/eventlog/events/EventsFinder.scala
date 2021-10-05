@@ -32,10 +32,7 @@ import io.renku.eventlog._
 import io.renku.eventlog.events.EventsEndpoint.{EventInfo, StatusProcessingTime}
 
 private trait EventsFinder[Interpretation[_]] {
-  def findEvents(projectPath:       projects.Path,
-                 maybeStatusFilter: Option[EventStatus],
-                 pagingRequest:     PagingRequest
-  ): Interpretation[PagingResponse[EventInfo]]
+  def findEvents(request: EventsEndpoint.Request): Interpretation[PagingResponse[EventInfo]]
 }
 
 private class EventsFinderImpl[Interpretation[_]: BracketThrow: Concurrent](
@@ -52,19 +49,13 @@ private class EventsFinderImpl[Interpretation[_]: BracketThrow: Concurrent](
   import skunk.implicits._
   import skunk.AppliedFragment._
 
-  override def findEvents(projectPath:       projects.Path,
-                          maybeStatusFilter: Option[EventStatus],
-                          pagingRequest:     PagingRequest
-  ): Interpretation[PagingResponse[EventInfo]] = {
+  override def findEvents(request: EventsEndpoint.Request): Interpretation[PagingResponse[EventInfo]] = {
     implicit val finder: PagedResultsFinder[Interpretation, EventInfo] =
-      createFinder(projectPath, pagingRequest, maybeStatusFilter)
+      createFinder(maybeProjectPath, maybeStatus, pagingRequest)
     findPage(pagingRequest)
   }
 
-  private def createFinder(projectPath:       projects.Path,
-                           pagingRequest:     PagingRequest,
-                           maybeStatusFilter: Option[EventStatus]
-  ) =
+  private def createFinder(projectPath: projects.Path, maybeStatus: Option[EventStatus], pagingRequest: PagingRequest) =
     new PagedResultsFinder[Interpretation, EventInfo] with TypeSerializers {
       override def findResults(paging: PagingRequest): Interpretation[List[EventInfo]] =
         sessionResource.useK {
@@ -95,7 +86,7 @@ private class EventsFinderImpl[Interpretation[_]: BracketThrow: Concurrent](
               LIMIT $perPageEncoder
           """
 
-        val condition: List[AppliedFragment] = List(maybeStatusFilter.map(filterStatus)).flatten
+        val condition: List[AppliedFragment] = List(maybeStatus.map(filterStatus)).flatten
         val filter =
           if (condition.isEmpty) AppliedFragment.empty
           else condition.foldSmash(void" WHERE ", AppliedFragment.empty, AppliedFragment.empty)
@@ -175,7 +166,6 @@ private class EventsFinderImpl[Interpretation[_]: BracketThrow: Concurrent](
       private lazy val statusProcessingTimesDecoder: Decoder[StatusProcessingTime] =
         (eventStatusDecoder ~ eventProcessingTimeDecoder).map((StatusProcessingTime.apply _).tupled.apply)
     }
-
 }
 
 private object EventsFinder {

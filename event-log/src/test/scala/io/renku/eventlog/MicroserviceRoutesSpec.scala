@@ -20,10 +20,10 @@ package io.renku.eventlog
 
 import cats.effect.{Clock, IO}
 import cats.syntax.all._
+import ch.datascience.generators.CommonGraphGenerators.pagingRequests
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.nonEmptyStrings
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventStatuses}
-import ch.datascience.generators.CommonGraphGenerators.pagingRequests
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.http.ErrorMessage.ErrorMessage
 import ch.datascience.http.InfoMessage.InfoMessage
@@ -44,30 +44,41 @@ import org.http4s.implicits._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
+import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext
 import scala.language.reflectiveCalls
 
-class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Matchers with TableDrivenPropertyChecks {
 
   "routes" should {
 
-    "define a GET /events?project-path=* endpoint" in new TestCase {
+    "define a GET /events - case with project-path only" in new TestCase {
       val projectPath = projectPaths.generateOne
 
       val request = Request[IO](method = GET, uri"events".withQueryParam("project-path", projectPath.value))
 
       (eventsEndpoint.findEvents _)
-        .expects(projectPath, None, PagingRequest.default)
+        .expects(EventsEndpoint.Request.ProjectEvents(projectPath, None, PagingRequest.default))
         .returning(Response[IO](Ok).pure[IO])
 
-      val response = routes.call(request)
-
-      response.status shouldBe Ok
+      routes.call(request).status shouldBe Ok
     }
 
-    "define a GET /events?project-path=*&status=*&page=*&per_page=* endpoint" in new TestCase {
+    "define a GET /events - case with status only" in new TestCase {
+      val eventStatus = eventStatuses.generateOne
+
+      val request = Request[IO](method = GET, uri"events".withQueryParam("status", eventStatus.value))
+
+      (eventsEndpoint.findEvents _)
+        .expects(EventsEndpoint.Request.EventsWithStatus(eventStatus, PagingRequest.default))
+        .returning(Response[IO](Ok).pure[IO])
+
+      routes.call(request).status shouldBe Ok
+    }
+
+    "define a GET /events - case with project-path and status" in new TestCase {
       val projectPath   = projectPaths.generateOne
       val eventStatus   = eventStatuses.generateOne
       val pagingRequest = pagingRequests.generateOne
@@ -82,28 +93,29 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
       )
 
       (eventsEndpoint.findEvents _)
-        .expects(projectPath, Some(eventStatus), pagingRequest)
+        .expects(EventsEndpoint.Request.ProjectEvents(projectPath, Some(eventStatus), PagingRequest.default))
         .returning(Response[IO](Ok).pure[IO])
 
-      val response = routes.call(request)
-
-      response.status shouldBe Ok
+      routes.call(request).status shouldBe Ok
     }
 
-    s"define a GET /events?project-path=* returning $BadRequest for invalid project path" in new TestCase {
-      val request = Request[IO](method = GET, uri"events".withQueryParam("project-path", nonEmptyStrings().generateOne))
-
-      val response = routes.call(request)
-
-      response.status shouldBe BadRequest
+    Set(
+      uri"events".withQueryParam("project-path", nonEmptyStrings().generateOne),
+      uri"events".withQueryParam("status", nonEmptyStrings().generateOne),
+      uri"events"
+        .withQueryParam("status", eventStatuses.generateOne.show)
+        .withQueryParam("page", nonEmptyStrings().generateOne),
+      uri"events"
+        .withQueryParam("status", eventStatuses.generateOne.show)
+        .withQueryParam("per_page", nonEmptyStrings().generateOne)
+    ) foreach { uri =>
+      s"define a GET $uri returning $BadRequest for invalid project path" in new TestCase {
+        routes.call(Request[IO](method = GET, uri)).status shouldBe BadRequest
+      }
     }
 
-    "define a GET /events?project-path=* not finding the endpoint when no project-path parameter is present" in new TestCase {
-      val request = Request[IO](method = GET, uri"events")
-
-      val response = routes.call(request)
-
-      response.status shouldBe ServiceUnavailable
+    "define a GET /events not finding the endpoint when no project-path or status parameter is present" in new TestCase {
+      routes.call(Request[IO](method = GET, uri"events")).status shouldBe NotFound
     }
 
     "define a GET /events/:event-id/:project-id endpoint" in new TestCase {

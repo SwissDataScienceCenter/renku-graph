@@ -29,7 +29,7 @@ import ch.datascience.http.ErrorMessage._
 import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.http.rest.paging.PagingRequest.Decoders.{page, perPage}
 import ch.datascience.http.rest.paging.model.{Page, PerPage}
-import ch.datascience.http.server.QueryParameterTools.toBadRequest
+import ch.datascience.http.server.QueryParameterTools.{resourceNotFound, toBadRequest}
 import ch.datascience.metrics.RoutesMetrics
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
@@ -50,21 +50,21 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
 )(implicit clock:             Clock[F], contextShift: ContextShift[F])
     extends Http4sDsl[F] {
 
+  import EventStatusParameter._
   import ProjectIdParameter._
   import ProjectPathParameter._
   import eventDetailsEndpoint._
   import eventEndpoint._
+  import eventsEndpoint._
   import org.http4s.HttpRoutes
   import processingStatusEndpoint._
   import routesMetrics._
   import subscriptionsEndpoint._
-  import eventsEndpoint._
-  import EventStatusParameter._
 
   // format: off
   lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
-    case GET -> Root / "events" :? `project-path`(validatedProjectPath) +& status(status) +& page(page) +& perPage(perPage) => maybeFindEvents(validatedProjectPath, status, page, perPage)
-    case request@POST -> Root / "events" => processEvent(request)
+    case GET             -> Root / "events" :? `project-path`(validatedProjectPath) +& status(status) +& page(page) +& perPage(perPage) => maybeFindEvents(validatedProjectPath, status, page, perPage)
+    case request @ POST  -> Root / "events"                                            => processEvent(request)
     case           GET   -> Root / "events"/ EventId(eventId) / ProjectId(projectId)   => getDetails(CompoundEventId(eventId, projectId))
     case           GET   -> Root / "processing-status" :? `project-id`(maybeProjectId) => maybeFindProcessingStatus(maybeProjectId)
     case           GET   -> Root / "ping"                                              => Ok("pong")
@@ -74,14 +74,13 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   // format: on
   private object ProjectIdParameter {
 
-    private implicit val queryParameterDecoder: QueryParamDecoder[projects.Id] =
-      (value: QueryParameterValue) =>
-        {
-          for {
-            int <- Try(value.value.toInt).toEither
-            id  <- projects.Id.from(int)
-          } yield id
-        }.leftMap(_ => ParseFailure(s"'${`project-id`}' parameter with invalid value", "")).toValidatedNel
+    private implicit val queryParameterDecoder: QueryParamDecoder[projects.Id] = (value: QueryParameterValue) =>
+      {
+        for {
+          int <- Try(value.value.toInt).toEither
+          id  <- projects.Id.from(int)
+        } yield id
+      }.leftMap(_ => ParseFailure(s"'${`project-id`}' parameter with invalid value", "")).toValidatedNel
 
     object `project-id` extends OptionalValidatingQueryParamDecoderMatcher[projects.Id]("project-id") {
       val parameterName:     String = "project-id"
@@ -97,7 +96,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
           .leftMap(_ => ParseFailure(s"'${`project-path`}' parameter with invalid value", ""))
           .toValidatedNel
 
-    object `project-path` extends ValidatingQueryParamDecoderMatcher[projects.Path]("project-path") {
+    object `project-path` extends OptionalValidatingQueryParamDecoderMatcher[projects.Path]("project-path") {
       val parameterName:     String = "project-path"
       override val toString: String = parameterName
     }
@@ -116,20 +115,28 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     }
   }
 
-  private def maybeFindEvents(validatedProjectPath: ValidatedNel[ParseFailure, projects.Path],
-                              maybeStatus:          Option[ValidatedNel[ParseFailure, EventStatus]],
-                              maybePage:            Option[ValidatedNel[ParseFailure, Page]],
-                              maybePerPage:         Option[ValidatedNel[ParseFailure, PerPage]]
-  ): F[Response[F]] =
-    (validatedProjectPath, maybeStatus.sequence, PagingRequest(maybePage, maybePerPage))
-      .mapN(findEvents)
-      .fold(toBadRequest(), identity)
+  private def maybeFindEvents(maybeProjectPath: Option[ValidatedNel[ParseFailure, projects.Path]],
+                              maybeStatus:      Option[ValidatedNel[ParseFailure, EventStatus]],
+                              maybePage:        Option[ValidatedNel[ParseFailure, Page]],
+                              maybePerPage:     Option[ValidatedNel[ParseFailure, PerPage]]
+  ): F[Response[F]] = (maybeProjectPath, maybeStatus) match {
+    case (None, None) => resourceNotFound
+    case (Some(validatedPath), maybeStatus) =>
+      (validatedPath, maybeStatus.sequence, PagingRequest(maybePage, maybePerPage))
+        .mapN(EventsEndpoint.Request.ProjectEvents)
+        .map(findEvents)
+        .fold(toBadRequest, identity)
+    case (None, Some(validatedStatus)) =>
+      (validatedStatus, PagingRequest(maybePage, maybePerPage))
+        .mapN(EventsEndpoint.Request.EventsWithStatus)
+        .map(findEvents)
+        .fold(toBadRequest, identity)
+  }
 
   private def maybeFindProcessingStatus(
       maybeProjectId: Option[ValidatedNel[ParseFailure, projects.Id]]
   ): F[Response[F]] = maybeProjectId match {
-    case None =>
-      NotFound(ErrorMessage(s"No '${`project-id`}' parameter"))
+    case None => NotFound(ErrorMessage(s"No '${`project-id`}' parameter"))
     case Some(validatedProjectId) =>
       validatedProjectId.fold(
         errors => BadRequest(ErrorMessage(errors.map(_.getMessage()).toList.mkString("; "))),

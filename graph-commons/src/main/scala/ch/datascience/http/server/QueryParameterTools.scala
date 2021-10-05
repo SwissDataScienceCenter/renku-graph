@@ -18,9 +18,9 @@
 
 package ch.datascience.http.server
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.data.NonEmptyList
-import ch.datascience.http.ErrorMessage
+import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.http.ErrorMessage._
 import io.circe.syntax._
 import org.http4s.circe._
@@ -28,10 +28,12 @@ import org.http4s.{ParseFailure, Response, Status}
 
 object QueryParameterTools {
 
-  def toBadRequest[F[_]]()(
-      errors:    NonEmptyList[ParseFailure]
-  )(implicit ME: MonadError[F, Throwable]): F[Response[F]] = ME.pure {
-    Response[F](Status.BadRequest)
-      .withEntity(ErrorMessage(errors.toList.map(_.message).mkString("; ")).asJson)
+  def toBadRequest[F[_]: MonadThrow]: NonEmptyList[ParseFailure] => F[Response[F]] = errors =>
+    MonadThrow[F].catchNonFatal {
+      Response[F](Status.BadRequest).withEntity(ErrorMessage(errors.toList.map(_.message).mkString("; ")).asJson)
+    }
+
+  def resourceNotFound[F[_]: MonadThrow]: F[Response[F]] = MonadThrow[F].catchNonFatal {
+    Response(Status.NotFound).withEntity(InfoMessage("Resource not found"))
   }
 }
