@@ -93,7 +93,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
       )
 
       (eventsEndpoint.findEvents _)
-        .expects(EventsEndpoint.Request.ProjectEvents(projectPath, Some(eventStatus), PagingRequest.default))
+        .expects(EventsEndpoint.Request.ProjectEvents(projectPath, Some(eventStatus), pagingRequest))
         .returning(Response[IO](Ok).pure[IO])
 
       routes.call(request).status shouldBe Ok

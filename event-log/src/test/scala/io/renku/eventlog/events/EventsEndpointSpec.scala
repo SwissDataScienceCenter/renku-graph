@@ -27,6 +27,7 @@ import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.EventsGenerators.eventStatuses
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.{EventId, EventProcessingTime, EventStatus}
+import ch.datascience.graph.model.projects
 import ch.datascience.http.ErrorMessage
 import ch.datascience.http.ErrorMessage._
 import ch.datascience.http.client.UrlEncoder.urlEncode
@@ -57,7 +58,8 @@ class EventsEndpointSpec extends AnyWordSpec with MockFactory with should.Matche
   "findEvents" should {
 
     s"$Ok with an empty array if there are no events found" in new TestCase {
-      val request = requests.generateOne
+      val request           = requests.generateOne
+      implicit val resource = resourceUrl(request)
 
       val pagingResponse =
         PagingResponse.from[Try, EventInfo](Nil, request.pagingRequest, Total(0)).fold(throw _, identity)
@@ -74,9 +76,10 @@ class EventsEndpointSpec extends AnyWordSpec with MockFactory with should.Matche
     }
 
     s"$Ok with array of events if there are events found" in new TestCase {
-      val request = requests.generateOne
+      val request           = requests.generateOne
+      implicit val resource = resourceUrl(request)
 
-      val pagingResponse = pagingResponses(eventInfos).generateOne
+      val pagingResponse = pagingResponses(eventInfos()).generateOne
 
       (eventsFinder.findEvents _)
         .expects(request)
@@ -91,7 +94,8 @@ class EventsEndpointSpec extends AnyWordSpec with MockFactory with should.Matche
     }
 
     s"$InternalServerError when an error happens while fetching the events" in new TestCase {
-      val request = requests.generateOne
+      val request           = requests.generateOne
+      implicit val resource = resourceUrl(request)
 
       val exception = exceptions.generateOne
       (eventsFinder.findEvents _)
@@ -120,31 +124,34 @@ class EventsEndpointSpec extends AnyWordSpec with MockFactory with should.Matche
         paging <- pagingRequests
       } yield EventsEndpoint.Request.EventsWithStatus(status, paging)
     )
+    val eventsFinder = mock[EventsFinder[IO]]
 
-    implicit val eventLogUrl: EventLogUrl = httpUrls().generateAs(EventLogUrl)
+    private val eventLogUrl: EventLogUrl = httpUrls().generateAs(EventLogUrl)
+
     implicit val resourceUrl: EventsEndpoint.Request => EventLogUrl = {
       case EventsEndpoint.Request.ProjectEvents(path, Some(status), paging) =>
-        s"eventLogUrl/events?project-path=${urlEncode(path.show)}&status=$status&${page.parameterName}=${paging.page}&${perPage.parameterName}=${paging.perPage}"
+        s"$eventLogUrl/events?project-path=${urlEncode(path.show)}&status=$status&${page.parameterName}=${paging.page}&${perPage.parameterName}=${paging.perPage}"
       case EventsEndpoint.Request.ProjectEvents(path, None, paging) =>
-        s"eventLogUrl/events?project-path=${urlEncode(path.show)}&${page.parameterName}=${paging.page}&${perPage.parameterName}=${paging.perPage}"
+        s"$eventLogUrl/events?project-path=${urlEncode(path.show)}&${page.parameterName}=${paging.page}&${perPage.parameterName}=${paging.perPage}"
       case EventsEndpoint.Request.EventsWithStatus(status, paging) =>
-        s"eventLogUrl/events?status=$status&${page.parameterName}=${paging.page}&${perPage.parameterName}=${paging.perPage}"
+        s"$eventLogUrl/events?status=$status&${page.parameterName}=${paging.page}&${perPage.parameterName}=${paging.perPage}"
     }
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val eventsFinder = mock[EventsFinder[IO]]
-    val endpoint     = new EventsEndpointImpl[IO](eventsFinder, eventLogUrl)
+
+    val endpoint = new EventsEndpointImpl[IO](eventsFinder, eventLogUrl)
   }
 
   private implicit val eventInfoDecoder: Decoder[EventInfo] = cursor =>
     for {
       id              <- cursor.downField("id").as[EventId]
+      projectPath     <- cursor.downField("projectPath").as[projects.Path]
       status          <- cursor.downField("status").as[EventStatus]
       eventDate       <- cursor.downField("date").as[EventDate]
       executionDate   <- cursor.downField("executionDate").as[ExecutionDate]
       maybeMessage    <- cursor.downField("message").as[Option[EventMessage]]
       processingTimes <- cursor.downField("processingTimes").as[List[StatusProcessingTime]]
-    } yield EventInfo(id, status, eventDate, executionDate, maybeMessage, processingTimes)
+    } yield EventInfo(id, projectPath, status, eventDate, executionDate, maybeMessage, processingTimes)
 
   private implicit val statusProcessingTimeDecoder: Decoder[StatusProcessingTime] = cursor =>
     for {

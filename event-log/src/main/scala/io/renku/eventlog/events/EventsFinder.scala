@@ -29,7 +29,7 @@ import ch.datascience.http.rest.paging.model.{PerPage, Total}
 import ch.datascience.http.rest.paging.{Paging, PagingRequest, PagingResponse}
 import ch.datascience.metrics.LabeledHistogram
 import io.renku.eventlog._
-import io.renku.eventlog.events.EventsEndpoint.{EventInfo, StatusProcessingTime}
+import io.renku.eventlog.events.EventsEndpoint.{EventInfo, Request, StatusProcessingTime}
 
 private trait EventsFinder[Interpretation[_]] {
   def findEvents(request: EventsEndpoint.Request): Interpretation[PagingResponse[EventInfo]]
@@ -47,16 +47,16 @@ private class EventsFinderImpl[Interpretation[_]: BracketThrow: Concurrent](
   import skunk._
   import skunk.codec.numeric._
   import skunk.implicits._
-  import skunk.AppliedFragment._
 
   override def findEvents(request: EventsEndpoint.Request): Interpretation[PagingResponse[EventInfo]] = {
     implicit val finder: PagedResultsFinder[Interpretation, EventInfo] =
-      createFinder(maybeProjectPath, maybeStatus, pagingRequest)
-    findPage(pagingRequest)
+      createFinder(request)
+    findPage(request.pagingRequest)
   }
 
-  private def createFinder(projectPath: projects.Path, maybeStatus: Option[EventStatus], pagingRequest: PagingRequest) =
+  private def createFinder(request: EventsEndpoint.Request) =
     new PagedResultsFinder[Interpretation, EventInfo] with TypeSerializers {
+
       override def findResults(paging: PagingRequest): Interpretation[List[EventInfo]] =
         sessionResource.useK {
           for {
@@ -65,50 +65,82 @@ private class EventsFinderImpl[Interpretation[_]: BracketThrow: Concurrent](
           } yield withProcessingTimes
         }
 
-      private def find() = measureExecutionTime {
+      val selectEventInfo: Fragment[Void] =
+        sql"""
+            SELECT evt.event_id, prj.project_path, evt.status, evt.event_date, evt.execution_date, evt.message,  COUNT(times.status)
+            FROM event evt
+        """
 
-        val selectStatement: Fragment[projects.Path] =
-          sql"""
-              SELECT evt.event_id, evt.status, evt.event_date, evt.execution_date, evt.message,  COUNT(times.status)
-              FROM event evt
-              JOIN project prj ON evt.project_id = prj.project_id AND prj.project_path = $projectPathEncoder
-              LEFT JOIN status_processing_time times ON evt.event_id = times.event_id AND evt.project_id = times.project_id
-              """
+      val joinProject: Fragment[Void] =
+        sql"""
+            JOIN project prj ON evt.project_id = prj.project_id
+         """
 
-        val filterStatus: Fragment[EventStatus] =
-          sql""" evt.status = $eventStatusEncoder """
+      val filteByProject: Fragment[projects.Path] =
+        sql"""AND prj.project_path = $projectPathEncoder """
 
-        val join: Fragment[Int ~ PerPage] =
-          sql""" 
-              GROUP BY evt.event_id, evt.status, evt.event_date, evt.execution_date, evt.message
+      val joinProcessingTime: Fragment[Void] =
+        sql"""
+            LEFT JOIN status_processing_time times ON evt.event_id = times.event_id AND evt.project_id = times.project_id
+          """
+
+      val statusFilter: Fragment[EventStatus] =
+        sql"""
+           WHERE evt.status = $eventStatusEncoder
+        """
+
+      val groupAndPaginate: Fragment[Int ~ PerPage] =
+        sql"""
+              GROUP BY evt.event_id, evt.status, evt.event_date, evt.execution_date, evt.message, prj.project_path
               ORDER BY evt.event_date DESC, evt.event_id
               OFFSET $int4
               LIMIT $perPageEncoder
           """
 
-        val condition: List[AppliedFragment] = List(maybeStatus.map(filterStatus)).flatten
-        val filter =
-          if (condition.isEmpty) AppliedFragment.empty
-          else condition.foldSmash(void" WHERE ", AppliedFragment.empty, AppliedFragment.empty)
+      private def selectEventInfoQuery: EventsEndpoint.Request => AppliedFragment = {
+        case Request.ProjectEvents(projectPath, None, pagingRequest) =>
+          selectEventInfo(Void) |+|
+            joinProject(Void) |+|
+            filteByProject(projectPath) |+|
+            joinProcessingTime(Void) |+|
+            groupAndPaginate(
+              ((pagingRequest.page.value - 1) * pagingRequest.perPage.value) ~ pagingRequest.perPage
+            )
+        case Request.ProjectEvents(projectPath, Some(status), pagingRequest) =>
+          selectEventInfo(Void) |+|
+            joinProject(Void) |+|
+            filteByProject(projectPath) |+|
+            joinProcessingTime(Void) |+|
+            statusFilter(status) |+|
+            groupAndPaginate(((pagingRequest.page.value - 1) * pagingRequest.perPage.value) ~ pagingRequest.perPage)
+        case Request.EventsWithStatus(status, pagingRequest) =>
+          selectEventInfo(Void) |+|
+            joinProject(Void) |+|
+            joinProcessingTime(Void) |+|
+            statusFilter(status) |+|
+            groupAndPaginate(((pagingRequest.page.value - 1) * pagingRequest.perPage.value) ~ pagingRequest.perPage)
 
-        val query: AppliedFragment = selectStatement(projectPath) |+| filter |+| join(
-          ((pagingRequest.page.value - 1) * pagingRequest.perPage.value) ~ pagingRequest.perPage
-        )
+      }
 
+      private def find() = measureExecutionTime {
+
+        val query: AppliedFragment = selectEventInfoQuery(request)
         SqlStatement[Interpretation](name = "find event infos")
           .select[query.A, (EventInfo, Long)](
             query.fragment
               .query(
-                eventIdDecoder ~ eventStatusDecoder ~ eventDateDecoder ~ executionDateDecoder ~ eventMessageDecoder.opt ~ int8
+                eventIdDecoder ~ projectPathDecoder ~ eventStatusDecoder ~ eventDateDecoder ~ executionDateDecoder ~ eventMessageDecoder.opt ~ int8
               )
               .map {
-                case (eventId: EventId) ~
-                    (status:   EventStatus) ~
+                case (eventId:    EventId) ~
+                    (projectPath: projects.Path) ~
+                    (status: EventStatus) ~
                     (eventDate: EventDate) ~
                     (executionDate: ExecutionDate) ~
                     (maybeMessage: Option[EventMessage]) ~
                     (processingTimesCount: Long) =>
                   EventInfo(eventId,
+                            projectPath,
                             status,
                             eventDate,
                             executionDate,
@@ -142,22 +174,46 @@ private class EventsFinderImpl[Interpretation[_]: BracketThrow: Concurrent](
           """
               .query(statusProcessingTimesDecoder)
           )
-          .arguments(eventInfo.eventId, projectPath)
+          .arguments(eventInfo.eventId, eventInfo.projectPath)
           .build(_.toList)
       }
 
+      private def countEventQuery: EventsEndpoint.Request => AppliedFragment = {
+        case Request.ProjectEvents(projectPath, None, _) =>
+          val query: Fragment[projects.Path] =
+            sql"""
+             SELECT COUNT(DISTINCT evt.event_id)
+             FROM event evt
+             JOIN project prj ON evt.project_id = prj.project_id AND prj.project_path = $projectPathEncoder
+           """
+          query(projectPath)
+        case Request.ProjectEvents(projectPath, Some(status), _) =>
+          val query: Fragment[projects.Path ~ EventStatus] =
+            sql"""
+             SELECT COUNT(DISTINCT evt.event_id)
+             FROM event evt
+             JOIN project prj ON evt.project_id = prj.project_id AND prj.project_path = $projectPathEncoder
+              WHERE evt.status = $eventStatusEncoder
+           """
+          query(projectPath ~ status)
+        case Request.EventsWithStatus(status, _) =>
+          val query: Fragment[EventStatus] =
+            sql"""
+             SELECT COUNT(DISTINCT evt.event_id)
+             FROM event evt
+             JOIN project prj ON evt.project_id = prj.project_id
+              WHERE evt.status = $eventStatusEncoder
+           """
+          query(status)
+
+      }
+
       override def findTotal(): Interpretation[Total] = sessionResource.useK {
+        val query = countEventQuery(request)
         measureExecutionTime {
           SqlStatement[Interpretation](name = "find event infos total")
-            .select[projects.Path, Total](
-              sql"""SELECT COUNT(DISTINCT evt.event_id)
-              FROM event evt
-              JOIN project prj ON evt.project_id = prj.project_id AND prj.project_path = $projectPathEncoder
-          """
-                .query(int8)
-                .map((total: Long) => Total(total.toInt))
-            )
-            .arguments(projectPath)
+            .select[query.A, Total](query.fragment.query(int8).map((total: Long) => Total(total.toInt)))
+            .arguments(query.argument)
             .build(_.option)
             .mapResult(_.getOrElse(Total(0)))
         }

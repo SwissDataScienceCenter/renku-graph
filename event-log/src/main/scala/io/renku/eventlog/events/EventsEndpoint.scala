@@ -81,12 +81,27 @@ object EventsEndpoint {
     eventlogUrl  <- EventLogUrl()
   } yield new EventsEndpointImpl(eventsFinder, eventlogUrl)
 
-  sealed trait Request { val pagingRequest: PagingRequest }
+  sealed trait Request {
+    val pagingRequest: PagingRequest
+  }
+
+  final case class EventInfo(eventId:         EventId,
+                             projectPath:     projects.Path,
+                             status:          EventStatus,
+                             eventDate:       EventDate,
+                             executionDate:   ExecutionDate,
+                             maybeMessage:    Option[EventMessage],
+                             processingTimes: List[StatusProcessingTime]
+  )
+
+  final case class StatusProcessingTime(status: EventStatus, processingTime: EventProcessingTime)
+
   object Request {
     final case class ProjectEvents(projectPath:   projects.Path,
                                    maybeStatus:   Option[EventStatus],
                                    pagingRequest: PagingRequest
     ) extends Request
+
     final case class EventsWithStatus(status: EventStatus, pagingRequest: PagingRequest) extends Request
 
     implicit val show: Show[Request] = Show.show {
@@ -95,15 +110,6 @@ object EventsEndpoint {
       case EventsEndpoint.Request.EventsWithStatus(status, _)          => show"status: $status"
     }
   }
-
-  final case class EventInfo(eventId:         EventId,
-                             status:          EventStatus,
-                             eventDate:       EventDate,
-                             executionDate:   ExecutionDate,
-                             maybeMessage:    Option[EventMessage],
-                             processingTimes: List[StatusProcessingTime]
-  )
-  final case class StatusProcessingTime(status: EventStatus, processingTime: EventProcessingTime)
 
   object EventInfo {
 
@@ -118,6 +124,7 @@ object EventsEndpoint {
 
       json"""{
         "id":              ${eventInfo.eventId.value},
+        "projectPath":     ${eventInfo.projectPath.value},
         "status":          ${eventInfo.status.value},
         "processingTimes": ${eventInfo.processingTimes.map(_.asJson)},
         "date" :           ${eventInfo.eventDate.value.asJson},

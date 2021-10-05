@@ -24,18 +24,21 @@ import ch.datascience.graph.model.events.EventStatus
 import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages, executionDates}
 import io.renku.eventlog.events.EventsEndpoint.{EventInfo, StatusProcessingTime}
 import org.scalacheck.Gen
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import ch.datascience.graph.model.projects
 
 private object Generators {
 
-  lazy val eventInfos: Gen[EventInfo] = for {
+  def eventInfos(projectPathGen: Gen[projects.Path] = projectPaths): Gen[EventInfo] = for {
     id            <- eventIds
+    projectPath   <- projectPathGen
     status        <- eventStatuses
     eventDate     <- eventDates
     executionDate <- executionDates
     maybeMessage  <- eventMessages.toGeneratorOfOptions
     processingTimes <-
       statusProcessingTimeObjects(status).toGeneratorOfList().map(_.sortBy(_.status)).map(_.distinctBy(_.status))
-  } yield EventInfo(id, status, eventDate, executionDate, maybeMessage, processingTimes)
+  } yield EventInfo(id, projectPath, status, eventDate, executionDate, maybeMessage, processingTimes)
 
   def statusProcessingTimeObjects(lowerThan: EventStatus): Gen[StatusProcessingTime] = for {
     status         <- Gen.oneOf(EventStatus.statusesOrdered.takeWhile(Ordering[EventStatus].lteq(_, lowerThan)))
