@@ -67,7 +67,7 @@ triplesGenerator:
     rateLimit: 30/sec
   ## a demanded number of concurrent triples generation processes
   generationProcessesNumber: 4
-  transformationProcessesNumber: 4
+  transformationProcessesNumber: 2
   threadsNumber: 6
   # set this to a pip-installable renku-python version which will be installed on startup
   renkuPythonDevVersion:
@@ -107,8 +107,8 @@ eventLog:
     requests:
       memory: 250Mi
     limits:
-      memory: 1200Mi
-  jvmXmx: 512M
+      memory: 2000Mi
+  jvmXmx: 1G
   threadsNumber: 6
   connectionPool: 10
 

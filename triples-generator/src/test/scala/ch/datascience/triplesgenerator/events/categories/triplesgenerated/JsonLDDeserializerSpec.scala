@@ -48,7 +48,7 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
 
     "successfully deserialize JsonLD to the model" in new TestCase {
       val project = anyProjectEntities
-        .withDatasets(datasetEntities(ofAnyProvenance))
+        .withDatasets(datasetEntities(provenanceNonModified))
         .withActivities(activityEntities)
         .generateOne
 
@@ -110,7 +110,7 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
 
     "fail if no project is found in the JsonLD" in new TestCase {
       val project = anyProjectEntities
-        .withDatasets(datasetEntities(ofAnyProvenance))
+        .withDatasets(datasetEntities(provenanceNonModified))
         .withActivities(activityEntities)
         .generateOne
 

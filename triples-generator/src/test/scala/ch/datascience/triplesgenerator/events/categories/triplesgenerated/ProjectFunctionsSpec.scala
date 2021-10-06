@@ -21,7 +21,7 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model._
-import ch.datascience.graph.model.testentities.{::~, activityEntities, anyProjectEntities, anyVisibility, creatorsLens, datasetEntities, ofAnyProvenance, personEntities, planEntities, projectEntities, projectWithParentEntities, provenanceLens, _}
+import ch.datascience.graph.model.testentities.{::~, activityEntities, anyProjectEntities, anyVisibility, creatorsLens, datasetEntities, provenanceNonModified, personEntities, planEntities, projectEntities, projectWithParentEntities, provenanceLens, _}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -35,7 +35,7 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
       forAll(
         anyProjectEntities
           .withActivities(activityEntities(planEntities()))
-          .withDatasets(datasetEntities(ofAnyProvenance))
+          .withDatasets(datasetEntities(provenanceNonModified))
           .map(_.to[entities.Project])
       ) { project =>
         findAllPersons(project) shouldBe project.members ++ project.maybeCreator ++ project.activities
@@ -93,10 +93,10 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
 
       val project = anyProjectEntities
         .withDatasets(
-          datasetEntities(ofAnyProvenance).modify(
+          datasetEntities(provenanceNonModified).modify(
             provenanceLens.modify(creatorsLens.modify(_ => Set(oldPerson, personEntities.generateOne)))
           ),
-          datasetEntities(ofAnyProvenance)
+          datasetEntities(provenanceNonModified)
         )
         .generateOne
         .to[entities.Project]
@@ -117,14 +117,14 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
 
     "replace the old dataset with the new one" in {
       val (_, project) = anyProjectEntities
-        .addDataset(datasetEntities(ofAnyProvenance))
-        .addDataset(datasetEntities(ofAnyProvenance))
+        .addDataset(datasetEntities(provenanceNonModified))
+        .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
         .map(_.to[entities.Project])
 
       val dataset1 :: dataset2Old :: Nil = project.datasets
 
-      val dataset2New = datasetEntities(ofAnyProvenance)(renkuBaseUrl)(project.dateCreated).generateOne
+      val dataset2New = datasetEntities(provenanceNonModified)(renkuBaseUrl)(project.dateCreated).generateOne
         .to[entities.Dataset[entities.Dataset.Provenance]]
 
       update(dataset2Old, dataset2New)(project).datasets should contain theSameElementsAs List(dataset1, dataset2New)

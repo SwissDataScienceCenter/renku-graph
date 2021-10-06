@@ -43,7 +43,7 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with InMemoryRdfStore with sho
     }
 
     "return topmostSameAs for the given id" in new TestCase {
-      val dataset = datasetEntities(ofAnyProvenance).decoupledFromProject.generateOne
+      val dataset = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
         .to[entities.Dataset[entities.Dataset.Provenance]]
 
       loadToStore(dataset)
@@ -60,7 +60,7 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with InMemoryRdfStore with sho
     }
 
     "return topmostSameAs for the given id" in new TestCase {
-      val dataset = datasetEntities(ofAnyProvenance).decoupledFromProject.generateOne
+      val dataset = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
         .to[entities.Dataset[entities.Dataset.Provenance]]
 
       loadToStore(dataset)
@@ -79,7 +79,7 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with InMemoryRdfStore with sho
     }
 
     "return the dataset's topmostSameAs if this dataset has one" in new TestCase {
-      val dataset = datasetEntities(ofAnyProvenance).decoupledFromProject.generateOne
+      val dataset = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
 
       loadToStore(dataset)
 
@@ -91,7 +91,7 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with InMemoryRdfStore with sho
     }
 
     "return None if there's a dataset with the given id but it has no topmostSameAs" in new TestCase {
-      val dataset = datasetEntities(ofAnyProvenance).decoupledFromProject.generateOne
+      val dataset = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
 
       loadToStore(dataset)
 
@@ -112,7 +112,7 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with InMemoryRdfStore with sho
     }
 
     "return the dataset's topmostDerivedFrom if this dataset has one" in new TestCase {
-      val dataset = datasetEntities(ofAnyProvenance).decoupledFromProject.generateOne
+      val dataset = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
 
       loadToStore(dataset)
 
@@ -124,7 +124,7 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with InMemoryRdfStore with sho
     }
 
     "return None if there's a dataset with the given id but it has no topmostDerivedFrom" in new TestCase {
-      val dataset = datasetEntities(ofAnyProvenance).decoupledFromProject.generateOne
+      val dataset = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
 
       loadToStore(dataset)
 
