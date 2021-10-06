@@ -34,22 +34,21 @@ private trait UpdatesUploader[Interpretation[_]] {
 }
 
 private class UpdatesUploaderImpl[Interpretation[_]: ConcurrentEffect: Timer](
-    rdfStoreConfig: RdfStoreConfig,
-    timeRecorder:   SparqlQueryTimeRecorder[Interpretation],
-    retryInterval:  FiniteDuration = SleepAfterConnectionIssue,
-    maxRetries:     Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-    idleTimeout:    Duration = 5 minutes,
-    requestTimeout: Duration = 4 minutes
-)(implicit
-    executionContext: ExecutionContext,
-    logger:           Logger[Interpretation]
-) extends RdfStoreClientImpl[Interpretation](rdfStoreConfig,
-                                             logger,
-                                             timeRecorder,
-                                             retryInterval,
-                                             maxRetries,
-                                             idleTimeoutOverride = idleTimeout.some,
-                                             requestTimeoutOverride = requestTimeout.some
+    rdfStoreConfig:          RdfStoreConfig,
+    logger:                  Logger[Interpretation],
+    timeRecorder:            SparqlQueryTimeRecorder[Interpretation],
+    retryInterval:           FiniteDuration = SleepAfterConnectionIssue,
+    maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
+    idleTimeout:             Duration = 5 minutes,
+    requestTimeout:          Duration = 4 minutes
+)(implicit executionContext: ExecutionContext)
+    extends RdfStoreClientImpl[Interpretation](rdfStoreConfig,
+                                               logger,
+                                               timeRecorder,
+                                               retryInterval,
+                                               maxRetries,
+                                               idleTimeoutOverride = idleTimeout.some,
+                                               requestTimeoutOverride = requestTimeout.some
     )
     with UpdatesUploader[Interpretation] {
 
