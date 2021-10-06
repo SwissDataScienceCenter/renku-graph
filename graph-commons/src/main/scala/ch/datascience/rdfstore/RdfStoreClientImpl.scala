@@ -34,20 +34,24 @@ import org.http4s.{Header, Uri}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration.{Duration, FiniteDuration}
 
 abstract class RdfStoreClientImpl[Interpretation[_]: ConcurrentEffect: Timer](
     rdfStoreConfig:          RdfStoreConfig,
     logger:                  Logger[Interpretation],
     timeRecorder:            SparqlQueryTimeRecorder[Interpretation],
     retryInterval:           FiniteDuration = SleepAfterConnectionIssue,
-    maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
+    maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
+    idleTimeoutOverride:     Option[Duration] = None,
+    requestTimeoutOverride:  Option[Duration] = None
 )(implicit executionContext: ExecutionContext)
     extends RestClient[Interpretation, RdfStoreClientImpl[Interpretation]](Throttler.noThrottling,
                                                                            logger,
                                                                            Some(timeRecorder.instance),
                                                                            retryInterval,
-                                                                           maxRetries
+                                                                           maxRetries,
+                                                                           idleTimeoutOverride,
+                                                                           requestTimeoutOverride
     ) {
 
   import RdfStoreClientImpl._

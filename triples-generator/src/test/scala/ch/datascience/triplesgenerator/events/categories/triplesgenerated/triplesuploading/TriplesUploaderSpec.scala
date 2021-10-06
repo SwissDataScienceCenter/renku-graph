@@ -89,16 +89,11 @@ class TriplesUploaderSpec extends AnyWordSpec with MockFactory with ExternalServ
 
     val triples = jsonLDEntities.generateOne
 
-    private val logger       = TestLogger[IO]()
+    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
     private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
     lazy val rdfStoreConfig  = rdfStoreConfigs.generateOne.copy(fusekiBaseUrl = FusekiBaseUrl(externalServiceBaseUrl))
-    lazy val triplesUploader = new TriplesUploaderImpl[IO](
-      rdfStoreConfig,
-      logger,
-      timeRecorder,
-      retryInterval = 100 millis,
-      maxRetries = 1
-    )
+    lazy val triplesUploader =
+      new TriplesUploaderImpl[IO](rdfStoreConfig, timeRecorder, retryInterval = 100 millis, maxRetries = 1)
 
     def givenUploader(returning: ResponseDefinitionBuilder) = stubFor {
       post(s"/${rdfStoreConfig.datasetName}/data")

@@ -87,16 +87,11 @@ class UpdatesUploaderSpec extends AnyWordSpec with ExternalServiceStubbing with 
   private trait TestCase {
     val query = sparqlQueries.generateOne
 
-    private val logger       = TestLogger[IO]()
+    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
     private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
     lazy val rdfStoreConfig  = rdfStoreConfigs.generateOne.copy(fusekiBaseUrl = FusekiBaseUrl(externalServiceBaseUrl))
-    lazy val updater = new UpdatesUploaderImpl[IO](
-      rdfStoreConfig,
-      logger,
-      timeRecorder,
-      retryInterval = 100 millis,
-      maxRetries = 1
-    )
+    lazy val updater =
+      new UpdatesUploaderImpl[IO](rdfStoreConfig, timeRecorder, retryInterval = 100 millis, maxRetries = 1)
 
     def givenStore(forUpdate: SparqlQuery, returning: ResponseDefinitionBuilder) = stubFor {
       post(s"/${rdfStoreConfig.datasetName}/update")

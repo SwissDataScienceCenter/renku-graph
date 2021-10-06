@@ -113,19 +113,17 @@ private[triplesgenerated] object TransformationStepsRunner {
 
   import cats.effect.IO
 
-  def apply(
-      logger:       Logger[IO],
-      timeRecorder: SparqlQueryTimeRecorder[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      concurrentEffect: ConcurrentEffect[IO],
-      timer:            Timer[IO]
+  def apply(timeRecorder: SparqlQueryTimeRecorder[IO])(implicit
+      executionContext:   ExecutionContext,
+      concurrentEffect:   ConcurrentEffect[IO],
+      timer:              Timer[IO],
+      logger:             Logger[IO]
   ): IO[TransformationStepsRunnerImpl[IO]] = for {
     rdfStoreConfig <- RdfStoreConfig[IO]()
     renkuBaseUrl   <- RenkuBaseUrlLoader[IO]()
     gitlabUrl      <- GitLabUrlLoader[IO]()
-  } yield new TransformationStepsRunnerImpl[IO](new TriplesUploaderImpl[IO](rdfStoreConfig, logger, timeRecorder),
-                                                new UpdatesUploaderImpl(rdfStoreConfig, logger, timeRecorder),
+  } yield new TransformationStepsRunnerImpl[IO](new TriplesUploaderImpl[IO](rdfStoreConfig, timeRecorder),
+                                                new UpdatesUploaderImpl(rdfStoreConfig, timeRecorder),
                                                 renkuBaseUrl,
                                                 gitlabUrl
   )

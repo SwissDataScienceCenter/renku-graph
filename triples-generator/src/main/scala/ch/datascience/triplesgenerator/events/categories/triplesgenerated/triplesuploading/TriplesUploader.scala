@@ -42,13 +42,12 @@ private trait TriplesUploader[Interpretation[_]] {
 
 private class TriplesUploaderImpl[Interpretation[_]: ConcurrentEffect: Timer](
     rdfStoreConfig:          RdfStoreConfig,
-    logger:                  Logger[Interpretation],
     timeRecorder:            SparqlQueryTimeRecorder[Interpretation],
     retryInterval:           FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     idleTimeout:             Duration = 6 minutes,
     requestTimeout:          Duration = 5 minutes
-)(implicit executionContext: ExecutionContext)
+)(implicit executionContext: ExecutionContext, logger: Logger[Interpretation])
     extends RestClient[Interpretation, Any](Throttler.noThrottling,
                                             logger,
                                             maybeTimeRecorder = timeRecorder.instance.some,
@@ -102,21 +101,18 @@ private class TriplesUploaderImpl[Interpretation[_]: ConcurrentEffect: Timer](
 }
 
 private object TriplesUploader {
-  def apply(rdfStoreConfig:    RdfStoreConfig,
-            logger:            Logger[IO],
-            timeRecorder:      SparqlQueryTimeRecorder[IO],
-            retryInterval:     FiniteDuration = SleepAfterConnectionIssue,
-            maxRetries:        Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-            idleTimeout:       Duration = 6 minutes,
-            requestTimeout:    Duration = 5 minutes
-  )(implicit executionContext: ExecutionContext, concurrentEffect: ConcurrentEffect[IO], timer: Timer[IO]) = IO(
-    new TriplesUploaderImpl[IO](rdfStoreConfig,
-                                logger,
-                                timeRecorder,
-                                retryInterval,
-                                maxRetries,
-                                idleTimeout,
-                                requestTimeout
-    )
+  def apply(rdfStoreConfig: RdfStoreConfig,
+            timeRecorder:   SparqlQueryTimeRecorder[IO],
+            retryInterval:  FiniteDuration = SleepAfterConnectionIssue,
+            maxRetries:     Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
+            idleTimeout:    Duration = 6 minutes,
+            requestTimeout: Duration = 5 minutes
+  )(implicit
+      executionContext: ExecutionContext,
+      concurrentEffect: ConcurrentEffect[IO],
+      timer:            Timer[IO],
+      logger:           Logger[IO]
+  ) = IO(
+    new TriplesUploaderImpl[IO](rdfStoreConfig, timeRecorder, retryInterval, maxRetries, idleTimeout, requestTimeout)
   )
 }

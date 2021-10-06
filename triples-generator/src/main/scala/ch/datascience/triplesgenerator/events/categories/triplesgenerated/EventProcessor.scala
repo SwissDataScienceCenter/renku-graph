@@ -220,7 +220,7 @@ private object EventProcessor {
       timer:            Timer[IO],
       logger:           Logger[IO]
   ): IO[EventProcessor[IO]] = for {
-    uploader              <- TransformationStepsRunner(logger, timeRecorder)
+    uploader              <- TransformationStepsRunner(timeRecorder)
     accessTokenFinder     <- AccessTokenFinder(logger)
     triplesCurator        <- TriplesCurator(timeRecorder)
     eventStatusUpdater    <- EventStatusUpdater(categoryName, logger)
