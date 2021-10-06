@@ -26,7 +26,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.projects.Path
-import ch.datascience.graph.model.testentities.generators.EntitiesGenerators._
+import ch.datascience.graph.model.testentities._
 import ch.datascience.graph.model.users.{Affiliation, Email, Name => UserName}
 import ch.datascience.graph.model.{RenkuBaseUrl, projects}
 import ch.datascience.http.InfoMessage._
@@ -65,7 +65,8 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
             .addDataset(datasetEntities(provenanceImportedExternal))
             .map((importedExternalToNonModified _).tupled),
           anyProjectEntities
-            .addDataset(datasetEntities(provenanceModified))
+            .addDatasetAndModification(datasetEntities(provenanceInternal))
+            .map { case (_ ::~ modified, project) => modified -> project }
             .map((modifiedToModified _).tupled)
         )
       ) { dataset =>

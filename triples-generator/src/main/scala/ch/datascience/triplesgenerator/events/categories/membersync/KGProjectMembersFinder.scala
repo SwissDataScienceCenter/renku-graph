@@ -70,7 +70,7 @@ private class KGProjectMembersFinderImpl(
     Prefixes.of(schema -> "schema", rdf -> "rdf"),
     s"""|SELECT DISTINCT ?memberId ?gitLabId
         |WHERE {
-        |  ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]} rdf:type      <http://schema.org/Project>;
+        |  ${ResourceId(path)(renkuBaseUrl).showAs[RdfResource]} rdf:type      <http://schema.org/Project>;
         |                                                        schema:member ?memberId.                                                     
         |  ?sameAsId  schema:additionalType  'GitLab';
         |             schema:identifier      ?gitLabId ;

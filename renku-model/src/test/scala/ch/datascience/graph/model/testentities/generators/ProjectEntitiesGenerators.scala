@@ -53,7 +53,7 @@ trait ProjectEntitiesGenerators {
         List.fill(nonNegativeInts(max = 5).generateOne.value)(activityEntities(planEntities())): _*
       )
       .withDatasets(
-        List.fill(nonNegativeInts(max = 5).generateOne.value)(datasetEntities(ofAnyProvenance)): _*
+        List.fill(nonNegativeInts(max = 5).generateOne.value)(datasetEntities(provenanceNonModified)): _*
       )
 
   def projectEntities(

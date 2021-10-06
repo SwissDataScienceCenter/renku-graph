@@ -68,7 +68,7 @@ private class ProjectDatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Tim
     Prefixes.of(renku -> "renku", schema -> "schema", prov -> "prov"),
     s"""|SELECT ?identifier ?name ?slug ?topmostSameAs ?maybeDerivedFrom ?initialVersion (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
         |WHERE {
-        |    ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]} a schema:Project;
+        |    ${ResourceId(path)(renkuBaseUrl).showAs[RdfResource]} a schema:Project;
         |                                                          renku:hasDataset ?datasetId.
         |    ?datasetId a schema:Dataset;
         |               schema:identifier ?identifier;

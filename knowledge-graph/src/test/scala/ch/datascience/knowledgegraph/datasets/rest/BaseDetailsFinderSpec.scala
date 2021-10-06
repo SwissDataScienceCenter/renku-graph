@@ -79,9 +79,9 @@ class BaseDetailsFinderSpec
 
     "decode result-set with a blank description, url, sameAs, and images to a Dataset object" in {
       forAll(
-        anyProjectEntities.addDataset(datasetEntities(provenanceModified)),
+        anyProjectEntities.addDatasetAndModification(datasetEntities(provenanceNonModified)),
         blankStrings()
-      ) { case ((dataset, project), description) =>
+      ) { case ((_ ::~ dataset, project), description) =>
         modifiedToResultSet(project, dataset, description).as[List[model.Dataset]](datasetsDecoder) shouldBe List(
           modifiedToModified(dataset, project)
             .copy(creators = Set.empty)

@@ -47,7 +47,7 @@ class ProjectDatasetsFinderSpec
       val (modification2, projectComplete) = project.addDataset(modification1.createModification())
 
       loadToStore(
-        projectEntities(anyVisibility).addDataset(datasetEntities(ofAnyProvenance)).generateOne._2,
+        projectEntities(anyVisibility).addDataset(datasetEntities(provenanceNonModified)).generateOne._2,
         projectComplete
       )
 

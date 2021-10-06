@@ -34,7 +34,7 @@ class PublicationEventSpec extends AnyWordSpec with should.Matchers with ScalaCh
 
     "turn JsonLD PublicationEvent entity into the PublicationEvent object" in {
       val startDate = timestampsNotInTheFuture.generateOne
-      val dataset   = datasetEntities(ofAnyProvenance).decoupledFromProject.generateOne
+      val dataset   = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
       forAll(publicationEventFactories(startDate)) { eventFactory: (Dataset[Dataset.Provenance] => PublicationEvent) =>
         val event = eventFactory(dataset)
         event.asJsonLD.cursor.as[entities.PublicationEvent] shouldBe event.to[entities.PublicationEvent].asRight

@@ -176,7 +176,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
     runQuery(
       s"""|SELECT DISTINCT ?gitLabId
           |WHERE {
-          |  ${projects.ResourceId(renkuBaseUrl, path).showAs[RdfResource]} schema:member ?memberId.
+          |  ${projects.ResourceId(path).showAs[RdfResource]} schema:member ?memberId.
           |  ?memberId  rdf:type      schema:Person;
           |             schema:sameAs ?sameAsId. 
           |             
@@ -193,7 +193,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
     runQuery(
       s"""|SELECT DISTINCT ?gitLabId ?email
           |WHERE {
-          |  ${projects.ResourceId(renkuBaseUrl, path).showAs[RdfResource]} schema:member ?memberId.
+          |  ${projects.ResourceId(path).showAs[RdfResource]} schema:member ?memberId.
           |  ?memberId  rdf:type     schema:Person;
           |             schema:sameAs ?sameAsId. 
           |             

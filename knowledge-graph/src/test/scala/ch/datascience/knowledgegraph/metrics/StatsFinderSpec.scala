@@ -49,7 +49,7 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
     "return info about number of objects by types" in new TestCase {
 
       val projectsWithDatasets =
-        anyProjectEntities.addDataset(datasetEntities(ofAnyProvenance)).generateNonEmptyList().toList
+        anyProjectEntities.addDataset(datasetEntities(provenanceNonModified)).generateNonEmptyList().toList
       val projectsWithActivities = anyProjectEntities
         .withActivities(activityEntities(planEntities()))
         .generateNonEmptyList(minElements = 10, maxElements = 50)

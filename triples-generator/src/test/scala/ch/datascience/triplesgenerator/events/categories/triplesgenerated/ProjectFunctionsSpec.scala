@@ -21,7 +21,7 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model._
-import ch.datascience.graph.model.testentities.{::~, activityEntities, anyProjectEntities, anyVisibility, creatorsLens, datasetEntities, provenanceNonModified, personEntities, planEntities, projectEntities, projectWithParentEntities, provenanceLens, _}
+import ch.datascience.graph.model.testentities.{::~, activityEntities, anyProjectEntities, anyVisibility, creatorsLens, datasetAndModificationEntities, datasetEntities, personEntities, planEntities, projectEntities, projectWithParentEntities, provenanceInternal, provenanceLens, provenanceNonModified, _}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -135,13 +135,13 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
 
     "return all datasets with ImportedInternalAncestorExternal or ImportedInternalAncestorInternal provenance" +
       "which are not invalidated" in {
-        val (importedInternalAncestorInternal ::~ importedInternalAncestorExternal ::~ _ ::~ _ ::~ _, project) =
+        val (importedInternalAncestorInternal ::~ importedInternalAncestorExternal ::~ _ ::~ _ ::~ _ ::~ _, project) =
           anyProjectEntities
             .addDataset(datasetEntities(provenanceImportedInternalAncestorInternal))
             .addDataset(datasetEntities(provenanceImportedInternalAncestorExternal))
             .addDataset(datasetEntities(provenanceInternal))
             .addDataset(datasetEntities(provenanceImportedExternal))
-            .addDataset(datasetEntities(provenanceModified))
+            .addDatasetAndModification(datasetEntities(provenanceInternal))
             .generateOne
 
         val originalImportedInternal =
@@ -158,17 +158,20 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
 
   "findModifiedDatasets" should {
     "return all datasets with Provenance.Modified which are not invalidations" in {
-      val (modified ::~ _ ::~ _ ::~ _ ::~ _, project) = anyProjectEntities
-        .addDataset(datasetEntities(provenanceModified))
+      val (_ ::~ modified ::~ _ ::~ _ ::~ _ ::~ _, project) = anyProjectEntities
+        .addDatasetAndModification(datasetEntities(provenanceInternal))
         .addDataset(datasetEntities(provenanceInternal))
         .addDataset(datasetEntities(provenanceImportedExternal))
         .addDataset(datasetEntities(provenanceImportedInternalAncestorInternal))
         .addDataset(datasetEntities(provenanceImportedInternalAncestorExternal))
         .generateOne
 
-      val originalModified = datasetEntities(provenanceModified)(renkuBaseUrl)(project.dateCreated).generateOne
+      val (original, modifiedBeforeInvalidation, modifiedInvalidated) =
+        datasetAndModificationEntities(provenanceInternal, projectDateCreated = project.dateCreated).map {
+          case (orig, modified) => (orig, modified, modified.invalidateNow)
+        }.generateOne
       val projectWithAllDatasets =
-        project.addDatasets(originalModified, originalModified.invalidateNow).to[entities.Project]
+        project.addDatasets(original, modifiedBeforeInvalidation, modifiedInvalidated).to[entities.Project]
 
       findModifiedDatasets(projectWithAllDatasets) should contain theSameElementsAs List(
         modified.to[entities.Dataset[entities.Dataset.Provenance.Modified]]
@@ -179,18 +182,30 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
   "findInvalidatedDatasets" should {
     "find all invalidated datasets and not valid datasets or invalidation datasets" in {
 
-      val (internal ::~ _ ::~ importedExternal ::~ _ ::~ ancestorInternal ::~ _ ::~ ancestorExternal ::~ _ ::~ modified ::~ _ ::~ _,
-           project
-      ) = anyProjectEntities
-        .addDatasetAndInvalidation(datasetEntities(provenanceInternal))
-        .addDatasetAndInvalidation(datasetEntities(provenanceImportedExternal))
-        .addDatasetAndInvalidation(datasetEntities(provenanceImportedInternalAncestorInternal))
-        .addDatasetAndInvalidation(datasetEntities(provenanceImportedInternalAncestorExternal))
-        .addDatasetAndInvalidation(datasetEntities(provenanceModified))
-        .addDataset(datasetEntities(provenanceModified))
-        .generateOne
+      val (internal ::~ _ ::~ importedExternal ::~ _ ::~ ancestorInternal ::~ _ ::~ ancestorExternal ::~ _, project) =
+        anyProjectEntities
+          .addDatasetAndInvalidation(datasetEntities(provenanceInternal))
+          .addDatasetAndInvalidation(datasetEntities(provenanceImportedExternal))
+          .addDatasetAndInvalidation(datasetEntities(provenanceImportedInternalAncestorInternal))
+          .addDatasetAndInvalidation(datasetEntities(provenanceImportedInternalAncestorExternal))
+          .generateOne
+      val (beforeModification, modified, modificationInvalidated) =
+        datasetAndModificationEntities(provenanceInternal, projectDateCreated = project.dateCreated).map {
+          case internal ::~ modified => (internal, modified, modified.invalidateNow)
+        }.generateOne
+      val (beforeNotInvalidatedModification, notInvalidatedModification) =
+        datasetAndModificationEntities(provenanceInternal, projectDateCreated = project.dateCreated).generateOne
 
-      findInvalidatedDatasets(project.to[entities.Project]) should contain theSameElementsAs List(
+      findInvalidatedDatasets(
+        project
+          .addDatasets(beforeModification,
+                       modified,
+                       modificationInvalidated,
+                       beforeNotInvalidatedModification,
+                       notInvalidatedModification
+          )
+          .to[entities.Project]
+      ) should contain theSameElementsAs List(
         internal,
         importedExternal,
         ancestorInternal,

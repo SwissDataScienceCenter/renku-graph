@@ -22,11 +22,11 @@ package generators
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{nonEmptyStrings, sentences, timestamps}
-import ch.datascience.graph.model.GraphModelGenerators.{datasetCreatedDates, datasetDerivedFroms, datasetDescriptions, datasetExternalSameAs, datasetIdentifiers, datasetImageUris, datasetInitialVersions, datasetInternalSameAs, datasetKeywords, datasetLicenses, datasetNames, datasetPartExternals, datasetPartSources, datasetPublishedDates, datasetTitles, datasetVersions, projectCreatedDates}
-import ch.datascience.graph.model._
-import ch.datascience.graph.model.datasets.{DerivedFrom, ExternalSameAs, Identifier, InitialVersion, PartId, TopmostDerivedFrom, TopmostSameAs}
+import ch.datascience.graph.model.GraphModelGenerators.{datasetCreatedDates, datasetDescriptions, datasetExternalSameAs, datasetIdentifiers, datasetImageUris, datasetInitialVersions, datasetInternalSameAs, datasetKeywords, datasetLicenses, datasetNames, datasetPartExternals, datasetPartSources, datasetPublishedDates, datasetTitles, datasetVersions, projectCreatedDates}
+import ch.datascience.graph.model.datasets.{DerivedFrom, ExternalSameAs, Identifier, InitialVersion, PartId, TopmostSameAs}
 import ch.datascience.graph.model.testentities.Dataset.{AdditionalInfo, Identification, Provenance}
 import ch.datascience.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
+import ch.datascience.graph.model._
 import ch.datascience.tinytypes.InstantTinyType
 import eu.timepit.refined.auto._
 import monocle.Lens
@@ -67,42 +67,50 @@ trait DatasetEntitiesGenerators {
       )
       .fold(errors => throw new IllegalStateException(errors.intercalate("; ")), identity)
 
+  def datasetAndModificationEntities[P <: Dataset.Provenance](
+      provenance:          ProvenanceGen[P],
+      projectDateCreated:  projects.DateCreated = projectCreatedDates().generateOne
+  )(implicit renkuBaseUrl: RenkuBaseUrl): Gen[(Dataset[P], Dataset[Dataset.Provenance.Modified])] = for {
+    original <- datasetEntities(provenance)(renkuBaseUrl)(projectDateCreated)
+    modified <- modifiedDatasetEntities(original, projectDateCreated)
+  } yield original -> modified
+
   def modifiedDatasetEntities(
-      original:            Dataset[Provenance]
-  )(implicit renkuBaseUrl: RenkuBaseUrl): DatasetGenFactory[Provenance.Modified] = projectDateCreated =>
-    for {
-      identifier <- datasetIdentifiers
-      title      <- datasetTitles
-      date <- datasetCreatedDates(
-                List(original.provenance.date.instant, projectDateCreated.value).max
-              )
-      modifyingPerson <- personEntities
-      additionalInfo  <- datasetAdditionalInfos
-      parts           <- datasetPartEntities(date.instant).toGeneratorOfList()
-      publicationEventFactories <- publicationEventFactories {
-                                     date match {
-                                       case dateCreated: datasets.DateCreated => dateCreated.value
-                                       case _ => projectDateCreated.value
-                                     }
-                                   }.toGeneratorOfList()
-    } yield Dataset
-      .from(
-        original.identification.copy(identifier = identifier, title = title),
-        Provenance.Modified(
-          Dataset.entityId(identifier),
-          DerivedFrom(original.entityId),
-          original.provenance.topmostDerivedFrom,
-          original.provenance.initialVersion,
-          date,
-          original.provenance.creators + modifyingPerson,
-          maybeInvalidationTime = None
-        ),
-        additionalInfo,
-        parts,
-        publicationEventFactories,
-        projectDateCreated
-      )
-      .fold(errors => throw new IllegalStateException(errors.intercalate("; ")), identity)
+      original:            Dataset[Provenance],
+      projectDateCreated:  projects.DateCreated
+  )(implicit renkuBaseUrl: RenkuBaseUrl): Gen[Dataset[Dataset.Provenance.Modified]] = for {
+    identifier <- datasetIdentifiers
+    title      <- datasetTitles
+    date <- datasetCreatedDates(
+              List(original.provenance.date.instant, projectDateCreated.value).max
+            )
+    modifyingPerson <- personEntities
+    additionalInfo  <- datasetAdditionalInfos
+    parts           <- datasetPartEntities(date.instant).toGeneratorOfList()
+    publicationEventFactories <- publicationEventFactories {
+                                   date match {
+                                     case dateCreated: datasets.DateCreated => dateCreated.value
+                                     case _ => projectDateCreated.value
+                                   }
+                                 }.toGeneratorOfList()
+  } yield Dataset
+    .from(
+      original.identification.copy(identifier = identifier, title = title),
+      Provenance.Modified(
+        Dataset.entityId(identifier),
+        DerivedFrom(original.entityId),
+        original.provenance.topmostDerivedFrom,
+        original.provenance.initialVersion,
+        date,
+        original.provenance.creators + modifyingPerson,
+        maybeInvalidationTime = None
+      ),
+      additionalInfo,
+      parts,
+      publicationEventFactories,
+      projectDateCreated
+    )
+    .fold(errors => throw new IllegalStateException(errors.intercalate("; ")), identity)
 
   val datasetIdentifications: Gen[Dataset.Identification] = for {
     identifier <- datasetIdentifiers
@@ -181,31 +189,6 @@ trait DatasetEntitiesGenerators {
     )
   }.head
 
-  val provenanceModified: ProvenanceGen[Dataset.Provenance.Modified] = (identifier, projectDateCreated) =>
-    implicit renkuBaseUrl =>
-      for {
-        date        <- datasetCreatedDates(projectDateCreated.value)
-        derivedFrom <- datasetDerivedFroms
-        creators    <- personEntities.toGeneratorOfSet(maxElements = 1)
-      } yield Dataset.Provenance.Modified(Dataset.entityId(identifier),
-                                          derivedFrom,
-                                          TopmostDerivedFrom(derivedFrom),
-                                          InitialVersion(identifier),
-                                          date,
-                                          creators,
-                                          maybeInvalidationTime = None
-      )
-
-  val ofAnyProvenance: ProvenanceGen[Dataset.Provenance] = (identifier, projectDateCreated) =>
-    renkuBaseUrl =>
-      Gen.oneOf(
-        provenanceInternal(identifier, projectDateCreated)(renkuBaseUrl),
-        provenanceImportedExternal(identifier, projectDateCreated)(renkuBaseUrl),
-        provenanceImportedInternalAncestorExternal(identifier, projectDateCreated)(renkuBaseUrl),
-        provenanceImportedInternalAncestorInternal(identifier, projectDateCreated)(renkuBaseUrl),
-        provenanceModified(identifier, projectDateCreated)(renkuBaseUrl)
-      )
-
   val datasetAdditionalInfos: Gen[Dataset.AdditionalInfo] = for {
     maybeDescription <- datasetDescriptions.toGeneratorOfOptions
     keywords         <- datasetKeywords.toGeneratorOfList()
@@ -239,6 +222,8 @@ trait DatasetEntitiesGenerators {
     def createMultiple(max: Int): List[DatasetGenFactory[P]] = List.fill(Random.nextInt(max - 1) + 1)(factory)
 
     def toGeneratorFor(project: Project): Gen[Dataset[P]] = factory(project.dateCreated)
+
+    def withDateAfter(projectDate: projects.DateCreated): Gen[Dataset[P]] = factory(projectDate)
 
     def withDateBefore(
         max:           InstantTinyType

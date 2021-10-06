@@ -43,7 +43,7 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
       "- a case of a non-modified renku dataset used in a single project" in new TestCase {
 
         forAll(anyProjectEntities addDataset datasetEntities(provenanceInternal),
-               anyProjectEntities addDataset datasetEntities(ofAnyProvenance)
+               anyProjectEntities addDataset datasetEntities(provenanceNonModified)
         ) { case ((dataset, project), (_, otherProject)) =>
           loadToStore(project, otherProject)
 
@@ -61,7 +61,10 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
         val (dataset2, project2) =
           anyProjectEntities.addDataset(datasetEntities(provenanceImportedExternal(commonSameAs))).generateOne
 
-        loadToStore(project1, project2, anyProjectEntities.addDataset(datasetEntities(ofAnyProvenance)).generateOne._2)
+        loadToStore(project1,
+                    project2,
+                    anyProjectEntities.addDataset(datasetEntities(provenanceNonModified)).generateOne._2
+        )
 
         datasetFinder.findDataset(dataset1.identifier).unsafeRunSync() shouldBe Some(
           importedExternalToNonModified(dataset1, project1)

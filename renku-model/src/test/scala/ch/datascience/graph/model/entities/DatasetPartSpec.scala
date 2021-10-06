@@ -42,7 +42,7 @@ class DatasetPartSpec extends AnyWordSpec with should.Matchers with ScalaCheckPr
     }
 
     "turn JsonLD DatasetPart with InvalidationTime entity into the DatasetPart object" in {
-      forAll(datasetEntities(ofAnyProvenance).decoupledFromProject) { dataset =>
+      forAll(datasetEntities(provenanceNonModified).decoupledFromProject) { dataset =>
         val datasetPart      = datasetPartEntities(dataset.provenance.date.instant).generateOne
         val invalidationTime = invalidationTimes(datasetPart.dateCreated.value).generateOne
         val invalidatedDataset = dataset

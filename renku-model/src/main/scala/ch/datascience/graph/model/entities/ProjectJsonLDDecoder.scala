@@ -37,7 +37,7 @@ object ProjectJsonLDDecoder {
         allPersons    <- findAllPersons(gitLabInfo)
         activities    <- findAllActivities(gitLabInfo)
         datasets      <- findAllDatasets(gitLabInfo)
-        resourceId    <- ResourceId(renkuBaseUrl, gitLabInfo.path).asRight
+        resourceId    <- ResourceId(gitLabInfo.path).asRight
         earliestDate = List(dateCreated, gitLabInfo.dateCreated).min
         project <-
           newProject(gitLabInfo, resourceId, earliestDate, agent, schemaVersion, allPersons, activities, datasets)
@@ -119,7 +119,7 @@ object ProjectJsonLDDecoder {
             schemaVersion,
             activities,
             datasets,
-            parentResourceId = ResourceId(renkuBaseUrl, parentPath)
+            parentResourceId = ResourceId(parentPath)
           )
       case None =>
         ProjectWithoutParent

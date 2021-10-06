@@ -58,7 +58,7 @@ private class NodeDetailsFinderImpl(
   )(implicit query: (T, ResourceId) => SparqlQuery): IO[Set[Node]] =
     ids.toList
       .map { id =>
-        queryExpecting[Option[Node]](using = query(id, ResourceId(renkuBaseUrl, projectPath))).flatMap(failIf(no = id))
+        queryExpecting[Option[Node]](using = query(id, ResourceId(projectPath)(renkuBaseUrl))).flatMap(failIf(no = id))
       }
       .parSequence
       .map(_.toSet)

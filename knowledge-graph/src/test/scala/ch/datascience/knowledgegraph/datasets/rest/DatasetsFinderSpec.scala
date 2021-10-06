@@ -388,7 +388,7 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
           .addDataset(datasetEntities(provenanceInternal).modify(_.makeKeywordsContaining(phrase)))
           .generateOne
         val (_, projectWithoutPhrase) =
-          publicProjectEntities.addDataset(datasetEntities(ofAnyProvenance)).generateOne
+          publicProjectEntities.addDataset(datasetEntities(provenanceNonModified)).generateOne
 
         loadToStore(project1, project2, project3, project4, project5, projectWithoutPhrase)
 

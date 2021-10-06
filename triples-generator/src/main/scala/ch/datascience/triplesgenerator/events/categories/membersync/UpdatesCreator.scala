@@ -107,7 +107,7 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApi
     }
 
   private def generateLinkTriple(projectPath: projects.Path, memberResourceId: users.ResourceId) =
-    s"${ResourceId(renkuBaseUrl, projectPath).showAs[RdfResource]} schema:member ${memberResourceId.showAs[RdfResource]}."
+    s"${ResourceId(projectPath)(renkuBaseUrl).showAs[RdfResource]} schema:member ${memberResourceId.showAs[RdfResource]}."
 
   private lazy val generatePersonTriples: ((users.ResourceId, GitLabProjectMember)) => String = {
     case (resourceId, member) =>

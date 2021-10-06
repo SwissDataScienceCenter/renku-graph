@@ -76,20 +76,20 @@ private class EdgesFinderImpl(
     s"""|SELECT DISTINCT ?plan ?date ?sourceEntityLocation ?targetEntityLocation
         |WHERE {
         |  {
-        |    ${projectMemberFilterQuery(ResourceId(renkuBaseUrl, path).showAs[RdfResource])(maybeUser)}
+        |    ${projectMemberFilterQuery(ResourceId(path)(renkuBaseUrl).showAs[RdfResource])(maybeUser)}
         |    ?plan a prov:Plan;
         |          renku:hasInputs ?input;
-        |          ^renku:hasPlan ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
+        |          ^renku:hasPlan ${ResourceId(path)(renkuBaseUrl).showAs[RdfResource]};
         |          ^(prov:qualifiedAssociation/prov:hadPlan) ?activity.
         |    ?activity prov:startedAtTime ?date.
         |    ?paramValue a renku:ParameterValue;
         |                schema:valueReference ?input;
         |                schema:value ?sourceEntityLocation.
         |  } UNION {
-        |    ${projectMemberFilterQuery(ResourceId(renkuBaseUrl, path).showAs[RdfResource])(maybeUser)}
+        |    ${projectMemberFilterQuery(ResourceId(path)(renkuBaseUrl).showAs[RdfResource])(maybeUser)}
         |    ?plan a prov:Plan;
         |          renku:hasOutputs ?output;
-        |          ^renku:hasPlan ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
+        |          ^renku:hasPlan ${ResourceId(path)(renkuBaseUrl).showAs[RdfResource]};
         |          ^(prov:qualifiedAssociation/prov:hadPlan) ?activity.
         |    ?activity prov:startedAtTime ?date.
         |    ?paramValue a renku:ParameterValue;

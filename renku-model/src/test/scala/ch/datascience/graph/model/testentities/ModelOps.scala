@@ -199,7 +199,8 @@ trait ModelOps extends Dataset.ProvenanceOps {
 
     def createModification(
         modifier: Dataset[Dataset.Provenance.Modified] => Dataset[Dataset.Provenance.Modified] = identity
-    ): DatasetGenFactory[Provenance.Modified] = modifiedDatasetEntities(dataset).modify(modifier)
+    ): DatasetGenFactory[Provenance.Modified] =
+      (projectDate => modifiedDatasetEntities(dataset, projectDate)).modify(modifier)
 
     def makeNameContaining(phrase: String): Dataset[P] = {
       val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(phrase)

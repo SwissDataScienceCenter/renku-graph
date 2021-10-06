@@ -40,7 +40,7 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
   "decode" should {
 
     "turn JsonLD Dataset entity into the Dataset object" in {
-      forAll(datasetEntities(ofAnyProvenance).decoupledFromProject) { dataset =>
+      forAll(datasetEntities(provenanceNonModified).decoupledFromProject) { dataset =>
         JsonLD
           .arr(dataset.asJsonLD :: dataset.publicationEvents.map(_.asJsonLD): _*)
           .flatten
@@ -77,7 +77,7 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
 
     "succeed if dataset parts are older than the modified or imported internal dataset" in {
       List(
-        datasetEntities(provenanceModified).decoupledFromProject,
+        datasetAndModificationEntities(provenanceNonModified).map(_._2),
         datasetEntities(provenanceImportedInternalAncestorInternal).decoupledFromProject
       ) foreach { datasetGen =>
         val dataset = datasetGen.generateOne.to[entities.Dataset[entities.Dataset.Provenance]]
@@ -97,7 +97,7 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     }
 
     "fail if invalidationTime is older than the dataset" in {
-      val dataset = datasetEntities(provenanceModified).decoupledFromProject.generateOne
+      val dataset = datasetAndModificationEntities(provenanceInternal).generateOne._2
         .to[entities.Dataset[entities.Dataset.Provenance.Modified]]
       val invalidationTime = timestamps(max = dataset.provenance.date.instant).generateAs(InvalidationTime)
       val invalidatedDataset = dataset
@@ -114,13 +114,13 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     }
 
     "skip publicationEvents that do not belong to a different dataset" in {
-      val dataset = datasetEntities(ofAnyProvenance).decoupledFromProject.generateOne
+      val dataset = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
         .to[entities.Dataset[entities.Dataset.Provenance]]
         .copy(publicationEvents = Nil)
 
       val otherDatasetPublicationEvent =
         publicationEventFactories(dataset.provenance.date.instant)
-          .generateOne(datasetEntities(ofAnyProvenance).decoupledFromProject.generateOne)
+          .generateOne(datasetEntities(provenanceNonModified).decoupledFromProject.generateOne)
           .to[entities.PublicationEvent]
 
       JsonLD
@@ -135,12 +135,12 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
   "from" should {
 
     "return a failure when initializing with a PublicationEvent belonging to another dataset" in {
-      val dataset = datasetEntities(ofAnyProvenance).decoupledFromProject.generateOne
+      val dataset = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
         .to[entities.Dataset[entities.Dataset.Provenance]]
 
       val otherDatasetPublicationEvent =
         publicationEventFactories(dataset.provenance.date.instant)
-          .generateOne(datasetEntities(ofAnyProvenance).decoupledFromProject.generateOne)
+          .generateOne(datasetEntities(provenanceNonModified).decoupledFromProject.generateOne)
           .to[entities.PublicationEvent]
 
       val errors = entities.Dataset.from(
@@ -181,7 +181,7 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     }
 
     "replace the topmostDerivedFrom " in {
-      val dataset = datasetEntities(provenanceModified).decoupledFromProject.generateOne
+      val dataset = datasetAndModificationEntities(provenanceInternal).generateOne._2
         .to[entities.Dataset[Provenance.Modified]]
 
       val newTopmostDerivedFrom = datasetTopmostDerivedFroms.generateOne

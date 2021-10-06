@@ -59,7 +59,7 @@ private class KGProjectFinderImpl[Interpretation[_]: ConcurrentEffect: Timer](
     Prefixes.of(schema -> "schema", prov -> "prov", renku -> "renku"),
     s"""|SELECT DISTINCT ?name ?visibility ?dateCreated ?maybeCreatorName ?maybeCreatorEmail ?maybeParentId ?maybeParentName ?maybeParentDateCreated ?maybeParentCreatorName ?maybeParentCreatorEmail ?schemaVersion
         |WHERE {
-        |  BIND (${ResourceId(renkuBaseUrl, path).showAs[RdfResource]} AS ?projectId)
+        |  BIND (${ResourceId(path)(renkuBaseUrl).showAs[RdfResource]} AS ?projectId)
         |  ?projectId a schema:Project;
         |             schema:name ?name;
         |             renku:projectVisibility ?visibility;

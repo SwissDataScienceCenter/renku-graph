@@ -20,10 +20,11 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated.tripl
 
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{SameAs, TopmostDerivedFrom, TopmostSameAs}
-import ch.datascience.graph.model.entities
 import ch.datascience.graph.model.testentities._
+import ch.datascience.graph.model.{entities, projects}
 import ch.datascience.rdfstore.InMemoryRdfStore
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -63,31 +64,31 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
       }
 
     "generate queries which " +
-      "updates topmostDerivedFrom for all datasets whose topmostDerivedFrom points to the current dataset" +
+      "updates topmostDerivedFrom for all datasets which topmostDerivedFrom points to the current dataset " +
       "when the topmostDerivedFrom on the current dataset is different than the value in KG" in {
-        val dataset0AsTopmostDerivedFrom = TopmostDerivedFrom(datasetResourceIds.generateOne.value)
-
-        val dataset1 = {
-          val ds = datasetEntities(provenanceModified).decoupledFromProject.generateOne
+        val (topmost, modification1) = datasetAndModificationEntities(provenanceInternal).generateOne
+        val modification1Entities    = modification1.to[entities.Dataset[entities.Dataset.Provenance.Modified]]
+        val modification2 = {
+          val ds = modifiedDatasetEntities(
+            modification1,
+            timestamps(max = modification1.provenance.date.instant).generateAs[projects.DateCreated]
+          ).generateOne
             .to[entities.Dataset[entities.Dataset.Provenance.Modified]]
-          ds.copy(provenance = ds.provenance.copy(topmostDerivedFrom = dataset0AsTopmostDerivedFrom))
-        }
-        val dataset2 = {
-          val ds = datasetEntities(provenanceModified).decoupledFromProject.generateOne
-            .to[entities.Dataset[entities.Dataset.Provenance.Modified]]
-          ds.copy(provenance = ds.provenance.copy(topmostDerivedFrom = TopmostDerivedFrom(dataset1.resourceId.value)))
+          ds.copy(provenance =
+            ds.provenance.copy(topmostDerivedFrom = TopmostDerivedFrom(modification1Entities.resourceId.value))
+          )
         }
 
-        loadToStore(dataset2)
+        loadToStore(modification2)
 
         findDatasets.map(onlyTopmostDerivedFrom) shouldBe Set(
-          (dataset2.resourceId.value, dataset2.provenance.topmostDerivedFrom.value.some)
+          (modification2.resourceId.value, modification1Entities.resourceId.value.some)
         )
 
-        UpdatesCreator.prepareUpdates(dataset1, None).runAll.unsafeRunSync()
+        UpdatesCreator.prepareUpdates(modification1Entities, None).runAll.unsafeRunSync()
 
         findDatasets.map(onlyTopmostDerivedFrom) shouldBe Set(
-          (dataset2.resourceId.value, dataset0AsTopmostDerivedFrom.value.some)
+          (modification2.resourceId.value, topmost.provenance.topmostDerivedFrom.value.some)
         )
       }
 

@@ -85,15 +85,16 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       "and update the modified datasets in the metadata" in new TestCase {
 
         val (dataset1 ::~ dataset2, project) = anyProjectEntities
-          .addDataset(datasetEntities(provenanceModified))
-          .addDataset(datasetEntities(provenanceModified))
+          .addDatasetAndModification(datasetEntities(provenanceNonModified))
+          .addDatasetAndModification(datasetEntities(provenanceNonModified))
           .generateOne
-          .bimap(
-            _.bimap(_.to[entities.Dataset[entities.Dataset.Provenance.Modified]],
-                    _.to[entities.Dataset[entities.Dataset.Provenance.Modified]]
-            ),
-            _.to[entities.Project]
-          )
+          .leftMap { case _ ::~ dataset1 ::~ _ ::~ dataset2 =>
+            (
+              dataset1.to[entities.Dataset[entities.Dataset.Provenance.Modified]],
+              dataset2.to[entities.Dataset[entities.Dataset.Provenance.Modified]]
+            )
+          }
+          .map(_.to[entities.Project])
 
         val kgTopmostDerivedFrom = datasetTopmostDerivedFroms.generateOne
         findingParentTopmostDerivedFromFor(dataset1.provenance.derivedFrom,
@@ -122,16 +123,22 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       }
 
     "prepare updates for deleted datasets" in new TestCase {
-      val (internal ::~ _ ::~ importedExternal ::~ _ ::~ ancestorInternal ::~ _ ::~ ancestorExternal ::~ _ ::~ _ ::~ _,
+      val (internal ::~ _ ::~ importedExternal ::~ _ ::~ ancestorInternal ::~ _ ::~ ancestorExternal ::~ _,
            projectWithAllDatasets
       ) = anyProjectEntities
         .addDatasetAndInvalidation(datasetEntities(provenanceInternal))
         .addDatasetAndInvalidation(datasetEntities(provenanceImportedExternal))
         .addDatasetAndInvalidation(datasetEntities(provenanceImportedInternalAncestorInternal))
         .addDatasetAndInvalidation(datasetEntities(provenanceImportedInternalAncestorExternal))
-        .addDatasetAndInvalidation(datasetEntities(provenanceModified))
         .generateOne
-      val entitiesProjectWithAllDatasets = projectWithAllDatasets.to[entities.Project]
+      val (beforeModification, modification, modificationInvalidated) =
+        datasetAndModificationEntities(provenanceInternal,
+                                       projectDateCreated = projectWithAllDatasets.dateCreated
+        ).map { case internal ::~ modified => (internal, modified, modified.invalidateNow) }.generateOne
+
+      val entitiesProjectWithAllDatasets = projectWithAllDatasets
+        .addDatasets(beforeModification, modification, modificationInvalidated)
+        .to[entities.Project]
 
       val internalDsQueries = sparqlQueries.generateList()
       (updatesCreator

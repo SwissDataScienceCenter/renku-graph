@@ -74,6 +74,7 @@ class ProjectAuthorizerImpl(
     ME:               MonadError[IO, Throwable]
 ) extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
     with ProjectAuthorizer[IO] {
+
   override def authorize(path:          projects.Path,
                          maybeAuthUser: Option[AuthUser]
   ): EitherT[IO, EndpointSecurityException, Unit] = for {
@@ -89,7 +90,7 @@ class ProjectAuthorizerImpl(
     Prefixes.of(rdf -> "rdf", schema -> "schema", renku -> "renku"),
     s"""|SELECT DISTINCT ?projectId ?maybeVisibility (GROUP_CONCAT(?maybeMemberGitLabId; separator=',') AS ?memberGitLabIds)
         |WHERE {
-        |  BIND (${ResourceId(renkuBaseUrl, path).showAs[RdfResource]} AS ?projectId)
+        |  BIND (${ResourceId(path)(renkuBaseUrl).showAs[RdfResource]} AS ?projectId)
         |  ?projectId rdf:type schema:Project.
         |  OPTIONAL { ?projectId renku:projectVisibility ?maybeVisibility. }
         |  OPTIONAL {
