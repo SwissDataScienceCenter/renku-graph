@@ -59,8 +59,8 @@ class LineageFinderSpec extends AnyWordSpec with MockFactory with ScalaCheckDriv
           .returning(trimmedEdgesMap.pure[Try])
 
         (nodeDetailsFinder
-          .findDetails(_: Set[RunInfo], _: projects.Path)(_: (RunInfo, ResourceId) => SparqlQuery))
-          .expects(trimmedEdgesMap.keySet, projectPath, runIdQuery)
+          .findDetails(_: Set[ExecutionInfo], _: projects.Path)(_: (ExecutionInfo, ResourceId) => SparqlQuery))
+          .expects(trimmedEdgesMap.keySet, projectPath, activityIdQuery)
           .returning(lineage.processRunNodes.pure[Try])
 
         val nodesSet = trimmedEdgesMap.view.mapValues { case (s, t) => s ++ t }.values.toSet.flatten
@@ -140,8 +140,8 @@ class LineageFinderSpec extends AnyWordSpec with MockFactory with ScalaCheckDriv
 
       val exception = exceptions.generateOne
       (nodeDetailsFinder
-        .findDetails(_: Set[RunInfo], _: projects.Path)(_: (RunInfo, ResourceId) => SparqlQuery))
-        .expects(trimmedEdgesMap.keySet, projectPath, runIdQuery)
+        .findDetails(_: Set[ExecutionInfo], _: projects.Path)(_: (ExecutionInfo, ResourceId) => SparqlQuery))
+        .expects(trimmedEdgesMap.keySet, projectPath, activityIdQuery)
         .returning(exception.raiseError[Try, Set[Node]])
 
       lineageFinder.find(projectPath, location, maybeAuthUser) shouldBeFailure exception
@@ -162,8 +162,8 @@ class LineageFinderSpec extends AnyWordSpec with MockFactory with ScalaCheckDriv
         .returning(trimmedEdgesMap.pure[Try])
 
       (nodeDetailsFinder
-        .findDetails(_: Set[RunInfo], _: projects.Path)(_: (RunInfo, ResourceId) => SparqlQuery))
-        .expects(trimmedEdgesMap.keySet, projectPath, runIdQuery)
+        .findDetails(_: Set[ExecutionInfo], _: projects.Path)(_: (ExecutionInfo, ResourceId) => SparqlQuery))
+        .expects(trimmedEdgesMap.keySet, projectPath, activityIdQuery)
         .returning(lineage.processRunNodes.pure[Try])
 
       val nodesSet = trimmedEdgesMap.view
@@ -198,8 +198,8 @@ class LineageFinderSpec extends AnyWordSpec with MockFactory with ScalaCheckDriv
         )
 
       (nodeDetailsFinder
-        .findDetails(_: Set[RunInfo], _: projects.Path)(_: (RunInfo, ResourceId) => SparqlQuery))
-        .expects(trimmedEdgesMap.keySet, projectPath, runIdQuery)
+        .findDetails(_: Set[ExecutionInfo], _: projects.Path)(_: (ExecutionInfo, ResourceId) => SparqlQuery))
+        .expects(trimmedEdgesMap.keySet, projectPath, activityIdQuery)
         .returning(lineage.processRunNodes.pure[Try])
 
       val nodesSet = trimmedEdgesMap.view

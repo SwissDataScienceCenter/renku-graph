@@ -19,9 +19,12 @@
 package ch.datascience.knowledgegraph.lineage
 
 import cats.effect.IO
+import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.authUsers
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators.fixed
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import ch.datascience.graph.model.testentities.CommandParameterBase.{CommandInput, CommandOutput}
 import ch.datascience.graph.model.testentities._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Warn
@@ -30,6 +33,7 @@ import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import ch.datascience.stubbing.ExternalServiceStubbing
 import io.renku.jsonld.EntityId
+import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -48,11 +52,19 @@ class EdgesFinderSpec extends AnyWordSpec with InMemoryRdfStore with ExternalSer
         edgesFinder
           .findEdges(project.path, maybeUser = None)
           .unsafeRunSync() shouldBe Map(
-          RunInfo(`activity3 plan1`.toEntityId, RunDate(`activity3 date`.value)) -> (
+          ExecutionInfo(activity1.asEntityId.show, RunDate(activity1.startTime.value)) -> (
             Set(`zhbikes folder`.toNodeLocation, `clean_data entity`.toNodeLocation),
             Set(`bikesparquet entity`.toNodeLocation)
           ),
-          RunInfo(`activity4 plan2`.toEntityId, RunDate(`activity4 date`.value)) -> (
+          ExecutionInfo(activity2.asEntityId.show, RunDate(activity2.startTime.value)) -> (
+            Set(`plot_data entity`.toNodeLocation, `bikesparquet entity`.toNodeLocation),
+            Set(`grid_plot entity`.toNodeLocation, `cumulative entity`.toNodeLocation)
+          ),
+          ExecutionInfo(activity3.asEntityId.show, RunDate(activity3.startTime.value)) -> (
+            Set(`zhbikes folder`.toNodeLocation, `clean_data entity`.toNodeLocation),
+            Set(`bikesparquet entity`.toNodeLocation)
+          ),
+          ExecutionInfo(activity4.asEntityId.show, RunDate(activity4.startTime.value)) -> (
             Set(`plot_data entity`.toNodeLocation, `bikesparquet entity`.toNodeLocation),
             Set(`grid_plot entity`.toNodeLocation, `cumulative entity`.toNodeLocation)
           )
@@ -62,6 +74,52 @@ class EdgesFinderSpec extends AnyWordSpec with InMemoryRdfStore with ExternalSer
           Warn(s"lineage - edges finished${executionTimeRecorder.executionTimeInfo}")
         )
       }
+
+    /** in1   in2       in3   in2
+      *  \    /          \    /
+      *   plan            plan
+      *    |               |
+      *   out1            out2
+      */
+    "return all the edges including executions with overridden inputs/outputs" in new TestCase {
+
+      val project = projectEntities(visibilityPublic).generateOne
+
+      val in1  = entityLocations.generateOne
+      val in2  = entityLocations.generateOne
+      val out1 = entityLocations.generateOne
+      val plan = planEntities(CommandInput.fromLocation(in1),
+                              CommandInput.fromLocation(in2),
+                              CommandOutput.fromLocation(out1)
+      ).generateOne
+
+      val activity1 = executionPlanners(fixed(plan), project).generateOne
+        .planInputParameterValuesFromChecksum(in1 -> entityChecksums.generateOne, in2 -> entityChecksums.generateOne)
+        .buildProvenanceUnsafe()
+
+      val in3  = entityLocations.generateOne
+      val out2 = entityLocations.generateOne
+      val activity2 = executionPlanners(fixed(plan), project).generateOne
+        .planInputParameterOverrides(in1 -> Entity.InputEntity(in3, entityChecksums.generateOne))
+        .planInputParameterValuesFromChecksum(in2 -> entityChecksums.generateOne)
+        .planOutputParameterOverrides(out1 -> out2)
+        .buildProvenanceUnsafe()
+
+      loadToStore(project.addActivities(activity1, activity2))
+
+      edgesFinder
+        .findEdges(project.path, maybeUser = None)
+        .unsafeRunSync() shouldBe Map(
+        ExecutionInfo(activity1.asEntityId.show, RunDate(activity1.startTime.value)) -> (
+          Set(Node.Location(in1.value), Node.Location(in2.value)),
+          Set(Node.Location(out1.value))
+        ),
+        ExecutionInfo(activity2.asEntityId.show, RunDate(activity2.startTime.value)) -> (
+          Set(Node.Location(in3.value), Node.Location(in2.value)),
+          Set(Node.Location(out2.value))
+        )
+      )
+    }
 
     "return None if there's no lineage for the project " +
       "case when the user is not authenticated and the project is public" in new TestCase {
@@ -101,18 +159,22 @@ class EdgesFinderSpec extends AnyWordSpec with InMemoryRdfStore with ExternalSer
         edgesFinder
           .findEdges(project.path, Some(authUser))
           .unsafeRunSync() shouldBe Map(
-          RunInfo(`activity3 plan1`.toEntityId, RunDate(`activity3 date`.value)) -> (
+          ExecutionInfo(activity1.asEntityId.show, RunDate(activity1.startTime.value)) -> (
             Set(`zhbikes folder`.toNodeLocation, `clean_data entity`.toNodeLocation),
             Set(`bikesparquet entity`.toNodeLocation)
           ),
-          RunInfo(`activity4 plan2`.toEntityId, RunDate(`activity4 date`.value)) -> (
+          ExecutionInfo(activity2.asEntityId.show, RunDate(activity2.startTime.value)) -> (
+            Set(`plot_data entity`.toNodeLocation, `bikesparquet entity`.toNodeLocation),
+            Set(`grid_plot entity`.toNodeLocation, `cumulative entity`.toNodeLocation)
+          ),
+          ExecutionInfo(activity3.asEntityId.show, RunDate(activity3.startTime.value)) -> (
+            Set(`zhbikes folder`.toNodeLocation, `clean_data entity`.toNodeLocation),
+            Set(`bikesparquet entity`.toNodeLocation)
+          ),
+          ExecutionInfo(activity4.asEntityId.show, RunDate(activity4.startTime.value)) -> (
             Set(`plot_data entity`.toNodeLocation, `bikesparquet entity`.toNodeLocation),
             Set(`grid_plot entity`.toNodeLocation, `cumulative entity`.toNodeLocation)
           )
-        )
-
-        logger.logged(
-          Warn(s"lineage - edges finished${executionTimeRecorder.executionTimeInfo}")
         )
       }
   }

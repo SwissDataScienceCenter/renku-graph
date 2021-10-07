@@ -28,12 +28,12 @@ import java.time.Instant
 
 object model {
 
-  private[lineage] final case class RunInfo(entityId: EntityId, date: RunDate)
+  private[lineage] final case class ExecutionInfo(entityId: EntityId, date: RunDate)
   private[lineage] final class RunDate private (val value: Instant) extends AnyVal with InstantTinyType
   private[lineage] implicit object RunDate extends TinyTypeFactory[RunDate](new RunDate(_))
   private[lineage] type FromAndToNodes = (Set[Node.Location], Set[Node.Location])
-  private[lineage] type EdgeMapEntry   = (RunInfo, FromAndToNodes)
-  private[lineage] type EdgeMap        = Map[RunInfo, FromAndToNodes]
+  private[lineage] type EdgeMapEntry   = (ExecutionInfo, FromAndToNodes)
+  private[lineage] type EdgeMap        = Map[ExecutionInfo, FromAndToNodes]
 
   final case class Lineage private (edges: Set[Edge], nodes: Set[Node]) extends LineageOps
 
@@ -58,8 +58,7 @@ object model {
   trait LineageOps {
     self: Lineage =>
 
-    def getNode(location: Location): Option[Node] =
-      nodes.find(_.location == location)
+    def getNode(location: Location): Option[Node] = nodes.find(_.location == location)
   }
 
   final case class Edge(source: Node.Location, target: Node.Location)

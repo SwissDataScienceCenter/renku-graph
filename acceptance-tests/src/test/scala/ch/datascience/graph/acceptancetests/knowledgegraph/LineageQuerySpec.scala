@@ -69,8 +69,7 @@ class LineageQuerySpec
       (lineageData, dataProjects(lineageData.project).generateOne)
     }
 
-    /**  ========================================== EXPECTED GRAPH  ==========================================
-      *  When looking for the grid_plot file
+    /** Expected data structure when looking for the grid_plot file
       *
       * zhbikes folder   clean_data
       *           \      /
@@ -257,12 +256,12 @@ class LineageQuerySpec
     import exemplarData._
     Right {
       Set(
-        json"""{"source": ${`zhbikes folder`.location},     "target": ${`activity3 plan1`.location}}""",
-        json"""{"source": ${`clean_data entity`.location},  "target": ${`activity3 plan1`.location}}""",
-        json"""{"source": ${`activity3 plan1`.location},    "target": ${`bikesparquet entity`.location}}""",
-        json"""{"source": ${`bikesparquet entity`.location},"target": ${`activity4 plan2`.location}}""",
-        json"""{"source": ${`plot_data entity`.location},   "target": ${`activity4 plan2`.location}}""",
-        json"""{"source": ${`activity4 plan2`.location},    "target": ${`grid_plot entity`.location}}"""
+        json"""{"source": ${`zhbikes folder`.location},     "target": ${`activity3 node`.location}}""",
+        json"""{"source": ${`clean_data entity`.location},  "target": ${`activity3 node`.location}}""",
+        json"""{"source": ${`activity3 node`.location},     "target": ${`bikesparquet entity`.location}}""",
+        json"""{"source": ${`bikesparquet entity`.location},"target": ${`activity4 node`.location}}""",
+        json"""{"source": ${`plot_data entity`.location},   "target": ${`activity4 node`.location}}""",
+        json"""{"source": ${`activity4 node`.location},     "target": ${`grid_plot entity`.location}}"""
       )
     }
   }
@@ -272,11 +271,11 @@ class LineageQuerySpec
     Right {
       Set(
         json"""{"id": ${`zhbikes folder`.location},      "location": ${`zhbikes folder`.location},      "label": ${`zhbikes folder`.label},      "type": ${`zhbikes folder`.singleWordType}}""",
-        json"""{"id": ${`activity3 plan1`.location},     "location": ${`activity3 plan1`.location},     "label": ${`activity3 plan1`.label},     "type": ${`activity3 plan1`.singleWordType}}""",
+        json"""{"id": ${`activity3 node`.location},      "location": ${`activity3 node`.location},     "label": ${`activity3 node`.label},     "type": ${`activity3 node`.singleWordType}}""",
         json"""{"id": ${`clean_data entity`.location},   "location": ${`clean_data entity`.location},   "label": ${`clean_data entity`.label},   "type": ${`clean_data entity`.singleWordType}}""",
         json"""{"id": ${`bikesparquet entity`.location}, "location": ${`bikesparquet entity`.location}, "label": ${`bikesparquet entity`.label}, "type": ${`bikesparquet entity`.singleWordType}}""",
         json"""{"id": ${`plot_data entity`.location},    "location": ${`plot_data entity`.location},    "label": ${`plot_data entity`.label},    "type": ${`plot_data entity`.singleWordType}}""",
-        json"""{"id": ${`activity4 plan2`.location},     "location": ${`activity4 plan2`.location},     "label": ${`activity4 plan2`.label},     "type": ${`activity4 plan2`.singleWordType}}""",
+        json"""{"id": ${`activity4 node`.location},      "location": ${`activity4 node`.location},     "label": ${`activity4 node`.label},     "type": ${`activity4 node`.singleWordType}}""",
         json"""{"id": ${`grid_plot entity`.location},    "location": ${`grid_plot entity`.location},    "label": ${`grid_plot entity`.label},    "type": ${`grid_plot entity`.singleWordType}}"""
       )
     }

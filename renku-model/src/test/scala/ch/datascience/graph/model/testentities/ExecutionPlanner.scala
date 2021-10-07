@@ -48,9 +48,7 @@ final case class ExecutionPlanner(plan:                     Plan,
   def planInputParameterValuesFromChecksum(
       valuesOverrides: (Location, Checksum)*
   ): ExecutionPlanner = planInputParameterOverrides(
-    valuesOverrides.map { case (location, checksum) =>
-      (InputDefaultValue(location), InputEntity(location, checksum))
-    }: _*
+    valuesOverrides.map { case (location, checksum) => location -> InputEntity(location, checksum) }: _*
   )
 
   def planInputParameterValuesFromEntity(
@@ -61,12 +59,20 @@ final case class ExecutionPlanner(plan:                     Plan,
     })
 
   def planInputParameterOverrides(
-      valuesOverrides: (InputDefaultValue, Entity)*
-  ): ExecutionPlanner = this.copy(inputsValueOverrides = inputsValueOverrides ::: valuesOverrides.toList)
+      valuesOverrides: (Location, Entity)*
+  ): ExecutionPlanner = this.copy(
+    inputsValueOverrides = inputsValueOverrides ::: valuesOverrides.map { case (planInputLocation, overrideEntity) =>
+      InputDefaultValue(planInputLocation) -> overrideEntity
+    }.toList
+  )
 
   def planOutputParameterOverrides(
-      valuesOverrides: (OutputDefaultValue, Location)*
-  ): ExecutionPlanner = this.copy(outputsValueOverrides = valuesOverrides.toList)
+      valuesOverrides: (Location, Location)*
+  ): ExecutionPlanner = this.copy(
+    outputsValueOverrides = valuesOverrides.map { case (planOutputLocation, overrideLocation) =>
+      OutputDefaultValue(planOutputLocation) -> overrideLocation
+    }.toList
+  )
 
   def buildProvenanceGraph: ValidatedNel[String, Activity] = (
     validateParameterValueOverride,

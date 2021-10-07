@@ -25,7 +25,7 @@ import ch.datascience.graph.model.Schemas._
 import ch.datascience.graph.model.{RenkuBaseUrl, projects}
 import ch.datascience.graph.model.projects.ResourceId
 import ch.datascience.graph.model.views.RdfResource
-import ch.datascience.knowledgegraph.lineage.model.{Node, RunInfo}
+import ch.datascience.knowledgegraph.lineage.model.{ExecutionInfo, Node}
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
 import ch.datascience.tinytypes.json.TinyTypeDecoders
@@ -102,7 +102,7 @@ private class NodeDetailsFinderImpl(
       no match {
         case location: Node.Location =>
           new IllegalArgumentException(s"No entity with $location").raiseError[IO, Node]
-        case runInfo: RunInfo =>
+        case runInfo: ExecutionInfo =>
           new IllegalArgumentException(s"No plan with ${runInfo.entityId}").raiseError[IO, Node]
         case other =>
           new IllegalArgumentException(s"Entity $other not recognisable").raiseError[IO, Node]
@@ -144,7 +144,7 @@ private object NodeDetailsFinder {
           |""".stripMargin
     )
 
-  implicit val runIdQuery: (RunInfo, ResourceId) => SparqlQuery = { case (RunInfo(runId, _), _) =>
+  implicit val activityIdQuery: (ExecutionInfo, ResourceId) => SparqlQuery = { case (ExecutionInfo(activityId, _), _) =>
     SparqlQuery.of(
       name = "lineage - plan details",
       Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema"),
@@ -153,16 +153,17 @@ private object NodeDetailsFinder {
           |  {
           |    SELECT DISTINCT ?command ?type ?location
           |    WHERE {
-          |      <$runId> renku:command ?command.
-          |      ?activity prov:qualifiedAssociation/prov:hadPlan <$runId>;
-          |                a ?type.
-          |      BIND (<$runId> AS ?location)
+          |      <$activityId> prov:qualifiedAssociation/prov:hadPlan ?planId;
+          |                    a ?type.
+          |      ?planId renku:command ?command.
+          |      BIND (<$activityId> AS ?location)
           |    }
           |  } {
           |    SELECT ?position ?commandParameter
           |     WHERE {
           |      { # inputs
-          |        <$runId> renku:hasInputs ?input .
+          |        <$activityId> prov:qualifiedAssociation/prov:hadPlan ?planId.
+          |        ?planId renku:hasInputs ?input .
           |        ?paramValue a renku:ParameterValue ;
           |                    schema:valueReference ?input .
           |        ?paramValue schema:value ?value .
@@ -174,7 +175,8 @@ private object NodeDetailsFinder {
           |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix).
           |        BIND (CONCAT(?prefix, ?streamOperator, STR(?value)) AS ?commandParameter) .
           |      } UNION { # outputs
-          |        <$runId> renku:hasOutputs ?output .
+          |        <$activityId> prov:qualifiedAssociation/prov:hadPlan ?planId.
+          |        ?planId renku:hasOutputs ?output .
           |        ?paramValue a renku:ParameterValue ;
           |                    schema:valueReference ?output .
           |        ?paramValue schema:value ?value .
@@ -186,7 +188,8 @@ private object NodeDetailsFinder {
           |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .
           |        BIND (CONCAT(?prefix, ?streamOperator, STR(?value)) AS ?commandParameter) .
           |      } UNION { # parameters
-          |        <$runId> renku:hasArguments ?parameter .
+          |        <$activityId> prov:qualifiedAssociation/prov:hadPlan ?planId.
+          |        ?planId renku:hasArguments ?parameter .
           |        ?paramValue a renku:ParameterValue;
           |                    schema:valueReference ?parameter .
           |        ?paramValue schema:value ?value .

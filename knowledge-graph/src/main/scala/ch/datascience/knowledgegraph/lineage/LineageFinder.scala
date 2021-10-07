@@ -77,7 +77,7 @@ class LineageFinderImpl[Interpretation[_]: MonadThrow](
       edgesAndLocations.view.mapValues { case (s, t) => s ++ t }.values.toSet.flatten
   }
 
-  private implicit class RunInfoOps(runInfo: RunInfo) {
+  private implicit class RunInfoOps(runInfo: ExecutionInfo) {
     lazy val toLocation: Node.Location = Node.Location(runInfo.entityId.value.toString)
   }
 

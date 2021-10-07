@@ -19,6 +19,7 @@
 package ch.datascience.knowledgegraph.lineage
 
 import cats.effect.IO
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
@@ -31,7 +32,7 @@ import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import ch.datascience.stubbing.ExternalServiceStubbing
 import eu.timepit.refined.auto._
-import io.renku.jsonld.EntityId
+import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -111,11 +112,11 @@ class NodeDetailsFinderSpec
     }
   }
 
-  "findDetails - planIds" should {
+  "findDetails - activityIds" should {
 
     import io.renku.jsonld.generators.JsonLDGenerators._
 
-    "find details of all Plans with the given ids" in new TestCase {
+    "find details of all Plans for the given activity ids" in new TestCase {
 
       val input  = entityLocations.generateOne
       val output = entityLocations.generateOne
@@ -151,18 +152,15 @@ class NodeDetailsFinderSpec
 
       val activity1 :: activity2 :: Nil = project.activities
 
-      val activity1Node = NodeDef(activity1).toNode
-      val activity2Node = NodeDef(activity2).toNode
-
       nodeDetailsFinder
         .findDetails(
           Set(
-            RunInfo(EntityId.of(activity1Node.location.toString), activity1.startTime.value),
-            RunInfo(EntityId.of(activity2Node.location.toString), activity2.startTime.value)
+            ExecutionInfo(activity1.asEntityId.show, activity1.startTime.value),
+            ExecutionInfo(activity2.asEntityId.show, activity2.startTime.value)
           ),
           project.path
         )
-        .unsafeRunSync() shouldBe Set(activity1Node, activity2Node)
+        .unsafeRunSync() shouldBe Set(NodeDef(activity1).toNode, NodeDef(activity2).toNode)
     }
 
     "find details of a Plan with mapped command parameters" in new TestCase {
@@ -191,7 +189,7 @@ class NodeDetailsFinderSpec
 
       nodeDetailsFinder
         .findDetails(
-          Set(RunInfo(EntityId.of(NodeDef(activity).toNode.location.toString), activity.startTime.value)),
+          Set(ExecutionInfo(activity.asEntityId.show, activity.startTime.value)),
           project.path
         )
         .unsafeRunSync() shouldBe Set(NodeDef(activity).toNode)
@@ -199,7 +197,7 @@ class NodeDetailsFinderSpec
 
     "return no results if no ids given" in new TestCase {
       nodeDetailsFinder
-        .findDetails(Set.empty[RunInfo], projectPaths.generateOne)
+        .findDetails(Set.empty[ExecutionInfo], projectPaths.generateOne)
         .unsafeRunSync() shouldBe Set.empty
     }
 
@@ -210,7 +208,7 @@ class NodeDetailsFinderSpec
       val exception = intercept[Exception] {
         nodeDetailsFinder
           .findDetails(
-            Set(RunInfo(missingPlan, timestampsNotInTheFuture.generateOne)),
+            Set(ExecutionInfo(missingPlan, timestampsNotInTheFuture.generateOne)),
             projectPaths.generateOne
           )
           .unsafeRunSync()

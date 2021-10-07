@@ -67,12 +67,12 @@ class EdgesTrimmerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
     val o = Location("o")
     val p = Location("p")
     val r = Location("r")
-    val B = RunInfo(EntityId.of("B"), Instant.now())
-    val F = RunInfo(EntityId.of("F"), B.date.value plusSeconds 60)
-    val H = RunInfo(EntityId.of("H"), F.date.value plusSeconds 60)
-    val L = RunInfo(EntityId.of("L"), F.date.value minusSeconds 60)
-    val N = RunInfo(EntityId.of("N"), Instant.now())
-    val Q = RunInfo(EntityId.of("Q"), Instant.now())
+    val B = ExecutionInfo(EntityId.of("B"), Instant.now())
+    val F = ExecutionInfo(EntityId.of("F"), B.date.value plusSeconds 60)
+    val H = ExecutionInfo(EntityId.of("H"), F.date.value plusSeconds 60)
+    val L = ExecutionInfo(EntityId.of("L"), F.date.value minusSeconds 60)
+    val N = ExecutionInfo(EntityId.of("N"), Instant.now())
+    val Q = ExecutionInfo(EntityId.of("Q"), Instant.now())
 
     val graph: EdgeMap = Map(
       B -> (Set(a, e), Set(c, d)),

@@ -29,8 +29,8 @@ import ch.datascience.graph.model.testentities.CommandParameterBase.CommandInput
 import ch.datascience.graph.model.testentities.CommandParameterBase.CommandOutput.{LocationCommandOutput, MappedCommandOutput}
 import ch.datascience.graph.model.testentities.CommandParameterBase._
 import ch.datascience.graph.model.testentities.Entity.InputEntity
-import ch.datascience.graph.model.testentities.ParameterValue.LocationParameterValue.{CommandInputValue, CommandOutputValue}
 import ch.datascience.graph.model.testentities.ParameterValue.CommandParameterValue
+import ch.datascience.graph.model.testentities.ParameterValue.LocationParameterValue.{CommandInputValue, CommandOutputValue}
 import ch.datascience.graph.model.testentities.Plan.CommandParameters
 import io.renku.jsonld.syntax.JsonEncoderOps
 
@@ -55,10 +55,12 @@ object LineageExemplarData {
       `plot_data entity`:    NodeDef,
       `grid_plot entity`:    NodeDef,
       `cumulative entity`:   NodeDef,
-      `activity3 plan1`:     NodeDef,
-      `activity3 date`:      activities.StartTime,
-      `activity4 plan2`:     NodeDef,
-      `activity4 date`:      activities.StartTime
+      `activity3 node`:      NodeDef,
+      `activity4 node`:      NodeDef,
+      activity1:             Activity,
+      activity2:             Activity,
+      activity3:             Activity,
+      activity4:             Activity
   )
 
   def apply(
@@ -169,9 +171,11 @@ object LineageExemplarData {
       NodeDef(activity4Plan2, gridPlot),
       NodeDef(activity4Plan2, cumulative),
       NodeDef(activity3Plan1),
-      activity3Plan1.startTime,
       NodeDef(activity4Plan2),
-      activity4Plan2.startTime
+      activity1Plan1,
+      activity2Plan2,
+      activity3Plan1,
+      activity4Plan2
     )
   }
 }
@@ -187,10 +191,7 @@ object NodeDef {
         NodeDef(
           entity.location.value,
           entity.location.value,
-          entity.asJsonLD.entityTypes
-            .map(_.toList.map(_.show))
-            .getOrElse(throw new Exception("No entityTypes found"))
-            .toSet
+          entity.asJsonLD.entityTypes.getOrElse(throw new Exception("No entityTypes found")).toList.map(_.show).toSet
         )
       }
       .getOrElse(
@@ -199,21 +200,11 @@ object NodeDef {
         )
       )
 
-  def apply(activity: Activity)(implicit renkuBaseUrl: RenkuBaseUrl): NodeDef =
-    NodeDef(
-      activity.association.plan.asJsonLD.entityId
-        .getOrElse(throw new Exception("Non entity id found for Activity"))
-        .toString,
-      activity.show,
-      activity.asJsonLD.asArray
-        .flatMap(_.collect {
-          case entity if entity.entityId.exists(_.show.contains(activity.id.value)) =>
-            entity.entityTypes.map(_.toList.map(_.show))
-        }.sequence) match {
-        case None        => throw new Exception("No entityTypes found")
-        case Some(types) => types.flatten.toSet
-      }
-    )
+  def apply(activity: Activity)(implicit renkuBaseUrl: RenkuBaseUrl): NodeDef = NodeDef(
+    activity.asJsonLD.entityId.getOrElse(throw new Exception("Non entity id found for Activity")).show,
+    activity.show,
+    activity.asJsonLD.entityTypes.getOrElse(throw new Exception("No entityTypes found")).toList.map(_.show).toSet
+  )
 
   private implicit lazy val activityShow: Show[Activity] = Show.show { activity =>
     activity.parameters

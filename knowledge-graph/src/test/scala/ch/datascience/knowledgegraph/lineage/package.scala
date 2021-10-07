@@ -30,10 +30,10 @@ package object lineage {
   private[lineage] implicit class LineageOps(lineage: Lineage) {
 
     lazy val toEdgesMap =
-      processRunNodes.foldLeft(Map.empty[RunInfo, (Set[Node.Location], Set[Node.Location])]) {
+      processRunNodes.foldLeft(Map.empty[ExecutionInfo, (Set[Node.Location], Set[Node.Location])]) {
         case (planWithLocation, node) =>
           planWithLocation + (
-            RunInfo(EntityId.of(node.location.toString), Instant.now()) -> (
+            ExecutionInfo(EntityId.of(node.location.toString), Instant.now()) -> (
               lineage.collectSources(of = node) -> lineage.collectTargets(of = node)
             )
           )
