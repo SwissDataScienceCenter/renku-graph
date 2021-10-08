@@ -118,7 +118,7 @@ object Activity {
     for {
       resourceId <- cursor.downEntityId.as[ResourceId]
       generations <- cursor.top
-                       .map(_.cursor.as[List[Generation]].map(_.filter(_.activityResourceId == resourceId)))
+                       .map(_.cursor.as(decodeList(Generation.decoder(resourceId))))
                        .getOrElse(Right(List.empty[Generation]))
       startedAtTime <- cursor.downField(prov / "startedAtTime").as[StartTime]
       endedAtTime   <- cursor.downField(prov / "endedAtTime").as[EndTime]

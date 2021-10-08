@@ -34,10 +34,11 @@ sealed trait Entity {
 object Entity {
 
   final case class InputEntity(resourceId: ResourceId, location: Location, checksum: Checksum) extends Entity
-  final case class OutputEntity(resourceId:           ResourceId,
-                                location:             Location,
-                                checksum:             Checksum,
-                                generationResourceId: generations.ResourceId
+
+  final case class OutputEntity(resourceId:            ResourceId,
+                                location:              Location,
+                                checksum:              Checksum,
+                                generationResourceIds: List[generations.ResourceId]
   ) extends Entity
 
   import io.renku.jsonld.JsonLDEncoder
@@ -65,18 +66,16 @@ object Entity {
           prov / "atLocation" -> location.asJsonLD,
           renku / "checksum"  -> checksum.asJsonLD
         )
-      case entity @ OutputEntity(resourceId, location, checksum, generationResourceId) =>
+      case entity @ OutputEntity(resourceId, location, checksum, generationResourceIds) =>
         JsonLD.entity(
           resourceId.asEntityId,
           toEntityTypes(entity),
           prov / "atLocation"          -> location.asJsonLD,
           renku / "checksum"           -> checksum.asJsonLD,
-          prov / "qualifiedGeneration" -> generationResourceId.asEntityId.asJsonLD
+          prov / "qualifiedGeneration" -> generationResourceIds.map(_.asEntityId).asJsonLD
         )
     }
   }
-
-  import io.renku.jsonld.JsonLDDecoder.decodeOption
 
   implicit lazy val entityDecoder: JsonLDDecoder[Entity] =
     JsonLDDecoder.entity(fileEntityTypes, withStrictEntityTypes) { cursor =>
@@ -85,11 +84,11 @@ object Entity {
         entityTypes <- cursor.getEntityTypes
         location    <- cursor.downField(prov / "atLocation").as[Location](locationDecoder(entityTypes))
         checksum    <- cursor.downField(renku / "checksum").as[Checksum]
-        maybeGenerationId <-
-          cursor.downField(prov / "qualifiedGeneration").downEntityId.as(decodeOption[generations.ResourceId])
-      } yield maybeGenerationId match {
-        case Some(generationId) => OutputEntity(resourceId, location, checksum, generationId)
-        case None               => InputEntity(resourceId, location, checksum)
+        maybeGenerationIds <-
+          cursor.downField(prov / "qualifiedGeneration").as[List[generations.ResourceId]]
+      } yield maybeGenerationIds match {
+        case Nil           => InputEntity(resourceId, location, checksum)
+        case generationIds => OutputEntity(resourceId, location, checksum, generationIds)
       }
     }
 
@@ -103,7 +102,7 @@ object Entity {
         entityTypes  <- cursor.getEntityTypes
         location     <- cursor.downField(prov / "atLocation").as[Location](locationDecoder(entityTypes))
         checksum     <- cursor.downField(renku / "checksum").as[Checksum]
-        generationId <- cursor.downField(prov / "qualifiedGeneration").downEntityId.as[generations.ResourceId]
+        generationId <- cursor.downField(prov / "qualifiedGeneration").as[List[generations.ResourceId]]
       } yield OutputEntity(resourceId, location, checksum, generationId)
     }
 
@@ -111,8 +110,8 @@ object Entity {
     _.getEntityTypes.map(types => types == fileEntityTypes || types == folderEntityTypes)
 
   private def withSpecific(generationId: generations.ResourceId): Cursor => Result[Boolean] =
-    _.downField(prov / "qualifiedGeneration").downEntityId
-      .as(decodeOption[generations.ResourceId])
+    _.downField(prov / "qualifiedGeneration")
+      .as[List[generations.ResourceId]]
       .map(_.contains(generationId))
 
   private def locationDecoder(entityTypes: EntityTypes): JsonLDDecoder[Location] =

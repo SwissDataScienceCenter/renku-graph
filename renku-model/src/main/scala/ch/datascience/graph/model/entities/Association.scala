@@ -18,11 +18,8 @@
 
 package ch.datascience.graph.model.entities
 
-import cats.syntax.all._
 import ch.datascience.graph.model.Schemas.prov
 import ch.datascience.graph.model.associations.ResourceId
-import ch.datascience.graph.model.{agents, plans}
-import io.circe.DecodingFailure
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 
@@ -42,24 +39,10 @@ object Association {
   }
 
   implicit lazy val decoder: JsonLDDecoder[Association] = JsonLDDecoder.entity(entityTypes) { cursor =>
-    def multipleToNone[T]: List[T] => Either[DecodingFailure, Option[T]] = {
-      case entity :: Nil => Right(Some(entity))
-      case _             => Right(None)
-    }
-
     for {
-      resourceId      <- cursor.downEntityId.as[ResourceId]
-      agentResourceId <- cursor.downField(prov / "agent").downEntityId.as[agents.ResourceId]
-      agent <- cursor.top
-                 .map(_.cursor.as[List[Agent]].map(_.filter(_.resourceId == agentResourceId)).flatMap(multipleToNone))
-                 .flatMap(_.sequence)
-                 .getOrElse(DecodingFailure(s"Association $resourceId without or with multiple Agents", Nil).asLeft)
-
-      planResourceId <- cursor.downField(prov / "hadPlan").downEntityId.as[plans.ResourceId]
-      plan <- cursor.top
-                .map(_.cursor.as[List[Plan]].map(_.filter(_.resourceId == planResourceId)).flatMap(multipleToNone))
-                .flatMap(_.sequence)
-                .getOrElse(DecodingFailure(s"Association $resourceId without or with multiple Plans", Nil).asLeft)
+      resourceId <- cursor.downEntityId.as[ResourceId]
+      agent      <- cursor.downField(prov / "agent").as[Agent]
+      plan       <- cursor.downField(prov / "hadPlan").as[Plan]
     } yield Association(resourceId, agent, plan)
   }
 }

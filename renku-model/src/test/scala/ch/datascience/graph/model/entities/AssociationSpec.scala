@@ -21,12 +21,10 @@ package ch.datascience.graph.model.entities
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.projectCreatedDates
-import ch.datascience.graph.model.Schemas.prov
 import ch.datascience.graph.model.entities
 import ch.datascience.graph.model.testentities._
-import io.circe.DecodingFailure
+import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{JsonLD, JsonLDEncoder}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -44,52 +42,6 @@ class AssociationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPr
           .cursor
           .as[List[entities.Association]] shouldBe List(association.to[entities.Association]).asRight
       }
-    }
-
-    "fail if there is no plan entity the Association points to" in {
-      val association = activityEntities(planEntities())(projectCreatedDates().generateOne).generateOne.association
-        .to[entities.Association]
-
-      val encoder = JsonLDEncoder.instance[entities.Association] { entity =>
-        JsonLD.entity(
-          entity.resourceId.asEntityId,
-          entities.Association.entityTypes,
-          prov / "agent"   -> entity.agent.asJsonLD,
-          prov / "hadPlan" -> entity.plan.resourceId.asEntityId.asJsonLD
-        )
-      }
-
-      val Left(error) = association
-        .asJsonLD(encoder)
-        .flatten
-        .fold(throw _, identity)
-        .cursor
-        .as[List[entities.Association]]
-      error         shouldBe a[DecodingFailure]
-      error.message shouldBe s"Association ${association.resourceId} without or with multiple Plans"
-    }
-
-    "fail if there are no Agent entity the Association points to" in {
-      val association = activityEntities(planEntities())(projectCreatedDates().generateOne).generateOne.association
-        .to[entities.Association]
-
-      val encoder = JsonLDEncoder.instance[entities.Association] { entity =>
-        JsonLD.entity(
-          entity.resourceId.asEntityId,
-          entities.Association.entityTypes,
-          prov / "agent"   -> entity.agent.resourceId.asEntityId.asJsonLD,
-          prov / "hadPlan" -> entity.plan.asJsonLD
-        )
-      }
-
-      val Left(error) = association
-        .asJsonLD(encoder)
-        .flatten
-        .fold(throw _, identity)
-        .cursor
-        .as[List[entities.Association]]
-      error         shouldBe a[DecodingFailure]
-      error.message shouldBe s"Association ${association.resourceId} without or with multiple Agents"
     }
   }
 }

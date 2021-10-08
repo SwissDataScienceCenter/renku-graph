@@ -21,8 +21,8 @@ package ch.datascience.graph.model.entities
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.timestampsNotInTheFuture
-import ch.datascience.graph.model.entities
 import ch.datascience.graph.model.testentities._
+import ch.datascience.graph.model.{datasets, entities}
 import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -37,7 +37,14 @@ class PublicationEventSpec extends AnyWordSpec with should.Matchers with ScalaCh
       val dataset   = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
       forAll(publicationEventFactories(startDate)) { eventFactory: (Dataset[Dataset.Provenance] => PublicationEvent) =>
         val event = eventFactory(dataset)
-        event.asJsonLD.cursor.as[entities.PublicationEvent] shouldBe event.to[entities.PublicationEvent].asRight
+        event.asJsonLD.cursor.as[entities.PublicationEvent](
+          entities.PublicationEvent.decoder(
+            dataset.asJsonLD.entityId
+              .map(_.show)
+              .map(datasets.ResourceId(_))
+              .getOrElse(fail("No entity id found on dataset"))
+          )
+        ) shouldBe event.to[entities.PublicationEvent].asRight
       }
     }
   }

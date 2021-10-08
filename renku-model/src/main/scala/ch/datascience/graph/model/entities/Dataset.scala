@@ -448,7 +448,7 @@ object Dataset {
       parts          <- cursor.downField(schema / "hasPart").as[List[DatasetPart]]
       publicationEvents <-
         cursor.top
-          .map(_.cursor.as[List[PublicationEvent]].map(_.filter(_.about == identification.resourceId)))
+          .map(_.cursor.as(decodeList(PublicationEvent.decoder(identification.resourceId))))
           .sequence
           .map(_ getOrElse Nil)
       dataset <-

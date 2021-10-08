@@ -54,7 +54,7 @@ object Entity {
       entities.Entity.OutputEntity(entityModel.ResourceId(entity.asEntityId.show),
                                    entity.location,
                                    entity.checksum,
-                                   generations.ResourceId(entity.generation.asEntityId.show)
+                                   List(generations.ResourceId(entity.generation.asEntityId.show))
       )
 
   implicit def encoder[E <: Entity](implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[E] =

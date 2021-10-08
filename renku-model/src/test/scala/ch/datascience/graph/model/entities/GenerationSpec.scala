@@ -18,12 +18,14 @@
 
 package ch.datascience.graph.model.entities
 
-import Generators._
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.projectCreatedDates
 import ch.datascience.graph.model.entities
+import ch.datascience.graph.model.entities.Generators._
 import ch.datascience.graph.model.testentities._
+import io.renku.jsonld.JsonLD
+import io.renku.jsonld.JsonLDDecoder._
 import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -35,14 +37,19 @@ class GenerationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPro
 
     "turn JsonLD Generation entity into the Generation object " in {
       forAll(locationCommandOutputObjects) { commandOutput =>
-        val activity = activityEntities(planEntities(commandOutput))(projectCreatedDates().generateOne).generateOne
+        val activity1 = activityEntities(planEntities(commandOutput))(projectCreatedDates().generateOne).generateOne
+          .to[entities.Activity]
+        val activity2 = activityEntities(planEntities(commandOutput))(projectCreatedDates().generateOne).generateOne
+          .to[entities.Activity]
 
-        activity.asJsonLD.flatten
+        JsonLD
+          .arr(activity1.asJsonLD, activity2.asJsonLD)
+          .flatten
           .fold(throw _, identity)
           .cursor
-          .as[List[entities.Generation]] shouldBe activity.generations
-          .map(_.to[entities.Generation])
-          .asRight
+          .as[List[entities.Generation]](
+            decodeList(entities.Generation.decoder(activity1.resourceId))
+          ) shouldBe activity1.generations.asRight
       }
     }
   }

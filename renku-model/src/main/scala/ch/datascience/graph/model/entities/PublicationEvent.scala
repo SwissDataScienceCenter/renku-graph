@@ -47,14 +47,18 @@ object PublicationEvent {
       )
   }
 
-  implicit lazy val decoder: JsonLDDecoder[PublicationEvent] = JsonLDDecoder.entity(entityTypes) { cursor =>
-    import ch.datascience.graph.model.views.StringTinyTypeJsonLDDecoders._
-    for {
-      resourceId       <- cursor.downEntityId.as[ResourceId]
-      about            <- cursor.downField(schema / "about").downEntityId.as[datasets.ResourceId]
-      maybeDescription <- cursor.downField(schema / "description").as[Option[Description]]
-      name             <- cursor.downField(schema / "name").as[Name]
-      startDate        <- cursor.downField(schema / "startDate").as[StartDate]
-    } yield PublicationEvent(resourceId, about, maybeDescription, name, startDate)
-  }
+  private def forDataset(datasetId: datasets.ResourceId): Cursor => JsonLDDecoder.Result[Boolean] =
+    _.downField(schema / "about").downEntityId.as[datasets.ResourceId].map(_ == datasetId)
+
+  def decoder(datasetId: datasets.ResourceId): JsonLDDecoder[PublicationEvent] =
+    JsonLDDecoder.entity(entityTypes, forDataset(datasetId)) { cursor =>
+      import ch.datascience.graph.model.views.StringTinyTypeJsonLDDecoders._
+      for {
+        resourceId       <- cursor.downEntityId.as[ResourceId]
+        about            <- cursor.downField(schema / "about").downEntityId.as[datasets.ResourceId]
+        maybeDescription <- cursor.downField(schema / "description").as[Option[Description]]
+        name             <- cursor.downField(schema / "name").as[Name]
+        startDate        <- cursor.downField(schema / "startDate").as[StartDate]
+      } yield PublicationEvent(resourceId, about, maybeDescription, name, startDate)
+    }
 }

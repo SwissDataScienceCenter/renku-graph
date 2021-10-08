@@ -44,24 +44,28 @@ object Generation {
       )
     }
 
-  implicit lazy val decoder: JsonLDDecoder[Generation] = JsonLDDecoder.entity(entityTypes) { cursor =>
-    val multipleToNone: List[OutputEntity] => Either[DecodingFailure, Option[OutputEntity]] = {
-      case entity :: Nil => Right(Some(entity))
-      case _             => Right(None)
-    }
+  private def withActivity(activityId: activities.ResourceId): Cursor => JsonLDDecoder.Result[Boolean] =
+    _.downField(prov / "activity").downEntityId.as[activities.ResourceId].map(_ == activityId)
 
-    for {
-      resourceId         <- cursor.downEntityId.as[generations.ResourceId]
-      activityResourceId <- cursor.downField(prov / "activity").downEntityId.as[activities.ResourceId]
-      entity <- cursor.top
-                  .map {
-                    _.cursor
-                      .as[List[OutputEntity]](decodeList(Entity.outputEntityDecoder(resourceId)))
-                      .flatMap(multipleToNone)
-                  }
-                  .flatMap(_.sequence)
-                  .getOrElse(Left(DecodingFailure("Generation without or with multiple entities", Nil)))
-    } yield Generation(resourceId, activityResourceId, entity)
-  }
+  def decoder(activityId: activities.ResourceId): JsonLDDecoder[Generation] =
+    JsonLDDecoder.entity(entityTypes, withActivity(activityId)) { cursor =>
+      val multipleToNone: List[OutputEntity] => Either[DecodingFailure, Option[OutputEntity]] = {
+        case entity :: Nil => Right(Some(entity))
+        case _             => Right(None)
+      }
+
+      for {
+        resourceId         <- cursor.downEntityId.as[generations.ResourceId]
+        activityResourceId <- cursor.downField(prov / "activity").downEntityId.as[activities.ResourceId]
+        entity <- cursor.top
+                    .map {
+                      _.cursor
+                        .as[List[OutputEntity]](decodeList(Entity.outputEntityDecoder(resourceId)))
+                        .flatMap(multipleToNone)
+                    }
+                    .flatMap(_.sequence)
+                    .getOrElse(Left(DecodingFailure(s"Generation $resourceId without or with multiple entities ", Nil)))
+      } yield Generation(resourceId, activityResourceId, entity)
+    }
 
 }

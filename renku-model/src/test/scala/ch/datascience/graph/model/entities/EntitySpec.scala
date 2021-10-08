@@ -21,7 +21,7 @@ package ch.datascience.graph.model.entities
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.{datasetCreatedDates, projectCreatedDates}
-import ch.datascience.graph.model.entities
+import ch.datascience.graph.model.{entities, generations}
 import ch.datascience.graph.model.entities.Generators._
 import ch.datascience.graph.model.testentities._
 import io.renku.jsonld.JsonLD
@@ -76,6 +76,30 @@ class EntitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
           )
 
         decodedEntities should contain allElementsOf activity.generations.map(_.entity)
+      }
+    }
+
+    "turn JsonLD Output entity with multiple Generations into the Entity object " in {
+      forAll(locationCommandOutputObjects) { commandOutput =>
+        val activity = activityEntities(planEntities(commandOutput))(projectCreatedDates().generateOne).generateOne
+          .to[entities.Activity]
+
+        val updateGenerations = activity.generations.map { generation =>
+          val updatedEntity = generation.entity.copy(generationResourceIds =
+            generation.entity.generationResourceIds ::: generations.ResourceId(Generation.Id.generate.value) :: Nil
+          )
+          generation.copy(entity = updatedEntity)
+        }
+        val updatedActivity = activity.copy(generations = updateGenerations)
+
+        val Right(decodedEntities) = JsonLD
+          .arr(updatedActivity.asJsonLD)
+          .flatten
+          .fold(throw _, identity)
+          .cursor
+          .as[List[entities.Entity]]
+
+        decodedEntities should contain allElementsOf updatedActivity.generations.map(_.entity)
       }
     }
   }
