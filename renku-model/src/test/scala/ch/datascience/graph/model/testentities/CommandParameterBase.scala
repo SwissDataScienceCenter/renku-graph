@@ -30,12 +30,16 @@ import io.renku.jsonld.syntax._
 sealed trait CommandParameterBase {
   type DefaultValue
 
+  val name:         Name
+  val maybePrefix:  Option[Prefix]
+  val defaultValue: DefaultValue
+  val plan:         Plan
+}
+
+sealed trait ExplicitCommandParameter {
+  self: CommandParameterBase =>
   val position:         Position
-  val name:             Name
   val maybeDescription: Option[Description]
-  val maybePrefix:      Option[Prefix]
-  val defaultValue:     DefaultValue
-  val plan:             Plan
 }
 
 object CommandParameterBase {
@@ -46,7 +50,8 @@ object CommandParameterBase {
                                     maybePrefix:      Option[Prefix],
                                     defaultValue:     ParameterDefaultValue,
                                     plan:             Plan
-  ) extends CommandParameterBase {
+  ) extends CommandParameterBase
+      with ExplicitCommandParameter {
     override type DefaultValue = ParameterDefaultValue
   }
 
@@ -132,6 +137,7 @@ object CommandParameterBase {
                                           maybeEncodingFormat: Option[EncodingFormat],
                                           plan:                Plan
     ) extends CommandInput
+        with ExplicitCommandParameter
 
     final case class MappedCommandInput(position:            Position,
                                         name:                Name,
@@ -141,9 +147,18 @@ object CommandParameterBase {
                                         maybeEncodingFormat: Option[EncodingFormat],
                                         plan:                Plan
     )(implicit renkuBaseUrl:                                 RenkuBaseUrl)
-        extends CommandInput {
+        extends CommandInput
+        with ExplicitCommandParameter {
       val mappedTo: IOStream.In = IOStream.StdIn(IOStream.ResourceId((renkuBaseUrl / "iostreams" / StdIn.name).value))
     }
+
+    final case class ImplicitCommandInput(
+        name:                Name,
+        maybePrefix:         Option[Prefix],
+        defaultValue:        InputDefaultValue,
+        maybeEncodingFormat: Option[EncodingFormat],
+        plan:                Plan
+    ) extends CommandInput
 
     implicit def toEntitiesCommandInput(implicit
         renkuBaseUrl: RenkuBaseUrl
@@ -169,13 +184,21 @@ object CommandParameterBase {
           parameter.maybeEncodingFormat,
           parameter.mappedTo
         )
+      case parameter: ImplicitCommandInput =>
+        entities.CommandParameterBase.ImplicitCommandInput(
+          commandParameters.ResourceId(parameter.asEntityId.show),
+          parameter.name,
+          parameter.maybePrefix,
+          parameter.defaultValue,
+          parameter.maybeEncodingFormat
+        )
     }
 
     implicit def commandInputEncoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[CommandInput] =
       JsonLDEncoder.instance(_.to[entities.CommandParameterBase.CommandInput].asJsonLD)
 
     implicit def entityIdEncoder[I <: CommandInput](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[I] =
-      EntityIdEncoder.instance(input => input.plan.asEntityId.asUrlEntityId / "inputs" / input.position)
+      EntityIdEncoder.instance(input => input.plan.asEntityId.asUrlEntityId / "inputs" / input.name)
   }
 
   sealed trait CommandOutput extends CommandInputOrOutput {
@@ -236,6 +259,7 @@ object CommandParameterBase {
                                            maybeEncodingFormat: Option[EncodingFormat],
                                            plan:                Plan
     ) extends CommandOutput
+        with ExplicitCommandParameter
 
     final case class MappedCommandOutput(position:            Position,
                                          name:                Name,
@@ -247,6 +271,7 @@ object CommandParameterBase {
                                          mappedTo:            IOStream.Out,
                                          plan:                Plan
     ) extends CommandOutput
+        with ExplicitCommandParameter
 
     implicit def toEntitiesCommandOutput(implicit
         renkuBaseUrl: RenkuBaseUrl
@@ -280,6 +305,6 @@ object CommandParameterBase {
       JsonLDEncoder.instance(_.to[entities.CommandParameterBase.CommandOutput].asJsonLD)
 
     implicit def entityIdEncoder[O <: CommandOutput](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[O] =
-      EntityIdEncoder.instance(output => output.plan.asEntityId.asUrlEntityId / "outputs" / output.position)
+      EntityIdEncoder.instance(output => output.plan.asEntityId.asUrlEntityId / "outputs" / output.name)
   }
 }

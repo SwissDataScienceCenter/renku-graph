@@ -208,12 +208,20 @@ object NodeDef {
 
   private implicit lazy val activityShow: Show[Activity] = Show.show { activity =>
     activity.parameters
-      .sortBy(_.valueReference.position)
-      .map(_.show)
+      .collect {
+        case parameter @ CommandInputValue(_, _, valueReference: ExplicitCommandParameter, _) =>
+          parameter -> valueReference.position
+        case parameter @ CommandOutputValue(_, _, valueReference: ExplicitCommandParameter, _) =>
+          parameter -> valueReference.position
+        case parameter @ CommandParameterValue(_, _, valueReference: ExplicitCommandParameter, _) =>
+          parameter -> valueReference.position
+      }
+      .sortBy(_._2)
+      .map(_._1.show)
       .mkString(s"${activity.association.plan.command} ", " ", "")
   }
 
-  private implicit lazy val parameterValueShow: Show[ParameterValue] = Show.show {
+  private implicit def parameterValueShow[P <: ParameterValue]: Show[P] = Show.show {
     case value: CommandParameterValue => (value.valueReference -> value.value).show
     case value: CommandInputValue     => (value.valueReference -> value.value).show
     case value: CommandOutputValue    => (value.valueReference -> value.value).show
@@ -224,7 +232,7 @@ object NodeDef {
       param.maybePrefix.fold(valueOverride.toString)(prefix => s"$prefix$valueOverride")
     }
 
-  private implicit def pathParameterValueShow[P <: CommandInputOrOutput]: Show[(P, LocationLike)] =
+  private implicit def commandParameterShow[P <: CommandInputOrOutput]: Show[(P, LocationLike)] =
     Show.show {
       case (param: LocationCommandInput, location) =>
         param.maybePrefix.fold(location.toString)(prefix => s"$prefix$location")
@@ -232,6 +240,7 @@ object NodeDef {
         param.maybePrefix.fold(s"${param.mappedTo.show} $location")(prefix =>
           s"$prefix ${param.mappedTo.show} $location"
         )
+      case (_: ImplicitCommandInput, _) => ""
       case (param: LocationCommandOutput, location) =>
         param.maybePrefix.fold(location.toString)(prefix => s"$prefix$location")
       case (param: MappedCommandOutput, location) =>

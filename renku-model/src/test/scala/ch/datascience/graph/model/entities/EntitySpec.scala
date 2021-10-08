@@ -86,7 +86,9 @@ class EntitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
 
         val updateGenerations = activity.generations.map { generation =>
           val updatedEntity = generation.entity.copy(generationResourceIds =
-            generation.entity.generationResourceIds ::: generations.ResourceId(Generation.Id.generate.value) :: Nil
+            generation.entity.generationResourceIds ::: generations.ResourceId(
+              (renkuBaseUrl / Generation.Id.generate).show
+            ) :: Nil
           )
           generation.copy(entity = updatedEntity)
         }

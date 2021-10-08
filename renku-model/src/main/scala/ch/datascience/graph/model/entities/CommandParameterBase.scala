@@ -28,12 +28,16 @@ import io.renku.jsonld.{Cursor, EntityId, JsonLDDecoder}
 sealed trait CommandParameterBase {
   type DefaultValue
 
-  val resourceId:       ResourceId
+  val resourceId:   ResourceId
+  val name:         Name
+  val maybePrefix:  Option[Prefix]
+  val defaultValue: DefaultValue
+}
+
+sealed trait ExplicitCommandParameter {
+  self: CommandParameterBase =>
   val position:         Position
-  val name:             Name
   val maybeDescription: Option[Description]
-  val maybePrefix:      Option[Prefix]
-  val defaultValue:     DefaultValue
 }
 
 object CommandParameterBase {
@@ -47,7 +51,8 @@ object CommandParameterBase {
                                     maybeDescription: Option[Description],
                                     maybePrefix:      Option[Prefix],
                                     defaultValue:     ParameterDefaultValue
-  ) extends CommandParameterBase {
+  ) extends CommandParameterBase
+      with ExplicitCommandParameter {
     override type DefaultValue = ParameterDefaultValue
   }
 
@@ -96,6 +101,7 @@ object CommandParameterBase {
                                         defaultValue:        InputDefaultValue,
                                         maybeEncodingFormat: Option[EncodingFormat]
   ) extends CommandInput
+      with ExplicitCommandParameter
 
   final case class MappedCommandInput(resourceId:          ResourceId,
                                       position:            Position,
@@ -105,6 +111,14 @@ object CommandParameterBase {
                                       defaultValue:        InputDefaultValue,
                                       maybeEncodingFormat: Option[EncodingFormat],
                                       mappedTo:            IOStream.In
+  ) extends CommandInput
+      with ExplicitCommandParameter
+
+  final case class ImplicitCommandInput(resourceId:          ResourceId,
+                                        name:                Name,
+                                        maybePrefix:         Option[Prefix],
+                                        defaultValue:        InputDefaultValue,
+                                        maybeEncodingFormat: Option[EncodingFormat]
   ) extends CommandInput
 
   object CommandInput {
@@ -150,36 +164,36 @@ object CommandParameterBase {
           schema / "encodingFormat" -> maybeEncodingFormat.asJsonLD,
           renku / "mappedTo"        -> mappedTo.asJsonLD
         )
+      case ImplicitCommandInput(resourceId, name, maybePrefix, defaultValue, maybeEncodingFormat) =>
+        JsonLD.entity(
+          resourceId.asEntityId,
+          entityTypes,
+          schema / "name"           -> name.asJsonLD,
+          renku / "prefix"          -> maybePrefix.asJsonLD,
+          schema / "defaultValue"   -> defaultValue.asJsonLD,
+          schema / "encodingFormat" -> maybeEncodingFormat.asJsonLD
+        )
     }
 
-    implicit lazy val decoder: JsonLDDecoder[CommandInput] = JsonLDDecoder.entity(entityTypes, filterOutNonUserInputs) {
-      cursor =>
-        for {
-          resourceId          <- cursor.downEntityId.as[ResourceId]
-          maybePosition       <- cursor.downField(renku / "position").as[Option[Position]]
-          name                <- cursor.downField(schema / "name").as[Name]
-          maybeDescription    <- cursor.downField(schema / "description").as[Option[Description]]
-          maybePrefix         <- cursor.downField(renku / "prefix").as[Option[Prefix]]
-          defaultValue        <- cursor.downField(schema / "defaultValue").as[InputDefaultValue]
-          maybeEncodingFormat <- cursor.downField(schema / "encodingFormat").as[Option[EncodingFormat]]
-          maybeMappedTo       <- cursor.downField(renku / "mappedTo").as[Option[IOStream.In]]
-          commandInput <- createCommandInput(resourceId,
-                                             maybePosition,
-                                             name,
-                                             maybeDescription,
-                                             maybePrefix,
-                                             defaultValue,
-                                             maybeEncodingFormat,
-                                             maybeMappedTo
-                          )
-        } yield commandInput
-    }
-
-    private lazy val filterOutNonUserInputs: Cursor => Result[Boolean] = { cursor =>
+    implicit lazy val decoder: JsonLDDecoder[CommandInput] = JsonLDDecoder.entity(entityTypes) { cursor =>
       for {
-        maybePosition <- cursor.downField(renku / "position").as[Option[Position]]
-        maybeMappedTo <- cursor.downField(renku / "mappedTo").as[Option[EntityId]]
-      } yield maybePosition.isDefined || maybeMappedTo.isDefined
+        resourceId          <- cursor.downEntityId.as[ResourceId]
+        maybePosition       <- cursor.downField(renku / "position").as[Option[Position]]
+        name                <- cursor.downField(schema / "name").as[Name]
+        maybeDescription    <- cursor.downField(schema / "description").as[Option[Description]]
+        maybePrefix         <- cursor.downField(renku / "prefix").as[Option[Prefix]]
+        defaultValue        <- cursor.downField(schema / "defaultValue").as[InputDefaultValue]
+        maybeEncodingFormat <- cursor.downField(schema / "encodingFormat").as[Option[EncodingFormat]]
+        maybeMappedTo       <- cursor.downField(renku / "mappedTo").as[Option[IOStream.In]]
+      } yield createCommandInput(resourceId,
+                                 maybePosition,
+                                 name,
+                                 maybeDescription,
+                                 maybePrefix,
+                                 defaultValue,
+                                 maybeEncodingFormat,
+                                 maybeMappedTo
+      )
     }
 
     private def createCommandInput(resourceId:          ResourceId,
@@ -199,7 +213,7 @@ object CommandParameterBase {
                              maybePrefix,
                              defaultValue,
                              maybeEncodingFormat
-        ).asRight
+        )
       case (maybePosition, Some(mappedTo)) =>
         MappedCommandInput(resourceId,
                            maybePosition.getOrElse(Position(1000)),
@@ -209,8 +223,8 @@ object CommandParameterBase {
                            defaultValue,
                            maybeEncodingFormat,
                            mappedTo
-        ).asRight
-      case _ => DecodingFailure(s"Command Input $resourceId without position and mappedTo", Nil).asLeft
+        )
+      case _ => ImplicitCommandInput(resourceId, name, maybePrefix, defaultValue, maybeEncodingFormat)
     }
   }
 
@@ -229,6 +243,7 @@ object CommandParameterBase {
                                          folderCreation:      FolderCreation,
                                          maybeEncodingFormat: Option[EncodingFormat]
   ) extends CommandOutput
+      with ExplicitCommandParameter
 
   final case class MappedCommandOutput(resourceId:          ResourceId,
                                        position:            Position,
@@ -240,6 +255,7 @@ object CommandParameterBase {
                                        maybeEncodingFormat: Option[EncodingFormat],
                                        mappedTo:            IOStream.Out
   ) extends CommandOutput
+      with ExplicitCommandParameter
 
   object CommandOutput {
 

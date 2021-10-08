@@ -30,7 +30,7 @@ import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 
-sealed trait ParameterValue {
+sealed trait ParameterValue extends Product with Serializable {
   type ValueReference <: CommandParameterBase
   type Value
 

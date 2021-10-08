@@ -108,17 +108,20 @@ final case class ExecutionPlanner(plan:                     Plan,
   }
 
   private lazy val validateInputsValueOverride = plan.inputs.traverse {
-    case input: LocationCommandInput =>
-      inputsValueOverrides
-        .foldMapK {
-          case (defaultValue, _) => Option.when(defaultValue == input.defaultValue)(input)
-          case _                 => Option.empty[CommandInput]
-        }
-        .toValidNel(
-          s"No execution location and checksum for input parameter with default value ${input.defaultValue}"
-        )
-    case input: MappedCommandInput => Validated.validNel(input)
+    case input: LocationCommandInput => validateChecksumForInputs(input)
+    case input: MappedCommandInput   => Validated.validNel(input)
+    case input: ImplicitCommandInput => validateChecksumForInputs(input)
   }
+
+  private def validateChecksumForInputs(input: CommandInput) =
+    inputsValueOverrides
+      .foldMapK {
+        case (defaultValue, _) => Option.when(defaultValue == input.defaultValue)(input)
+        case _                 => Option.empty[CommandInput]
+      }
+      .toValidNel(
+        s"No execution location and checksum for input parameter with default value ${input.defaultValue}"
+      )
 
   private lazy val validateOutputsValueOverride: ValidatedNel[String, List[CommandOutput]] =
     outputsValueOverrides

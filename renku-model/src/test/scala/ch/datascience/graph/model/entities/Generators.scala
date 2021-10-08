@@ -58,6 +58,14 @@ private object Generators {
     (plan: Plan) =>
       MappedCommandInput(position, name, maybeDescription, maybePrefix, defaultValue, maybeEncodingFormat, plan)
 
+  lazy val implicitCommandInputObjects: Gen[Position => Plan => ImplicitCommandInput] = for {
+    name                <- commandParameterNames
+    maybePrefix         <- nonEmptyStrings().toGeneratorOf(Prefix).toGeneratorOfOptions
+    defaultValue        <- entityLocations.map(InputDefaultValue(_))
+    maybeEncodingFormat <- commandParameterEncodingFormats.toGeneratorOfOptions
+  } yield (_: Position) =>
+    (plan: Plan) => ImplicitCommandInput(name, maybePrefix, defaultValue, maybeEncodingFormat, plan)
+
   implicit lazy val locationCommandOutputObjects: Gen[Position => Plan => LocationCommandOutput] = for {
     name                <- commandParameterNames
     maybeDescription    <- nonEmptyStrings().toGeneratorOf(Description).toGeneratorOfOptions
