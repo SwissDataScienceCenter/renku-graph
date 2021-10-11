@@ -67,5 +67,4 @@ object Generation {
                     .getOrElse(Left(DecodingFailure(s"Generation $resourceId without or with multiple entities ", Nil)))
       } yield Generation(resourceId, activityResourceId, entity)
     }
-
 }

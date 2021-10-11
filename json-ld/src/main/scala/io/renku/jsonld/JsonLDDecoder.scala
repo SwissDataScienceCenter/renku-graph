@@ -120,7 +120,7 @@ object JsonLDDecoder {
     }
   }
 
-  implicit def decodeList[I](implicit itemDecoder: JsonLDDecoder[I]): JsonLDDecoder[List[I]] = new JsonLDListEncoder[I]
+  implicit def decodeList[I](implicit itemDecoder: JsonLDDecoder[I]): JsonLDDecoder[List[I]] = new JsonLDListDecoder[I]
 }
 
 class JsonLDEntityDecoder[A](
@@ -130,10 +130,17 @@ class JsonLDEntityDecoder[A](
     extends JsonLDDecoder[A] { self =>
 
   override def apply(cursor: Cursor): Result[A] = cursor match {
-    case flattenedCursor: FlattenedJsonCursor =>
-      tryDecode(flattenedCursor)
-        .getOrElse(DecodingFailure(show"Cannot find an entity of type(s) $entityTypes", Nil).asLeft)
+    case cur: FlattenedJsonCursor => tryDecode(cur) getOrElse cannotDecodeToEntityTypes(cur)
     case _ => goDownType(cursor)
+  }
+
+  private lazy val cannotDecodeToEntityTypes: Cursor => Result[A] = _.jsonLD match {
+    case entity: JsonLDEntity =>
+      DecodingFailure(
+        show"Cannot decode entity with ${entity.id} to entity of type(s) $entityTypes; check entity decoder predicate",
+        Nil
+      ).asLeft
+    case _ => DecodingFailure(show"Cannot find an entity of type(s) $entityTypes", Nil).asLeft
   }
 
   lazy val allowedEntityTypes: Set[EntityTypes] = Set(entityTypes)
@@ -179,14 +186,15 @@ class JsonLDEntityDecoder[A](
   }
 }
 
-private[jsonld] class JsonLDListEncoder[I](implicit itemDecoder: JsonLDDecoder[I]) extends JsonLDDecoder[List[I]] {
+private[jsonld] class JsonLDListDecoder[I](implicit itemDecoder: JsonLDDecoder[I]) extends JsonLDDecoder[List[I]] {
   import JsonLDDecoder._
 
   override def apply(cursor: Cursor): Result[List[I]] = cursor match {
     case cursor: FlattenedArrayCursor => decodeInCaseOfFlattenedCursor(cursor)
     case cursor: ArrayCursor =>
       cursor.jsonLD.jsons.toList.map(v => itemDecoder(ListItemCursor(cursor, v))).filter(_.isRight).sequence
-    case cursor: Cursor => decodeForOtherCursor(cursor)
+    case cursor: FlattenedJsonCursor => decodeInCaseOfFlattenedJsonCursor(cursor)
+    case cursor: Cursor              => decodeForOtherCursor(cursor)
   }
 
   private lazy val decodeInCaseOfFlattenedCursor: FlattenedArrayCursor => Result[List[I]] = {
@@ -202,7 +210,7 @@ private[jsonld] class JsonLDListEncoder[I](implicit itemDecoder: JsonLDDecoder[I
             validEntities <-
               entities
                 .filter(entity =>
-                  itemDecoder.allowedEntityTypes.exists(allowed => entity.entityTypes.exists(_.contains(allowed)))
+                  itemDecoder.allowedEntityTypes.exists(allowed => entity.entityTypes.exists(_ contains allowed))
                 )
                 .map(t => itemDecoder(FlattenedJsonCursor(cursor, t, allEntities)))
                 .sequence
@@ -212,32 +220,41 @@ private[jsonld] class JsonLDListEncoder[I](implicit itemDecoder: JsonLDDecoder[I
       }
   }
 
-  private lazy val decodeForOtherCursor: Cursor => Result[List[I]] = cursor =>
-    cursor.jsonLD match {
-      case JsonLDArray(jsons) =>
-        itemDecoder match {
-          case itemDecoder: JsonLDEntityDecoder[I] =>
-            val allEntitiesMap = jsons.toList.flatMap(json => json.cursor.as[(EntityId, JsonLDEntity)].toList)
-            val entitiesWithMatchingTypes = allEntitiesMap
-              .filter { case (_, entity) =>
-                itemDecoder.allowedEntityTypes.exists(allowed => entity.entityTypes.exists(_.contains(allowed)))
-              }
-            val entitiesMatchingPredicate = entitiesWithMatchingTypes
-              .map { case (_, jsonLDEntity) => itemDecoder.predicate(jsonLDEntity.cursor).map(jsonLDEntity -> _) }
-              .sequence
-              .map(_.collect { case (entity, true) => entity })
+  private def decodeInCaseOfFlattenedJsonCursor(cursor: FlattenedJsonCursor): Result[List[I]] = cursor.jsonLD match {
+    case entity: JsonLDEntity => entity.cursor.as[I].map(List(_))
+    case JsonLDEntityId(entityId) =>
+      cursor.allEntities
+        .get(entityId)
+        .map(_.cursor.as[I].map(List(_)))
+        .getOrElse(DecodingFailure(show"Cannot find entity with $entityId", Nil).asLeft)
+    case jsonLD => DecodingFailure(s"Cannot decode ${ShowTypeName(jsonLD)} to List", Nil).asLeft
+  }
 
-            entitiesMatchingPredicate >>= { entities =>
-              entities.map(entity => itemDecoder(FlattenedJsonCursor(cursor, entity, allEntitiesMap.toMap))).sequence
+  private def decodeForOtherCursor(cursor: Cursor): Result[List[I]] = cursor.jsonLD match {
+    case JsonLDArray(jsons) =>
+      itemDecoder match {
+        case itemDecoder: JsonLDEntityDecoder[I] =>
+          val allEntitiesMap = jsons.toList.flatMap(json => json.cursor.as[(EntityId, JsonLDEntity)].toList)
+          val entitiesWithMatchingTypes = allEntitiesMap
+            .filter { case (_, entity) =>
+              itemDecoder.allowedEntityTypes.exists(allowed => entity.entityTypes.exists(_.contains(allowed)))
             }
-          case itemDecoder: JsonLDDecoder[I] =>
-            jsons.toList.map(json => itemDecoder(ListItemCursor(cursor, json))).sequence
-        }
-      case entity @ JsonLDEntity(_, _, _, _) => entity.cursor.as[I].map(List(_))
-      case value @ JsonLDValue(_, _)         => value.cursor.as[I].map(List(_))
-      case JsonLDNull                        => List.empty[I].asRight
-      case json                              => DecodingFailure(s"Cannot decode ${ShowTypeName(json)} to List", Nil).asLeft
-    }
+          val entitiesMatchingPredicate = entitiesWithMatchingTypes
+            .map { case (_, jsonLDEntity) => itemDecoder.predicate(jsonLDEntity.cursor).map(jsonLDEntity -> _) }
+            .sequence
+            .map(_.collect { case (entity, true) => entity })
+
+          entitiesMatchingPredicate >>= { entities =>
+            entities.map(entity => itemDecoder(FlattenedJsonCursor(cursor, entity, allEntitiesMap.toMap))).sequence
+          }
+        case itemDecoder: JsonLDDecoder[I] =>
+          jsons.toList.map(json => itemDecoder(ListItemCursor(cursor, json))).sequence
+      }
+    case entity @ JsonLDEntity(_, _, _, _) => entity.cursor.as[I].map(List(_))
+    case value @ JsonLDValue(_, _)         => value.cursor.as[I].map(List(_))
+    case JsonLDNull                        => List.empty[I].asRight
+    case jsonLD                            => DecodingFailure(s"Cannot decode ${ShowTypeName(jsonLD)} to List", Nil).asLeft
+  }
 
   private implicit lazy val decodeJsonLDEntity: JsonLDDecoder[(EntityId, JsonLDEntity)] = _.jsonLD match {
     case entity @ JsonLDEntity(id, _, _, _) => Right(id -> entity)

@@ -21,6 +21,7 @@ package io.renku.jsonld
 import JsonLDDecoder._
 import cats.syntax.all._
 import io.circe.DecodingFailure
+import io.renku.jsonld.Cursor.FlattenedJsonCursor
 import io.renku.jsonld.JsonLD.JsonLDValue
 import io.renku.jsonld.generators.Generators.Implicits._
 import io.renku.jsonld.generators.Generators.{localDates, nonEmptyStrings, timestamps}
@@ -208,6 +209,33 @@ class JsonLDDecoderSpec
 
       parent1.asJsonLD(parentEncoder).flatten.fold(fail(_), identity).cursor.as[List[Parent]] shouldBe
         List(parent1).asRight
+    }
+
+    "decode entity when only its id is encoded as a single value array on flattened json" in {
+      val childEntityIdEncoder = EntityIdEncoder.instance[Child](child => EntityId.of(s"child/${child.name}"))
+      val childEntity = JsonLD.entity(childEntityIdEncoder(parent1.child),
+                                      EntityTypes.of(schema / "Child"),
+                                      schema / "name" -> JsonLD.arr(parent1.child.name.asJsonLD)
+      )
+
+      val parentEntityIdEncoder = EntityIdEncoder.instance[Parent](_.id)
+      val parent1Entity = JsonLD.entity(
+        parentEntityIdEncoder(parent1),
+        parent1.types,
+        schema / "name"  -> JsonLD.arr(parent1.name.asJsonLD),
+        schema / "child" -> JsonLD.arr(parent1.child.asEntityId(childEntityIdEncoder).asJsonLD)
+      )
+
+      val cursor = FlattenedJsonCursor(
+        Cursor.Empty(),
+        parent1.child.asEntityId(childEntityIdEncoder).asJsonLD,
+        allEntities = Map(
+          parentEntityIdEncoder(parent1)      -> parent1Entity,
+          childEntityIdEncoder(parent1.child) -> childEntity
+        )
+      )
+
+      cursor.as[List[Child]] shouldBe List(parent1.child).asRight
     }
 
     "decode entity with an optional value when the value is stored in an array" in {
