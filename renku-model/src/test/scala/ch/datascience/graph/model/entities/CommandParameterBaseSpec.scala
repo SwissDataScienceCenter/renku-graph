@@ -117,5 +117,18 @@ class CommandParameterBaseSpec extends AnyWordSpec with should.Matchers with Sca
           List(parameter.to[entities.CommandParameterBase.CommandOutput]).asRight
       }
     }
+
+    "turn JsonLD ImplicitCommandOutput entity into the ImplicitCommandOutput object" in {
+      forAll(implicitCommandOutputObjects) { parameterFactory =>
+        val plan      = planEntities(parameterFactory).generateOne
+        val parameter = plan.outputs.head
+
+        plan.asJsonLD.flatten
+          .fold(throw _, identity)
+          .cursor
+          .as[List[entities.CommandParameterBase.CommandOutput]] shouldBe
+          List(parameter.to[entities.CommandParameterBase.CommandOutput]).asRight
+      }
+    }
   }
 }

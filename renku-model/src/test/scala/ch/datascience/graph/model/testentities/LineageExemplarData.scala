@@ -26,7 +26,7 @@ import ch.datascience.graph.model.commandParameters.IOStream
 import ch.datascience.graph.model.entityModel.{Location, LocationLike}
 import ch.datascience.graph.model.plans.Command
 import ch.datascience.graph.model.testentities.CommandParameterBase.CommandInput._
-import ch.datascience.graph.model.testentities.CommandParameterBase.CommandOutput.{LocationCommandOutput, MappedCommandOutput}
+import ch.datascience.graph.model.testentities.CommandParameterBase.CommandOutput.{ImplicitCommandOutput, LocationCommandOutput, MappedCommandOutput}
 import ch.datascience.graph.model.testentities.CommandParameterBase._
 import ch.datascience.graph.model.testentities.Entity.InputEntity
 import ch.datascience.graph.model.testentities.ParameterValue.CommandParameterValue
@@ -247,6 +247,8 @@ object NodeDef {
         param.maybePrefix.fold(s"${param.mappedTo.show} $location")(prefix =>
           s"$prefix ${param.mappedTo.show} $location"
         )
+      case (param: ImplicitCommandOutput, location) =>
+        param.maybePrefix.fold(location.toString)(prefix => s"$prefix$location")
     }
 
   private implicit def mappingShow[S <: IOStream]: Show[S] = Show.show {

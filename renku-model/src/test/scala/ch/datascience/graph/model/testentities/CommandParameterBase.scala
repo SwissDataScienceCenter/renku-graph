@@ -273,6 +273,15 @@ object CommandParameterBase {
     ) extends CommandOutput
         with ExplicitCommandParameter
 
+    final case class ImplicitCommandOutput(
+        name:                Name,
+        maybePrefix:         Option[Prefix],
+        defaultValue:        OutputDefaultValue,
+        folderCreation:      FolderCreation,
+        maybeEncodingFormat: Option[EncodingFormat],
+        plan:                Plan
+    ) extends CommandOutput
+
     implicit def toEntitiesCommandOutput(implicit
         renkuBaseUrl: RenkuBaseUrl
     ): CommandOutput => entities.CommandParameterBase.CommandOutput = {
@@ -298,6 +307,15 @@ object CommandParameterBase {
           parameter.folderCreation,
           parameter.maybeEncodingFormat,
           parameter.mappedTo
+        )
+      case parameter: ImplicitCommandOutput =>
+        entities.CommandParameterBase.ImplicitCommandOutput(
+          commandParameters.ResourceId(parameter.asEntityId.show),
+          parameter.name,
+          parameter.maybePrefix,
+          parameter.defaultValue,
+          parameter.folderCreation,
+          parameter.maybeEncodingFormat
         )
     }
 

@@ -18,12 +18,9 @@
 
 package ch.datascience.graph.model.entities
 
-import cats.syntax.all._
 import ch.datascience.graph.model.Schemas._
 import ch.datascience.graph.model.commandParameters._
-import io.circe.DecodingFailure
-import io.renku.jsonld.JsonLDDecoder.Result
-import io.renku.jsonld.{Cursor, EntityId, JsonLDDecoder}
+import io.renku.jsonld.JsonLDDecoder
 
 sealed trait CommandParameterBase {
   type DefaultValue
@@ -257,6 +254,14 @@ object CommandParameterBase {
   ) extends CommandOutput
       with ExplicitCommandParameter
 
+  case class ImplicitCommandOutput(resourceId:          ResourceId,
+                                   name:                Name,
+                                   maybePrefix:         Option[Prefix],
+                                   defaultValue:        OutputDefaultValue,
+                                   folderCreation:      FolderCreation,
+                                   maybeEncodingFormat: Option[EncodingFormat]
+  ) extends CommandOutput
+
   object CommandOutput {
 
     private val entityTypes = EntityTypes of (renku / "CommandOutput", renku / "CommandParameterBase")
@@ -304,10 +309,21 @@ object CommandParameterBase {
           renku / "createFolder"    -> folderCreation.asJsonLD,
           schema / "encodingFormat" -> maybeEncodingFormat.asJsonLD
         )
+
+      case ImplicitCommandOutput(resourceId, name, maybePrefix, defaultValue, folderCreation, maybeEncodingFormat) =>
+        JsonLD.entity(
+          resourceId.asEntityId,
+          entityTypes,
+          schema / "name"           -> name.asJsonLD,
+          renku / "prefix"          -> maybePrefix.asJsonLD,
+          schema / "defaultValue"   -> defaultValue.asJsonLD,
+          renku / "createFolder"    -> folderCreation.asJsonLD,
+          schema / "encodingFormat" -> maybeEncodingFormat.asJsonLD
+        )
     }
 
     implicit lazy val decoder: JsonLDDecoder[CommandOutput] =
-      JsonLDDecoder.entity(entityTypes, filterOutNonUserOutputs) { cursor =>
+      JsonLDDecoder.entity(entityTypes) { cursor =>
         for {
           resourceId          <- cursor.downEntityId.as[ResourceId]
           maybePosition       <- cursor.downField(renku / "position").as[Option[Position]]
@@ -318,17 +334,16 @@ object CommandParameterBase {
           folderCreation      <- cursor.downField(renku / "createFolder").as[FolderCreation]
           maybeEncodingFormat <- cursor.downField(schema / "encodingFormat").as[Option[EncodingFormat]]
           maybeMappedTo       <- cursor.downField(renku / "mappedTo").as[Option[IOStream.Out]]
-          commandOutput <- createCommandOutput(resourceId,
-                                               maybePosition,
-                                               name,
-                                               maybeDescription,
-                                               maybePrefix,
-                                               defaultValue,
-                                               folderCreation,
-                                               maybeEncodingFormat,
-                                               maybeMappedTo
-                           )
-        } yield commandOutput
+        } yield createCommandOutput(resourceId,
+                                    maybePosition,
+                                    name,
+                                    maybeDescription,
+                                    maybePrefix,
+                                    defaultValue,
+                                    folderCreation,
+                                    maybeEncodingFormat,
+                                    maybeMappedTo
+        )
       }
 
     private def createCommandOutput(resourceId:          ResourceId,
@@ -350,7 +365,7 @@ object CommandParameterBase {
                               defaultValue,
                               folderCreation,
                               maybeEncodingFormat
-        ).asRight
+        )
 
       case (maybePosition, Some(mappedTo)) =>
         MappedCommandOutput(resourceId,
@@ -362,15 +377,9 @@ object CommandParameterBase {
                             folderCreation,
                             maybeEncodingFormat,
                             mappedTo
-        ).asRight
-      case _ => DecodingFailure(s"Command Output $resourceId without position and mappedTo", Nil).asLeft
-    }
-
-    private lazy val filterOutNonUserOutputs: Cursor => Result[Boolean] = { cursor =>
-      for {
-        maybePosition <- cursor.downField(renku / "position").as[Option[Position]]
-        maybeMappedTo <- cursor.downField(renku / "mappedTo").as[Option[EntityId]]
-      } yield maybePosition.isDefined || maybeMappedTo.isDefined
+        )
+      case _ =>
+        ImplicitCommandOutput(resourceId, name, maybePrefix, defaultValue, folderCreation, maybeEncodingFormat)
     }
   }
 }

@@ -106,6 +106,15 @@ private object Generators {
                           plan
       )
 
+  implicit lazy val implicitCommandOutputObjects: Gen[Position => Plan => ImplicitCommandOutput] = for {
+    name                <- commandParameterNames
+    maybePrefix         <- nonEmptyStrings().toGeneratorOf(Prefix).toGeneratorOfOptions
+    defaultValue        <- entityLocations.map(OutputDefaultValue(_))
+    folderCreation      <- commandParameterFolderCreation
+    maybeEncodingFormat <- commandParameterEncodingFormats.toGeneratorOfOptions
+  } yield (_: Position) =>
+    (plan: Plan) => ImplicitCommandOutput(name, maybePrefix, defaultValue, folderCreation, maybeEncodingFormat, plan)
+
   implicit val ioStreamOuts: Gen[IOStream.Out] = Gen.oneOf(
     IOStream.StdOut(IOStream.ResourceId((renkuBaseUrl / nonEmptyStrings().generateOne).show)),
     IOStream.StdErr(IOStream.ResourceId((renkuBaseUrl / nonEmptyStrings().generateOne).show))
