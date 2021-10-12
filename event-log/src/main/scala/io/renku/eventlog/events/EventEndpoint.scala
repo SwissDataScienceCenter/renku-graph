@@ -50,9 +50,11 @@ class EventEndpointImpl[Interpretation[_]: Effect: MonadThrow](
       multipart    <- toMultipart(request)
       eventJson    <- toEvent(multipart)
       maybePayload <- getPayload(multipart)
-      result <- right[Response[Interpretation]](
-                  eventConsumersRegistry.handle(EventRequestContent(eventJson, maybePayload)) >>= toHttpResult
-                )
+      eventRequest = maybePayload match {
+                       case Some(payload) => EventRequestContent.WithPayload(eventJson, payload)
+                       case None          => EventRequestContent(eventJson)
+                     }
+      result <- right[Response[Interpretation]](eventConsumersRegistry.handle(eventRequest) >>= toHttpResult)
     } yield result
   }.merge recoverWith { case NonFatal(error) =>
     toHttpResult(EventSchedulingResult.SchedulingError(error))

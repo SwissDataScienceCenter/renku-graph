@@ -29,7 +29,10 @@ object ConsumersModelGenerators {
   implicit val eventRequestContents: Gen[EventRequestContent] = for {
     event        <- jsons
     maybePayload <- nonEmptyStrings().toGeneratorOfOptions
-  } yield EventRequestContent(event, maybePayload)
+  } yield maybePayload match {
+    case Some(payload) => EventRequestContent.WithPayload(event, payload)
+    case None          => EventRequestContent.NoPayload(event)
+  }
 
   implicit lazy val projectsGen: Gen[Project] = for {
     projectId <- projectIds

@@ -32,16 +32,14 @@ private trait ProjectTableCreator[Interpretation[_]] {
 }
 
 private object ProjectTableCreator {
-  def apply[Interpretation[_]: BracketThrow](
-      sessionResource: SessionResource[Interpretation, EventLogDB],
-      logger:          Logger[Interpretation]
+  def apply[Interpretation[_]: BracketThrow: Logger](
+      sessionResource: SessionResource[Interpretation, EventLogDB]
   ): ProjectTableCreator[Interpretation] =
-    new ProjectTableCreatorImpl(sessionResource, logger)
+    new ProjectTableCreatorImpl(sessionResource)
 }
 
-private class ProjectTableCreatorImpl[Interpretation[_]: BracketThrow](
-    sessionResource: SessionResource[Interpretation, EventLogDB],
-    logger:          Logger[Interpretation]
+private class ProjectTableCreatorImpl[Interpretation[_]: BracketThrow: Logger](
+    sessionResource: SessionResource[Interpretation, EventLogDB]
 ) extends ProjectTableCreator[Interpretation]
     with EventTableCheck {
 
@@ -49,9 +47,9 @@ private class ProjectTableCreatorImpl[Interpretation[_]: BracketThrow](
 
   override def run(): Interpretation[Unit] = sessionResource.useK {
     whenEventTableExists(
-      Kleisli.liftF(logger info "'project' table creation skipped"),
+      Kleisli.liftF(Logger[Interpretation] info "'project' table creation skipped"),
       otherwise = checkTableExists >>= {
-        case true  => Kleisli.liftF(logger info "'project' table exists")
+        case true  => Kleisli.liftF(Logger[Interpretation] info "'project' table exists")
         case false => createTable()
       }
     )
@@ -69,9 +67,9 @@ private class ProjectTableCreatorImpl[Interpretation[_]: BracketThrow](
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id        ON project(project_id)".command)
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_path      ON project(project_path)".command)
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_latest_event_date ON project(latest_event_date)".command)
-      _ <- Kleisli.liftF(logger info "'project' table created")
+      _ <- Kleisli.liftF(Logger[Interpretation] info "'project' table created")
       _ <- execute(fillInTableSql)
-      _ <- Kleisli.liftF(logger info "'project' table filled in")
+      _ <- Kleisli.liftF(Logger[Interpretation] info "'project' table filled in")
       _ <- execute(foreignKeySql)
     } yield ()
 

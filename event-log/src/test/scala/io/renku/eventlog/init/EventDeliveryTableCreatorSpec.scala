@@ -75,7 +75,7 @@ class EventDeliveryTableCreatorSpec extends AnyWordSpec with DbInitSpec with sho
   }
 
   private trait TestCase {
-    val logger       = TestLogger[IO]()
-    val tableCreator = new EventDeliveryTableCreatorImpl[IO](sessionResource, logger)
+    implicit val logger = TestLogger[IO]()
+    val tableCreator    = new EventDeliveryTableCreatorImpl[IO](sessionResource)
   }
 }

@@ -47,7 +47,7 @@ private class CommitEventsRemoverImpl[Interpretation[_]: MonadThrow](
   override def removeDeletedEvent(project: Project, commitId: CommitId): Interpretation[UpdateResult] =
     eventSender
       .sendEvent(
-        EventRequestContent(json"""{
+        EventRequestContent.NoPayload(json"""{
           "categoryName": "EVENTS_STATUS_CHANGE",
           "id":           $commitId,
           "project": {

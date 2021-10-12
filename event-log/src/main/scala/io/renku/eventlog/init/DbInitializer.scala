@@ -18,12 +18,12 @@
 
 package io.renku.eventlog.init
 
-import DbInitializer._
-import cats.effect.{Bracket, ContextShift, IO}
+import cats.effect.{BracketThrow, ContextShift, IO}
 import cats.syntax.all._
 import ch.datascience.db.SessionResource
-import org.typelevel.log4cats.Logger
 import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.init.DbInitializer._
+import org.typelevel.log4cats.Logger
 
 import scala.language.reflectiveCalls
 import scala.util.control.NonFatal
@@ -32,45 +32,41 @@ trait DbInitializer[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
-class DbInitializerImpl[Interpretation[_]](
-    migrators: List[Runnable[Interpretation, Unit]],
-    logger:    Logger[Interpretation]
-)(implicit ME: Bracket[Interpretation, Throwable])
+class DbInitializerImpl[Interpretation[_]: BracketThrow: Logger](migrators: List[Runnable[Interpretation, Unit]])
     extends DbInitializer[Interpretation] {
 
   override def run(): Interpretation[Unit] = {
-    migrators.map(_.run()).sequence >> logger.info("Event Log database initialization success")
+    migrators.map(_.run()).sequence >> Logger[Interpretation].info("Event Log database initialization success")
   } recoverWith logging
 
   private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    logger.error(exception)("Event Log database initialization failure")
+    Logger[Interpretation].error(exception)("Event Log database initialization failure")
     exception.raiseError[Interpretation, Unit]
   }
 }
 
 object DbInitializer {
   def apply(
-      sessionResource:     SessionResource[IO, EventLogDB],
-      logger:              Logger[IO]
-  )(implicit contextShift: ContextShift[IO]): IO[DbInitializer[IO]] = IO {
+      sessionResource:     SessionResource[IO, EventLogDB]
+  )(implicit contextShift: ContextShift[IO], logger: Logger[IO]): IO[DbInitializer[IO]] = IO {
     new DbInitializerImpl[IO](
       migrators = List[Runnable[IO, Unit]](
-        EventLogTableCreator(sessionResource, logger),
-        ProjectPathAdder(sessionResource, logger),
-        BatchDateAdder(sessionResource, logger),
-        ProjectTableCreator(sessionResource, logger),
-        ProjectPathRemover(sessionResource, logger),
-        EventLogTableRenamer(sessionResource, logger),
-        EventStatusRenamer(sessionResource, logger),
-        EventPayloadTableCreator(sessionResource, logger),
-        EventPayloadSchemaVersionAdder(sessionResource, logger),
-        SubscriptionCategorySyncTimeTableCreator(sessionResource, logger),
-        StatusesProcessingTimeTableCreator(sessionResource, logger),
-        SubscriberTableCreator(sessionResource, logger),
-        EventDeliveryTableCreator(sessionResource, logger),
-        TimestampZoneAdder(sessionResource, logger)
-      ),
-      logger
+        EventLogTableCreator(sessionResource),
+        ProjectPathAdder(sessionResource),
+        BatchDateAdder(sessionResource),
+        ProjectTableCreator(sessionResource),
+        ProjectPathRemover(sessionResource),
+        EventLogTableRenamer(sessionResource),
+        EventStatusRenamer(sessionResource),
+        EventPayloadTableCreator(sessionResource),
+        EventPayloadSchemaVersionAdder(sessionResource),
+        SubscriptionCategorySyncTimeTableCreator(sessionResource),
+        StatusesProcessingTimeTableCreator(sessionResource),
+        SubscriberTableCreator(sessionResource),
+        EventDeliveryTableCreator(sessionResource),
+        TimestampZoneAdder(sessionResource),
+        PayloadTypeChanger(sessionResource)
+      )
     )
   }
 

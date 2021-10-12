@@ -26,9 +26,12 @@ import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessT
 import ch.datascience.http.client.RestClient._
 import ch.datascience.http.client.RestClientError._
 import ch.datascience.logging.ExecutionTimeRecorder
+import ch.datascience.tinytypes.ByteArrayTinyType
+import ch.datascience.tinytypes.contenttypes.ZippedContent
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.NonNegative
+import fs2.Stream
 import io.circe.Json
 import org.http4s.AuthScheme.Bearer
 import org.http4s.Credentials.Token
@@ -37,7 +40,7 @@ import org.http4s._
 import org.http4s.blaze.pipeline.Command
 import org.http4s.client.blaze.BlazeClientBuilder
 import org.http4s.client.{Client, ConnectionFailure}
-import org.http4s.headers.{Authorization, `Content-Type`}
+import org.http4s.headers.{Authorization, `Content-Disposition`, `Content-Type`}
 import org.http4s.multipart.{Multipart, Part}
 import org.http4s.util.CaseInsensitiveString
 import org.typelevel.log4cats.Logger
@@ -251,10 +254,7 @@ abstract class RestClient[Interpretation[_]: ConcurrentEffect: Timer, Throttling
       def addPart[PartType](name: String, value: PartType)(implicit
           encoder:                PartEncoder[PartType]
       ): MultipartBuilder =
-        new MultipartBuilder(request,
-                             Part
-                               .formData[Interpretation](name, encoder.encodeValue(value), encoder.contentType) +: parts
-        )
+        new MultipartBuilder(request, encoder.encode[Interpretation](name, value) +: parts)
 
       def maybeAddPart[PartType](name: String, maybeValue: Option[PartType])(implicit
           encoder:                     PartEncoder[PartType]
@@ -271,26 +271,10 @@ abstract class RestClient[Interpretation[_]: ConcurrentEffect: Timer, Throttling
     }
   }
 
-  trait PartEncoder[PartType] {
-    def encodeValue(value: PartType): String
-
-    val contentType: `Content-Type`
-  }
-
-  implicit object JsonPartEncoder extends PartEncoder[Json] {
-    override def encodeValue(value: Json): String = value.noSpaces
-
-    override val contentType: `Content-Type` = `Content-Type`(MediaType.application.json)
-  }
-
-  implicit object StringPartEncoder extends PartEncoder[String] {
-    override def encodeValue(value: String): String = value
-
-    override val contentType: `Content-Type` = `Content-Type`(MediaType.text.plain)
-  }
 }
 
 object RestClient {
+
   import eu.timepit.refined.auto._
 
   import scala.concurrent.duration._
@@ -301,4 +285,44 @@ object RestClient {
 
   def validateUri[Interpretation[_]: MonadThrow](uri: String): Interpretation[Uri] =
     MonadThrow[Interpretation].fromEither(Uri.fromString(uri))
+
+  trait PartEncoder[PartType] {
+    def encode[Interpretation[_]](name: String, value: PartType): Part[Interpretation]
+  }
+
+  implicit object JsonPartEncoder extends PartEncoder[Json] {
+    override def encode[Interpretation[_]](name: String, value: Json): Part[Interpretation] = Part
+      .formData[Interpretation](name, encodeValue(value), contentType)
+
+    private def encodeValue(value: Json): String = value.noSpaces
+
+    private val contentType: `Content-Type` = `Content-Type`(MediaType.application.json)
+
+  }
+
+  implicit object StringPartEncoder extends PartEncoder[String] {
+
+    override def encode[Interpretation[_]](name: String, value: String): Part[Interpretation] = Part
+      .formData[Interpretation](name, encodeValue(value), contentType)
+
+    private def encodeValue(value: String): String = value
+
+    private val contentType: `Content-Type` = `Content-Type`(MediaType.text.plain)
+
+  }
+
+  implicit object ZipEncoder extends PartEncoder[ByteArrayTinyType with ZippedContent] {
+
+    override def encode[Interpretation[_]](name:  String,
+                                           value: ByteArrayTinyType with ZippedContent
+    ): Part[Interpretation] =
+      Part(
+        Headers(
+          `Content-Disposition`("form-data", Map("name" -> name)) ::
+            Header("Content-Transfer-Encoding", "binary") ::
+            `Content-Type`(MediaType.application.zip) :: Nil
+        ),
+        Stream.emits(value.value)
+      )
+  }
 }

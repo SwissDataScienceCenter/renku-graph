@@ -27,7 +27,6 @@ import ch.datascience.events.EventRequestContent
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.metrics.TestLabeledHistogram
@@ -35,7 +34,6 @@ import eu.timepit.refined.auto._
 import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
-import io.renku.eventlog.EventPayload
 import io.renku.eventlog.events.categories.statuschange.Generators._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent._
 import org.scalacheck.Gen
@@ -60,28 +58,30 @@ class EventHandlerSpec
         Gen
           .const(AllEventsToNew)
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
-          .map(event => event -> None),
+          .map(event => EventRequestContent.NoPayload(event._1.asJson) -> event._2),
         toTriplesGeneratedEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
-          .map(event => event -> Some((event._1.payload -> event._1.schemaVersion).asJson.noSpaces)),
+          .map(event =>
+            EventRequestContent.WithPayload[Array[Byte]](event._1.asJson, event._1.payload.value) -> event._2
+          ),
         toTripleStoreEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
-          .map(event => event -> None),
+          .map(event => EventRequestContent.NoPayload(event._1.asJson) -> event._2),
         toFailureEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
-          .map(event => event -> None),
+          .map(event => EventRequestContent.NoPayload(event._1.asJson) -> event._2),
         rollbackToNewEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
-          .map(event => event -> None),
+          .map(event => EventRequestContent.NoPayload(event._1.asJson) -> event._2),
         rollbackToTriplesGeneratedEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
-          .map(event => event -> None),
+          .map(event => EventRequestContent.NoPayload(event._1.asJson) -> event._2),
         toAwaitingDeletionEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
-          .map(event => event -> None)
-      ).map(_.generateOne) foreach { case ((event, eventAsString), maybePayload) =>
+          .map(event => EventRequestContent.NoPayload(event._1.asJson) -> event._2)
+      ).map(_.generateOne) foreach { case (eventRequestContent, eventAsString) =>
         handler
-          .createHandlingProcess(EventRequestContent(event.asJson, maybePayload))
+          .createHandlingProcess(eventRequestContent)
           .unsafeRunSync()
           .process
           .value
@@ -157,7 +157,7 @@ class EventHandlerSpec
       "categoryName": "EVENTS_STATUS_CHANGE",
       "newStatus":    "NEW"
     }"""
-    case StatusChangeEvent.ToTriplesGenerated(eventId, path, processingTime, _, _) =>
+    case StatusChangeEvent.ToTriplesGenerated(eventId, path, processingTime, _) =>
       json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",
       "id":           ${eventId.id.value},
@@ -222,10 +222,4 @@ class EventHandlerSpec
     }"""
   }
 
-  private implicit lazy val payloadEncoder: Encoder[(EventPayload, SchemaVersion)] = Encoder.instance {
-    case (payload, schemaVersion) => json"""{
-      "payload": ${payload.value}, 
-      "schemaVersion":${schemaVersion.value}
-    }"""
-  }
 }

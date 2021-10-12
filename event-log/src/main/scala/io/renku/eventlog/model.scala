@@ -49,6 +49,7 @@ object ExecutionDate extends TinyTypeFactory[ExecutionDate](new ExecutionDate(_)
 }
 
 final class EventMessage private (val value: String) extends AnyVal with StringTinyType
+
 object EventMessage extends TinyTypeFactory[EventMessage](new EventMessage(_)) with NonBlank {
 
   implicit val decoder: Decoder[EventMessage] = stringDecoder(EventMessage)
@@ -56,7 +57,6 @@ object EventMessage extends TinyTypeFactory[EventMessage](new EventMessage(_)) w
   def apply(exception: Throwable): EventMessage = EventMessage(ErrorMessage.withStackTrace(exception).value)
 }
 
-final class EventPayload private (val value: String) extends AnyVal with StringTinyType
-object EventPayload extends TinyTypeFactory[EventPayload](new EventPayload(_)) with NonBlank {
-  implicit val decoder: Decoder[EventPayload] = stringDecoder(EventPayload)
-}
+final class EventPayload private (val value: Array[Byte]) extends AnyVal with ByteArrayTinyType
+
+object EventPayload extends TinyTypeFactory[EventPayload](new EventPayload(_))

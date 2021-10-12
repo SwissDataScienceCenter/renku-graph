@@ -68,7 +68,7 @@ object Microservice extends IOMicroservice {
       for {
         certificateLoader           <- CertificateLoader[IO](ApplicationLogger)
         sentryInitializer           <- SentryInitializer[IO]()
-        dbInitializer               <- DbInitializer(sessionResource, ApplicationLogger)
+        dbInitializer               <- DbInitializer(sessionResource)
         metricsRegistry             <- MetricsRegistry()
         queriesExecTimes            <- QueriesExecutionTimes(metricsRegistry)
         statsFinder                 <- IOStatsFinder(sessionResource, queriesExecTimes)

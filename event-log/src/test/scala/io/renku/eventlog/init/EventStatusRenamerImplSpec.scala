@@ -111,8 +111,8 @@ class EventStatusRenamerImplSpec
   }
 
   private trait TestCase {
-    val logger             = TestLogger[IO]()
-    val eventStatusRenamer = new EventStatusRenamerImpl[IO](sessionResource, logger)
+    implicit val logger    = TestLogger[IO]()
+    val eventStatusRenamer = new EventStatusRenamerImpl[IO](sessionResource)
   }
 
   private def store(event: Event, withStatus: String): Unit = {

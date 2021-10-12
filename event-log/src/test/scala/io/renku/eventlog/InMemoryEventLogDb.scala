@@ -61,12 +61,31 @@ trait InMemoryEventLogDb extends ForAllTestContainer with TypeSerializers {
 
   def verifyTrue(sql: Command[Void]): Unit = execute[Unit](Kleisli(session => session.execute(sql).void))
 
-  def verify(column: String, hasType: String) = execute[Boolean] {
+  def verify(table: String, column: String, hasType: String) = execute[Boolean] {
     Kleisli { session =>
-      val query: Query[String, String] =
+      val query: Query[String ~ String, String] =
         sql"""SELECT data_type FROM information_schema.columns WHERE
-         table_name = event AND column_name = $varchar;""".query(varchar)
-      session.prepare(query).use(_.unique(column)).map(dataType => dataType == hasType).recover { case _ => false }
+         table_name = $varchar AND column_name = $varchar;""".query(varchar)
+      session
+        .prepare(query)
+        .use(_.unique(table ~ column))
+        .map(dataType => dataType == hasType)
+        .recover { case _ => false }
+    }
+  }
+
+  def verifyColumnExists(table: String, column: String) = execute[Boolean] {
+    Kleisli { session =>
+      val query: Query[String ~ String, Boolean] =
+        sql"""SELECT EXISTS (
+                SELECT *
+                FROM information_schema.columns 
+                WHERE table_name = $varchar AND column_name = $varchar
+              )""".query(bool)
+      session
+        .prepare(query)
+        .use(_.unique(table ~ column))
+        .recover { case _ => false }
     }
   }
 

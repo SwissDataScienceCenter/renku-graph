@@ -97,8 +97,8 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
   }
 
   private trait TestCase {
-    val logger         = TestLogger[IO]()
-    val batchDateAdder = new BatchDateAdderImpl[IO](sessionResource, logger)
+    implicit val logger = TestLogger[IO]()
+    val batchDateAdder  = new BatchDateAdderImpl[IO](sessionResource)
   }
 
   private def checkColumnExists: Boolean =

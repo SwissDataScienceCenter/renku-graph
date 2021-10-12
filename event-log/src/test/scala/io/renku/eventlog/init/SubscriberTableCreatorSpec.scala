@@ -73,7 +73,7 @@ class SubscriberTableCreatorSpec extends AnyWordSpec with DbInitSpec with should
   }
 
   private trait TestCase {
-    val logger       = TestLogger[IO]()
-    val tableCreator = new SubscriberTableCreatorImpl[IO](sessionResource, logger)
+    implicit val logger = TestLogger[IO]()
+    val tableCreator    = new SubscriberTableCreatorImpl[IO](sessionResource)
   }
 }

@@ -634,8 +634,7 @@ Event-log uses relational database as an internal storage. The DB has the follow
 |--------------------------------------|
 | event_id   VARCHAR    PK FK NOT NULL |
 | project_id INT4       PK FK NOT NULL |
-| payload    TEXT             NOT NULL |
-| schema_version TEXT   PK    NOT NULL |
+| payload    BYTEA            NOT NULL |
 
 | subscription_category_sync_time       |
 |---------------------------------------|

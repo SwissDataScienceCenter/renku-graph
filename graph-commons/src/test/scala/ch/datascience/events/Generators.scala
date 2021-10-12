@@ -19,13 +19,18 @@
 package ch.datascience.events
 
 import ch.datascience.events
-import ch.datascience.generators.Generators.{jsons, nonEmptyStrings}
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators.{jsons, nonEmptyStrings}
 import org.scalacheck.Gen
 
 object Generators {
   implicit val eventRequestContents: Gen[EventRequestContent] = for {
     event        <- jsons
     maybePayload <- nonEmptyStrings().toGeneratorOfOptions
-  } yield events.EventRequestContent(event, maybePayload)
+  } yield maybePayload match {
+    case Some(payload) => events.EventRequestContent.WithPayload(event, payload)
+    case None          => events.EventRequestContent.NoPayload(event)
+  }
+
+  implicit val eventRequestContentNoPayloads = jsons.map(events.EventRequestContent.NoPayload)
 }

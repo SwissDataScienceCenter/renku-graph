@@ -29,6 +29,9 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Warn
 import ch.datascience.logging.{ExecutionTimeRecorder, TestExecutionTimeRecorder}
 import ch.datascience.stubbing.ExternalServiceStubbing
+import ch.datascience.tinytypes.ByteArrayTinyType
+import ch.datascience.tinytypes.TestTinyTypes.ByteArrayTestType
+import ch.datascience.tinytypes.contenttypes.ZippedContent
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.http.Fault
 import com.github.tomakehurst.wiremock.http.Fault._
@@ -48,6 +51,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.typelevel.log4cats.Logger
 
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeoutException
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -332,6 +336,11 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
 
       val jsonPart = nonEmptyStrings().generateOne -> jsons.generateOne
       val textPart = nonEmptyStrings().generateOne -> nonEmptyStrings().generateOne
+      val zippedPart =
+        nonEmptyStrings().generateOne -> nonEmptyStrings()
+          .map(_.getBytes(StandardCharsets.UTF_8))
+          .map(ByteArrayTestType)
+          .generateOne
 
       stubFor {
         post("/resource")
@@ -345,6 +354,11 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
               .withBody(equalTo(textPart._2))
               .withHeader("Content-Type", equalTo(s"${text.plain.mainType}/${text.plain.subType}"))
           )
+          .withMultipartRequestBody(
+            aMultipart(zippedPart._1)
+              .withBody(binaryEqualTo(zippedPart._2.value))
+              .withHeader("Content-Type", equalTo(s"${application.zip.mainType}/${application.zip.subType}"))
+          )
           .withHeader(
             "Content-Type",
             containing(s"${multipart.`form-data`.mainType}/${multipart.`form-data`.subType}")
@@ -354,7 +368,7 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
 
       verifyThrottling()
 
-      client.callMultipartEndpoint(jsonPart, textPart).unsafeRunSync() shouldBe 1
+      client.callMultipartEndpoint(jsonPart, textPart, zippedPart).unsafeRunSync() shouldBe 1
       verify {
         postRequestedFor(urlEqualTo("/resource")).withoutHeader("Transfer-encoding")
       }
@@ -408,13 +422,17 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
       accessToken <- send(HttpRequest(request(GET, uri), requestName))(mapResponseToInt)
     } yield accessToken
 
-    def callMultipartEndpoint(jsonPart: (String, Json), textPart: (String, String)): IO[Int] = for {
+    def callMultipartEndpoint(jsonPart:   (String, Json),
+                              textPart:   (String, String),
+                              zippedPart: (String, ByteArrayTinyType with ZippedContent)
+    ): IO[Int] = for {
       uri <- validateUri(s"$hostUrl/resource")
       response <-
         send(
           request(POST, uri).withMultipartBuilder
             .addPart(jsonPart._1, jsonPart._2)
             .addPart(textPart._1, textPart._2)
+            .addPart(zippedPart._1, zippedPart._2)
             .build()
         )(mapResponseToInt)
     } yield response

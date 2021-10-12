@@ -33,22 +33,20 @@ private trait TimestampZoneAdder[Interpretation[_]] {
 }
 
 private object TimestampZoneAdder {
-  def apply[Interpretation[_]: BracketThrow](
-      sessionResource: SessionResource[Interpretation, EventLogDB],
-      logger:          Logger[Interpretation]
+  def apply[Interpretation[_]: BracketThrow: Logger](
+      sessionResource: SessionResource[Interpretation, EventLogDB]
   ): TimestampZoneAdder[Interpretation] =
-    TimestampZoneAdderImpl(sessionResource, logger)
+    TimestampZoneAdderImpl(sessionResource)
 }
 
-private case class TimestampZoneAdderImpl[Interpretation[_]: BracketThrow](
-    sessionResource: SessionResource[Interpretation, EventLogDB],
-    logger:          Logger[Interpretation]
+private case class TimestampZoneAdderImpl[Interpretation[_]: BracketThrow: Logger](
+    sessionResource: SessionResource[Interpretation, EventLogDB]
 ) extends TimestampZoneAdder[Interpretation]
     with EventTableCheck {
   override def run(): Interpretation[Unit] = sessionResource.useK {
     checkIfAlreadyTimestamptz >>= {
       case true =>
-        Kleisli.liftF(logger.info("Fields are already in timestamptz type"))
+        Kleisli.liftF(Logger[Interpretation].info("Fields are already in timestamptz type"))
       case false => migrateTimestampToCEST()
     }
   }

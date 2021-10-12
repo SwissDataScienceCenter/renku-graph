@@ -22,18 +22,19 @@ import cats.data.EitherT
 import cats.effect.{Concurrent, ContextShift, IO}
 import cats.syntax.all._
 import cats.{MonadThrow, Show}
+import ch.datascience.compression.Zip
 import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
 import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
 import ch.datascience.events.{EventRequestContent, consumers}
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventId, EventProcessingTime, EventStatus}
-import ch.datascience.graph.model.{SchemaVersion, projects}
+import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import io.circe.{DecodingFailure, parser}
+import io.circe.DecodingFailure
 import io.renku.eventlog.events.categories.statuschange.DBUpdater.EventUpdaterFactory
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent._
-import io.renku.eventlog.{EventLogDB, EventMessage, EventPayload}
+import io.renku.eventlog.{EventLogDB, EventMessage}
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -125,7 +126,7 @@ private object EventHandler {
 
   private implicit lazy val eventTriplesGeneratedDecoder
       : EventRequestContent => Either[DecodingFailure, ToTriplesGenerated] = {
-    case EventRequestContent(event, Some(payload)) =>
+    case EventRequestContent.WithPayload(event, payload) =>
       for {
         id             <- event.hcursor.downField("id").as[EventId]
         projectId      <- event.hcursor.downField("project").downField("id").as[projects.Id]
@@ -135,15 +136,8 @@ private object EventHandler {
                case TriplesGenerated => Right(())
                case status           => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
              }
-        payloadJson          <- parser.parse(payload).leftMap(p => DecodingFailure(s"Could not parse payload: $p", Nil))
-        eventPayload         <- payloadJson.hcursor.downField("payload").as[EventPayload]
-        payloadSchemaVersion <- payloadJson.hcursor.downField("schemaVersion").as[SchemaVersion]
-      } yield ToTriplesGenerated(CompoundEventId(id, projectId),
-                                 projectPath,
-                                 processingTime,
-                                 eventPayload,
-                                 payloadSchemaVersion
-      )
+        eventPayload <- Zip.unzip(payload)
+      } yield ToTriplesGenerated(CompoundEventId(id, projectId), projectPath, processingTime, eventPayload)
     case _ => Left(DecodingFailure("Missing event payload", Nil))
   }
 

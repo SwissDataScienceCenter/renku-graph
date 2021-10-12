@@ -31,16 +31,15 @@ private trait SubscriberTableCreator[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
-private class SubscriberTableCreatorImpl[Interpretation[_]: BracketThrow](
-    sessionResource: SessionResource[Interpretation, EventLogDB],
-    logger:          Logger[Interpretation]
+private class SubscriberTableCreatorImpl[Interpretation[_]: BracketThrow: Logger](
+    sessionResource: SessionResource[Interpretation, EventLogDB]
 ) extends SubscriberTableCreator[Interpretation] {
 
   import cats.syntax.all._
 
   override def run(): Interpretation[Unit] = sessionResource.useK {
     checkTableExists >>= {
-      case true  => Kleisli.liftF(logger info "'subscriber' table exists")
+      case true  => Kleisli.liftF(Logger[Interpretation] info "'subscriber' table exists")
       case false => createTable()
 
     }
@@ -58,7 +57,7 @@ private class SubscriberTableCreatorImpl[Interpretation[_]: BracketThrow](
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_delivery_id ON subscriber(delivery_id)".command)
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_delivery_url ON subscriber(delivery_url)".command)
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_source_url ON subscriber(source_url)".command)
-      _ <- Kleisli.liftF(logger info "'subscriber' table created")
+      _ <- Kleisli.liftF(Logger[Interpretation] info "'subscriber' table created")
     } yield ()
 
   private lazy val createTableSql: Command[Void] =
@@ -74,9 +73,8 @@ private class SubscriberTableCreatorImpl[Interpretation[_]: BracketThrow](
 }
 
 private object SubscriberTableCreator {
-  def apply[Interpretation[_]: BracketThrow](
-      sessionResource: SessionResource[Interpretation, EventLogDB],
-      logger:          Logger[Interpretation]
+  def apply[Interpretation[_]: BracketThrow: Logger](
+      sessionResource: SessionResource[Interpretation, EventLogDB]
   ): SubscriberTableCreator[Interpretation] =
-    new SubscriberTableCreatorImpl(sessionResource, logger)
+    new SubscriberTableCreatorImpl(sessionResource)
 }

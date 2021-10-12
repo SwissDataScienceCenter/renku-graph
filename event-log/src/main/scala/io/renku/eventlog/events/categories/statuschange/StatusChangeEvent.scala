@@ -21,7 +21,7 @@ package io.renku.eventlog.events.categories.statuschange
 import cats.Show
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime}
-import ch.datascience.graph.model.{SchemaVersion, projects}
+import ch.datascience.graph.model.projects
 import io.renku.eventlog.{EventMessage, EventPayload}
 
 private sealed trait StatusChangeEvent extends Product with Serializable
@@ -38,12 +38,11 @@ private object StatusChangeEvent {
   final case class ToTriplesGenerated(eventId:        CompoundEventId,
                                       projectPath:    projects.Path,
                                       processingTime: EventProcessingTime,
-                                      payload:        EventPayload,
-                                      schemaVersion:  SchemaVersion
+                                      payload:        EventPayload
   ) extends StatusChangeEvent
   object ToTriplesGenerated {
     implicit lazy val show: Show[ToTriplesGenerated] = Show.show {
-      case ToTriplesGenerated(eventId, projectPath, _, _, _) =>
+      case ToTriplesGenerated(eventId, projectPath, _, _) =>
         s"$eventId, projectPath = $projectPath, status = $TriplesGenerated - update"
     }
   }

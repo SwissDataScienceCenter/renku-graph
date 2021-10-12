@@ -33,26 +33,24 @@ private trait ProjectPathRemover[Interpretation[_]] {
 }
 
 private object ProjectPathRemover {
-  def apply[Interpretation[_]: BracketThrow](
-      sessionResource: SessionResource[Interpretation, EventLogDB],
-      logger:          Logger[Interpretation]
+  def apply[Interpretation[_]: BracketThrow: Logger](
+      sessionResource: SessionResource[Interpretation, EventLogDB]
   ): ProjectPathRemover[Interpretation] =
-    new ProjectPathRemoverImpl(sessionResource, logger)
+    new ProjectPathRemoverImpl(sessionResource)
 }
 
-private class ProjectPathRemoverImpl[Interpretation[_]: BracketThrow](
-    sessionResource: SessionResource[Interpretation, EventLogDB],
-    logger:          Logger[Interpretation]
+private class ProjectPathRemoverImpl[Interpretation[_]: BracketThrow: Logger](
+    sessionResource: SessionResource[Interpretation, EventLogDB]
 ) extends ProjectPathRemover[Interpretation]
     with EventTableCheck {
 
   override def run(): Interpretation[Unit] = sessionResource.useK {
     whenEventTableExists(
-      Kleisli.liftF(logger info "'project_path' column dropping skipped"),
+      Kleisli.liftF(Logger[Interpretation] info "'project_path' column dropping skipped"),
       otherwise = checkColumnExists >>= {
         case false =>
           Kleisli.liftF[Interpretation, Session[Interpretation], Unit](
-            logger info "'project_path' column already removed"
+            Logger[Interpretation] info "'project_path' column already removed"
           )
         case true => removeColumn()
       }
@@ -71,7 +69,7 @@ private class ProjectPathRemoverImpl[Interpretation[_]: BracketThrow](
   private def removeColumn(): Kleisli[Interpretation, Session[Interpretation], Unit] =
     for {
       _ <- execute(sql"ALTER TABLE event_log DROP COLUMN IF EXISTS project_path".command)
-      _ <- Kleisli.liftF(logger info "'project_path' column removed")
+      _ <- Kleisli.liftF(Logger[Interpretation] info "'project_path' column removed")
     } yield ()
 
 }

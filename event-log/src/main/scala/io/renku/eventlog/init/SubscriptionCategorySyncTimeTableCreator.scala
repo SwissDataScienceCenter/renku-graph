@@ -32,23 +32,21 @@ private trait SubscriptionCategorySyncTimeTableCreator[Interpretation[_]] {
 }
 
 private object SubscriptionCategorySyncTimeTableCreator {
-  def apply[Interpretation[_]: BracketThrow](
-      sessionResource: SessionResource[Interpretation, EventLogDB],
-      logger:          Logger[Interpretation]
+  def apply[Interpretation[_]: BracketThrow: Logger](
+      sessionResource: SessionResource[Interpretation, EventLogDB]
   ): SubscriptionCategorySyncTimeTableCreator[Interpretation] =
-    new SubscriptionCategorySyncTimeTableCreatorImpl[Interpretation](sessionResource, logger)
+    new SubscriptionCategorySyncTimeTableCreatorImpl[Interpretation](sessionResource)
 }
 
-private class SubscriptionCategorySyncTimeTableCreatorImpl[Interpretation[_]: BracketThrow](
-    sessionResource: SessionResource[Interpretation, EventLogDB],
-    logger:          Logger[Interpretation]
+private class SubscriptionCategorySyncTimeTableCreatorImpl[Interpretation[_]: BracketThrow: Logger](
+    sessionResource: SessionResource[Interpretation, EventLogDB]
 ) extends SubscriptionCategorySyncTimeTableCreator[Interpretation] {
 
   import cats.syntax.all._
 
   override def run(): Interpretation[Unit] = sessionResource.useK {
     checkTableExists >>= {
-      case true  => Kleisli.liftF(logger info "'subscription_category_sync_time' table exists")
+      case true  => Kleisli.liftF(Logger[Interpretation] info "'subscription_category_sync_time' table exists")
       case false => createTable()
     }
   }
@@ -76,7 +74,7 @@ private class SubscriptionCategorySyncTimeTableCreatorImpl[Interpretation[_]: Br
         execute(
           sql"CREATE INDEX IF NOT EXISTS idx_last_synced      ON subscription_category_sync_time(last_synced)".command
         )
-      _ <- Kleisli.liftF(logger info "'subscription_category_sync_time' table created")
+      _ <- Kleisli.liftF(Logger[Interpretation] info "'subscription_category_sync_time' table created")
       _ <- execute(foreignKeySql)
     } yield ()
 

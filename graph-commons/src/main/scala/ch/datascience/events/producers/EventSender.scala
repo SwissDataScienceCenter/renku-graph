@@ -39,7 +39,11 @@ import scala.concurrent.duration.{Duration, FiniteDuration, _}
 import scala.language.postfixOps
 
 trait EventSender[Interpretation[_]] {
-  def sendEvent(eventContent: EventRequestContent, errorMessage: String): Interpretation[Unit]
+  def sendEvent(eventContent: EventRequestContent.NoPayload, errorMessage: String): Interpretation[Unit]
+
+  def sendEvent[PayloadType](eventContent: EventRequestContent.WithPayload[PayloadType], errorMessage: String)(implicit
+      partEncoder:                         RestClient.PartEncoder[PayloadType]
+  ): Interpretation[Unit]
 }
 
 class EventSenderImpl[Interpretation[_]: ConcurrentEffect: Timer](
@@ -58,36 +62,52 @@ class EventSenderImpl[Interpretation[_]: ConcurrentEffect: Timer](
     )
     with EventSender[Interpretation] {
 
-  def sendEvent(eventContent: EventRequestContent, errorMessage: String): Interpretation[Unit] = {
-
-    def retryOnServerError(retry: Eval[Interpretation[Unit]]): PartialFunction[Throwable, Interpretation[Unit]] = {
-      case exception @ UnexpectedResponseException(ServiceUnavailable | GatewayTimeout | BadGateway, _) =>
-        waitAndRetry(retry, exception)
-      case exception @ (_: ConnectivityException | _: ClientException) =>
-        waitAndRetry(retry, exception)
-    }
-
-    def waitAndRetry(retry: Eval[Interpretation[Unit]], exception: Throwable) = for {
-      _      <- logger.error(exception)(errorMessage)
-      _      <- Timer[Interpretation] sleep onErrorSleep
-      result <- retry.value
-    } yield result
-
+  override def sendEvent(eventContent: EventRequestContent.NoPayload, errorMessage: String): Interpretation[Unit] =
     for {
       uri <- validateUri(s"$eventLogUrl/events")
       request = createRequest(uri, eventContent)
       sendingResult <-
         send(request)(responseMapping)
-          .recoverWith(retryOnServerError(Eval.always(sendEvent(eventContent, errorMessage))))
+          .recoverWith(retryOnServerError(Eval.always(sendEvent(eventContent, errorMessage)), errorMessage))
     } yield sendingResult
 
-  }
+  override def sendEvent[PayloadType](eventContent: EventRequestContent.WithPayload[PayloadType], errorMessage: String)(
+      implicit partEncoder:                         RestClient.PartEncoder[PayloadType]
+  ): Interpretation[Unit] = for {
+    uri <- validateUri(s"$eventLogUrl/events")
+    request = createRequest(uri, eventContent)
+    sendingResult <-
+      send(request)(responseMapping)
+        .recoverWith(retryOnServerError(Eval.always(sendEvent(eventContent, errorMessage)), errorMessage))
+  } yield sendingResult
 
-  private def createRequest(uri: Uri, eventRequestContent: EventRequestContent) =
+  private def createRequest(uri: Uri, eventRequestContent: EventRequestContent.NoPayload) =
     request(POST, uri).withMultipartBuilder
       .addPart("event", eventRequestContent.event)
-      .maybeAddPart("payload", eventRequestContent.maybePayload)
       .build()
+
+  private def createRequest[PayloadType](uri: Uri, eventRequestContent: EventRequestContent.WithPayload[PayloadType])(
+      implicit partEncoder:                   RestClient.PartEncoder[PayloadType]
+  ) = request(POST, uri).withMultipartBuilder
+    .addPart("event", eventRequestContent.event)
+    .addPart("payload", eventRequestContent.payload)
+    .build()
+
+  private def retryOnServerError(
+      retry:        Eval[Interpretation[Unit]],
+      errorMessage: String
+  ): PartialFunction[Throwable, Interpretation[Unit]] = {
+    case exception @ UnexpectedResponseException(ServiceUnavailable | GatewayTimeout | BadGateway, _) =>
+      waitAndRetry(retry, exception, errorMessage)
+    case exception @ (_: ConnectivityException | _: ClientException) =>
+      waitAndRetry(retry, exception, errorMessage)
+  }
+
+  private def waitAndRetry(retry: Eval[Interpretation[Unit]], exception: Throwable, errorMessage: String) = for {
+    _      <- logger.error(exception)(errorMessage)
+    _      <- Timer[Interpretation] sleep onErrorSleep
+    result <- retry.value
+  } yield result
 
   private lazy val responseMapping
       : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[Unit]] = {

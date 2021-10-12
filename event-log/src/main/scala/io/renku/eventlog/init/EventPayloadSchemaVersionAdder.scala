@@ -32,16 +32,14 @@ private trait EventPayloadSchemaVersionAdder[Interpretation[_]] {
 }
 
 private object EventPayloadSchemaVersionAdder {
-  def apply[Interpretation[_]: BracketThrow](
-      sessionResource: SessionResource[Interpretation, EventLogDB],
-      logger:          Logger[Interpretation]
+  def apply[Interpretation[_]: BracketThrow: Logger](
+      sessionResource: SessionResource[Interpretation, EventLogDB]
   ): EventPayloadSchemaVersionAdder[Interpretation] =
-    new EventPayloadSchemaVersionAdderImpl(sessionResource, logger)
+    new EventPayloadSchemaVersionAdderImpl(sessionResource)
 }
 
-private class EventPayloadSchemaVersionAdderImpl[Interpretation[_]: BracketThrow](
-    sessionResource: SessionResource[Interpretation, EventLogDB],
-    logger:          Logger[Interpretation]
+private class EventPayloadSchemaVersionAdderImpl[Interpretation[_]: BracketThrow: Logger](
+    sessionResource: SessionResource[Interpretation, EventLogDB]
 ) extends EventPayloadSchemaVersionAdder[Interpretation]
     with EventTableCheck {
 
@@ -69,7 +67,7 @@ private class EventPayloadSchemaVersionAdderImpl[Interpretation[_]: BracketThrow
     for {
       _ <- execute(alterTableSql)
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_schema_version ON event_payload(schema_version)".command)
-      _ <- Kleisli.liftF(logger info "'event_payload' table altered")
+      _ <- Kleisli.liftF(Logger[Interpretation] info "'event_payload' table altered")
     } yield ()
 
   private lazy val alterTableSql: Command[Void] =

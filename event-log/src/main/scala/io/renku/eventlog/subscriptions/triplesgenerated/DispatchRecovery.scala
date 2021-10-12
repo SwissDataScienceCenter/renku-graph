@@ -41,7 +41,7 @@ private class DispatchRecoveryImpl[Interpretation[_]: MonadThrow](
     with TinyTypeEncoders {
 
   override def returnToQueue(event: TriplesGeneratedEvent): Interpretation[Unit] = eventSender.sendEvent(
-    EventRequestContent(json"""{
+    EventRequestContent.NoPayload(json"""{
         "categoryName": "EVENTS_STATUS_CHANGE",
         "id":           ${event.id.id},
         "project": {
@@ -58,7 +58,7 @@ private class DispatchRecoveryImpl[Interpretation[_]: MonadThrow](
       event: TriplesGeneratedEvent
   ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
     eventSender.sendEvent(
-      EventRequestContent(json"""{
+      EventRequestContent.NoPayload(json"""{
         "categoryName": "EVENTS_STATUS_CHANGE",
         "id":           ${event.id.id},
         "project": {

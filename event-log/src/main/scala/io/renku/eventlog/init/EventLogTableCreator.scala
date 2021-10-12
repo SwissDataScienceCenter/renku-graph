@@ -34,16 +34,14 @@ private trait EventLogTableCreator[Interpretation[_]] {
 }
 
 private object EventLogTableCreator {
-  def apply[Interpretation[_]: BracketThrow](
-      sessionResource: SessionResource[Interpretation, EventLogDB],
-      logger:          Logger[Interpretation]
+  def apply[Interpretation[_]: BracketThrow: Logger](
+      sessionResource: SessionResource[Interpretation, EventLogDB]
   ): EventLogTableCreator[Interpretation] =
-    new EventLogTableCreatorImpl(sessionResource, logger)
+    new EventLogTableCreatorImpl(sessionResource)
 }
 
-private class EventLogTableCreatorImpl[Interpretation[_]: BracketThrow](
-    sessionResource: SessionResource[Interpretation, EventLogDB],
-    logger:          Logger[Interpretation]
+private class EventLogTableCreatorImpl[Interpretation[_]: BracketThrow: Logger](
+    sessionResource: SessionResource[Interpretation, EventLogDB]
 ) extends EventLogTableCreator[Interpretation]
     with EventTableCheck
     with TypeSerializers {
@@ -52,10 +50,12 @@ private class EventLogTableCreatorImpl[Interpretation[_]: BracketThrow](
 
   override def run(): Interpretation[Unit] = sessionResource.useK {
     whenEventTableExists(
-      Kleisli.liftF(logger info "'event_log' table creation skipped"),
+      Kleisli.liftF(Logger[Interpretation] info "'event_log' table creation skipped"),
       otherwise = checkTableExists flatMap {
         case true =>
-          Kleisli.liftF[Interpretation, Session[Interpretation], Unit](logger info "'event_log' table exists")
+          Kleisli.liftF[Interpretation, Session[Interpretation], Unit](
+            Logger[Interpretation] info "'event_log' table exists"
+          )
         case false => createTable
       }
     )
@@ -77,7 +77,7 @@ private class EventLogTableCreatorImpl[Interpretation[_]: BracketThrow](
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_date ON event_log(event_date DESC)".command)
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_created_date ON event_log(created_date DESC)".command)
       _ <- revertStatusToGenerationRecoverableFailure
-      _ <- Kleisli.liftF(logger info "'event_log' table created")
+      _ <- Kleisli.liftF(Logger[Interpretation] info "'event_log' table created")
     } yield ()
 
   private lazy val createTableSql: Command[Void] =
