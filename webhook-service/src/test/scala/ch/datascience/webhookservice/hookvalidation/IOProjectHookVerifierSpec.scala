@@ -23,7 +23,7 @@ import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.config.GitLabUrl
+import ch.datascience.graph.model.GitLabUrl
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.RestClientError.UnauthorizedException
@@ -131,7 +131,9 @@ class IOProjectHookVerifierSpec extends AnyWordSpec with MockFactory with Extern
 
       intercept[Exception] {
         verifier.checkHookPresence(projectHookId, personalAccessToken).unsafeRunSync()
-      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId/hooks returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      }.getMessage should startWith(
+        s"GET $gitLabUrl/api/v4/projects/$projectId/hooks returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      )
     }
   }
 

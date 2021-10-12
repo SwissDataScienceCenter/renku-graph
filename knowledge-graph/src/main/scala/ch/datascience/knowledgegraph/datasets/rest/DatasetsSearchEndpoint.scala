@@ -22,7 +22,9 @@ import cats.effect._
 import cats.syntax.all._
 import ch.datascience.config._
 import ch.datascience.config.renku.ResourceUrl
-import ch.datascience.graph.model.datasets.PublishedDate
+import ch.datascience.graph.config.GitLabUrlLoader
+import ch.datascience.graph.model.datasets.{Date, DatePublished, ImageUri}
+import ch.datascience.graph.model.{GitLabUrl, projects}
 import ch.datascience.http.ErrorMessage
 import ch.datascience.http.InfoMessage._
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
@@ -44,6 +46,7 @@ import scala.util.control.NonFatal
 class DatasetsSearchEndpoint[Interpretation[_]: Effect: MonadThrow](
     datasetsFinder:        DatasetsFinder[Interpretation],
     renkuResourcesUrl:     renku.ResourcesUrl,
+    gitLabUrl:             GitLabUrl,
     executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
     logger:                Logger[Interpretation]
 ) extends Http4sDsl[Interpretation] {
@@ -55,21 +58,20 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect: MonadThrow](
   import ch.datascience.json.JsonOps._
   import ch.datascience.tinytypes.json.TinyTypeEncoders._
   import executionTimeRecorder._
-  import io.circe.Encoder
   import io.circe.literal._
+  import io.circe.{Encoder, Json}
 
   def searchForDatasets(maybePhrase: Option[Phrase],
                         sort:        Sort.By,
                         paging:      PagingRequest,
                         maybeUser:   Option[AuthUser]
-  ): Interpretation[Response[Interpretation]] =
-    measureExecutionTime {
-      implicit val datasetsUrl: renku.ResourceUrl = requestedUrl(maybePhrase, sort, paging)
-      datasetsFinder
-        .findDatasets(maybePhrase, sort, paging, maybeUser)
-        .map(_.toHttpResponse)
-        .recoverWith(httpResult(maybePhrase))
-    } map logExecutionTimeWhen(finishedSuccessfully(maybePhrase))
+  ): Interpretation[Response[Interpretation]] = measureExecutionTime {
+    implicit val datasetsUrl: renku.ResourceUrl = requestedUrl(maybePhrase, sort, paging)
+    datasetsFinder
+      .findDatasets(maybePhrase, sort, paging, maybeUser)
+      .map(_.toHttpResponse)
+      .recoverWith(httpResult(maybePhrase))
+  } map logExecutionTimeWhen(finishedSuccessfully(maybePhrase))
 
   private def requestedUrl(maybePhrase: Option[Phrase], sort: Sort.By, paging: PagingRequest): renku.ResourceUrl =
     (renkuResourcesUrl / "datasets") ? (page.parameterName -> paging.page) & (perPage.parameterName -> paging.perPage) & (Sort.sort.parameterName -> sort) && (query.parameterName -> maybePhrase)
@@ -94,41 +96,65 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect: MonadThrow](
   }
 
   private implicit val datasetEncoder: Encoder[DatasetSearchResult] = Encoder.instance[DatasetSearchResult] {
-    case DatasetSearchResult(id, title, name, maybeDescription, creators, dates, projectsCount, keywords, images) =>
-      json"""
-      {
+    case DatasetSearchResult(id,
+                             title,
+                             name,
+                             maybeDescription,
+                             creators,
+                             date,
+                             exemplarProjectPath,
+                             projectsCount,
+                             keywords,
+                             images
+        ) =>
+      json"""{
         "identifier": $id,
         "title": $title,
         "name": $name,
-        "published": ${creators -> dates.maybeDatePublished},
-        "date": ${dates.date},
+        "published": ${creators -> date},
+        "date": ${date.instant},
         "projectsCount": $projectsCount,
         "keywords": $keywords,
-        "images": $images
+        "images": ${images -> exemplarProjectPath}
       }"""
         .addIfDefined("description" -> maybeDescription)
         .deepMerge(_links(Link(Rel("details") -> Href(renkuResourcesUrl / "datasets" / id))))
   }
 
-  private implicit lazy val publishingEncoder: Encoder[(Set[DatasetCreator], Option[PublishedDate])] =
-    Encoder.instance[(Set[DatasetCreator], Option[PublishedDate])] {
-      case (creators, Some(date)) =>
-        json"""{
-          "creator": $creators,
-          "datePublished": $date
-        }"""
-      case (creators, None) =>
-        json"""{
-          "creator": $creators
-        }"""
+  private implicit lazy val publishingEncoder: Encoder[(Set[DatasetCreator], Date)] =
+    Encoder.instance {
+      case (creators, DatePublished(date)) => json"""{
+        "creator": $creators,
+        "datePublished": $date
+      }"""
+      case (creators, _)                   => json"""{
+        "creator": $creators
+      }"""
     }
 
   private implicit lazy val creatorEncoder: Encoder[DatasetCreator] = Encoder.instance[DatasetCreator] {
-    case DatasetCreator(maybeEmail, name, _) =>
-      json"""{
-        "name": $name
-      }""" addIfDefined ("email" -> maybeEmail)
+    case DatasetCreator(maybeEmail, name, _) => json"""{
+      "name": $name
+    }""" addIfDefined ("email" -> maybeEmail)
   }
+
+  private implicit lazy val imagesEncoder: Encoder[(List[ImageUri], projects.Path)] =
+    Encoder.instance[(List[ImageUri], projects.Path)] { case (imageUris, exemplarProjectPath) =>
+      Json.arr(imageUris.map {
+        case uri: ImageUri.Relative =>
+          json"""{
+            "location": $uri  
+          }""" deepMerge _links(
+            Link(Rel("view") -> Href(gitLabUrl / exemplarProjectPath / "raw" / "master" / uri))
+          )
+        case uri: ImageUri.Absolute =>
+          json"""{
+            "location": $uri  
+          }""" deepMerge _links(
+            Link(Rel("view") -> Href(uri.show))
+          )
+      }: _*)
+    }
 }
 
 object DatasetsSearchEndpoint {
@@ -185,6 +211,7 @@ object IODatasetsSearchEndpoint {
     for {
       rdfStoreConfig        <- RdfStoreConfig[IO]()
       renkuResourceUrl      <- renku.ResourcesUrl[IO]()
+      gitLabUrl             <- GitLabUrlLoader[IO]()
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     } yield new DatasetsSearchEndpoint[IO](
       new DatasetsFinderImpl(rdfStoreConfig,
@@ -193,6 +220,7 @@ object IODatasetsSearchEndpoint {
                              timeRecorder
       ),
       renkuResourceUrl,
+      gitLabUrl,
       executionTimeRecorder,
       ApplicationLogger
     )

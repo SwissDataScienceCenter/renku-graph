@@ -19,7 +19,8 @@
 package ch.datascience.triplesgenerator.events.categories.membersync
 
 import cats.effect.IO
-import ch.datascience.events.consumers.{EventHandlingProcess, EventRequestContent}
+import ch.datascience.events.EventRequestContent
+import ch.datascience.events.consumers.EventHandlingProcess
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -97,5 +98,4 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     def unsafeRunSyncProcess() =
       handlingProcess.unsafeRunSync().process.value.unsafeRunSync()
   }
-
 }

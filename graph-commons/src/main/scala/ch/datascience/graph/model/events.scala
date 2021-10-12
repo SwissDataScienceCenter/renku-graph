@@ -34,16 +34,14 @@ import java.time.{Clock, Duration, Instant}
 object events {
 
   final class CategoryName private (val value: String) extends AnyVal with StringTinyType
-  implicit object CategoryName extends TinyTypeFactory[CategoryName](new CategoryName(_)) with NonBlank {
-    implicit lazy val show: Show[CategoryName] = Show.show(_.value)
-  }
+  implicit object CategoryName extends TinyTypeFactory[CategoryName](new CategoryName(_)) with NonBlank
 
   final case class CompoundEventId(id: EventId, projectId: projects.Id) {
     override lazy val toString: String = s"id = $id, projectId = $projectId"
   }
 
   object CompoundEventId {
-    implicit lazy val show: Show[CompoundEventId] = Show.show(id => show"${id.id}, ${id.projectId}")
+    implicit lazy val show: Show[CompoundEventId] = Show.show(id => show"id = ${id.id}, projectId = ${id.projectId}")
   }
 
   final case class EventDetails(id: EventId, projectId: projects.Id, eventBody: EventBody) {
@@ -65,13 +63,11 @@ object events {
   final class CommittedDate private (val value: Instant) extends AnyVal with InstantTinyType
   implicit object CommittedDate extends TinyTypeFactory[CommittedDate](new CommittedDate(_)) with BoundedInstant {
     import java.time.temporal.ChronoUnit.HOURS
-    protected[this] override def maybeMax: Option[Instant] = now.plus(24, HOURS).some
+    protected[this] override def maybeMax: Option[Instant] = instantNow.plus(24, HOURS).some
   }
 
   final class EventId private (val value: String) extends AnyVal with StringTinyType
-  implicit object EventId extends TinyTypeFactory[EventId](new EventId(_)) with NonBlank {
-    implicit lazy val show: Show[EventId] = Show.show(id => show"id = ${id.value}")
-  }
+  implicit object EventId extends TinyTypeFactory[EventId](new EventId(_)) with NonBlank
 
   final class EventBody private (val value: String) extends AnyVal with StringTinyType
   implicit object EventBody extends TinyTypeFactory[EventBody](new EventBody(_)) with NonBlank {
@@ -97,28 +93,45 @@ object events {
   sealed trait EventStatus extends StringTinyType with Product with Serializable
   object EventStatus extends TinyTypeFactory[EventStatus](EventStatusInstantiator) {
 
-    val all: Set[EventStatus] =
-      Set(
-        New,
-        GeneratingTriples,
-        TriplesGenerated,
-        TransformingTriples,
-        TriplesStore,
-        Skipped,
-        GenerationRecoverableFailure,
-        GenerationNonRecoverableFailure,
-        TransformationRecoverableFailure,
-        TransformationNonRecoverableFailure,
-        AwaitingDeletion
-      )
+    val all: Set[EventStatus] = Set(
+      New,
+      Skipped,
+      GeneratingTriples,
+      GenerationRecoverableFailure,
+      GenerationNonRecoverableFailure,
+      TriplesGenerated,
+      TransformingTriples,
+      TransformationRecoverableFailure,
+      TransformationNonRecoverableFailure,
+      TriplesStore,
+      AwaitingDeletion
+    )
+
+    val statusesOrdered = List(
+      Skipped,
+      New,
+      GeneratingTriples,
+      GenerationRecoverableFailure,
+      GenerationNonRecoverableFailure,
+      TriplesGenerated,
+      TransformingTriples,
+      TransformationRecoverableFailure,
+      TransformationNonRecoverableFailure,
+      TriplesStore,
+      AwaitingDeletion
+    )
+
+    implicit val ordering: Ordering[EventStatus] = Ordering.by(statusesOrdered.indexOf)
 
     type New = New.type
     final case object New extends EventStatus {
       override val value: String = "NEW"
     }
 
+    sealed trait ProcessingStatus extends EventStatus
+
     type GeneratingTriples = GeneratingTriples.type
-    final case object GeneratingTriples extends EventStatus {
+    final case object GeneratingTriples extends EventStatus with ProcessingStatus {
       override val value: String = "GENERATING_TRIPLES"
     }
 
@@ -128,12 +141,13 @@ object events {
     }
 
     type TransformingTriples = TransformingTriples.type
-    final case object TransformingTriples extends EventStatus {
+    final case object TransformingTriples extends EventStatus with ProcessingStatus {
       override val value: String = "TRANSFORMING_TRIPLES"
     }
 
     sealed trait FinalStatus extends EventStatus
 
+    type TriplesStore = TriplesStore.type
     final case object TriplesStore extends EventStatus with FinalStatus {
       override val value: String = "TRIPLES_STORE"
     }
@@ -141,6 +155,7 @@ object events {
       override val value: String = "SKIPPED"
     }
 
+    type AwaitingDeletion = AwaitingDeletion.type
     final case object AwaitingDeletion extends EventStatus with FinalStatus {
       override val value: String = "AWAITING_DELETION"
     }
@@ -167,25 +182,11 @@ object events {
       override val value: String = "TRANSFORMATION_NON_RECOVERABLE_FAILURE"
     }
 
-    implicit val eventStatusDecoder: Decoder[EventStatus] = decodeString.emap { value =>
+    implicit val eventStatusJsonDecoder: Decoder[EventStatus] = decodeString.emap { value =>
       Either.fromOption(
         EventStatus.all.find(_.value == value),
         ifNone = s"'$value' unknown EventStatus"
       )
-    }
-
-    implicit lazy val show: Show[EventStatus] = Show.show {
-      case New                                 => show"status = ${New.value}"
-      case GeneratingTriples                   => show"status = ${GeneratingTriples.value}"
-      case TriplesGenerated                    => show"status = ${TriplesGenerated.value}"
-      case TransformingTriples                 => show"status = ${TransformingTriples.value}"
-      case GenerationRecoverableFailure        => show"status = ${GenerationRecoverableFailure.value}"
-      case GenerationNonRecoverableFailure     => show"status = ${GenerationNonRecoverableFailure.value}"
-      case TransformationRecoverableFailure    => show"status = ${TransformationRecoverableFailure.value}"
-      case TransformationNonRecoverableFailure => show"status = ${TransformationNonRecoverableFailure.value}"
-      case TriplesStore                        => show"status = ${TriplesStore.value}"
-      case Skipped                             => show"status = ${Skipped.value}"
-      case AwaitingDeletion                    => show"status = ${AwaitingDeletion.value}"
     }
   }
 
@@ -216,7 +217,5 @@ object events {
   final class LastSyncedDate private (val value: Instant) extends AnyVal with InstantTinyType
   object LastSyncedDate extends TinyTypeFactory[LastSyncedDate](new LastSyncedDate(_)) with InstantNotInTheFuture {
     implicit val decoder: Decoder[LastSyncedDate] = instantDecoder(LastSyncedDate)
-
-    implicit lazy val show: Show[LastSyncedDate] = Show.show(date => show"lastSynced = ${date.value.toString}")
   }
 }

@@ -23,7 +23,6 @@ import io.circe.{Encoder, Json}
 import io.renku.jsonld.JsonLD.{JsonLDArray, JsonLDEntity, JsonLDEntityId}
 
 final case class Reverse(properties: Map[Property, JsonLD]) {
-
   override lazy val toString: String = s"Reverse($properties)"
 }
 
@@ -33,6 +32,9 @@ object Reverse {
 
   def ofEntities(first: (Property, JsonLDEntity), other: (Property, JsonLDEntity)*): Reverse =
     new Reverse((first +: other).toMap)
+
+  def ofJsonLDsUnsafe(first: (Property, JsonLD), other: (Property, JsonLD)*): Reverse =
+    fromList((first +: other).toList).fold(throw _, identity)
 
   def of(first: (Property, JsonLD), other: (Property, JsonLD)*): Either[Exception, Reverse] =
     fromList((first +: other).toList)

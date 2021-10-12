@@ -18,13 +18,17 @@
 
 package io.renku.jsonld
 
-import java.util.UUID
-
+import cats.Show
 import io.circe.{Decoder, Encoder, Json}
+
+import java.util.UUID
 
 abstract class EntityId extends Product with Serializable {
   type Value
-  def value: Value
+  def value:  Value
+  def asJson: Json
+
+  def valueShow: Show[Value]
 }
 
 object EntityId {
@@ -35,16 +39,19 @@ object EntityId {
   private[jsonld] final case class StandardEntityId(override val value: String) extends EntityId {
     type Value = String
     override lazy val toString: String = value
+    override lazy val asJson:   Json   = Json.fromString(value)
+
+    override def valueShow: Show[String] = Show[String](_ => value)
   }
   private[jsonld] final case class BlankNodeEntityId(override val value: UUID) extends EntityId {
     type Value = UUID
     override lazy val toString: String = s"_:$value"
+    override lazy val asJson:   Json   = Json.fromString(s"_:$value")
+
+    override def valueShow: Show[UUID] = Show[UUID](_ => value.toString)
   }
 
-  implicit val entityIdJsonEncoder: Encoder[EntityId] = Encoder.instance {
-    case StandardEntityId(url)   => Json.fromString(url)
-    case BlankNodeEntityId(uuid) => Json.fromString(s"_:$uuid")
-  }
+  implicit val entityIdJsonEncoder: Encoder[EntityId] = Encoder.instance(_.asJson)
 
   implicit val entityIdJsonDecoder: Decoder[EntityId] = Decoder.instance {
     _.as[String].map {
@@ -55,4 +62,6 @@ object EntityId {
 
   implicit val stringToEntityId:   String => EntityId   = StandardEntityId.apply
   implicit val propertyToEntityId: Property => EntityId = p => StandardEntityId(p.url)
+
+  implicit val show: Show[EntityId] = Show[EntityId](entityId => entityId.valueShow.show(entityId.value))
 }

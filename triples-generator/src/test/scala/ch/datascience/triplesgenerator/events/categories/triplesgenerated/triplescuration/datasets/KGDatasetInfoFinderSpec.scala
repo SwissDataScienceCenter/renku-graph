@@ -19,81 +19,120 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets
 
 import cats.effect.IO
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{DerivedFrom, SameAs, TopmostDerivedFrom}
+import ch.datascience.graph.model.entities
+import ch.datascience.graph.model.testentities.Dataset._
+import ch.datascience.graph.model.testentities._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
+import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
-import ch.datascience.rdfstore.entities.DataSet
-import ch.datascience.rdfstore.entities.bundles._
 import eu.timepit.refined.auto._
 import io.renku.jsonld.EntityId
-import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class KGDatasetInfoFinderSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers {
 
   "findTopmostSameAs" should {
-
-    "return None if there's no dataset with the given id" in new TestCase {
-      val sameAs = datasetIdSameAs.generateOne
-      kgDatasetInfoFinder.findTopmostSameAs(sameAs).unsafeRunSync() shouldBe Option.empty[SameAs]
+    "return None if there is no dataset with that id" in new TestCase {
+      kgDatasetInfoFinder.findTopmostSameAs(datasetResourceIds.generateOne).unsafeRunSync() shouldBe None
     }
 
-    "return the dataset's topmostSameAs if this dataset has one" in new TestCase {
-      val activity = randomDataSetActivity
-      loadToStore(JsonLDTriples(activity.asJsonLD.toJson))
+    "return topmostSameAs for the given id" in new TestCase {
+      val dataset = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance]]
 
-      val parentDataset = activity.entity[DataSet]
-      val topmostSameAs = SameAs(parentDataset.entityId)
+      loadToStore(dataset)
 
-      kgDatasetInfoFinder.findTopmostSameAs(topmostSameAs).unsafeRunSync() shouldBe Some(parentDataset.topmostSameAs)
-    }
-
-    "return None if there's a dataset with the given id but it has no topmostSameAs" in new TestCase {
-      val activity = randomDataSetActivity
-      loadToStore(JsonLDTriples(activity.asJsonLD.toJson))
-
-      val parentDataset = activity.entity[DataSet]
-      val topmostSameAs = SameAs(parentDataset.entityId)
-
-      removeTopmostSameAs(parentDataset.entityId)
-
-      kgDatasetInfoFinder.findTopmostSameAs(topmostSameAs).unsafeRunSync() shouldBe None
+      kgDatasetInfoFinder
+        .findTopmostSameAs(dataset.resourceId)
+        .unsafeRunSync() shouldBe dataset.provenance.topmostSameAs.some
     }
   }
 
   "findTopmostDerivedFrom" should {
+    "return None if there is no dataset with that id" in new TestCase {
+      kgDatasetInfoFinder.findTopmostDerivedFrom(datasetResourceIds.generateOne).unsafeRunSync() shouldBe None
+    }
+
+    "return topmostSameAs for the given id" in new TestCase {
+      val dataset = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance]]
+
+      loadToStore(dataset)
+
+      kgDatasetInfoFinder
+        .findTopmostDerivedFrom(dataset.resourceId)
+        .unsafeRunSync() shouldBe dataset.provenance.topmostDerivedFrom.some
+    }
+  }
+
+  "findParentTopmostSameAs" should {
+
+    "return None if there's no dataset with the given id" in new TestCase {
+      val sameAs = datasetInternalSameAs.generateOne
+      kgDatasetInfoFinder.findParentTopmostSameAs(sameAs).unsafeRunSync() shouldBe Option.empty[SameAs]
+    }
+
+    "return the dataset's topmostSameAs if this dataset has one" in new TestCase {
+      val dataset = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
+
+      loadToStore(dataset)
+
+      val sameAs = SameAs(dataset.entityId)
+
+      kgDatasetInfoFinder.findParentTopmostSameAs(sameAs).unsafeRunSync() shouldBe Some(
+        dataset.provenance.topmostSameAs
+      )
+    }
+
+    "return None if there's a dataset with the given id but it has no topmostSameAs" in new TestCase {
+      val dataset = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
+
+      loadToStore(dataset)
+
+      removeTopmostSameAs(dataset.entityId)
+
+      val sameAs = SameAs(dataset.entityId)
+
+      kgDatasetInfoFinder.findParentTopmostSameAs(sameAs).unsafeRunSync() shouldBe None
+    }
+  }
+
+  "findParentTopmostDerivedFrom" should {
 
     "return None if there's no dataset with the given id" in new TestCase {
       val derivedFrom = datasetDerivedFroms.generateOne
-      kgDatasetInfoFinder.findTopmostDerivedFrom(derivedFrom).unsafeRunSync() shouldBe Option.empty[TopmostDerivedFrom]
+      kgDatasetInfoFinder.findParentTopmostDerivedFrom(derivedFrom).unsafeRunSync() shouldBe Option
+        .empty[TopmostDerivedFrom]
     }
 
     "return the dataset's topmostDerivedFrom if this dataset has one" in new TestCase {
-      val activity = randomDataSetActivity
-      loadToStore(JsonLDTriples(activity.asJsonLD.toJson))
+      val dataset = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
 
-      val parentDataset      = activity.entity[DataSet]
-      val topmostDerivedFrom = DerivedFrom(parentDataset.entityId)
+      loadToStore(dataset)
 
-      kgDatasetInfoFinder.findTopmostDerivedFrom(topmostDerivedFrom).unsafeRunSync() shouldBe Some(
-        parentDataset.topmostDerivedFrom
+      val derivedFrom = DerivedFrom(dataset.entityId)
+
+      kgDatasetInfoFinder.findParentTopmostDerivedFrom(derivedFrom).unsafeRunSync() shouldBe Some(
+        dataset.provenance.topmostDerivedFrom
       )
     }
 
     "return None if there's a dataset with the given id but it has no topmostDerivedFrom" in new TestCase {
-      val activity = randomDataSetActivity
-      loadToStore(JsonLDTriples(activity.asJsonLD.toJson))
+      val dataset = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
 
-      val parentDataset      = activity.entity[DataSet]
-      val topmostDerivedFrom = DerivedFrom(parentDataset.entityId)
+      loadToStore(dataset)
 
-      removeTopmostDerivedFrom(parentDataset.entityId)
+      removeTopmostDerivedFrom(dataset.entityId)
 
-      kgDatasetInfoFinder.findTopmostDerivedFrom(topmostDerivedFrom).unsafeRunSync() shouldBe None
+      val derivedFrom = DerivedFrom(dataset.entityId)
+
+      kgDatasetInfoFinder.findParentTopmostDerivedFrom(derivedFrom).unsafeRunSync() shouldBe None
     }
   }
 
@@ -103,39 +142,29 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with InMemoryRdfStore with sho
     val kgDatasetInfoFinder  = new KGDatasetInfoFinderImpl(rdfStoreConfig, logger, timeRecorder)
   }
 
-  private def removeTopmostSameAs(datasetId: EntityId): Unit =
-    runUpdate {
-      SparqlQuery(
-        name = "topmostSameAs removal",
-        prefixes = Set(
-          "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>",
-          "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-          "PREFIX schema: <http://schema.org/>"
-        ),
-        body = s"""|DELETE { <$datasetId> renku:topmostSameAs ?sameAs }
-                   |WHERE {
-                   |  <$datasetId> rdf:type schema:Dataset;
-                   |               renku:topmostSameAs ?sameAs.
-                   |}
-                   |""".stripMargin
-      )
-    }.unsafeRunSync()
+  private def removeTopmostSameAs(datasetId: EntityId): Unit = runUpdate {
+    SparqlQuery.of(
+      name = "topmostSameAs removal",
+      Prefixes.of(renku -> "renku", schema -> "schema"),
+      body = s"""|DELETE { <$datasetId> renku:topmostSameAs ?sameAs }
+                 |WHERE {
+                 |  <$datasetId> a schema:Dataset;
+                 |               renku:topmostSameAs ?sameAs.
+                 |}
+                 |""".stripMargin
+    )
+  }.unsafeRunSync()
 
-  private def removeTopmostDerivedFrom(datasetId: EntityId): Unit =
-    runUpdate {
-      SparqlQuery(
-        name = "topmostDerivedFrom removal",
-        prefixes = Set(
-          "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>",
-          "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-          "PREFIX schema: <http://schema.org/>"
-        ),
-        body = s"""|DELETE { <$datasetId> renku:topmostDerivedFrom ?derivedFrom }
-                   |WHERE {
-                   |  <$datasetId> rdf:type schema:Dataset;
-                   |               renku:topmostDerivedFrom ?derivedFrom.
-                   |}
-                   |""".stripMargin
-      )
-    }.unsafeRunSync()
+  private def removeTopmostDerivedFrom(datasetId: EntityId): Unit = runUpdate {
+    SparqlQuery.of(
+      name = "topmostDerivedFrom removal",
+      Prefixes.of(renku -> "renku", schema -> "schema"),
+      body = s"""|DELETE { <$datasetId> renku:topmostDerivedFrom ?derivedFrom }
+                 |WHERE {
+                 |  <$datasetId> a schema:Dataset;
+                 |               renku:topmostDerivedFrom ?derivedFrom.
+                 |}
+                 |""".stripMargin
+    )
+  }.unsafeRunSync()
 }

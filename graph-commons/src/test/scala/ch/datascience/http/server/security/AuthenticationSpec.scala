@@ -21,10 +21,9 @@ package ch.datascience.http.server.security
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.http.ErrorMessage._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.http.ErrorMessage._
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.http.server.security.EndpointSecurityException.AuthenticationFailure
 import ch.datascience.http.server.security.model.AuthUser

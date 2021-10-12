@@ -83,12 +83,12 @@ private class EventsDistributorImpl[Interpretation[_]: Effect: MonadThrow: Timer
 
   private def handleResult(subscriber: SubscriberUrl, event: CategoryEvent): SendingResult => Interpretation[Unit] = {
     case result @ Delivered =>
-      logger.info(show"$categoryName: $event, $subscriber -> $result")
+      logger.info(show"$categoryName: $event, subscriber = $subscriber -> $result")
       eventDelivery.registerSending(event, subscriber) recoverWith logError(event, subscriber)
     case TemporarilyUnavailable =>
       (markBusy(subscriber) recover withNothing) >> (returnToQueue(event) recoverWith logError(event))
     case result @ Misdelivered =>
-      logger.error(show"$categoryName: $event, $subscriber -> $result")
+      logger.error(show"$categoryName: $event, subscriber = $subscriber -> $result")
       (delete(subscriber) recover withNothing) >> (returnToQueue(event) recoverWith logError(event))
   }
 

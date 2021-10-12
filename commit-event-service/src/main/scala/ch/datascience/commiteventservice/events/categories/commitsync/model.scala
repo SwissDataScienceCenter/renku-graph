@@ -18,10 +18,15 @@
 
 package ch.datascience.commiteventservice.events.categories.commitsync
 
+import cats.Show
 import ch.datascience.events.consumers.Project
 import ch.datascience.graph.model.events.{CommitId, LastSyncedDate}
 
 private sealed trait CommitSyncEvent { val project: Project }
+
+private object CommitSyncEvent {
+  implicit lazy val show: Show[CommitSyncEvent] = Show.show(_.toString)
+}
 
 private final case class FullCommitSyncEvent(id: CommitId, override val project: Project, lastSynced: LastSyncedDate)
     extends CommitSyncEvent {

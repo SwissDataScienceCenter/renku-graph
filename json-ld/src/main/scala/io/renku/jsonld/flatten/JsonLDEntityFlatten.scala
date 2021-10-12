@@ -21,11 +21,15 @@ package io.renku.jsonld.flatten
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.JsonLD.{JsonLDEntity, MalformedJsonLD}
 
-trait JsonLDEntityFlatten extends Flatten {
+trait JsonLDEntityFlatten extends JsonLDFlatten {
   self: JsonLDEntity =>
 
+  import Flatten._
+  import IDValidation._
+
   lazy val flatten: Either[MalformedJsonLD, JsonLD] =
-    deNest(List(this), Nil)
+    deNest(toProcess = List(this), topLevelEntities = Nil)
       .flatMap(jsonLDs => checkForUniqueIds(jsonLDs.distinct))
       .map(flattenedJsonLDs => JsonLD.arr(flattenedJsonLDs: _*))
+      .flatMap(_.merge)
 }

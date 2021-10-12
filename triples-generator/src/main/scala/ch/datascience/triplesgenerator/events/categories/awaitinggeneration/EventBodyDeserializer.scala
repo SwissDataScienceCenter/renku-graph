@@ -18,49 +18,35 @@
 
 package ch.datascience.triplesgenerator.events.categories.awaitinggeneration
 
-import cats.MonadError
-import cats.data.NonEmptyList
+import cats.MonadThrow
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.events.consumers.Project
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
-import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent.{CommitEventWithParent, CommitEventWithoutParent}
 import io.circe.parser._
-import io.circe.{Decoder, DecodingFailure, Error, HCursor, ParsingFailure}
+import io.circe.{Decoder, DecodingFailure, Error, ParsingFailure}
 
 private trait EventBodyDeserializer[Interpretation[_]] {
-  def toCommitEvents(eventBody: EventBody): Interpretation[NonEmptyList[CommitEvent]]
+  def toCommitEvent(eventBody: EventBody): Interpretation[CommitEvent]
 }
 
-private class EventBodyDeserializerImpl[Interpretation[_]](implicit
-    ME: MonadError[Interpretation, Throwable]
-) extends EventBodyDeserializer[Interpretation] {
+private class EventBodyDeserializerImpl[Interpretation[_]: MonadThrow] extends EventBodyDeserializer[Interpretation] {
 
-  override def toCommitEvents(eventBody: EventBody): Interpretation[NonEmptyList[CommitEvent]] = ME.fromEither {
-    parse(eventBody.value)
-      .flatMap(_.as[NonEmptyList[CommitEvent]])
-      .leftMap(toMeaningfulError(eventBody))
-  }
-
-  private implicit val commitsDecoder: Decoder[NonEmptyList[CommitEvent]] = (cursor: HCursor) =>
-    for {
-      commitId      <- cursor.downField("id").as[CommitId]
-      projectId     <- cursor.downField("project").downField("id").as[Id]
-      projectPath   <- cursor.downField("project").downField("path").as[Path]
-      parentCommits <- cursor.downField("parents").as[List[CommitId]]
-    } yield {
-      val project = Project(projectId, projectPath)
-      parentCommits match {
-        case Nil =>
-          NonEmptyList.one(CommitEventWithoutParent(EventId(commitId.value), project, commitId))
-        case parentIds =>
-          NonEmptyList.fromListUnsafe(
-            parentIds map (CommitEventWithParent(EventId(commitId.value), project, commitId, _))
-          )
-      }
+  override def toCommitEvent(eventBody: EventBody): Interpretation[CommitEvent] =
+    MonadThrow[Interpretation].fromEither {
+      parse(eventBody.value)
+        .flatMap(_.as[CommitEvent])
+        .leftMap(toMeaningfulError(eventBody))
     }
+
+  private implicit val commitsDecoder: Decoder[CommitEvent] = cursor =>
+    for {
+      commitId    <- cursor.downField("id").as[CommitId]
+      projectId   <- cursor.downField("project").downField("id").as[Id]
+      projectPath <- cursor.downField("project").downField("path").as[Path]
+    } yield CommitEvent(EventId(commitId.value), Project(projectId, projectPath), commitId)
 
   private def toMeaningfulError(eventBody: EventBody): Error => Error = {
     case failure: DecodingFailure => failure.withMessage(s"CommitEvent cannot be deserialised: '$eventBody'")

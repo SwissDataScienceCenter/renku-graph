@@ -18,8 +18,10 @@
 
 package io.renku.eventlog.init
 
+import Generators._
 import cats.data.Kleisli
 import cats.effect.IO
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventId, EventStatus}
@@ -29,7 +31,8 @@ import ch.datascience.interpreters.TestLogger.Level.Info
 import eu.timepit.refined.auto._
 import io.circe.literal.JsonStringContext
 import io.renku.eventlog.EventContentGenerators._
-import io.renku.eventlog._
+import io.renku.eventlog.init.model.Event
+import io.renku.eventlog.{events => _, _}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk._
@@ -42,6 +45,7 @@ class EventStatusRenamerImplSpec
     with should.Matchers
     with EventLogDataProvisioning
     with EventDataFetching {
+
   protected override lazy val migrationsToRun: List[Migration] = List(
     eventLogTableCreator,
     projectPathAdder,
@@ -52,35 +56,37 @@ class EventStatusRenamerImplSpec
   )
 
   "run" should {
-    s"rename all the events from PROCESSING to GENERATING_TRIPLES, " +
-      s"RECOVERABLE_FAILURE to GENERATION_RECOVERABLE_FAILURE and " +
-      s"NON_RECOVERABLE_FAILURE to GENERATION_NON_RECOVERABLE_FAILURE" in new TestCase {
-        val processingEvents = newOrSkippedEvents.generateNonEmptyList(minElements = 2)
+    "rename all the events from PROCESSING to GENERATING_TRIPLES, " +
+      "RECOVERABLE_FAILURE to GENERATION_RECOVERABLE_FAILURE and " +
+      "NON_RECOVERABLE_FAILURE to GENERATION_NON_RECOVERABLE_FAILURE" in new TestCase {
+        val processingEvents = events.generateNonEmptyList(minElements = 2)
         processingEvents.map(event => store(event, withStatus = "PROCESSING"))
 
-        val recoverableEvents = newOrSkippedEvents.generateNonEmptyList(minElements = 2)
-        recoverableEvents.map(event => store(event, withStatus = "GENERATION_RECOVERABLE_FAILURE"))
+        val recoverableEvents = events.generateNonEmptyList(minElements = 2)
+        recoverableEvents.map(event => store(event, withStatus = "RECOVERABLE_FAILURE"))
 
-        val nonRecoverableEvents = newOrSkippedEvents.generateNonEmptyList(minElements = 2)
-        nonRecoverableEvents.map(event => store(event, withStatus = "GENERATION_NON_RECOVERABLE_FAILURE"))
+        val nonRecoverableEvents = events.generateNonEmptyList(minElements = 2)
+        nonRecoverableEvents.map(event => store(event, withStatus = "NON_RECOVERABLE_FAILURE"))
 
-        val otherEvents = newOrSkippedEvents.generateNonEmptyList()
+        val otherEvents = events.generateNonEmptyList()
         otherEvents.map(event => store(event, withStatus = event.status.toString))
 
-        eventStatusRenamer.run().unsafeRunSync() shouldBe ((): Unit)
+        eventStatusRenamer.run().unsafeRunSync() shouldBe ()
 
-        findEventsCompoundId(status = GeneratingTriples).toSet shouldBe processingEvents
-          .map(_.compoundEventId)
-          .toList
-          .toSet
-        findEventsCompoundId(status = GenerationRecoverableFailure).toSet shouldBe recoverableEvents
-          .map(_.compoundEventId)
-          .toList
-          .toSet
-        findEventsCompoundId(status = GenerationNonRecoverableFailure).toSet shouldBe nonRecoverableEvents
-          .map(_.compoundEventId)
-          .toList
-          .toSet
+        findEventsCompoundId(status = GeneratingTriples).toSet shouldBe
+          (processingEvents.toList ++ otherEvents.filter(_.status == GeneratingTriples))
+            .map(_.compoundEventId)
+            .toSet
+        findEventsCompoundId(status = GenerationRecoverableFailure).toSet shouldBe
+          (recoverableEvents ++ otherEvents.filter(_.status == GenerationRecoverableFailure))
+            .map(_.compoundEventId)
+            .toList
+            .toSet
+        findEventsCompoundId(status = GenerationNonRecoverableFailure).toSet shouldBe
+          (nonRecoverableEvents ++ otherEvents.filter(_.status == GenerationNonRecoverableFailure))
+            .map(_.compoundEventId)
+            .toList
+            .toSet
 
         logger.loggedOnly(
           Info(s"'PROCESSING' event status renamed to 'GENERATING_TRIPLES'"),
@@ -89,23 +95,19 @@ class EventStatusRenamerImplSpec
         )
       }
 
-    s"Not do anything if there are no events with the status PROCESSING" in new TestCase {
-      val otherEvents = newOrSkippedEvents.generateNonEmptyList()
-      otherEvents.map(event => store(event, withStatus = event.status.toString))
+    "do nothing if there are no events with the status PROCESSING" in new TestCase {
+      val otherEvents = events.generateNonEmptyList()
+      otherEvents.map(event => store(event, withStatus = event.status.show))
 
-      eventStatusRenamer.run().unsafeRunSync() shouldBe ((): Unit)
+      eventStatusRenamer.run().unsafeRunSync() shouldBe ()
 
-      findEventsCompoundId(status = GeneratingTriples).toSet shouldBe Set.empty[CompoundId]
+      findEventsCompoundId(status = GeneratingTriples).toSet shouldBe otherEvents
+        .filter(_.status == GeneratingTriples)
+        .map(_.compoundEventId)
+        .toSet
 
       findEventsId shouldBe otherEvents.map(_.id).toList.toSet
-
-      logger.loggedOnly(
-        Info(s"'PROCESSING' event status renamed to 'GENERATING_TRIPLES'"),
-        Info(s"'RECOVERABLE_FAILURE' event status renamed to 'GENERATION_RECOVERABLE_FAILURE'"),
-        Info(s"'NON_RECOVERABLE_FAILURE' event status renamed to 'GENERATION_NON_RECOVERABLE_FAILURE'")
-      )
     }
-
   }
 
   private trait TestCase {
@@ -163,17 +165,16 @@ class EventStatusRenamerImplSpec
     .unsafeRunSync()
     .toSet
 
-  private def findEventsCompoundId(status: EventStatus): List[CompoundEventId] =
-    execute[List[CompoundEventId]] {
-      Kleisli { session =>
-        val query: Query[EventStatus, CompoundEventId] =
-          sql"""SELECT event_id, project_id
+  private def findEventsCompoundId(status: EventStatus): List[CompoundEventId] = execute[List[CompoundEventId]] {
+    Kleisli { session =>
+      val query: Query[EventStatus, CompoundEventId] =
+        sql"""SELECT event_id, project_id
                 FROM event
                 WHERE status = $eventStatusEncoder
                 ORDER BY created_date asc"""
-            .query(eventIdDecoder ~ projectIdDecoder)
-            .map { case eventId ~ projectId => CompoundEventId(eventId, projectId) }
-        session.prepare(query).use(_.stream(status, 32).compile.toList)
-      }
+          .query(eventIdDecoder ~ projectIdDecoder)
+          .map { case eventId ~ projectId => CompoundEventId(eventId, projectId) }
+      session.prepare(query).use(_.stream(status, 32).compile.toList)
     }
+  }
 }

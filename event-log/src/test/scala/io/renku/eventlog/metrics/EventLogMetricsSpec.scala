@@ -72,14 +72,14 @@ class EventLogMetricsSpec
     "log an eventual error and continue collecting the metrics" in new TestCase {
 
       val categoryNamesException = exceptions.generateOne
-      givenCountEventsByCategoryNameMethodToReturn.add(categoryNamesException.raiseError[IO, Map[CategoryName, Long]])
+      givenCountEventsByCategoryNameMethodToReturn add categoryNamesException.raiseError[IO, Map[CategoryName, Long]]
       val categoryNameCount = categoryNameCounts.generateOne
       givenCountEventsByCategoryNameMethodToReturn add categoryNameCount.pure[IO]
 
       val statusesFindException = exceptions.generateOne
-      givenStatusesMethodToReturn.add(statusesFindException.raiseError[IO, Map[EventStatus, Long]])
+      givenStatusesMethodToReturn add statusesFindException.raiseError[IO, Map[EventStatus, Long]]
       val statuses = statusCounts.generateOne
-      givenStatusesMethodToReturn.add(statuses.pure[IO])
+      givenStatusesMethodToReturn add statuses.pure[IO]
 
       metrics.run().unsafeRunAsyncAndForget()
 
@@ -110,8 +110,9 @@ class EventLogMetricsSpec
         case (categoryName, value) => categoryNameValues.put(categoryName, value).pure[IO].void
       }
 
-      override def increment(labelValue: CategoryName) = fail("Spec shouldn't be calling that")
-      override def decrement(labelValue: CategoryName) = fail("Spec shouldn't be calling that")
+      override def update(labelValue:    (CategoryName, Double)) = fail("Spec shouldn't be calling that")
+      override def increment(labelValue: CategoryName)           = fail("Spec shouldn't be calling that")
+      override def decrement(labelValue: CategoryName)           = fail("Spec shouldn't be calling that")
       override def reset()         = fail("Spec shouldn't be calling that")
       protected override def gauge = fail("Spec shouldn't be calling that")
     }
@@ -125,8 +126,9 @@ class EventLogMetricsSpec
         case (status, value) => statusValues.put(status, value).pure[IO].void
       }
 
-      override def increment(labelValue: EventStatus) = fail("Spec shouldn't be calling that")
-      override def decrement(labelValue: EventStatus) = fail("Spec shouldn't be calling that")
+      override def update(labelValue:    (EventStatus, Double)) = fail("Spec shouldn't be calling that")
+      override def increment(labelValue: EventStatus)           = fail("Spec shouldn't be calling that")
+      override def decrement(labelValue: EventStatus)           = fail("Spec shouldn't be calling that")
       override def reset()         = fail("Spec shouldn't be calling that")
       protected override def gauge = fail("Spec shouldn't be calling that")
     }
@@ -152,10 +154,9 @@ class EventLogMetricsSpec
       override def countEvents(statuses: Set[EventStatus], maybeLimit: Option[Refined[Int, Positive]]) =
         fail("Spec shouldn't be calling that")
     }
-    lazy val logger = TestLogger[IO]()
+    implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
     lazy val metrics = new EventLogMetricsImpl(
       statsFinder,
-      logger,
       categoryNameEventsGauge,
       statusesGauge,
       totalGauge,

@@ -20,7 +20,8 @@ package ch.datascience.logging
 
 import cats.MonadError
 import cats.effect.Clock
-
+import cats.syntax.all._
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
@@ -38,8 +39,8 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import scala.jdk.CollectionConverters._
 import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 import scala.util.{Success, Try}
 
 class ExecutionTimeRecorderSpec
@@ -56,20 +57,20 @@ class ExecutionTimeRecorderSpec
       (clock
         .monotonic(_: TimeUnit))
         .expects(MILLISECONDS)
-        .returning(context.pure(startTime))
+        .returning(startTime.pure[Try])
 
       val elapsedTime = elapsedTimes.generateOne
       (clock
         .monotonic(_: TimeUnit))
         .expects(MILLISECONDS)
-        .returning(context.pure(startTime + elapsedTime.value))
+        .returning((startTime + elapsedTime.value).pure[Try])
 
       val blockOut = nonEmptyStrings().generateOne
-      block.expects().returning(context.pure(blockOut))
+      block.expects().returning(blockOut.pure[Try])
 
       executionTimeRecorder.measureExecutionTime[String] {
         block()
-      } shouldBe context.pure(elapsedTime -> blockOut)
+      } shouldBe (elapsedTime -> blockOut).pure[Try]
     }
 
     "let the block failure propagate" in new TestCase {
@@ -78,14 +79,14 @@ class ExecutionTimeRecorderSpec
       (clock
         .monotonic(_: TimeUnit))
         .expects(MILLISECONDS)
-        .returning(context.pure(startTime))
+        .returning(startTime.pure[Try])
 
       val exception = exceptions.generateOne
-      block.expects().returning(context.raiseError(exception))
+      block.expects().returning(exception.raiseError[Try, String])
 
       executionTimeRecorder.measureExecutionTime[String] {
         block()
-      } shouldBe context.raiseError(exception)
+      } shouldBe exception.raiseError[Try, String]
     }
 
     "made the given histogram to collect process' execution time - case without a label" in new TestCase {
@@ -95,10 +96,10 @@ class ExecutionTimeRecorderSpec
       (clock
         .monotonic(_: TimeUnit))
         .expects(MILLISECONDS)
-        .returning(context.pure(positiveLongs().generateOne.value))
+        .returning(positiveLongs().generateOne.value.pure[Try])
 
       val blockOut = nonEmptyStrings().generateOne
-      block.expects().returning(context.pure(blockOut))
+      block.expects().returning(blockOut.pure[Try])
 
       val blockExecutionTime = positiveInts(max = 100).generateOne.value
       executionTimeRecorder.measureExecutionTime[String] {
@@ -119,10 +120,10 @@ class ExecutionTimeRecorderSpec
       (clock
         .monotonic(_: TimeUnit))
         .expects(MILLISECONDS)
-        .returning(context.pure(positiveLongs().generateOne.value))
+        .returning(positiveLongs().generateOne.value.pure[Try])
 
       val blockOut = nonEmptyStrings().generateOne
-      block.expects().returning(context.pure(blockOut))
+      block.expects().returning(blockOut.pure[Try])
 
       val blockExecutionTime = positiveInts(max = 100).generateOne.value
       executionTimeRecorder.measureExecutionTime[String]({
@@ -146,10 +147,10 @@ class ExecutionTimeRecorderSpec
       (clock
         .monotonic(_: TimeUnit))
         .expects(MILLISECONDS)
-        .returning(context.pure(positiveLongs().generateOne.value))
+        .returning(positiveLongs().generateOne.value.pure[Try])
 
       val blockOut = nonEmptyStrings().generateOne
-      block.expects().returning(context.pure(blockOut))
+      block.expects().returning(blockOut.pure[Try])
 
       val blockExecutionTime = positiveInts(max = 100).generateOne.value
       executionTimeRecorder.measureExecutionTime[String] {
@@ -173,9 +174,9 @@ class ExecutionTimeRecorderSpec
         val blockOut              = nonEmptyStrings().generateOne
         val blockExecutionMessage = "block executed"
 
-        context.pure(elapsedTime -> blockOut) map logExecutionTimeWhen { case _ =>
+        (elapsedTime -> blockOut).pure[Try] map logExecutionTimeWhen { case _ =>
           blockExecutionMessage
-        } shouldBe context.pure(blockOut)
+        } shouldBe blockOut.pure[Try]
 
         logger.loggedOnly(Warn(s"$blockExecutionMessage in ${elapsedTime}ms"))
       }
@@ -188,9 +189,9 @@ class ExecutionTimeRecorderSpec
         val blockOut              = nonEmptyStrings().generateOne
         val blockExecutionMessage = "block executed"
 
-        context.pure(elapsedTime -> blockOut) map logExecutionTimeWhen { case _ =>
+        (elapsedTime -> blockOut).pure[Try] map logExecutionTimeWhen { case _ =>
           blockExecutionMessage
-        } shouldBe context.pure(blockOut)
+        } shouldBe blockOut.pure[Try]
 
         logger.expectNoLogs()
       }
@@ -202,9 +203,9 @@ class ExecutionTimeRecorderSpec
       val blockOut              = nonEmptyStrings().generateOne
       val blockExecutionMessage = "block executed"
 
-      context.pure(elapsedTime -> blockOut) map logExecutionTimeWhen { case "" =>
+      (elapsedTime -> blockOut).pure[Try] map logExecutionTimeWhen { case "" =>
         blockExecutionMessage
-      } shouldBe context.pure(blockOut)
+      } shouldBe blockOut.pure[Try]
 
       logger.expectNoLogs()
     }
@@ -219,9 +220,9 @@ class ExecutionTimeRecorderSpec
       val blockOut              = nonEmptyStrings().generateOne
       val blockExecutionMessage = "block executed"
 
-      context
-        .pure(elapsedTime -> blockOut)
-        .map(logExecutionTime(blockExecutionMessage)) shouldBe context.pure(blockOut)
+      (elapsedTime -> blockOut)
+        .pure[Try]
+        .map(logExecutionTime(blockExecutionMessage)) shouldBe blockOut.pure[Try]
 
       logger.loggedOnly(Warn(s"$blockExecutionMessage in ${elapsedTime}ms"))
     }
@@ -233,9 +234,9 @@ class ExecutionTimeRecorderSpec
       val blockOut              = nonEmptyStrings().generateOne
       val blockExecutionMessage = "block executed"
 
-      context
-        .pure(elapsedTime -> blockOut)
-        .map(logExecutionTime(blockExecutionMessage)) shouldBe context.pure(blockOut)
+      (elapsedTime -> blockOut)
+        .pure[Try]
+        .map(logExecutionTime(blockExecutionMessage)) shouldBe blockOut.pure[Try]
 
       logger.expectNoLogs()
     }
@@ -271,8 +272,6 @@ class ExecutionTimeRecorderSpec
       }
     }
   }
-
-  private val context = MonadError[Try, Throwable]
 
   private trait TestCase {
 

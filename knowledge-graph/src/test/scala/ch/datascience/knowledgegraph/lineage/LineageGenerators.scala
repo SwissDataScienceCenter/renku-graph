@@ -18,9 +18,10 @@
 
 package ch.datascience.knowledgegraph.lineage
 
+import cats.syntax.all._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.entities.{Activity, Entity}
 import ch.datascience.knowledgegraph.lineage.model._
-import ch.datascience.rdfstore.entities.bundles._
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 
@@ -35,12 +36,13 @@ object LineageGenerators {
   val entityNodes: Gen[Node] = for {
     location <- nodeLocations
     label    <- nodeLabels
-  } yield Node(location, label, Set(prov / "Entity", wfprov / "Artifact").map(p => Node.Type(p.toString)))
+    types    <- Gen.oneOf(Entity.fileEntityTypes, Entity.folderEntityTypes)
+  } yield Node(location, label, types.toList.map(t => Node.Type(t.show)).toSet)
 
   val processRunNodes: Gen[Node] = for {
     location <- nodeLocations
     label    <- nodeLabels
-  } yield Node(location, label, Set(wfprov / "ProcessRun", prov / "Activity").map(p => Node.Type(p.toString)))
+  } yield Node(location, label, Activity.entityTypes.toList.map(t => Node.Type(t.show)).toSet)
 
   implicit val nodes: Gen[Node] = Gen.oneOf(processRunNodes, entityNodes)
 

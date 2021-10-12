@@ -18,9 +18,12 @@
 
 package ch.datascience.knowledgegraph.datasets.rest
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.Parallel
+import cats.effect.{ConcurrentEffect, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.model.datasets.{DateCreated, Dates, Description, Identifier, ImageUri, Keyword, Name, PublishedDate, Title}
+import ch.datascience.graph.model.Schemas._
+import ch.datascience.graph.model.datasets.{Date, DateCreated, DatePublished, Description, Identifier, ImageUri, Keyword, Name, Title}
+import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Visibility
 import ch.datascience.http.rest.paging.Paging.PagedResultsFinder
 import ch.datascience.http.rest.paging.{Paging, PagingRequest, PagingResponse}
@@ -29,12 +32,13 @@ import ch.datascience.knowledgegraph.datasets.model.DatasetCreator
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.DatasetSearchResult
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
+import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
 import ch.datascience.tinytypes.constraints.NonNegativeInt
 import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
 import eu.timepit.refined.auto._
-import org.typelevel.log4cats.Logger
 import io.circe.DecodingFailure
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
@@ -49,106 +53,94 @@ private trait DatasetsFinder[Interpretation[_]] {
 private object DatasetsFinder {
 
   final case class DatasetSearchResult(
-      id:               Identifier,
-      title:            Title,
-      name:             Name,
-      maybeDescription: Option[Description],
-      creators:         Set[DatasetCreator],
-      dates:            Dates,
-      projectsCount:    ProjectsCount,
-      keywords:         List[Keyword],
-      images:           List[ImageUri]
+      id:                  Identifier,
+      title:               Title,
+      name:                Name,
+      maybeDescription:    Option[Description],
+      creators:            Set[DatasetCreator],
+      date:                Date,
+      exemplarProjectPath: projects.Path,
+      projectsCount:       ProjectsCount,
+      keywords:            List[Keyword],
+      images:              List[ImageUri]
   )
 
   final class ProjectsCount private (val value: Int) extends AnyVal with IntTinyType
 
   implicit object ProjectsCount extends TinyTypeFactory[ProjectsCount](new ProjectsCount(_)) with NonNegativeInt
-
 }
 
-private class DatasetsFinderImpl(
+private class DatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer: Parallel](
     rdfStoreConfig:          RdfStoreConfig,
-    creatorsFinder:          CreatorsFinder,
-    logger:                  Logger[IO],
-    timeRecorder:            SparqlQueryTimeRecorder[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+    creatorsFinder:          CreatorsFinder[Interpretation],
+    logger:                  Logger[Interpretation],
+    timeRecorder:            SparqlQueryTimeRecorder[Interpretation]
+)(implicit executionContext: ExecutionContext)
     extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
-    with DatasetsFinder[IO]
-    with Paging[IO, DatasetSearchResult] {
+    with DatasetsFinder[Interpretation]
+    with Paging[DatasetSearchResult] {
 
   import DatasetsFinderImpl._
   import cats.syntax.all._
   import creatorsFinder._
 
+  private lazy val projectMemberFilterQuery: Option[AuthUser] => String = {
+    case Some(user) =>
+      s"""|?projectId renku:projectVisibility ?visibility .
+          |OPTIONAL { 
+          |    ?projectId schema:member/schema:sameAs ?memberId.
+          |    ?memberId  schema:additionalType 'GitLab';
+          |               schema:identifier ?userGitlabId .
+          |}
+          |FILTER (
+          |  ?visibility = '${Visibility.Public.value}' || ?userGitlabId = ${user.id.value}
+          |)
+          |""".stripMargin
+    case _ =>
+      s"""|?projectId renku:projectVisibility ?visibility .
+          |FILTER(?visibility = '${Visibility.Public.value}')
+          |""".stripMargin
+  }
+  private lazy val addCreators: DatasetSearchResult => Interpretation[DatasetSearchResult] =
+    dataset =>
+      findCreators(dataset.id)
+        .map(creators => dataset.copy(creators = creators))
+
   override def findDatasets(maybePhrase:   Option[Phrase],
                             sort:          Sort.By,
                             pagingRequest: PagingRequest,
                             maybeUser:     Option[AuthUser]
-  ): IO[PagingResponse[DatasetSearchResult]] = {
+  ): Interpretation[PagingResponse[DatasetSearchResult]] = {
     val phrase = maybePhrase getOrElse Phrase("*")
-    implicit val resultsFinder: PagedResultsFinder[IO, DatasetSearchResult] = pagedResultsFinder(
+    implicit val resultsFinder: PagedResultsFinder[Interpretation, DatasetSearchResult] = pagedResultsFinder(
       sparqlQuery(phrase, sort, maybeUser)
     )
     for {
-      page                 <- findPage(pagingRequest)
+      page                 <- findPage[Interpretation](pagingRequest)
       datasetsWithCreators <- (page.results map addCreators).parSequence
-      updatedPage          <- page.updateResults[IO](datasetsWithCreators)
+      updatedPage          <- page.updateResults[Interpretation](datasetsWithCreators)
     } yield updatedPage
   }
 
-  private lazy val projectMemberFilterQuery: Option[AuthUser] => String = {
-    case Some(user) =>
-      s"""
-         |OPTIONAL { 
-         |    ?projectId renku:projectVisibility ?visibility .
-         |}
-         |OPTIONAL { 
-         |    ?projectId schema:member/schema:sameAs ?memberId.
-         |    ?memberId  schema:additionalType 'GitLab';
-         |               schema:identifier ?userGitlabId .
-         |}
-         |BIND (IF (BOUND (?visibility), ?visibility,  '${Visibility.Public.value}') as ?projectVisibility)
-         |FILTER (
-         |  lcase(str(?projectVisibility)) = '${Visibility.Public.value}' || 
-         |  (lcase(str(?projectVisibility)) != '${Visibility.Public.value}' && ?userGitlabId = ${user.id.value})
-         |)
-         |""".stripMargin
-    case _ =>
-      s"""
-         |OPTIONAL {
-         |  ?projectId renku:projectVisibility ?visibility .
-         |}
-         |BIND(IF (BOUND (?visibility), ?visibility, '${Visibility.Public.value}' ) as ?projectVisibility)
-         |FILTER(lcase(str(?projectVisibility)) = '${Visibility.Public.value}')
-         |""".stripMargin
-  }
-
-  private def sparqlQuery(phrase: Phrase, sort: Sort.By, maybeUser: Option[AuthUser]): SparqlQuery = SparqlQuery(
+  private def sparqlQuery(phrase: Phrase, sort: Sort.By, maybeUser: Option[AuthUser]): SparqlQuery = SparqlQuery.of(
     name = "ds free-text search",
-    Set(
-      "PREFIX prov: <http://www.w3.org/ns/prov#>",
-      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-      "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
-      "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>",
-      "PREFIX schema: <http://schema.org/>",
-      "PREFIX text: <http://jena.apache.org/text#>"
-    ),
-    s"""|SELECT ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?projectsCount (GROUP_CONCAT(?keyword; separator='|') AS ?keywords) ?images
+    Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema", text -> "text"),
+    s"""|SELECT ?identifier ?name ?slug ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?exemplarProjectPath ?projectsCount (GROUP_CONCAT(?keyword; separator='|') AS ?keywords) ?images
         |WHERE {        
-        |  SELECT ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?projectsCount ?keyword (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
+        |  SELECT ?identifier ?name ?slug ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?exemplarProjectPath ?projectsCount ?keyword (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
         |  WHERE {
         |    {
-        |      SELECT (MIN(?dsId) AS ?dsIdExample) ?sameAs (COUNT(DISTINCT ?projectId) AS ?projectsCount)
+        |      SELECT ?sameAs (COUNT(DISTINCT ?projectId) AS ?projectsCount) (MIN(?projectDate) AS ?minProjectDate)
         |      WHERE {
         |        {
         |          SELECT DISTINCT ?sameAs
         |          WHERE {
         |            {
         |              SELECT DISTINCT ?id
-        |              WHERE { ?id text:query (schema:name schema:description schema:alternateName schema:keywords '$phrase') }
+        |              WHERE { ?id text:query (schema:name schema:description renku:slug schema:keywords '$phrase') }
         |            } {
         |              ?id a schema:Dataset;
-        |              	  renku:topmostSameAs ?sameAs.
+        |              	   renku:topmostSameAs ?sameAs.
         |            } UNION {
         |              ?id a schema:Person.
         |              ?luceneDsId schema:creator ?id;
@@ -158,37 +150,34 @@ private class DatasetsFinderImpl(
         |          }
         |        } {
         |          ?dsId a schema:Dataset;
-        |                schema:isPartOf ?projectId ;
-        |                renku:topmostSameAs ?sameAs;
-        |                prov:atLocation ?location .
+        |                ^renku:hasDataset ?projectId;
+        |                renku:topmostSameAs ?sameAs.
+        |          FILTER NOT EXISTS {
+        |            ?dsId prov:invalidatedAtTime ?invalidationTime.
+        |          }
+        |          FILTER NOT EXISTS {
+        |            ?someId prov:wasDerivedFrom/schema:url ?dsId;
+        |                    ^renku:hasDataset ?projectId; 
+        |          }
+        |          ?projectId schema:dateCreated ?projectDate.
         |          ${projectMemberFilterQuery(maybeUser)}
-        |          BIND(CONCAT(?location, "/metadata.yml") AS ?metaDataLocation).
-        |          FILTER NOT EXISTS {
-        |              # Removing dataset that have an activity that invalidates them
-        |              ?deprecationEntity  prov:atLocation ?metaDataLocation ;
-        |                                  schema:isPartOf ?projectId ;
-        |                                  a prov:Entity;
-        |                                  prov:wasInvalidatedBy ?invalidationActivity .
-        |          }
-        |          FILTER NOT EXISTS {
-        |              ?someId  prov:wasDerivedFrom/schema:url ?dsId;
-        |                       schema:isPartOf ?projectId; 
-        |          }
         |        }
         |      }
         |      GROUP BY ?sameAs
         |      HAVING (COUNT(*) > 0)
         |    } {
-        |      ?dsIdExample renku:topmostSameAs ?sameAs;
-        |                   a schema:Dataset;
+        |      ?dsIdExample a schema:Dataset;
+        |                   renku:topmostSameAs ?sameAs;
         |                   schema:identifier ?identifier;
-        |                   schema:name ?name ;
-        |                   schema:alternateName ?alternateName;
-        |                   schema:isPartOf ?projectId .
+        |                   schema:name ?name;
+        |                   renku:slug ?slug;
+        |                   ^renku:hasDataset ?exemplarProjectId.
+        |      ?exemplarProjectId schema:dateCreated ?minProjectDate;
+        |                         renku:projectPath ?exemplarProjectPath.
         |      OPTIONAL {
         |        ?dsIdExample schema:image ?imageId .
-        |        ?imageId     schema:position ?imagePosition ;
-        |                     schema:contentUrl ?imageUrl .
+        |        ?imageId schema:position ?imagePosition ;
+        |                 schema:contentUrl ?imageUrl .
         |        BIND(CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
         |      }
         |      OPTIONAL { ?dsIdExample schema:keywords ?keyword }
@@ -196,17 +185,16 @@ private class DatasetsFinderImpl(
         |      OPTIONAL { ?dsIdExample schema:datePublished ?maybePublishedDate }
         |      OPTIONAL { ?dsIdExample schema:dateCreated ?maybeDateCreated }
         |      OPTIONAL { ?dsIdExample prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }
-        |      OPTIONAL { ?dsIdExample schema:url ?maybeUrl }
         |      BIND (IF(BOUND(?maybePublishedDate), ?maybePublishedDate, ?maybeDateCreated) AS ?date)
         |      FILTER NOT EXISTS {
         |        ?someId prov:wasDerivedFrom/schema:url ?dsIdExample;
-        |                schema:isPartOf ?projectId.
+        |                ^renku:hasDataset ?exemplarProjectId.
         |      }
         |    }
         |  }
-        |  GROUP BY ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?projectsCount ?keyword
+        |  GROUP BY ?identifier ?name ?slug ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?exemplarProjectPath ?projectsCount ?keyword
         |}
-        |GROUP BY ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?projectsCount ?images
+        |GROUP BY ?identifier ?name ?slug ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?exemplarProjectPath ?projectsCount ?images
         |${`ORDER BY`(sort)}
         |""".stripMargin
   )
@@ -217,11 +205,6 @@ private class DatasetsFinderImpl(
     case Sort.DatePublishedProperty => s"ORDER BY ${sort.direction}(?maybePublishedDate)"
     case Sort.ProjectsCountProperty => s"ORDER BY ${sort.direction}(?projectsCount)"
   }
-
-  private lazy val addCreators: DatasetSearchResult => IO[DatasetSearchResult] =
-    dataset =>
-      findCreators(dataset.id)
-        .map(creators => dataset.copy(creators = creators))
 }
 
 private object DatasetsFinderImpl {
@@ -257,30 +240,28 @@ private object DatasetsFinderImpl {
         .getOrElse(Nil)
 
     for {
-      id                 <- cursor.downField("identifier").downField("value").as[Identifier]
-      title              <- cursor.downField("name").downField("value").as[Title]
-      name               <- cursor.downField("alternateName").downField("value").as[Name]
-      maybeDateCreated   <- cursor.downField("maybeDateCreated").downField("value").as[Option[DateCreated]]
-      maybePublishedDate <- cursor.downField("maybePublishedDate").downField("value").as[Option[PublishedDate]]
-      projectsCount      <- cursor.downField("projectsCount").downField("value").as[ProjectsCount]
-      keywords           <- cursor.downField("keywords").downField("value").as[Option[String]].map(toListOfKeywords)
-      images             <- cursor.downField("images").downField("value").as[Option[String]].map(toListOfImageUrls)
-      maybeDescription <- cursor
-                            .downField("maybeDescription")
-                            .downField("value")
-                            .as[Option[String]]
-                            .map(blankToNone)
-                            .flatMap(toOption[Description])
-      dates <- Dates
-                 .from(maybeDateCreated, maybePublishedDate)
-                 .leftMap(e => DecodingFailure(e.getMessage, Nil))
+      id                  <- cursor.downField("identifier").downField("value").as[Identifier]
+      title               <- cursor.downField("name").downField("value").as[Title]
+      name                <- cursor.downField("slug").downField("value").as[Name]
+      maybeDateCreated    <- cursor.downField("maybeDateCreated").downField("value").as[Option[DateCreated]]
+      maybePublishedDate  <- cursor.downField("maybePublishedDate").downField("value").as[Option[DatePublished]]
+      projectsCount       <- cursor.downField("projectsCount").downField("value").as[ProjectsCount]
+      exemplarProjectPath <- cursor.downField("exemplarProjectPath").downField("value").as[projects.Path]
+      keywords            <- cursor.downField("keywords").downField("value").as[Option[String]].map(toListOfKeywords)
+      images              <- cursor.downField("images").downField("value").as[Option[String]].map(toListOfImageUrls)
+      maybeDescription    <- cursor.downField("maybeDescription").downField("value").as[Option[Description]]
+      date <- maybeDateCreated
+                .orElse(maybePublishedDate)
+                .map(_.asRight)
+                .getOrElse(DecodingFailure("No dateCreated or publishedDate found", Nil).asLeft)
     } yield DatasetSearchResult(
       id,
       title,
       name,
       maybeDescription,
       Set.empty,
-      dates,
+      date,
+      exemplarProjectPath,
       projectsCount,
       keywords,
       images

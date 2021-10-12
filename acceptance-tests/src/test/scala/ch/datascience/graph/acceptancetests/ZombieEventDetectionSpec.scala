@@ -22,6 +22,8 @@ import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators.timestampsNotInTheFuture
+import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.db.EventLog
 import ch.datascience.graph.acceptancetests.flows.AccessTokenPresence.givenAccessTokenPresentFor
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
@@ -29,27 +31,26 @@ import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import ch.datascience.graph.model.EventsGenerators.commitIds
-import ch.datascience.graph.model.events.{BatchDate, CommitId, EventBody, EventId, EventStatus}
 import ch.datascience.graph.model.events.EventStatus._
+import ch.datascience.graph.model.events.{BatchDate, CommitId, EventBody, EventId, EventStatus}
 import ch.datascience.graph.model.projects._
 import ch.datascience.http.client.AccessToken
-import ch.datascience.knowledgegraph.projects.ProjectsGenerators.projects
-import ch.datascience.knowledgegraph.projects.model.Project
-import ch.datascience.knowledgegraph.projects.model.Statistics.CommitsCount
 import ch.datascience.microservices.MicroserviceIdentifier
-import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
 import io.circe.literal._
-import io.renku.eventlog.EventContentGenerators.eventDates
-import io.renku.eventlog.{CreatedDate, EventDate, ExecutionDate, TypeSerializers}
+import io.renku.eventlog._
+import org.scalacheck.Gen
 import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.Eventually
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
-import skunk._
 import skunk.data.Completion
 import skunk.implicits._
+import skunk.{Command, Session, ~}
 
+import java.lang.Thread.sleep
 import java.time.Instant
+import scala.concurrent.duration._
+import scala.language.postfixOps
 
 class ZombieEventDetectionSpec
     extends AnyFeatureSpec
@@ -65,28 +66,17 @@ class ZombieEventDetectionSpec
     s"An event which got stuck in either $GeneratingTriples or $TransformingTriples status " +
       s"should be detected and re-processes"
   ) {
-
     implicit val accessToken: AccessToken = accessTokens.generateOne
-    val project   = projects.generateOne
+    val project   = dataProjects(projectEntities(visibilityPublic)).generateOne
     val projectId = project.id
     val commitId  = commitIds.generateOne
-    val committer = persons.generateOne
     val eventDate = eventDates.generateOne
 
     Given("Triples generation is successful")
-    `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId, committer)
-
-    And("project members/users exists in GitLab")
-    `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(
-      project.path,
-      committer.asMembersList()
-    )
+    `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
 
     And("project exists in GitLab")
-    `GET <gitlabApi>/projects/:path AND :id returning OK with`(
-      project,
-      maybeCommitsCount = CommitsCount(1).some
-    )
+    `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
 
     And("the event commit in GitLab")
     `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
@@ -102,6 +92,7 @@ class ZombieEventDetectionSpec
     EventLog.execute { implicit session =>
       insertEventToDB(commitId, project, eventDate) >> insertEventDeliveryToDB(commitId, project)
     }
+    sleep((5 seconds).toMillis)
 
     Then("the zombie chasing functionality should re-do the event")
     eventually {
@@ -110,7 +101,7 @@ class ZombieEventDetectionSpec
     }
   }
 
-  private def insertProjectToDB(project: Project, eventDate: EventDate) = EventLog.execute { session =>
+  private def insertProjectToDB(project: data.Project, eventDate: EventDate): Int = EventLog.execute { session =>
     val query: Command[Id ~ Path ~ EventDate] =
       sql"""INSERT INTO project (project_id, project_path, latest_event_date)
           VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
@@ -125,9 +116,11 @@ class ZombieEventDetectionSpec
     }
   }
 
-  private def insertEventToDB(commitId: CommitId, project: Project, eventDate: EventDate)(implicit
-      session:                          Session[IO]
-  ) = {
+  private def insertEventToDB(
+      commitId:       CommitId,
+      project:        data.Project,
+      eventDate:      EventDate
+  )(implicit session: Session[IO]) = {
     val query: Command[EventId ~ Id ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody] =
       sql"""
           INSERT INTO event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body)
@@ -155,11 +148,13 @@ class ZombieEventDetectionSpec
       )
   }
 
-  private def insertEventDeliveryToDB(commitId: CommitId, project: Project)(implicit session: Session[IO]) = {
+  private def insertEventDeliveryToDB(commitId: CommitId, project: data.Project)(implicit session: Session[IO]) = {
     val query: Command[EventId ~ Id ~ MicroserviceIdentifier] = sql"""
           INSERT INTO event_delivery (event_id, project_id, delivery_id)
           VALUES ($eventIdEncoder, $projectIdEncoder, $microserviceIdentifierEncoder)
           """.command
     session.prepare(query).use(_.execute(EventId(commitId.value) ~ project.id ~ MicroserviceIdentifier.generate))
   }
+
+  private implicit lazy val eventDates: Gen[EventDate] = timestampsNotInTheFuture map EventDate.apply
 }

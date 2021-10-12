@@ -22,18 +22,18 @@ import cats.MonadThrow
 import cats.syntax.all._
 import ch.datascience.knowledgegraph.lineage.model.Node.Location
 import ch.datascience.tinytypes.{InstantTinyType, TinyTypeFactory}
-import io.renku.jsonld.EntityId
+import io.renku.jsonld.{EntityId, EntityType}
 
 import java.time.Instant
 
 object model {
 
-  private[lineage] final case class RunInfo(entityId: EntityId, date: RunDate)
+  private[lineage] final case class ExecutionInfo(entityId: EntityId, date: RunDate)
   private[lineage] final class RunDate private (val value: Instant) extends AnyVal with InstantTinyType
   private[lineage] implicit object RunDate extends TinyTypeFactory[RunDate](new RunDate(_))
   private[lineage] type FromAndToNodes = (Set[Node.Location], Set[Node.Location])
-  private[lineage] type EdgeMapEntry   = (RunInfo, FromAndToNodes)
-  private[lineage] type EdgeMap        = Map[RunInfo, FromAndToNodes]
+  private[lineage] type EdgeMapEntry   = (ExecutionInfo, FromAndToNodes)
+  private[lineage] type EdgeMap        = Map[ExecutionInfo, FromAndToNodes]
 
   final case class Lineage private (edges: Set[Edge], nodes: Set[Node]) extends LineageOps
 
@@ -58,8 +58,7 @@ object model {
   trait LineageOps {
     self: Lineage =>
 
-    def getNode(location: Location): Option[Node] =
-      nodes.find(_.location == location)
+    def getNode(location: Location): Option[Node] = nodes.find(_.location == location)
   }
 
   final case class Edge(source: Node.Location, target: Node.Location)
@@ -67,7 +66,7 @@ object model {
   final case class Node(location: Node.Location, label: Node.Label, types: Set[Node.Type])
 
   object Node {
-    import ch.datascience.tinytypes.constraints.{NonBlank, RelativePath}
+    import ch.datascience.tinytypes.constraints.NonBlank
     import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
     final class Id private (val value: String) extends AnyVal with StringTinyType
@@ -87,7 +86,7 @@ object model {
     object Type extends TinyTypeFactory[Type](new Type(_)) with NonBlank
 
     final class Location private (val value: String) extends AnyVal with StringTinyType
-    object Location extends TinyTypeFactory[Location](new Location(_)) with RelativePath
+    object Location extends TinyTypeFactory[Location](new Location(_))
 
     sealed trait SingleWordType extends Product with Serializable {
       val name: String
@@ -103,26 +102,13 @@ object model {
     implicit class NodeOps(node: Node) {
 
       import SingleWordType._
+      import ch.datascience.graph.model.entities.{Activity, Entity}
 
-      private lazy val FileTypes = Set(
-        "http://www.w3.org/ns/prov#Entity",
-        "http://purl.org/wf4ever/wfprov#Artifact"
-      )
-      private lazy val DirectoryTypes = Set(
-        "http://www.w3.org/ns/prov#Entity",
-        "http://purl.org/wf4ever/wfprov#Artifact",
-        "http://www.w3.org/ns/prov#Collection"
-      )
-      private lazy val ProcessRunTypes = Set(
-        "http://purl.org/wf4ever/wfprov#ProcessRun",
-        "http://www.w3.org/ns/prov#Activity"
-      )
-
-      lazy val singleWordType: Either[Exception, SingleWordType] = node.types.map(_.toString) match {
-        case types if (ProcessRunTypes diff types).isEmpty => Right(ProcessRun)
-        case types if (DirectoryTypes diff types).isEmpty  => Right(Directory)
-        case types if (FileTypes diff types).isEmpty       => Right(File)
-        case types                                         => Left(new Exception(s"${types.mkString(", ")} cannot be converted to a NodeType"))
+      lazy val singleWordType: Either[Exception, SingleWordType] = node.types.map(t => EntityType.of(t.show)) match {
+        case types if Activity.entityTypes.toList.toSet === types     => Right(ProcessRun)
+        case types if Entity.folderEntityTypes.toList.toSet === types => Right(Directory)
+        case types if Entity.fileEntityTypes.toList.toSet === types   => Right(File)
+        case types                                                    => Left(new Exception(s"${types.map(_.show).mkString(", ")} cannot be converted to a NodeType"))
       }
     }
   }

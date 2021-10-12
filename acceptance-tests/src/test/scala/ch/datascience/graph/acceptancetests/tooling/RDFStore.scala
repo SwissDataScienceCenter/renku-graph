@@ -20,17 +20,16 @@ package ch.datascience.graph.acceptancetests.tooling
 
 import cats.effect.concurrent.MVar
 import cats.effect.{ContextShift, Fiber, IO}
-import ch.datascience.graph.Schemas.renku
+import cats.syntax.all._
 import ch.datascience.graph.acceptancetests.data.RdfStoreData
 import ch.datascience.graph.model.RenkuVersionPair
-import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.Schemas._
 import ch.datascience.rdfstore.FusekiBaseUrl
-import ch.datascience.rdfstore.entities.bundles
 import io.renku.jsonld.EntityId
 import org.apache.jena.fuseki.main.FusekiServer
 import org.apache.jena.rdfconnection.RDFConnectionFactory
 import org.apache.lucene.store.MMapDirectory
-
+import ch.datascience.graph.model.testentities.renkuBaseUrl
 import java.nio.file.Files
 import scala.concurrent.ExecutionContext
 import scala.jdk.CollectionConverters._
@@ -54,10 +53,10 @@ object RDFStore extends RdfStoreData {
 
       val entityDefinition: EntityDefinition = {
         val definition = new EntityDefinition("uri", "name")
-        definition.setPrimaryPredicate(NodeFactory.createURI("http://schema.org/name"))
-        definition.set("description", NodeFactory.createURI("http://schema.org/description"))
-        definition.set("alternateName", NodeFactory.createURI("http://schema.org/alternateName"))
-        definition.set("keywords", NodeFactory.createURI("http://schema.org/keywords"))
+        definition.setPrimaryPredicate(NodeFactory.createURI((schema / "name").show))
+        definition.set("description", NodeFactory.createURI((schema / "description").show))
+        definition.set("slug", NodeFactory.createURI((renku / "slug").show))
+        definition.set("keywords", NodeFactory.createURI((schema / "keywords").show))
         definition
       }
 
@@ -118,7 +117,7 @@ object RDFStore extends RdfStoreData {
                    .update(s"""
             INSERT DATA{
               <${EntityId
-                     .of((bundles.renkuBaseUrl / "version-pair").toString)}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <${renku / "VersionPair"}> ;
+                     .of((renkuBaseUrl / "version-pair").toString)}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <${renku / "VersionPair"}> ;
                                 <${renku / "cliVersion"}> '${currentVersionPair.cliVersion}' ;
                                 <${renku / "schemaVersion"}> '${currentVersionPair.schemaVersion}'}""")
                }
@@ -136,16 +135,16 @@ object RDFStore extends RdfStoreData {
     jenaReference.read
       .map { jena =>
         jena.connection
-          .query("""SELECT (COUNT(*) as ?count) 
-                                WHERE { ?s ?p ?o 
-                                  FILTER NOT EXISTS {
-                                    ?s <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://swissdatasciencecenter.github.io/renku-ontology#VersionPair>
-                                  }
-                                  FILTER NOT EXISTS {
-                                    ?s <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://swissdatasciencecenter.github.io/renku-ontology#ReProvisioning>
-                                  }
-                                }
-        """)
+          .query("""|SELECT (COUNT(*) as ?count)
+                    |WHERE { ?s ?p ?o
+                    |  FILTER NOT EXISTS {
+                    |    ?s <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://swissdatasciencecenter.github.io/renku-ontology#VersionPair>
+                    |  }
+                    |  FILTER NOT EXISTS {
+                    |    ?s <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://swissdatasciencecenter.github.io/renku-ontology#ReProvisioning>
+                    |  }
+                    |}
+                    |""".stripMargin)
           .execSelect()
           .next()
           .get("count")
@@ -153,20 +152,6 @@ object RDFStore extends RdfStoreData {
           .getInt
       }
       .unsafeRunSync()
-
-  def commitTriplesCount(commitId: CommitId) = jenaReference.read
-    .map { jena =>
-      jena.connection
-        .query(s"""SELECT (COUNT(*) as ?count) 
-                                WHERE { ?s  <http://www.w3.org/2000/01/rdf-schema#label> '${commitId.value}' }
-        """)
-        .execSelect()
-        .next()
-        .get("count")
-        .asLiteral()
-        .getInt
-    }
-    .unsafeRunSync()
 
   def run(query: String): Seq[Map[String, String]] =
     jenaReference.read

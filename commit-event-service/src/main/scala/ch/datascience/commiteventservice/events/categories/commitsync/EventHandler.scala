@@ -26,7 +26,7 @@ import cats.syntax.all._
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.events.consumers
+import ch.datascience.events.{EventRequestContent, consumers}
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import ch.datascience.events.consumers._
 import ch.datascience.graph.model.events.{CategoryName, CommitId, LastSyncedDate}
@@ -66,8 +66,6 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow: ContextShift: 
                   .semiflatTap(logger log event)
                   .leftSemiflatTap(logger log event)
     } yield result
-
-  private implicit lazy val eventInfoToString: CommitSyncEvent => String = _.toString
 
   private def logError(event: CommitSyncEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
     case NonFatal(exception) =>

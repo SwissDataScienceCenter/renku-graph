@@ -21,16 +21,14 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 import ch.datascience.events.consumers.Project
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.{CompoundEventId, EventId}
-import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.events.categories.models.CategoryEvent
+import io.renku.jsonld.JsonLD
 
 final case class TriplesGeneratedEvent(eventId:       EventId,
                                        project:       Project,
-                                       triples:       JsonLDTriples,
+                                       triples:       JsonLD,
                                        schemaVersion: SchemaVersion
 ) extends Product
-    with Serializable
     with CategoryEvent {
-  override val compoundEventId: CompoundEventId =
-    CompoundEventId(eventId, project.id)
+  override val compoundEventId: CompoundEventId = CompoundEventId(eventId, project.id)
 }

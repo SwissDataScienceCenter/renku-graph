@@ -18,9 +18,10 @@
 
 package io.renku.jsonld
 
+import cats.Contravariant
+
 import java.time.{Instant, LocalDate}
 
-@FunctionalInterface
 /** A type class that provides a conversion from a value of type `A` to a [[JsonLD]] value.
   */
 trait JsonLDEncoder[A] extends Serializable {
@@ -28,6 +29,13 @@ trait JsonLDEncoder[A] extends Serializable {
 }
 
 object JsonLDEncoder {
+
+  implicit val contravariantForJsonLDEncoder: Contravariant[JsonLDEncoder] = new Contravariant[JsonLDEncoder] {
+    def contramap[A, B](fa: JsonLDEncoder[A])(f: B => A): JsonLDEncoder[B] =
+      JsonLDEncoder[B](b => fa(f(b)))
+  }
+
+  def apply[A](implicit instance: JsonLDEncoder[A]): JsonLDEncoder[A] = instance
 
   final def instance[A](f: A => JsonLD): JsonLDEncoder[A] = (a: A) => f(a)
 

@@ -22,7 +22,7 @@ import cats.syntax.all._
 import ch.datascience.config.ConfigLoader.ConfigLoadingException
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{nonBlankStrings, positiveInts}
-import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.config.RenkuBaseUrlLoader
 import com.typesafe.config.ConfigFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -55,7 +55,7 @@ class GenerationProcessesNumberSpec extends AnyWordSpec with ScalaCheckPropertyC
         Map("generation-processes-number" -> nonBlankStrings().generateOne.value).asJava
       )
 
-      val Failure(exception) = RenkuBaseUrl[Try](config)
+      val Failure(exception) = RenkuBaseUrlLoader[Try](config)
 
       exception shouldBe an[ConfigLoadingException]
     }

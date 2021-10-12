@@ -31,6 +31,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import java.time.temporal.ChronoUnit.{HOURS, SECONDS}
 import java.time.{Clock, Instant, ZoneId, Duration => JavaDuration}
+import scala.util.Random
 
 class EventStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
@@ -41,11 +42,13 @@ class EventStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
       "NEW"                                    -> New,
       "GENERATING_TRIPLES"                     -> GeneratingTriples,
       "TRIPLES_STORE"                          -> TriplesStore,
+      "TRANSFORMING_TRIPLES"                   -> TransformingTriples,
       "SKIPPED"                                -> Skipped,
       "GENERATION_RECOVERABLE_FAILURE"         -> GenerationRecoverableFailure,
       "GENERATION_NON_RECOVERABLE_FAILURE"     -> GenerationNonRecoverableFailure,
       "TRANSFORMATION_RECOVERABLE_FAILURE"     -> TransformationRecoverableFailure,
-      "TRANSFORMATION_NON_RECOVERABLE_FAILURE" -> TransformationNonRecoverableFailure
+      "TRANSFORMATION_NON_RECOVERABLE_FAILURE" -> TransformationNonRecoverableFailure,
+      "AWAITING_DELETION"                      -> AwaitingDeletion
     )
 
     forAll(scenarios) { (stringValue, expectedStatus) =>
@@ -72,6 +75,22 @@ class EventStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
       val Left(exception) = Json.fromString(unknown).as[EventStatus]
 
       exception.getMessage shouldBe s"'$unknown' unknown EventStatus"
+    }
+
+    "be sortable in the way that reflects the possible state changes" in {
+      Random.shuffle(EventStatus.all.toList).sorted shouldBe List(
+        Skipped,
+        New,
+        GeneratingTriples,
+        GenerationRecoverableFailure,
+        GenerationNonRecoverableFailure,
+        TriplesGenerated,
+        TransformingTriples,
+        TransformationRecoverableFailure,
+        TransformationNonRecoverableFailure,
+        TriplesStore,
+        AwaitingDeletion
+      )
     }
   }
 }

@@ -21,10 +21,8 @@ package ch.datascience.commiteventservice.events.categories.globalcommitsync.eve
 import cats.MonadThrow
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.commiteventservice.events.categories.common.EventStatusPatcher
-import ch.datascience.commiteventservice.events.categories.common.UpdateResult.{Deleted, Failed}
-import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.GlobalCommitEventSynchronizer.SynchronizationSummary
-import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.GlobalCommitEventSynchronizer.SynchronizationSummary.toSummaryKey
+import ch.datascience.commiteventservice.events.categories.common.UpdateResult.Failed
+import ch.datascience.commiteventservice.events.categories.common.{CommitEventsRemover, SynchronizationSummary}
 import ch.datascience.events.consumers.Project
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.http.client.AccessToken
@@ -39,21 +37,19 @@ private[eventgeneration] trait CommitEventDeleter[Interpretation[_]] {
   ): Interpretation[SynchronizationSummary]
 }
 private[eventgeneration] class CommitEventDeleterImpl[Interpretation[_]: MonadThrow](
-    eventStatusPatcher: EventStatusPatcher[Interpretation]
+    commitEventsRemover: CommitEventsRemover[Interpretation]
 ) extends CommitEventDeleter[Interpretation] {
-  import eventStatusPatcher._
+
+  import commitEventsRemover._
 
   override def deleteExtraneousCommits(project: Project, commitsToDelete: List[CommitId])(implicit
       maybeAccessToken:                         Option[AccessToken]
   ): Interpretation[SynchronizationSummary] = commitsToDelete.foldLeftM(SynchronizationSummary()) { (summary, commit) =>
-    sendDeletionStatus(project.id, commit).map { _ =>
-      val currentCount = summary.get(toSummaryKey(Deleted))
-      summary.updated(Deleted, currentCount + 1)
-    } recoverWith { case NonFatal(error) =>
-      val errorMessage      = s"Failed to delete commit $commit"
-      val currentErrorCount = summary.get(toSummaryKey(Failed(errorMessage, error)))
-      summary.updated(Failed(errorMessage, error), currentErrorCount + 1).pure[Interpretation]
-    }
+    removeDeletedEvent(project, commit)
+      .map(summary.incrementCount)
+      .recoverWith { case NonFatal(error) =>
+        summary.incrementCount(Failed(s"Failed to delete commit $commit", error)).pure[Interpretation]
+      }
   }
 }
 private[eventgeneration] object CommitEventDeleter {
@@ -62,6 +58,6 @@ private[eventgeneration] object CommitEventDeleter {
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[CommitEventDeleter[IO]] = for {
-    eventStatusPatcher <- EventStatusPatcher(logger)
-  } yield new CommitEventDeleterImpl[IO](eventStatusPatcher)
+    commitEventsRemover <- CommitEventsRemover(logger)
+  } yield new CommitEventDeleterImpl[IO](commitEventsRemover)
 }

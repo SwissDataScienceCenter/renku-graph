@@ -19,16 +19,15 @@
 package ch.datascience.generators
 
 import ch.datascience.config.certificates.Certificate
-import ch.datascience.config.renku
 import ch.datascience.config.sentry.SentryConfig
 import ch.datascience.config.sentry.SentryConfig.{EnvironmentName, SentryBaseUrl, SentryStackTracePackage, ServiceName}
+import ch.datascience.config.{ServiceUrl, renku}
 import ch.datascience.control.{RateLimit, RateLimitUnit}
 import ch.datascience.crypto.AesCrypto
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.Schemas
-import ch.datascience.graph.config.{GitLabUrl, RenkuBaseUrl, RenkuLogTimeout}
-import ch.datascience.graph.model.CliVersion
+import ch.datascience.graph.model.GraphModelGenerators.userGitLabIds
+import ch.datascience.graph.model.Schemas
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.RestClientError._
 import ch.datascience.http.client._
@@ -38,19 +37,21 @@ import ch.datascience.http.rest.paging.{PagingRequest, PagingResponse}
 import ch.datascience.http.rest.{Links, SortBy, paging}
 import ch.datascience.http.server.security.EndpointSecurityException
 import ch.datascience.http.server.security.EndpointSecurityException.{AuthenticationFailure, AuthorizationFailure}
+import ch.datascience.http.server.security.model.AuthUser
+import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.microservices.MicroserviceBaseUrl
 import ch.datascience.rdfstore._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
-import io.circe.literal._
 import io.renku.jsonld.Schema
+import io.renku.jsonld.generators.JsonLDGenerators
+import org.http4s.Status
+import org.http4s.Status._
 import org.scalacheck.{Arbitrary, Gen}
 
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Base64
-import scala.concurrent.duration._
-import scala.language.postfixOps
 import scala.util.Try
 
 object CommonGraphGenerators {
@@ -99,13 +100,6 @@ object CommonGraphGenerators {
     authCredentials <- basicAuthCredentials
   } yield RdfStoreConfig(fusekiUrl, datasetName, authCredentials)
 
-  implicit val cliVersions: Gen[CliVersion] = Gen
-    .listOfN(3, positiveInts(max = 50))
-    .map(_.mkString("."))
-    .map(CliVersion.apply)
-
-  implicit val renkuLogTimeouts: Gen[RenkuLogTimeout] = durations(max = 5 hours) map RenkuLogTimeout.apply
-
   implicit val microserviceBaseUrls: Gen[MicroserviceBaseUrl] = for {
     protocol <- Arbitrary.arbBool.arbitrary map {
                   case true  => "http"
@@ -118,21 +112,16 @@ object CommonGraphGenerators {
     ip4  <- positiveInts(999)
   } yield MicroserviceBaseUrl(s"$protocol://$ip1$ip2$ip3$ip4:$port")
 
-  implicit val renkuBaseUrls: Gen[RenkuBaseUrl] = httpUrls() map RenkuBaseUrl.apply
   implicit val renkuResourcesUrls: Gen[renku.ResourcesUrl] = for {
     url  <- httpUrls()
     path <- relativePaths(maxSegments = 1)
   } yield renku.ResourcesUrl(s"$url/$path")
+
   def renkuResourceUrls(
       renkuResourcesUrl: renku.ResourcesUrl = renkuResourcesUrls.generateOne
-  ): Gen[renku.ResourceUrl] =
-    for {
-      path <- relativePaths(maxSegments = 1)
-    } yield renkuResourcesUrl / path
-  implicit val gitLabUrls: Gen[GitLabUrl] = for {
-    url  <- httpUrls()
-    path <- relativePaths(maxSegments = 2)
-  } yield GitLabUrl(s"$url/$path")
+  ): Gen[renku.ResourceUrl] = for {
+    path <- relativePaths(maxSegments = 1)
+  } yield renkuResourcesUrl / path
 
   private implicit val sentryBaseUrls: Gen[SentryBaseUrl] = for {
     url         <- httpUrls()
@@ -208,19 +197,8 @@ object CommonGraphGenerators {
       }
 
   implicit val jsonLDTriples: Gen[JsonLDTriples] = for {
-    subject <- nonEmptyStrings()
-    obj     <- nonEmptyStrings()
-  } yield JsonLDTriples {
-    json"""{
-        "@context": {
-          "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
-          "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
-          "xsd": "http://www.w3.org/2001/XMLSchema#"
-        },
-        "@id": $subject,
-        "rdfs:label": $obj
-      }"""
-  }
+    jsonLD <- JsonLDGenerators.jsonLDEntities
+  } yield JsonLDTriples(jsonLD.toJson)
 
   implicit lazy val sparqlPrefixes: Gen[SparqlQuery.Prefix] = Gen.oneOf(
     SparqlQuery.Prefix("prov", Schemas.prov),
@@ -228,7 +206,7 @@ object CommonGraphGenerators {
     SparqlQuery.Prefix("wfdesc", Schemas.wfdesc),
     SparqlQuery.Prefix("rdf", Schemas.rdf),
     SparqlQuery.Prefix("rdfs", Schemas.rdfs),
-    SparqlQuery.Prefix("xmlSchema", Schemas.xmlSchema),
+    SparqlQuery.Prefix("xmlSchema", Schemas.xml),
     SparqlQuery.Prefix("schema", Schemas.schema),
     SparqlQuery.Prefix("renku", Schemas.renku)
   )
@@ -238,6 +216,25 @@ object CommonGraphGenerators {
   } yield sparqlQuery
 
   implicit lazy val schemas: Gen[Schema] = Gen.oneOf(Schemas.all)
+
+  lazy val httpStatuses: Gen[Status] = Gen.oneOf(successHttpStatuses, clientErrorHttpStatuses, serverErrorHttpStatuses)
+
+  lazy val successHttpStatuses: Gen[Status] = Gen.oneOf(Ok, Created, Accepted)
+
+  lazy val clientErrorHttpStatuses: Gen[Status] = Gen.oneOf(
+    Unauthorized,
+    PaymentRequired,
+    Forbidden,
+    NotFound,
+    Conflict
+  )
+  lazy val serverErrorHttpStatuses: Gen[Status] = Gen.oneOf(
+    InternalServerError,
+    NotImplemented,
+    BadGateway,
+    ServiceUnavailable,
+    GatewayTimeout
+  )
 
   implicit val unexpectedResponseExceptions: Gen[UnexpectedResponseException] = for {
     status  <- serverErrorHttpStatuses
@@ -253,4 +250,12 @@ object CommonGraphGenerators {
     message   <- nonBlankStrings()
     exception <- exceptions
   } yield ClientException(message.value, exception)
+
+  implicit val serviceUrls:  Gen[ServiceUrl]  = httpUrls() map ServiceUrl.apply
+  implicit val elapsedTimes: Gen[ElapsedTime] = Gen.choose(0L, 10000L) map ElapsedTime.apply
+
+  implicit val authUsers: Gen[AuthUser] = for {
+    gitLabId    <- userGitLabIds
+    accessToken <- accessTokens
+  } yield AuthUser(gitLabId, accessToken)
 }

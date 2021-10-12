@@ -128,10 +128,10 @@ private class SubscribersRegistry(
     (checkupTime.value compareTo now()) <= 0
   }
 
-  private def bringToAvailable(subscribers: List[SubscriptionInfo]): IO[List[Unit]] = subscribers.map { subscriberUrl =>
+  private def bringToAvailable(subscribers: List[SubscriptionInfo]): IO[List[Unit]] = subscribers.map { subscription =>
     for {
-      wasAdded <- add(subscriberUrl)
-      _        <- whenA(wasAdded)(logger.debug(show"$categoryName: $subscriberUrl taken from busy state"))
+      wasAdded <- add(subscription)
+      _        <- whenA(wasAdded)(logger.debug(show"$categoryName: $subscription taken from busy state"))
     } yield ()
   }.sequence
 

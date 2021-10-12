@@ -18,15 +18,12 @@
 
 package io.renku.jsonld
 
-import java.time.{Instant, LocalDate}
-
 import cats.data.NonEmptyList
 import eu.timepit.refined.auto._
 import io.circe.Json
 import io.circe.literal._
 import io.circe.parser._
 import io.circe.syntax._
-import io.renku.jsonld.JsonLD.JsonLDEntity
 import io.renku.jsonld.generators.Generators.Implicits._
 import io.renku.jsonld.generators.Generators._
 import io.renku.jsonld.generators.JsonLDGenerators._
@@ -35,6 +32,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
+import java.time.{Instant, LocalDate}
 import scala.util.Random
 
 class JsonLDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
@@ -508,36 +506,16 @@ class JsonLDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
 
   private def listValueProperties(schema: Schema): Gen[(Property, NonEmptyList[JsonLD])] =
     for {
-      property <- nonBlankStrings() map (p => schema / p.value)
-      valuesGen = nonBlankStrings() map (v => JsonLD.fromString(v.value))
+      property <- nonBlankStrings(minLength = 5) map (p => schema / p.value)
+      valuesGen = nonBlankStrings(minLength = 5) map (v => JsonLD.fromString(v.value))
       values <- nonEmptyList(valuesGen, minElements = 2)
     } yield property -> values
 
   private def singleValueProperties(schema: Schema): Gen[(Property, JsonLD)] =
     for {
-      property <- nonBlankStrings() map (p => schema / p.value)
-      value    <- nonBlankStrings() map (v => JsonLD.fromString(v.value))
+      property <- nonBlankStrings(minLength = 5) map (p => schema / p.value)
+      value    <- nonBlankStrings(minLength = 5) map (v => JsonLD.fromString(v.value))
     } yield property -> value
 
-  private lazy val entityProperties: Gen[(Property, JsonLDEntity)] = for {
-    property <- properties
-    entity   <- jsonLDEntities
-  } yield property -> entity
-
   private case class Object(value: String)
-
-  private implicit class JsonLDEntityOps(entity: JsonLDEntity) {
-
-    def add(properties: List[(Property, JsonLD)]): JsonLDEntity =
-      properties.foldLeft(entity) { case (entity, (property, entityValue)) =>
-        entity.add(property -> entityValue)
-      }
-
-    def add(property: (Property, JsonLD)): JsonLDEntity = entity.copy(properties = entity.properties + property)
-  }
-
-  private implicit class EitherJsonLDOps[T <: Exception, U](either: Either[T, U]) {
-    lazy val unsafeGetRight: U = either.fold(throw _, identity)
-  }
-
 }

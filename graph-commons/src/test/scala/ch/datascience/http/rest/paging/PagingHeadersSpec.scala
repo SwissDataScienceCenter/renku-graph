@@ -18,15 +18,14 @@
 
 package ch.datascience.http.rest.paging
 
-import PagingRequest.Decoders.page.{parameterName => pageParamName}
-import PagingRequest.Decoders.perPage.{parameterName => perPageParamName}
-
-import ch.datascience.config.renku
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.http.rest.paging.PagingRequest.Decoders.page.{parameterName => pageParamName}
+import ch.datascience.http.rest.paging.PagingRequest.Decoders.perPage.{parameterName => perPageParamName}
 import ch.datascience.http.rest.paging.PagingResponse.PagingInfo
 import ch.datascience.http.rest.paging.model.Page.first
+import ch.datascience.tinytypes.TestTinyTypes.UrlTestType
 import eu.timepit.refined.api.Refined
 import org.http4s._
 import org.scalacheck.Gen
@@ -50,7 +49,7 @@ class PagingHeadersSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
           import response.pagingInfo._
           import response.pagingInfo.pagingRequest._
 
-          implicit val resourceUrl: renku.ResourceUrl = renkuResourceUrlFrom(page, perPage)
+          implicit val resourceUrl: UrlTestType = resourceUrlFrom(page, perPage)
 
           val totalPages = findTotalPages(pagingInfo)
           PagingHeaders.from(response) should contain theSameElementsAs Set(
@@ -76,7 +75,7 @@ class PagingHeadersSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
           import response.pagingInfo._
           import response.pagingInfo.pagingRequest._
 
-          implicit val resourceUrl: renku.ResourceUrl = renkuResourceUrlFrom(page, perPage)
+          implicit val resourceUrl: UrlTestType = resourceUrlFrom(page, perPage)
 
           val totalPages = findTotalPages(pagingInfo)
           PagingHeaders.from(response) should contain theSameElementsAs Set(
@@ -100,7 +99,7 @@ class PagingHeadersSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
           import response.pagingInfo._
           import response.pagingInfo.pagingRequest._
 
-          implicit val resourceUrl: renku.ResourceUrl = renkuResourceUrlFrom(page, perPage)
+          implicit val resourceUrl: UrlTestType = resourceUrlFrom(page, perPage)
 
           val totalPages = findTotalPages(pagingInfo)
           PagingHeaders.from(response) should contain theSameElementsAs Set(
@@ -123,7 +122,7 @@ class PagingHeadersSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
           import response.pagingInfo._
           import response.pagingInfo.pagingRequest._
 
-          implicit val resourceUrl: renku.ResourceUrl = renkuResourceUrlFrom(page, perPage)
+          implicit val resourceUrl: UrlTestType = resourceUrlFrom(page, perPage)
 
           PagingHeaders.from(response) should contain theSameElementsAs Set(
             Header("Total", total.toString),
@@ -135,17 +134,28 @@ class PagingHeadersSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
           )
         }
       }
-  }
 
-  private def renkuResourceUrlFrom(page: model.Page, perPage: model.PerPage): renku.ResourceUrl =
-    renkuResourceUrls().generateOne ? (pageParamName -> page.toString) & (perPageParamName -> perPage.toString)
+    s"generate $Total, $TotalPages, $PerPage, $Page and $Link headers " +
+      "if there's no results" in {
 
-  private def findTotalPages(pagingInfo: PagingInfo): Int = {
-    import pagingInfo._
-    import pagingInfo.pagingRequest._
+        val perPage = positiveInts().map(_.value).generateAs(model.PerPage)
+        val page    = positiveInts().map(_.value).generateAs(model.Page)
+        val response = PagingResponse
+          .from[Try, NonBlank](Nil, PagingRequest(page, perPage), model.Total(0))
+          .fold(throw _, identity)
 
-    if ((total.value / perPage.value.toFloat).isWhole) total.value / perPage.value
-    else total.value / perPage.value + 1
+        implicit val resourceUrl: UrlTestType = resourceUrlFrom(page, perPage)
+
+        PagingHeaders.from(response) should contain theSameElementsAs Set(
+          Header("Total", "0"),
+          Header("Total-Pages", "0"),
+          Header("Per-Page", perPage.toString),
+          Header("Page", page.toString),
+          Header("Link", s"""<${resourceUrl ? (pageParamName -> first.value)}>; rel="first""""),
+          Header("Link", s"""<${resourceUrl ? (pageParamName -> 1)}>; rel="last"""")
+        )
+
+      }
   }
 
   private lazy val currentPageNeitherFirstNorLast: Gen[PagingResponse[NonBlank]] =
@@ -161,7 +171,6 @@ class PagingHeadersSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
     } yield PagingResponse
       .from[Try, NonBlank](results.toList, PagingRequest(currentPage, perPage), total)
       .fold(throw _, identity)
-
   private lazy val currentPageLast: Gen[PagingResponse[NonBlank]] =
     for {
       page    <- pages.retryUntil(_.value > 1)
@@ -174,7 +183,6 @@ class PagingHeadersSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
     } yield PagingResponse
       .from[Try, NonBlank](results.toList, PagingRequest(page, perPage), total)
       .fold(throw _, identity)
-
   private lazy val currentPageFirst: Gen[PagingResponse[NonBlank]] =
     for {
       page    <- pages.retryUntil(_.value > 1)
@@ -187,7 +195,6 @@ class PagingHeadersSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
     } yield PagingResponse
       .from[Try, NonBlank](results.toList, PagingRequest(first, perPage), total)
       .fold(throw _, identity)
-
   private lazy val onePageOnly: Gen[PagingResponse[NonBlank]] =
     for {
       perPage <- perPages
@@ -199,4 +206,15 @@ class PagingHeadersSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
     } yield PagingResponse
       .from[Try, NonBlank](results.toList, PagingRequest(first, perPage), total)
       .fold(throw _, identity)
+
+  private def resourceUrlFrom(page: model.Page, perPage: model.PerPage): UrlTestType =
+    httpUrls().generateAs(UrlTestType) ? (pageParamName -> page.toString) & (perPageParamName -> perPage.toString)
+
+  private def findTotalPages(pagingInfo: PagingInfo): Int = {
+    import pagingInfo._
+    import pagingInfo.pagingRequest._
+
+    if ((total.value / perPage.value.toFloat).isWhole) total.value / perPage.value
+    else total.value / perPage.value + 1
+  }
 }

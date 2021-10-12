@@ -19,23 +19,24 @@
 package ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration
 
 import cats.effect.{ConcurrentEffect, IO, Timer}
+import cats.syntax.all._
 import ch.datascience.commiteventservice.events.categories.common.CommitInfo
 import ch.datascience.commiteventservice.events.categories.common.Generators.commitInfos
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators.personalAccessTokens
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.config.GitLabUrl
+import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.GitLabUrl
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
-import com.github.tomakehurst.wiremock.client.WireMock.{equalTo, get, okJson, stubFor, urlPathEqualTo}
+import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Json
+import io.circe.literal._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import io.circe.literal._
-import ch.datascience.graph.model.EventsGenerators._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -52,9 +53,8 @@ class LatestCommitFinderSpec extends AnyWordSpec with MockFactory with ExternalS
           .willReturn(okJson(commitsJson(from = commitId)))
       }
 
-      latestCommitFinder.findLatestCommitId(projectId, Some(personalAccessToken)).value.unsafeRunSync() shouldBe Some(
-        commitId
-      )
+      latestCommitFinder.findLatestCommitId(projectId, Some(personalAccessToken)).value.unsafeRunSync() shouldBe
+        commitId.some
     }
   }
 

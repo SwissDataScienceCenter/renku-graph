@@ -29,9 +29,9 @@ import ch.datascience.graph.model.events.{CompoundEventId, EventBody, EventId, E
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
-import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog._
 import io.renku.eventlog.events.categories.creation.EventPersister.Result._
+import io.renku.eventlog.events.categories.creation.Generators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -57,11 +57,11 @@ class EventPersisterSpec
         // storeNewEvent 1
         (waitingEventsGauge.increment _).expects(newEvent.project.path).returning(IO.unit)
 
-        persister.storeNewEvent(newEvent).unsafeRunSync() shouldBe Created
+        persister.storeNewEvent(newEvent).unsafeRunSync() shouldBe Created(newEvent)
 
         storedEvent(newEvent.compoundEventId) shouldBe (
           newEvent.compoundEventId,
-          EventStatus.New,
+          New,
           CreatedDate(now),
           ExecutionDate(now),
           newEvent.date,
@@ -77,7 +77,7 @@ class EventPersisterSpec
         val nowForEvent2 = Instant.now()
         currentTime.expects().returning(nowForEvent2)
 
-        persister.storeNewEvent(event2).unsafeRunSync() shouldBe Created
+        persister.storeNewEvent(event2).unsafeRunSync() shouldBe Created(event2)
 
         val save2Event1 +: save2Event2 +: Nil = findEvents(status = New)
         save2Event1 shouldBe (newEvent.compoundEventId, ExecutionDate(now), newEvent.batchDate)
@@ -97,7 +97,7 @@ class EventPersisterSpec
         // storeNewEvent 1
         (waitingEventsGauge.increment _).expects(newEvent.project.path).returning(IO.unit)
 
-        persister.storeNewEvent(newEvent).unsafeRunSync() shouldBe Created
+        persister.storeNewEvent(newEvent).unsafeRunSync() shouldBe a[Created]
 
         findEvents(status = New).head shouldBe (
           newEvent.compoundEventId, ExecutionDate(now), newEvent.batchDate
@@ -110,7 +110,7 @@ class EventPersisterSpec
         val nowForEvent2 = Instant.now()
         currentTime.expects().returning(nowForEvent2)
 
-        persister.storeNewEvent(event2).unsafeRunSync() shouldBe Created
+        persister.storeNewEvent(event2).unsafeRunSync() shouldBe a[Created]
 
         val save2Event1 +: save2Event2 +: Nil = findEvents(status = New)
         save2Event1 shouldBe (newEvent.compoundEventId, ExecutionDate(now), newEvent.batchDate)
@@ -124,7 +124,7 @@ class EventPersisterSpec
         // storing event 1
         (waitingEventsGauge.increment _).expects(event1.project.path).returning(IO.unit)
 
-        persister.storeNewEvent(event1).unsafeRunSync() shouldBe Created
+        persister.storeNewEvent(event1).unsafeRunSync() shouldBe a[Created]
 
         // storing event 2 for the same project but more recent Event Date
         val event2 = newEvents.generateOne.copy(project = event1.project, date = EventDate(now.minus(1, HOURS)))
@@ -132,7 +132,7 @@ class EventPersisterSpec
         val nowForEvent2 = Instant.now()
         currentTime.expects().returning(nowForEvent2)
 
-        persister.storeNewEvent(event2).unsafeRunSync() shouldBe Created
+        persister.storeNewEvent(event2).unsafeRunSync() shouldBe a[Created]
 
         // storing event 3 for the same project but less recent Event Date
         val event3 = newEvents.generateOne.copy(project = event1.project, date = EventDate(now.minus(3, HOURS)))
@@ -140,7 +140,7 @@ class EventPersisterSpec
         val nowForEvent3 = Instant.now()
         currentTime.expects().returning(nowForEvent3)
 
-        persister.storeNewEvent(event3).unsafeRunSync() shouldBe Created
+        persister.storeNewEvent(event3).unsafeRunSync() shouldBe a[Created]
 
         val savedEvent1 +: savedEvent2 +: savedEvent3 +: Nil = findEvents(status = New).noBatchDate
         savedEvent1    shouldBe (event1.compoundEventId, ExecutionDate(now))
@@ -156,7 +156,7 @@ class EventPersisterSpec
         // storing event 1
         (waitingEventsGauge.increment _).expects(event1.project.path).returning(IO.unit)
 
-        persister.storeNewEvent(event1).unsafeRunSync() shouldBe Created
+        persister.storeNewEvent(event1).unsafeRunSync() shouldBe a[Created]
 
         // storing event 2 for the same project but with different project_path and more recent Event Date
         val event2 = newEvents.generateOne.copy(project = event1.project.copy(path = projectPaths.generateOne),
@@ -166,7 +166,7 @@ class EventPersisterSpec
         val nowForEvent2 = Instant.now()
         currentTime.expects().returning(nowForEvent2)
 
-        persister.storeNewEvent(event2).unsafeRunSync() shouldBe Created
+        persister.storeNewEvent(event2).unsafeRunSync() shouldBe a[Created]
 
         val savedEvent1 +: savedEvent2 +: Nil = findEvents(status = New).noBatchDate
         savedEvent1    shouldBe (event1.compoundEventId, ExecutionDate(now))
@@ -181,7 +181,7 @@ class EventPersisterSpec
         // storing event 1
         (waitingEventsGauge.increment _).expects(event1.project.path).returning(IO.unit)
 
-        persister.storeNewEvent(event1).unsafeRunSync() shouldBe Created
+        persister.storeNewEvent(event1).unsafeRunSync() shouldBe a[Created]
 
         // storing event 2 for the same project but with different project_path and less recent Event Date
         val event2 = newEvents.generateOne.copy(project = event1.project.copy(path = projectPaths.generateOne),
@@ -191,7 +191,7 @@ class EventPersisterSpec
         val nowForEvent2 = Instant.now()
         currentTime.expects().returning(nowForEvent2)
 
-        persister.storeNewEvent(event2).unsafeRunSync() shouldBe Created
+        persister.storeNewEvent(event2).unsafeRunSync() shouldBe a[Created]
 
         val savedEvent1 +: savedEvent2 +: Nil = findEvents(status = New).noBatchDate
         savedEvent1    shouldBe (event1.compoundEventId, ExecutionDate(now))
@@ -199,15 +199,37 @@ class EventPersisterSpec
         storedProjects shouldBe List((event1.project.id, event1.project.path, event1.date))
       }
 
+    "create event with the TRIPLES_STORE status if a newer event has the TRIPLES_STORE status already" in new TestCase {
+      val event1 = newEvents.generateOne.copy(date = EventDate(now.minus(2, HOURS)), status = TriplesStore)
+
+      // storing event 1
+      persister.storeNewEvent(event1).unsafeRunSync() shouldBe a[Created]
+
+      // storing event 2 older than event1
+      val event2 = newEvents.generateOne.copy(project = event1.project, date = EventDate(now.minus(3, HOURS)))
+
+      val nowForEvent2 = Instant.now()
+      currentTime.expects().returning(nowForEvent2)
+
+      persister.storeNewEvent(event2).unsafeRunSync() shouldBe a[Created]
+
+      findEvents(status = New) shouldBe Nil
+
+      findEvents(status =
+        TriplesStore
+      ).eventIdsOnly should contain theSameElementsAs event1.compoundEventId :: event2.compoundEventId :: Nil
+
+    }
+
     "add a *skipped* event if there is no event with the given id for the given project " in new TestCase {
       val skippedEvent = skippedEvents.generateOne
 
       // storeNewEvent 1
-      persister.storeNewEvent(skippedEvent).unsafeRunSync() shouldBe Created
+      persister.storeNewEvent(skippedEvent).unsafeRunSync() shouldBe a[Created]
 
       storedEvent(skippedEvent.compoundEventId) shouldBe (
         skippedEvent.compoundEventId,
-        EventStatus.Skipped,
+        Skipped,
         CreatedDate(now),
         ExecutionDate(now),
         skippedEvent.date,
@@ -222,7 +244,7 @@ class EventPersisterSpec
       val nowForEvent2 = Instant.now()
       currentTime.expects().returning(nowForEvent2)
 
-      persister.storeNewEvent(skippedEvent2).unsafeRunSync() shouldBe Created
+      persister.storeNewEvent(skippedEvent2).unsafeRunSync() shouldBe a[Created]
 
       val save2Event1 +: save2Event2 +: Nil = findEvents(status = Skipped)
       save2Event1 shouldBe (skippedEvent.compoundEventId, ExecutionDate(now), skippedEvent.batchDate)
@@ -241,7 +263,7 @@ class EventPersisterSpec
       // Save 1
       (waitingEventsGauge.increment _).expects(newEvent.project.path).returning(IO.unit)
 
-      persister.storeNewEvent(newEvent).unsafeRunSync() shouldBe Created
+      persister.storeNewEvent(newEvent).unsafeRunSync() shouldBe a[Created]
 
       val save1Event1 +: Nil = findEvents(status = New)
       save1Event1 shouldBe (newEvent.compoundEventId, ExecutionDate(now), newEvent.batchDate)
@@ -253,7 +275,7 @@ class EventPersisterSpec
       val nowForEvent2 = Instant.now()
       currentTime.expects().returning(nowForEvent2)
 
-      persister.storeNewEvent(event2).unsafeRunSync() shouldBe Created
+      persister.storeNewEvent(event2).unsafeRunSync() shouldBe a[Created]
 
       val save2Event1 +: save2Event2 +: Nil = findEvents(status = New)
       save2Event1 shouldBe (newEvent.compoundEventId, ExecutionDate(now), newEvent.batchDate)
@@ -265,7 +287,7 @@ class EventPersisterSpec
 
       (waitingEventsGauge.increment _).expects(newEvent.project.path).returning(IO.unit)
 
-      persister.storeNewEvent(newEvent).unsafeRunSync() shouldBe Created
+      persister.storeNewEvent(newEvent).unsafeRunSync() shouldBe a[Created]
 
       storedEvent(newEvent.compoundEventId)._1 shouldBe newEvent.compoundEventId
 
@@ -273,7 +295,7 @@ class EventPersisterSpec
 
       storedEvent(newEvent.compoundEventId) shouldBe (
         newEvent.compoundEventId,
-        EventStatus.New,
+        New,
         CreatedDate(now),
         ExecutionDate(now),
         newEvent.date,

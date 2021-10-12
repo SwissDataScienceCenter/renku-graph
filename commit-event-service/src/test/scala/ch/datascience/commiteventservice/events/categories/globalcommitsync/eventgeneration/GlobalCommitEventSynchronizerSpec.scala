@@ -18,17 +18,18 @@
 
 package ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration
 
+import cats.syntax.all._
+import ch.datascience.commiteventservice.events.categories.common.SynchronizationSummary
 import ch.datascience.commiteventservice.events.categories.common.UpdateResult.{Created, Deleted, Skipped}
 import ch.datascience.commiteventservice.events.categories.globalcommitsync.Generators.globalCommitSyncEventsNonZero
 import ch.datascience.commiteventservice.events.categories.globalcommitsync.categoryName
-import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.GlobalCommitEventSynchronizer.SynchronizationSummary
 import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.ProjectCommitStats.CommitCount
 import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.gitlab.{GitLabCommitFetcher, GitLabCommitStatFetcher}
 import ch.datascience.events.consumers.Project
 import ch.datascience.generators.CommonGraphGenerators.personalAccessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
-import ch.datascience.graph.model.EventsGenerators.{batchDates, commitIds}
+import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Id
@@ -43,7 +44,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.{Failure, Random, Success, Try}
+import scala.util._
 
 class GlobalCommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with MockFactory {
 
@@ -75,7 +76,7 @@ class GlobalCommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers
         (missingCommitEventCreator
           .createMissingCommits(_: Project, _: List[CommitId])(_: Option[AccessToken]))
           .expects(event.project, List(newSkippableCommit), maybeAccessToken)
-          .returning(Success(SynchronizationSummary().updated(Skipped, 1)))
+          .returning(SynchronizationSummary().updated(Skipped, 1).pure[Try])
 
         commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
 
@@ -155,27 +156,33 @@ class GlobalCommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers
       )
     }
 
+    "succeed and delete all Event Log commits if the call for commits stats returns a 404" in new TestCase {
+      val event = globalCommitSyncEventsNonZero.generateOne
+
+      givenAccessTokenIsFound(event.project.id)
+      givenNotCommitStatsExistsInGL404(event.project.id)
+      expectEventsDeletedSuccessfully(event.project, event.commits)
+
+      commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
+
+      logger.loggedOnly(
+        logSummary(event.project, executionTimeRecorder.elapsedTime, deleted = event.commits.length)
+      )
+    }
+
   }
 
   private trait TestCase {
 
-    val logger = TestLogger[Try]()
-
     val maybeAccessToken = personalAccessTokens.generateOption
-    val batchDate        = batchDates.generateOne
 
-    val accessTokenFinder = mock[AccessTokenFinder[Try]]
-
-    val gitLabCommitStatFetcher = mock[GitLabCommitStatFetcher[Try]]
-
-    val gitLabCommitFetcher = mock[GitLabCommitFetcher[Try]]
-
-    val commitEventDeleter = mock[CommitEventDeleter[Try]]
-
+    val accessTokenFinder         = mock[AccessTokenFinder[Try]]
+    val gitLabCommitStatFetcher   = mock[GitLabCommitStatFetcher[Try]]
+    val gitLabCommitFetcher       = mock[GitLabCommitFetcher[Try]]
+    val commitEventDeleter        = mock[CommitEventDeleter[Try]]
     val missingCommitEventCreator = mock[MissingCommitEventCreator[Try]]
-
-    val executionTimeRecorder = TestExecutionTimeRecorder[Try](logger)
-
+    val logger                    = TestLogger[Try]()
+    val executionTimeRecorder     = TestExecutionTimeRecorder[Try](logger)
     val commitEventSynchronizer = new GlobalCommitEventSynchronizerImpl[Try](accessTokenFinder,
                                                                              gitLabCommitStatFetcher,
                                                                              gitLabCommitFetcher,
@@ -194,7 +201,7 @@ class GlobalCommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers
       (gitLabCommitStatFetcher
         .fetchCommitStats(_: projects.Id)(_: Option[AccessToken]))
         .expects(projectId, maybeAccessToken)
-        .returning(Success(ProjectCommitStats(None, 0)))
+        .returning(Success(Some(ProjectCommitStats(None, 0))))
 
       (gitLabCommitFetcher
         .fetchGitLabCommits(_: projects.Id)(_: Option[AccessToken]))
@@ -209,7 +216,13 @@ class GlobalCommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers
       (gitLabCommitStatFetcher
         .fetchCommitStats(_: projects.Id)(_: Option[AccessToken]))
         .expects(projectId, maybeAccessToken)
-        .returning(Success(ProjectCommitStats(Some(commits.head), commits.length)))
+        .returning(Success(Some(ProjectCommitStats(Some(commits.head), commits.length))))
+
+    def givenNotCommitStatsExistsInGL404(projectId: Id) =
+      (gitLabCommitStatFetcher
+        .fetchCommitStats(_: projects.Id)(_: Option[AccessToken]))
+        .expects(projectId, maybeAccessToken)
+        .returning(Success(None))
 
     def givenCommitsInGL(projectId: Id, commits: List[CommitId]) =
       (gitLabCommitFetcher

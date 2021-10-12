@@ -18,7 +18,7 @@
 
 package ch.datascience.metrics
 
-import cats.MonadError
+import cats.{MonadError, MonadThrow}
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
@@ -34,66 +34,68 @@ trait Gauge[Interpretation[_]] {
 }
 
 trait SingleValueGauge[Interpretation[_]] extends Gauge[Interpretation] {
-
   def set(value: Double): Interpretation[Unit]
 }
 
 trait LabeledGauge[Interpretation[_], LabelValue] extends Gauge[Interpretation] {
   def set(labelValue:       (LabelValue, Double)): Interpretation[Unit]
+  def update(labelValue:    (LabelValue, Double)): Interpretation[Unit]
   def increment(labelValue: LabelValue):           Interpretation[Unit]
-
-  def decrement(labelValue: LabelValue): Interpretation[Unit]
-
+  def decrement(labelValue: LabelValue):           Interpretation[Unit]
   def reset(): Interpretation[Unit]
 }
 
-class SingleValueGaugeImpl[Interpretation[_]] private[metrics] (
-    protected val gauge: LibGauge
-)(implicit ME:           MonadError[Interpretation, Throwable])
+class SingleValueGaugeImpl[Interpretation[_]: MonadThrow] private[metrics] (protected val gauge: LibGauge)
     extends SingleValueGauge[Interpretation] {
 
-  override def set(value: Double): Interpretation[Unit] = ME.catchNonFatal {
+  override def set(value: Double): Interpretation[Unit] = MonadError[Interpretation, Throwable].catchNonFatal {
     gauge.set(value)
   }
 }
 
-class LabeledGaugeImpl[Interpretation[_], LabelValue] private[metrics] (
+class LabeledGaugeImpl[Interpretation[_]: MonadThrow, LabelValue] private[metrics] (
     protected val gauge: LibGauge,
     resetDataFetch:      () => Interpretation[Map[LabelValue, Double]]
-)(implicit ME:           MonadError[Interpretation, Throwable])
-    extends LabeledGauge[Interpretation, LabelValue] {
+) extends LabeledGauge[Interpretation, LabelValue] {
 
-  override def set(labelValueAndValue: (LabelValue, Double)): Interpretation[Unit] = ME.catchNonFatal {
-    val (labelValue, value) = labelValueAndValue
-    gauge.labels(labelValue.toString).set(value)
-  }
+  override def set(labelValueAndValue: (LabelValue, Double)): Interpretation[Unit] =
+    MonadError[Interpretation, Throwable].catchNonFatal {
+      val (labelValue, value) = labelValueAndValue
+      gauge.labels(labelValue.toString).set(value)
+    }
 
-  def increment(labelValue: LabelValue): Interpretation[Unit] = ME.catchNonFatal {
-    gauge.labels(labelValue.toString).inc()
-  }
+  override def update(labelValueAndValue: (LabelValue, Double)): Interpretation[Unit] =
+    MonadError[Interpretation, Throwable].catchNonFatal {
+      val (labelValue, value) = labelValueAndValue
+      val child               = gauge.labels(labelValue.toString)
+      child.set(child.get() + value)
+    }
 
-  def decrement(labelValue: LabelValue): Interpretation[Unit] = ME.catchNonFatal {
-    if (gauge.labels(labelValue.toString).get() != 0)
-      gauge.labels(labelValue.toString).dec()
-    else ()
-  }
+  override def increment(labelValue: LabelValue): Interpretation[Unit] =
+    MonadError[Interpretation, Throwable].catchNonFatal {
+      gauge.labels(labelValue.toString).inc()
+    }
 
-  def reset(): Interpretation[Unit] =
-    for {
-      newValues <- resetDataFetch()
-      _         <- ME.catchNonFatal(gauge.clear())
-      _         <- ME.catchNonFatal(newValues foreach set)
-    } yield ()
+  override def decrement(labelValue: LabelValue): Interpretation[Unit] =
+    MonadError[Interpretation, Throwable].catchNonFatal {
+      if (gauge.labels(labelValue.toString).get() != 0)
+        gauge.labels(labelValue.toString).dec()
+      else ()
+    }
+
+  override def reset(): Interpretation[Unit] = for {
+    newValues <- resetDataFetch()
+    _         <- MonadError[Interpretation, Throwable].catchNonFatal(gauge.clear())
+    _         <- MonadError[Interpretation, Throwable].catchNonFatal(newValues foreach set)
+  } yield ()
 }
 
 object Gauge {
 
-  def apply[Interpretation[_]](
-      name: String Refined NonEmpty,
-      help: String Refined NonEmpty
-  )(
-      metricsRegistry: MetricsRegistry[Interpretation]
-  )(implicit ME:       MonadError[Interpretation, Throwable]): Interpretation[SingleValueGauge[Interpretation]] = {
+  def apply[Interpretation[_]: MonadThrow](
+      name:          String Refined NonEmpty,
+      help:          String Refined NonEmpty
+  )(metricsRegistry: MetricsRegistry[Interpretation]): Interpretation[SingleValueGauge[Interpretation]] = {
 
     val gaugeBuilder = LibGauge
       .build()
@@ -105,23 +107,19 @@ object Gauge {
     } yield new SingleValueGaugeImpl[Interpretation](gauge)
   }
 
-  def apply[Interpretation[_], LabelValue](
-      name:      String Refined NonEmpty,
-      help:      String Refined NonEmpty,
-      labelName: String Refined NonEmpty
-  )(
-      metricsRegistry: MetricsRegistry[Interpretation]
-  )(implicit ME:       MonadError[Interpretation, Throwable]): Interpretation[LabeledGauge[Interpretation, LabelValue]] =
+  def apply[Interpretation[_]: MonadThrow, LabelValue](
+      name:          String Refined NonEmpty,
+      help:          String Refined NonEmpty,
+      labelName:     String Refined NonEmpty
+  )(metricsRegistry: MetricsRegistry[Interpretation]): Interpretation[LabeledGauge[Interpretation, LabelValue]] =
     this(name, help, labelName, () => Map.empty[LabelValue, Double].pure[Interpretation])(metricsRegistry)
 
-  def apply[Interpretation[_], LabelValue](
+  def apply[Interpretation[_]: MonadThrow, LabelValue](
       name:           String Refined NonEmpty,
       help:           String Refined NonEmpty,
       labelName:      String Refined NonEmpty,
       resetDataFetch: () => Interpretation[Map[LabelValue, Double]]
-  )(
-      metricsRegistry: MetricsRegistry[Interpretation]
-  )(implicit ME:       MonadError[Interpretation, Throwable]): Interpretation[LabeledGauge[Interpretation, LabelValue]] = {
+  )(metricsRegistry:  MetricsRegistry[Interpretation]): Interpretation[LabeledGauge[Interpretation, LabelValue]] = {
 
     val gaugeBuilder = LibGauge
       .build()

@@ -55,17 +55,16 @@ private class ZombieStatusCleanerImpl[Interpretation[_]: BracketThrow](
     case TransformingTriplesZombieEvent(eventId, _) => updateStatusQuery(eventId, TransformingTriples, TriplesGenerated)
   }
 
-  private def cleanEventualDeliveries(eventId: CompoundEventId) =
-    measureExecutionTime {
-      SqlStatement(name = "zombie_chasing - clean deliveries")
-        .command[EventId ~ projects.Id](
-          sql"""DELETE FROM event_delivery
+  private def cleanEventualDeliveries(eventId: CompoundEventId) = measureExecutionTime {
+    SqlStatement(name = "zombie_chasing - clean deliveries")
+      .command[EventId ~ projects.Id](
+        sql"""DELETE FROM event_delivery
                 WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
             """.command
-        )
-        .arguments(eventId.id ~ eventId.projectId)
-        .build
-    }
+      )
+      .arguments(eventId.id ~ eventId.projectId)
+      .build
+  }
 
   private def updateStatusQuery(
       eventId:   CompoundEventId,

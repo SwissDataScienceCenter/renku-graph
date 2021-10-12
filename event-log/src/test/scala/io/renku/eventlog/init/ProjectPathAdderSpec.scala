@@ -30,13 +30,15 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
 import io.circe.literal._
 import io.renku.eventlog.EventContentGenerators._
-import io.renku.eventlog.{CreatedDate, Event, EventDate, ExecutionDate}
+import io.renku.eventlog.init.Generators.events
+import io.renku.eventlog.init.model.Event
+import io.renku.eventlog.{CreatedDate, EventDate, ExecutionDate}
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk._
-import skunk.implicits._
 import skunk.codec.all._
+import skunk.implicits._
 
 class ProjectPathAdderSpec
     extends AnyWordSpec
@@ -81,9 +83,9 @@ class ProjectPathAdderSpec
 
       checkColumnExists shouldBe false
 
-      val event1 = newOrSkippedEvents.generateOne
+      val event1 = events.generateOne
       storeEvent(event1)
-      val event2 = newOrSkippedEvents.generateOne
+      val event2 = events.generateOne
       storeEvent(event2)
 
       projectPathAdder.run().unsafeRunSync() shouldBe ((): Unit)

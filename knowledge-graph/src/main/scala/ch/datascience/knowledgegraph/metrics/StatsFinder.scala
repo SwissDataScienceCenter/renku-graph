@@ -18,8 +18,7 @@
 
 package ch.datascience.knowledgegraph.metrics
 
-import cats.MonadError
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
@@ -31,70 +30,54 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-trait StatsFinder[Interpretation[_]] {
-  def entitiesCount(): Interpretation[Map[EntityType, EntitiesCount]]
+private trait StatsFinder[Interpretation[_]] {
+  def entitiesCount(): Interpretation[Map[EntityLabel, Count]]
 }
 
-class StatsFinderImpl(
-    rdfStoreConfig: RdfStoreConfig,
-    logger:         Logger[IO],
-    timeRecorder:   SparqlQueryTimeRecorder[IO]
-)(implicit
-    executionContext: ExecutionContext,
-    contextShift:     ContextShift[IO],
-    timer:            Timer[IO],
-    ME:               MonadError[IO, Throwable]
-) extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
-    with StatsFinder[IO] {
+private class StatsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer](
+    rdfStoreConfig:          RdfStoreConfig,
+    logger:                  Logger[Interpretation],
+    timeRecorder:            SparqlQueryTimeRecorder[Interpretation]
+)(implicit executionContext: ExecutionContext)
+    extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
+    with StatsFinder[Interpretation] {
 
   import EntityCount._
-  import ch.datascience.graph.Schemas._
+  import ch.datascience.graph.model.Schemas._
 
-  override def entitiesCount(): IO[Map[EntityType, EntitiesCount]] =
-    queryExpecting[List[(EntityType, EntitiesCount)]](using = query) map (_.toMap)
+  override def entitiesCount(): Interpretation[Map[EntityLabel, Count]] =
+    queryExpecting[List[(EntityLabel, Count)]](using = query) map (_.toMap)
 
   private lazy val query = SparqlQuery.of(
     name = "entities - counts",
-    Prefixes.of(
-      rdf    -> "rdf",
-      prov   -> "prov",
-      schema -> "schema",
-      wfprov -> "wfprov",
-      renku  -> "renku"
-    ),
+    Prefixes.of(prov -> "prov", schema -> "schema", renku -> "renku"),
     s"""|SELECT ?type ?count
         |WHERE {
         |  {
         |    SELECT (schema:Dataset AS ?type) (COUNT(DISTINCT ?id) AS ?count)
-        |    WHERE { ?id rdf:type schema:Dataset }
+        |    WHERE { ?id a schema:Dataset }
         |  } UNION {
         |    SELECT (schema:Project AS ?type) (COUNT(DISTINCT ?id) AS ?count)
-        |    WHERE { ?id rdf:type schema:Project }
+        |    WHERE { ?id a schema:Project }
         |  } UNION {
         |    SELECT (prov:Activity AS ?type) (COUNT(DISTINCT ?id) AS ?count)
-        |    WHERE { ?id rdf:type prov:Activity }
+        |    WHERE { ?id a prov:Activity }
         |  } UNION {
-        |    SELECT (wfprov:ProcessRun AS ?type) (COUNT(DISTINCT ?id) AS ?count)
-        |    WHERE { ?id rdf:type wfprov:ProcessRun }
-        |  } UNION {
-        |    SELECT (wfprov:WorkflowRun AS ?type) (COUNT(DISTINCT ?id) AS ?count)
-        |    WHERE { ?id rdf:type wfprov:WorkflowRun }
-        |  } UNION {
-        |    SELECT (renku:Run AS ?type) (COUNT(DISTINCT ?id) AS ?count)
-        |    WHERE { ?id rdf:type renku:Run }
+        |    SELECT (prov:Plan AS ?type) (COUNT(DISTINCT ?id) AS ?count)
+        |    WHERE { ?id a prov:Plan }
         |  } UNION {
         |    SELECT (schema:Person AS ?type) (COUNT(DISTINCT ?id) AS ?count)
         |    WHERE { 
-        |      ?activityId rdf:type prov:Activity;
+        |      ?activityId a prov:Activity;
         |                  prov:wasAssociatedWith ?id.
-        |      ?id rdf:type schema:Person.
+        |      ?id a schema:Person.
         |    }
         |  } UNION {
         |    SELECT (CONCAT(STR(schema:Person), ' with GitLabId') AS ?type) (COUNT(DISTINCT ?id) AS ?count)
         |    WHERE { 
-        |      ?activityId rdf:type prov:Activity;
+        |      ?activityId a prov:Activity;
         |                  prov:wasAssociatedWith ?id.
-        |      ?id rdf:type schema:Person;
+        |      ?id a schema:Person;
         |          schema:sameAs/schema:additionalType 'GitLab'.
         |    }
         |  }
@@ -105,16 +88,16 @@ class StatsFinderImpl(
 
 private object EntityCount {
 
-  private[metrics] implicit val countsDecoder: Decoder[List[(EntityType, EntitiesCount)]] = {
-    val counts: Decoder[(EntityType, EntitiesCount)] = { cursor =>
+  private[metrics] implicit val countsDecoder: Decoder[List[(EntityLabel, Count)]] = {
+    val counts: Decoder[(EntityLabel, Count)] = { cursor =>
       for {
         entityType <- cursor
                         .downField("type")
                         .downField("value")
                         .as[String]
-                        .flatMap(convert[String, EntityType](EntityType))
+                        .flatMap(convert[String, EntityLabel](EntityLabel))
         count <-
-          cursor.downField("count").downField("value").as[Long].flatMap(convert[Long, EntitiesCount](EntitiesCount))
+          cursor.downField("count").downField("value").as[Long].flatMap(convert[Long, Count](Count))
       } yield (entityType, count)
     }
 
@@ -132,7 +115,7 @@ private object EntityCount {
         .leftMap(exception => DecodingFailure(exception.getMessage, Nil))
 }
 
-object IOStatsFinder {
+private object StatsFinder {
   def apply(
       timeRecorder:   SparqlQueryTimeRecorder[IO],
       logger:         Logger[IO],
@@ -140,10 +123,8 @@ object IOStatsFinder {
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
-      timer:            Timer[IO],
-      ME:               MonadError[IO, Throwable]
-  ): IO[StatsFinder[IO]] =
-    for {
-      config <- rdfStoreConfig
-    } yield new StatsFinderImpl(config, logger, timeRecorder)
+      timer:            Timer[IO]
+  ): IO[StatsFinder[IO]] = for {
+    config <- rdfStoreConfig
+  } yield new StatsFinderImpl(config, logger, timeRecorder)
 }

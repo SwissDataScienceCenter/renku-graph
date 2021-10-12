@@ -22,20 +22,15 @@ import ch.datascience.events.consumers.ConsumersModelGenerators._
 import ch.datascience.generators.Generators.nonEmptyStrings
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.events.EventId
-import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent.{CommitEventWithParent, CommitEventWithoutParent}
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import org.scalacheck.Gen
 
 private object EventProcessingGenerators {
 
   implicit val commitEvents: Gen[CommitEvent] = for {
-    commitId      <- commitIds
-    project       <- projectsGen
-    maybeParentId <- Gen.option(commitIds)
-  } yield maybeParentId match {
-    case None           => CommitEventWithoutParent(EventId(commitId.value), project, commitId)
-    case Some(parentId) => CommitEventWithParent(EventId(commitId.value), project, commitId, parentId)
-  }
+    commitId <- commitIds
+    project  <- projectsGen
+  } yield CommitEvent(EventId(commitId.value), project, commitId)
 
   lazy val generationRecoverableErrors: Gen[GenerationRecoverableError] = for {
     message <- nonEmptyStrings()

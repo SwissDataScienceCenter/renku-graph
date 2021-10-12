@@ -54,7 +54,6 @@ private class EventDetailsFinderImpl[Interpretation[_]: BracketThrow](
       )
       .arguments(eventId.id ~ eventId.projectId)
       .build(_.option)
-
 }
 
 private object EventDetailsFinder {

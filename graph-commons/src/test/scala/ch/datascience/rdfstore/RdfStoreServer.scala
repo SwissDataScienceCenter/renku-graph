@@ -18,8 +18,6 @@
 
 package ch.datascience.rdfstore
 
-import java.net.BindException
-
 import cats.effect._
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
@@ -28,15 +26,18 @@ import eu.timepit.refined.numeric.Positive
 import org.apache.jena.fuseki.FusekiException
 import org.apache.jena.fuseki.main.FusekiServer
 
+import java.net.BindException
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
 object RdfStoreServer extends IOApp {
 
-  override def run(args: List[String]): IO[ExitCode] =
-    for {
-      _ <- new RdfStoreServer(3030, DatasetName("renku"), muteLogging = false).start
-    } yield ExitCode.Success
+  val datasetName: DatasetName          = DatasetName("renku")
+  val fusekiPort:  Int Refined Positive = 3030
+
+  override def run(args: List[String]): IO[ExitCode] = for {
+    _ <- new RdfStoreServer(fusekiPort, datasetName, muteLogging = false).start
+  } yield ExitCode.Success
 }
 
 class RdfStoreServer(
@@ -59,19 +60,20 @@ class RdfStoreServer(
   }
 
   private lazy val dataset = {
-    import java.nio.file.Files
-
+    import ch.datascience.graph.model.Schemas._
     import org.apache.jena.graph.NodeFactory
     import org.apache.jena.query.DatasetFactory
     import org.apache.jena.query.text.{EntityDefinition, TextDatasetFactory, TextIndexConfig}
     import org.apache.lucene.store.MMapDirectory
 
+    import java.nio.file.Files
+
     val entityDefinition: EntityDefinition = {
       val definition = new EntityDefinition("uri", "name")
-      definition.setPrimaryPredicate(NodeFactory.createURI("http://schema.org/name"))
-      definition.set("description", NodeFactory.createURI("http://schema.org/description"))
-      definition.set("alternateName", NodeFactory.createURI("http://schema.org/alternateName"))
-      definition.set("keywords", NodeFactory.createURI("http://schema.org/keywords"))
+      definition.setPrimaryPredicate(NodeFactory.createURI((schema / "name").show))
+      definition.set("description", NodeFactory.createURI((schema / "description").show))
+      definition.set("slug", NodeFactory.createURI((renku / "slug").show))
+      definition.set("keywords", NodeFactory.createURI((schema / "keywords").show))
       definition
     }
 

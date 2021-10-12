@@ -20,14 +20,16 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 
 import cats.effect.IO
 import cats.syntax.all._
+import ch.datascience.events
+import ch.datascience.events.EventRequestContent
 import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
-import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventRequestContent, Project}
+import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, Project}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
+import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
@@ -47,9 +49,9 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
       "schedule triples generation " +
       s"and return $Accepted if event processor accepted the event" in new TestCase {
 
-        val triplesGeneratedEvent = eventBody.toTriplesGeneratedEvent
-        (eventBodyDeserializer.toTriplesGeneratedEvent _)
-          .expects(eventId, project, schemaVersion, eventBody)
+        val triplesGeneratedEvent = triplesGeneratedEvents.generateOne
+        (eventBodyDeserializer.toEvent _)
+          .expects(eventId, project, eventBody -> schemaVersion)
           .returning(triplesGeneratedEvent.pure[IO])
 
         (eventProcessor.process _)
@@ -59,9 +61,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
         val requestContent: EventRequestContent =
           requestContent((eventId, project).asJson(eventEncoder), bodyContent.some)
 
-        handler.createHandlingProcess(requestContent).unsafeRunSyncProcess() shouldBe Right(
-          Accepted
-        )
+        handler.createHandlingProcess(requestContent).unsafeRunSyncProcess() shouldBe Right(Accepted)
 
         logger.loggedOnly(
           Info(
@@ -75,9 +75,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
       val requestContent: EventRequestContent =
         requestContent((eventId, project).asJson(eventEncoder), None)
 
-      handler.createHandlingProcess(requestContent).unsafeRunSyncProcess() shouldBe Left(
-        BadRequest
-      )
+      handler.createHandlingProcess(requestContent).unsafeRunSyncProcess() shouldBe Left(BadRequest)
 
       logger.expectNoLogs()
     }
@@ -96,9 +94,9 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
     s"return $Accepted when event processor fails processing the event" in new TestCase {
 
-      val triplesGeneratedEvent = eventBody.toTriplesGeneratedEvent
-      (eventBodyDeserializer.toTriplesGeneratedEvent _)
-        .expects(eventId, project, schemaVersion, eventBody)
+      val triplesGeneratedEvent = triplesGeneratedEvents.generateOne
+      (eventBodyDeserializer.toEvent _)
+        .expects(eventId, project, eventBody -> schemaVersion)
         .returning(triplesGeneratedEvent.pure[IO])
 
       (eventProcessor.process _)
@@ -148,7 +146,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
       )
 
     def requestContent(event: Json, maybePayload: Option[String]): EventRequestContent =
-      EventRequestContent(event, maybePayload)
+      events.EventRequestContent(event, maybePayload)
   }
 
   private implicit lazy val eventEncoder: Encoder[(CompoundEventId, Project)] =
@@ -163,14 +161,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
       }"""
     }
 
-  private implicit class EventBodyOps(eventBody: EventBody) {
-    lazy val toTriplesGeneratedEvent: TriplesGeneratedEvent =
-      triplesGeneratedEvents.generateOne
-  }
-
   private implicit class EventHandlingProcessOps(handlingProcess: IO[EventHandlingProcess[IO]]) {
-    def unsafeRunSyncProcess() =
-      handlingProcess.unsafeRunSync().process.value.unsafeRunSync()
+    def unsafeRunSyncProcess() = handlingProcess.unsafeRunSync().process.value.unsafeRunSync()
   }
-
 }

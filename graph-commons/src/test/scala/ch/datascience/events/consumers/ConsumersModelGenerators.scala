@@ -18,6 +18,7 @@
 
 package ch.datascience.events.consumers
 
+import ch.datascience.events.EventRequestContent
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{jsons, nonEmptyStrings}
 import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}

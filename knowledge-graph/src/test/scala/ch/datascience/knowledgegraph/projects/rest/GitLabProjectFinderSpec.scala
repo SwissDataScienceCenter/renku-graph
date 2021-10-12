@@ -18,18 +18,18 @@
 
 package ch.datascience.knowledgegraph.projects.rest
 
+import ProjectsGenerators._
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators.{oauthAccessTokens, personalAccessTokens}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.blankStrings
-import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model
+import ch.datascience.graph.model.GitLabUrl
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.knowledgegraph.projects.model.Permissions
 import ch.datascience.knowledgegraph.projects.model.Permissions._
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
@@ -144,7 +144,9 @@ class GitLabProjectFinderSpec
 
       intercept[Exception] {
         projectFinder.findProject(path, None).value.unsafeRunSync()
-      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/${urlEncode(path.toString)}?statistics=true returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      }.getMessage should startWith(
+        s"GET $gitLabUrl/api/v4/projects/${urlEncode(path.toString)}?statistics=true returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      )
     }
   }
 
@@ -153,7 +155,7 @@ class GitLabProjectFinderSpec
 
   private trait TestCase {
     val gitLabUrl     = GitLabUrl(externalServiceBaseUrl)
-    val projectFinder = new IOGitLabProjectFinder(gitLabUrl, Throttler.noThrottling, TestLogger())
+    val projectFinder = new GitLabProjectFinderImpl[IO](gitLabUrl, Throttler.noThrottling, TestLogger())
   }
 
   private def projectJson(project: GitLabProject): Json = json"""{

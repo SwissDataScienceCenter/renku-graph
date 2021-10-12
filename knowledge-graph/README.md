@@ -63,14 +63,14 @@ Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&
 Response body example:
 
 ```
-[  
+[
    {  
       "identifier": "9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c",
       "title":"rmDaYfpehl",
       "name": "mniouUnmal",
       "description": "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
       "published": {
-        "datePublished": "2012-10-14T03:02:25.639Z", // optional property
+        "datePublished": "2012-10-14", // optional property
         "creator": [
           {
             "name": "e wmtnxmcguz"
@@ -84,7 +84,17 @@ Response body example:
       "date": "2012-10-14T03:02:25.639Z",            // either datePublished or dateCreated
       "projectsCount": 2,
       "keywords": ["grüezi", "안녕", "잘 지내?"],
-      "images": ["image.png"],
+      "images": [
+        {
+          "location": "image.png",
+          "_links":[  
+             {  
+                "rel":  "view",
+                "href": "https://renkulab.io/gitlab/project_path/raw/master/data/mniouUnmal/image.png"
+             }
+          ]
+        }
+      ],
       "_links":[  
          {  
             "rel":"details",
@@ -105,7 +115,17 @@ Response body example:
       "date": "2012-11-15T10:00:00.000Z",            // either datePublished or dateCreated
       "projectsCount": 1,
       "keywords": [],
-      "images": ["https://blah.com/image.png"],
+      "images": [
+        {
+          "location": "https://blah.com/image.png",
+          "_links":[  
+             {  
+                "rel":  "view",
+                "href": "https://blah.com/image.png"
+             }
+          ]
+        }
+      ],
       "_links":[  
          {  
             "rel":"details",
@@ -148,12 +168,12 @@ Response body example:
   },
   "title" : "dataset title",
   "name" : "dataset alternate name",
-  "url" : "http://host/url1",  // optional property
+  "url" : "http://host/url1",                     // optional property
   "sameAs" : "http://host/url2",                  // optional property when no "derivedFrom" exists
   "derivedFrom" : "http://host/url1",             // optional property when no "sameAs" exists
   "description" : "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
   "published" : {
-    "datePublished" : "2012-10-14T03:02:25.639Z", // optional property
+    "datePublished" : "2012-10-14",               // optional property
     "creator" : [
       {
         "name" : "e wmtnxmcguz"
@@ -168,11 +188,9 @@ Response body example:
   "created" : "2012-10-15T03:02:25.639Z",         // optional property
   "hasPart" : [
     {
-      "name" : "o",
       "atLocation" : "data/dataset-name/file1"
     },
     {
-      "name" : "rldzpwo",
       "atLocation" : "data/dataset-name/file2"
     }
   ],
@@ -184,16 +202,9 @@ Response body example:
       }
     ],
     "path" : "namespace1/project1-name",
-    "name" : "project1 name",
-    "created" : {
-      "dateCreated" : "1970-05-12T06:06:41.448Z",
-      "agent" : {
-        "email" : "n@ulQdsXl",                  // optional property
-        "name" : "v imzn"
-      }
-    }
+    "name" : "project1 name"
   },
-  "usedIn" : [
+  "isPartOf" : [
     {
       "_links" : [
         {
@@ -202,14 +213,7 @@ Response body example:
         }
       ],
       "path" : "namespace1/project1-name",
-      "name" : "project1 name",
-      "created" : {
-        "dateCreated" : "1970-05-12T06:06:41.448Z",
-        "agent" : {
-          "email" : "n@ulQdsXl",                  // optional property
-          "name" : "v imzn"
-        }
-      }
+      "name" : "project1 name"
     },
     {
       "_links" : [
@@ -219,14 +223,29 @@ Response body example:
         }
       ],
       "path" : "namespace2/project2-name",
-      "name" : "project2 name",
-      "created" : {
-        "dateCreated" : "1970-06-12T06:06:41.448Z",
-        "agent" : {
-          "email" : "name@ulQdsXl",               // optional property
-          "name" : "v imzn"
+      "name" : "project2 name"
+    }
+  ],
+  "usedIn" : [
+    {
+      "_links" : [
+        {
+          "rel" : "project-details",
+          "href" : "https://zemdgsw:9540/projects/namespace1/project1-name"
         }
-      }
+      ],
+      "path" : "namespace1/project1-name",
+      "name" : "project1 name"
+    },
+    {
+      "_links" : [
+        {
+          "rel" : "project-details",
+          "href" : "https://zemdgsw:9540/projects/namespace2/project2-name"
+        }
+      ],
+      "path" : "namespace2/project2-name",
+      "name" : "project2 name"
     }
   ],
   "keywords": [
@@ -234,9 +253,25 @@ Response body example:
     "gfioui"
   ],
   "images": [
-    "https://renku.io/dataset1/23423423.jpg",
-    "image.png"
-  ]
+    {
+      "location": "image.png",
+      "_links":[  
+         {  
+            "rel":  "view",
+            "href": "https://renkulab.io/gitlab/project_path/raw/master/data/mniouUnmal/image.png"
+         }
+      ]
+    },
+    {
+      "location": "http://host/external-image.png",
+      "_links":[  
+         {  
+            "rel":  "view",
+            "href": "http://host/external-image.png"
+         }
+      ]
+    }
+  ],
 }
 ```
 
@@ -449,9 +484,28 @@ Response body example:
         "initial": "22222222-2222-2222-2222-222222222222"
       },
       "name": "a",
-      "sameAs" : "http://host/url2",                  // optional property when no "derivedFrom" exists
-      "derivedFrom" : "http://host/url2",             // optional property when no "sameAs" exists
-      "images": ["image.png"],
+      "sameAs" : "http://host/url2",        // optional property when no "derivedFrom" exists
+      "derivedFrom" : "http://host/url2",   // optional property when no "sameAs" exists
+      "images": [
+        {
+          "location": "image.png",
+          "_links":[  
+             {  
+                "rel":  "view",
+                "href": "https://renkulab.io/gitlab/project_path/raw/master/data/mniouUnmal/image.png"
+             }
+          ]
+        },
+        {
+          "location": "http://host/external-image.png",
+          "_links":[  
+             {  
+                "rel":  "view",
+                "href": "http://host/external-image.png"
+             }
+          ]
+        }
+      ],
       "_links": [  
          {  
             "rel": "details",

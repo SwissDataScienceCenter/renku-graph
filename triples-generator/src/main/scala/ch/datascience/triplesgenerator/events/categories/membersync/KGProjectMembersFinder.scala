@@ -19,14 +19,14 @@
 package ch.datascience.triplesgenerator.events.categories.membersync
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.graph.Schemas.{rdf, schema}
-import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.{projects, users}
+import ch.datascience.graph.config.RenkuBaseUrlLoader
+import ch.datascience.graph.model.Schemas.{rdf, schema}
 import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.graph.model.users.GitLabId
 import ch.datascience.graph.model.views.RdfResource
+import ch.datascience.graph.model.{RenkuBaseUrl, projects, users}
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
-import ch.datascience.rdfstore.{RdfStoreClientImpl, RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
+import ch.datascience.rdfstore._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -70,7 +70,7 @@ private class KGProjectMembersFinderImpl(
     Prefixes.of(schema -> "schema", rdf -> "rdf"),
     s"""|SELECT DISTINCT ?memberId ?gitLabId
         |WHERE {
-        |  ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]} rdf:type      <http://schema.org/Project>;
+        |  ${ResourceId(path)(renkuBaseUrl).showAs[RdfResource]} rdf:type      <http://schema.org/Project>;
         |                                                        schema:member ?memberId.                                                     
         |  ?sameAsId  schema:additionalType  'GitLab';
         |             schema:identifier      ?gitLabId ;
@@ -88,8 +88,7 @@ private object KGProjectMembersFinder {
       timer:            Timer[IO]
   ): IO[KGProjectMembersFinder[IO]] = for {
     rdfStoreConfig <- RdfStoreConfig[IO]()
-    renkuBaseUrl   <- RenkuBaseUrl[IO]()
-
+    renkuBaseUrl   <- RenkuBaseUrlLoader[IO]()
   } yield new KGProjectMembersFinderImpl(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
 }
 

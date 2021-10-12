@@ -31,7 +31,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.circe.{Decoder, HCursor, Json}
-import io.renku.jsonld.JsonLD
+import io.renku.jsonld.{JsonLD, JsonLDEncoder}
 import org.apache.jena.rdf.model.ModelFactory
 import org.apache.jena.rdfconnection.{RDFConnection, RDFConnectionFuseki}
 import org.apache.jena.riot.{Lang, RDFDataMgr}
@@ -156,6 +156,10 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
         }
       }
       .unsafeRunSync()
+
+  protected def loadToStore[T](objects: T*)(implicit encoder: JsonLDEncoder[T]): Unit = loadToStore(
+    objects.map(encoder.apply): _*
+  )
 
   private lazy val logger = TestLogger[IO]()
   private lazy val queryRunner = new RdfStoreClientImpl(

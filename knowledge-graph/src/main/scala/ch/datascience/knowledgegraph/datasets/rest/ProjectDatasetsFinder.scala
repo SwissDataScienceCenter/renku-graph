@@ -19,11 +19,12 @@
 package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ConcurrentEffect, IO, Timer}
-import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.model.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.{DerivedFrom, Identifier, ImageUri, InitialVersion, Name, SameAs, Title}
 import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.graph.model.views.RdfResource
-import ch.datascience.knowledgegraph.datasets.rest.ProjectDatasetsFinder._
+import ch.datascience.knowledgegraph.datasets.rest.ProjectDatasetsFinder.{ProjectDataset, SameAsOrDerived}
+import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
 import org.typelevel.log4cats.Logger
 
@@ -56,51 +57,37 @@ private class ProjectDatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Tim
     with ProjectDatasetsFinder[Interpretation] {
 
   import ProjectDatasetsFinderImpl._
+  import ch.datascience.graph.model.Schemas._
   import eu.timepit.refined.auto._
 
   def findProjectDatasets(projectPath: Path): Interpretation[List[ProjectDataset]] =
     queryExpecting[List[ProjectDataset]](using = query(projectPath))
 
-  private def query(path: Path) = SparqlQuery(
+  private def query(path: Path) = SparqlQuery.of(
     name = "ds projects",
-    Set(
-      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-      "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>",
-      "PREFIX schema: <http://schema.org/>",
-      "PREFIX prov: <http://www.w3.org/ns/prov#>"
-    ),
-    s"""|SELECT ?identifier ?name ?alternateName ?topmostSameAs ?maybeDerivedFrom ?initialVersion (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
+    Prefixes.of(renku -> "renku", schema -> "schema", prov -> "prov"),
+    s"""|SELECT ?identifier ?name ?slug ?topmostSameAs ?maybeDerivedFrom ?initialVersion (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
         |WHERE {
-        |    ?datasetId rdf:type <http://schema.org/Dataset>;
-        |               schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
+        |    ${ResourceId(path)(renkuBaseUrl).showAs[RdfResource]} a schema:Project;
+        |                                                          renku:hasDataset ?datasetId.
+        |    ?datasetId a schema:Dataset;
         |               schema:identifier ?identifier;
         |               schema:name ?name;
-        |               prov:atLocation ?location;
-        |               schema:alternateName  ?alternateName;
+        |               renku:slug ?slug;
         |               renku:topmostSameAs ?topmostSameAs;
         |               renku:topmostDerivedFrom/schema:identifier ?initialVersion.
         |    OPTIONAL { ?datasetId prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }.
         |    FILTER NOT EXISTS { ?otherDsId prov:wasDerivedFrom/schema:url ?datasetId }
-        |    BIND(CONCAT(?location, "/metadata.yml") AS ?metaDataLocation).
-        |    
-        |    FILTER NOT EXISTS { 
-        |      # Removing dataset that have an activity that invalidates them
-        |      ?deprecationEntity rdf:type <http://www.w3.org/ns/prov#Entity>;
-        |                         prov:atLocation ?metaDataLocation ;
-        |                         schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
-        |                         prov:wasInvalidatedBy ?invalidationActivity .	
-        |    }
+        |    FILTER NOT EXISTS { ?datasetId prov:invalidatedAtTime ?invalidationTime. }
         |    OPTIONAL { 
-        |      ?imageId     schema:position ?imagePosition ;
-        |                   schema:contentUrl ?imageUrl ;
-        |                   ^schema:image ?datasetId .
+        |      ?imageId schema:position ?imagePosition ;
+        |               schema:contentUrl ?imageUrl ;
+        |               ^schema:image ?datasetId .
         |      BIND(CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
         |    }
         |}
-        |
-        |GROUP BY ?identifier ?name ?alternateName ?topmostSameAs ?maybeDerivedFrom ?initialVersion 
+        |GROUP BY ?identifier ?name ?slug ?topmostSameAs ?maybeDerivedFrom ?initialVersion 
         |ORDER BY ?name
-        |
         |""".stripMargin
   )
 }
@@ -135,7 +122,7 @@ private object ProjectDatasetsFinderImpl {
       for {
         id               <- cursor.downField("identifier").downField("value").as[Identifier]
         title            <- cursor.downField("name").downField("value").as[Title]
-        name             <- cursor.downField("alternateName").downField("value").as[Name]
+        name             <- cursor.downField("slug").downField("value").as[Name]
         sameAs           <- cursor.downField("topmostSameAs").downField("value").as[SameAs]
         maybeDerivedFrom <- cursor.downField("maybeDerivedFrom").downField("value").as[Option[DerivedFrom]]
         initialVersion   <- cursor.downField("initialVersion").downField("value").as[InitialVersion]

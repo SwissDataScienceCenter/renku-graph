@@ -362,7 +362,7 @@ class RdfStoreClientImplSpec extends AnyWordSpec with ExternalServiceStubbing wi
                                        rdfStoreConfig: RdfStoreConfig,
                                        logger:         Logger[IO] = TestLogger[IO]()
   ) extends RdfStoreClientImpl(rdfStoreConfig, logger, new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger)))
-      with Paging[IO, String] {
+      with Paging[String] {
 
     def callRemote: IO[Json] = queryExpecting[Json](query)
 
@@ -370,7 +370,7 @@ class RdfStoreClientImplSpec extends AnyWordSpec with ExternalServiceStubbing wi
                  maybeCountQuery: Option[SparqlQuery] = None
     ): IO[PagingResponse[String]] = {
       implicit val resultsFinder: PagedResultsFinder[IO, String] = pagedResultsFinder(query, maybeCountQuery)
-      findPage(pagingRequest)
+      findPage[IO](pagingRequest)
     }
   }
 }

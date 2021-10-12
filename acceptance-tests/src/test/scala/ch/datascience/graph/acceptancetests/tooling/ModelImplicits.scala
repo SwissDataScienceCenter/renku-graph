@@ -21,8 +21,8 @@ package ch.datascience.graph.acceptancetests.tooling
 import cats.data.NonEmptyList
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.testentities.Person
 import ch.datascience.graph.model.users
-import ch.datascience.rdfstore.entities.Person
 
 trait ModelImplicits {
 

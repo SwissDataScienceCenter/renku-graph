@@ -18,83 +18,69 @@
 
 package io.renku.eventlog.subscriptions.triplesgenerated
 
-import cats.effect.{BracketThrow, IO, Timer}
+import cats.MonadThrow
+import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.db.{SessionResource, SqlStatement}
+import ch.datascience.events.EventRequestContent
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, ToTransformationNonRecoverableFailure, TransformingToTriplesGenerated, UpdateResult}
-import io.renku.eventlog.statuschange.{IOUpdateCommandsRunner, StatusUpdatesRunner}
+import ch.datascience.events.producers.EventSender
+import ch.datascience.graph.model.events.EventStatus.{TransformationNonRecoverableFailure, TriplesGenerated}
+import ch.datascience.tinytypes.json.TinyTypeEncoders
+import io.circe.literal._
 import io.renku.eventlog.subscriptions.DispatchRecovery
-import io.renku.eventlog.{EventLogDB, EventMessage, subscriptions}
+import io.renku.eventlog.{EventMessage, subscriptions}
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.duration._
-import scala.language.postfixOps
+import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-private class DispatchRecoveryImpl[Interpretation[_]: BracketThrow](
-    awaitingTransformationGauge:     LabeledGauge[Interpretation, projects.Path],
-    underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
-    statusUpdatesRunner:             StatusUpdatesRunner[Interpretation],
-    logger:                          Logger[Interpretation],
-    onErrorSleep:                    FiniteDuration
-)(implicit timer:                    Timer[Interpretation])
-    extends subscriptions.DispatchRecovery[Interpretation, TriplesGeneratedEvent] {
+private class DispatchRecoveryImpl[Interpretation[_]: MonadThrow](
+    eventSender: EventSender[Interpretation],
+    logger:      Logger[Interpretation]
+) extends subscriptions.DispatchRecovery[Interpretation, TriplesGeneratedEvent]
+    with TinyTypeEncoders {
 
-  override def returnToQueue(event: TriplesGeneratedEvent): Interpretation[Unit] = {
-    val toTriplesGeneratedCommand = TransformingToTriplesGenerated[Interpretation](event.id,
-                                                                                   awaitingTransformationGauge,
-                                                                                   underTriplesTransformationGauge
-    )
-    statusUpdatesRunner run toTriplesGeneratedCommand void
-  }
+  override def returnToQueue(event: TriplesGeneratedEvent): Interpretation[Unit] = eventSender.sendEvent(
+    EventRequestContent(json"""{
+        "categoryName": "EVENTS_STATUS_CHANGE",
+        "id":           ${event.id.id},
+        "project": {
+          "id":   ${event.id.projectId},
+          "path": ${event.projectPath}
+        },
+        "newStatus": $TriplesGenerated
+      }"""),
+    errorMessage = s"${SubscriptionCategory.name}: Marking event as $TriplesGenerated failed"
+  )
 
   override def recover(
       url:   SubscriberUrl,
       event: TriplesGeneratedEvent
   ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    val markEventFailed = ToTransformationNonRecoverableFailure[Interpretation](
-      event.id,
-      EventMessage(exception),
-      underTriplesTransformationGauge,
-      maybeProcessingTime = None
+    eventSender.sendEvent(
+      EventRequestContent(json"""{
+        "categoryName": "EVENTS_STATUS_CHANGE",
+        "id":           ${event.id.id},
+        "project": {
+          "id":   ${event.id.projectId},
+          "path": ${event.projectPath}
+        },
+        "newStatus": $TransformationNonRecoverableFailure,
+        "message":   ${EventMessage(exception)} }"""),
+      errorMessage = s"${SubscriptionCategory.name}: $event, url = $url -> $TransformationNonRecoverableFailure"
+    ) >> logger.error(exception)(
+      s"${SubscriptionCategory.name}: $event, url = $url -> $TransformationNonRecoverableFailure"
     )
-    for {
-      _ <- statusUpdatesRunner run markEventFailed recoverWith retry(markEventFailed)
-      _ <- logger.error(exception)(s"${SubscriptionCategory.name}: $event, url = $url -> ${markEventFailed.status}")
-    } yield ()
-  }
-
-  private def retry(
-      command: ChangeStatusCommand[Interpretation]
-  ): PartialFunction[Throwable, Interpretation[UpdateResult]] = { case NonFatal(exception) =>
-    {
-      for {
-        _      <- logger.error(exception)(s"${SubscriptionCategory.name}: Marking event as ${command.status} failed")
-        _      <- timer sleep onErrorSleep
-        result <- statusUpdatesRunner run command
-      } yield result
-    } recoverWith retry(command)
   }
 }
 
 private object DispatchRecovery {
 
-  private val OnErrorSleep: FiniteDuration = 1 seconds
-
-  def apply(sessionResource:                 SessionResource[IO, EventLogDB],
-            awaitingTransformationGauge:     LabeledGauge[IO, projects.Path],
-            underTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
-            queriesExecTimes:                LabeledHistogram[IO, SqlStatement.Name],
-            logger:                          Logger[IO]
-  )(implicit timer:                          Timer[IO]): IO[DispatchRecovery[IO, TriplesGeneratedEvent]] = for {
-    updateCommandRunner <- IOUpdateCommandsRunner(sessionResource, queriesExecTimes, logger)
-  } yield new DispatchRecoveryImpl[IO](awaitingTransformationGauge,
-                                       underTriplesTransformationGauge,
-                                       updateCommandRunner,
-                                       logger,
-                                       OnErrorSleep
-  )
+  def apply(logger:     Logger[IO])(implicit
+      effect:           ConcurrentEffect[IO],
+      timer:            Timer[IO],
+      executionContext: ExecutionContext
+  ): IO[DispatchRecovery[IO, TriplesGeneratedEvent]] = for {
+    eventSender <- EventSender(logger)
+  } yield new DispatchRecoveryImpl[IO](eventSender, logger)
 }

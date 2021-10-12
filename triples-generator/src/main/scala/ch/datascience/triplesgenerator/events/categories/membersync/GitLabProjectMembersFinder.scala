@@ -22,7 +22,8 @@ import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.graph.config.{GitLabApiUrl, GitLabUrl}
+import ch.datascience.graph.config.GitLabUrlLoader
+import ch.datascience.graph.model.GitLabApiUrl
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.model.users.{GitLabId, Name}
 import ch.datascience.http.client.UrlEncoder.urlEncode
@@ -127,7 +128,7 @@ private object IOGitLabProjectMembersFinder {
       contextShift:          ContextShift[IO],
       timer:                 Timer[IO]
   ): IO[GitLabProjectMembersFinder[IO]] = for {
-    gitLabUrl <- GitLabUrl[IO]()
+    gitLabUrl <- GitLabUrlLoader[IO]()
   } yield new IOGitLabProjectMembersFinder(gitLabUrl.apiV4, gitLabThrottler, logger)
 }
 

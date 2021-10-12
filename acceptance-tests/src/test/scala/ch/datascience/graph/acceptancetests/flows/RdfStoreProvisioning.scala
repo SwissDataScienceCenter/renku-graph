@@ -18,7 +18,7 @@
 
 package ch.datascience.graph.acceptancetests.flows
 
-import cats.data.NonEmptyList
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.data
 import ch.datascience.graph.acceptancetests.flows.AccessTokenPresence._
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
@@ -27,12 +27,10 @@ import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices._
 import ch.datascience.graph.acceptancetests.tooling.ModelImplicits
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
+import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.{projects, users}
+import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
-import ch.datascience.knowledgegraph.projects.model.Project
-import ch.datascience.knowledgegraph.projects.model.Statistics.CommitsCount
-import ch.datascience.rdfstore.entities.Person
 import ch.datascience.webhookservice.model.HookToken
 import io.renku.jsonld.JsonLD
 import org.http4s.Status._
@@ -40,47 +38,34 @@ import org.scalatest.Assertion
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
 
+import java.lang.Thread.sleep
+import scala.concurrent.duration._
+import scala.language.postfixOps
+
 object RdfStoreProvisioning extends ModelImplicits with Eventually with AcceptanceTestPatience with should.Matchers {
 
   def `data in the RDF store`(
-      project:   Project,
-      commitId:  CommitId,
-      committer: Person,
-      triples:   JsonLD
-  )(
-      members: NonEmptyList[(users.GitLabId, users.Username, users.Name)] = committer.asMembersList()
-  )(implicit
-      accessToken: AccessToken
-  ): Project = {
-    val projectId = project.id
+      project:            data.Project,
+      triples:            JsonLD,
+      commitId:           CommitId = commitIds.generateOne
+  )(implicit accessToken: AccessToken): Assertion = {
+    `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(project.id, commitId)
 
-    val projectWithStatistics = project.copy(statistics =
-      project.statistics.copy(commitsCount =
-        CommitsCount(
-          triples.asArray.map(_.size).getOrElse(throw new Exception("Could not get commits count"))
-        )
-      )
-    )
+    `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project.id, commitId)
 
-    `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
+    `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
 
-    `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(projectId, commitId)
+    `GET <triples-generator>/projects/:id/commits/:id returning OK`(project, commitId, triples)
 
-    `GET <gitlabApi>/projects/:path AND :id returning OK with`(projectWithStatistics, maybeCreator = Some(committer))
-
-    `GET <triples-generator>/projects/:id/commits/:id returning OK`(projectWithStatistics, commitId, triples)
-
-    `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project.path, members)
-
-    givenAccessTokenPresentFor(projectWithStatistics)
+    givenAccessTokenPresentFor(project)
 
     webhookServiceClient
-      .POST("webhooks/events", HookToken(projectId), data.GitLab.pushEvent(projectWithStatistics, commitId))
+      .POST("webhooks/events", HookToken(project.id), data.GitLab.pushEvent(project, commitId))
       .status shouldBe Accepted
 
-    `wait for events to be processed`(projectId)
+    sleep((3 second).toMillis)
 
-    projectWithStatistics
+    `wait for events to be processed`(project.id)
   }
 
   def `wait for events to be processed`(projectId: projects.Id): Assertion = eventually {

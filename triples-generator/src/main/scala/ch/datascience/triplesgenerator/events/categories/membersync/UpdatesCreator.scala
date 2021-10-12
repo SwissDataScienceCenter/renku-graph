@@ -20,15 +20,15 @@ package ch.datascience.triplesgenerator.events.categories.membersync
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.graph.Schemas.{rdf, schema}
-import ch.datascience.graph.config.{GitLabApiUrl, GitLabUrl, RenkuBaseUrl}
+import ch.datascience.graph.config.{GitLabUrlLoader, RenkuBaseUrlLoader}
+import ch.datascience.graph.model.Schemas.{rdf, schema}
 import ch.datascience.graph.model.projects.ResourceId
 import ch.datascience.graph.model.users.GitLabId
 import ch.datascience.graph.model.views.RdfResource
-import ch.datascience.graph.model.{projects, users}
+import ch.datascience.graph.model.views.SparqlValueEncoder.sparqlEncode
+import ch.datascience.graph.model._
 import ch.datascience.rdfstore.SparqlQuery
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
-import ch.datascience.rdfstore.SparqlValueEncoder.sparqlEncode
 import eu.timepit.refined.auto._
 
 private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl) {
@@ -89,9 +89,8 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApi
     membersCreations ::: linksCreations
   }
 
-  private def generateResourceId(gitLabId: GitLabId): users.ResourceId = users.ResourceId(
-    (renkuBaseUrl / "persons" / s"gitlabid$gitLabId").toString
-  )
+  private def generateResourceId(gitLabId: GitLabId): users.ResourceId =
+    users.ResourceId(gitLabId)(renkuBaseUrl)
 
   private def createMemberLinks(projectPath:        projects.Path,
                                 membersAlreadyInKG: List[(GitLabProjectMember, users.ResourceId)]
@@ -108,7 +107,7 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApi
     }
 
   private def generateLinkTriple(projectPath: projects.Path, memberResourceId: users.ResourceId) =
-    s"${ResourceId(renkuBaseUrl, projectPath).showAs[RdfResource]} schema:member ${memberResourceId.showAs[RdfResource]}."
+    s"${ResourceId(projectPath)(renkuBaseUrl).showAs[RdfResource]} schema:member ${memberResourceId.showAs[RdfResource]}."
 
   private lazy val generatePersonTriples: ((users.ResourceId, GitLabProjectMember)) => String = {
     case (resourceId, member) =>
@@ -133,7 +132,7 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApi
 
 private object UpdatesCreator {
   def apply(): IO[UpdatesCreator] = for {
-    renkuBaseUrl <- RenkuBaseUrl[IO]()
-    gitLabUrl    <- GitLabUrl[IO]()
+    renkuBaseUrl <- RenkuBaseUrlLoader[IO]()
+    gitLabUrl    <- GitLabUrlLoader[IO]()
   } yield new UpdatesCreator(renkuBaseUrl, gitLabUrl.apiV4)
 }

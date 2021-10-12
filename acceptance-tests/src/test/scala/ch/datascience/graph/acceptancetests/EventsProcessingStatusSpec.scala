@@ -20,21 +20,17 @@ package ch.datascience.graph.acceptancetests
 
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.acceptancetests.db.EventLog
+import ch.datascience.graph.acceptancetests.data.Project.Statistics.CommitsCount
+import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.flows.AccessTokenPresence.givenAccessTokenPresentFor
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
-import ch.datascience.graph.acceptancetests.tooling.TokenRepositoryClient._
 import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import ch.datascience.graph.model.EventsGenerators.commitIds
-import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.projects.Visibility.Public
+import ch.datascience.graph.model.events.CommitId
 import ch.datascience.http.client.AccessToken
-import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
-import ch.datascience.knowledgegraph.projects.model.Project
-import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
 import ch.datascience.webhookservice.model.HookToken
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -44,6 +40,8 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.Eventually
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
+
+import java.time.Instant
 
 class EventsProcessingStatusSpec
     extends AnyFeatureSpec
@@ -60,19 +58,18 @@ class EventsProcessingStatusSpec
 
     Scenario("As a user I would like to see progress of events processing for my project") {
 
-      val project   = projects.generateOne
-      val projectId = project.id
       implicit val accessToken: AccessToken = accessTokens.generateOne
+      val project = dataProjects(projectEntities(visibilityPublic), CommitsCount(numberOfEvents.value)).generateOne
 
       When("there's no webhook for a given project in GitLab")
       Then("the status endpoint should return NOT_FOUND")
-      webhookServiceClient.GET(s"projects/$projectId/events/status").status shouldBe NotFound
+      webhookServiceClient.GET(s"projects/${project.id}/events/status").status shouldBe NotFound
 
       When("there is a webhook but no events in the Event Log")
       givenHookValidationToHookExists(project)
 
       Then("the status endpoint should return OK with done = total = 0")
-      val noEventsResponse = webhookServiceClient GET s"projects/$projectId/events/status"
+      val noEventsResponse = webhookServiceClient GET s"projects/${project.id}/events/status"
       noEventsResponse.status shouldBe Ok
       val noEventsResponseJson = noEventsResponse.bodyAsJson.hcursor
       noEventsResponseJson.downField("done").as[Int]        shouldBe Right(0)
@@ -84,68 +81,51 @@ class EventsProcessingStatusSpec
 
       Then("the status endpoint should return OK with some progress info")
       eventually {
-        val response = webhookServiceClient GET s"projects/$projectId/events/status"
+        val response = webhookServiceClient GET s"projects/${project.id}/events/status"
 
         response.status shouldBe Ok
 
         val responseJson = response.bodyAsJson.hcursor
         val Right(done)  = responseJson.downField("done").as[Int]
-        done should be <= numberOfEvents.value
         val Right(total) = responseJson.downField("total").as[Int]
-        total shouldBe numberOfEvents.value
-        val Right(progress) = responseJson.downField("progress").as[Double]
-        progress should be <= 100d
-      }
-
-      // wait for the Event Log to be emptied
-      eventually {
-        EventLog.findEvents(projectId, status = New) shouldBe List.empty
+        done                                            should (be <= numberOfEvents.value and be >= 1)
+        total                                           should (be <= numberOfEvents.value and be >= 1)
+        responseJson.downField("progress").as[Double] shouldBe Right(100d)
       }
     }
   }
 
-  private def givenHookValidationToHookExists(
-      project:            Project
-  )(implicit accessToken: AccessToken): Unit = {
-    `GET <gitlabApi>/projects/:path AND :id returning OK with`(project.copy(visibility = Public))
-    tokenRepositoryClient
-      .PUT(s"projects/${project.id}/tokens", accessToken.toJson, maybeAccessToken = None)
-      .status shouldBe NoContent
-    `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(project.id)
-  }
-
-  private def sendEventsForProcessing(project: Project)(implicit accessToken: AccessToken) = {
-
-    val allCommitIds = commitIds.generateNonEmptyList(minElements = numberOfEvents, maxElements = numberOfEvents).toList
-
-    `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project.id,
-                                                                                        allCommitIds.head,
-                                                                                        allCommitIds.tail.toSet
-    )
-
-    `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(project.id, allCommitIds.head)
-
-    // assuring there's project info in GitLab for the triples curation process
+  private def givenHookValidationToHookExists(project: data.Project)(implicit accessToken: AccessToken): Unit = {
     `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
 
     givenAccessTokenPresentFor(project)
 
-    allCommitIds foreach { commitId =>
+    `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(project.id)
+  }
+
+  private def sendEventsForProcessing(project: data.Project)(implicit accessToken: AccessToken) = {
+
+    val allCommitIds = commitIds.generateNonEmptyList(minElements = numberOfEvents, maxElements = numberOfEvents).toList
+
+    `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(project.id, allCommitIds: _*)
+
+    val theMostRecentEventDate = Instant.now()
+    allCommitIds.foldLeft(Option.empty[CommitId]) { (maybePreviousCommitId, commitId) =>
       // GitLab to return commit info about all the parent commits
-      if (commitId != allCommitIds.head)
-        `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project.id, commitId)
+      `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project.id,
+                                                                                          commitId,
+                                                                                          maybePreviousCommitId.toSet,
+                                                                                          theMostRecentEventDate
+      )
 
       // making the triples generation process happy and not throwing exceptions to the logs
-      val committer = persons.generateOne
-      `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId, committer)
-      `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(
-        project.path,
-        committer.asMembersList()
-      )
+      `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
+
+      Some(commitId)
     }
 
     webhookServiceClient
-      .POST("webhooks/events", HookToken(project.id), data.GitLab.pushEvent(project, allCommitIds.head))
+      .POST("webhooks/events", HookToken(project.id), data.GitLab.pushEvent(project, allCommitIds.last))
       .status shouldBe Accepted
   }
 }

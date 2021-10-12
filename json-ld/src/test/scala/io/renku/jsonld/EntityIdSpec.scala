@@ -21,8 +21,8 @@ package io.renku.jsonld
 import io.renku.jsonld.EntityId.BlankNodeEntityId
 import io.renku.jsonld.generators.Generators.Implicits._
 import io.renku.jsonld.generators.Generators._
-import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class EntityIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
@@ -67,7 +67,6 @@ class EntityIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
   "EntityId json encoder" should {
 
     import io.circe.Encoder
-    import io.circe.syntax._
 
     "encode the 'of' created EntityId's value as String JSON" in {
       val entityId = EntityId of httpUrls().generateOne
@@ -81,8 +80,6 @@ class EntityIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
   }
 
   "EntityId json decoder" should {
-
-    import io.circe.syntax._
 
     "decode non blank EntityId as StandardEntityId" in {
       val entityId = EntityId of httpUrls().generateOne

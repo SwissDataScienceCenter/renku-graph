@@ -19,11 +19,11 @@
 package ch.datascience.knowledgegraph.projects.rest
 
 import cats.data.OptionT
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.model.projects
+import ch.datascience.graph.config.GitLabUrlLoader
+import ch.datascience.graph.model.{GitLabUrl, projects}
 import ch.datascience.graph.model.projects.{Description, Id, Visibility}
 import ch.datascience.http.client.{AccessToken, RestClient}
 import ch.datascience.knowledgegraph.projects.model.Forking.ForksCount
@@ -34,37 +34,21 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-trait GitLabProjectFinder[Interpretation[_]] {
+private trait GitLabProjectFinder[Interpretation[_]] {
   def findProject(
       projectPath:      projects.Path,
       maybeAccessToken: Option[AccessToken]
   ): OptionT[Interpretation, GitLabProject]
 }
 
-object GitLabProjectFinder {
-
-  final case class GitLabProject(id:               Id,
-                                 maybeDescription: Option[Description],
-                                 visibility:       Visibility,
-                                 urls:             Urls,
-                                 forksCount:       ForksCount,
-                                 tags:             Set[Tag],
-                                 starsCount:       StarsCount,
-                                 updatedAt:        DateUpdated,
-                                 permissions:      Permissions,
-                                 statistics:       Statistics
-  )
-}
-
-private class IOGitLabProjectFinder(
+private class GitLabProjectFinderImpl[Interpretation[_]: ConcurrentEffect: Timer](
     gitLabUrl:               GitLabUrl,
-    gitLabThrottler:         Throttler[IO, GitLab],
-    logger:                  Logger[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+    gitLabThrottler:         Throttler[Interpretation, GitLab],
+    logger:                  Logger[Interpretation]
+)(implicit executionContext: ExecutionContext)
     extends RestClient(gitLabThrottler, logger)
-    with GitLabProjectFinder[IO] {
+    with GitLabProjectFinder[Interpretation] {
 
-  import cats.effect._
   import cats.syntax.all._
   import ch.datascience.http.client.UrlEncoder.urlEncode
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
@@ -74,7 +58,9 @@ private class IOGitLabProjectFinder(
   import org.http4s.circe.jsonOf
   import org.http4s.dsl.io._
 
-  def findProject(projectPath: projects.Path, maybeAccessToken: Option[AccessToken]): OptionT[IO, GitLabProject] =
+  def findProject(projectPath:      projects.Path,
+                  maybeAccessToken: Option[AccessToken]
+  ): OptionT[Interpretation, GitLabProject] =
     OptionT {
       for {
         uri     <- validateUri(s"$gitLabUrl/api/v4/projects/${urlEncode(projectPath.value)}?statistics=true")
@@ -82,12 +68,14 @@ private class IOGitLabProjectFinder(
       } yield project
     }
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[GitLabProject]]] = {
+  private lazy val mapResponse: PartialFunction[(Status, Request[Interpretation], Response[Interpretation]),
+                                                Interpretation[Option[GitLabProject]]
+  ] = {
     case (Ok, _, response) => response.as[GitLabProject].map(Option.apply)
-    case (NotFound, _, _)  => None.pure[IO]
+    case (NotFound, _, _)  => Option.empty[GitLabProject].pure[Interpretation]
   }
 
-  private implicit lazy val projectDecoder: EntityDecoder[IO, GitLabProject] = {
+  private implicit lazy val projectDecoder: EntityDecoder[Interpretation, GitLabProject] = {
     import ch.datascience.knowledgegraph.projects.model.Forking.ForksCount
     import ch.datascience.knowledgegraph.projects.model.Permissions._
     import ch.datascience.knowledgegraph.projects.model.Project.StarsCount
@@ -136,23 +124,19 @@ private class IOGitLabProjectFinder(
 
     implicit val decoder: Decoder[GitLabProject] = cursor =>
       for {
-        id             <- cursor.downField("id").as[Id]
-        visibility     <- cursor.downField("visibility").as[Visibility]
-        sshUrl         <- cursor.downField("ssh_url_to_repo").as[SshUrl]
-        httpUrl        <- cursor.downField("http_url_to_repo").as[HttpUrl]
-        webUrl         <- cursor.downField("web_url").as[WebUrl]
-        maybeReadmeUrl <- cursor.downField("readme_url").as[Option[ReadmeUrl]]
-        forksCount     <- cursor.downField("forks_count").as[ForksCount]
-        tags           <- cursor.downField("tag_list").as[List[Tag]]
-        starsCount     <- cursor.downField("star_count").as[StarsCount]
-        updatedAt      <- cursor.downField("last_activity_at").as[DateUpdated]
-        statistics     <- cursor.downField("statistics").as[Statistics]
-        permissions    <- cursor.downField("permissions").as[Permissions]
-        maybeDescription <- cursor
-                              .downField("description")
-                              .as[Option[String]]
-                              .map(blankToNone)
-                              .flatMap(toOption[Description])
+        id               <- cursor.downField("id").as[Id]
+        visibility       <- cursor.downField("visibility").as[Visibility]
+        sshUrl           <- cursor.downField("ssh_url_to_repo").as[SshUrl]
+        httpUrl          <- cursor.downField("http_url_to_repo").as[HttpUrl]
+        webUrl           <- cursor.downField("web_url").as[WebUrl]
+        maybeReadmeUrl   <- cursor.downField("readme_url").as[Option[ReadmeUrl]]
+        forksCount       <- cursor.downField("forks_count").as[ForksCount]
+        tags             <- cursor.downField("tag_list").as[List[Tag]]
+        starsCount       <- cursor.downField("star_count").as[StarsCount]
+        updatedAt        <- cursor.downField("last_activity_at").as[DateUpdated]
+        statistics       <- cursor.downField("statistics").as[Statistics]
+        permissions      <- cursor.downField("permissions").as[Permissions]
+        maybeDescription <- cursor.downField("description").as[Option[Description]]
       } yield GitLabProject(
         id,
         maybeDescription,
@@ -166,11 +150,23 @@ private class IOGitLabProjectFinder(
         statistics
       )
 
-    jsonOf[IO, GitLabProject]
+    jsonOf[Interpretation, GitLabProject]
   }
 }
 
-object IOGitLabProjectFinder {
+private object GitLabProjectFinder {
+
+  final case class GitLabProject(id:               Id,
+                                 maybeDescription: Option[Description],
+                                 visibility:       Visibility,
+                                 urls:             Urls,
+                                 forksCount:       ForksCount,
+                                 tags:             Set[Tag],
+                                 starsCount:       StarsCount,
+                                 updatedAt:        DateUpdated,
+                                 permissions:      Permissions,
+                                 statistics:       Statistics
+  )
 
   def apply(
       gitLabThrottler: Throttler[IO, GitLab],
@@ -179,8 +175,7 @@ object IOGitLabProjectFinder {
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[GitLabProjectFinder[IO]] =
-    for {
-      gitLabUrl <- GitLabUrl[IO]()
-    } yield new IOGitLabProjectFinder(gitLabUrl, gitLabThrottler, logger)
+  ): IO[GitLabProjectFinder[IO]] = for {
+    gitLabUrl <- GitLabUrlLoader[IO]()
+  } yield new GitLabProjectFinderImpl(gitLabUrl, gitLabThrottler, logger)
 }

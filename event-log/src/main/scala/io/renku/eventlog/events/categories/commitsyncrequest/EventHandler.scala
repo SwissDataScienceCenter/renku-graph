@@ -18,14 +18,14 @@
 
 package io.renku.eventlog.events.categories.commitsyncrequest
 
-import cats.MonadThrow
 import cats.data.EitherT.fromEither
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
+import cats.{MonadThrow, Show}
 import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
-import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventRequestContent, EventSchedulingResult}
+import ch.datascience.events.consumers._
+import ch.datascience.events.{EventRequestContent, consumers}
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.metrics.LabeledHistogram
 import io.circe.Decoder
@@ -60,8 +60,8 @@ private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurre
                 .leftSemiflatTap(logger.log(event))
   } yield result
 
-  private implicit lazy val eventInfoToString: ((projects.Id, projects.Path)) => String = {
-    case (projectId, projectPath) => s"projectId = $projectId, projectPath = $projectPath"
+  private implicit lazy val eventInfoToString: Show[(projects.Id, projects.Path)] = Show.show {
+    case (projectId, projectPath) => show"projectId = $projectId, projectPath = $projectPath"
   }
 
   private implicit val eventDecoder: Decoder[(projects.Id, projects.Path)] = { cursor =>

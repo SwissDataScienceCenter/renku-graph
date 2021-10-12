@@ -31,8 +31,8 @@ import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecove
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import com.typesafe.config.{Config, ConfigFactory}
-import org.typelevel.log4cats.Logger
 import io.circe.Json
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
@@ -72,16 +72,17 @@ private[awaitinggeneration] class RemoteTriplesGenerator(
 
   override def generateTriples(
       commitEvent:             CommitEvent
-  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] =
-    EitherT {
-      (for {
+  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] = EitherT {
+    {
+      for {
         uri           <- validateUri(s"$serviceUrl/projects/${commitEvent.project.id}/commits/${commitEvent.commitId}")
         triplesInJson <- send(request(GET, uri))(mapResponse)
         triples       <- IO.fromEither(JsonLDTriples from triplesInJson)
-      } yield triples.asRight[ProcessingRecoverableError]).recoverWith { case UnauthorizedException =>
-        GenerationRecoverableError("Unauthorized exception").asLeft[JsonLDTriples].pure[IO]
-      }
+      } yield triples.asRight[ProcessingRecoverableError]
+    } recoverWith { case UnauthorizedException =>
+      GenerationRecoverableError("Unauthorized exception").asLeft[JsonLDTriples].pure[IO]
     }
+  }
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Json]] = {
     case (Ok, _, response)    => response.as[Json]

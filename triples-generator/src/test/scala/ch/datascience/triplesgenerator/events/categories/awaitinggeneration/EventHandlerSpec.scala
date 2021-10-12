@@ -18,16 +18,16 @@
 
 package ch.datascience.triplesgenerator.events.categories.awaitinggeneration
 
-import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all._
+import ch.datascience.events.EventRequestContent
 import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
-import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventRequestContent}
+import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
-import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
+import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
@@ -48,74 +48,66 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
       "schedule triples generation " +
       s"and return $Accepted if event processor accepted the event" in new TestCase {
 
-        val commitEvents = eventBody.toCommitEvents
-        (eventBodyDeserializer.toCommitEvents _)
+        val commitEvent = commitEvents.generateOne
+        (eventBodyDeserializer.toCommitEvent _)
           .expects(eventBody)
-          .returning(commitEvents.pure[IO])
+          .returning(commitEvent.pure[IO])
 
         (eventProcessor.process _)
-          .expects(eventId, commitEvents, renkuVersionPair.schemaVersion)
+          .expects(commitEvent, renkuVersionPair.schemaVersion)
           .returning(().pure[IO])
 
-        val requestContent: EventRequestContent = requestContent(eventId.asJson(eventEncoder), eventBody.value.some)
+        val request = requestContent(commitEvent.compoundEventId.asJson(eventEncoder), eventBody.value.some)
 
-        handler.createHandlingProcess(requestContent).unsafeRunSyncProcess() shouldBe Right(
-          Accepted
-        )
+        handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Right(Accepted)
 
         logger.loggedOnly(
           Info(
-            s"${handler.categoryName}: $eventId, projectPath = ${commitEvents.head.project.path} -> $Accepted"
+            s"${handler.categoryName}: ${commitEvent.compoundEventId}, projectPath = ${commitEvent.project.path} -> $Accepted"
           )
         )
       }
 
     s"return $BadRequest if event body is not correct" in new TestCase {
 
-      val requestContent: EventRequestContent = requestContent(eventId.asJson(eventEncoder), eventBody.value.some)
+      val request = requestContent(compoundEventIds.generateOne.asJson(eventEncoder), eventBody.value.some)
 
-      (eventBodyDeserializer.toCommitEvents _)
+      (eventBodyDeserializer.toCommitEvent _)
         .expects(eventBody)
-        .returning(exceptions.generateOne.raiseError[IO, NonEmptyList[CommitEvent]])
+        .returning(exceptions.generateOne.raiseError[IO, CommitEvent])
 
-      handler.createHandlingProcess(requestContent).unsafeRunSyncProcess() shouldBe Left(
-        BadRequest
-      )
+      handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Left(BadRequest)
 
       logger.expectNoLogs()
     }
 
     s"return $BadRequest if event body is not present" in new TestCase {
 
-      val requestContent: EventRequestContent = requestContent(eventId.asJson(eventEncoder), None)
+      val request = requestContent(compoundEventIds.generateOne.asJson(eventEncoder), None)
 
-      handler.createHandlingProcess(requestContent).unsafeRunSyncProcess() shouldBe Left(
-        BadRequest
-      )
+      handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Left(BadRequest)
 
       logger.expectNoLogs()
     }
 
     s"return $Accepted when event processor fails while processing the event" in new TestCase {
 
-      val commitEvents = eventBody.toCommitEvents
-      (eventBodyDeserializer.toCommitEvents _)
+      val commitEvent = commitEvents.generateOne
+      (eventBodyDeserializer.toCommitEvent _)
         .expects(eventBody)
-        .returning(commitEvents.pure[IO])
+        .returning(commitEvent.pure[IO])
 
       (eventProcessor.process _)
-        .expects(eventId, commitEvents, renkuVersionPair.schemaVersion)
+        .expects(commitEvent, renkuVersionPair.schemaVersion)
         .returning(exceptions.generateOne.raiseError[IO, Unit])
 
-      val requestContent: EventRequestContent = requestContent(eventId.asJson(eventEncoder), eventBody.value.some)
+      val request = requestContent(commitEvent.compoundEventId.asJson(eventEncoder), eventBody.value.some)
 
-      handler.createHandlingProcess(requestContent).unsafeRunSyncProcess() shouldBe Right(
-        Accepted
-      )
+      handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Right(Accepted)
 
       logger.loggedOnly(
         Info(
-          s"${handler.categoryName}: $eventId, projectPath = ${commitEvents.head.project.path} -> $Accepted"
+          s"${handler.categoryName}: ${commitEvent.compoundEventId}, projectPath = ${commitEvent.project.path} -> $Accepted"
         )
       )
     }
@@ -123,7 +115,6 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
   private trait TestCase {
 
-    val eventId   = compoundEventIds.generateOne
     val eventBody = eventBodies.generateOne
 
     val eventProcessor             = mock[EventProcessor[IO]]
@@ -143,6 +134,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
                                        renkuVersionPair,
                                        logger
     )
+
     def requestContent(event: Json, maybePayload: Option[String]): EventRequestContent =
       EventRequestContent(event, maybePayload)
   }
@@ -157,10 +149,6 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
         }
       }"""
     }
-
-  private implicit class EventBodyOps(eventBody: EventBody) {
-    lazy val toCommitEvents: NonEmptyList[CommitEvent] = commitEvents.generateNonEmptyList()
-  }
 
   private implicit class EventHandlingProcessOps(handlingProcess: IO[EventHandlingProcess[IO]]) {
     def unsafeRunSyncProcess() =

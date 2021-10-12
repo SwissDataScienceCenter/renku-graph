@@ -18,10 +18,11 @@
 
 package ch.datascience.http.rest.paging
 
-import PagingRequest.Decoders.page.{parameterName => pageParamName}
-import ch.datascience.config.renku.ResourceUrl
+import ch.datascience.http.rest.paging.PagingRequest.Decoders.page.{parameterName => pageParamName}
 import ch.datascience.http.rest.paging.PagingResponse.PagingInfo
 import ch.datascience.http.rest.paging.model.Page.first
+import ch.datascience.tinytypes.UrlTinyType
+import ch.datascience.tinytypes.constraints.UrlOps
 import org.http4s.Header
 
 object PagingHeaders {
@@ -34,16 +35,19 @@ object PagingHeaders {
   val PrevPage:   String = "Prev-Page"
   val Link:       String = "Link"
 
-  def from[F[_]](response: PagingResponse[_])(implicit resourceUrl: ResourceUrl): Set[Header] =
+  def from[F[_], ResourceUrl <: UrlTinyType](response: PagingResponse[_])(implicit
+      resourceUrl:                                     ResourceUrl,
+      resourceUrlOps:                                  UrlOps[ResourceUrl]
+  ): Set[Header] =
     Set(
       Some(Header(Total, response.pagingInfo.total.toString)),
       Some(Header(TotalPages, totalPages(response.pagingInfo).toString)),
       Some(Header(PerPage, response.pagingInfo.pagingRequest.perPage.toString)),
       Some(Header(Page, response.pagingInfo.pagingRequest.page.toString)),
       nextPage(response.pagingInfo),
-      prevPage(response.pagingInfo.pagingRequest),
+      prevPage(response.pagingInfo),
       nextLink(response.pagingInfo),
-      prevLink(response.pagingInfo.pagingRequest),
+      prevLink(response.pagingInfo),
       firstLink,
       lastLink(response.pagingInfo)
     ).flatten
@@ -54,33 +58,47 @@ object PagingHeaders {
   }
 
   private def nextPage(pagingInfo: PagingInfo): Option[Header] =
-    if (pagingInfo.pagingRequest.page.value == totalPages(pagingInfo)) None
+    if (pagingInfo.pagingRequest.page.value == totalPages(pagingInfo) || pagingInfo.total.value == 0) None
     else Some(Header(NextPage, (pagingInfo.pagingRequest.page.value + 1).toString))
 
-  private def prevPage(pagingRequest: PagingRequest): Option[Header] =
-    if (pagingRequest.page == first) None
-    else Some(Header(PrevPage, (pagingRequest.page.value - 1).toString))
+  private def prevPage(pagingInfo: PagingInfo): Option[Header] =
+    if (pagingInfo.pagingRequest.page == first || pagingInfo.total.value == 0) None
+    else Some(Header(PrevPage, (pagingInfo.pagingRequest.page.value - 1).toString))
 
-  private def prevLink[F[_]](pagingRequest: PagingRequest)(implicit resourceUrl: ResourceUrl): Option[Header] = {
-    val page = pagingRequest.page
-    if (page == first) None
+  private def prevLink[F[_], ResourceUrl <: UrlTinyType](
+      pagingInfo:         PagingInfo
+  )(implicit resourceUrl: ResourceUrl, resourceUrlOps: UrlOps[ResourceUrl]): Option[Header] = {
+    val page = pagingInfo.pagingRequest.page
+    if (page == first || pagingInfo.total.value == 0) None
     else Some(Header(Link, s"""<${uriWithPageParam(pageParamName, page.value - 1)}>; rel="prev""""))
   }
 
-  private def nextLink[F[_]](pagingInfo: PagingInfo)(implicit resourceUrl: ResourceUrl): Option[Header] = {
+  private def uriWithPageParam[F[_], ResourceUrl <: UrlTinyType](
+      paramName:          String,
+      value:              Int
+  )(implicit resourceUrl: ResourceUrl, resourceUrlOps: UrlOps[ResourceUrl]) = {
+    import resourceUrlOps._
+    resourceUrl ? (paramName -> value)
+  }
+
+  private def nextLink[F[_], ResourceUrl <: UrlTinyType](
+      pagingInfo:         PagingInfo
+  )(implicit resourceUrl: ResourceUrl, resourceUrlOps: UrlOps[ResourceUrl]): Option[Header] = {
     val page = pagingInfo.pagingRequest.page
-    if (page.value == totalPages(pagingInfo)) None
+    if (page.value == totalPages(pagingInfo) || pagingInfo.total.value == 0) None
     else Some(Header(Link, s"""<${uriWithPageParam(pageParamName, page.value + 1)}>; rel="next""""))
   }
 
-  private def firstLink[F[_]](implicit resourceUrl: ResourceUrl): Option[Header] =
+  private def firstLink[F[_], ResourceUrl <: UrlTinyType](implicit
+      resourceUrl:    ResourceUrl,
+      resourceUrlOps: UrlOps[ResourceUrl]
+  ): Option[Header] =
     Some(Header(Link, s"""<${uriWithPageParam(pageParamName, 1)}>; rel="first""""))
 
-  private def lastLink[F[_]](pagingInfo: PagingInfo)(implicit resourceUrl: ResourceUrl): Option[Header] =
+  private def lastLink[F[_], ResourceUrl <: UrlTinyType](pagingInfo: PagingInfo)(implicit
+      resourceUrl:                                                   ResourceUrl,
+      resourceUrlOps:                                                UrlOps[ResourceUrl]
+  ): Option[Header] = if (pagingInfo.total.value > 0) {
     Some(Header(Link, s"""<${uriWithPageParam(pageParamName, totalPages(pagingInfo))}>; rel="last""""))
-
-  private def uriWithPageParam[F[_]](
-      paramName:          String,
-      value:              Int
-  )(implicit resourceUrl: ResourceUrl) = resourceUrl ? (paramName -> value)
+  } else Some(Header(Link, s"""<${uriWithPageParam(pageParamName, 1)}>; rel="last""""))
 }

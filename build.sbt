@@ -16,7 +16,10 @@ lazy val root = Project(
   publish / skip := true,
   publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 ).aggregate(
+  generators,
   jsonLd,
+  tinyTypes,
+  renkuModel,
   graphCommons,
   eventLog,
   tokenRepository,
@@ -24,6 +27,15 @@ lazy val root = Project(
   commitEventService,
   triplesGenerator,
   knowledgeGraph
+)
+
+lazy val generators = Project(
+  id = "generators",
+  base = file("generators")
+).settings(
+  commonSettings
+).enablePlugins(
+  AutomateHeaderPlugin
 )
 
 lazy val jsonLd = Project(
@@ -35,14 +47,41 @@ lazy val jsonLd = Project(
   AutomateHeaderPlugin
 )
 
+lazy val tinyTypes = Project(
+  id = "tiny-types",
+  base = file("tiny-types")
+).settings(
+  commonSettings
+).dependsOn(
+  generators % "test->test"
+).enablePlugins(
+  AutomateHeaderPlugin
+)
+
+lazy val renkuModel = Project(
+  id = "renku-model",
+  base = file("renku-model")
+).settings(
+  commonSettings
+).dependsOn(
+  tinyTypes % "compile->compile",
+  tinyTypes % "test->test",
+  jsonLd    % "compile->compile",
+  jsonLd    % "test->test"
+).enablePlugins(
+  AutomateHeaderPlugin
+)
+
 lazy val graphCommons = Project(
   id = "graph-commons",
   base = file("graph-commons")
 ).settings(
   commonSettings
 ).dependsOn(
-  jsonLd % "compile->compile",
-  jsonLd % "test->test"
+  jsonLd     % "compile->compile",
+  jsonLd     % "test->test",
+  renkuModel % "compile->compile",
+  renkuModel % "test->test"
 ).enablePlugins(
   AutomateHeaderPlugin
 )
@@ -92,8 +131,6 @@ lazy val triplesGenerator = Project(
 ).settings(
   commonSettings
 ).dependsOn(
-  jsonLd       % "compile->compile",
-  jsonLd       % "test->test",
   graphCommons % "compile->compile",
   graphCommons % "test->test"
 ).enablePlugins(

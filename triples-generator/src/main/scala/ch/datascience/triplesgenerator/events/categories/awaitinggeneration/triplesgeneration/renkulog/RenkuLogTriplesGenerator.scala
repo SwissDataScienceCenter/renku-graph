@@ -21,16 +21,13 @@ package triplesgeneration.renkulog
 
 import cats.Applicative
 import cats.data.EitherT
-import cats.data.EitherT.right
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.config.{GitLabUrl, RenkuLogTimeout}
+import ch.datascience.graph.config.GitLabUrlLoader
 import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent
-import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent._
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.{GitLabRepoUrlFinder, RepositoryPath}
 
@@ -72,7 +69,7 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
   ): IO[Either[ProcessingRecoverableError, JsonLDTriples]] = {
     for {
       _      <- prepareRepository(commitEvent)
-      _      <- cleanUpRepository().toRight
+      _      <- EitherT.liftF(cleanUpRepository())
       result <- migrateAndLog(commitEvent)
     } yield result
   }.value
@@ -80,12 +77,11 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
   private def prepareRepository(commitEvent: CommitEvent)(implicit
       maybeAccessToken:                      Option[AccessToken],
       repoDirectory:                         RepositoryPath
-  ): EitherT[IO, ProcessingRecoverableError, Unit] =
-    for {
-      repositoryUrl <- findRepositoryUrl(commitEvent.project.path, maybeAccessToken).toRight
-      _             <- git.clone(repositoryUrl, workDirectory)
-      _             <- git.checkout(commitEvent.commitId).toRight
-    } yield ()
+  ): EitherT[IO, ProcessingRecoverableError, Unit] = for {
+    repositoryUrl <- EitherT.liftF(findRepositoryUrl(commitEvent.project.path, maybeAccessToken))
+    _             <- git.clone(repositoryUrl, workDirectory)
+    _             <- EitherT.liftF(git.checkout(commitEvent.commitId))
+  } yield ()
 
   private def cleanUpRepository()(implicit repoDirectory: RepositoryPath) = {
     val gitAttributeFilePath = repoDirectory.value / gitAttributeFileName
@@ -102,15 +98,10 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
 
   private def migrateAndLog(
       commitEvent:          CommitEvent
-  )(implicit repoDirectory: RepositoryPath): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] =
-    for {
-      _       <- renku.migrate(commitEvent).toRight
-      triples <- findTriples(commitEvent)
-    } yield triples
-
-  private implicit class IOOps[Right](io: IO[Right]) {
-    lazy val toRight: EitherT[IO, ProcessingRecoverableError, Right] = right[ProcessingRecoverableError](io)
-  }
+  )(implicit repoDirectory: RepositoryPath): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] = for {
+    _       <- EitherT.liftF(renku migrate commitEvent)
+    triples <- renku.`export`
+  } yield triples
 
   private def createRepositoryDirectory(projectPath: projects.Path): IO[Path] =
     mkdir(tempDirectoryName(repositoryNameFrom(projectPath)))
@@ -120,17 +111,6 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
 
   private def repositoryNameFrom(projectPath: projects.Path): String = projectPath.value match {
     case repositoryDirectoryFinder(folderName) => folderName
-  }
-
-  private def findTriples(
-      commitEvent:                CommitEvent
-  )(implicit repositoryDirectory: RepositoryPath): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] = {
-    import renku._
-
-    commitEvent match {
-      case withParent:    CommitEventWithParent    => renku.log(withParent)
-      case withoutParent: CommitEventWithoutParent => renku.log(withoutParent)
-    }
   }
 
   private def meaningfulError(
@@ -158,15 +138,13 @@ private[events] object RenkuLogTriplesGenerator {
       contextShift:     ContextShift[IO],
       executionContext: ExecutionContext,
       timer:            Timer[IO]
-  ): IO[TriplesGenerator[IO]] =
-    for {
-      renkuLogTimeout <- RenkuLogTimeout[IO]()
-      gitLabUrl       <- GitLabUrl[IO]()
-    } yield new RenkuLogTriplesGenerator(
-      new GitLabRepoUrlFinder[IO](gitLabUrl),
-      new Commands.Renku(renkuLogTimeout),
-      new Commands.File,
-      new Commands.Git,
-      randomLong = new SecureRandom().nextLong _
-    )
+  ): IO[TriplesGenerator[IO]] = for {
+    gitLabUrl <- GitLabUrlLoader[IO]()
+  } yield new RenkuLogTriplesGenerator(
+    new GitLabRepoUrlFinder[IO](gitLabUrl),
+    new Commands.Renku,
+    new Commands.File,
+    new Commands.Git,
+    randomLong = new SecureRandom().nextLong _
+  )
 }

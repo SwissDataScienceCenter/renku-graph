@@ -20,8 +20,9 @@ package ch.datascience.webhookservice.hookvalidation
 
 import cats.effect.IO
 import cats.syntax.all._
+import ch.datascience.generators.CommonGraphGenerators.authUsers
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators.{authUsers, projectIds}
+import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.ErrorMessage
 import ch.datascience.http.ErrorMessage._

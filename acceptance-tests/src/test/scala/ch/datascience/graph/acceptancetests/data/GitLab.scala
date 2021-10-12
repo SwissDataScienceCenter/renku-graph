@@ -22,7 +22,6 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{nonEmptyStrings, positiveInts}
 import ch.datascience.graph.model.GraphModelGenerators.userEmails
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.knowledgegraph.projects.model.Project
 import io.circe.Json
 import io.circe.literal._
 
@@ -38,4 +37,5 @@ object GitLab {
       "path_with_namespace": ${project.path.value}
     }
   }"""
+
 }

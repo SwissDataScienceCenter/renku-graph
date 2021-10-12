@@ -20,20 +20,21 @@ package ch.datascience.commiteventservice.events.categories.commitsync.eventgene
 
 import cats.data.OptionT
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
+import cats.syntax.all._
+import ch.datascience.commiteventservice.events.categories.common.CommitInfo
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.graph.config.GitLabUrl
+import ch.datascience.graph.config.GitLabUrlLoader
+import ch.datascience.graph.model.GitLabUrl
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.{AccessToken, RestClient}
-import org.typelevel.log4cats.Logger
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
 import org.http4s.circe.jsonOf
 import org.http4s.{EntityDecoder, Status}
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import cats.syntax.all._
-import ch.datascience.commiteventservice.events.categories.common.CommitInfo
 
 private trait LatestCommitFinder[Interpretation[_]] {
   def findLatestCommit(
@@ -90,6 +91,6 @@ private object LatestCommitFinder {
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[LatestCommitFinder[IO]] = for {
-    gitLabUrl <- GitLabUrl[IO]()
+    gitLabUrl <- GitLabUrlLoader[IO]()
   } yield new LatestCommitFinderImpl(gitLabUrl, gitLabThrottler, logger)
 }

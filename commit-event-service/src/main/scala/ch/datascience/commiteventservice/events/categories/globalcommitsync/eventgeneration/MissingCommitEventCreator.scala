@@ -21,9 +21,7 @@ package ch.datascience.commiteventservice.events.categories.globalcommitsync.eve
 import cats.MonadThrow
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.commiteventservice.events.categories.common.{CommitInfoFinder, CommitToEventLog, UpdateResult}
-import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.GlobalCommitEventSynchronizer.SynchronizationSummary
-import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.GlobalCommitEventSynchronizer.SynchronizationSummary.toSummaryKey
+import ch.datascience.commiteventservice.events.categories.common._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.events.consumers.Project
@@ -50,14 +48,10 @@ private[eventgeneration] class MissingCommitEventCreatorImpl[Interpretation[_]: 
   override def createMissingCommits(project: Project, commitsToCreate: List[CommitId])(implicit
       maybeAccessToken:                      Option[AccessToken]
   ): Interpretation[SynchronizationSummary] = for {
-    commitInfos <-
-      commitsToCreate.map(findCommitInfo(project.id, _)).sequence
-    results <- commitInfos.map(commitToEventLog.storeCommitInEventLog(project, _, BatchDate(clock))).sequence
+    commitInfos <- commitsToCreate.map(findCommitInfo(project.id, _)).sequence
+    results     <- commitInfos.map(commitToEventLog.storeCommitInEventLog(project, _, BatchDate(clock))).sequence
     summary <- results
-                 .foldLeft(SynchronizationSummary()) { (summary, result: UpdateResult) =>
-                   val currentCount = summary.get(toSummaryKey(result))
-                   summary.updated(result, currentCount + 1)
-                 }
+                 .foldLeft(SynchronizationSummary())(_.incrementCount(_))
                  .pure[Interpretation]
   } yield summary
 }

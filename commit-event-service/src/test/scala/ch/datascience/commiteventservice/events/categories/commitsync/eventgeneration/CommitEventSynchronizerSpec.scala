@@ -21,10 +21,10 @@ package ch.datascience.commiteventservice.events.categories.commitsync.eventgene
 import cats.data.OptionT
 import cats.syntax.all._
 import ch.datascience.commiteventservice.events.categories.commitsync.Generators._
-import ch.datascience.commiteventservice.events.categories.common.Generators.commitInfos
 import ch.datascience.commiteventservice.events.categories.commitsync.{categoryName, logMessageCommon}
-import ch.datascience.commiteventservice.events.categories.common.{CommitInfo, CommitInfoFinder, CommitToEventLog, CommitWithParents, EventStatusPatcher}
+import ch.datascience.commiteventservice.events.categories.common.Generators.commitInfos
 import ch.datascience.commiteventservice.events.categories.common.UpdateResult._
+import ch.datascience.commiteventservice.events.categories.common._
 import ch.datascience.events.consumers.Project
 import ch.datascience.generators.CommonGraphGenerators.personalAccessTokens
 import ch.datascience.generators.Generators.Implicits._
@@ -45,7 +45,6 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.{Clock, ZoneId, ZoneOffset}
 import scala.util.{Failure, Success, Try}
-import eu.timepit.refined.auto._
 
 class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with MockFactory {
 
@@ -195,18 +194,18 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       )
       givenCommitIsNotInGL(event.id, event.project.id)
 
-      (eventStatusPatcher.sendDeletionStatus _)
-        .expects(event.project.id, event.id)
-        .returning(Try(()))
+      (commitEventsRemover.removeDeletedEvent _)
+        .expects(event.project, event.id)
+        .returning(UpdateResult.Deleted.pure[Try])
 
       givenEventIsInEL(parentCommit.id, event.project.id)(returning =
         CommitWithParents(parentCommit.id, event.project.id, List.empty[CommitId])
       )
       givenCommitIsNotInGL(parentCommit.id, event.project.id)
 
-      (eventStatusPatcher.sendDeletionStatus _)
-        .expects(event.project.id, parentCommit.id)
-        .returning(Try(()))
+      (commitEventsRemover.removeDeletedEvent _)
+        .expects(event.project, parentCommit.id)
+        .returning(UpdateResult.Deleted.pure[Try])
 
       commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
 
@@ -238,9 +237,9 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       )
       givenCommitIsNotInGL(parentCommit.id, event.project.id)
 
-      (eventStatusPatcher.sendDeletionStatus _)
-        .expects(event.project.id, parentCommit.id)
-        .returning(Try(()))
+      (commitEventsRemover.removeDeletedEvent _)
+        .expects(event.project, parentCommit.id)
+        .returning(UpdateResult.Deleted.pure[Try])
 
       commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
 
@@ -371,6 +370,47 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       )
     }
 
+    "succeed and continue the process if the commit deletion is needed and return a failure" in new TestCase {
+      val event            = fullCommitSyncEvents.generateOne
+      val parent1Commit    = commitInfos.generateOne.copy(parents = List.empty[CommitId])
+      val latestCommitInfo = commitInfos.generateOne
+
+      givenAccessTokenIsFound(event.project.id)
+
+      givenLatestCommitIsFound(latestCommitInfo, event.project.id)
+
+      givenEventIsInEL(latestCommitInfo.id, event.project.id)(
+        CommitWithParents(latestCommitInfo.id, event.project.id, List(parent1Commit.id))
+      )
+      givenCommitIsNotInGL(latestCommitInfo.id, event.project.id)
+
+      val exception       = exceptions.generateOne
+      val deletionFailure = UpdateResult.Failed(nonEmptyStrings().generateOne, exception)
+      (commitEventsRemover.removeDeletedEvent _)
+        .expects(event.project, latestCommitInfo.id)
+        .returning(deletionFailure.pure[Try])
+
+      givenEventIsNotInEL(parent1Commit, event.project.id)
+      givenCommitIsInGL(parent1Commit, event.project.id)
+
+      (commitToEventLog.storeCommitInEventLog _)
+        .expects(event.project, parent1Commit, batchDate)
+        .returning(Success(Created))
+
+      commitEventSynchronizer.synchronizeEvents(event) shouldBe Success(())
+
+      logger.loggedOnly(
+        logErrorSynchronization(latestCommitInfo.id,
+                                event.project,
+                                executionTimeRecorder.elapsedTime,
+                                exception,
+                                deletionFailure.message
+        ),
+        logNewEventFound(parent1Commit.id, event.project, executionTimeRecorder.elapsedTime),
+        logSummary(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime, created = 1, failed = 1)
+      )
+    }
+
     "succeed and continue the process if the commit deletion is needed and fails" in new TestCase {
       val event            = fullCommitSyncEvents.generateOne
       val parent1Commit    = commitInfos.generateOne.copy(parents = List.empty[CommitId])
@@ -386,10 +426,9 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
       givenCommitIsNotInGL(latestCommitInfo.id, event.project.id)
 
       val exception = exceptions.generateOne
-
-      (eventStatusPatcher.sendDeletionStatus _)
-        .expects(event.project.id, latestCommitInfo.id)
-        .returning(exception.raiseError[Try, Unit])
+      (commitEventsRemover.removeDeletedEvent _)
+        .expects(event.project, latestCommitInfo.id)
+        .returning(exception.raiseError[Try, UpdateResult])
 
       givenEventIsNotInEL(parent1Commit, event.project.id)
       givenCommitIsInGL(parent1Commit, event.project.id)
@@ -442,8 +481,8 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
     val eventDetailsFinder = mock[EventDetailsFinder[Try]]
     val commitInfoFinder   = mock[CommitInfoFinder[Try]]
 
-    val commitToEventLog   = mock[CommitToEventLog[Try]]
-    val eventStatusPatcher = mock[EventStatusPatcher[Try]]
+    val commitToEventLog    = mock[CommitToEventLog[Try]]
+    val commitEventsRemover = mock[CommitEventsRemover[Try]]
 
     val executionTimeRecorder = TestExecutionTimeRecorder[Try](logger)
 
@@ -452,7 +491,7 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
                                                                        eventDetailsFinder,
                                                                        commitInfoFinder,
                                                                        commitToEventLog,
-                                                                       eventStatusPatcher,
+                                                                       commitEventsRemover,
                                                                        executionTimeRecorder,
                                                                        logger,
                                                                        clock

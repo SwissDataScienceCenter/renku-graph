@@ -21,14 +21,15 @@ package ch.datascience.webhookservice.hookcreation
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.graph.config.GitLabUrl
+import ch.datascience.graph.config.GitLabUrlLoader
+import ch.datascience.graph.model.GitLabUrl
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.{AccessToken, RestClient}
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import ch.datascience.webhookservice.model.ProjectHookUrl
-import org.typelevel.log4cats.Logger
 import org.http4s.Status
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
@@ -95,6 +96,6 @@ private object IOProjectHookCreator {
       timer:            Timer[IO]
   ): IO[ProjectHookCreator[IO]] =
     for {
-      gitLabUrl <- GitLabUrl[IO]()
+      gitLabUrl <- GitLabUrlLoader[IO]()
     } yield new IOProjectHookCreator(gitLabUrl, gitLabThrottler, logger)
 }

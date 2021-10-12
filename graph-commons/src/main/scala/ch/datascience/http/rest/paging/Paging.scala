@@ -18,34 +18,31 @@
 
 package ch.datascience.http.rest.paging
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.syntax.all._
 import ch.datascience.http.rest.paging.model.Total
 
-trait Paging[Interpretation[_], Result] {
+trait Paging[Result] {
 
   import Paging.PagedResultsFinder
 
-  def findPage(paging: PagingRequest)(implicit
-      resultsFinder:   PagedResultsFinder[Interpretation, Result],
-      ME:              MonadError[Interpretation, Throwable]
-  ): Interpretation[PagingResponse[Result]] =
-    for {
-      results  <- resultsFinder.findResults(paging)
-      response <- prepareResponse(results, paging)
-    } yield response
+  def findPage[Interpretation[_]: MonadThrow](paging: PagingRequest)(implicit
+      resultsFinder: PagedResultsFinder[Interpretation, Result]
+  ): Interpretation[PagingResponse[Result]] = for {
+    results  <- resultsFinder.findResults(paging)
+    response <- prepareResponse(results, paging)
+  } yield response
 
-  private def prepareResponse(
+  private def prepareResponse[Interpretation[_]: MonadThrow](
       results:              List[Result],
       pagingRequest:        PagingRequest
-  )(implicit resultsFinder: PagedResultsFinder[Interpretation, Result], ME: MonadError[Interpretation, Throwable]) =
-    for {
-      total <- if (results.nonEmpty && results.size < pagingRequest.perPage.value)
-                 Total((pagingRequest.page.value - 1) * pagingRequest.perPage.value + results.size).pure[Interpretation]
-               else
-                 resultsFinder.findTotal()
-      response <- PagingResponse.from[Interpretation, Result](results, pagingRequest, total)
-    } yield response
+  )(implicit resultsFinder: PagedResultsFinder[Interpretation, Result]) = for {
+    total <- if (results.nonEmpty && results.size < pagingRequest.perPage.value)
+               Total((pagingRequest.page.value - 1) * pagingRequest.perPage.value + results.size).pure[Interpretation]
+             else
+               resultsFinder.findTotal()
+    response <- PagingResponse.from[Interpretation, Result](results, pagingRequest, total)
+  } yield response
 }
 
 object Paging {

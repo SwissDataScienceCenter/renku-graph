@@ -19,11 +19,11 @@
 package ch.datascience.config
 
 import ch.datascience.tinytypes.constraints.{Url, UrlOps}
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{TinyTypeFactory, UrlTinyType}
 import pureconfig.ConfigReader
 
-class ServiceUrl private (val value: String) extends AnyVal with StringTinyType
+class ServiceUrl private (val value: String) extends AnyVal with UrlTinyType
 
 object ServiceUrl extends TinyTypeFactory[ServiceUrl](new ServiceUrl(_)) with Url with UrlOps[ServiceUrl] {
-  implicit val serviceUrlReader: ConfigReader[ServiceUrl] = ConfigLoader.stringTinyTypeReader(this)
+  implicit val serviceUrlReader: ConfigReader[ServiceUrl] = ConfigLoader.urlTinyTypeReader(this)
 }

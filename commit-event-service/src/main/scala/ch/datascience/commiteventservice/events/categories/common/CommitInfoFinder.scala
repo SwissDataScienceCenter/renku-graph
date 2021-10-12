@@ -22,7 +22,8 @@ import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.graph.config.GitLabUrl
+import ch.datascience.graph.config.GitLabUrlLoader
+import ch.datascience.graph.model.GitLabUrl
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.{AccessToken, RestClient}
@@ -104,6 +105,6 @@ private[categories] object CommitInfoFinder {
       concurrentEffect:      ConcurrentEffect[IO],
       timer:                 Timer[IO]
   ): IO[CommitInfoFinderImpl[IO]] = for {
-    gitLabUrl <- GitLabUrl[IO]()
+    gitLabUrl <- GitLabUrlLoader[IO]()
   } yield new CommitInfoFinderImpl[IO](gitLabUrl, gitLabThrottler, logger)
 }

@@ -18,48 +18,45 @@
 
 package ch.datascience.knowledgegraph.datasets.rest
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, Timer}
+import cats.syntax.all._
+import ch.datascience.graph.model.Schemas._
 import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.users.{Affiliation, Email, Name => UserName}
 import ch.datascience.knowledgegraph.datasets.model.DatasetCreator
+import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
-import io.circe.Decoder.{Result, decodeList}
-import io.circe.HCursor
+import io.circe.Decoder.decodeList
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private class CreatorsFinder(
+private class CreatorsFinder[Interpretation[_]: ConcurrentEffect: Timer](
     rdfStoreConfig:          RdfStoreConfig,
-    logger:                  Logger[IO],
-    timeRecorder:            SparqlQueryTimeRecorder[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+    logger:                  Logger[Interpretation],
+    timeRecorder:            SparqlQueryTimeRecorder[Interpretation]
+)(implicit executionContext: ExecutionContext)
     extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder) {
 
   import CreatorsFinder._
 
-  def findCreators(identifier: Identifier): IO[Set[DatasetCreator]] =
-    queryExpecting[List[DatasetCreator]](using = query(identifier))
-      .map(_.toSet)
+  def findCreators(identifier: Identifier): Interpretation[Set[DatasetCreator]] =
+    queryExpecting[List[DatasetCreator]](using = query(identifier)).map(_.toSet)
 
-  private def query(identifier: Identifier) = SparqlQuery(
+  private def query(identifier: Identifier) = SparqlQuery.of(
     name = "ds by id - creators",
-    Set(
-      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-      "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
-      "PREFIX schema: <http://schema.org/>"
-    ),
+    Prefixes.of(schema -> "schema"),
     s"""|SELECT DISTINCT ?email ?name ?affiliation
         |WHERE {
-        |  ?dataset rdf:type <http://schema.org/Dataset> ;
+        |  ?dataset a schema:Dataset ;
         |           schema:identifier "$identifier" ;
         |           schema:creator ?creatorResource .
-        |  OPTIONAL { ?creatorResource rdf:type <http://schema.org/Person> ;
+        |  OPTIONAL { ?creatorResource a schema:Person ;
         |                              schema:email ?email . } .
-        |  OPTIONAL { ?creatorResource rdf:type <http://schema.org/Person> ;
+        |  OPTIONAL { ?creatorResource a schema:Person ;
         |                              schema:affiliation ?affiliation . } .
-        |  ?creatorResource rdf:type <http://schema.org/Person> ;
+        |  ?creatorResource a schema:Person ;
         |                   schema:name ?name .
         |}""".stripMargin
   )
@@ -72,14 +69,11 @@ private object CreatorsFinder {
   private[datasets] implicit val creatorsDecoder: Decoder[List[DatasetCreator]] = {
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-    def extract(property: String, from: HCursor): Result[Option[String]] =
-      from.downField(property).downField("value").as[Option[String]]
-
     val creator: Decoder[DatasetCreator] = { cursor =>
       for {
         maybeEmail       <- cursor.downField("email").downField("value").as[Option[Email]]
         name             <- cursor.downField("name").downField("value").as[UserName]
-        maybeAffiliation <- extract("affiliation", from = cursor).map(blankToNone).flatMap(toOption[Affiliation])
+        maybeAffiliation <- cursor.downField("affiliation").downField("value").as[Option[Affiliation]]
       } yield DatasetCreator(maybeEmail, name, maybeAffiliation)
     }
 

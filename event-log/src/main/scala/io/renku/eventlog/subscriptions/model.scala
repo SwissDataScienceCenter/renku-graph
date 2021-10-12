@@ -47,8 +47,10 @@ private trait SubscriptionInfo extends Product with Serializable {
 }
 
 private object SubscriptionInfo {
+
   implicit def showInfo[T <: SubscriptionInfo]: Show[T] =
-    Show.show(info => show"${info.subscriberUrl}, ${info.subscriberId}${info.maybeCapacity}")
+    Show.show(info => show"subscriber = ${info.subscriberUrl}, id = ${info.subscriberId}${info.maybeCapacity}")
+
   private implicit lazy val showCapacity: Show[Option[Capacity]] =
     Show.show(maybeCapacity => maybeCapacity.map(capacity => show" with capacity ${capacity.value}").getOrElse(""))
 }

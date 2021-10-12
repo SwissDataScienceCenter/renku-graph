@@ -18,11 +18,11 @@
 
 package io.renku.jsonld
 
-import io.circe.{Encoder, Json}
+import cats.Show
+import cats.syntax.all._
+import io.circe.{Decoder, DecodingFailure, Encoder, Json}
 
-abstract class EntityType(val value: String) extends Product with Serializable {
-  override lazy val toString: String = value
-}
+sealed abstract class EntityType(val value: String) extends Product with Serializable
 
 object EntityType {
 
@@ -32,12 +32,27 @@ object EntityType {
   private[jsonld] final case class UrlEntityType(override val value: String) extends EntityType(value)
 
   implicit val entityTypeJsonEncoder: Encoder[EntityType] = Encoder.instance(t => Json.fromString(t.value))
+
+  implicit val entityTypeJsonDecoder: Decoder[EntityType] = Decoder.instance {
+    _.as[String].map(EntityType.of)
+  }
+
+  implicit val show: Show[EntityType] = Show.show[EntityType] { case UrlEntityType(value) => value }
 }
 
 import cats.data.NonEmptyList
 
 final case class EntityTypes(list: NonEmptyList[EntityType]) {
   lazy val toList: List[EntityType] = list.toList
+  def contains(types: EntityType*): Boolean = (types diff list.toList).isEmpty
+  def contains(types: EntityTypes): Boolean = contains(types.toList: _*)
+
+  override def hashCode(): Int = list.toList.toSet.hashCode()
+
+  override def equals(obj: Any): Boolean = Option(obj).exists {
+    case v: EntityTypes => v.list.toList.toSet == list.toList.toSet
+    case _ => false
+  }
 }
 
 object EntityTypes {
@@ -55,4 +70,18 @@ object EntityTypes {
       case multiple    => Json.arr(multiple.map(_.asJson): _*)
     }
   }
+
+  implicit val entityTypeJsonDecoder: Decoder[EntityTypes] = Decoder.instance { cursor =>
+    cursor
+      .as[List[EntityType]]
+      .flatMap {
+        case head :: tail => EntityTypes.of(head, tail: _*).asRight[DecodingFailure]
+        case Nil          => DecodingFailure("Types cannot be an empty list", Nil).asLeft[EntityTypes]
+      }
+      .leftFlatMap { _ =>
+        cursor.as[EntityType].map(EntityTypes.of(_))
+      }
+  }
+
+  implicit val show: Show[EntityTypes] = Show.show[EntityTypes](_.list.map(_.show).nonEmptyIntercalate("; "))
 }

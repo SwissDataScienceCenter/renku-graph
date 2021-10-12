@@ -16,14 +16,15 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.events.categories.creation
+package io.renku.eventlog.events.categories
+package creation
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
-import ch.datascience.events.consumers.ConsumersModelGenerators._
+import ch.datascience.events.Generators._
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, SchedulingError}
-import ch.datascience.events.consumers.{EventRequestContent, Project}
+import ch.datascience.events.consumers.Project
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventStatus
@@ -32,31 +33,37 @@ import ch.datascience.interpreters.TestLogger.Level._
 import io.circe.literal.JsonStringContext
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
-import io.renku.eventlog.Event
-import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
-import io.renku.eventlog.EventContentGenerators._
+import io.renku.eventlog.events.categories.creation.Event.{NewEvent, SkippedEvent}
 import io.renku.eventlog.events.categories.creation.EventPersister.Result.{Created, Existed}
+import io.renku.eventlog.events.categories.creation.Generators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.global
+import org.scalatest.prop.TableDrivenPropertyChecks
 
-class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class EventHandlerSpec extends AnyWordSpec with MockFactory with TableDrivenPropertyChecks with should.Matchers {
 
   "createHandlingProcess" should {
 
-    List(Created, Existed).foreach { successfulResponse =>
-      s"return $Accepted if the creation of the event returns $successfulResponse" in new TestCase {
+    val scenarios = Table(
+      "status"  -> "resultFactory",
+      "Created" -> ((event: Event) => Created(event)),
+      "Existed" -> ((_: Event) => Existed)
+    )
+    forAll(scenarios) { case (status, resultFactory) =>
+      s"return $Accepted if the creation of the event returns $status" in new TestCase {
         val event = newOrSkippedEvents.generateOne
 
-        val requestContent = EventRequestContent(event = event.asJson, None)
+        (eventPersister.storeNewEvent _).expects(event).returning(resultFactory(event).pure[IO])
 
-        (eventPersister.storeNewEvent _).expects(event).returning(successfulResponse.pure[IO])
-
-        handler.createHandlingProcess(requestContent).unsafeRunSync().process.value.unsafeRunSync() shouldBe Right(
-          Accepted
-        )
+        handler
+          .createHandlingProcess(requestContent(event.asJson))
+          .unsafeRunSync()
+          .process
+          .value
+          .unsafeRunSync() shouldBe Right(Accepted)
 
         logger.loggedOnly(
           Info(
@@ -109,13 +116,14 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
       val event     = newOrSkippedEvents.generateOne
       val exception = exceptions.generateOne
 
-      val requestContent = EventRequestContent(event = event.asJson, None)
-
       (eventPersister.storeNewEvent _).expects(event).returning(context.raiseError(exception))
 
-      handler.createHandlingProcess(requestContent).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(
-        SchedulingError(exception)
-      )
+      handler
+        .createHandlingProcess(requestContent(event.asJson))
+        .unsafeRunSync()
+        .process
+        .value
+        .unsafeRunSync() shouldBe Left(SchedulingError(exception))
 
       logger.loggedOnly(
         Error(
@@ -136,8 +144,8 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     val eventPersister = mock[EventPersister[IO]]
 
     val handler = new EventHandler[IO](categoryName, eventPersister, logger)
-
   }
+
   private def toJson(event: Event): Json =
     json"""{
       "categoryName": ${categoryName.value},
@@ -162,5 +170,4 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     case event: NewEvent     => toJson(event)
     case event: SkippedEvent => toJson(event) deepMerge json"""{ "message":    ${event.message.value} }"""
   }
-
 }

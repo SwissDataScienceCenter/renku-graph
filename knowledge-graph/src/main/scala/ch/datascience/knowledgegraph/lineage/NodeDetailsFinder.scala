@@ -20,12 +20,12 @@ package ch.datascience.knowledgegraph.lineage
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.Schemas._
-import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.projects
+import ch.datascience.graph.config.RenkuBaseUrlLoader
+import ch.datascience.graph.model.Schemas._
+import ch.datascience.graph.model.{RenkuBaseUrl, projects}
 import ch.datascience.graph.model.projects.ResourceId
 import ch.datascience.graph.model.views.RdfResource
-import ch.datascience.knowledgegraph.lineage.model.{Node, RunInfo}
+import ch.datascience.knowledgegraph.lineage.model.{ExecutionInfo, Node}
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
 import ch.datascience.tinytypes.json.TinyTypeDecoders
@@ -58,7 +58,7 @@ private class NodeDetailsFinderImpl(
   )(implicit query: (T, ResourceId) => SparqlQuery): IO[Set[Node]] =
     ids.toList
       .map { id =>
-        queryExpecting[Option[Node]](using = query(id, ResourceId(renkuBaseUrl, projectPath))).flatMap(failIf(no = id))
+        queryExpecting[Option[Node]](using = query(id, ResourceId(projectPath)(renkuBaseUrl))).flatMap(failIf(no = id))
       }
       .parSequence
       .map(_.toSet)
@@ -102,8 +102,8 @@ private class NodeDetailsFinderImpl(
       no match {
         case location: Node.Location =>
           new IllegalArgumentException(s"No entity with $location").raiseError[IO, Node]
-        case runInfo: RunInfo =>
-          new IllegalArgumentException(s"No runPlan with ${runInfo.entityId}").raiseError[IO, Node]
+        case runInfo: ExecutionInfo =>
+          new IllegalArgumentException(s"No plan with ${runInfo.entityId}").raiseError[IO, Node]
         case other =>
           new IllegalArgumentException(s"Entity $other not recognisable").raiseError[IO, Node]
       }
@@ -118,93 +118,85 @@ private object NodeDetailsFinder {
       timer:              Timer[IO]
   ): IO[NodeDetailsFinder[IO]] = for {
     config       <- RdfStoreConfig[IO]()
-    renkuBaseUrl <- RenkuBaseUrl[IO]()
+    renkuBaseUrl <- RenkuBaseUrlLoader[IO]()
   } yield new NodeDetailsFinderImpl(config, renkuBaseUrl, logger, timeRecorder)
 
   implicit val locationQuery: (Node.Location, ResourceId) => SparqlQuery = (location, path) =>
     SparqlQuery.of(
       name = "lineage - entity details",
-      Prefixes.of(prov -> "prov", rdf -> "rdf", schema -> "schema"),
+      Prefixes.of(prov -> "prov", schema -> "schema", renku -> "renku"),
       s"""|SELECT DISTINCT ?type ?location ?label
           |WHERE {
-          |  ?entity prov:atLocation '$location';
-          |          rdf:type prov:Entity;
-          |          rdf:type ?type;
-          |          schema:isPartOf ${path.showAs[RdfResource]}.
+          |  { 
+          |    ?entity prov:atLocation '$location';
+          |          a prov:Entity;
+          |          a ?type .
+          |  } {
+          |    ?activityId a prov:Activity ;
+          |                prov:qualifiedUsage / prov:entity ?entity ;
+          |                ^renku:hasActivity ${path.showAs[RdfResource]} .
+          |  } UNION {
+          |    ?entity prov:qualifiedGeneration / prov:activity / ^renku:hasActivity ${path.showAs[RdfResource]} .
+          |  }
           |  BIND ('$location' AS ?location)
           |  BIND ('$location' AS ?label)
           |}
           |""".stripMargin
     )
 
-  implicit val runIdQuery: (RunInfo, ResourceId) => SparqlQuery = { case (RunInfo(runId, _), _) =>
+  implicit val activityIdQuery: (ExecutionInfo, ResourceId) => SparqlQuery = { case (ExecutionInfo(activityId, _), _) =>
     SparqlQuery.of(
-      name = "lineage - runPlan details",
-      Prefixes.of(prov -> "prov", rdf -> "rdf", renku -> "renku", schema -> "schema"),
+      name = "lineage - plan details",
+      Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema"),
       s"""|SELECT DISTINCT  ?type (CONCAT(STR(?command), STR(' '), (GROUP_CONCAT(?commandParameter; separator=' '))) AS ?label) ?location
           |WHERE {
           |  {
           |    SELECT DISTINCT ?command ?type ?location
           |    WHERE {
-          |      <$runId> renku:command ?command.
-          |      ?activity prov:qualifiedAssociation/prov:hadPlan <$runId>;
-          |                rdf:type ?type.
-          |      BIND (<$runId> AS ?location)
+          |      <$activityId> prov:qualifiedAssociation/prov:hadPlan ?planId;
+          |                    a ?type.
+          |      ?planId renku:command ?command.
+          |      BIND (<$activityId> AS ?location)
           |    }
           |  } {
           |    SELECT ?position ?commandParameter
-          |    WHERE {
-          |      { # inputs with position
-          |        <$runId> renku:hasInputs ?input .
-          |        ?input renku:consumes/prov:atLocation ?location;
-          |               renku:position ?position.
+          |     WHERE {
+          |      { # inputs
+          |        <$activityId> prov:qualifiedAssociation/prov:hadPlan ?planId.
+          |        ?planId renku:hasInputs ?input .
+          |        ?paramValue a renku:ParameterValue ;
+          |                    schema:valueReference ?input .
+          |        ?paramValue schema:value ?value .
+          |        OPTIONAL { ?input renku:mappedTo/renku:streamType ?maybeStreamType. }
+          |        ?input renku:position ?position.
           |        OPTIONAL { ?input renku:prefix ?maybePrefix }
-          |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .
-          |        BIND (CONCAT(?prefix, STR(?location)) AS ?commandParameter) .
-          |      } UNION { # inputs with mappedTo
-          |        <$runId> renku:hasInputs ?input .
-          |        ?input renku:consumes/prov:atLocation ?location;
-          |               renku:mappedTo/renku:streamType ?streamType.
-          |        OPTIONAL { ?input renku:prefix ?maybePrefix }
-          |        FILTER NOT EXISTS { ?input renku:position ?maybePosition }.
+          |        BIND (IF(bound(?maybeStreamType), ?maybeStreamType, '') AS ?streamType).
           |        BIND (IF(?streamType = 'stdin', '< ', '') AS ?streamOperator).
-          |        BIND (1 AS ?position).
           |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix).
-          |        BIND (CONCAT(?prefix, ?streamOperator, STR(?location)) AS ?commandParameter) .
-          |      } UNION { # inputs with no position and mappedTo
-          |        <$runId> renku:hasInputs ?input .
-          |        FILTER NOT EXISTS { ?input renku:position ?maybePosition }.
-          |        FILTER NOT EXISTS { ?input renku:mappedTo ?mappedTo }.
-          |        BIND (1 AS ?position).
-          |        BIND ('' AS ?commandParameter).
-          |      } UNION { # outputs with position
-          |        <$runId> renku:hasOutputs ?output .
-          |        ?output renku:produces/prov:atLocation ?location;
-          |                renku:position ?position.
+          |        BIND (CONCAT(?prefix, ?streamOperator, STR(?value)) AS ?commandParameter) .
+          |      } UNION { # outputs
+          |        <$activityId> prov:qualifiedAssociation/prov:hadPlan ?planId.
+          |        ?planId renku:hasOutputs ?output .
+          |        ?paramValue a renku:ParameterValue ;
+          |                    schema:valueReference ?output .
+          |        ?paramValue schema:value ?value .
+          |        ?output renku:position ?position.
+          |        OPTIONAL { ?output renku:mappedTo/renku:streamType ?maybeStreamType. }
           |        OPTIONAL { ?output renku:prefix ?maybePrefix }
-          |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .
-          |        BIND (CONCAT(?prefix, STR(?location)) AS ?commandParameter) .
-          |      } UNION { # outputs with mappedTo
-          |        <$runId> renku:hasOutputs ?output .
-          |        ?output renku:produces/prov:atLocation ?location;
-          |                renku:mappedTo/renku:streamType ?streamType.
-          |        OPTIONAL { ?output renku:prefix ?maybePrefix }
-          |        FILTER NOT EXISTS { ?output renku:position ?maybePosition }.
+          |        BIND (IF(bound(?maybeStreamType), ?maybeStreamType, '') AS ?streamType).
           |        BIND (IF(?streamType = 'stdout', '> ', IF(?streamType = 'stderr', '2> ', '')) AS ?streamOperator).
-          |        BIND (IF(?streamType = 'stdout', 2, IF(?streamType = 'stderr', 3, 3)) AS ?position).
           |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .
-          |        BIND (CONCAT(?prefix, ?streamOperator, STR(?location)) AS ?commandParameter) .
-          |      } UNION { # outputs with no position and mappedTo
-          |        <$runId> renku:hasOutputs ?output .
-          |        FILTER NOT EXISTS { ?output renku:position ?maybePosition }.
-          |        FILTER NOT EXISTS { ?output renku:mappedTo ?mappedTo }.
-          |        BIND (1 AS ?position).
-          |        BIND ('' AS ?commandParameter).
-          |      } UNION { # arguments
-          |        <$runId> renku:hasArguments ?argument .
-          |        ?argument renku:position ?position .
-          |        OPTIONAL { ?argument renku:prefix ?maybePrefix }
-          |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?commandParameter) .
+          |        BIND (CONCAT(?prefix, ?streamOperator, STR(?value)) AS ?commandParameter) .
+          |      } UNION { # parameters
+          |        <$activityId> prov:qualifiedAssociation/prov:hadPlan ?planId.
+          |        ?planId renku:hasArguments ?parameter .
+          |        ?paramValue a renku:ParameterValue;
+          |                    schema:valueReference ?parameter .
+          |        ?paramValue schema:value ?value .
+          |        ?parameter renku:position ?position .
+          |        OPTIONAL { ?parameter renku:prefix ?maybePrefix }
+          |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .
+          |        BIND (CONCAT(?prefix, STR(?value)) AS ?commandParameter) .
           |      }
           |    }
           |    GROUP BY ?position ?commandParameter

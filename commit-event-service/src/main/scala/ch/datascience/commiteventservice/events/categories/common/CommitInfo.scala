@@ -36,24 +36,16 @@ private[categories] object CommitInfo {
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import io.circe._
 
-  implicit val commitInfoDecoder: Decoder[CommitInfo] = (cursor: HCursor) => {
-
-    implicit class CursorOps(cursor: ACursor) {
-      lazy val toMaybeName: Decoder.Result[Option[Name]] =
-        cursor.as[Option[String]].map(blankToNone).flatMap(toOption[Name])
-      lazy val toMaybeEmail: Decoder.Result[Option[Email]] =
-        cursor.as[Option[String]].map(blankToNone).flatMap(toOption[Email]).leftFlatMap(_ => Right(None))
-    }
-
+  implicit val commitInfoDecoder: Decoder[CommitInfo] = cursor =>
     for {
       id             <- cursor.downField("id").as[CommitId]
       message        <- cursor.downField("message").as[CommitMessage]
       committedDate  <- cursor.downField("committed_date").as[CommittedDate]
       parents        <- cursor.downField("parent_ids").as[List[CommitId]]
-      authorName     <- cursor.downField("author_name").toMaybeName
-      authorEmail    <- cursor.downField("author_email").toMaybeEmail
-      committerName  <- cursor.downField("committer_name").toMaybeName
-      committerEmail <- cursor.downField("committer_email").toMaybeEmail
+      authorName     <- cursor.downField("author_name").as[Option[Name]]
+      authorEmail    <- cursor.downField("author_email").as[Option[Email]].leftFlatMap(_ => Right(None))
+      committerName  <- cursor.downField("committer_name").as[Option[Name]]
+      committerEmail <- cursor.downField("committer_email").as[Option[Email]].leftFlatMap(_ => Right(None))
       author <- (authorName, authorEmail) match {
                   case (Some(name), Some(email)) => Right(Author(name, email))
                   case (Some(name), None)        => Right(Author.withName(name))
@@ -67,5 +59,4 @@ private[categories] object CommitInfo {
                      case _                         => Left(DecodingFailure("Neither committer name nor email", Nil))
                    }
     } yield CommitInfo(id, message, committedDate, author, committer, parents)
-  }
 }

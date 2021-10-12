@@ -26,30 +26,31 @@ import ch.datascience.graph.model.users.{Affiliation, Email, Name => UserName}
 object model {
 
   sealed trait Dataset extends Product with Serializable {
+    val resourceId:       ResourceId
     val id:               Identifier
     val title:            Title
     val name:             Name
-    val url:              Url
     val maybeDescription: Option[Description]
     val creators:         Set[DatasetCreator]
-    val dates:            Dates
+    val date:             Date
     val parts:            List[DatasetPart]
     val project:          DatasetProject
     val usedIn:           List[DatasetProject]
     val keywords:         List[Keyword]
     val versions:         DatasetVersions
     val images:           List[ImageUri]
+
   }
 
-  final case class NonModifiedDataset(id:               Identifier,
+  final case class NonModifiedDataset(resourceId:       ResourceId,
+                                      id:               Identifier,
                                       title:            Title,
                                       name:             Name,
-                                      url:              Url,
                                       sameAs:           SameAs,
                                       versions:         DatasetVersions,
                                       maybeDescription: Option[Description],
                                       creators:         Set[DatasetCreator],
-                                      dates:            Dates,
+                                      date:             Date,
                                       parts:            List[DatasetPart],
                                       project:          DatasetProject,
                                       usedIn:           List[DatasetProject],
@@ -57,15 +58,15 @@ object model {
                                       images:           List[ImageUri]
   ) extends Dataset
 
-  final case class ModifiedDataset(id:               Identifier,
+  final case class ModifiedDataset(resourceId:       ResourceId,
+                                   id:               Identifier,
                                    title:            Title,
                                    name:             Name,
-                                   url:              Url,
                                    derivedFrom:      DerivedFrom,
                                    versions:         DatasetVersions,
                                    maybeDescription: Option[Description],
                                    creators:         Set[DatasetCreator],
-                                   dates:            Dates,
+                                   date:             DateCreated,
                                    parts:            List[DatasetPart],
                                    project:          DatasetProject,
                                    usedIn:           List[DatasetProject],
@@ -75,10 +76,8 @@ object model {
 
   final case class DatasetCreator(maybeEmail: Option[Email], name: UserName, maybeAffiliation: Option[Affiliation])
 
-  final case class DatasetPart(name: PartName, atLocation: PartLocation)
+  final case class DatasetPart(location: PartLocation)
   final case class DatasetVersions(initial: InitialVersion)
 
-  final case class DatasetProject(path: Path, name: projects.Name, created: AddedToProject)
-  final case class AddedToProject(date: DateCreatedInProject, agent: DatasetAgent)
-  final case class DatasetAgent(maybeEmail: Option[Email], name: UserName)
+  final case class DatasetProject(path: Path, name: projects.Name)
 }

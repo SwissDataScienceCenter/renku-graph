@@ -18,11 +18,12 @@
 
 package ch.datascience.http.rest.paging
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.syntax.all._
-import ch.datascience.config.renku
 import ch.datascience.http.rest.paging.PagingResponse.PagingInfo
 import ch.datascience.http.rest.paging.model.Total
+import ch.datascience.tinytypes.UrlTinyType
+import ch.datascience.tinytypes.constraints.UrlOps
 
 final class PagingResponse[Result] private (val results: List[Result], val pagingInfo: PagingInfo) {
   override lazy val toString: String = s"PagingResponse(pagingInfo: $pagingInfo, results: $results)"
@@ -30,15 +31,11 @@ final class PagingResponse[Result] private (val results: List[Result], val pagin
 
 object PagingResponse {
 
-  final class PagingInfo private[PagingResponse] (val pagingRequest: PagingRequest, val total: Total) {
-    override lazy val toString: String = s"PagingInfo(request: $pagingRequest, total: $total)"
-  }
-
-  def from[Interpretation[_], Result](
+  def from[Interpretation[_]: MonadThrow, Result](
       results:       List[Result],
       pagingRequest: PagingRequest,
       total:         Total
-  )(implicit ME:     MonadError[Interpretation, Throwable]): Interpretation[PagingResponse[Result]] = {
+  ): Interpretation[PagingResponse[Result]] = {
 
     val pagingInfo = new PagingInfo(pagingRequest, total)
 
@@ -56,6 +53,10 @@ object PagingResponse {
       ).raiseError[Interpretation, PagingResponse[Result]]
   }
 
+  final class PagingInfo private[PagingResponse] (val pagingRequest: PagingRequest, val total: Total) {
+    override lazy val toString: String = s"PagingInfo(request: $pagingRequest, total: $total)"
+  }
+
   implicit class ResponseOps[Result](response: PagingResponse[Result]) {
 
     import cats.effect.Effect
@@ -64,18 +65,17 @@ object PagingResponse {
     import org.http4s.circe.jsonEncoderOf
     import org.http4s.{EntityEncoder, Response, Status}
 
-    def updateResults[Interpretation[_]](
-        newResults: List[Result]
-    )(implicit ME:  MonadError[Interpretation, Throwable]): Interpretation[PagingResponse[Result]] =
+    def updateResults[Interpretation[_]: MonadThrow](newResults: List[Result]): Interpretation[PagingResponse[Result]] =
       if (response.results.size == newResults.size)
         new PagingResponse[Result](newResults, response.pagingInfo).pure[Interpretation]
       else
         new IllegalArgumentException("Cannot update Paging Results as there's different number of results")
           .raiseError[Interpretation, PagingResponse[Result]]
 
-    def toHttpResponse[Interpretation[_]: Effect](implicit
-        renkuResourceUrl: renku.ResourceUrl,
-        encoder:          Encoder[Result]
+    def toHttpResponse[Interpretation[_]: Effect, ResourceUrl <: UrlTinyType](implicit
+        resourceUrl:    ResourceUrl,
+        resourceUrlOps: UrlOps[ResourceUrl],
+        encoder:        Encoder[Result]
     ): Response[Interpretation] =
       Response(Status.Ok)
         .withEntity(response.results.asJson)

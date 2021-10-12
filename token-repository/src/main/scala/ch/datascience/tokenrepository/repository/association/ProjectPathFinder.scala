@@ -21,8 +21,8 @@ package ch.datascience.tokenrepository.repository.association
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.GitLab
 import ch.datascience.control.{RateLimit, Throttler}
-import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.model.projects
+import ch.datascience.graph.config.GitLabUrlLoader
+import ch.datascience.graph.model.{GitLabUrl, projects}
 import ch.datascience.http.client.{AccessToken, RestClient}
 import org.typelevel.log4cats.Logger
 import org.http4s.circe.jsonOf
@@ -83,6 +83,6 @@ object IOProjectPathFinder {
     for {
       gitLabRateLimit <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
       gitLabThrottler <- Throttler[IO, GitLab](gitLabRateLimit)
-      gitLabUrl       <- GitLabUrl[IO]()
+      gitLabUrl       <- GitLabUrlLoader[IO]()
     } yield new IOProjectPathFinder(gitLabUrl, gitLabThrottler, logger)
 }

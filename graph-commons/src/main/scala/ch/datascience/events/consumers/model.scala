@@ -24,12 +24,13 @@ import cats.effect.Concurrent
 import cats.effect.concurrent.Deferred
 import cats.syntax.all._
 import ch.datascience.graph.model.projects
-import io.circe.Json
 
 final case class Project(id: projects.Id, path: projects.Path)
 
 object Project {
-  implicit lazy val show: Show[Project] = Show.show(project => show"${project.id}, ${project.path}")
+  implicit lazy val show: Show[Project] = Show.show { case Project(id, path) =>
+    s"projectId = $id, projectPath = $path"
+  }
 }
 
 sealed trait EventSchedulingResult extends Product with Serializable
@@ -41,12 +42,14 @@ object EventSchedulingResult {
   case object UnsupportedEventType extends EventSchedulingResult
   case object BadRequest           extends EventSchedulingResult
   final case class SchedulingError(throwable: Throwable) extends EventSchedulingResult
-}
 
-final case class EventRequestContent(event: Json, maybePayload: Option[String])
-
-object EventRequestContent {
-  def apply(event: Json): EventRequestContent = EventRequestContent(event, None)
+  implicit def show[SE <: EventSchedulingResult]: Show[SE] = Show.show {
+    case Accepted             => "Accepted"
+    case Busy                 => "Busy"
+    case UnsupportedEventType => "UnsupportedEventType"
+    case BadRequest           => "BadRequest"
+    case SchedulingError(_)   => "SchedulingError"
+  }
 }
 
 import EventSchedulingResult._

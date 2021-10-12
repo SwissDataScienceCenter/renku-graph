@@ -25,8 +25,8 @@ import ch.datascience.commiteventservice.events.categories.common.Generators._
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.GitLabUrl
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.CommittedDate
 import ch.datascience.http.client.RestClientError.UnauthorizedException
@@ -127,7 +127,9 @@ class CommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSer
 
       intercept[Exception] {
         finder.findCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync()
-      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId/repository/commits/$commitId returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      }.getMessage should startWith(
+        s"GET $gitLabUrl/api/v4/projects/$projectId/repository/commits/$commitId returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      )
     }
 
     "return an Error if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
@@ -242,7 +244,9 @@ class CommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSer
 
       intercept[Exception] {
         finder.findCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync()
-      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId/repository/commits/$commitId returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      }.getMessage should startWith(
+        s"GET $gitLabUrl/api/v4/projects/$projectId/repository/commits/$commitId returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      )
     }
 
     "return an Error if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {

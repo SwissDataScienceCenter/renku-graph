@@ -18,9 +18,10 @@
 
 package ch.datascience.knowledgegraph.projects.rest
 
+import ProjectsGenerators._
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators.renkuResourcesUrls
+import ch.datascience.generators.CommonGraphGenerators.{authUsers, renkuResourcesUrls}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
@@ -34,7 +35,6 @@ import ch.datascience.http.server.EndpointTester._
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
-import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.knowledgegraph.projects.model.Forking.ForksCount
 import ch.datascience.knowledgegraph.projects.model.Permissions.{AccessLevel, GroupAccessLevel, ProjectAccessLevel}
 import ch.datascience.knowledgegraph.projects.model.Project._
@@ -128,11 +128,11 @@ class ProjectEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
   }
 
   private trait TestCase {
-    val projectFinder         = mock[IOProjectFinder]
+    val projectFinder         = mock[ProjectFinder[IO]]
     val renkuResourcesUrl     = renkuResourcesUrls.generateOne
     val logger                = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
-    val getProject = new ProjectEndpoint[IO](
+    val getProject = new ProjectEndpointImpl[IO](
       projectFinder,
       renkuResourcesUrl,
       executionTimeRecorder,

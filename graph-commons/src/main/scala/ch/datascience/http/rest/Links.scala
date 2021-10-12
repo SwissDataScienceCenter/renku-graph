@@ -21,7 +21,7 @@ package ch.datascience.http.rest
 import cats.data.NonEmptyList
 import ch.datascience.http.rest.Links.{Link, Rel}
 import ch.datascience.tinytypes.constraints.{NonBlank, Url, UrlOps}
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory, UrlTinyType}
 import io.circe._
 import io.circe.literal._
 
@@ -46,9 +46,9 @@ object Links {
     lazy val Self: Rel = Rel("self")
   }
 
-  final class Href private (val value: String) extends AnyVal with StringTinyType
+  final class Href private (val value: String) extends AnyVal with UrlTinyType
   implicit object Href extends TinyTypeFactory[Href](new Href(_)) with Url with UrlOps[Href] {
-    def apply(value: StringTinyType): Href = Href(value.value)
+    def apply(value: UrlTinyType): Href = Href(value.value)
   }
 
   final case class Link(rel: Rel, href: Href)

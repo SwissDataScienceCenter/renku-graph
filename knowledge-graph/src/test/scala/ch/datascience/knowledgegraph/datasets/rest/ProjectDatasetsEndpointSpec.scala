@@ -20,7 +20,6 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.http.InfoMessage._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -28,13 +27,15 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{Identifier, ImageUri, InitialVersion, Name, Title}
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.http.ErrorMessage
+import ch.datascience.http.InfoMessage._
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
 import ch.datascience.logging.TestExecutionTimeRecorder
-import io.circe.Json
+import ch.datascience.tinytypes.json.TinyTypeEncoders
 import io.circe.literal._
 import io.circe.syntax._
+import io.circe.{Encoder, Json}
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
@@ -48,7 +49,8 @@ class ProjectDatasetsEndpointSpec
     extends AnyWordSpec
     with MockFactory
     with ScalaCheckPropertyChecks
-    with should.Matchers {
+    with should.Matchers
+    with TinyTypeEncoders {
 
   import ProjectDatasetsFinder._
 
@@ -62,7 +64,7 @@ class ProjectDatasetsEndpointSpec
           .expects(projectPath)
           .returning(datasetsList.pure[IO])
 
-        val response = getProjectDatasets(projectPath).unsafeRunSync()
+        val response = endpoint.getProjectDatasets(projectPath).unsafeRunSync()
 
         response.status      shouldBe Ok
         response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -83,7 +85,7 @@ class ProjectDatasetsEndpointSpec
         .expects(projectPath)
         .returning(List.empty[ProjectDataset].pure[IO])
 
-      val response = getProjectDatasets(projectPath).unsafeRunSync()
+      val response = endpoint.getProjectDatasets(projectPath).unsafeRunSync()
 
       response.status                         shouldBe Ok
       response.contentType                    shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -102,7 +104,7 @@ class ProjectDatasetsEndpointSpec
         .expects(projectPath)
         .returning(exception.raiseError[IO, List[ProjectDataset]])
 
-      val response = getProjectDatasets(projectPath).unsafeRunSync()
+      val response = endpoint.getProjectDatasets(projectPath).unsafeRunSync()
 
       response.status      shouldBe InternalServerError
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -118,52 +120,72 @@ class ProjectDatasetsEndpointSpec
 
     val projectDatasetsFinder = mock[ProjectDatasetsFinder[IO]]
     val renkuResourcesUrl     = renkuResourcesUrls.generateOne
+    val gitLabUrl             = gitLabUrls.generateOne
     val logger                = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
-    val getProjectDatasets = new ProjectDatasetsEndpoint[IO](
-      projectDatasetsFinder,
-      renkuResourcesUrl,
-      executionTimeRecorder,
-      logger
-    ).getProjectDatasets _
+    val endpoint = new ProjectDatasetsEndpoint[IO](projectDatasetsFinder,
+                                                   renkuResourcesUrl,
+                                                   gitLabUrl,
+                                                   executionTimeRecorder,
+                                                   logger
+    )
 
     lazy val toJson: ((Identifier, InitialVersion, Title, Name, SameAsOrDerived, List[ImageUri])) => Json = {
       case (id, initialVersion, title, name, Left(sameAs), images) =>
         json"""{
-          "identifier": ${id.value},
+          "identifier": $id,
           "versions": {
-            "initial": ${initialVersion.value}
+            "initial": $initialVersion
           },
-          "title": ${title.value},
-          "name": ${name.value},
-          "sameAs": ${sameAs.value},
-          "images": ${images.map(_.value)},
+          "title": $title,
+          "name": $name,
+          "sameAs": $sameAs,
+          "images": $images,
           "_links": [{
             "rel": "details",
-            "href": ${(renkuResourcesUrl / "datasets" / id).value}
+            "href": ${renkuResourcesUrl / "datasets" / id}
           }, {
             "rel": "initial-version",
-            "href": ${(renkuResourcesUrl / "datasets" / initialVersion).value}
+            "href": ${renkuResourcesUrl / "datasets" / initialVersion}
           }]
         }"""
       case (id, initialVersion, title, name, Right(derivedFrom), images) =>
         json"""{
-          "identifier": ${id.value},
+          "identifier": $id,
           "versions" : {
-            "initial": ${initialVersion.value}
+            "initial": $initialVersion
           },
-          "title": ${title.value},
-          "name": ${name.value},
-          "derivedFrom": ${derivedFrom.value},
-          "images": ${images.map(_.value)},
+          "title": $title,
+          "name": $name,
+          "derivedFrom": $derivedFrom,
+          "images": $images,
           "_links": [{
             "rel": "details",
-            "href": ${(renkuResourcesUrl / "datasets" / id).value}
+            "href": ${renkuResourcesUrl / "datasets" / id}
           }, {
             "rel": "initial-version",
-            "href": ${(renkuResourcesUrl / "datasets" / initialVersion).value}
+            "href": ${renkuResourcesUrl / "datasets" / initialVersion}
           }]
         }"""
+    }
+
+    private implicit lazy val imagesEncoder: Encoder[List[ImageUri]] = Encoder.instance[List[ImageUri]] { images =>
+      Json.arr(images.map {
+        case uri: ImageUri.Relative => json"""{
+            "location": $uri,
+            "_links": [{
+              "rel": "view",
+              "href": ${s"$gitLabUrl/$projectPath/raw/master/$uri"}
+            }]
+          }"""
+        case uri: ImageUri.Absolute => json"""{
+            "location": $uri,
+            "_links": [{
+              "rel": "view",
+              "href": $uri
+            }]
+          }"""
+      }: _*)
     }
   }
 
@@ -173,6 +195,6 @@ class ProjectDatasetsEndpointSpec
     title                   <- datasetTitles
     name                    <- datasetNames
     sameAsEitherDerivedFrom <- Gen.oneOf(datasetSameAs map (Left(_)), datasetDerivedFroms map (Right(_)))
-    images                  <- listOf(imageUris)
+    images                  <- listOf(datasetImageUris)
   } yield (id, initialVersion, title, name, sameAsEitherDerivedFrom, images)
 }

@@ -20,21 +20,18 @@ package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.Schemas.rdf
-import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.RenkuVersionPair
+import ch.datascience.graph.model.Schemas._
 import ch.datascience.graph.model.views.RdfResource
+import ch.datascience.graph.model.{RenkuBaseUrl, RenkuVersionPair}
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
-import ch.datascience.rdfstore.{RdfStoreClientImpl, RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
+import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
 trait RenkuVersionPairFinder[Interpretation[_]] {
-
   def find(): Interpretation[Option[RenkuVersionPair]]
-
 }
 
 private class RenkuVersionPairFinderImpl[Interpretation[_]: ConcurrentEffect: Timer](
@@ -60,7 +57,7 @@ private class RenkuVersionPairFinderImpl[Interpretation[_]: ConcurrentEffect: Ti
           |}
           |""".stripMargin
     )
-  }.flatMap {
+  } >>= {
     case Nil         => Option.empty[RenkuVersionPair].pure[Interpretation]
     case head :: Nil => head.some.pure[Interpretation]
     case versionPairs =>

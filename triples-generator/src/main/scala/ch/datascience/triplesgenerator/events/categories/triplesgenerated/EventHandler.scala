@@ -19,17 +19,17 @@
 package ch.datascience.triplesgenerator
 package events.categories.triplesgenerated
 
-import cats.MonadThrow
 import cats.data.EitherT.{fromEither, fromOption}
 import cats.effect.concurrent.Deferred
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.all._
+import cats.{MonadThrow, Show}
 import ch.datascience.config.{ConfigLoader, GitLab}
 import ch.datascience.control.Throttler
-import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
-import ch.datascience.events.consumers._
+import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, Project}
+import ch.datascience.events.{EventRequestContent, consumers}
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventBody}
 import ch.datascience.metrics.MetricsRegistry
@@ -37,7 +37,7 @@ import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
-import io.circe.parser
+import io.circe.parser.{parse => parseJson}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -52,6 +52,8 @@ private[events] class EventHandler[Interpretation[_]: ConcurrentEffect: MonadThr
 ) extends consumers.EventHandlerWithProcessLimiter[Interpretation](concurrentProcessesLimiter) {
 
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
+  import eventBodyDeserializer._
+  import eventProcessor._
   import io.circe.Decoder
 
   private type IdAndBody = (CompoundEventId, EventBody)
@@ -60,30 +62,25 @@ private[events] class EventHandler[Interpretation[_]: ConcurrentEffect: MonadThr
       request: EventRequestContent
   ): Interpretation[EventHandlingProcess[Interpretation]] =
     EventHandlingProcess.withWaitingForCompletion[Interpretation](
-      deferred => startProcessingEvent(request, deferred),
-      subscriptionMechanism.renewSubscription()
+      processing => startProcessingEvent(request, processing),
+      releaseProcess = subscriptionMechanism.renewSubscription()
     )
 
-  private def startProcessingEvent(request: EventRequestContent, deferred: Deferred[Interpretation, Unit]) = for {
-    eventId <- fromEither(request.event.getEventId)
-    project <- fromEither(request.event.getProject)
-    eventBodyJson <-
-      fromOption[Interpretation](request.maybePayload.flatMap(str => parser.parse(str).toOption), BadRequest)
+  private def startProcessingEvent(request: EventRequestContent, processing: Deferred[Interpretation, Unit]) = for {
+    eventId            <- fromEither(request.event.getEventId)
+    project            <- fromEither(request.event.getProject)
+    eventBodyString    <- fromOption(request.maybePayload, BadRequest)
+    eventBodyJson      <- fromEither(parseJson(eventBodyString)).leftMap(_ => BadRequest)
     eventBodyAndSchema <- fromEither(eventBodyJson.as[(EventBody, SchemaVersion)]).leftMap(_ => BadRequest)
-    (eventBody, schemaVersion) = eventBodyAndSchema
-    triplesGeneratedEvent <-
-      eventBodyDeserializer
-        .toTriplesGeneratedEvent(eventId, project, schemaVersion, eventBody)
-        .toRightT(recoverTo = BadRequest)
+    event              <- toEvent(eventId, project, eventBodyAndSchema).toRightT(recoverTo = BadRequest)
     result <- (ContextShift[Interpretation].shift *> Concurrent[Interpretation]
-                .start(eventProcessor.process(triplesGeneratedEvent).flatMap(_ => deferred.complete(())))).toRightT
+                .start(process(event) >> processing.complete(()))).toRightT
                 .map(_ => Accepted)
-                .semiflatTap(logger.log(eventId -> triplesGeneratedEvent.project))
-                .leftSemiflatTap(logger.log(eventId -> triplesGeneratedEvent.project))
-
+                .semiflatTap(logger.log(eventId -> event.project))
+                .leftSemiflatTap(logger.log(eventId -> event.project))
   } yield result
 
-  private implicit lazy val eventInfoToString: ((CompoundEventId, Project)) => String = { case (eventId, project) =>
+  private implicit lazy val eventInfoShow: Show[(CompoundEventId, Project)] = Show.show { case (eventId, project) =>
     s"$eventId, projectPath = ${project.path}"
   }
 
@@ -104,17 +101,16 @@ private[events] object EventHandler {
       gitLabThrottler:       Throttler[IO, GitLab],
       timeRecorder:          SparqlQueryTimeRecorder[IO],
       subscriptionMechanism: SubscriptionMechanism[IO],
-      logger:                Logger[IO],
       config:                Config = ConfigFactory.load()
   )(implicit
       contextShift:     ContextShift[IO],
       executionContext: ExecutionContext,
-      timer:            Timer[IO]
+      timer:            Timer[IO],
+      logger:           Logger[IO]
   ): IO[EventHandler[IO]] = for {
-    generationProcesses <- find[IO, Int Refined Positive]("transformation-processes-number", config)
-    eventProcessor      <- IOTriplesGeneratedEventProcessor(metricsRegistry, gitLabThrottler, timeRecorder, logger)
-    concurrentProcessesLimiter <-
-      ConcurrentProcessesLimiter(generationProcesses)
+    generationProcesses        <- find[IO, Int Refined Positive]("transformation-processes-number", config)
+    eventProcessor             <- EventProcessor(metricsRegistry, gitLabThrottler, timeRecorder)
+    concurrentProcessesLimiter <- ConcurrentProcessesLimiter(generationProcesses)
   } yield new EventHandler[IO](categoryName,
                                EventBodyDeserializer(),
                                subscriptionMechanism,

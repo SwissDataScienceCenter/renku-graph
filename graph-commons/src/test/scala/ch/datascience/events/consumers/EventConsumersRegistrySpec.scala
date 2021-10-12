@@ -18,10 +18,10 @@
 
 package ch.datascience.events.consumers
 
+import ConsumersModelGenerators._
 import cats.Parallel
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
-import ch.datascience.events.consumers.ConsumersModelGenerators._
 import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
 import ch.datascience.generators.Generators.Implicits._
@@ -160,5 +160,4 @@ class EventConsumersRegistrySpec extends AnyWordSpec with should.Matchers with M
     val registry =
       new EventConsumersRegistryImpl[IO](List(handler0, handler1), List(subscriptionMechanism0, subscriptionMechanism1))
   }
-
 }

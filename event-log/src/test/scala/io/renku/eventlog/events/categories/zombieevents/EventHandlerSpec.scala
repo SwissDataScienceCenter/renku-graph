@@ -16,11 +16,11 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.events.categories.zombieevents
+package io.renku.eventlog.events.categories
+package zombieevents
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.events.consumers.EventRequestContent
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{exceptions, jsons}
@@ -32,9 +32,9 @@ import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.metrics.LabeledGauge
+import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
-import io.circe.{Encoder, Json}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
@@ -73,9 +73,7 @@ class EventHandlerSpec
             .unsafeRunSync()
             .process
             .value
-            .unsafeRunSync() shouldBe Right(
-            Accepted
-          )
+            .unsafeRunSync() shouldBe Right(Accepted)
 
           eventually {
             logger.loggedOnly(
@@ -125,7 +123,6 @@ class EventHandlerSpec
               )
             )
           }
-
         }
     }
 
@@ -214,8 +211,6 @@ class EventHandlerSpec
                                        underTriplesTransformationGauge,
                                        logger
     )
-
-    def requestContent(event: Json): EventRequestContent = EventRequestContent(event, None)
   }
 
   private lazy val events: Gen[ZombieEvent] = for {
@@ -237,5 +232,4 @@ class EventHandlerSpec
       "status":       ${event.status.value}
     }"""
   }
-
 }

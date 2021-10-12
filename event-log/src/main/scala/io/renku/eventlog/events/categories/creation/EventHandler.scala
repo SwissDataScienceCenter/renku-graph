@@ -18,20 +18,20 @@
 
 package io.renku.eventlog.events.categories.creation
 
-import cats.MonadThrow
 import cats.data.EitherT.fromEither
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
+import cats.{MonadThrow, Show}
 import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import ch.datascience.events.consumers._
+import ch.datascience.events.{EventRequestContent, consumers}
 import ch.datascience.graph.model.events.{BatchDate, CategoryName, EventBody, EventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import io.circe.{Decoder, DecodingFailure, HCursor}
-import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
+import io.circe.{ACursor, Decoder, DecodingFailure}
 import io.renku.eventlog._
+import io.renku.eventlog.events.categories.creation.Event.{NewEvent, SkippedEvent}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -60,11 +60,11 @@ private class EventHandler[Interpretation[_]: MonadThrow: Concurrent](
                 .leftSemiflatTap(logger.log(event))
   } yield result
 
-  private implicit lazy val eventInfoToString: Event => String = { event =>
+  private implicit lazy val eventInfoToString: Show[Event] = Show.show { event =>
     s"${event.compoundEventId}, projectPath = ${event.project.path}, status = ${event.status}"
   }
 
-  private implicit val eventDecoder: Decoder[Event] = (cursor: HCursor) =>
+  private implicit val eventDecoder: Decoder[Event] = cursor =>
     cursor.downField("status").as[Option[EventStatus]] flatMap {
       case None | Some(EventStatus.New) =>
         for {
@@ -81,22 +81,22 @@ private class EventHandler[Interpretation[_]: MonadThrow: Concurrent](
           date      <- cursor.downField("date").as[EventDate]
           batchDate <- cursor.downField("batchDate").as[BatchDate]
           body      <- cursor.downField("body").as[EventBody]
-          message   <- verifyMessage(cursor.downField("message").as[Option[String]])
+          message   <- extractMessage(cursor)
         } yield SkippedEvent(id, project, date, batchDate, body, message)
       case Some(invalidStatus) =>
         Left(DecodingFailure(s"Status $invalidStatus is not valid. Only NEW or SKIPPED are accepted", Nil))
     }
 
-  private def verifyMessage(result: Decoder.Result[Option[String]]) =
-    result
-      .map(blankToNone)
+  private lazy val extractMessage: ACursor => Decoder.Result[EventMessage] =
+    _.downField("message")
+      .as(blankStringToNoneDecoder(EventMessage))
       .flatMap {
-        case None          => Left(DecodingFailure(s"Skipped Status requires message", Nil))
-        case Some(message) => EventMessage.from(message.value)
+        case None          => DecodingFailure(s"Skipped Status requires message", Nil).asLeft
+        case Some(message) => message.asRight
       }
       .leftMap(_ => DecodingFailure("Invalid Skipped Event message", Nil))
 
-  implicit val projectDecoder: Decoder[Project] = (cursor: HCursor) =>
+  implicit val projectDecoder: Decoder[Project] = cursor =>
     for {
       id   <- cursor.downField("id").as[projects.Id]
       path <- cursor.downField("path").as[projects.Path]

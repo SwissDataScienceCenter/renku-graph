@@ -18,15 +18,17 @@
 
 package ch.datascience.knowledgegraph.datasets.rest
 
-import cats.MonadError
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.config.renku
+import ch.datascience.config.renku.ResourceUrl
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.PublishedDate
+import ch.datascience.graph.model.datasets._
+import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.testentities.generators.EntitiesGenerators._
 import ch.datascience.http.ErrorMessage
 import ch.datascience.http.InfoMessage._
 import ch.datascience.http.rest.paging.PagingRequest.Decoders.{page, perPage}
@@ -35,7 +37,6 @@ import ch.datascience.http.rest.paging.{PagingHeaders, PagingResponse}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
-import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model.DatasetCreator
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.{DatasetSearchResult, ProjectsCount}
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.{Phrase, query}
@@ -68,11 +69,11 @@ class DatasetsSearchEndpointSpec
           .expects(maybePhrase, sort, pagingRequest, maybeAuthUser)
           .returning(pagingResponse.pure[IO])
 
-        val response = searchForDatasets(maybePhrase, sort, pagingRequest, maybeAuthUser).unsafeRunSync()
+        val response = endpoint.searchForDatasets(maybePhrase, sort, pagingRequest, maybeAuthUser).unsafeRunSync()
 
         response.status       shouldBe Ok
         response.contentType  shouldBe Some(`Content-Type`(application.json))
-        response.headers.toList should contain allElementsOf PagingHeaders.from(pagingResponse)
+        response.headers.toList should contain allElementsOf PagingHeaders.from[IO, ResourceUrl](pagingResponse)
         response
           .as[List[Json]]
           .unsafeRunSync() should contain theSameElementsAs (pagingResponse.results map toJson)
@@ -90,12 +91,12 @@ class DatasetsSearchEndpointSpec
         .expects(maybePhrase, sort, pagingRequest, maybeAuthUser)
         .returning(pagingResponse.pure[IO])
 
-      val response = searchForDatasets(maybePhrase, sort, pagingRequest, maybeAuthUser).unsafeRunSync()
+      val response = endpoint.searchForDatasets(maybePhrase, sort, pagingRequest, maybeAuthUser).unsafeRunSync()
 
       response.status                         shouldBe Ok
       response.contentType                    shouldBe Some(`Content-Type`(application.json))
       response.as[List[Json]].unsafeRunSync() shouldBe empty
-      response.headers.toList                   should contain allElementsOf PagingHeaders.from(pagingResponse)
+      response.headers.toList                   should contain allElementsOf PagingHeaders.from[IO, ResourceUrl](pagingResponse)
 
       logger.loggedOnly(warn(maybePhrase))
     }
@@ -104,9 +105,9 @@ class DatasetsSearchEndpointSpec
       val exception = exceptions.generateOne
       (datasetsFinder.findDatasets _)
         .expects(maybePhrase, sort, pagingRequest, maybeAuthUser)
-        .returning(context.raiseError(exception))
+        .returning(exception.raiseError[IO, PagingResponse[DatasetSearchResult]])
 
-      val response = searchForDatasets(maybePhrase, sort, pagingRequest, maybeAuthUser).unsafeRunSync()
+      val response = endpoint.searchForDatasets(maybePhrase, sort, pagingRequest, maybeAuthUser).unsafeRunSync()
 
       response.status      shouldBe InternalServerError
       response.contentType shouldBe Some(`Content-Type`(application.json))
@@ -135,11 +136,11 @@ class DatasetsSearchEndpointSpec
     }
   }
 
+  private lazy val gitLabUrl = gitLabUrls.generateOne
+
   private trait TestCase {
     import ch.datascience.json.JsonOps._
     import ch.datascience.tinytypes.json.TinyTypeEncoders._
-
-    val context = MonadError[IO, Throwable]
 
     val maybePhrase   = phrases.generateOption
     val sort          = searchEndpointSorts.generateOne
@@ -154,24 +155,30 @@ class DatasetsSearchEndpointSpec
     val datasetsFinder        = mock[DatasetsFinder[IO]]
     val logger                = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
-    val searchForDatasets = new DatasetsSearchEndpoint[IO](
-      datasetsFinder,
-      renkuResourcesUrl,
-      executionTimeRecorder,
-      logger
-    ).searchForDatasets _
+    val endpoint =
+      new DatasetsSearchEndpoint[IO](datasetsFinder, renkuResourcesUrl, gitLabUrl, executionTimeRecorder, logger)
 
     lazy val toJson: DatasetSearchResult => Json = {
-      case DatasetSearchResult(id, title, name, maybeDescription, creators, dates, projectsCount, keywords, images) =>
+      case DatasetSearchResult(id,
+                               title,
+                               name,
+                               maybeDescription,
+                               creators,
+                               date,
+                               exemplarProjectPath,
+                               projectsCount,
+                               keywords,
+                               images
+          ) =>
         json"""{
           "identifier": $id,
           "title": $title,
           "name": $name,
-          "published": ${creators -> dates.maybeDatePublished},
-          "date": ${dates.date},
+          "published": ${creators -> date},
+          "date": ${date.instant},
           "projectsCount": ${projectsCount.value},
           "keywords": ${keywords.map(_.value)},
-          "images": ${images.map(_.value)},
+          "images": ${images -> exemplarProjectPath},
           "_links": [{
             "rel": "details",
             "href": ${(renkuResourcesUrl / "datasets" / id).value}
@@ -179,14 +186,14 @@ class DatasetsSearchEndpointSpec
         }""" addIfDefined "description" -> maybeDescription
     }
 
-    private implicit lazy val publishingEncoder: Encoder[(Set[DatasetCreator], Option[PublishedDate])] =
-      Encoder.instance[(Set[DatasetCreator], Option[PublishedDate])] {
-        case (creators, Some(date)) =>
+    private implicit lazy val publishingEncoder: Encoder[(Set[DatasetCreator], Date)] =
+      Encoder.instance[(Set[DatasetCreator], Date)] {
+        case (creators, DatePublished(date)) =>
           json"""{
           "creator": $creators,
           "datePublished": $date
         }"""
-        case (creators, None) =>
+        case (creators, _) =>
           json"""{
           "creator": $creators
         }"""
@@ -195,9 +202,29 @@ class DatasetsSearchEndpointSpec
     private implicit lazy val creatorEncoder: Encoder[DatasetCreator] = Encoder.instance[DatasetCreator] {
       case DatasetCreator(maybeEmail, name, _) =>
         json"""{
-        "name": $name
-      }""" addIfDefined ("email" -> maybeEmail)
+          "name": $name
+        }""" addIfDefined ("email" -> maybeEmail)
     }
+
+    private implicit lazy val imagesEncoder: Encoder[(List[ImageUri], projects.Path)] =
+      Encoder.instance[(List[ImageUri], projects.Path)] { case (images, exemplarProjectPath) =>
+        Json.arr(images.map {
+          case uri: ImageUri.Relative => json"""{
+            "location": $uri,
+            "_links": [{
+              "rel": "view",
+              "href": ${s"$gitLabUrl/$exemplarProjectPath/raw/master/$uri"}
+            }]
+          }"""
+          case uri: ImageUri.Absolute => json"""{
+            "location": $uri,
+            "_links": [{
+              "rel": "view",
+              "href": $uri
+            }]
+          }"""
+        }: _*)
+      }
 
     def warn(maybePhrase: Option[Phrase]) = maybePhrase match {
       case Some(phrase) =>
@@ -208,14 +235,25 @@ class DatasetsSearchEndpointSpec
   }
 
   private implicit lazy val datasetSearchResultItems: Gen[DatasetSearchResult] = for {
-    id               <- datasetIdentifiers
-    title            <- datasetTitles
-    name             <- datasetNames
-    maybeDescription <- Gen.option(datasetDescriptions)
-    creators         <- nonEmptySet(datasetCreators, maxElements = 4)
-    dates            <- datasetDates
-    projectsCount    <- nonNegativeInts() map (_.value) map ProjectsCount.apply
-    keywords         <- listOf(datasetKeywords)
-    images           <- listOf(imageUris)
-  } yield DatasetSearchResult(id, title, name, maybeDescription, creators, dates, projectsCount, keywords, images)
+    id                  <- datasetIdentifiers
+    title               <- datasetTitles
+    name                <- datasetNames
+    maybeDescription    <- Gen.option(datasetDescriptions)
+    creators            <- nonEmptySet(personEntities, maxElements = 4)
+    dates               <- datasetDates
+    exemplarProjectPath <- projectPaths
+    projectsCount       <- nonNegativeInts() map (_.value) map ProjectsCount.apply
+    keywords            <- listOf(datasetKeywords)
+    images              <- listOf(datasetImageUris)
+  } yield DatasetSearchResult(id,
+                              title,
+                              name,
+                              maybeDescription,
+                              creators.map(_.to[DatasetCreator]),
+                              dates,
+                              exemplarProjectPath,
+                              projectsCount,
+                              keywords,
+                              images
+  )
 }

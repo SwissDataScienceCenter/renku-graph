@@ -21,7 +21,8 @@ package ch.datascience.graph.http.server.security
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.graph.config.GitLabApiUrl
+import ch.datascience.graph.config.GitLabUrlLoader
+import ch.datascience.graph.model.GitLabApiUrl
 import ch.datascience.http.client.{AccessToken, RestClient}
 import ch.datascience.http.server.security.EndpointSecurityException.AuthenticationFailure
 import ch.datascience.http.server.security.model.AuthUser
@@ -75,8 +76,6 @@ class GitLabAuthenticatorImpl(
 
 object GitLabAuthenticator {
 
-  import ch.datascience.graph.config.GitLabUrl
-
   def apply(
       gitLabThrottler: Throttler[IO, GitLab],
       logger:          Logger[IO]
@@ -85,6 +84,6 @@ object GitLabAuthenticator {
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[Authenticator[IO]] = for {
-    gitLabApiUrl <- GitLabUrl[IO]().map(_.apiV4)
+    gitLabApiUrl <- GitLabUrlLoader[IO]().map(_.apiV4)
   } yield new GitLabAuthenticatorImpl(gitLabApiUrl, gitLabThrottler, logger)
 }

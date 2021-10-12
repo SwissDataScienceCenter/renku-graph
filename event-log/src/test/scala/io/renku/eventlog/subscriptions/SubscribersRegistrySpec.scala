@@ -80,7 +80,7 @@ class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.M
       registry.add(subscriptionInfo).unsafeRunSync()                    shouldBe true
       registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
 
-      registry.markBusy(subscriberUrl).unsafeRunSync()                  shouldBe ((): Unit)
+      registry.markBusy(subscriberUrl).unsafeRunSync()                  shouldBe ()
       registry.add(subscriptionInfo).unsafeRunSync()                    shouldBe true
       registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
     }
@@ -206,7 +206,7 @@ class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.M
         logger.loggedOnly(
           Info(s"$categoryName: all 1 subscriber(s) are busy; waiting for one to become available"),
           Debug(
-            s"$categoryName: url = ${subscriptionInfo.subscriberUrl}, id = ${subscriptionInfo.subscriberId}$withCapacity taken from busy state"
+            s"$categoryName: subscriber = ${subscriptionInfo.subscriberUrl}, id = ${subscriptionInfo.subscriberId}$withCapacity taken from busy state"
           )
         )
       }

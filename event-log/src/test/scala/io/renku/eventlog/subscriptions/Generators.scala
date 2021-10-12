@@ -18,7 +18,6 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.Show
 import ch.datascience.events.consumers.subscriptions._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{nonBlankStrings, positiveInts}
@@ -35,14 +34,9 @@ private object Generators {
                                         maybeCapacity: Option[Capacity]
   ) extends SubscriptionInfo
 
-  object TestSubscriptionInfo {
-    implicit lazy val show: Show[TestSubscriptionInfo] = SubscriptionInfo.showInfo[TestSubscriptionInfo]
-  }
-
   implicit val subscriptionInfos: Gen[TestSubscriptionInfo] = for {
     url           <- subscriberUrls
     id            <- subscriberIds
     maybeCapacity <- capacities.toGeneratorOfOptions
   } yield TestSubscriptionInfo(url, id, maybeCapacity)
-
 }

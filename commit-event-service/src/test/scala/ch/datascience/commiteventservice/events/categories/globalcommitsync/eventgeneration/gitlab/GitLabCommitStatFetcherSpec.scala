@@ -26,15 +26,14 @@ import ch.datascience.commiteventservice.events.categories.globalcommitsync.even
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators.personalAccessTokens
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
-import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.{GitLabUrl, projects}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
-import com.github.tomakehurst.wiremock.client.WireMock.{get, okJson, stubFor, unauthorized}
+import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.literal.JsonStringContext
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -62,11 +61,29 @@ class GitLabCommitStatFetcherSpec
             .willReturn(okJson(jsonCommitCount(commitCount)))
         }
 
-        gitLabCommitStatFetcher.fetchCommitStats(projectId).unsafeRunSync() shouldBe ProjectCommitStats(
-          maybeLatestCommit,
-          commitCount
+        gitLabCommitStatFetcher.fetchCommitStats(projectId).unsafeRunSync() shouldBe Some(
+          ProjectCommitStats(
+            maybeLatestCommit,
+            commitCount
+          )
         )
       }
+
+    }
+
+    "return None if the gitlab API returns a NotFound" in new TestCase {
+      val maybeLatestCommit = commitIds.generateOption
+      (gitLabCommitFetcher
+        .fetchLatestGitLabCommit(_: projects.Id)(_: Option[AccessToken]))
+        .expects(projectId, maybeAccessToken)
+        .returning(maybeLatestCommit.pure[IO])
+
+      stubFor {
+        get(s"/api/v4/projects/$projectId?statistics=true")
+          .willReturn(notFound())
+      }
+
+      gitLabCommitStatFetcher.fetchCommitStats(projectId).unsafeRunSync() shouldBe None
 
     }
 

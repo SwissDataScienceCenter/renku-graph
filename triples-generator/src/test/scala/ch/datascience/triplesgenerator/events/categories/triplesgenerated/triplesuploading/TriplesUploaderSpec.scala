@@ -27,8 +27,11 @@ import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.{FusekiBaseUrl, SparqlQueryTimeRecorder}
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult._
+import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
 import com.github.tomakehurst.wiremock.client.WireMock._
+import com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER
 import eu.timepit.refined.auto._
+import io.renku.jsonld.generators.JsonLDGenerators._
 import org.http4s.Status._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -44,13 +47,7 @@ class TriplesUploaderSpec extends AnyWordSpec with MockFactory with ExternalServ
 
     s"return $DeliverySuccess if uploading triples to the Store was successful" in new TestCase {
 
-      stubFor {
-        post(s"/${rdfStoreConfig.datasetName}/data")
-          .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
-          .withHeader("content-type", equalTo("application/ld+json"))
-          .withRequestBody(equalToJson(triples.value.toString()))
-          .willReturn(ok())
-      }
+      givenUploader(returning = ok())
 
       triplesUploader.upload(triples).unsafeRunSync() shouldBe DeliverySuccess
     }
@@ -59,13 +56,7 @@ class TriplesUploaderSpec extends AnyWordSpec with MockFactory with ExternalServ
       s"return $InvalidTriplesFailure if remote client responds with a $status" in new TestCase {
         val errorMessage = nonEmptyStrings().generateOne
 
-        stubFor {
-          post(s"/${rdfStoreConfig.datasetName}/data")
-            .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
-            .withHeader("content-type", equalTo("application/ld+json"))
-            .withRequestBody(equalToJson(triples.value.toString()))
-            .willReturn(badRequest().withBody(errorMessage))
-        }
+        givenUploader(returning = aResponse().withStatus(status.code).withBody(errorMessage))
 
         triplesUploader.upload(triples).unsafeRunSync() shouldBe InvalidTriplesFailure(errorMessage)
       }
@@ -75,33 +66,19 @@ class TriplesUploaderSpec extends AnyWordSpec with MockFactory with ExternalServ
 
       val errorMessage = nonEmptyStrings().generateOne
 
-      stubFor {
-        post(s"/${rdfStoreConfig.datasetName}/data")
-          .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
-          .withHeader("content-type", equalTo("application/ld+json"))
-          .withRequestBody(equalToJson(triples.value.toString()))
-          .willReturn(unauthorized().withBody(errorMessage))
-      }
+      givenUploader(returning = unauthorized().withBody(errorMessage))
 
       triplesUploader.upload(triples).unsafeRunSync() shouldBe RecoverableFailure(s"$Unauthorized: $errorMessage")
     }
 
     s"return $RecoverableFailure for connectivity issues" in new TestCase {
 
-      val fusekiBaseUrl = localHttpUrls.map(FusekiBaseUrl.apply).generateOne
-      override val rdfStoreConfig = rdfStoreConfigs.generateOne.copy(
-        fusekiBaseUrl = fusekiBaseUrl
-      )
-      val exceptionMessage =
-        s"""Error connecting to $fusekiBaseUrl using address ${fusekiBaseUrl.toString.replaceFirst("http[s]?://",
-                                                                                                   ""
-        )} (unresolved: false)"""
+      givenUploader(returning = aResponse.withFault(CONNECTION_RESET_BY_PEER))
 
-      triplesUploader
-        .upload(triples)
-        .unsafeRunSync() shouldBe RecoverableFailure(
-        s"POST $fusekiBaseUrl/${rdfStoreConfig.datasetName}/data error: $exceptionMessage"
-      )
+      val failure = triplesUploader.upload(triples).unsafeRunSync()
+
+      failure       shouldBe a[RecoverableFailure]
+      failure.message should startWith(s"POST $externalServiceBaseUrl/${rdfStoreConfig.datasetName}/data error")
     }
   }
 
@@ -110,19 +87,20 @@ class TriplesUploaderSpec extends AnyWordSpec with MockFactory with ExternalServ
 
   private trait TestCase {
 
-    val triples = jsonLDTriples.generateOne
+    val triples = jsonLDEntities.generateOne
 
-    val logger               = TestLogger[IO]()
+    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
     private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
-    val rdfStoreConfig = rdfStoreConfigs.generateOne.copy(
-      fusekiBaseUrl = FusekiBaseUrl(externalServiceBaseUrl)
-    )
-    lazy val triplesUploader = new TriplesUploaderImpl[IO](
-      rdfStoreConfig,
-      logger,
-      timeRecorder,
-      retryInterval = 100 millis,
-      maxRetries = 1
-    )
+    lazy val rdfStoreConfig  = rdfStoreConfigs.generateOne.copy(fusekiBaseUrl = FusekiBaseUrl(externalServiceBaseUrl))
+    lazy val triplesUploader =
+      new TriplesUploaderImpl[IO](rdfStoreConfig, timeRecorder, retryInterval = 100 millis, maxRetries = 1)
+
+    def givenUploader(returning: ResponseDefinitionBuilder) = stubFor {
+      post(s"/${rdfStoreConfig.datasetName}/data")
+        .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
+        .withHeader("content-type", equalTo("application/ld+json"))
+        .withRequestBody(equalToJson(triples.toJson.toString()))
+        .willReturn(returning)
+    }
   }
 }

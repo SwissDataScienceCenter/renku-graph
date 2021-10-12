@@ -20,10 +20,10 @@ package ch.datascience.http.server
 
 import EndpointTester._
 import cats.effect.IO
-import ch.datascience.http.ErrorMessage.ErrorMessage
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.ErrorMessage
+import ch.datascience.http.ErrorMessage.ErrorMessage
 import org.http4s.ParseFailure
 import org.http4s.Status._
 import org.scalacheck.Gen
@@ -37,9 +37,10 @@ class QueryParameterToolsSpec extends AnyWordSpec with should.Matchers {
   "toBadRequest" should {
 
     "return a BAD_REQUEST response containing JSON body with information about the query parameter name and validation errors" in {
-      val parseFailuresList = nonEmptyList(parseFailures).generateOne
+      val parseFailuresList  = nonEmptyList(parseFailures).generateOne
+      val badRequestResponse = toBadRequest[IO]
 
-      val response = toBadRequest[IO]()(parseFailuresList).unsafeRunSync()
+      val response = badRequestResponse(parseFailuresList).unsafeRunSync()
 
       response.status shouldBe BadRequest
       response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(

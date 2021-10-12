@@ -23,6 +23,10 @@ import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{Sensitive, StringTinyType, TinyTypeFactory}
 import io.circe._
 
+import java.util.Base64
+
+import java.nio.charset.StandardCharsets.UTF_8
+
 sealed trait AccessToken extends Any with StringTinyType with Sensitive
 
 object AccessToken {
@@ -33,9 +37,14 @@ object AccessToken {
   final class OAuthAccessToken private (val value: String) extends AnyVal with AccessToken
   object OAuthAccessToken extends TinyTypeFactory[OAuthAccessToken](new OAuthAccessToken(_)) with NonBlank
 
+  private val base64Decoder = Base64.getDecoder
+  private val base64Encoder = Base64.getEncoder
+
   implicit val accessTokenEncoder: Encoder[AccessToken] = {
-    case OAuthAccessToken(token)    => Json.obj("oauthAccessToken" -> Json.fromString(token))
-    case PersonalAccessToken(token) => Json.obj("personalAccessToken" -> Json.fromString(token))
+    case OAuthAccessToken(token) =>
+      Json.obj("oauthAccessToken" -> Json.fromString(new String(base64Encoder.encode(token.getBytes(UTF_8)), UTF_8)))
+    case PersonalAccessToken(token) =>
+      Json.obj("personalAccessToken" -> Json.fromString(new String(base64Encoder.encode(token.getBytes(UTF_8)), UTF_8)))
   }
 
   implicit val accessTokenDecoder: Decoder[AccessToken] = (cursor: HCursor) => {
@@ -53,7 +62,7 @@ object AccessToken {
   ): Option[String] => DecodingFailure Either Option[AccessToken] = {
     case None => Right(None)
     case Some(token) =>
-      from(token)
+      from(new String(base64Decoder.decode(token.getBytes(UTF_8)), UTF_8))
         .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
         .map(Option.apply)
   }

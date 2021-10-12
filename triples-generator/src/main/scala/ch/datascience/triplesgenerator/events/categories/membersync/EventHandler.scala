@@ -18,15 +18,15 @@
 
 package ch.datascience.triplesgenerator.events.categories.membersync
 
-import cats.MonadThrow
 import cats.data.EitherT.fromEither
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
+import cats.{MonadThrow, Show}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventSchedulingResult.Accepted
-import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventRequestContent}
+import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
+import ch.datascience.events.{EventRequestContent, consumers}
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
@@ -56,18 +56,16 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow: ContextShift: 
                 .leftSemiflatTap(logger.log(projectPath))
   } yield result
 
-  private implicit lazy val eventInfoToString: projects.Path => String = { path =>
-    s"projectPath = $path"
-  }
+  private implicit lazy val eventInfoToString: Show[projects.Path] = Show.show(path => s"projectPath = $path")
 }
 
 private[events] object EventHandler {
-  def apply(gitLabThrottler: Throttler[IO, GitLab], logger: Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])(
-      implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
+  def apply(gitLabThrottler: Throttler[IO, GitLab], timeRecorder: SparqlQueryTimeRecorder[IO])(implicit
+      executionContext:      ExecutionContext,
+      contextShift:          ContextShift[IO],
+      timer:                 Timer[IO],
+      logger:                Logger[IO]
   ): IO[EventHandler[IO]] = for {
-    membersSynchronizer <- MembersSynchronizer(gitLabThrottler, logger, timeRecorder)
+    membersSynchronizer <- MembersSynchronizer(gitLabThrottler, timeRecorder)
   } yield new EventHandler[IO](categoryName, membersSynchronizer, logger)
 }

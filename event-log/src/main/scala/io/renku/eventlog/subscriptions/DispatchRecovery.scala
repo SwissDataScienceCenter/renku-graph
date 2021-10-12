@@ -38,9 +38,7 @@ private object LoggingDispatchRecovery {
   def apply[Interpretation[_]: MonadThrow, CategoryEvent](
       categoryName: CategoryName,
       logger:       Logger[Interpretation]
-  )(implicit
-      show: Show[CategoryEvent]
-  ): Interpretation[DispatchRecovery[Interpretation, CategoryEvent]] =
+  )(implicit show:  Show[CategoryEvent]): Interpretation[DispatchRecovery[Interpretation, CategoryEvent]] =
     MonadThrow[Interpretation].catchNonFatal {
       new DispatchRecovery[Interpretation, CategoryEvent] {
 
@@ -49,7 +47,7 @@ private object LoggingDispatchRecovery {
         override def recover(url:   SubscriberUrl,
                              event: CategoryEvent
         ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-          logger.error(exception)(show"$categoryName: $event, $url failed")
+          logger.error(exception)(show"$categoryName: $event, url = $url failed")
         }
       }
     }

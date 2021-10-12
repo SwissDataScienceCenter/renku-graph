@@ -18,13 +18,11 @@
 
 package ch.datascience.graph.acceptancetests.stubs
 
+import ch.datascience.graph.acceptancetests.data
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.tooling.TestLogger
-import ch.datascience.graph.model.CliVersion
+import ch.datascience.graph.model._
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.knowledgegraph.projects.model.Project
-import ch.datascience.rdfstore.entities.Person
-import ch.datascience.rdfstore.entities.bundles._
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.client.{MappingBuilder, WireMock}
@@ -34,6 +32,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.jsonld.JsonLD
+import io.renku.jsonld.syntax._
 
 object RemoteTriplesGenerator extends RdfStoreData {
 
@@ -41,43 +40,31 @@ object RemoteTriplesGenerator extends RdfStoreData {
   private val port: Int Refined Positive = 8080
 
   def `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(
-      project:    Project,
-      commitId:   CommitId,
-      committer:  Person,
-      cliVersion: CliVersion = currentVersionPair.cliVersion
-  ): Unit =
+      project:             data.Project,
+      commitId:            CommitId
+  )(implicit gitLabApiUrl: GitLabApiUrl, renkuBaseUrl: RenkuBaseUrl): Unit =
     `GET <triples-generator>/projects/:id/commits/:id returning OK`(
       project,
       commitId,
-      fileCommit(
-        commitId = commitId,
-        committer = committer,
-        cliVersion = cliVersion
-      )(
-        projectPath = project.path,
-        projectName = project.name,
-        projectDateCreated = project.created.date,
-        maybeProjectCreator = project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail)),
-        projectVersion = project.version
-      )
+      project.entitiesProject.asJsonLD.flatten.fold(throw _, identity)
     )
 
   def `GET <triples-generator>/projects/:id/commits/:id returning OK`(
-      project:  Project,
+      project:  data.Project,
       commitId: CommitId,
       triples:  JsonLD
   ): Unit = {
     stubFor {
       get(s"/projects/${project.id}/commits/$commitId")
         .willReturn(
-          ok(triples.toJson.spaces2)
+          ok(triples.flatten.fold(throw _, _.toJson.spaces2))
         )
     }
     ()
   }
 
   def `GET <triples-generator>/projects/:id/commits/:id fails non recoverably`(
-      project:  Project,
+      project:  data.Project,
       commitId: CommitId
   ): Unit = {
     stubFor {
@@ -88,7 +75,7 @@ object RemoteTriplesGenerator extends RdfStoreData {
   }
 
   def `GET <triples-generator>/projects/:id/commits/:id fails recoverably`(
-      project:  Project,
+      project:  data.Project,
       commitId: CommitId
   ): Unit = {
     stubFor {
@@ -109,6 +96,8 @@ object RemoteTriplesGenerator extends RdfStoreData {
     logger.info(s"Remote Triples Generator stub started")
     newServer
   }
+
+  def reset(): Unit = server.resetAll()
 
   def shutdown(): Unit = {
     server.stop()

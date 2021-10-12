@@ -18,9 +18,8 @@
 
 package ch.datascience.graph.acceptancetests.knowledgegraph
 
-import cats.data.NonEmptyList
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators.accessTokens
+import ch.datascience.generators.CommonGraphGenerators.{accessTokens, authUsers}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.data._
@@ -30,31 +29,20 @@ import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TestReadabilityTools._
-import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{Description, Identifier, Name, PublishedDate, Title}
-import ch.datascience.graph.model.events.{CommitId, CommittedDate}
-import ch.datascience.graph.model.projects.Visibility
-import ch.datascience.graph.model.users.{Name => UserName}
+import ch.datascience.graph.model.datasets.{DatePublished, Identifier, ImageUri, Title}
+import ch.datascience.graph.model.testentities.generators.EntitiesGenerators
+import ch.datascience.graph.model.testentities.{::~, Dataset, Person}
+import ch.datascience.graph.model.{projects, testentities}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.http.rest.Links.{Href, Rel, _links}
 import ch.datascience.http.server.EndpointTester._
-import ch.datascience.http.server.security.model.AuthUser
-import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
-import ch.datascience.knowledgegraph.datasets.model._
-import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
-import ch.datascience.knowledgegraph.projects.model.Project
-import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
-import ch.datascience.rdfstore.entities.Person
-import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import eu.timepit.refined.auto._
 import io.circe.literal._
 import io.circe.{Encoder, Json}
-import io.renku.jsonld.JsonLD
+import io.renku.jsonld.syntax._
 import org.http4s.Status._
-import org.scalacheck.Gen
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
@@ -67,7 +55,8 @@ class DatasetsResourcesSpec
     with GraphServices
     with AcceptanceTestPatience
     with RdfStoreData
-    with should.Matchers {
+    with should.Matchers
+    with EntitiesGenerators {
 
   import DatasetsResources._
 
@@ -76,113 +65,16 @@ class DatasetsResourcesSpec
     val user = authUsers.generateOne
     implicit val accessToken: AccessToken = user.accessToken
 
-    val project = {
-      val initProject = projects.generateOne
-      initProject.copy(
-        maybeDescription = projectDescriptions.generateSome,
-        forking = initProject.forking.copy(maybeParent = None),
-        created = initProject.created.copy(maybeCreator = None)
-      )
-    }
-    val dataset1Creation = addedToProjectObjects.generateOne.copy(
-      agent = DatasetAgent(project.created.maybeCreator.flatMap(_.maybeEmail),
-                           project.created.maybeCreator.map(_.name).getOrElse(userNames.generateOne)
-      )
-    )
-    val dataset1CommitId  = commitIds.generateOne
-    val dataset1Committer = Person(dataset1Creation.agent.name, dataset1Creation.agent.maybeEmail)
-    val dataset1 = nonModifiedDatasets().generateOne.copy(
-      maybeDescription = Some(datasetDescriptions.generateOne),
-      usedIn = List(DatasetProject(project.path, project.name, dataset1Creation))
-    )
-    val dataset2Creation = addedToProjectObjects.generateOne
-    val dataset2CommitId = commitIds.generateOne
-    val dataset2 = nonModifiedDatasets().generateOne.copy(
-      maybeDescription = None,
-      usedIn = List(DatasetProject(project.path, project.name, dataset2Creation))
-    )
-    val modifiedDataset2 = modifiedDatasetsOnFirstProject(dataset2).generateOne
+    val (dataset1 ::~ dataset2 ::~ dataset2Modified, testEntitiesProject) = projectEntities(visibilityPublic)
+      .addDataset(datasetEntities(provenanceInternal))
+      .addDatasetAndModification(datasetEntities(provenanceInternal))
+      .generateOne
+    val project = dataProjects(testEntitiesProject).generateOne
 
     Scenario("As a user I would like to find project's datasets by calling a REST endpoint") {
 
       Given("some data in the RDF Store")
-      val jsonLDTriples = JsonLD.arr(
-        nonModifiedDataSetCommit(
-          commitId = dataset1CommitId,
-          committedDate = dataset1Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
-          committer = dataset1Committer,
-          cliVersion = currentVersionPair.cliVersion
-        )(
-          projectPath = project.path,
-          projectName = project.name,
-          projectDateCreated = project.created.date,
-          maybeProjectCreator = project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail)),
-          projectVersion = project.version
-        )(
-          datasetIdentifier = dataset1.id,
-          datasetTitle = dataset1.title,
-          datasetName = dataset1.name,
-          maybeDatasetSameAs = dataset1.sameAs.some,
-          maybeDatasetDescription = dataset1.maybeDescription,
-          dates = dataset1.dates,
-          datasetCreators = dataset1.creators map toPerson,
-          datasetParts = dataset1.parts.map(part => (part.name, part.atLocation)),
-          datasetKeywords = dataset1.keywords,
-          datasetImages = dataset1.images
-        ),
-        nonModifiedDataSetCommit(
-          commitId = dataset2CommitId,
-          committedDate = dataset2Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
-          committer = Person(dataset2Creation.agent.name, dataset2Creation.agent.maybeEmail),
-          cliVersion = currentVersionPair.cliVersion
-        )(
-          projectPath = project.path,
-          projectName = project.name,
-          projectDateCreated = project.created.date,
-          maybeProjectCreator = project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail)),
-          projectVersion = project.version
-        )(
-          datasetIdentifier = dataset2.id,
-          datasetTitle = dataset2.title,
-          datasetName = dataset2.name,
-          maybeDatasetSameAs = dataset2.sameAs.some,
-          maybeDatasetDescription = dataset2.maybeDescription,
-          dates = dataset2.dates,
-          datasetCreators = dataset2.creators map toPerson,
-          datasetParts = dataset2.parts.map(part => (part.name, part.atLocation)),
-          datasetKeywords = dataset2.keywords,
-          datasetImages = dataset2.images
-        ),
-        modifiedDataSetCommit(
-          committedDate = modifiedDataset2.usedIn.head.created.date.toUnsafe(date => CommittedDate.from(date.value)),
-          committer = Person(modifiedDataset2.usedIn.head.created.agent.name,
-                             modifiedDataset2.usedIn.head.created.agent.maybeEmail
-          ),
-          cliVersion = currentVersionPair.cliVersion
-        )(
-          projectPath = project.path,
-          projectName = project.name,
-          projectDateCreated = project.created.date,
-          maybeProjectCreator = project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail)),
-          projectVersion = project.version
-        )(
-          datasetIdentifier = modifiedDataset2.id,
-          datasetTitle = modifiedDataset2.title,
-          datasetName = modifiedDataset2.name,
-          datasetDerivedFrom = modifiedDataset2.derivedFrom,
-          maybeDatasetDescription = modifiedDataset2.maybeDescription,
-          dates = modifiedDataset2.dates,
-          datasetCreators = modifiedDataset2.creators map toPerson,
-          datasetParts = modifiedDataset2.parts.map(part => (part.name, part.atLocation)),
-          datasetKeywords = modifiedDataset2.keywords,
-          datasetImages = modifiedDataset2.images
-        )
-      )
-
-      val projectWithStatistics = `data in the RDF store`(project, dataset1CommitId, dataset1Committer, jsonLDTriples)(
-        NonEmptyList.of(dataset1Committer, persons.generateOne.copy(maybeGitLabId = user.id.some)).map(_.asMember())
-      )
-
+      `data in the RDF store`(project, testEntitiesProject.asJsonLD)
       `wait for events to be processed`(project.id)
 
       When("user fetches project's datasets with GET knowledge-graph/projects/<project-name>/datasets")
@@ -191,24 +83,25 @@ class DatasetsResourcesSpec
       Then("he should get OK response with project's datasets")
       projectDatasetsResponse.status shouldBe Ok
       val Right(foundDatasets) = projectDatasetsResponse.bodyAsJson.as[List[Json]]
-      foundDatasets should contain theSameElementsAs List(briefJson(dataset1), briefJson(modifiedDataset2))
+      foundDatasets should contain theSameElementsAs List(briefJson(dataset1, project.path),
+                                                          briefJson(dataset2Modified, project.path)
+      )
 
       When("user then fetches details of the chosen dataset with the link from the response")
-      val someDatasetDetailsLink =
-        Random
-          .shuffle(foundDatasets)
-          .headOption
-          .flatMap(_._links.get(Rel("details")))
-          .getOrFail(message = "No link with rel 'details'")
+      val someDatasetDetailsLink = Random
+        .shuffle(foundDatasets)
+        .headOption
+        .flatMap(_._links.get(Rel("details")))
+        .getOrFail(message = "No link with rel 'details'")
       val datasetDetailsResponse = restClient GET someDatasetDetailsLink.toString
 
       Then("he should get OK response with dataset details")
       datasetDetailsResponse.status shouldBe Ok
       val foundDatasetDetails = datasetDetailsResponse.bodyAsJson
-      val expectedDataset = List(dataset1, modifiedDataset2)
-        .find(dataset => someDatasetDetailsLink.value contains urlEncode(dataset.id.value))
+      val expectedDataset = List(dataset1, dataset2Modified)
+        .find(dataset => someDatasetDetailsLink.value contains urlEncode(dataset.identifier.value))
         .getOrFail(message = "Returned 'details' link does not point to any dataset in the RDF store")
-      findIdentifier(foundDatasetDetails) shouldBe expectedDataset.id
+      findIdentifier(foundDatasetDetails) shouldBe expectedDataset.identifier
 
       When("user is authenticated")
       `GET <gitlabApi>/user returning OK`(user)
@@ -230,21 +123,21 @@ class DatasetsResourcesSpec
 
       Then("he should get OK response with project details")
       getProjectResponse.status     shouldBe Ok
-      getProjectResponse.bodyAsJson shouldBe ProjectsResources.fullJson(projectWithStatistics)
+      getProjectResponse.bodyAsJson shouldBe ProjectsResources.fullJson(project)
 
       When("user fetches initial version of the modified dataset with the link from the response")
       val modifiedDataset2Json = foundDatasets
-        .find(json => findIdentifier(json) == modifiedDataset2.id)
-        .getOrFail(s"No modified dataset with ${modifiedDataset2.id} id")
+        .find(json => findIdentifier(json) == dataset2Modified.identifier)
+        .getOrFail(s"No modified dataset with ${dataset2Modified.identifier} id")
 
-      val modifiedDatasetInitialVersionLink = modifiedDataset2Json.hcursor._links
+      val modifiedDatasetInitialVersionLink = modifiedDataset2Json._links
         .get(Rel("initial-version"))
         .getOrFail("No link with rel 'initial-version'")
       val getInitialVersionResponse = restClient GET modifiedDatasetInitialVersionLink.toString
 
       Then("he should get OK response with project details")
       getInitialVersionResponse.status                     shouldBe Ok
-      findIdentifier(getInitialVersionResponse.bodyAsJson) shouldBe dataset2.id
+      findIdentifier(getInitialVersionResponse.bodyAsJson) shouldBe dataset2.identifier
     }
   }
 
@@ -256,55 +149,34 @@ class DatasetsResourcesSpec
 
       val text = nonBlankStrings(minLength = 10).generateOne
 
-      val dataset1Projects = nonEmptyList(projects).generateOne.toList.map(_.copy(visibility = Visibility.Public))
-      val dataset1 = nonModifiedDatasets().generateOne.copy(
-        title = sentenceContaining(text).map(_.value).map(Title.apply).generateOne,
-        usedIn = dataset1Projects map toDatasetProject,
-        keywords = datasetKeywords.generateNonEmptyList().toList
-      )
-      val dataset2Projects = nonEmptyList(projects).generateOne.toList.map(_.copy(visibility = Visibility.Public))
-      val dataset2 = nonModifiedDatasets().generateOne.copy(
-        maybeDescription = Some(sentenceContaining(text).map(_.value).map(Description.apply).generateOne),
-        usedIn = dataset2Projects map toDatasetProject
-      )
-      val dataset3Projects = nonEmptyList(projects).generateOne.toList.map(_.copy(visibility = Visibility.Public))
-      val dataset3 = {
-        val dataset = nonModifiedDatasets().generateOne
-        dataset.copy(
-          creators = Set(
-            datasetCreators.generateOne
-              .copy(name = sentenceContaining(text).map(_.value).map(UserName.apply).generateOne)
-          ),
-          usedIn = dataset3Projects map toDatasetProject
-        )
-      }
-
-      val dataset4Projects = nonEmptyList(projects).generateOne.toList.map(_.copy(visibility = Visibility.Public))
-      val dataset4 = nonModifiedDatasets().generateOne.copy(
-        name = sentenceContaining(text).map(_.value).map(Name.apply).generateOne,
-        usedIn = dataset4Projects map toDatasetProject
-      )
-
-      val dataset5Projects = List(projects.generateOne).map(_.copy(visibility = Visibility.Public))
-      val dataset5 = nonModifiedDatasets().generateOne.copy(
-        usedIn = dataset5Projects map toDatasetProject
-      )
-
-      val dataset6PrivateProjects = List(projects.generateOne).map(
-        _.copy(visibility = Gen.oneOf(Visibility.Private, Visibility.Internal).generateOne)
-      )
-      val dataset6 = nonModifiedDatasets().generateOne.copy(
-        title = sentenceContaining(text).map(_.value).map(Title.apply).generateOne,
-        usedIn = dataset6PrivateProjects map toDatasetProject
-      )
-
+      val (dataset1, project1) = projectEntities(visibilityPublic)
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(text)))
+        .generateOne
+      val (dataset2, project2) = projectEntities(visibilityPublic)
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeDescContaining(text)))
+        .generateOne
+      val (dataset3, project3) = projectEntities(visibilityPublic)
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeCreatorNameContaining(text)))
+        .generateOne
+      val (dataset4, project4 ::~ project4Fork) = projectEntities(visibilityPublic)
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeKeywordsContaining(text)))
+        .forkOnce()
+        .generateOne
+      val (dataset5WithoutText, project5) = projectEntities(visibilityPublic)
+        .addDataset(datasetEntities(provenanceInternal))
+        .generateOne
+      val (_, project6Private) = projectEntities(visibilityNonPublic)
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(text)))
+        .generateOne
       Given("some datasets with title, description, name and author containing some arbitrary chosen text")
-      val sameAs1Ids = pushToStore(dataset1, dataset1Projects)
-      val sameAs2Ids = pushToStore(dataset2, dataset2Projects)
-      val sameAs3Ids = pushToStore(dataset3, dataset3Projects)
-      val sameAs4Ids = pushToStore(dataset4, dataset4Projects)
-      val sameAs5Ids = pushToStore(dataset5, dataset5Projects)
-      pushToStore(dataset6, dataset6PrivateProjects)
+
+      pushToStore(project1)
+      pushToStore(project2)
+      pushToStore(project3)
+      pushToStore(project4)
+      pushToStore(project4Fork)
+      pushToStore(project5)
+      pushToStore(project6Private)
 
       When("user calls the GET knowledge-graph/datasets?query=<text>")
       val datasetsSearchResponse = knowledgeGraphClient GET s"knowledge-graph/datasets?query=${urlEncode(text.value)}"
@@ -314,10 +186,10 @@ class DatasetsResourcesSpec
 
       val Right(foundDatasets) = datasetsSearchResponse.bodyAsJson.as[List[Json]]
       foundDatasets.flatMap(sortCreators) should contain theSameElementsAs List(
-        searchResultJson(dataset1, sameAs1Ids, foundDatasets),
-        searchResultJson(dataset2, sameAs2Ids, foundDatasets),
-        searchResultJson(dataset3, sameAs3Ids, foundDatasets),
-        searchResultJson(dataset4, sameAs4Ids, foundDatasets)
+        searchResultJson(dataset1, 1, project1.path, foundDatasets),
+        searchResultJson(dataset2, 1, project2.path, foundDatasets),
+        searchResultJson(dataset3, 1, project3.path, foundDatasets),
+        searchResultJson(dataset4, 2, project4.path, foundDatasets)
       ).flatMap(sortCreators)
 
       When("user calls the GET knowledge-graph/datasets?query=<text>&sort=title:asc")
@@ -329,10 +201,10 @@ class DatasetsResourcesSpec
 
       val Right(foundDatasetsSortedByName) = searchSortedByName.bodyAsJson.as[List[Json]]
       val datasetsSortedByName = List(
-        searchResultJson(dataset1, sameAs1Ids, foundDatasetsSortedByName),
-        searchResultJson(dataset2, sameAs2Ids, foundDatasetsSortedByName),
-        searchResultJson(dataset3, sameAs3Ids, foundDatasetsSortedByName),
-        searchResultJson(dataset4, sameAs4Ids, foundDatasetsSortedByName)
+        searchResultJson(dataset1, 1, project1.path, foundDatasetsSortedByName),
+        searchResultJson(dataset2, 1, project2.path, foundDatasetsSortedByName),
+        searchResultJson(dataset3, 1, project3.path, foundDatasetsSortedByName),
+        searchResultJson(dataset4, 2, project4.path, foundDatasetsSortedByName)
       ).flatMap(sortCreators)
         .sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
       foundDatasetsSortedByName.flatMap(sortCreators) shouldBe datasetsSortedByName
@@ -352,11 +224,11 @@ class DatasetsResourcesSpec
       Then("he should get OK response with all the datasets")
       val Right(foundDatasetsWithoutPhrase) = searchWithoutPhrase.bodyAsJson.as[List[Json]]
       foundDatasetsWithoutPhrase.flatMap(sortCreators) should contain allElementsOf List(
-        searchResultJson(dataset1, sameAs1Ids, foundDatasetsWithoutPhrase),
-        searchResultJson(dataset2, sameAs2Ids, foundDatasetsWithoutPhrase),
-        searchResultJson(dataset3, sameAs3Ids, foundDatasetsWithoutPhrase),
-        searchResultJson(dataset4, sameAs4Ids, foundDatasetsWithoutPhrase),
-        searchResultJson(dataset5, sameAs5Ids, foundDatasetsWithoutPhrase)
+        searchResultJson(dataset1, 1, project1.path, foundDatasetsWithoutPhrase),
+        searchResultJson(dataset2, 1, project2.path, foundDatasetsWithoutPhrase),
+        searchResultJson(dataset3, 1, project3.path, foundDatasetsWithoutPhrase),
+        searchResultJson(dataset4, 2, project4.path, foundDatasetsWithoutPhrase),
+        searchResultJson(dataset5WithoutText, 1, project5.path, foundDatasetsWithoutPhrase)
       ).flatMap(sortCreators)
         .sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
 
@@ -393,34 +265,23 @@ class DatasetsResourcesSpec
 
       val text = nonBlankStrings(minLength = 10).generateOne
 
-      val dataset1Projects = nonEmptyList(projects).generateOne.toList.map(_.copy(visibility = Visibility.Public))
-      val dataset1 = nonModifiedDatasets().generateOne.copy(
-        title = sentenceContaining(text).map(_.value).map(Title.apply).generateOne,
-        usedIn = dataset1Projects map toDatasetProject
-      )
+      val (dataset1, project1) = projectEntities(visibilityPublic)
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(text)))
+        .generateOne
 
-      val dataset2PrivateProjects =
-        List(projects.generateOne).map(
-          _.copy(visibility = Gen.oneOf(Visibility.Private, Visibility.Internal).generateOne)
-        )
-      val dataset2 = nonModifiedDatasets().generateOne.copy(
-        title = sentenceContaining(text).map(_.value).map(Title.apply).generateOne,
-        usedIn = dataset2PrivateProjects map toDatasetProject
-      )
+      val (_, project2Private) = projectEntities(visibilityNonPublic)
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(text)))
+        .generateOne
 
-      val dataset3PrivateProjects =
-        List(projects.generateOne).map(
-          _.copy(visibility = Gen.oneOf(Visibility.Private, Visibility.Internal).generateOne)
-        )
-      val dataset3 = nonModifiedDatasets().generateOne.copy(
-        title = sentenceContaining(text).map(_.value).map(Title.apply).generateOne,
-        usedIn = dataset3PrivateProjects map toDatasetProject
-      )
+      val (dataset3PrivateWithAccess, project3PrivateWithAccess) = projectEntities(visibilityNonPublic)
+        .map(_.copy(members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some))))
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(text)))
+        .generateOne
 
       Given("some datasets with title, description, name and author containing some arbitrary chosen text")
-      val sameAs1Ids = pushToStore(dataset1, dataset1Projects)
-      pushToStore(dataset2, dataset2PrivateProjects)
-      val sameAs3Ids = pushToStore(dataset3, dataset3PrivateProjects, user.some)
+      pushToStore(project1)
+      pushToStore(project2Private)
+      pushToStore(project3PrivateWithAccess)
 
       When("user calls the GET knowledge-graph/datasets?query=<text>")
       val datasetsSearchResponse =
@@ -431,124 +292,15 @@ class DatasetsResourcesSpec
 
       val Right(foundDatasets) = datasetsSearchResponse.bodyAsJson.as[List[Json]]
       foundDatasets.flatMap(sortCreators) should contain theSameElementsAs List(
-        searchResultJson(dataset1, sameAs1Ids, foundDatasets),
-        searchResultJson(dataset3, sameAs3Ids, foundDatasets)
+        searchResultJson(dataset1, 1, project1.path, foundDatasets),
+        searchResultJson(dataset3PrivateWithAccess, 1, project3PrivateWithAccess.path, foundDatasets)
       ).flatMap(sortCreators)
-
-      When("user calls the GET knowledge-graph/datasets?query=<text>&sort=title:asc&page=2&per_page=1")
-      val searchForPage =
-        knowledgeGraphClient GET (s"knowledge-graph/datasets?query=${urlEncode(text.value)}&sort=title:asc&page=2&per_page=1", accessToken)
-
-      Then("he should get OK response with the dataset from the requested page")
-      val Right(foundDatasetsPage) = searchForPage.bodyAsJson.as[List[Json]]
-
-      val datasetsSortedByTitle = List(
-        searchResultJson(dataset1, sameAs1Ids, foundDatasets),
-        searchResultJson(dataset3, sameAs3Ids, foundDatasets)
-      ).flatMap(sortCreators)
-        .sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
-
-      foundDatasetsPage.flatMap(sortCreators) should contain theSameElementsAs List(datasetsSortedByTitle(1))
-        .flatMap(sortCreators)
-
-      When("user uses the response header link with the rel='first'")
-      val firstPageLink     = searchForPage.headerLink(rel = "first")
-      val firstPageResponse = restClient GET (firstPageLink, accessToken)
-
-      Then("he should get OK response with the datasets from the first page")
-      val Right(foundFirstPage) = firstPageResponse.bodyAsJson.as[List[Json]]
-      foundFirstPage.flatMap(sortCreators) should contain theSameElementsAs List(datasetsSortedByTitle.head)
-        .flatMap(sortCreators)
-
-      When("user uses 'details' link of one of the found datasets")
-      val someDatasetJson = Random.shuffle(foundDatasets).head
-
-      val detailsLinkResponse = restClient GET (someDatasetJson._links
-        .get(Rel("details"))
-        .getOrFail(message = "No link with rel 'details'")
-        .toString, accessToken)
-      detailsLinkResponse.status shouldBe Ok
-
-      Then("he should get the same result as he'd call the knowledge-graph/datasets/:id endpoint directly")
-      val datasetDetailsResponse =
-        knowledgeGraphClient GET (s"knowledge-graph/datasets/${urlEncode(findIdentifier(someDatasetJson).toString)}", accessToken)
-      detailsLinkResponse.bodyAsJson shouldBe datasetDetailsResponse.bodyAsJson
     }
 
-    def pushToStore(dataset:                NonModifiedDataset,
-                    projects:               List[Project],
-                    maybeAuthenticatedUser: Option[AuthUser] = None
-    )(implicit
-        accessToken: AccessToken
-    ): List[Identifier] = {
-      val firstProject +: otherProjects = projects
-
-      val commitId      = commitIds.generateOne
-      val committer     = persons.generateOne
-      val committedDate = committedDates.generateOne
-      val datasetJsonLD = toDataSetCommit(firstProject, commitId, committer, committedDate, dataset)
-      `data in the RDF store`(firstProject, commitId, committer, datasetJsonLD)(
-        NonEmptyList(
-          committer,
-          List(maybeAuthenticatedUser.map(user => persons.generateOne.copy(maybeGitLabId = user.id.some))).flatten
-        ).map(_.asMember())
-      )
-      `wait for events to be processed`(firstProject.id)
-
-      otherProjects.foldLeft(List(dataset.id)) { (datasetsIds, project) =>
-        val commitId  = commitIds.generateOne
-        val committer = persons.generateOne
-        val datasetId = datasetIdentifiers.generateOne
-
-        `data in the RDF store`(
-          project,
-          commitId,
-          committer,
-          toDataSetCommit(project,
-                          commitId,
-                          committer,
-                          CommittedDate(committedDate.value plusSeconds positiveInts().generateOne.value),
-                          dataset,
-                          datasetId.some
-          )
-        )()
-
-        `wait for events to be processed`(project.id)
-
-        datasetsIds :+ datasetId
-      }
+    def pushToStore(project: testentities.Project)(implicit accessToken: AccessToken): Unit = {
+      `data in the RDF store`(dataProjects(project).generateOne, project.asJsonLD)
+      ()
     }
-
-    def toDataSetCommit(project:              Project,
-                        commitId:             CommitId,
-                        committer:            Person,
-                        committedDate:        CommittedDate,
-                        dataset:              NonModifiedDataset,
-                        overriddenIdentifier: Option[Identifier] = None
-    ): JsonLD =
-      nonModifiedDataSetCommit(
-        commitId = commitId,
-        committer = committer,
-        committedDate = committedDate,
-        cliVersion = currentVersionPair.cliVersion
-      )(
-        projectPath = project.path,
-        projectName = project.name,
-        projectVersion = project.version
-      )(
-        datasetIdentifier = overriddenIdentifier getOrElse dataset.id,
-        datasetTitle = dataset.title,
-        datasetName = dataset.name,
-        maybeDatasetSameAs = dataset.sameAs.some,
-        maybeDatasetDescription = dataset.maybeDescription,
-        dates = dataset.dates,
-        datasetCreators = dataset.creators map toPerson,
-        datasetKeywords = dataset.keywords,
-        datasetImages = dataset.images
-      )
-
-    def toDatasetProject(project: Project) =
-      DatasetProject(project.path, project.name, addedToProjectObjects.generateOne)
   }
 }
 
@@ -557,56 +309,62 @@ object DatasetsResources {
   import ch.datascience.json.JsonOps._
   import ch.datascience.tinytypes.json.TinyTypeEncoders._
 
-  def briefJson(dataset: NonModifiedDataset): Json = json"""{
-    "identifier": ${dataset.id.value},
-    "versions": {
-      "initial": ${dataset.versions.initial.value}
-    },
-    "title": ${dataset.title.value},
-    "name": ${dataset.name.value},
-    "sameAs": ${dataset.sameAs.value},
-    "images": ${dataset.images.map(_.value)}
-  }""" deepMerge {
-    _links(
-      Rel("details")         -> Href(renkuResourcesUrl / "datasets" / dataset.id),
-      Rel("initial-version") -> Href(renkuResourcesUrl / "datasets" / dataset.versions.initial)
-    )
+  def briefJson(dataset: Dataset[Dataset.Provenance], projectPath: projects.Path)(implicit
+      encoder:           Encoder[(Dataset[Dataset.Provenance], projects.Path)]
+  ): Json = encoder(dataset -> projectPath)
+
+  implicit def datasetEncoder[P <: Dataset.Provenance](implicit
+      provenanceEncoder: Encoder[P]
+  ): Encoder[(Dataset[P], projects.Path)] = Encoder.instance { case (dataset, projectPath) =>
+    json"""{
+      "identifier": ${dataset.identification.identifier.value},
+      "versions": {
+        "initial": ${dataset.provenance.initialVersion.value}
+      },
+      "title": ${dataset.identification.title.value},
+      "name": ${dataset.identification.name.value},
+      "images": ${dataset.additionalInfo.images -> projectPath}
+    }"""
+      .deepMerge(
+        _links(
+          Rel("details")         -> Href(renkuResourcesUrl / "datasets" / dataset.identification.identifier),
+          Rel("initial-version") -> Href(renkuResourcesUrl / "datasets" / dataset.provenance.initialVersion)
+        )
+      )
+      .deepMerge(provenanceEncoder(dataset.provenance))
   }
 
-  def briefJson(dataset: ModifiedDataset): Json = json"""{
-    "identifier": ${dataset.id.value},
-    "versions": {
-      "initial": ${dataset.versions.initial.value}
-    },
-    "title": ${dataset.title.value},
-    "name": ${dataset.name.value},
-    "derivedFrom": ${dataset.derivedFrom.value},
-    "images": ${dataset.images.map(_.value)}
-  }""" deepMerge {
-    _links(
-      Rel("details")         -> Href(renkuResourcesUrl / "datasets" / dataset.id),
-      Rel("initial-version") -> Href(renkuResourcesUrl / "datasets" / dataset.versions.initial)
-    )
+  implicit def provenanceEncoder: Encoder[Dataset.Provenance] = Encoder.instance {
+    case provenance: Dataset.Provenance.Modified => json"""{
+        "derivedFrom": ${provenance.derivedFrom.value}
+      }"""
+    case provenance => json"""{
+        "sameAs": ${provenance.topmostSameAs.value}
+      }"""
   }
 
-  def searchResultJson(dataset: Dataset, sameAsIds: List[Identifier], actualResults: List[Json]): Json = {
+  def searchResultJson[P <: Dataset.Provenance](dataset:       Dataset[P],
+                                                projectsCount: Int,
+                                                projectPath:   projects.Path,
+                                                actualResults: List[Json]
+  ): Json = {
     val actualIdentifier = actualResults
-      .findId(dataset.title)
-      .getOrElse(fail(s"No ${dataset.title} dataset found among the results"))
+      .findId(dataset.identification.title)
+      .getOrElse(fail(s"No ${dataset.identification.title} dataset found among the results"))
 
-    sameAsIds should contain(actualIdentifier)
+    dataset.identification.identifier shouldBe actualIdentifier
 
     json"""{
       "identifier": ${actualIdentifier.value},
-      "title": ${dataset.title.value},
-      "name": ${dataset.name.value},
-      "published": ${dataset.creators -> dataset.dates.maybeDatePublished},
-      "date": ${dataset.dates.date}, 
-      "projectsCount": ${dataset.usedIn.size},
-      "images": ${dataset.images.map(_.value)},
-      "keywords": ${dataset.keywords.sorted.map(_.value)}
+      "title": ${dataset.identification.title.value},
+      "name": ${dataset.identification.name.value},
+      "published": ${dataset.provenance.creators -> dataset.provenance.date},
+      "date": ${dataset.provenance.date.instant},
+      "projectsCount": $projectsCount,
+      "images": ${dataset.additionalInfo.images -> projectPath},
+      "keywords": ${dataset.additionalInfo.keywords.sorted.map(_.value)}
     }"""
-      .addIfDefined("description" -> dataset.maybeDescription)
+      .addIfDefined("description" -> dataset.additionalInfo.maybeDescription)
       .deepMerge {
         _links(
           Rel("details") -> Href(renkuResourcesUrl / "datasets" / actualIdentifier)
@@ -614,25 +372,42 @@ object DatasetsResources {
       }
   }
 
-  private implicit lazy val publishingEncoder: Encoder[(Set[DatasetCreator], Option[PublishedDate])] =
-    Encoder.instance[(Set[DatasetCreator], Option[PublishedDate])] {
-      case (creators, Some(date)) =>
-        json"""{
+  private implicit def publishedEncoder[P <: Dataset.Provenance]: Encoder[(Set[Person], P#D)] =
+    Encoder.instance {
+      case (creators, DatePublished(date)) => json"""{
           "creator": ${creators.toList},
           "datePublished": $date
         }"""
-      case (creators, None) =>
-        json"""{
+      case (creators, _)                   => json"""{
           "creator": ${creators.toList}
         }"""
     }
 
-  private implicit lazy val creatorEncoder: Encoder[DatasetCreator] = Encoder.instance[DatasetCreator] {
-    case DatasetCreator(maybeEmail, name, _) =>
-      json"""{
-        "name": $name
-      }""" addIfDefined ("email" -> maybeEmail)
+  private implicit lazy val personEncoder: Encoder[Person] = Encoder.instance[Person] {
+    case Person(name, maybeEmail, _, _) => json"""{
+      "name": $name
+    }""" addIfDefined ("email" -> maybeEmail)
   }
+
+  private implicit lazy val imagesEncoder: Encoder[(List[ImageUri], projects.Path)] =
+    Encoder.instance[(List[ImageUri], projects.Path)] { case (images, exemplarProjectPath) =>
+      Json.arr(images.map {
+        case uri: ImageUri.Relative => json"""{
+            "location": $uri,
+            "_links": [{
+              "rel": "view",
+              "href": ${s"$gitLabUrl/$exemplarProjectPath/raw/master/$uri"}
+            }]
+          }"""
+        case uri: ImageUri.Absolute => json"""{
+            "location": $uri,
+            "_links": [{
+              "rel": "view",
+              "href": $uri
+            }]
+          }"""
+      }: _*)
+    }
 
   def sortCreators(json: Json): Option[Json] = {
 
@@ -644,8 +419,6 @@ object DatasetsResources {
 
     json.hcursor.downField("published").downField("creator").withFocus(_.mapArray(orderByName)).top
   }
-
-  lazy val toPerson: DatasetCreator => Person = creator => Person(creator.name, creator.maybeEmail, None)
 
   implicit class JsonsOps(jsons: List[Json]) {
 

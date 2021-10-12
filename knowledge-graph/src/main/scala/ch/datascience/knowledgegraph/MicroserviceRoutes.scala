@@ -35,7 +35,7 @@ import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import ch.datascience.knowledgegraph.datasets.rest._
 import ch.datascience.knowledgegraph.graphql.{IOQueryEndpoint, QueryEndpoint}
-import ch.datascience.knowledgegraph.projects.rest.{IOProjectEndpoint, ProjectEndpoint}
+import ch.datascience.knowledgegraph.projects.rest.ProjectEndpoint
 import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import org.http4s.dsl.Http4sDsl
@@ -98,7 +98,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
       .mapN { case (maybePhrase, sort, paging) =>
         datasetsSearchEndpoint.searchForDatasets(maybePhrase, sort, paging, maybeAuthUser)
       }
-      .fold(toBadRequest(), identity)
+      .fold(toBadRequest, identity)
 
   private def routeToProjectsEndpoints(
       path:          Path,
@@ -141,7 +141,7 @@ private object MicroserviceRoutes {
       gitLabRateLimit         <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
       gitLabThrottler         <- Throttler[IO, GitLab](gitLabRateLimit)
       queryEndpoint           <- IOQueryEndpoint(sparqlTimeRecorder, logger)
-      projectEndpoint         <- IOProjectEndpoint(gitLabThrottler, sparqlTimeRecorder)
+      projectEndpoint         <- ProjectEndpoint(gitLabThrottler, sparqlTimeRecorder)
       projectDatasetsEndpoint <- IOProjectDatasetsEndpoint(sparqlTimeRecorder)
       datasetEndpoint         <- IODatasetEndpoint(sparqlTimeRecorder)
       datasetsSearchEndpoint  <- IODatasetsSearchEndpoint(sparqlTimeRecorder)

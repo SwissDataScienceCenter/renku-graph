@@ -26,10 +26,10 @@ import cats.syntax.all._
 import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.GlobalCommitEventSynchronizer
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import ch.datascience.events.consumers._
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
+import ch.datascience.events.{EventRequestContent, consumers}
 import ch.datascience.graph.model.events.{CategoryName, CommitId}
 import ch.datascience.logging.ExecutionTimeRecorder
 import eu.timepit.refined.api.Refined

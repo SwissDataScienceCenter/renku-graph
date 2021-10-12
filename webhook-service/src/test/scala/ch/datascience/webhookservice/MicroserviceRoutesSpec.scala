@@ -20,6 +20,7 @@ package ch.datascience.webhookservice
 
 import cats.data.OptionT
 import cats.effect.{Clock, IO}
+import ch.datascience.generators.CommonGraphGenerators.authUsers
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects

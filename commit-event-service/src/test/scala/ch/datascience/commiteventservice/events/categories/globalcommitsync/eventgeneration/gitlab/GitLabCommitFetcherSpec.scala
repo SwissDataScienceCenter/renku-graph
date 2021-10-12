@@ -24,9 +24,10 @@ import ch.datascience.commiteventservice.events.categories.common.Generators.com
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators.{oauthAccessTokens, personalAccessTokens}
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.config.GitLabUrl
+import ch.datascience.graph.model.GitLabUrl
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.graph.model.events.CommitId
+import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
@@ -43,8 +44,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
 class GitLabCommitFetcherSpec extends AnyWordSpec with MockFactory with ExternalServiceStubbing with should.Matchers {
 
   "fetchGitLabCommits" should {
-    "Handle a paged request" in new TestCase {
 
+    "handle a paged request" in new TestCase {
       stubFor {
         get(s"/api/v4/projects/$projectId/repository/commits")
           .willReturn(okJson(commitsJson(from = List(commitInfoList.head))).withHeader("X-Next-Page", "2"))
@@ -62,7 +63,7 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with MockFactory with External
       )
     }
 
-    "Fetch commits from GitLab - personal access token case " in new TestCase {
+    "fetch commits from GitLab - personal access token case " in new TestCase {
       val personalAccessToken = personalAccessTokens.generateOne
 
       stubFor {
@@ -78,7 +79,7 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with MockFactory with External
       )
     }
 
-    "Fetch commits from GitLab - oauth token case " in new TestCase {
+    "fetch commits from GitLab - oauth token case " in new TestCase {
       val authAccessToken = oauthAccessTokens.generateOne
 
       stubFor {
@@ -94,7 +95,7 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with MockFactory with External
       )
     }
 
-    "Fetch commits from GitLab - no token case " in new TestCase {
+    "fetch commits from GitLab - no token case " in new TestCase {
 
       stubFor {
         get(s"/api/v4/projects/$projectId/repository/commits")
@@ -108,7 +109,7 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with MockFactory with External
       )
     }
 
-    "Fetch no commits from GitLab if there aren't any" in new TestCase {
+    "fetch no commits from GitLab if there aren't any" in new TestCase {
 
       stubFor {
         get(s"/api/v4/projects/$projectId/repository/commits")
@@ -120,7 +121,7 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with MockFactory with External
         .unsafeRunSync() shouldBe List.empty[CommitId]
     }
 
-    "Return an empty list if project not found" in new TestCase {
+    "return an empty list if project not found" in new TestCase {
 
       stubFor {
         get(s"/api/v4/projects/$projectId/repository/commits")
@@ -157,7 +158,7 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with MockFactory with External
         gitLabCommitFetcher
           .fetchGitLabCommits(projectId)(maybeAccessToken = None)
           .unsafeRunSync()
-      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId/repository/commits returned ${Status.BadRequest}; body: some error"
+      }.getMessage shouldBe s"GET $gitLabApiUrl/projects/$projectId/repository/commits returned ${Status.BadRequest}; body: some error"
     }
 
     "return an Exception if remote client responds with unexpected body" in new TestCase {
@@ -171,11 +172,14 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with MockFactory with External
         gitLabCommitFetcher
           .fetchGitLabCommits(projectId)(maybeAccessToken = None)
           .unsafeRunSync()
-      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId/repository/commits returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      }.getMessage should startWith(
+        s"GET $gitLabApiUrl/projects/$projectId/repository/commits returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      )
     }
   }
 
   "fetchLatestGitLabCommit" should {
+
     "return a single commit" in new TestCase {
       stubFor {
         get(s"/api/v4/projects/$projectId/repository/commits?per_page=1")
@@ -188,18 +192,17 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with MockFactory with External
   private implicit val ce:    ConcurrentEffect[IO] = IO.ioConcurrentEffect(IO.contextShift(global))
   private implicit val timer: Timer[IO]            = IO.timer(global)
 
-  trait TestCase {
-    val projectId                 = projectIds.generateOne
-    val commitInfoList            = commitInfos.generateNonEmptyList().toList
-    implicit val maybeAccessToken = personalAccessTokens.generateSome
+  private trait TestCase {
+    implicit val maybeAccessToken: Option[AccessToken] = personalAccessTokens.generateSome
+    val projectId      = projectIds.generateOne
+    val commitInfoList = commitInfos.generateNonEmptyList().toList
 
-    val gitLabUrl = GitLabUrl(externalServiceBaseUrl)
-
-    val gitLabCommitFetcher = new GitLabCommitFetcherImpl[IO](gitLabUrl, Throttler.noThrottling, TestLogger())
+    val gitLabApiUrl        = GitLabUrl(externalServiceBaseUrl).apiV4
+    val gitLabCommitFetcher = new GitLabCommitFetcherImpl[IO](gitLabApiUrl, Throttler.noThrottling, TestLogger())
   }
 
   private def commitsJson(from: List[CommitInfo]) =
-    Json.arr(from.map(commitJson(_)): _*).noSpaces
+    Json.arr(from.map(commitJson): _*).noSpaces
 
   private def commitJson(commitInfo: CommitInfo) = json"""{
     "id":              ${commitInfo.id.value},

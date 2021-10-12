@@ -32,7 +32,7 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.Positive
 
-object model {
+private object model {
   import Forking.ForksCount
   import Project._
   import Urls._

@@ -20,22 +20,23 @@ package io.renku.eventlog
 
 import cats.effect.{Clock, IO}
 import cats.syntax.all._
+import ch.datascience.generators.CommonGraphGenerators.pagingRequests
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators.compoundEventIds
-import ch.datascience.graph.model.GraphModelGenerators.projectIds
+import ch.datascience.generators.Generators.nonEmptyStrings
+import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventStatuses}
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.http.ErrorMessage.ErrorMessage
 import ch.datascience.http.InfoMessage.InfoMessage
+import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.interpreters.TestRoutesMetrics
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
-import io.renku.eventlog.events.EventEndpoint
-import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
-import io.renku.eventlog.processingstatus.{ProcessingStatusEndpoint, ProcessingStatusFinder}
-import io.renku.eventlog.statuschange.{StatusChangeEndpoint, StatusUpdatesRunner}
-import io.renku.eventlog.subscriptions.{EventProducersRegistry, SubscriptionsEndpoint}
+import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
+import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
+import io.renku.eventlog.subscriptions.SubscriptionsEndpoint
 import org.http4s.MediaType.application
-import org.http4s.Method.{GET, PATCH, POST}
+import org.http4s.Method.{GET, POST}
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
@@ -43,17 +44,81 @@ import org.http4s.implicits._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
+import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
-import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.language.reflectiveCalls
 
-class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Matchers with TableDrivenPropertyChecks {
 
   "routes" should {
 
-    "define a GET /events/:event-id/:project-:id endpoint" in new TestCase {
+    "define a GET /events - case with project-path only" in new TestCase {
+      val projectPath = projectPaths.generateOne
+
+      val request = Request[IO](method = GET, uri"events".withQueryParam("project-path", projectPath.value))
+
+      (eventsEndpoint.findEvents _)
+        .expects(EventsEndpoint.Request.ProjectEvents(projectPath, None, PagingRequest.default))
+        .returning(Response[IO](Ok).pure[IO])
+
+      routes.call(request).status shouldBe Ok
+    }
+
+    "define a GET /events - case with status only" in new TestCase {
+      val eventStatus = eventStatuses.generateOne
+
+      val request = Request[IO](method = GET, uri"events".withQueryParam("status", eventStatus.value))
+
+      (eventsEndpoint.findEvents _)
+        .expects(EventsEndpoint.Request.EventsWithStatus(eventStatus, PagingRequest.default))
+        .returning(Response[IO](Ok).pure[IO])
+
+      routes.call(request).status shouldBe Ok
+    }
+
+    "define a GET /events - case with project-path and status" in new TestCase {
+      val projectPath   = projectPaths.generateOne
+      val eventStatus   = eventStatuses.generateOne
+      val pagingRequest = pagingRequests.generateOne
+
+      val request = Request[IO](
+        method = GET,
+        uri"events"
+          .withQueryParam("project-path", projectPath.value)
+          .withQueryParam("status", eventStatus.value)
+          .withQueryParam("page", pagingRequest.page.value)
+          .withQueryParam("per_page", pagingRequest.perPage.value)
+      )
+
+      (eventsEndpoint.findEvents _)
+        .expects(EventsEndpoint.Request.ProjectEvents(projectPath, Some(eventStatus), pagingRequest))
+        .returning(Response[IO](Ok).pure[IO])
+
+      routes.call(request).status shouldBe Ok
+    }
+
+    Set(
+      uri"events".withQueryParam("project-path", nonEmptyStrings().generateOne),
+      uri"events".withQueryParam("status", nonEmptyStrings().generateOne),
+      uri"events"
+        .withQueryParam("status", eventStatuses.generateOne.show)
+        .withQueryParam("page", nonEmptyStrings().generateOne),
+      uri"events"
+        .withQueryParam("status", eventStatuses.generateOne.show)
+        .withQueryParam("per_page", nonEmptyStrings().generateOne)
+    ) foreach { uri =>
+      s"define a GET $uri returning $BadRequest for invalid project path" in new TestCase {
+        routes.call(Request[IO](method = GET, uri)).status shouldBe BadRequest
+      }
+    }
+
+    "define a GET /events not finding the endpoint when no project-path or status parameter is present" in new TestCase {
+      routes.call(Request[IO](method = GET, uri"events")).status shouldBe NotFound
+    }
+
+    "define a GET /events/:event-id/:project-id endpoint" in new TestCase {
       val eventId = compoundEventIds.generateOne
 
       val request = Request[IO](
@@ -68,16 +133,6 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
       response.status shouldBe Ok
     }
 
-    "define a PATCH /events endpoint" in new TestCase {
-      val request = Request[IO](PATCH, uri"events")
-
-      (eventsPatchingEndpoint.triggerEventsPatching _).expects(request).returning(Response[IO](Accepted).pure[IO])
-
-      val response = routes.call(request)
-
-      response.status shouldBe Accepted
-    }
-
     "define a POST /events endpoint" in new TestCase {
       val request        = Request[IO](POST, uri"events")
       val expectedStatus = Gen.oneOf(Accepted, BadRequest, InternalServerError, TooManyRequests).generateOne
@@ -86,21 +141,6 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
       val response = routes.call(request)
 
       response.status shouldBe expectedStatus
-    }
-
-    "define a PATCH /events/:event-id/:project-:id endpoint" in new TestCase {
-      val eventId = compoundEventIds.generateOne
-
-      val request = Request[IO](
-        method = PATCH,
-        uri"events" / eventId.id.toString / eventId.projectId.toString
-      )
-
-      (statusChangeEndpoint.changeStatus _).expects(eventId, request).returning(Response[IO](Ok).pure[IO])
-
-      val response = routes.call(request)
-
-      response.status shouldBe Ok
     }
 
     "define a GET /metrics endpoint returning OK with some prometheus metrics" in new TestCase {
@@ -168,33 +208,18 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
 
   private trait TestCase {
     val eventEndpoint            = mock[EventEndpoint[IO]]
-    val processingStatusEndpoint = mock[TestProcessingStatusEndpoint]
-    val eventsPatchingEndpoint   = mock[EventsPatchingEndpoint[IO]]
-    val routesMetrics            = TestRoutesMetrics()
-    val statusChangeEndpoint     = mock[TestStatusChangeEndpoint]
-    val subscriptionsEndpoint    = mock[TestSubscriptionEndpoint]
+    val eventsEndpoint           = mock[EventsEndpoint[IO]]
+    val processingStatusEndpoint = mock[ProcessingStatusEndpoint[IO]]
+    val subscriptionsEndpoint    = mock[SubscriptionsEndpoint[IO]]
     val eventDetailsEndpoint     = mock[EventDetailsEndpoint[IO]]
+    val routesMetrics            = TestRoutesMetrics()
     val routes = new MicroserviceRoutes[IO](
       eventEndpoint,
+      eventsEndpoint,
       processingStatusEndpoint,
-      eventsPatchingEndpoint,
-      statusChangeEndpoint,
       subscriptionsEndpoint,
       eventDetailsEndpoint,
       routesMetrics
     ).routes.map(_.or(notAvailableResponse))
   }
-
-  class TestProcessingStatusEndpoint(processingStatusFinder: ProcessingStatusFinder[IO], logger: Logger[IO])
-      extends ProcessingStatusEndpoint[IO](processingStatusFinder, logger)
-
-  class TestSubscriptionEndpoint(
-      subscriptionCategoryRegistry: EventProducersRegistry[IO],
-      logger:                       Logger[IO]
-  ) extends SubscriptionsEndpoint[IO](subscriptionCategoryRegistry, logger)
-
-  class TestStatusChangeEndpoint(
-      updateCommandsRunner: StatusUpdatesRunner[IO],
-      logger:               Logger[IO]
-  ) extends StatusChangeEndpoint[IO](updateCommandsRunner, Set.empty, logger)
 }

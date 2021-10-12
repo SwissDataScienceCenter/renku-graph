@@ -16,70 +16,82 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration
+package ch.datascience.commiteventservice.events.categories.globalcommitsync
+package eventgeneration
 
-import ch.datascience.commiteventservice.events.categories.common.EventStatusPatcher
+import cats.syntax.all._
 import ch.datascience.commiteventservice.events.categories.common.UpdateResult.{Deleted, Failed}
-import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.GlobalCommitEventSynchronizer.SynchronizationSummary
+import ch.datascience.commiteventservice.events.categories.common.{CommitEventsRemover, SynchronizationSummary, UpdateResult}
 import ch.datascience.events.consumers.ConsumersModelGenerators.projectsGen
 import ch.datascience.generators.CommonGraphGenerators.personalAccessTokens
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.exceptions
+import ch.datascience.generators.Generators.{exceptions, nonEmptyStrings}
 import ch.datascience.graph.model.EventsGenerators.commitIds
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects
+import ch.datascience.http.client.AccessToken
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 class CommitEventDeleterSpec extends AnyWordSpec with should.Matchers with MockFactory {
+
   "deleteExtraneousCommits" should {
-    "Successfully delete commits" in new TestCase {
+
+    "successfully delete commits" in new TestCase {
       val project         = projectsGen.generateOne
       val commitsToDelete = commitIds.generateNonEmptyList().toList
 
-      commitsToDelete.foreach {
-        (eventStatusPatcher.sendDeletionStatus _)
-          .expects(project.id, _)
-          .returning(Success(()))
+      commitsToDelete foreach {
+        (commitEventsRemover.removeDeletedEvent _)
+          .expects(project, _)
+          .returning(Deleted.pure[Try])
       }
 
-      commitEventDeleter.deleteExtraneousCommits(project, commitsToDelete)(maybeAccessToken) shouldBe Success(
-        SynchronizationSummary().updated(Deleted, commitsToDelete.length)
-      )
+      commitEventDeleter.deleteExtraneousCommits(project, commitsToDelete) shouldBe
+        SynchronizationSummary().updated(Deleted, commitsToDelete.length).pure[Try]
     }
 
-    "Synchronization summary of failed events " +
-      "if EventStatusPatcher sending deletion status fails" in new TestCase {
+    "return synchronization summary of failed events " +
+      "if EventStatusPatcher returns Failure while sending the deletion status" in new TestCase {
         val project         = projectsGen.generateOne
         val commitsToDelete = commitIds.generateNonEmptyList().toList
-        val exception       = exceptions.generateOne
 
-        commitsToDelete.foreach {
-          (eventStatusPatcher.sendDeletionStatus _)
-            .expects(project.id, _)
-            .returning(Failure(exception))
+        val failure = Failed(nonEmptyStrings().generateOne, exceptions.generateOne)
+        commitsToDelete foreach {
+          (commitEventsRemover.removeDeletedEvent _)
+            .expects(project, _)
+            .returning(failure.pure[Try])
         }
 
-        commitEventDeleter.deleteExtraneousCommits(project, commitsToDelete)(maybeAccessToken) shouldBe Success(
-          SynchronizationSummary().updated(Failed("Failed to delete commit", exception), commitsToDelete.length)
-        )
+        commitEventDeleter.deleteExtraneousCommits(project, commitsToDelete) shouldBe
+          SynchronizationSummary().updated(failure, commitsToDelete.length).pure[Try]
+      }
+
+    "return synchronization summary of failed events " +
+      "if EventStatusPatcher fails while sending the deletion status" in new TestCase {
+        val project         = projectsGen.generateOne
+        val commitsToDelete = commitIds.generateNonEmptyList().toList
+
+        val exception = exceptions.generateOne
+        commitsToDelete foreach {
+          (commitEventsRemover.removeDeletedEvent _)
+            .expects(project, _)
+            .returning(exception.raiseError[Try, UpdateResult])
+        }
+
+        commitEventDeleter.deleteExtraneousCommits(project, commitsToDelete) shouldBe
+          SynchronizationSummary()
+            .updated(Failed(s"$categoryName Failed to delete commit", exception), commitsToDelete.length)
+            .pure[Try]
       }
   }
 
-  trait TestCase {
+  private trait TestCase {
 
-    implicit val maybeAccessToken = personalAccessTokens.generateOption
+    implicit val maybeAccessToken: Option[AccessToken] = personalAccessTokens.generateOption
 
-    val eventStatusPatcher = mock[EventStatusPatcher[Try]]
-
-    def givenSendingDeletionStatusSucceeds(projectId: projects.Id, eventId: CommitId) =
-      (eventStatusPatcher.sendDeletionStatus _)
-        .expects(projectId, eventId)
-        .returning(Success(()))
-
-    val commitEventDeleter = new CommitEventDeleterImpl[Try](eventStatusPatcher)
+    val commitEventsRemover = mock[CommitEventsRemover[Try]]
+    val commitEventDeleter  = new CommitEventDeleterImpl[Try](commitEventsRemover)
   }
 }

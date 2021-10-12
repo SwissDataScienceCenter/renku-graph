@@ -22,7 +22,8 @@ import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.commiteventservice.events.categories.commitsync.Generators._
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer
-import ch.datascience.events.consumers.EventRequestContent
+import ch.datascience.events
+import ch.datascience.events.EventRequestContent
 import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -136,7 +137,7 @@ class EventHandlerSpec
     val handler =
       new EventHandler[IO](categoryName, commitEventSynchronizer, logger)
 
-    def requestContent(event: Json): EventRequestContent = EventRequestContent(event, None)
+    def requestContent(event: Json): EventRequestContent = events.EventRequestContent(event, None)
   }
 
   private implicit def eventEncoder[E <: CommitSyncEvent]: Encoder[E] = Encoder.instance[E] {

@@ -21,7 +21,6 @@ package ch.datascience.graph.acceptancetests.tooling
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.projects
-import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.{AccessToken, BasicAuthCredentials, RestClient}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
@@ -94,14 +93,6 @@ object TokenRepositoryClient {
       timer:            Timer[IO]
   ): ServiceClient = new ServiceClient {
     override val baseUrl: String Refined Url = "http://localhost:9003"
-  }
-
-  implicit class AccessTokenOps(accessToken: AccessToken) {
-
-    lazy val toJson: Json = accessToken match {
-      case OAuthAccessToken(token)    => json"""{"oauthAccessToken": $token}"""
-      case PersonalAccessToken(token) => json"""{"personalAccessToken": $token}"""
-    }
   }
 }
 

@@ -19,38 +19,89 @@
 package io.renku.eventlog
 
 import cats.data.Kleisli
+import cats.syntax.all._
 import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl, subscriberIds, subscriberUrls}
 import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators.timestampsNotInTheFuture
+import ch.datascience.graph.model.EventsGenerators.{eventBodies, eventIds, eventProcessingTimes}
 import ch.datascience.graph.model.GraphModelGenerators.{projectPaths, projectSchemaVersions}
-import ch.datascience.graph.model.events.EventStatus.{TransformationRecoverableFailure, TransformingTriples, TriplesGenerated}
+import ch.datascience.graph.model.events.EventStatus.{AwaitingDeletion, TransformationRecoverableFailure, TransformingTriples, TriplesGenerated, TriplesStore}
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.model.{SchemaVersion, projects}
 import ch.datascience.microservices.MicroserviceBaseUrl
+import io.renku.eventlog.EventContentGenerators.{eventMessages, eventPayloads}
 import skunk._
 import skunk.implicits._
 
 import java.time.Instant
+import scala.util.Random
 
 trait EventLogDataProvisioning {
   self: InMemoryEventLogDb =>
 
-  protected def storeEvent(compoundEventId:      CompoundEventId,
-                           eventStatus:          EventStatus,
-                           executionDate:        ExecutionDate,
-                           eventDate:            EventDate,
-                           eventBody:            EventBody,
-                           createdDate:          CreatedDate = CreatedDate(Instant.now),
-                           batchDate:            BatchDate = BatchDate(Instant.now),
-                           projectPath:          Path = projectPaths.generateOne,
-                           maybeMessage:         Option[EventMessage] = None,
-                           payloadSchemaVersion: SchemaVersion = projectSchemaVersions.generateOne,
-                           maybeEventPayload:    Option[EventPayload] = None
+  protected def storeGeneratedEvent(status:      EventStatus,
+                                    eventDate:   EventDate,
+                                    projectId:   projects.Id,
+                                    projectPath: projects.Path
+  ): (EventId,
+      EventStatus,
+      Option[EventMessage],
+      Option[EventPayload],
+      Option[SchemaVersion],
+      List[EventProcessingTime]
+  ) = {
+    val eventId = CompoundEventId(eventIds.generateOne, projectId)
+    val maybeMessage = status match {
+      case _: EventStatus.FailureStatus => eventMessages.generateSome
+      case _ => eventMessages.generateOption
+    }
+    val maybePayload = status match {
+      case TriplesGenerated | TransformingTriples | TriplesStore => eventPayloads.generateSome
+      case AwaitingDeletion                                      => eventPayloads.generateOption
+      case _                                                     => eventPayloads.generateNone
+    }
+    val maybeSchemaVersion = maybePayload.map(_ => projectSchemaVersions.generateOne)
+    storeEvent(
+      eventId,
+      status,
+      timestampsNotInTheFuture.generateAs(ExecutionDate),
+      eventDate,
+      eventBodies.generateOne,
+      projectPath = projectPath,
+      maybeMessage = maybeMessage,
+      maybeEventPayload = maybePayload,
+      maybeSchemaVersion = maybeSchemaVersion
+    )
+
+    val processingTimes = status match {
+      case TriplesGenerated | TriplesStore => List(eventProcessingTimes.generateOne)
+      case AwaitingDeletion =>
+        if (Random.nextBoolean()) List(eventProcessingTimes.generateOne)
+        else Nil
+      case _ => Nil
+    }
+    processingTimes.foreach(upsertProcessingTime(eventId, status, _))
+
+    (eventId.id, status, maybeMessage, maybePayload, maybeSchemaVersion, processingTimes)
+  }
+
+  protected def storeEvent(compoundEventId:    CompoundEventId,
+                           eventStatus:        EventStatus,
+                           executionDate:      ExecutionDate,
+                           eventDate:          EventDate,
+                           eventBody:          EventBody,
+                           createdDate:        CreatedDate = CreatedDate(Instant.now),
+                           batchDate:          BatchDate = BatchDate(Instant.now),
+                           projectPath:        Path = projectPaths.generateOne,
+                           maybeMessage:       Option[EventMessage] = None,
+                           maybeEventPayload:  Option[EventPayload] = None,
+                           maybeSchemaVersion: Option[SchemaVersion] = None
   ): Unit = {
     upsertProject(compoundEventId, projectPath, eventDate)
     insertEvent(compoundEventId, eventStatus, executionDate, eventDate, eventBody, createdDate, batchDate, maybeMessage)
-    upsertEventPayload(compoundEventId, eventStatus, payloadSchemaVersion, maybeEventPayload)
+    upsertEventPayload(compoundEventId, eventStatus, maybeEventPayload, maybeSchemaVersion)
   }
 
   protected def insertEvent(compoundEventId: CompoundEventId,
@@ -117,27 +168,31 @@ trait EventLogDataProvisioning {
       }
     }
 
-  protected def upsertEventPayload(compoundEventId: CompoundEventId,
-                                   eventStatus:     EventStatus,
-                                   schemaVersion:   SchemaVersion,
-                                   maybePayload:    Option[EventPayload]
-  ): Unit = (eventStatus, maybePayload) match {
-    case (TriplesGenerated | TransformationRecoverableFailure | TransformingTriples, Some(payload)) =>
-      execute[Unit] {
-        Kleisli { session =>
-          val query: Command[EventId ~ projects.Id ~ EventPayload ~ SchemaVersion] =
-            sql"""INSERT INTO
-                  event_payload (event_id, project_id, payload, schema_version)
-                  VALUES ($eventIdEncoder, $projectIdEncoder, $eventPayloadEncoder, $schemaVersionEncoder)
-                  ON CONFLICT (event_id, project_id, schema_version)
-                  DO UPDATE SET payload = excluded.payload
-            """.command
-          session
-            .prepare(query)
-            .use(_.execute(compoundEventId.id ~ compoundEventId.projectId ~ payload ~ schemaVersion))
-            .void
+  protected def upsertEventPayload(compoundEventId:    CompoundEventId,
+                                   eventStatus:        EventStatus,
+                                   maybePayload:       Option[EventPayload],
+                                   maybeSchemaVersion: Option[SchemaVersion]
+  ): Unit = eventStatus match {
+    case TriplesGenerated | TransformationRecoverableFailure | TransformingTriples | TriplesStore | AwaitingDeletion =>
+      (maybePayload, maybeSchemaVersion)
+        .mapN { (payload, schemaVersion) =>
+          execute[Unit] {
+            Kleisli { session =>
+              val query: Command[EventId ~ projects.Id ~ EventPayload ~ SchemaVersion] =
+                sql"""INSERT INTO
+                    event_payload (event_id, project_id, payload, schema_version)
+                    VALUES ($eventIdEncoder, $projectIdEncoder, $eventPayloadEncoder, $schemaVersionEncoder)
+                    ON CONFLICT (event_id, project_id, schema_version)
+                    DO UPDATE SET payload = excluded.payload
+              """.command
+              session
+                .prepare(query)
+                .use(_.execute(compoundEventId.id ~ compoundEventId.projectId ~ payload ~ schemaVersion))
+                .void
+            }
+          }
         }
-      }
+        .getOrElse(())
     case _ => ()
   }
 
@@ -192,8 +247,7 @@ trait EventLogDataProvisioning {
   ): Unit = execute[Unit] {
     Kleisli { session =>
       val query: Command[EventId ~ projects.Id ~ SubscriberId] =
-        sql"""INSERT INTO
-              event_delivery (event_id, project_id, delivery_id)
+        sql"""INSERT INTO event_delivery (event_id, project_id, delivery_id)
               VALUES ($eventIdEncoder, $projectIdEncoder, $subscriberIdEncoder)
               ON CONFLICT (event_id, project_id)
               DO NOTHING

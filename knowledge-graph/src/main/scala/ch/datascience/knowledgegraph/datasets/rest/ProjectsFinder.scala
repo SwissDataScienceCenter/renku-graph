@@ -18,12 +18,14 @@
 
 package ch.datascience.knowledgegraph.datasets.rest
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.model.datasets.{DateCreatedInProject, Identifier}
+import ch.datascience.graph.model.Schemas._
+import ch.datascience.graph.model.datasets.Identifier
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{Path, ResourceId}
-import ch.datascience.knowledgegraph.datasets.model.{AddedToProject, DatasetAgent, DatasetProject}
+import ch.datascience.knowledgegraph.datasets.model.DatasetProject
+import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
 import io.circe.Decoder.decodeList
@@ -33,69 +35,42 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.ExecutionContext
 import scala.util.Try
 
-private class ProjectsFinder(
+private class ProjectsFinder[Interpretation[_]: ConcurrentEffect: Timer](
     rdfStoreConfig:          RdfStoreConfig,
-    logger:                  Logger[IO],
-    timeRecorder:            SparqlQueryTimeRecorder[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+    logger:                  Logger[Interpretation],
+    timeRecorder:            SparqlQueryTimeRecorder[Interpretation]
+)(implicit executionContext: ExecutionContext)
     extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder) {
 
   import ProjectsFinder._
 
-  def findUsedIn(identifier: Identifier): IO[List[DatasetProject]] =
+  def findUsedIn(identifier: Identifier): Interpretation[List[DatasetProject]] =
     queryExpecting[List[DatasetProject]](using = query(identifier))
 
-  private def query(identifier: Identifier) = SparqlQuery(
+  private def query(identifier: Identifier) = SparqlQuery.of(
     name = "ds by id - projects",
-    Set(
-      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-      "PREFIX schema: <http://schema.org/>",
-      "PREFIX prov: <http://www.w3.org/ns/prov#>",
-      "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>"
-    ),
-    s"""|SELECT DISTINCT ?projectId ?projectName ?minDateCreated ?maybeAgentEmail ?agentName
+    Prefixes.of(schema -> "schema", prov -> "prov", renku -> "renku"),
+    s"""|SELECT DISTINCT ?projectId ?projectName
         |WHERE {
-        |  {
-        |    SELECT ?allDsId ?projectId(MIN(?dateCreated) AS ?minDateCreated)
-        |    WHERE {
-        |      ?dsId rdf:type <http://schema.org/Dataset>;
-        |            schema:identifier '$identifier';
-        |            prov:atLocation ?location ;
-        |            renku:topmostSameAs ?topmostSameAs.
-        |            
-        |      BIND(CONCAT(?location, "/metadata.yml") AS ?metaDataLocation) .
-        |      FILTER NOT EXISTS {
-        |      # Removing dataset that have an activity that invalidates them
-        |      ?deprecationEntity rdf:type <http://www.w3.org/ns/prov#Entity>;
-        |                         prov:atLocation ?metaDataLocation ;
-        |                         prov:wasInvalidatedBy ?invalidationActivity ;
-        |                         schema:isPartOf ?projectId .
-        |      }  
-        |            
-        |      ?allDsId rdf:type <http://schema.org/Dataset>;
-        |               renku:topmostSameAs ?topmostSameAs;
-        |               schema:isPartOf ?projectId;
-        |               prov:qualifiedGeneration/prov:activity ?activityId.
-        |      ?activityId prov:startedAtTime ?dateCreated.
-        |      
-        |    }
-        |    GROUP BY ?allDsId ?projectId
+        |  ?dsId a schema:Dataset;
+        |        schema:identifier '$identifier';
+        |        renku:topmostSameAs ?topmostSameAs.
+        |  
+        |  ?allDsId a schema:Dataset;
+        |           renku:topmostSameAs ?topmostSameAs;
+        |           ^renku:hasDataset ?projectId.
+        |  FILTER NOT EXISTS {
+        |    ?projectDatasets prov:wasDerivedFrom / schema:url ?allDsId;
+        |                     ^renku:hasDataset ?projectId. 
         |  }
-        |  ?allDsId rdf:type <http://schema.org/Dataset>;
-        |           schema:isPartOf ?projectId;
-        |           prov:qualifiedGeneration/prov:activity ?activityId.
-        |  ?activityId prov:startedAtTime ?minDateCreated;
-        |              prov:wasAssociatedWith ?associationId.
-        |  ?projectId rdf:type <http://schema.org/Project>;
-        |             schema:name ?projectName.
-        |  ?associationId rdf:type <http://schema.org/Person>;
-        |                 schema:name ?agentName.
-        |  OPTIONAL { ?associationId schema:email ?maybeAgentEmail }
+        |  FILTER NOT EXISTS {
+        |    ?allDsId prov:invalidatedAtTime ?invalidationTime .
+        |  }  
+        |  ?projectId schema:name ?projectName .
         |}
         |ORDER BY ASC(?projectName)
         |""".stripMargin
   )
-
 }
 
 private object ProjectsFinder {
@@ -103,7 +78,6 @@ private object ProjectsFinder {
   import io.circe.Decoder
 
   private implicit val projectsDecoder: Decoder[List[DatasetProject]] = {
-    import ch.datascience.graph.model.users.{Email, Name => UserName}
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
     def toProjectPath(projectPath: ResourceId) =
@@ -114,12 +88,9 @@ private object ProjectsFinder {
 
     implicit val projectDecoder: Decoder[DatasetProject] = { cursor =>
       for {
-        path            <- cursor.downField("projectId").downField("value").as[ResourceId].flatMap(toProjectPath)
-        name            <- cursor.downField("projectName").downField("value").as[projects.Name]
-        dateCreated     <- cursor.downField("minDateCreated").downField("value").as[DateCreatedInProject]
-        maybeAgentEmail <- cursor.downField("maybeAgentEmail").downField("value").as[Option[Email]]
-        agentName       <- cursor.downField("agentName").downField("value").as[UserName]
-      } yield DatasetProject(path, name, AddedToProject(dateCreated, DatasetAgent(maybeAgentEmail, agentName)))
+        path <- cursor.downField("projectId").downField("value").as[ResourceId].flatMap(toProjectPath)
+        name <- cursor.downField("projectName").downField("value").as[projects.Name]
+      } yield DatasetProject(path, name)
     }
 
     _.downField("results").downField("bindings").as(decodeList[DatasetProject])

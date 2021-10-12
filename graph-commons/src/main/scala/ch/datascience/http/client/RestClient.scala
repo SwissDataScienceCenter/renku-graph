@@ -34,6 +34,7 @@ import org.http4s.AuthScheme.Bearer
 import org.http4s.Credentials.Token
 import org.http4s.Status.BadRequest
 import org.http4s._
+import org.http4s.blaze.pipeline.Command
 import org.http4s.client.blaze.BlazeClientBuilder
 import org.http4s.client.{Client, ConnectionFailure}
 import org.http4s.headers.{Authorization, `Content-Type`}
@@ -45,7 +46,6 @@ import java.net.ConnectException
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.control.NonFatal
-import org.http4s.blaze.pipeline.Command
 
 abstract class RestClient[Interpretation[_]: ConcurrentEffect: Timer, ThrottlingTarget](
     throttler:               Throttler[Interpretation, ThrottlingTarget],
@@ -79,6 +79,10 @@ abstract class RestClient[Interpretation[_]: ConcurrentEffect: Timer, Throttling
       case Some(accessToken) => request(method, uri, accessToken)
       case _                 => request(method, uri)
     }
+
+  protected def secureRequest(method: Method, uri: Uri)(implicit
+      maybeAccessToken:               Option[AccessToken]
+  ): Request[Interpretation] = request(method, uri, maybeAccessToken)
 
   protected def request(method: Method, uri: Uri, basicAuth: BasicAuthCredentials): Request[Interpretation] =
     Request[Interpretation](
@@ -170,6 +174,9 @@ abstract class RestClient[Interpretation[_]: ConcurrentEffect: Timer, Throttling
                               response: Response[Interpretation]
   ): PartialFunction[Throwable, Interpretation[T]] = {
     case error: RestClientError => MonadThrow[Interpretation].raiseError(error)
+    case NonFatal(cause: InvalidMessageBodyFailure) =>
+      val exception = new Exception(List(cause, cause.getCause()).map(_.getMessage()).mkString("; "), cause)
+      MonadThrow[Interpretation].raiseError(MappingException(LogMessage(request, response, exception), exception))
     case NonFatal(cause) =>
       MonadThrow[Interpretation].raiseError(MappingException(LogMessage(request, response, cause), cause))
   }

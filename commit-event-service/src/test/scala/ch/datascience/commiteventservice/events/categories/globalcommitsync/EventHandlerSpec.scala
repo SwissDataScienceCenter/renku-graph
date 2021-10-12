@@ -22,9 +22,10 @@ import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.commiteventservice.events.categories.globalcommitsync.Generators.globalCommitSyncEventsNonZero
 import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.GlobalCommitEventSynchronizer
+import ch.datascience.events.EventRequestContent
+import ch.datascience.events.consumers.ConcurrentProcessesLimiter
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
-import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventRequestContent}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{exceptions, jsons}
 import ch.datascience.interpreters.TestLogger

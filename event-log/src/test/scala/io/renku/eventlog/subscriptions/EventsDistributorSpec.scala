@@ -77,8 +77,8 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
 
       eventually {
         logger.loggedOnly(
-          Info(s"$categoryName: $event, url = $subscriber -> $Delivered"),
-          Info(s"$categoryName: $otherEvent, url = $otherSubscriber -> $Delivered")
+          Info(s"$categoryName: $event, subscriber = $subscriber -> $Delivered"),
+          Info(s"$categoryName: $otherEvent, subscriber = $otherSubscriber -> $Delivered")
         )
       }
     }
@@ -111,7 +111,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
 
         eventually {
           logger.loggedOnly(
-            Info(s"$categoryName: $event, url = $otherSubscriber -> $Delivered")
+            Info(s"$categoryName: $event, subscriber = $otherSubscriber -> $Delivered")
           )
         }
       }
@@ -154,9 +154,9 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
 
         eventually {
           logger.loggedOnly(
-            Error(s"$categoryName: $event, url = $subscriber -> $Misdelivered"),
-            Error(s"$categoryName: $event, url = $otherSubscriber -> $Misdelivered"),
-            Info(s"$categoryName: $event, url = $yetAnotherSubscriber -> $Delivered")
+            Error(s"$categoryName: $event, subscriber = $subscriber -> $Misdelivered"),
+            Error(s"$categoryName: $event, subscriber = $otherSubscriber -> $Misdelivered"),
+            Info(s"$categoryName: $event, subscriber = $yetAnotherSubscriber -> $Delivered")
           )
         }
       }
@@ -195,7 +195,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
 
         eventually {
           logger.loggedOnly(
-            Info(s"$categoryName: $event, url = $subscriber -> $Delivered")
+            Info(s"$categoryName: $event, subscriber = $subscriber -> $Delivered")
           )
         }
       }
@@ -225,7 +225,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
       eventually {
         logger.loggedOnly(
           Error(s"$categoryName: executing event distribution on a subscriber failed", exception),
-          Info(s"$categoryName: $event, url = $subscriber -> $Delivered")
+          Info(s"$categoryName: $event, subscriber = $subscriber -> $Delivered")
         )
       }
     }
@@ -257,7 +257,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
       eventually {
         logger.loggedOnly(
           Error(s"$categoryName: finding events to dispatch failed", exception),
-          Info(s"$categoryName: $event, url = $subscriber -> $Delivered")
+          Info(s"$categoryName: $event, subscriber = $subscriber -> $Delivered")
         )
       }
     }
@@ -291,9 +291,9 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
 
       eventually {
         logger.loggedOnly(
-          Info(s"$categoryName: $event, url = $subscriber -> $Delivered"),
+          Info(s"$categoryName: $event, subscriber = $subscriber -> $Delivered"),
           Error(s"$categoryName: registering sending $event to $subscriber failed", exception),
-          Info(s"$categoryName: $otherEvent, url = $subscriber -> $Delivered")
+          Info(s"$categoryName: $otherEvent, subscriber = $subscriber -> $Delivered")
         )
       }
     }
@@ -327,7 +327,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
 
       eventually {
         logger.loggedOnly(
-          Info(s"$categoryName: $event, url = $subscriber -> $Delivered")
+          Info(s"$categoryName: $event, subscriber = $subscriber -> $Delivered")
         )
       }
     }
@@ -362,8 +362,8 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
 
       eventually {
         logger.loggedOnly(
-          Error(s"$categoryName: $event, url = $subscriber -> $Misdelivered"),
-          Info(s"$categoryName: $event, url = $otherSubscriber -> $Delivered")
+          Error(s"$categoryName: $event, subscriber = $subscriber -> $Misdelivered"),
+          Info(s"$categoryName: $event, subscriber = $otherSubscriber -> $Delivered")
         )
       }
     }
@@ -396,9 +396,9 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
 
       eventually {
         logger.loggedOnly(
-          Error(s"$categoryName: $event, url = $subscriber -> $Misdelivered"),
+          Error(s"$categoryName: $event, subscriber = $subscriber -> $Misdelivered"),
           Error(s"$categoryName: $event -> returning an event to the queue failed", backToTheQueueException),
-          Info(s"$categoryName: $event, url = $otherSubscriber -> $Delivered")
+          Info(s"$categoryName: $event, subscriber = $otherSubscriber -> $Delivered")
         )
       }
     }

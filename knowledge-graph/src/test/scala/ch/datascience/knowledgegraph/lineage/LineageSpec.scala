@@ -21,9 +21,10 @@ package ch.datascience.knowledgegraph.lineage
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.Schemas.schema
+import ch.datascience.graph.model.entities.{Activity, Entity}
 import ch.datascience.knowledgegraph.lineage.LineageGenerators._
 import ch.datascience.knowledgegraph.lineage.model.{Edge, Lineage, Node}
-import ch.datascience.rdfstore.entities.bundles.{prov, schema, wfprov}
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
@@ -72,48 +73,32 @@ class LineageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.
 
   "singleWordType" should {
 
-    s"return '${Node.SingleWordType.ProcessRun}' " +
-      "if node contains the 'http://purl.org/wf4ever/wfprov#ProcessRun' type" in {
-        val node = entityNodes.generateOne.copy(
-          types = Set(
-            (prov / "Activity").toString,
-            (wfprov / "ProcessRun").toString
-          ).map(Node.Type.apply)
-        )
+    s"return '${Node.SingleWordType.ProcessRun}' if node contains Activity types" in {
+      val node = entityNodes.generateOne.copy(
+        types = Activity.entityTypes.toList.map(_.show).map(Node.Type(_)).toSet
+      )
 
-        node.singleWordType shouldBe Right(Node.SingleWordType.ProcessRun)
-      }
+      node.singleWordType shouldBe Right(Node.SingleWordType.ProcessRun)
+    }
 
-    s"return '${Node.SingleWordType.File}' " +
-      "if node contains the 'http://www.w3.org/ns/prov#Entity' type but not 'http://www.w3.org/ns/prov#Collection'" in {
-        val node = entityNodes.generateOne.copy(
-          types = Set(
-            (prov / "Entity").toString,
-            (wfprov / "Artifact").toString
-          ).map(Node.Type.apply)
-        )
+    s"return '${Node.SingleWordType.File}' if node contains File Entity types" in {
+      val node = entityNodes.generateOne.copy(
+        types = Entity.fileEntityTypes.toList.map(_.show).map(Node.Type(_)).toSet
+      )
 
-        node.singleWordType shouldBe Right(Node.SingleWordType.File)
-      }
+      node.singleWordType shouldBe Right(Node.SingleWordType.File)
+    }
 
-    s"return '${Node.SingleWordType.Directory}' " +
-      "if node contains the 'http://www.w3.org/ns/prov#Entity' and 'http://www.w3.org/ns/prov#Collection' types" in {
-        val node = entityNodes.generateOne.copy(
-          types = Set(
-            (prov / "Entity").toString,
-            (wfprov / "Artifact").toString,
-            (prov / "Collection").toString
-          ).map(Node.Type.apply)
-        )
+    s"return '${Node.SingleWordType.Directory}' if node contains File Entity types" in {
+      val node = entityNodes.generateOne.copy(
+        types = Entity.folderEntityTypes.toList.map(_.show).map(Node.Type(_)).toSet
+      )
 
-        node.singleWordType shouldBe Right(Node.SingleWordType.Directory)
-      }
+      node.singleWordType shouldBe Right(Node.SingleWordType.Directory)
+    }
 
     "return an Exception there's no match to the given types" in {
-      val types = Set(
-        (wfprov / "Artifact").toString,
-        (schema / "Dataset").toString
-      )
+      val types = Set(schema / "Dataset", schema / "Project").map(_.show)
 
       val Left(exception) = entityNodes.generateOne
         .copy(types = types.map(Node.Type.apply))

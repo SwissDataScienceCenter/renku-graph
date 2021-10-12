@@ -18,43 +18,34 @@
 
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.events.consumers.Project
 import ch.datascience.graph.model.SchemaVersion
-import ch.datascience.graph.model.events._
-import ch.datascience.rdfstore.JsonLDTriples
-import io.circe.parser._
-import io.circe.{DecodingFailure, Error, ParsingFailure}
+import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 
 private trait EventBodyDeserializer[Interpretation[_]] {
-  def toTriplesGeneratedEvent(eventId:       CompoundEventId,
-                              project:       Project,
-                              schemaVersion: SchemaVersion,
-                              eventBody:     EventBody
+  def toEvent(eventId: CompoundEventId,
+              project: Project,
+              body:    (EventBody, SchemaVersion)
   ): Interpretation[TriplesGeneratedEvent]
 }
 
-private class EventBodyDeserializerImpl[Interpretation[_]](implicit
-    ME: MonadError[Interpretation, Throwable]
-) extends EventBodyDeserializer[Interpretation] {
+private class EventBodyDeserializerImpl[Interpretation[_]: MonadThrow] extends EventBodyDeserializer[Interpretation] {
+  import io.renku.jsonld.parser.{parse => parserToJsonLD, _}
 
-  override def toTriplesGeneratedEvent(eventId:       CompoundEventId,
-                                       project:       Project,
-                                       schemaVersion: SchemaVersion,
-                                       eventBody:     EventBody
-  ): Interpretation[TriplesGeneratedEvent] =
-    ME.fromEither {
-      parse(eventBody.value)
-        .map(json => TriplesGeneratedEvent(eventId.id, project, JsonLDTriples(json), schemaVersion))
-        .leftMap(toMeaningfulError(eventId))
-    }
+  override def toEvent(eventId: CompoundEventId,
+                       project: Project,
+                       body:    (EventBody, SchemaVersion)
+  ): Interpretation[TriplesGeneratedEvent] = MonadThrow[Interpretation].fromEither {
+    parserToJsonLD(body._1.value)
+      .map(jsonLD => TriplesGeneratedEvent(eventId.id, project, jsonLD, body._2))
+      .leftMap(toMeaningfulError(eventId))
+  }
 
-  private def toMeaningfulError(eventId: CompoundEventId): Error => Error = {
-    case failure: DecodingFailure => failure.withMessage(s"TriplesGeneratedEvent cannot be deserialised: $eventId")
-    case failure: ParsingFailure =>
-      ParsingFailure(s"TriplesGeneratedEvent cannot be deserialised: $eventId", failure)
+  private def toMeaningfulError(eventId: CompoundEventId): ParsingFailure => ParsingFailure = { failure =>
+    ParsingFailure(s"TriplesGeneratedEvent cannot be deserialised: $eventId", failure)
   }
 }
 

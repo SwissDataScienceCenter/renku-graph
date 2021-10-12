@@ -22,7 +22,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.config.GitLabUrl
+import ch.datascience.graph.model.GitLabUrl
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects.Visibility
 import ch.datascience.http.client.AccessToken
@@ -125,7 +125,9 @@ class ProjectInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSe
 
       intercept[Exception] {
         projectInfoFinder.findProjectInfo(projectId, maybeAccessToken = None).unsafeRunSync()
-      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      }.getMessage should startWith(
+        s"GET $gitLabUrl/api/v4/projects/$projectId returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      )
     }
   }
 

@@ -56,8 +56,8 @@ object Microservice extends IOMicroservice {
     ExecutionContext fromExecutorService newFixedThreadPool(ConfigSource.default.at("threads-number").loadOrThrow[Int])
 
   protected implicit override def contextShift: ContextShift[IO] = IO.contextShift(executionContext)
-
-  protected implicit override def timer: Timer[IO] = IO.timer(executionContext)
+  protected implicit override def timer:        Timer[IO]        = IO.timer(executionContext)
+  private implicit val logger:                  Logger[IO]       = ApplicationLogger
 
   private def parseConfigArgs(args: List[String]): IO[Config] = IO {
     args.headOption match {
@@ -82,13 +82,9 @@ object Microservice extends IOMicroservice {
                                                                                                metricsRegistry,
                                                                                                ApplicationLogger
                                       )
-    membersSyncSubscription <-
-      events.categories.membersync.SubscriptionFactory(gitLabThrottler, ApplicationLogger, sparqlTimeRecorder)
-    triplesGeneratedSubscription <- events.categories.triplesgenerated.SubscriptionFactory(metricsRegistry,
-                                                                                           gitLabThrottler,
-                                                                                           sparqlTimeRecorder,
-                                                                                           ApplicationLogger
-                                    )
+    membersSyncSubscription <- events.categories.membersync.SubscriptionFactory(gitLabThrottler, sparqlTimeRecorder)
+    triplesGeneratedSubscription <-
+      events.categories.triplesgenerated.SubscriptionFactory(metricsRegistry, gitLabThrottler, sparqlTimeRecorder)
     eventConsumersRegistry <- consumers.EventConsumersRegistry(
                                 awaitingGenerationSubscription,
                                 membersSyncSubscription,

@@ -18,7 +18,6 @@
 
 package io.renku.eventlog.metrics
 
-import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.graph.model.events.{CategoryName, EventStatus}
@@ -35,12 +34,11 @@ trait EventLogMetrics[Interpretation[_]] {
 
 class EventLogMetricsImpl(
     statsFinder:             StatsFinder[IO],
-    logger:                  Logger[IO],
     categoryNameEventsGauge: LabeledGauge[IO, CategoryName],
     statusesGauge:           LabeledGauge[IO, EventStatus],
     totalGauge:              SingleValueGauge[IO],
     interval:                FiniteDuration = EventLogMetrics.interval
-)(implicit ME:               MonadError[IO, Throwable], timer: Timer[IO], cs: ContextShift[IO])
+)(implicit logger:           Logger[IO], timer: Timer[IO], cs: ContextShift[IO])
     extends EventLogMetrics[IO] {
 
   override def run(): IO[Unit] = updateStatuses().foreverM[Unit]
@@ -76,32 +74,28 @@ class EventLogMetricsImpl(
 }
 
 object EventLogMetrics {
-  private[metrics] val interval: FiniteDuration = 10 seconds
-}
 
-object IOEventLogMetrics {
+  private[metrics] val interval: FiniteDuration = 10 seconds
 
   import cats.effect.IO._
   import eu.timepit.refined.auto._
 
   def apply(
-      statsFinder:         StatsFinder[IO],
-      logger:              Logger[IO],
-      metricsRegistry:     MetricsRegistry[IO]
-  )(implicit contextShift: ContextShift[IO], timer: Timer[IO]): IO[EventLogMetrics[IO]] =
-    for {
-      categoryNameEventsGauge <- Gauge[IO, CategoryName](
-                                   name = "category_name_events_count",
-                                   help = "Number of events waiting for processing per Category Name.",
-                                   labelName = "category_name"
-                                 )(metricsRegistry)
-      statusesGauge <- Gauge[IO, EventStatus](name = "events_statuses_count",
-                                              help = "Total Commit Events by status.",
-                                              labelName = "status"
-                       )(metricsRegistry)
-      totalGauge <- Gauge(
-                      name = "events_count",
-                      help = "Total Commit Events."
-                    )(metricsRegistry)
-    } yield new EventLogMetricsImpl(statsFinder, logger, categoryNameEventsGauge, statusesGauge, totalGauge)
+      metricsRegistry: MetricsRegistry[IO],
+      statsFinder:     StatsFinder[IO]
+  )(implicit logger:   Logger[IO], contextShift: ContextShift[IO], timer: Timer[IO]): IO[EventLogMetrics[IO]] = for {
+    categoryNameEventsGauge <- Gauge[IO, CategoryName](
+                                 name = "category_name_events_count",
+                                 help = "Number of events waiting for processing per Category Name.",
+                                 labelName = "category_name"
+                               )(metricsRegistry)
+    statusesGauge <- Gauge[IO, EventStatus](name = "events_statuses_count",
+                                            help = "Total Commit Events by status.",
+                                            labelName = "status"
+                     )(metricsRegistry)
+    totalGauge <- Gauge(
+                    name = "events_count",
+                    help = "Total Commit Events."
+                  )(metricsRegistry)
+  } yield new EventLogMetricsImpl(statsFinder, categoryNameEventsGauge, statusesGauge, totalGauge)
 }

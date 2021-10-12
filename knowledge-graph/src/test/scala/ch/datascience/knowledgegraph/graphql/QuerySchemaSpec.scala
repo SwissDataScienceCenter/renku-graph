@@ -19,8 +19,8 @@
 package ch.datascience.knowledgegraph.graphql
 
 import cats.effect.IO
+import ch.datascience.generators.CommonGraphGenerators.authUsers
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators.authUsers
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.knowledgegraph.lineage

@@ -83,6 +83,50 @@ class LabeledGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers
     }
   }
 
+  "update" should {
+
+    "update the value associated with the label - case without a label" in new TestCase {
+
+      val labelValue = projectPaths.generateOne
+      val update     = nonNegativeDoubles().generateOne.value
+      gauge.update(labelValue -> update) shouldBe ME.unit
+
+      underlying.collectAllSamples should contain only ((label, labelValue.value, update))
+    }
+
+    "update the value associated with the label - case with a positive value" in new TestCase {
+
+      val labelValue   = projectPaths.generateOne
+      val initialValue = nonNegativeDoubles().generateOne.value
+      gauge.set(labelValue -> initialValue) shouldBe ME.unit
+
+      underlying.collectAllSamples should contain only ((label, labelValue.value, initialValue))
+
+      val update = nonNegativeDoubles().generateOne.value
+      gauge.update(labelValue -> update) shouldBe ME.unit
+
+      underlying.collectAllSamples should contain.only(
+        (label, labelValue.value, initialValue + update)
+      )
+    }
+
+    "update the value associated with the label - case with a negative value" in new TestCase {
+
+      val labelValue   = projectPaths.generateOne
+      val initialValue = nonNegativeDoubles().generateOne.value
+      gauge.set(labelValue -> initialValue) shouldBe ME.unit
+
+      underlying.collectAllSamples should contain only ((label, labelValue.value, initialValue))
+
+      val update = initialValue * negativeInts(-5).generateOne
+      gauge.update(labelValue -> -update) shouldBe ME.unit
+
+      underlying.collectAllSamples should contain.only(
+        (label, labelValue.value, initialValue - update)
+      )
+    }
+  }
+
   "reset" should {
 
     "replace all current entries with ones returned from the given reset data fetch function" in new TestCase {

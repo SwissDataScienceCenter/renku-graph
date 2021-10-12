@@ -18,8 +18,9 @@
 
 package ch.datascience.knowledgegraph
 
+import cats.syntax.all._
+import ch.datascience.graph.model.entities.{Activity, Entity}
 import ch.datascience.knowledgegraph.lineage.model._
-import ch.datascience.rdfstore.entities.bundles.{prov, wfprov}
 import io.renku.jsonld.EntityId
 
 import java.time.Instant
@@ -29,10 +30,10 @@ package object lineage {
   private[lineage] implicit class LineageOps(lineage: Lineage) {
 
     lazy val toEdgesMap =
-      processRunNodes.foldLeft(Map.empty[RunInfo, (Set[Node.Location], Set[Node.Location])]) {
+      processRunNodes.foldLeft(Map.empty[ExecutionInfo, (Set[Node.Location], Set[Node.Location])]) {
         case (planWithLocation, node) =>
           planWithLocation + (
-            RunInfo(EntityId.of(node.location.toString), Instant.now()) -> (
+            ExecutionInfo(EntityId.of(node.location.toString), Instant.now()) -> (
               lineage.collectSources(of = node) -> lineage.collectTargets(of = node)
             )
           )
@@ -50,10 +51,13 @@ package object lineage {
         case (locations, _)                         => locations
       }
 
-    lazy val locationNodes: Set[Node] = lineage.nodes
-      .filter(node => node.types.exists(_.toString == (prov / "Entity").toString))
+    lazy val locationNodes: Set[Node] = lineage.nodes.filter { node =>
+      Set(Entity.fileEntityTypes, Entity.folderEntityTypes)
+        .map(_.toList.map(_.show).toSet)
+        .contains(node.types.map(_.show))
+    }
 
     lazy val processRunNodes: Set[Node] = lineage.nodes
-      .filter(node => node.types.exists(_.toString == (wfprov / "ProcessRun").toString))
+      .filter(_.types.map(_.show) === Activity.entityTypes.toList.map(_.show).toSet)
   }
 }

@@ -20,14 +20,10 @@ package ch.datascience.commiteventservice.events.categories.globalcommitsync.eve
 
 import cats.MonadThrow
 import cats.effect.{ContextShift, IO, Timer}
-import cats.kernel.Semigroup
 import cats.syntax.all._
-import ch.datascience.commiteventservice.events.categories.common.UpdateResult
-import ch.datascience.commiteventservice.events.categories.common.UpdateResult.Failed
-import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.GlobalCommitEventSynchronizer.SynchronizationSummary
-import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.GlobalCommitEventSynchronizer.SynchronizationSummary.SummaryKey
+import ch.datascience.commiteventservice.events.categories.common.SynchronizationSummary
 import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.gitlab.{GitLabCommitFetcher, GitLabCommitStatFetcher}
-import ch.datascience.commiteventservice.events.categories.globalcommitsync.{GlobalCommitSyncEvent, _}
+import ch.datascience.commiteventservice.events.categories.globalcommitsync._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.events.consumers.Project
@@ -55,7 +51,6 @@ private[globalcommitsync] class GlobalCommitEventSynchronizerImpl[Interpretation
 ) extends GlobalCommitEventSynchronizer[Interpretation] {
 
   import accessTokenFinder._
-  import ch.datascience.commiteventservice.events.categories.globalcommitsync.eventgeneration.GlobalCommitEventSynchronizer.SynchronizationSummary._
   import commitEventDeleter._
   import executionTimeRecorder._
   import gitLabCommitFetcher._
@@ -64,18 +59,26 @@ private[globalcommitsync] class GlobalCommitEventSynchronizerImpl[Interpretation
 
   override def synchronizeEvents(event: GlobalCommitSyncEvent): Interpretation[Unit] = (for {
     maybeAccessToken <- findAccessToken(event.project.id)
-    commitStats      <- fetchCommitStats(event.project.id)(maybeAccessToken)
-    commitsInSync    <- commitsInSync(event, commitStats).pure[Interpretation]
-    _ <- if (!commitsInSync) {
-           syncCommitsAndLogSummary(event)(maybeAccessToken)
-         } else measureExecutionTime(SynchronizationSummary().pure[Interpretation]) >>= logSummary(event.project)
+    maybeCommitStats <- fetchCommitStats(event.project.id)(maybeAccessToken)
+    _                <- syncOrDeleteCommits(event, maybeCommitStats)(maybeAccessToken)
   } yield ()).recoverWith { case NonFatal(error) =>
-    logger.error(error)(s"$categoryName - Failed to sync commits for project ${event.project}")
-    error.raiseError[Interpretation, Unit]
+    logger.error(error)(s"$categoryName - Failed to sync commits for project ${event.project}") >>
+      error.raiseError[Interpretation, Unit]
   }
 
-  private def commitsInSync(event: GlobalCommitSyncEvent, commitStats: ProjectCommitStats): Boolean =
-    event.commits.length == commitStats.commitCount.value && event.commits.headOption == commitStats.maybeLatestCommit
+  private def syncOrDeleteCommits(event: GlobalCommitSyncEvent, maybeCommitStats: Option[ProjectCommitStats])(implicit
+      maybeAccessToken:                  Option[AccessToken]
+  ): Interpretation[Unit] =
+    maybeCommitStats match {
+      case Some(commitStats) =>
+        val commitsInSync = event.commits.length == commitStats.commitCount.value &&
+          event.commits.headOption == commitStats.maybeLatestCommit
+
+        if (!commitsInSync) syncCommitsAndLogSummary(event)(maybeAccessToken)
+        else measureExecutionTime(SynchronizationSummary().pure[Interpretation]) >>= logSummary(event.project)
+      case None =>
+        measureExecutionTime(deleteExtraneousCommits(event.project, event.commits)) >>= logSummary(event.project)
+    }
 
   private def syncCommitsAndLogSummary(
       event:                   GlobalCommitSyncEvent
@@ -85,18 +88,15 @@ private[globalcommitsync] class GlobalCommitEventSynchronizerImpl[Interpretation
   private def syncCommits(
       event:                   GlobalCommitSyncEvent
   )(implicit maybeAccessToken: Option[AccessToken]): Interpretation[SynchronizationSummary] = for {
-    commitsInGL     <- fetchGitLabCommits(event.project.id)(maybeAccessToken)
-    deletionSummary <- deleteExtraneousCommits(event.project, event.commits.filterNot(commitsInGL.contains(_)))
-    creationSummary <- createMissingCommits(event.project, commitsInGL.filterNot(event.commits.contains(_)))
+    commitsInGL     <- fetchGitLabCommits(event.project.id)
+    deletionSummary <- deleteExtraneousCommits(event.project, event.commits.filterNot(commitsInGL.contains))
+    creationSummary <- createMissingCommits(event.project, commitsInGL.filterNot(event.commits.contains))
   } yield deletionSummary combine creationSummary
 
   private def logSummary(
       project: Project
   ): ((ElapsedTime, SynchronizationSummary)) => Interpretation[Unit] = { case (elapsedTime, summary) =>
-    logger.info(
-      s"$categoryName: ${project.show} -> events generation result: ${summary
-        .getSummary()} in ${elapsedTime}ms"
-    )
+    logger.info(show"$categoryName: $project -> events generation result: $summary in ${elapsedTime}ms")
   }
 }
 
@@ -123,32 +123,4 @@ private[globalcommitsync] object GlobalCommitEventSynchronizer {
     executionTimeRecorder,
     logger
   )
-
-  final case class SynchronizationSummary(private val summary: Map[SummaryKey, Int]) {
-    import SynchronizationSummary._
-    def getSummary(): String =
-      s"${get("Created")} created, ${get("Existed")} existed, ${get("Skipped")} skipped, ${get("Deleted")} deleted, ${get("Failed")} failed"
-
-    def get(key: String) = summary.getOrElse(key, 0)
-
-    def updated(result: UpdateResult, newValue: Int): SynchronizationSummary = {
-      val newSummary = summary.updated(toSummaryKey(result), newValue)
-      new SynchronizationSummary(newSummary)
-    }
-  }
-
-  object SynchronizationSummary {
-
-    def apply() = new SynchronizationSummary(Map.empty[SummaryKey, Int])
-
-    implicit val semigroup: Semigroup[SynchronizationSummary] =
-      (x: SynchronizationSummary, y: SynchronizationSummary) => new SynchronizationSummary(x.summary combine y.summary)
-
-    type SummaryKey = String
-
-    def toSummaryKey(result: UpdateResult): SummaryKey = result match {
-      case Failed(_, _) => "Failed"
-      case s            => s.toString
-    }
-  }
 }

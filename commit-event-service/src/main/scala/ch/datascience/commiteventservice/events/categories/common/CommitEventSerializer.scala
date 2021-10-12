@@ -18,17 +18,16 @@
 
 package ch.datascience.commiteventservice.events.categories.common
 
-import cats.MonadError
+import cats.{MonadError, MonadThrow}
 import io.circe.literal._
 import io.circe.{Encoder, Json}
 
 import scala.util.Try
 
-private class CommitEventSerializer[Interpretation[_]](implicit ME: MonadError[Interpretation, Throwable]) {
+private class CommitEventSerializer[Interpretation[_]: MonadThrow] {
 
-  def serialiseToJsonString(commitEvent: CommitEvent): Interpretation[String] = ME.fromTry {
-    Try(toJson(commitEvent).noSpaces)
-  }
+  def serialiseToJsonString(commitEvent: CommitEvent): Interpretation[String] =
+    MonadError[Interpretation, Throwable].fromTry(Try(toJson(commitEvent).noSpaces))
 
   private def toJson(commitEvent: CommitEvent): Json = json"""{
     "id":            ${commitEvent.id.value},

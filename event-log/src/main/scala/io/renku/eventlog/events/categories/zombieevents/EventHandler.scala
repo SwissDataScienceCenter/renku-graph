@@ -21,11 +21,11 @@ package io.renku.eventlog.events.categories.zombieevents
 import cats.data.EitherT.fromEither
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
-import cats.{Applicative, MonadThrow}
+import cats.{Applicative, MonadThrow, Show}
 import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
-import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventRequestContent, EventSchedulingResult}
+import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
+import ch.datascience.events.{EventRequestContent, consumers}
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventId, EventStatus}
 import ch.datascience.graph.model.projects
@@ -87,8 +87,8 @@ private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurre
       } yield ()
   }
 
-  private implicit lazy val eventInfoToString: ZombieEvent => String = { event =>
-    s"${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status}"
+  private implicit lazy val eventInfoToString: Show[ZombieEvent] = Show.show { event =>
+    show"${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status}"
   }
 
   private implicit val eventDecoder: Decoder[ZombieEvent] = { cursor =>

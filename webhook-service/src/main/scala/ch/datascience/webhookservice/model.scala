@@ -18,13 +18,13 @@
 
 package ch.datascience.webhookservice
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.syntax.all._
-import ch.datascience.config.ConfigLoader.{find, stringTinyTypeReader}
+import ch.datascience.config.ConfigLoader.{find, urlTinyTypeReader}
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.tinytypes.constraints.{Url, UrlOps}
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory, UrlTinyType}
 import com.typesafe.config.{Config, ConfigFactory}
 import pureconfig.ConfigReader
 
@@ -36,24 +36,26 @@ object model {
   final case class Project(id: projects.Id, path: projects.Path)
 
   final class ProjectHookUrl private (val value: String) extends AnyVal with StringTinyType
+
   object ProjectHookUrl {
 
-    def fromConfig[Interpretation[_]](
-        config:    Config = ConfigFactory.load
-    )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[ProjectHookUrl] =
+    def fromConfig[Interpretation[_]: MonadThrow](
+        config: Config = ConfigFactory.load
+    ): Interpretation[ProjectHookUrl] =
       SelfUrl[Interpretation](config).map(from)
 
     def from(selfUrl: SelfUrl): ProjectHookUrl = new ProjectHookUrl((selfUrl / "webhooks" / "events").value)
   }
 
-  final class SelfUrl private (val value: String) extends AnyVal with StringTinyType
+  final class SelfUrl private (val value: String) extends AnyVal with UrlTinyType
+
   object SelfUrl extends TinyTypeFactory[SelfUrl](new SelfUrl(_)) with Url with UrlOps[SelfUrl] {
 
-    private implicit val configReader: ConfigReader[SelfUrl] = stringTinyTypeReader(SelfUrl)
+    private implicit val configReader: ConfigReader[SelfUrl] = urlTinyTypeReader(SelfUrl)
 
-    def apply[Interpretation[_]](
-        config:    Config = ConfigFactory.load
-    )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[SelfUrl] =
+    def apply[Interpretation[_]: MonadThrow](
+        config: Config = ConfigFactory.load
+    ): Interpretation[SelfUrl] =
       find[Interpretation, SelfUrl]("services.self.url", config)
   }
 }

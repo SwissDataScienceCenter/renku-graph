@@ -20,14 +20,13 @@ package ch.datascience.triplesgenerator.events.categories.membersync
 
 import Generators._
 import cats.effect.IO
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.users.ResourceId
+import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.testentities._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.entities.EntitiesGenerators._
-import ch.datascience.rdfstore.entities.bundles.{gitLabApiUrl, renkuBaseUrl}
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
-import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -40,22 +39,20 @@ class KGPersonFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
 
       val memberNonExistingInKG = gitLabProjectMembers.generateOne
       val memberExistingInKG    = gitLabProjectMembers.generateOne
-      val person                = persons().generateOne.copy(maybeGitLabId = Some(memberExistingInKG.gitLabId))
-      val personJsonLD          = person.asJsonLD
+      val person                = personEntities(fixed(memberExistingInKG.gitLabId.some)).generateOne
 
-      loadToStore(personJsonLD)
+      loadToStore(person)
 
       finder.findPersonIds(Set(memberNonExistingInKG, memberExistingInKG)).unsafeRunSync() shouldBe Set(
         memberNonExistingInKG -> None,
-        memberExistingInKG    -> personJsonLD.entityId.map(ResourceId.apply)
+        memberExistingInKG    -> person.resourceId.some
       )
     }
   }
 
   private trait TestCase {
-    private val logger       = TestLogger[IO]()
+    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
     private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
-    val finder               = new KGPersonFinderImpl(rdfStoreConfig, logger, timeRecorder)
+    val finder               = new KGPersonFinderImpl(rdfStoreConfig, timeRecorder)
   }
-
 }

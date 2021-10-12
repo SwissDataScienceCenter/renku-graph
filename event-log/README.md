@@ -6,18 +6,67 @@ This is a microservice which provides CRUD operations for Event Log DB.
 
 | Method | Path                                    | Description                                                    |
 |--------|-----------------------------------------|----------------------------------------------------------------|
-|  GET   | ```/events/:event-id/:project-id```     | Retrieve chosen event's data                                   |
-|  PATCH | ```/events```                           | Changes events' data by applying the given patch               |
-|  POST  | ```/events```                           | Send an event for processing                                   |
-|  PATCH | ```/events/:event-id/:project-id```     | Updates chosen event's data                                    |
+|  GET   | ```/events```                           | Returns info about events                                      |
+|  GET   | ```/events/:event-id/:project-id```     | Returns info about event with the given `id` and `project-id`  |
+|  POST  | ```/events```                           | Sends an event for processing                                  |
 |  GET   | ```/metrics```                          | Returns Prometheus metrics of the service                      |
 |  GET   | ```/ping```                             | Verifies service health                                        |
 |  GET   | ```/processing-status?project-id=:id``` | Finds processing status of events belonging to a project       |
 |  POST  | ```/subscriptions```                    | Adds a subscription for events                                 |
 
+#### GET /events
+
+Returns information about the selected events.
+
+| Query Parameter | Mandatory | Default | Description                                            |
+|-----------------|-----------|---------|--------------------------------------------------------|
+| project-path    | No        | -       | Url-encoded non-blank project path                     |
+| status          | No        | -       | Event status e.g. `TRIPLES_STORE`, `TRIPLES_GENERATED` |
+| page            | No        | 1       | Page number                                            |
+| per_page        | No        | 20      | Number of items per page                               |
+
+NOTES:
+
+* at least `project-path` or `status` query parameter has to be given.
+* the returned events are sorted by the `event_date`.
+
+**Response**
+
+| Status                     | Description                     |
+|----------------------------|---------------------------------|
+| OK (200)                   | If finding events is successful |
+| INTERNAL SERVER ERROR (500)| When there are problems         |
+
+Response body example:
+
+```json
+[
+  {
+    "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+    "status": "NEW",
+    "processingTimes": [],
+    "date": "2001-09-04T10:48:29.457Z",
+    "executionDate": "2001-09-04T10:48:29.457Z"
+  },
+  {
+    "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+    "status": "TRANSFORMATION_NON_RECOVERABLE_FAILURE",
+    "message": "detailed info about the cause of the failure",
+    "processingTimes": [
+      {
+        "status": "TRIPLES_GENERATED",
+        "processingTime": "PT20.345S"
+      }
+    ],
+    "date": "2001-09-04T10:48:29.457Z",
+    "executionDate": "2001-09-04T10:48:29.457Z"
+  }
+]
+```
+
 #### GET /events/:event-id/:project-id`
 
-Find event details.
+Finds event details.
 
 **Response**
 
@@ -38,29 +87,6 @@ Response body example:
   "body": "JSON payload"
 }
 ```
-
-#### PATCH /events
-
-Changes events' data by applying the given patch.
-
-**NOTICE:**
-Be aware that the given patch affects all the events in the Event Log.
-
-**Request**
-
-```json
-{
-  "status": "NEW"
-}
-```
-
-**Response**
-
-| Status                     | Description                                          |
-|----------------------------|------------------------------------------------------|
-| ACCEPTED (202)             | When the given data patch got accepted               |
-| BAD_REQUEST (400)          | When request body is not valid                       |
-| INTERNAL SERVER ERROR (500)| When there were problems with processing the request |
 
 #### POST /events
 
@@ -108,6 +134,153 @@ In the case of a *SKIPPED* event. Note that a non-blank `message` is required.
   "body": "JSON payload",
   "status": "SKIPPED",
   "message": "reason for skipping"
+}
+```
+
+- **EVENTS_STATUS_CHANGE**
+
+Changes the status of events. The events for which the status will be changed are defined within the event as well as
+the new status.
+
+#### Changing status of the specified event from `GENERATING_TRIPLES` to `NEW`
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "EVENTS_STATUS_CHANGE",
+  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "project": {
+    "id": 12,
+    "path": "namespace/project-name"
+  },
+  "newStatus": "NEW"
+}
+```
+
+#### Changing status of the specified event from processing statuses to failure statuses
+
+**Allowed combinations**
+
+| Processing status    | Failure status                         |
+| -------------------- | -------------------------------------- |
+| GENERATING_TRIPLES   | GENERATION_NON_RECOVERABLE_FAILURE     |
+| GENERATING_TRIPLES   | GENERATION_RECOVERABLE_FAILURE         |
+| TRANSFORMING_TRIPLES | TRANSFORMATION_NON_RECOVERABLE_FAILURE |
+| TRANSFORMING_TRIPLES | TRANSFORMATION_RECOVERABLE_FAILURE     |
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "EVENTS_STATUS_CHANGE",
+  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "project": {
+    "id": 12,
+    "path": "namespace/project-name"
+  },
+  "message": "<failure message>",
+  "newStatus": "<failure status>"
+}
+```
+
+#### Changing status of the specified event from `TRANSFORMING_TRIPLES` to `TRIPLES_GENERATED`
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "EVENTS_STATUS_CHANGE",
+  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "project": {
+    "id": 12,
+    "path": "namespace/project-name"
+  },
+  "newStatus": "TRIPLES_GENERATED"
+}
+```
+
+#### Changing status of the specified event to `AWAITING_DELETION`
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "EVENTS_STATUS_CHANGE",
+  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "project": {
+    "id": 12,
+    "path": "namespace/project-name"
+  },
+  "newStatus": "AWAITING_DELETION"
+}
+```
+
+#### Changing status of all project events older than the given one to `TRIPLES_GENERATED`
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "EVENTS_STATUS_CHANGE",
+  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "project": {
+    "id": 12,
+    "path": "namespace/project-name"
+  },
+  "newStatus": "TRIPLES_GENERATED",
+  "processingTime": "PT2.023S"
+}
+```
+
+`payload` part:
+
+```json
+{
+  "payload": "json-ld payload as string",
+  "schemaVersion": "8"
+}
+```
+
+#### Changing status of all project events older than the given one to `TRIPLES_STORE`
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "EVENTS_STATUS_CHANGE",
+  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "project": {
+    "id": 12,
+    "path": "namespace/project-name"
+  },
+  "newStatus": "TRIPLES_STORE",
+  "processingTime": "PT2.023S"
+}
+```
+
+#### Changing status of all events to `NEW`
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "EVENTS_STATUS_CHANGE",
+  "newStatus": "NEW"
 }
 ```
 
@@ -167,112 +340,6 @@ To fetch various Prometheus metrics of the service.
 |----------------------------|------------------------|
 | OK (200)                   | Containing the metrics |
 | INTERNAL SERVER ERROR (500)| Otherwise              |
-
-#### PATCH /events/:event-id/:project-id
-
-Updates event's data with the given payload.
-
-**Request**
-
-Currently, only status changing payloads are allowed:
-
-- for transitioning event from status `GENERATING_TRIPLES` to `NEW`
-- each status transition can optionally provide a processing_time for the status change in the ISO_8601 format
-  PnDTnHnMn.nS
-
-```json
-{
-  "status": "NEW",
-  "processing_time (optional)": "PT2.023S"
-}
-```
-
-- for transitioning event from status `TRIPLES_GENERATED` to `TRIPLES_STORE`
-
-```json
-{
-  "status": "TRIPLES_STORE",
-  "processing_time (optional)": "PT2.023S"
-}
-```
-
-- for transitioning event from status `GENERATING_TRIPLES` to `TRIPLES_GENERATED`
-- a multipart request is required with the `event` part as follow
-
-```json
-{
-  "status": "TRIPLES_GENERATED",
-  "processing_time (optional)": "PT2.023S"
-}
-
-```
-
-- and a `payload` part as a __STRING encoded json__
-
-```json
-{
-  "payload": "json-ld as string",
-  "schemaVersion": "schema version of the triples"
-}
-```
-
-- for transitioning event from status `GENERATING_TRIPLES` to `GENERATION_RECOVERABLE_FAILURE`
-
-```json
-{
-  "status": "GENERATION_RECOVERABLE_FAILURE",
-  "message": "error message",
-  "processing_time (optional)": "PT2.023S"
-}
-```
-
-- for transitioning event from status `GENERATING_TRIPLES` to `GENERATION_NON_RECOVERABLE_FAILURE`
-
-```json
-{
-  "status": "GENERATION_NON_RECOVERABLE_FAILURE",
-  "message": "error message",
-  "processing_time (optional)": "PT2.023S"
-}
-```
-
-- for transitioning event from status `TRANSFORMING_TRIPLES` to `TRANSFORMATION_RECOVERABLE_FAILURE`
-
-```json
-{
-  "status": "TRANSFORMATION_RECOVERABLE_FAILURE",
-  "message": "error message",
-  "processing_time (optional)": "PT15M"
-}
-```
-
-- for transitioning event from status `TRANSFORMING_TRIPLES` to `TRANSFORMATION_NON_RECOVERABLE_FAILURE`
-
-```json
-{
-  "status": "TRANSFORMATION_NON_RECOVERABLE_FAILURE",
-  "message": "error message",
-  "processing_time (optional)": "P2DT3H4M"
-}
-```
-
-- for transitioning event from any status to `AWAITING_DELETION`
-
-```json
-{
-  "status": "AWAITING_DELETION",
-  "processing_time (optional)": "PT15M"
-}
-```
-
-**Response**
-
-| Status                     | Description                                                                 |
-|----------------------------|-----------------------------------------------------------------------------|
-| OK (200)                   | If status update is successful                                              |
-| BAD_REQUEST (400)          | When invalid payload is given                                               |
-| NOT_FOUND (404)            | When the event does not exists                                              |
-| INTERNAL SERVER ERROR (500)| When some problems occurs                                                   |
 
 #### GET /ping
 

@@ -20,8 +20,9 @@ package ch.datascience.knowledgegraph.lineage
 
 import cats.effect._
 import cats.syntax.all._
-import ch.datascience.graph.Schemas._
-import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.config.RenkuBaseUrlLoader
+import ch.datascience.graph.model.RenkuBaseUrl
+import ch.datascience.graph.model.Schemas._
 import ch.datascience.graph.model.projects.{Path, ResourceId, Visibility}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.http.server.security.model.AuthUser
@@ -47,10 +48,10 @@ private class EdgesFinderImpl(
     extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
     with EdgesFinder[IO] {
 
-  private type EdgeData = (RunInfo, Option[Node.Location], Option[Node.Location])
+  private type EdgeData = (ExecutionInfo, Option[Node.Location], Option[Node.Location])
 
   override def findEdges(projectPath: Path, maybeUser: Option[AuthUser]): IO[EdgeMap] =
-    queryEdges(using = query(projectPath, maybeUser: Option[AuthUser])) map toNodesLocations
+    queryEdges(using = query(projectPath, maybeUser)) map toNodesLocations
 
   private def queryEdges(using: SparqlQuery): IO[Set[EdgeData]] = {
     val pageSize = 2000
@@ -71,26 +72,26 @@ private class EdgesFinderImpl(
 
   private def query(path: Path, maybeUser: Option[AuthUser]) = SparqlQuery.of(
     name = "lineage - edges",
-    Prefixes.of(prov -> "prov", renku -> "renku", wfprov -> "wfprov", schema -> "schema"),
-    s"""SELECT DISTINCT ?runPlan ?date ?sourceEntityLocation ?targetEntityLocation
-       |WHERE {
-       |  {
-       |  ${projectMemberFilterQuery(ResourceId(renkuBaseUrl, path).showAs[RdfResource])(maybeUser)}
-       |    ?runPlan schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
-       |             renku:hasInputs/renku:consumes/prov:atLocation ?sourceEntityLocation;
-       |             ^(prov:qualifiedAssociation/prov:hadPlan) ?activity.
-       |    ?activity prov:startedAtTime ?date.
-       |    FILTER NOT EXISTS {?activity a wfprov:WorkflowRun}
-       |  } UNION {
-       |  ${projectMemberFilterQuery(ResourceId(renkuBaseUrl, path).showAs[RdfResource])(maybeUser)}
-       |    ?runPlan schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
-       |             renku:hasOutputs/renku:produces/prov:atLocation ?targetEntityLocation;
-       |             ^(prov:qualifiedAssociation/prov:hadPlan) ?activity.
-       |    ?activity prov:startedAtTime ?date.
-       |    FILTER NOT EXISTS {?activity a wfprov:WorkflowRun}
-       |  }
-       |}
-       |ORDER BY ASC(?date)""".stripMargin
+    Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema"),
+    s"""|SELECT DISTINCT ?activity ?date ?sourceEntityLocation ?targetEntityLocation
+        |WHERE {
+        |   ${projectMemberFilterQuery(ResourceId(path)(renkuBaseUrl).showAs[RdfResource])(maybeUser)}
+        |   ?activity a prov:Activity;
+        |             ^renku:hasActivity ${ResourceId(path)(renkuBaseUrl).showAs[RdfResource]};
+        |             prov:startedAtTime ?date;
+        |             renku:parameter ?paramValue.
+        |   ?paramValue schema:valueReference ?parameter.
+        |   OPTIONAL {
+        | 	  ?parameter a renku:CommandInput.
+        |     ?paramValue schema:value ?sourceEntityLocation.
+        |   }
+        |   OPTIONAL {
+        | 	  ?parameter a renku:CommandOutput.
+        |     ?paramValue schema:value ?targetEntityLocation.
+        |   }
+        |}
+        |ORDER BY ASC(?date)
+        |""".stripMargin
   )
 
   import io.circe.Decoder
@@ -102,23 +103,23 @@ private class EdgesFinderImpl(
 
     implicit lazy val edgeDecoder: Decoder[EdgeData] = { cursor =>
       for {
-        runPlanId      <- cursor.downField("runPlan").downField("value").as[EntityId]
+        activityId     <- cursor.downField("activity").downField("value").as[EntityId]
         date           <- cursor.downField("date").downField("value").as[RunDate]
         sourceLocation <- cursor.downField("sourceEntityLocation").downField("value").as[Option[Node.Location]]
         targetLocation <- cursor.downField("targetEntityLocation").downField("value").as[Option[Node.Location]]
-      } yield (RunInfo(runPlanId, date), sourceLocation, targetLocation)
+      } yield (ExecutionInfo(activityId, date), sourceLocation, targetLocation)
     }
 
     _.downField("results").downField("bindings").as[List[EdgeData]].map(_.toSet)
   }
 
   private def toNodesLocations(edges: Set[EdgeData]): EdgeMap =
-    edges.foldLeft(Map.empty[RunInfo, FromAndToNodes]) {
+    edges.foldLeft(Map.empty[ExecutionInfo, FromAndToNodes]) {
       case (edgesMap, (runInfo, Some(source), None)) =>
         edgesMap.find(matching(runInfo)) match {
           case None =>
             edgesMap + (runInfo -> (Set(source), Set.empty))
-          case Some((RunInfo(_, date), (from, to))) if runInfo.date == date =>
+          case Some((ExecutionInfo(_, date), (from, to))) if runInfo.date == date =>
             edgesMap + (runInfo -> (from + source, to))
           case Some((oldInfo, _)) if (runInfo.date compareTo oldInfo.date) > 0 =>
             edgesMap - oldInfo + (runInfo -> (Set(source), Set.empty))
@@ -128,7 +129,7 @@ private class EdgesFinderImpl(
         edgesMap.find(matching(runInfo)) match {
           case None =>
             edgesMap + (runInfo -> (Set.empty, Set(target)))
-          case Some((RunInfo(_, date), (from, to))) if runInfo.date == date =>
+          case Some((ExecutionInfo(_, date), (from, to))) if runInfo.date == date =>
             edgesMap + (runInfo -> (from, to + target))
           case Some((oldInfo, _)) if (runInfo.date compareTo oldInfo.date) > 0 =>
             edgesMap - oldInfo + (runInfo -> (Set.empty, Set(target)))
@@ -137,37 +138,25 @@ private class EdgesFinderImpl(
       case (edgesMap, _) => edgesMap
     }
 
-  private def matching(runInfo: RunInfo): ((RunInfo, FromAndToNodes)) => Boolean = {
-    case (RunInfo(runInfo.entityId, _), _) => true
-    case _                                 => false
+  private def matching(runInfo: ExecutionInfo): ((ExecutionInfo, FromAndToNodes)) => Boolean = {
+    case (ExecutionInfo(runInfo.entityId, _), _) => true
+    case _                                       => false
   }
 
   private def projectMemberFilterQuery(projectResourceId: String): Option[AuthUser] => String = {
     case Some(user) =>
-      s"""
-         |OPTIONAL { 
-         |    $projectResourceId renku:projectVisibility ?visibility .
-         |}
-         |OPTIONAL {
-         |    $projectResourceId schema:member/schema:sameAs ?memberId.
-         |    ?memberId  schema:additionalType 'GitLab';
-         |               schema:identifier ?userGitlabId .
-         |}
-         |
-         |BIND (IF (BOUND (?visibility), ?visibility,  '${Visibility.Public.value}') as ?projectVisibility)
-         |FILTER (
-         |  lcase(str(?projectVisibility)) = '${Visibility.Public.value}' || 
-         |  (lcase(str(?projectVisibility)) != '${Visibility.Public.value}'  && ?userGitlabId = ${user.id.value})
-         |)
-         |""".stripMargin
+      s"""|$projectResourceId renku:projectVisibility ?visibility .
+          |OPTIONAL {
+          |  $projectResourceId schema:member/schema:sameAs ?memberId.
+          |  ?memberId  schema:additionalType 'GitLab';
+          |             schema:identifier ?userGitlabId .
+          |}
+          |FILTER ( ?visibility = '${Visibility.Public.value}' || ?userGitlabId = ${user.id.value} )
+          |""".stripMargin
     case _ =>
-      s"""
-         |OPTIONAL {
-         |  $projectResourceId renku:projectVisibility ?visibility .
-         |}
-         |BIND(IF (BOUND (?visibility), ?visibility, '${Visibility.Public.value}' ) as ?projectVisibility)
-         |FILTER(lcase(str(?projectVisibility)) = '${Visibility.Public.value}')
-         |""".stripMargin
+      s"""|$projectResourceId renku:projectVisibility ?visibility .
+          |FILTER(?visibility = '${Visibility.Public.value}')
+          |""".stripMargin
   }
 }
 
@@ -179,6 +168,6 @@ private object EdgesFinder {
       timer:              Timer[IO]
   ): IO[EdgesFinder[IO]] = for {
     config       <- RdfStoreConfig[IO]()
-    renkuBaseUrl <- RenkuBaseUrl[IO]()
+    renkuBaseUrl <- RenkuBaseUrlLoader[IO]()
   } yield new EdgesFinderImpl(config, renkuBaseUrl, logger, timeRecorder)
 }

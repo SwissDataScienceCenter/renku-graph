@@ -23,59 +23,51 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.config.RenkuLogTimeout
-import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.EventProcessingGenerators._
-import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.{Renku, RepositoryPath}
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent._
-import scala.concurrent.duration._
-import scala.language.postfixOps
 
-class RenkuSpec extends AnyWordSpec with should.Matchers {
+class RenkuSpec extends AnyWordSpec with should.Matchers with MockFactory {
 
-  "log" should {
+  "export" should {
 
-    "return the 'renku log' output if it executes quicker than the defined timeout" in new TestCase {
+    "return the 'renku export' output if renku export succeeds" in new TestCase {
       val commandBody = jsonLDTriples.generateOne
       val commandResult = CommandResult(
         exitCode = 0,
         chunks = Seq(Left(new Bytes(commandBody.value.noSpaces.getBytes())))
       )
 
-      val Right(triples) = renku().log(event)(triplesGeneration(returning = commandResult), path).value.unsafeRunSync()
+      renkuExport.expects(path.value).returning(commandResult)
+
+      val Right(triples) = renku.export(path).value.unsafeRunSync()
 
       triples shouldBe commandBody
     }
 
-    "fail if calling 'renku log' results in a failure" in new TestCase {
+    "fail if calling 'renku export' results in a failure" in new TestCase {
       val exception = exceptions.generateOne
 
+      renkuExport.expects(path.value).throws(exception)
+
       intercept[Exception] {
-        renku().log(event)(triplesGeneration(failingWith = exception), path).value.unsafeRunSync()
+        renku.export(path).value.unsafeRunSync()
       } shouldBe exception
     }
 
-    s"return $GenerationRecoverableError if calling 'renku log' results in a 137 exit code" in new TestCase {
+    s"return $GenerationRecoverableError if calling 'renku export' results in a 137 exit code" in new TestCase {
       val exception = ShelloutException(CommandResult(exitCode = 137, chunks = Nil))
+      renkuExport.expects(path.value).throws(exception)
 
-      val Left(error) = renku().log(event)(triplesGeneration(failingWith = exception), path).value.unsafeRunSync()
+      val Left(error) = renku.export(path).value.unsafeRunSync()
 
       error            shouldBe a[GenerationRecoverableError]
       error.getMessage shouldBe "Not enough memory"
-    }
-
-    "get terminated if calling 'renku log' takes longer than the defined timeout" in new TestCase {
-      val timeout = RenkuLogTimeout(100 millis)
-
-      intercept[Exception] {
-        renku(timeout).log(event)(triplesGenerationTakingTooLong, path).value.unsafeRunSync()
-      }.getMessage shouldBe s"'renku log' execution for commit: ${event.commitId}, project: ${event.project.id} " +
-        s"took longer than $timeout - terminating"
     }
   }
 
@@ -83,25 +75,9 @@ class RenkuSpec extends AnyWordSpec with should.Matchers {
   private implicit val timer:        Timer[IO]        = IO.timer(ExecutionContext.global)
 
   private trait TestCase {
-    val event = commitEvents.generateOne
-    val path  = RepositoryPath(paths.generateOne)
+    val path        = RepositoryPath(paths.generateOne)
+    val renkuExport = mockFunction[Path, CommandResult]
 
-    private val renkuLogTimeout = RenkuLogTimeout(1500 millis)
-    def renku(timeout: RenkuLogTimeout = renkuLogTimeout) = new Renku(timeout)
-
-    def triplesGeneration(returning: CommandResult): (CommitEvent, Path) => CommandResult =
-      (_, _) => {
-        Thread sleep (renkuLogTimeout.value - (1300 millis)).toMillis
-        returning
-      }
-
-    def triplesGeneration(failingWith: Exception): (CommitEvent, Path) => CommandResult =
-      (_, _) => throw failingWith
-
-    val triplesGenerationTakingTooLong: (CommitEvent, Path) => CommandResult =
-      (_, _) => {
-        blocking(Thread sleep (renkuLogTimeout.value * 10).toMillis)
-        CommandResult(exitCode = 0, chunks = Nil)
-      }
+    val renku = new Renku(renkuExport)
   }
 }

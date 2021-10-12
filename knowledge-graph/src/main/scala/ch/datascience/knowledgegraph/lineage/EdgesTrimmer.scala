@@ -75,11 +75,13 @@ private class EdgesTrimmerImpl[Interpretation[_]: MonadThrow]() extends EdgesTri
       }
   }
 
-  private def edgesProducing(location: Location): ((RunInfo, FromAndToNodes)) => Boolean = { case (_, (_, to)) =>
+  private def edgesProducing(location: Location): ((ExecutionInfo, FromAndToNodes)) => Boolean = { case (_, (_, to)) =>
     to contains location
   }
 
-  private lazy val runInfoDate: ((RunInfo, FromAndToNodes)) => RunDate = { case (RunInfo(_, date), _) => date }
+  private lazy val runInfoDate: ((ExecutionInfo, FromAndToNodes)) => RunDate = { case (ExecutionInfo(_, date), _) =>
+    date
+  }
 
   @scala.annotation.tailrec
   private def findEdgesConnected[T <: TraversalDirection](
@@ -132,11 +134,9 @@ private class EdgesTrimmerImpl[Interpretation[_]: MonadThrow]() extends EdgesTri
 
     def removeNode(edges: EdgeMap, nodeToRemove: Location): EdgeMap
 
-    def edgeContaining(location: Location): ((RunInfo, FromAndToNodes)) => Boolean
+    def edgeContaining(location: Location): ((ExecutionInfo, FromAndToNodes)) => Boolean
 
-    def locationsOtherThan(
-        location: Location
-    ): PartialFunction[(RunInfo, FromAndToNodes), Set[Location]]
+    def locationsOtherThan(location: Location): PartialFunction[(ExecutionInfo, FromAndToNodes), Set[Location]]
   }
 
   private implicit lazy val toTraversalStrategy: TraversalStrategy[To] = new TraversalStrategy[To] {
@@ -156,14 +156,12 @@ private class EdgesTrimmerImpl[Interpretation[_]: MonadThrow]() extends EdgesTri
         case (graphWithoutSiblings, _) => graphWithoutSiblings
       }
 
-    def edgeContaining(location: Location): ((RunInfo, FromAndToNodes)) => Boolean = {
+    def edgeContaining(location: Location): ((ExecutionInfo, FromAndToNodes)) => Boolean = {
       case (_, (from, _)) if from contains location => true
       case _                                        => false
     }
 
-    def locationsOtherThan(
-        location: Location
-    ): PartialFunction[(RunInfo, FromAndToNodes), Set[Location]] = {
+    def locationsOtherThan(location: Location): PartialFunction[(ExecutionInfo, FromAndToNodes), Set[Location]] = {
       case (_, (from, to)) if from contains location => to
     }
   }
@@ -185,14 +183,12 @@ private class EdgesTrimmerImpl[Interpretation[_]: MonadThrow]() extends EdgesTri
         case (graphWithoutSiblings, _) => graphWithoutSiblings
       }
 
-    def edgeContaining(location: Location): ((RunInfo, FromAndToNodes)) => Boolean = {
+    def edgeContaining(location: Location): ((ExecutionInfo, FromAndToNodes)) => Boolean = {
       case (_, (_, to)) if to contains location => true
       case _                                    => false
     }
 
-    def locationsOtherThan(
-        location: Location
-    ): PartialFunction[(RunInfo, FromAndToNodes), Set[Location]] = {
+    def locationsOtherThan(location: Location): PartialFunction[(ExecutionInfo, FromAndToNodes), Set[Location]] = {
       case (_, (from, to)) if to contains location => from
     }
   }

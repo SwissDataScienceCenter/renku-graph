@@ -19,18 +19,17 @@
 package ch.datascience.triplesgenerator
 package events.categories.awaitinggeneration
 
-import cats.MonadThrow
-import cats.data.EitherT.{fromEither, fromOption}
-import cats.data.NonEmptyList
+import cats.data.EitherT.fromOption
 import cats.effect.concurrent.Deferred
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.events.consumers
+import cats.{MonadThrow, Show}
 import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
-import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventRequestContent}
+import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
+import ch.datascience.events.{EventRequestContent, consumers}
 import ch.datascience.graph.model.RenkuVersionPair
-import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventBody}
+import ch.datascience.graph.model.events.{CategoryName, EventBody}
 import ch.datascience.metrics.MetricsRegistry
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
@@ -49,7 +48,7 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow: ConcurrentEffe
 ) extends consumers.EventHandlerWithProcessLimiter[Interpretation](concurrentProcessesLimiter) {
 
   import currentVersionPair.schemaVersion
-  import eventBodyDeserializer.toCommitEvents
+  import eventBodyDeserializer.toCommitEvent
 
   override def createHandlingProcess(
       requestContent: EventRequestContent
@@ -59,24 +58,19 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow: ConcurrentEffe
       subscriptionMechanism.renewSubscription()
     )
 
-  private def startProcessEvent(requestContent: EventRequestContent, deferred: Deferred[Interpretation, Unit]) =
-    for {
-      eventId      <- fromEither(requestContent.event.getEventId)
-      eventBody    <- fromOption[Interpretation](requestContent.maybePayload.map(EventBody.apply), BadRequest)
-      commitEvents <- toCommitEvents(eventBody).toRightT(recoverTo = BadRequest)
-      result <-
-        Concurrent[Interpretation]
-          .start(
-            eventProcessor.process(eventId, commitEvents, schemaVersion) >> deferred.complete(())
-          )
-          .toRightT
-          .map(_ => Accepted)
-          .semiflatTap(logger.log(eventId -> commitEvents))
-          .leftSemiflatTap(logger.log(eventId -> commitEvents))
-    } yield result
+  private def startProcessEvent(requestContent: EventRequestContent, deferred: Deferred[Interpretation, Unit]) = for {
+    eventBody   <- fromOption[Interpretation](requestContent.maybePayload.map(EventBody.apply), BadRequest)
+    commitEvent <- toCommitEvent(eventBody).toRightT(recoverTo = BadRequest)
+    result <- Concurrent[Interpretation]
+                .start(eventProcessor.process(commitEvent, schemaVersion) >> deferred.complete(()))
+                .toRightT
+                .map(_ => Accepted)
+                .semiflatTap(logger.log(commitEvent))
+                .leftSemiflatTap(logger.log(commitEvent))
+  } yield result
 
-  private implicit lazy val eventInfoToString: ((CompoundEventId, NonEmptyList[CommitEvent])) => String = {
-    case (eventId, events) => s"$eventId, projectPath = ${events.head.project.path}"
+  private implicit lazy val eventInfoToString: Show[CommitEvent] = Show.show { event =>
+    show"${event.compoundEventId}, projectPath = ${event.project.path}"
   }
 }
 

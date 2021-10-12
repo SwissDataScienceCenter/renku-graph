@@ -23,8 +23,8 @@ ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 ENV TZ UTC
 
 # Installing Renku and other dependencies
-RUN apk update && apk add --no-cache tzdata git git-lfs curl bash python3-dev py3-pip openssl-dev libffi-dev linux-headers gcc libxml2-dev libxslt-dev libc-dev yaml-dev 'rust>1.41.0' cargo && \
-    python3 -m pip install 'renku==0.14.1' 'sentry-sdk==0.18.0'  && \
+RUN apk update && apk add --no-cache tzdata git git-lfs curl bash python3-dev py3-pip py3-wheel openssl-dev libffi-dev linux-headers gcc libxml2-dev libxslt-dev libc-dev yaml-dev 'rust>1.41.0' cargo && \
+    python3 -m pip install 'git+https://github.com/SwissDataScienceCenter/renku-python.git@master' 'sentry-sdk==0.18.0'  && \
     chown -R daemon:daemon . && \
     git config --global user.name 'renku'  && \
     git config --global user.email 'renku@renkulab.io'  && \

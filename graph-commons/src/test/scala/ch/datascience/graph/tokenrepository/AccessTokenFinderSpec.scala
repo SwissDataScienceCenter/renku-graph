@@ -22,10 +22,12 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
+import io.circe.syntax.EncoderOps
 import org.http4s.Status
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -41,12 +43,12 @@ class AccessTokenFinderSpec extends AnyWordSpec with ExternalServiceStubbing wit
 
     "return Some Personal Access Token if remote responds with OK and valid body" in new TestCase {
 
-      val projectId   = projectIds.generateOne
-      val accessToken = personalAccessTokens.generateOne
+      val projectId = projectIds.generateOne
+      val accessToken: AccessToken = personalAccessTokens.generateOne
 
       stubFor {
         get(s"/projects/$projectId/tokens")
-          .willReturn(okJson(s"""{"personalAccessToken": "${accessToken.value}"}"""))
+          .willReturn(okJson(accessToken.asJson.noSpaces))
       }
 
       accessTokenFinder.findAccessToken(projectId).unsafeRunSync() shouldBe Some(accessToken)
@@ -54,12 +56,12 @@ class AccessTokenFinderSpec extends AnyWordSpec with ExternalServiceStubbing wit
 
     "return Some OAuth Access Token if remote responds with OK and valid body" in new TestCase {
 
-      val projectId   = projectIds.generateOne
-      val accessToken = oauthAccessTokens.generateOne
+      val projectId = projectIds.generateOne
+      val accessToken: AccessToken = oauthAccessTokens.generateOne
 
       stubFor {
         get(s"/projects/$projectId/tokens")
-          .willReturn(okJson(s"""{"oauthAccessToken": "${accessToken.value}"}"""))
+          .willReturn(okJson(accessToken.asJson.noSpaces))
       }
 
       accessTokenFinder.findAccessToken(projectId).unsafeRunSync() shouldBe Some(accessToken)
@@ -67,8 +69,7 @@ class AccessTokenFinderSpec extends AnyWordSpec with ExternalServiceStubbing wit
 
     "return None if remote responds with NOT_FOUND" in new TestCase {
 
-      val projectId   = projectIds.generateOne
-      val accessToken = oauthAccessTokens.generateOne
+      val projectId = projectIds.generateOne
 
       stubFor {
         get(s"/projects/$projectId/tokens")
@@ -99,8 +100,7 @@ class AccessTokenFinderSpec extends AnyWordSpec with ExternalServiceStubbing wit
 
     "return a RuntimeException if remote responds with unexpected body" in new TestCase {
 
-      val projectId   = projectIds.generateOne
-      val accessToken = oauthAccessTokens.generateOne
+      val projectId = projectIds.generateOne
 
       stubFor {
         get(s"/projects/$projectId/tokens")
@@ -109,7 +109,7 @@ class AccessTokenFinderSpec extends AnyWordSpec with ExternalServiceStubbing wit
 
       intercept[Exception] {
         accessTokenFinder.findAccessToken(projectId).unsafeRunSync()
-      }.getMessage shouldBe s"GET $tokenRepositoryUrl/projects/$projectId/tokens returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      }.getMessage shouldBe s"GET $tokenRepositoryUrl/projects/$projectId/tokens returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}; Access token cannot be deserialized"
     }
   }
 
@@ -118,11 +118,11 @@ class AccessTokenFinderSpec extends AnyWordSpec with ExternalServiceStubbing wit
     "return Some Personal Access Token if remote responds with OK and valid body" in new TestCase {
 
       val projectPath = projectPaths.generateOne
-      val accessToken = personalAccessTokens.generateOne
+      val accessToken: AccessToken = personalAccessTokens.generateOne
 
       stubFor {
         get(s"/projects/${urlEncode(projectPath.toString)}/tokens")
-          .willReturn(okJson(s"""{"personalAccessToken": "${accessToken.value}"}"""))
+          .willReturn(okJson(accessToken.asJson.noSpaces))
       }
 
       accessTokenFinder.findAccessToken(projectPath).unsafeRunSync() shouldBe Some(accessToken)
@@ -131,11 +131,11 @@ class AccessTokenFinderSpec extends AnyWordSpec with ExternalServiceStubbing wit
     "return Some OAuth Access Token if remote responds with OK and valid body" in new TestCase {
 
       val projectPath = projectPaths.generateOne
-      val accessToken = oauthAccessTokens.generateOne
+      val accessToken: AccessToken = oauthAccessTokens.generateOne
 
       stubFor {
         get(s"/projects/${urlEncode(projectPath.toString)}/tokens")
-          .willReturn(okJson(s"""{"oauthAccessToken": "${accessToken.value}"}"""))
+          .willReturn(okJson(accessToken.asJson.noSpaces))
       }
 
       accessTokenFinder.findAccessToken(projectPath).unsafeRunSync() shouldBe Some(accessToken)
@@ -144,7 +144,6 @@ class AccessTokenFinderSpec extends AnyWordSpec with ExternalServiceStubbing wit
     "return None if remote responds with NOT_FOUND" in new TestCase {
 
       val projectPath = projectPaths.generateOne
-      val accessToken = oauthAccessTokens.generateOne
 
       stubFor {
         get(s"/projects/${urlEncode(projectPath.toString)}/tokens")
@@ -176,7 +175,6 @@ class AccessTokenFinderSpec extends AnyWordSpec with ExternalServiceStubbing wit
     "return a RuntimeException if remote responds with unexpected body" in new TestCase {
 
       val projectPath = projectPaths.generateOne
-      val accessToken = oauthAccessTokens.generateOne
 
       stubFor {
         get(s"/projects/${urlEncode(projectPath.toString)}/tokens")
@@ -185,7 +183,7 @@ class AccessTokenFinderSpec extends AnyWordSpec with ExternalServiceStubbing wit
 
       intercept[Exception] {
         accessTokenFinder.findAccessToken(projectPath).unsafeRunSync()
-      }.getMessage shouldBe s"GET $tokenRepositoryUrl/projects/${urlEncode(projectPath.toString)}/tokens returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      }.getMessage shouldBe s"GET $tokenRepositoryUrl/projects/${urlEncode(projectPath.toString)}/tokens returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}; Access token cannot be deserialized"
     }
   }
 

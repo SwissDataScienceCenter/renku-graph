@@ -20,27 +20,18 @@ package ch.datascience.knowledgegraph.lineage
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators.cliVersions
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import ch.datascience.graph.model.testentities.CommandParameterBase._
+import ch.datascience.graph.model.testentities._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.lineage.LineageGenerators._
 import ch.datascience.knowledgegraph.lineage.model._
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory
-import ch.datascience.rdfstore.entities.CommandParameter.Mapping.IOStream._
-import ch.datascience.rdfstore.entities.CommandParameter.Output.OutputFactory
-import ch.datascience.rdfstore.entities.CommandParameter.{Input, Output}
-import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
-import ch.datascience.rdfstore.entities.RunPlan.Command
-import ch.datascience.rdfstore.entities._
-import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import ch.datascience.stubbing.ExternalServiceStubbing
 import eu.timepit.refined.auto._
-import io.renku.jsonld.EntityId
 import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -57,50 +48,62 @@ class NodeDetailsFinderSpec
 
     "find details of all entities with the given locations" in new TestCase {
 
-      val input         = locations.generateOne
-      val inputActivity = activity(creating = input)
-      val output        = locations.generateOne
-      val processRunActivity = processRun(
-        inputs = List(Input.withoutPositionFrom(inputActivity.entity(input))),
-        outputs = List(Output.withoutPositionFactory(activity => Entity(Generation(output, activity)))),
-        previousActivity = inputActivity
-      )
+      val input  = entityLocations.generateOne
+      val output = entityLocations.generateOne
 
-      loadToStore(inputActivity.asJsonLD, processRunActivity.asJsonLD)
+      val project = anyProjectEntities
+        .addActivity(project =>
+          executionPlanners(
+            planEntities(
+              CommandInput.fromLocation(input),
+              CommandOutput.fromLocation(output)
+            ),
+            project
+          ).map(_.planInputParameterValuesFromChecksum(input -> entityChecksums.generateOne).buildProvenanceUnsafe())
+        )
+        .generateOne
 
-      val inputEntityNode  = NodeDef(inputActivity.entity(input)).toNode
-      val outputEntityNode = NodeDef(processRunActivity.processRunAssociation.runPlan.output(output)).toNode
+      loadToStore(project)
+
+      val inputEntityNode  = NodeDef(project.activities.head, input).toNode
+      val outputEntityNode = NodeDef(project.activities.head, output).toNode
 
       nodeDetailsFinder
-        .findDetails(Set(inputEntityNode.location, outputEntityNode.location), projectPath)
+        .findDetails(Set(inputEntityNode.location, outputEntityNode.location), project.path)
         .unsafeRunSync() shouldBe Set(inputEntityNode, outputEntityNode)
     }
 
     "return no results if no locations given" in new TestCase {
-
       nodeDetailsFinder
-        .findDetails(Set.empty[Node.Location], projectPath)
+        .findDetails(Set.empty[Node.Location], projectPaths.generateOne)
         .unsafeRunSync() shouldBe Set.empty
     }
 
     "fail if details of the given location cannot be found" in new TestCase {
 
-      val input         = locations.generateOne
-      val inputActivity = activity(creating = input)
-      val output        = locations.generateOne
-      val processRunActivity = processRun(
-        inputs = List(Input.withoutPositionFrom(inputActivity.entity(input))),
-        outputs = List(Output.withoutPositionFactory(activity => Entity(Generation(output, activity)))),
-        previousActivity = inputActivity
-      )
+      val input  = entityLocations.generateOne
+      val output = entityLocations.generateOne
+      val project = anyProjectEntities
+        .addActivity(project =>
+          executionPlanners(
+            planEntities(
+              CommandInput.fromLocation(input),
+              CommandOutput.fromLocation(output)
+            ),
+            project
+          ).map(
+            _.planInputParameterValuesFromChecksum(input -> entityChecksums.generateOne).buildProvenanceUnsafe()
+          )
+        )
+        .generateOne
 
-      loadToStore(inputActivity.asJsonLD, processRunActivity.asJsonLD)
+      loadToStore(project)
 
       val missingLocation = nodeLocations.generateOne
 
       val exception = intercept[Exception] {
         nodeDetailsFinder
-          .findDetails(Set(Node.Location(input.toString), missingLocation), projectPath)
+          .findDetails(Set(Node.Location(input.toString), missingLocation), project.path)
           .unsafeRunSync()
       }
 
@@ -109,137 +112,114 @@ class NodeDetailsFinderSpec
     }
   }
 
-  "findDetails - runPlanIds" should {
+  "findDetails - activityIds" should {
 
     import io.renku.jsonld.generators.JsonLDGenerators._
 
-    "find details of all RunPlans with the given ids" in new TestCase {
+    "find details of all Plans for the given activity ids" in new TestCase {
 
-      val input         = locations.generateOne
-      val inputActivity = activity(creating = input)
-      val output        = locations.generateOne
-      val processRun1Activity = processRun(
-        inputs = List(Input.withoutPositionFrom(inputActivity.entity(input))),
-        outputs = List(Output.withoutPositionFactory(activity => Entity(Generation(output, activity)))),
-        previousActivity = inputActivity
-      )
-      val processRun2Activity = processRun(
-        inputs = List(Input.withoutPositionFrom(inputActivity.entity(input))),
-        outputs = List.empty,
-        previousActivity = processRun1Activity
-      )
+      val input  = entityLocations.generateOne
+      val output = entityLocations.generateOne
 
-      loadToStore(inputActivity.asJsonLD, processRun1Activity.asJsonLD, processRun2Activity.asJsonLD)
+      val project = anyProjectEntities
+        .addActivity(project =>
+          executionPlanners(
+            planEntities(
+              CommandInput.fromLocation(input),
+              CommandOutput.fromLocation(output)
+            ),
+            project
+          ).map(
+            _.planInputParameterValuesFromChecksum(input -> entityChecksums.generateOne)
+              .buildProvenanceUnsafe()
+          )
+        )
+        .addActivity(project =>
+          executionPlanners(
+            planEntities(CommandInput.fromLocation(output)),
+            project
+          ).generateOne
+            .planInputParameterValuesFromEntity(
+              output -> project.activities.head
+                .findGenerationEntity(output)
+                .getOrElse(throw new Exception(s"No generation entity for $output"))
+            )
+            .buildProvenanceUnsafe()
+        )
+        .generateOne
 
-      val process1ActivityNode = NodeDef(processRun1Activity).toNode
-      val process2ActivityNode = NodeDef(processRun2Activity).toNode
+      loadToStore(project)
+
+      val activity1 :: activity2 :: Nil = project.activities
 
       nodeDetailsFinder
         .findDetails(
           Set(
-            RunInfo(EntityId.of(process1ActivityNode.location.toString), timestampsNotInTheFuture.generateOne),
-            RunInfo(EntityId.of(process2ActivityNode.location.toString), timestampsNotInTheFuture.generateOne)
+            ExecutionInfo(activity1.asEntityId.show, activity1.startTime.value),
+            ExecutionInfo(activity2.asEntityId.show, activity2.startTime.value)
           ),
-          projectPath
+          project.path
         )
-        .unsafeRunSync() shouldBe Set(process1ActivityNode, process2ActivityNode)
+        .unsafeRunSync() shouldBe Set(NodeDef(activity1).toNode, NodeDef(activity2).toNode)
     }
 
-    "find details of a RunPlan with command parameters without a position" in new TestCase {
-      val input         = locations.generateOne
-      val inputActivity = activity(creating = input)
-      val processRunActivity = processRun(
-        inputs = List(Input.withoutPositionFrom(inputActivity.entity(input))),
-        outputs = List(Output.withoutPositionFactory(activity => Entity(Generation(locations.generateOne, activity)))),
-        previousActivity = inputActivity
-      )
+    "find details of a Plan with mapped command parameters" in new TestCase {
+      val input +: output +: errOutput +: Nil =
+        entityLocations.generateNonEmptyList(minElements = 3, maxElements = 3).toList
 
-      loadToStore(inputActivity.asJsonLD, processRunActivity.asJsonLD)
+      val project = anyProjectEntities
+        .addActivity(project =>
+          executionPlanners(
+            planEntities(
+              CommandInput.streamedFromLocation(input),
+              CommandOutput.streamedFromLocation(output, CommandOutput.stdOut),
+              CommandOutput.streamedFromLocation(errOutput, CommandOutput.stdErr)
+            ),
+            project
+          ).map(
+            _.planInputParameterValuesFromChecksum(input -> entityChecksums.generateOne)
+              .buildProvenanceUnsafe()
+          )
+        )
+        .generateOne
+
+      loadToStore(project)
+
+      val activity = project.activities.head
 
       nodeDetailsFinder
         .findDetails(
-          Set(
-            RunInfo(EntityId.of(NodeDef(processRunActivity).toNode.location.toString),
-                    timestampsNotInTheFuture.generateOne
-            )
-          ),
-          projectPath
+          Set(ExecutionInfo(activity.asEntityId.show, activity.startTime.value)),
+          project.path
         )
-        .unsafeRunSync() shouldBe Set(NodeDef(processRunActivity).toNode)
-    }
-
-    "find details of a RunPlan with mapped command parameters" in new TestCase {
-      val input +: output +: errOutput +: Nil = locations.generateNonEmptyList(minElements = 3, maxElements = 3).toList
-      val inputActivity                       = activity(creating = input)
-      val processRunActivity = processRun(
-        inputs = List(Input.streamFrom(inputActivity.entity(input))),
-        outputs = List(
-          Output.streamFactory(activity => Entity(Generation(output, activity)), to = StdOut),
-          Output.streamFactory(activity => Entity(Generation(errOutput, activity)), to = StdErr)
-        ),
-        previousActivity = inputActivity
-      )
-
-      loadToStore(inputActivity.asJsonLD, processRunActivity.asJsonLD)
-
-      nodeDetailsFinder
-        .findDetails(
-          Set(
-            RunInfo(EntityId.of(NodeDef(processRunActivity).toNode.location.toString),
-                    timestampsNotInTheFuture.generateOne
-            )
-          ),
-          projectPath
-        )
-        .unsafeRunSync() shouldBe Set(NodeDef(processRunActivity).toNode)
+        .unsafeRunSync() shouldBe Set(NodeDef(activity).toNode)
     }
 
     "return no results if no ids given" in new TestCase {
-
       nodeDetailsFinder
-        .findDetails(Set.empty[RunInfo], projectPath)
+        .findDetails(Set.empty[ExecutionInfo], projectPaths.generateOne)
         .unsafeRunSync() shouldBe Set.empty
     }
 
     "fail if details of the given location cannot be found" in new TestCase {
 
-      val input         = locations.generateOne
-      val inputActivity = activity(creating = input)
-      val output        = locations.generateOne
-      val processRunActivity = processRun(
-        inputs = List(Input.withoutPositionFrom(inputActivity.entity(input))),
-        outputs = List(Output.withoutPositionFactory(activity => Entity(Generation(output, activity)))),
-        previousActivity = inputActivity
-      )
-
-      loadToStore(inputActivity.asJsonLD, processRunActivity.asJsonLD)
-
-      val missingRunPlan = entityIds.generateOne
+      val missingPlan = entityIds.generateOne
 
       val exception = intercept[Exception] {
         nodeDetailsFinder
           .findDetails(
-            Set(
-              RunInfo(EntityId.of(NodeDef(processRunActivity).toNode.location.toString),
-                      timestampsNotInTheFuture.generateOne
-              ),
-              RunInfo(missingRunPlan, timestampsNotInTheFuture.generateOne)
-            ),
-            projectPath
+            Set(ExecutionInfo(missingPlan, timestampsNotInTheFuture.generateOne)),
+            projectPaths.generateOne
           )
           .unsafeRunSync()
       }
 
       exception            shouldBe an[IllegalArgumentException]
-      exception.getMessage shouldBe s"No runPlan with $missingRunPlan"
+      exception.getMessage shouldBe s"No plan with $missingPlan"
     }
   }
 
   private trait TestCase {
-    val projectPath     = projectPaths.generateOne
-    private val agent   = generateAgent
-    private val project = generateProject(projectPath)
-
     val logger                = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
     val nodeDetailsFinder = new NodeDetailsFinderImpl(
@@ -248,36 +228,6 @@ class NodeDetailsFinderSpec
       logger,
       new SparqlQueryTimeRecorder(executionTimeRecorder)
     )
-
-    def activity(creating: Location) = Activity(
-      commitIds.generateOne,
-      committedDates.generateOne,
-      committer = persons.generateOne,
-      project,
-      agent,
-      comment = "committing 1 file",
-      maybeGenerationFactories = List(Generation.factory(entityFactory = Entity.factory(creating)))
-    )
-
-    def processRun(inputs: List[InputFactory], outputs: List[OutputFactory], previousActivity: Activity) =
-      ProcessRun.standAlone(
-        commitIds.generateOne,
-        committedDates.generateOne,
-        persons.generateOne,
-        project,
-        agent,
-        comment = s"renku run: committing 1 newly added files",
-        associationFactory = Association.process(
-          agent.copy(cliVersion = cliVersions.generateOne),
-          RunPlan.process(
-            WorkflowFile.yaml("renku-run.yaml"),
-            Command("cat"),
-            inputs = inputs,
-            outputs = outputs
-          )
-        ),
-        maybeInformedBy = previousActivity.some
-      )
   }
 
   private implicit class NodeDefOps(nodeDef: NodeDef) {

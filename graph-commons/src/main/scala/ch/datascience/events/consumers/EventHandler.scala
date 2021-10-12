@@ -21,8 +21,9 @@ package ch.datascience.events.consumers
 import cats.data.EitherT
 import cats.data.EitherT.fromEither
 import cats.syntax.all._
-import cats.{Monad, MonadError}
-import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, SchedulingError, UnsupportedEventType}
+import cats.{Monad, MonadError, Show}
+import ch.datascience.events.EventRequestContent
+import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventId}
 import ch.datascience.graph.model.projects
 import io.circe.{Decoder, DecodingFailure, Json}
@@ -96,21 +97,22 @@ abstract class EventHandlerWithProcessLimiter[Interpretation[_]: Monad](
 
     def log[EventInfo](
         eventInfo: EventInfo
-    )(result:      EventSchedulingResult)(implicit toString: EventInfo => String): Interpretation[Unit] =
+    )(result:      EventSchedulingResult)(implicit show: Show[EventInfo]): Interpretation[Unit] =
       result match {
-        case Accepted => logger.info(s"$categoryName: ${toString(eventInfo)} -> $result")
-        case SchedulingError(exception) =>
-          logger.error(exception)(s"$categoryName: ${toString(eventInfo)} -> $SchedulingError")
+        case Accepted =>
+          logger.info(show"$categoryName: $eventInfo -> $result")
+        case error @ SchedulingError(exception) =>
+          logger.error(exception)(show"$categoryName: $eventInfo -> $error")
         case _ => ME.unit
       }
 
     def logInfo[EventInfo](eventInfo: EventInfo, message: String)(implicit
-        toString:                     EventInfo => String
-    ): Interpretation[Unit] = logger.info(s"$categoryName: ${toString(eventInfo)} -> $message")
+        show:                         Show[EventInfo]
+    ): Interpretation[Unit] = logger.info(show"$categoryName: $eventInfo -> $message")
 
     def logError[EventInfo](eventInfo: EventInfo, exception: Throwable)(implicit
-        toString:                      EventInfo => String
-    ): Interpretation[Unit] = logger.error(exception)(s"$categoryName: ${toString(eventInfo)} -> Failure")
+        show:                          Show[EventInfo]
+    ): Interpretation[Unit] = logger.error(exception)(show"$categoryName: $eventInfo -> Failure")
   }
 
   protected implicit class EitherTOps[T](
@@ -129,9 +131,7 @@ abstract class EventHandlerWithProcessLimiter[Interpretation[_]: Monad](
 
     private def as(
         result: EventSchedulingResult
-    ): PartialFunction[Throwable, Either[EventSchedulingResult, T]] = { case NonFatal(_) =>
-      Left(result)
-    }
+    ): PartialFunction[Throwable, Either[EventSchedulingResult, T]] = { case NonFatal(_) => Left(result) }
 
     private lazy val asSchedulingError: PartialFunction[Throwable, Either[EventSchedulingResult, T]] = {
       case NonFatal(exception) => Left(SchedulingError(exception))

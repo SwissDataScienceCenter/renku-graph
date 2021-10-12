@@ -20,6 +20,7 @@ package ch.datascience.triplesgenerator.events.categories.awaitinggeneration.tri
 
 import ammonite.ops.{Bytes, CommandResult, Path, ShelloutException}
 import ch.datascience.config.ServiceUrl
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths

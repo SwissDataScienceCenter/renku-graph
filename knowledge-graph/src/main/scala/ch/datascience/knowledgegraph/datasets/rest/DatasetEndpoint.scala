@@ -21,7 +21,9 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.effect._
 import cats.syntax.all._
 import ch.datascience.config.renku
-import ch.datascience.graph.model.datasets.{Identifier, PublishedDate}
+import ch.datascience.graph.config.GitLabUrlLoader
+import ch.datascience.graph.model.GitLabUrl
+import ch.datascience.graph.model.datasets.{Date, DateCreated, DatePublished, Identifier, ImageUri}
 import ch.datascience.http.InfoMessage._
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.{ErrorMessage, InfoMessage}
@@ -41,6 +43,7 @@ import scala.util.control.NonFatal
 class DatasetEndpoint[Interpretation[_]: Effect](
     datasetFinder:         DatasetFinder[Interpretation],
     renkuResourcesUrl:     renku.ResourcesUrl,
+    gitLabUrl:             GitLabUrl,
     executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
     logger:                Logger[Interpretation]
 ) extends Http4sDsl[Interpretation] {
@@ -49,13 +52,12 @@ class DatasetEndpoint[Interpretation[_]: Effect](
   import executionTimeRecorder._
   import org.http4s.circe._
 
-  def getDataset(identifier: Identifier): Interpretation[Response[Interpretation]] =
-    measureExecutionTime {
-      datasetFinder
-        .findDataset(identifier)
-        .flatMap(toHttpResult(identifier))
-        .recoverWith(httpResult(identifier))
-    } map logExecutionTimeWhen(finishedSuccessfully(identifier))
+  def getDataset(identifier: Identifier): Interpretation[Response[Interpretation]] = measureExecutionTime {
+    datasetFinder
+      .findDataset(identifier)
+      .flatMap(toHttpResult(identifier))
+      .recoverWith(httpResult(identifier))
+  } map logExecutionTimeWhen(finishedSuccessfully(identifier))
 
   private def toHttpResult(
       identifier: Identifier
@@ -84,20 +86,23 @@ class DatasetEndpoint[Interpretation[_]: Effect](
         ("identifier" -> dataset.id.asJson).some,
         ("name" -> dataset.name.asJson).some,
         ("title" -> dataset.title.asJson).some,
-        ("url" -> dataset.url.asJson).some,
+        ("url" -> dataset.resourceId.asJson).some,
         dataset match {
           case ds: NonModifiedDataset => ("sameAs" -> ds.sameAs.asJson).some
           case ds: ModifiedDataset    => ("derivedFrom" -> ds.derivedFrom.asJson).some
         },
         ("versions" -> dataset.versions.asJson).some,
         dataset.maybeDescription.map(description => "description" -> description.asJson),
-        ("published" -> (dataset.creators -> dataset.dates.maybeDatePublished).asJson).some,
-        dataset.dates.maybeDateCreated.map(date => "created" -> date.asJson),
+        ("published" -> (dataset.creators -> dataset.date).asJson).some,
+        dataset.date match {
+          case DatePublished(_)  => Option.empty[(String, Json)]
+          case DateCreated(date) => ("created" -> date.asJson).some
+        },
         ("hasPart" -> dataset.parts.asJson).some,
         ("project" -> dataset.project.asJson).some,
         ("usedIn" -> dataset.usedIn.asJson).some,
         ("keywords" -> dataset.keywords.asJson).some,
-        ("images" -> dataset.images.asJson).some
+        ("images" -> (dataset.images, dataset.project).asJson).some
       ).flatten: _*
     ) deepMerge _links(
       Rel.Self -> Href(renkuResourcesUrl / "datasets" / dataset.id),
@@ -106,14 +111,14 @@ class DatasetEndpoint[Interpretation[_]: Effect](
   }
   // format: on
 
-  private implicit lazy val publishingEncoder: Encoder[(Set[DatasetCreator], Option[PublishedDate])] =
-    Encoder.instance[(Set[DatasetCreator], Option[PublishedDate])] {
-      case (creators, Some(published)) =>
+  private implicit lazy val publishingEncoder: Encoder[(Set[DatasetCreator], Date)] =
+    Encoder.instance {
+      case (creators, DatePublished(date)) =>
         Json.obj(
-          "datePublished" -> published.asJson,
+          "datePublished" -> date.asJson,
           "creator"       -> creators.toList.asJson
         )
-      case (creators, None) =>
+      case (creators, _) =>
         Json.obj(
           "creator" -> creators.toList.asJson
         )
@@ -131,22 +136,14 @@ class DatasetEndpoint[Interpretation[_]: Effect](
 
   private implicit lazy val partEncoder: Encoder[DatasetPart] = Encoder.instance[DatasetPart] { part =>
     json"""{
-      "name": ${part.name},
-      "atLocation": ${part.atLocation}
+      "atLocation": ${part.location}
     }"""
   }
 
   private implicit lazy val projectEncoder: Encoder[DatasetProject] = Encoder.instance[DatasetProject] { project =>
     json"""{
       "path": ${project.path},
-      "name": ${project.name},
-      "created": {
-        "dateCreated": ${project.created.date},
-        "agent": {
-          "email": ${project.created.agent.maybeEmail},
-          "name": ${project.created.agent.name}
-        }
-      }
+      "name": ${project.name}
     }""" deepMerge _links(
       Link(Rel("project-details") -> Href(renkuResourcesUrl / "projects" / project.path))
     )
@@ -157,6 +154,24 @@ class DatasetEndpoint[Interpretation[_]: Effect](
       "initial": ${versions.initial}
     }"""
   }
+
+  private implicit lazy val imagesEncoder: Encoder[(List[ImageUri], DatasetProject)] =
+    Encoder.instance[(List[ImageUri], DatasetProject)] { case (imageUris, project) =>
+      Json.arr(imageUris.map {
+        case uri: ImageUri.Relative =>
+          json"""{
+            "location": $uri
+          }""" deepMerge _links(
+            Link(Rel("view") -> Href(gitLabUrl / project.path / "raw" / "master" / uri))
+          )
+        case uri: ImageUri.Absolute =>
+          json"""{
+            "location": $uri
+          }""" deepMerge _links(
+            Link(Rel("view") -> Href(uri.show))
+          )
+      }: _*)
+    }
 }
 
 object IODatasetEndpoint {
@@ -167,15 +182,10 @@ object IODatasetEndpoint {
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[DatasetEndpoint[IO]] =
-    for {
-      datasetFinder         <- IODatasetFinder(timeRecorder, logger = ApplicationLogger)
-      renkuResourceUrl      <- renku.ResourcesUrl[IO]()
-      executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
-    } yield new DatasetEndpoint[IO](
-      datasetFinder,
-      renkuResourceUrl,
-      executionTimeRecorder,
-      ApplicationLogger
-    )
+  ): IO[DatasetEndpoint[IO]] = for {
+    datasetFinder         <- DatasetFinder(timeRecorder, logger = ApplicationLogger)
+    renkuResourceUrl      <- renku.ResourcesUrl[IO]()
+    gitLabUrl             <- GitLabUrlLoader[IO]()
+    executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
+  } yield new DatasetEndpoint[IO](datasetFinder, renkuResourceUrl, gitLabUrl, executionTimeRecorder, ApplicationLogger)
 }

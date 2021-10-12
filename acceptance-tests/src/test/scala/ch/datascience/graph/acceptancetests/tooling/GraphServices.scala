@@ -24,13 +24,23 @@ import ch.datascience.graph.acceptancetests.db.{EventLog, TokenRepository}
 import ch.datascience.graph.acceptancetests.stubs.{GitLab, RemoteTriplesGenerator}
 import ch.datascience.graph.acceptancetests.tooling.KnowledgeGraphClient.KnowledgeGraphClient
 import ch.datascience.graph.acceptancetests.tooling.WebhookServiceClient.WebhookServiceClient
+import ch.datascience.graph.config.RenkuBaseUrlLoader
+import ch.datascience.graph.model.{GitLabApiUrl, GitLabUrl, RenkuBaseUrl}
+import ch.datascience.graph.model.testentities.generators.EntitiesGenerators
+import ch.datascience.rdfstore.FusekiBaseUrl
 import io.renku.eventlog
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
 import scala.concurrent.ExecutionContext
+import scala.util.Try
 
-trait GraphServices extends BeforeAndAfterAll {
+trait GraphServices extends BeforeAndAfterAll with EntitiesGenerators {
   this: Suite =>
+
+  protected implicit val fusekiBaseUrl: FusekiBaseUrl = RDFStore.fusekiBaseUrl
+  implicit override val renkuBaseUrl:   RenkuBaseUrl  = RenkuBaseUrlLoader[Try]().fold(throw _, identity)
+  implicit override val gitLabUrl:      GitLabUrl     = GitLab.gitLabUrl
+  implicit override val gitLabApiUrl:   GitLabApiUrl  = GitLab.gitLabApiUrl
 
   protected implicit lazy val executionContext: ExecutionContext     = GraphServices.executionContext
   protected implicit lazy val contextShift:     ContextShift[IO]     = GraphServices.contextShift

@@ -38,12 +38,17 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-class ProjectEndpoint[Interpretation[_]: Effect](
+trait ProjectEndpoint[Interpretation[_]] {
+  def getProject(path: projects.Path, maybeAuthUser: Option[AuthUser]): Interpretation[Response[Interpretation]]
+}
+
+class ProjectEndpointImpl[Interpretation[_]: Effect](
     projectFinder:         ProjectFinder[Interpretation],
     renkuResourcesUrl:     renku.ResourcesUrl,
     executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
     logger:                Logger[Interpretation]
-) extends Http4sDsl[Interpretation] {
+) extends Http4sDsl[Interpretation]
+    with ProjectEndpoint[Interpretation] {
 
   import executionTimeRecorder._
   import io.circe.literal._
@@ -167,7 +172,7 @@ class ProjectEndpoint[Interpretation[_]: Effect](
   }
 }
 
-object IOProjectEndpoint {
+object ProjectEndpoint {
 
   def apply(
       gitLabThrottler: Throttler[IO, GitLab],
@@ -176,15 +181,14 @@ object IOProjectEndpoint {
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[ProjectEndpoint[IO]] =
-    for {
-      projectFinder         <- IOProjectFinder(gitLabThrottler, ApplicationLogger, timeRecorder)
-      renkuResourceUrl      <- renku.ResourcesUrl[IO]()
-      executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
-    } yield new ProjectEndpoint[IO](
-      projectFinder,
-      renkuResourceUrl,
-      executionTimeRecorder,
-      ApplicationLogger
-    )
+  ): IO[ProjectEndpoint[IO]] = for {
+    projectFinder         <- ProjectFinder(gitLabThrottler, ApplicationLogger, timeRecorder)
+    renkuResourceUrl      <- renku.ResourcesUrl[IO]()
+    executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
+  } yield new ProjectEndpointImpl[IO](
+    projectFinder,
+    renkuResourceUrl,
+    executionTimeRecorder,
+    ApplicationLogger
+  )
 }

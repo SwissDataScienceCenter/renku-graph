@@ -23,12 +23,11 @@ import cats.syntax.all._
 import ch.datascience.commiteventservice.events.categories.common.CommitInfo
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.graph.config.{GitLabApiUrl, GitLabUrl}
+import ch.datascience.graph.config.GitLabUrlLoader
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.{GitLabApiUrl, projects}
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.http.client.{AccessToken, RestClient}
-import ch.datascience.tinytypes.json.TinyTypeDecoders.stringDecoder
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import org.http4s.Method.GET
@@ -53,7 +52,7 @@ private[globalcommitsync] trait GitLabCommitFetcher[Interpretation[_]] {
 }
 
 private[globalcommitsync] class GitLabCommitFetcherImpl[Interpretation[_]: ConcurrentEffect: Timer](
-    gitLabUrl:               GitLabUrl,
+    gitLabApiUrl:            GitLabApiUrl,
     gitLabThrottler:         Throttler[Interpretation, GitLab],
     logger:                  Logger[Interpretation],
     retryInterval:           FiniteDuration = RestClient.SleepAfterConnectionIssue,
@@ -71,7 +70,7 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[Interpretation[_]: Concu
   override def fetchLatestGitLabCommit(projectId: projects.Id)(implicit
       maybeAccessToken:                           Option[AccessToken]
   ): Interpretation[Option[CommitId]] = for {
-    uriString   <- getUriString(gitLabUrl.apiV4, projectId)
+    uriString   <- getUriString(projectId)
     uri         <- validateUri(uriString).map(_.withQueryParam("per_page", "1"))
     maybeCommit <- send(request(GET, uri, maybeAccessToken))(mapSingleCommitResponse)
   } yield maybeCommit
@@ -79,11 +78,11 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[Interpretation[_]: Concu
   override def fetchGitLabCommits(projectId: projects.Id)(implicit
       maybeAccessToken:                      Option[AccessToken]
   ): Interpretation[List[CommitId]] = for {
-    uri     <- getUriString(gitLabUrl.apiV4, projectId)
+    uri     <- getUriString(projectId)
     commits <- fetch(uri)
   } yield commits
 
-  private def getUriString(gitLabApiUrl: GitLabApiUrl, projectId: projects.Id): Interpretation[String] =
+  private def getUriString(projectId: projects.Id): Interpretation[String] =
     s"$gitLabApiUrl/projects/$projectId/repository/commits".pure[Interpretation]
 
   private def fetch(uriWithoutPage:           String,
@@ -91,16 +90,15 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[Interpretation[_]: Concu
                     previouslyFetchedCommits: List[CommitId] = List.empty[CommitId]
   )(implicit
       maybeAccessToken: Option[AccessToken]
-  ): Interpretation[List[CommitId]] =
-    for {
-      uri          <- addPageToUrl(uriWithoutPage, maybePage)
-      responsePair <- send(request(GET, uri, maybeAccessToken))(mapCommitResponse)
-      allCommitIds <- addNextPage(uriWithoutPage,
-                                  previouslyFetchedCommits,
-                                  newlyFetchedCommits = responsePair._1,
-                                  maybeNextPage = responsePair._2
-                      )
-    } yield allCommitIds
+  ): Interpretation[List[CommitId]] = for {
+    uri          <- addPageToUrl(uriWithoutPage, maybePage)
+    responsePair <- send(request(GET, uri, maybeAccessToken))(mapCommitResponse)
+    allCommitIds <- addNextPage(uriWithoutPage,
+                                previouslyFetchedCommits,
+                                newlyFetchedCommits = responsePair._1,
+                                maybeNextPage = responsePair._2
+                    )
+  } yield allCommitIds
 
   private def addPageToUrl(url: String, maybePage: Option[Int]) = maybePage match {
     case Some(page) => validateUri(s"$url").map(_.withQueryParam("page", page.toString))
@@ -152,6 +150,6 @@ private[globalcommitsync] object GitLabCommitFetcher {
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[GitLabCommitFetcher[IO]] = for {
-    gitLabUrl <- GitLabUrl[IO]()
-  } yield new GitLabCommitFetcherImpl[IO](gitLabUrl, gitLabThrottler, logger)
+    gitLabUrl <- GitLabUrlLoader[IO]()
+  } yield new GitLabCommitFetcherImpl[IO](gitLabUrl.apiV4, gitLabThrottler, logger)
 }

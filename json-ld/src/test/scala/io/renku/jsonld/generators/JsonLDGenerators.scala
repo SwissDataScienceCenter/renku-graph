@@ -19,7 +19,7 @@
 package io.renku.jsonld.generators
 
 import Generators._
-import io.renku.jsonld.JsonLD.{JsonLDEntity}
+import io.renku.jsonld.JsonLD.{JsonLDEdge, JsonLDEntity}
 import io.renku.jsonld._
 import org.scalacheck.{Arbitrary, Gen}
 
@@ -67,4 +67,10 @@ object JsonLDGenerators {
     types      <- entityTypesObject
     properties <- nonEmptyList(valuesProperties)
   } yield JsonLD.entity(id, types, properties.toList.toMap)
+
+  implicit val jsonLDEdges: Gen[JsonLDEdge] = for {
+    source   <- entityIds
+    property <- properties
+    target   <- entityIds
+  } yield JsonLD.edge(source, property, target)
 }

@@ -18,12 +18,12 @@
 
 package ch.datascience.rdfstore
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.syntax.all._
-import ch.datascience.config.ConfigLoader.stringTinyTypeReader
+import ch.datascience.config.ConfigLoader.{stringTinyTypeReader, urlTinyTypeReader}
 import ch.datascience.http.client.{BasicAuthCredentials, BasicAuthPassword, BasicAuthUsername}
 import ch.datascience.tinytypes.constraints.{NonBlank, Url, UrlOps}
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory, UrlTinyType}
 import com.typesafe.config.{Config, ConfigFactory}
 import pureconfig.ConfigReader
 
@@ -38,9 +38,9 @@ object RdfStoreConfig {
   import ch.datascience.config.ConfigLoader._
   import ch.datascience.http.client.BasicAuthConfigReaders._
 
-  def apply[Interpretation[_]](
-      config:    Config = ConfigFactory.load()
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[RdfStoreConfig] =
+  def apply[Interpretation[_]: MonadThrow](
+      config: Config = ConfigFactory.load()
+  ): Interpretation[RdfStoreConfig] =
     for {
       url         <- find[Interpretation, FusekiBaseUrl]("services.fuseki.url", config)
       datasetName <- find[Interpretation, DatasetName]("services.fuseki.dataset-name", config)
@@ -49,9 +49,10 @@ object RdfStoreConfig {
     } yield RdfStoreConfig(url, datasetName, BasicAuthCredentials(username, password))
 }
 
-class FusekiBaseUrl private (val value: String) extends AnyVal with StringTinyType
+class FusekiBaseUrl private (val value: String) extends AnyVal with UrlTinyType
+
 object FusekiBaseUrl extends TinyTypeFactory[FusekiBaseUrl](new FusekiBaseUrl(_)) with Url with UrlOps[FusekiBaseUrl] {
-  implicit val fusekiBaseUrlReader: ConfigReader[FusekiBaseUrl] = stringTinyTypeReader(FusekiBaseUrl)
+  implicit val fusekiBaseUrlReader: ConfigReader[FusekiBaseUrl] = urlTinyTypeReader(FusekiBaseUrl)
 }
 
 class DatasetName private (val value: String) extends AnyVal with StringTinyType

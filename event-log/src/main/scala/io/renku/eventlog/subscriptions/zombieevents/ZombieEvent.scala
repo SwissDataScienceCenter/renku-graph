@@ -26,10 +26,7 @@ import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.renku.eventlog.subscriptions.EventEncoder
 
 private final class ZombieEventProcess private (val value: String) extends AnyVal with StringTinyType
-
-private object ZombieEventProcess extends TinyTypeFactory[ZombieEventProcess](new ZombieEventProcess(_)) {
-  implicit lazy val show: Show[ZombieEventProcess] = Show.show(_.value)
-}
+private object ZombieEventProcess extends TinyTypeFactory[ZombieEventProcess](new ZombieEventProcess(_))
 
 private case class ZombieEvent(generatedBy: ZombieEventProcess,
                                eventId:     CompoundEventId,
@@ -41,8 +38,9 @@ private case class ZombieEvent(generatedBy: ZombieEventProcess,
 }
 
 private object ZombieEvent {
-  implicit lazy val show: Show[ZombieEvent] =
-    Show.show(event => show"ZombieEvent ${event.generatedBy} ${event.eventId}, ${event.projectPath}, ${event.status}")
+  implicit lazy val show: Show[ZombieEvent] = Show.show(event =>
+    show"ZombieEvent ${event.generatedBy} ${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status}"
+  )
 }
 
 private object ZombieEventEncoder extends EventEncoder[ZombieEvent] {

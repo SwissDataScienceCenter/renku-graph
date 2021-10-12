@@ -19,8 +19,9 @@
 package ch.datascience.webhookservice.hookcreation
 
 import cats.effect.IO
+import ch.datascience.generators.CommonGraphGenerators.authUsers
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators.{authUsers, projectIds}
+import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.ErrorMessage
 import ch.datascience.http.ErrorMessage._

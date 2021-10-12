@@ -18,15 +18,15 @@
 
 package io.renku.jsonld
 
+import cats.syntax.all._
+import io.circe.{Encoder, Json, JsonNumber}
+import io.renku.jsonld.flatten.{JsonLDArrayFlatten, JsonLDEntityFlatten, JsonLDFlatten}
+import io.renku.jsonld.merge.{JsonLDArrayMerge, JsonLDMerge}
+
 import java.io.Serializable
 import java.time.{Instant, LocalDate}
 
-import cats.implicits.catsSyntaxEitherId
-import io.circe.{Encoder, Json}
-import io.renku.jsonld.JsonLD.MalformedJsonLD
-import io.renku.jsonld.flatten.{JsonLDArrayFlatten, JsonLDEntityFlatten}
-
-abstract class JsonLD extends Product with Serializable {
+abstract class JsonLD extends JsonLDMerge with JsonLDFlatten with Product with Serializable {
   def toJson: Json
 
   def entityId: Option[EntityId]
@@ -36,8 +36,6 @@ abstract class JsonLD extends Product with Serializable {
   def cursor: Cursor = Cursor.from(this)
 
   def asArray: Option[Vector[JsonLD]]
-
-  def flatten: Either[MalformedJsonLD, JsonLD]
 
 }
 
@@ -49,13 +47,15 @@ object JsonLD {
 
   def fromString(value: String): JsonLD = JsonLDValue(value)
 
-  def fromInt(value: Int): JsonLD = JsonLDValue(value)
+  def fromInt(value: Int): JsonLD = JsonLDValue(Json.fromInt(value).asNumber.getOrElse(throw new Exception("")))
 
-  def fromLong(value: Long): JsonLD = JsonLDValue(value)
+  def fromLong(value: Long): JsonLD = JsonLDValue(Json.fromLong(value).asNumber.getOrElse(throw new Exception("")))
 
-  def fromInstant(value: Instant): JsonLD = JsonLDValue(value, "http://www.w3.org/2001/XMLSchema#dateTime")
+  def fromNumber(value: JsonNumber): JsonLD = JsonLDValue(value)
 
-  def fromLocalDate(value: LocalDate): JsonLD = JsonLDValue(value, "http://schema.org/Date")
+  def fromInstant(value: Instant): JsonLD = JsonLDInstantValue.from(value)
+
+  def fromLocalDate(value: LocalDate): JsonLD = JsonLDLocalDateValue.from(value)
 
   def fromBoolean(value: Boolean): JsonLD = JsonLDValue(value)
 
@@ -94,6 +94,9 @@ object JsonLD {
       properties: Map[Property, JsonLD]
   ): JsonLDEntity = JsonLDEntity(id, types, properties, reverse)
 
+  def edge(source: EntityId, property: Property, target: EntityId): JsonLDEdge =
+    JsonLDEdge(source, property, target)
+
   private[jsonld] final case class JsonLDEntity(id:         EntityId,
                                                 types:      EntityTypes,
                                                 properties: Map[Property, JsonLD],
@@ -120,33 +123,59 @@ object JsonLD {
       }
     }
 
-    override lazy val entityId:    Option[EntityId]       = Some(id)
-    override lazy val entityTypes: Option[EntityTypes]    = Some(types)
-    override lazy val asArray:     Option[Vector[JsonLD]] = Some(Vector(this))
+    override lazy val entityId:    Option[EntityId]                = Some(id)
+    override lazy val entityTypes: Option[EntityTypes]             = Some(types)
+    override lazy val asArray:     Option[Vector[JsonLD]]          = Some(Vector(this))
+    override lazy val merge:       Either[MalformedJsonLD, JsonLD] = this.asRight
+  }
 
+  private[jsonld] final case class JsonLDEdge(source: EntityId, property: Property, target: EntityId) extends JsonLD {
+
+    override lazy val toJson: Json = Json.obj(
+      "@id"        -> source.asJson,
+      property.url -> JsonLD.fromEntityId(target).toJson
+    )
+
+    override lazy val entityId:    Option[EntityId]                = Some(source)
+    override lazy val entityTypes: Option[EntityTypes]             = None
+    override lazy val asArray:     Option[Vector[JsonLD]]          = Some(Vector(this))
+    override lazy val flatten:     Either[MalformedJsonLD, JsonLD] = this.asRight
+    override lazy val merge:       Either[MalformedJsonLD, JsonLD] = this.asRight
   }
 
   private[jsonld] final case class JsonLDValue[V](
       value:          V,
-      maybeType:      Option[String] = None
+      maybeType:      Option[EntityTypes] = None
   )(implicit encoder: Encoder[V])
       extends JsonLD {
+
     override lazy val toJson: Json = maybeType match {
       case None    => Json.obj("@value" -> value.asJson)
       case Some(t) => Json.obj("@type" -> t.asJson, "@value" -> value.asJson)
     }
 
-    override lazy val entityId:    Option[EntityId]    = None
-    override lazy val entityTypes: Option[EntityTypes] = None
-
-    override lazy val asArray: Option[Vector[JsonLD]] = Some(Vector(this))
-
-    override lazy val flatten: Either[MalformedJsonLD, JsonLD] = this.asRight
+    override lazy val entityId:    Option[EntityId]                = None
+    override lazy val entityTypes: Option[EntityTypes]             = None
+    override lazy val asArray:     Option[Vector[JsonLD]]          = Some(Vector(this))
+    override lazy val flatten:     Either[MalformedJsonLD, JsonLD] = this.asRight
+    override lazy val merge:       Either[MalformedJsonLD, JsonLD] = this.asRight
   }
 
   private[jsonld] object JsonLDValue {
-    def apply[V](value: V, entityType: String)(implicit encoder: Encoder[V]): JsonLDValue[V] =
+    def apply[V](value: V, entityType: EntityTypes)(implicit encoder: Encoder[V]): JsonLDValue[V] =
       JsonLDValue[V](value, Some(entityType))
+  }
+
+  private[jsonld] object JsonLDInstantValue {
+    val entityTypes = EntityTypes.of(Schema.from("http://www.w3.org/2001/XMLSchema", "#") / "dateTime")
+
+    def from(instant: Instant): JsonLDValue[Instant] = JsonLDValue(instant, entityTypes.some)
+  }
+
+  private[jsonld] object JsonLDLocalDateValue {
+    val entityTypes = EntityTypes.of(Schema.from("http://schema.org") / "Date")
+
+    def from(localDate: LocalDate): JsonLDValue[LocalDate] = JsonLDValue(localDate, entityTypes.some)
   }
 
   private[jsonld] final case object JsonLDNull extends JsonLD {
@@ -155,6 +184,7 @@ object JsonLD {
     override lazy val entityTypes: Option[EntityTypes]             = None
     override lazy val asArray:     Option[Vector[JsonLD]]          = None
     override lazy val flatten:     Either[MalformedJsonLD, JsonLD] = this.asRight
+    override lazy val merge:       Either[MalformedJsonLD, JsonLD] = this.asRight
   }
 
   private[jsonld] final case object JsonLDOptionValue {
@@ -165,9 +195,12 @@ object JsonLD {
       }
   }
 
-  private[jsonld] final case class JsonLDArray(jsons: Seq[JsonLD]) extends JsonLD with JsonLDArrayFlatten {
+  private[jsonld] final case class JsonLDArray(jsons: Seq[JsonLD])
+      extends JsonLD
+      with JsonLDArrayFlatten
+      with JsonLDArrayMerge {
 
-    override def hashCode(): Int = jsons.size.hashCode() + jsons.toSet.hashCode()
+    override lazy val hashCode: Int = jsons.size.hashCode() + jsons.toSet.hashCode()
 
     override def equals(that: Any): Boolean = that match {
       case JsonLDArray(otherJsons) => (otherJsons.size == jsons.size) && (otherJsons.toSet == jsons.toSet)
@@ -186,6 +219,7 @@ object JsonLD {
     override lazy val entityTypes: Option[EntityTypes]             = None
     override lazy val asArray:     Option[Vector[JsonLD]]          = Some(Vector(this))
     override lazy val flatten:     Either[MalformedJsonLD, JsonLD] = this.asRight
+    override lazy val merge:       Either[MalformedJsonLD, JsonLD] = this.asRight
   }
 
   final case class MalformedJsonLD(message: String) extends RuntimeException(message)

@@ -34,18 +34,18 @@ object SubscriptionFactory {
   def apply(
       metricsRegistry: MetricsRegistry[IO],
       gitLabThrottler: Throttler[IO, GitLab],
-      timeRecorder:    SparqlQueryTimeRecorder[IO],
-      logger:          Logger[IO]
+      timeRecorder:    SparqlQueryTimeRecorder[IO]
   )(implicit
       contextShift:     ContextShift[IO],
       executionContext: ExecutionContext,
-      timer:            Timer[IO]
+      timer:            Timer[IO],
+      logger:           Logger[IO]
   ): IO[(EventHandler[IO], SubscriptionMechanism[IO])] = for {
     subscriptionMechanism <- SubscriptionMechanism(
                                categoryName,
                                categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort, Microservice.Identifier),
                                logger
                              )
-    handler <- EventHandler(metricsRegistry, gitLabThrottler, timeRecorder, subscriptionMechanism, logger)
+    handler <- EventHandler(metricsRegistry, gitLabThrottler, timeRecorder, subscriptionMechanism)
   } yield handler -> subscriptionMechanism
 }

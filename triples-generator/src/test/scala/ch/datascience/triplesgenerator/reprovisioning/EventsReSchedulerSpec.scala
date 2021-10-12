@@ -37,8 +37,11 @@ class EventsReSchedulerSpec extends AnyWordSpec with ExternalServiceStubbing wit
     s"succeed if posting to Event Log's events/status/NEW results with $Accepted" in new TestCase {
 
       stubFor {
-        patch(urlEqualTo("/events"))
-          .withRequestBody(equalToJson(json"""{"status": "NEW"}""".spaces2))
+        post(urlEqualTo("/events"))
+          .withMultipartRequestBody(
+            aMultipart("event")
+              .withBody(equalToJson(json"""{"categoryName": "EVENTS_STATUS_CHANGE" ,"newStatus": "NEW"}""".spaces2))
+          )
           .willReturn(aResponse().withStatus(Accepted.code))
       }
 
@@ -49,13 +52,13 @@ class EventsReSchedulerSpec extends AnyWordSpec with ExternalServiceStubbing wit
 
       val message = "message"
       stubFor {
-        patch(urlEqualTo("/events"))
+        post(urlEqualTo("/events"))
           .willReturn(badRequest().withBody(message))
       }
 
       intercept[Exception] {
         sender.triggerEventsReScheduling().unsafeRunSync()
-      }.getMessage shouldBe s"PATCH $eventLogUrl/events returned $BadRequest; body: $message"
+      }.getMessage shouldBe s"POST $eventLogUrl/events returned $BadRequest; body: $message"
     }
   }
 

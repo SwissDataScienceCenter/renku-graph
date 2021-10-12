@@ -21,9 +21,9 @@ package ch.datascience.triplesgenerator.reprovisioning
 import cats.effect.IO
 import cats.effect.concurrent.Ref
 import ch.datascience.events.consumers.EventConsumersRegistry
-import ch.datascience.generators.CommonGraphGenerators.renkuBaseUrls
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.Schemas._
+import ch.datascience.graph.model.GraphModelGenerators.renkuBaseUrls
+import ch.datascience.graph.model.Schemas._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.SparqlQuery.Prefixes

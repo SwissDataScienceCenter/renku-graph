@@ -18,46 +18,47 @@
 
 package ch.datascience.knowledgegraph.datasets.rest
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, Timer}
+import ch.datascience.graph.model.Schemas._
 import ch.datascience.graph.model.datasets._
 import ch.datascience.knowledgegraph.datasets.model.DatasetPart
+import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
-import org.typelevel.log4cats.Logger
 import io.circe.Decoder.decodeList
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private class PartsFinder(
+private class PartsFinder[Interpretation[_]: ConcurrentEffect: Timer](
     rdfStoreConfig:          RdfStoreConfig,
-    logger:                  Logger[IO],
-    timeRecorder:            SparqlQueryTimeRecorder[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+    logger:                  Logger[Interpretation],
+    timeRecorder:            SparqlQueryTimeRecorder[Interpretation]
+)(implicit executionContext: ExecutionContext)
     extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder) {
 
   import PartsFinder._
 
-  def findParts(identifier: Identifier): IO[List[DatasetPart]] =
+  def findParts(identifier: Identifier): Interpretation[List[DatasetPart]] =
     queryExpecting[List[DatasetPart]](using = query(identifier))
 
-  private def query(identifier: Identifier) = SparqlQuery(
+  private def query(identifier: Identifier) = SparqlQuery.of(
     name = "ds by id - parts",
-    Set(
-      "PREFIX prov: <http://www.w3.org/ns/prov#>",
-      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-      "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
-      "PREFIX schema: <http://schema.org/>"
-    ),
-    s"""|SELECT DISTINCT ?partName ?partLocation
+    Prefixes.of(prov -> "prov", schema -> "schema"),
+    s"""|SELECT DISTINCT ?partLocation
         |WHERE {
-        |  ?dataset rdf:type <http://schema.org/Dataset> ;
-        |           schema:identifier "$identifier" ;
+        |  ?dataset a schema:Dataset ;
+        |           schema:identifier '$identifier' ;
         |           schema:hasPart ?partResource .
-        |  ?partResource rdf:type <http://schema.org/DigitalDocument> ;
-        |                schema:name ?partName ;
-        |                prov:atLocation ?partLocation .
+        |
+        |  ?partResource a schema:DigitalDocument;
+        |                prov:entity / prov:atLocation ?partLocation
+        |  
+        |  FILTER NOT EXISTS {
+        |    ?partResource prov:invalidatedAtTime ?invalidation           
+        |  }  
         |}
-        |ORDER BY ASC(?partName)
+        |ORDER BY ASC(?partLocation)
         |""".stripMargin
   )
 }
@@ -71,9 +72,8 @@ private object PartsFinder {
 
     implicit val datasetDecoder: Decoder[DatasetPart] = { cursor =>
       for {
-        partName     <- cursor.downField("partName").downField("value").as[PartName]
         partLocation <- cursor.downField("partLocation").downField("value").as[PartLocation]
-      } yield DatasetPart(partName, partLocation)
+      } yield DatasetPart(partLocation)
     }
 
     _.downField("results").downField("bindings").as(decodeList[DatasetPart])

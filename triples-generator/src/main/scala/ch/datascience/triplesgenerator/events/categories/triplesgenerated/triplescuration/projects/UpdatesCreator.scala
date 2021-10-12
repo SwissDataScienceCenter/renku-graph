@@ -16,126 +16,68 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects
+package ch.datascience.triplesgenerator.events.categories.triplesgenerated
+package triplescuration.projects
 
-import cats.MonadError
-import cats.data.{EitherT, OptionT}
-import cats.effect.{ContextShift, IO}
-import cats.syntax.all._
-import ch.datascience.graph.config.{GitLabUrl, RenkuBaseUrl}
-import ch.datascience.graph.model.users
-import ch.datascience.http.client.AccessToken
-import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
-import ch.datascience.rdfstore.{SparqlQuery, SparqlQueryTimeRecorder}
-import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedEvent
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CuratedTriples.CurationUpdatesGroup
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
+import ch.datascience.graph.model.Schemas._
+import ch.datascience.graph.model.entities.{Project, ProjectWithParent, ProjectWithoutParent}
+import ch.datascience.graph.model.views.RdfResource
+import ch.datascience.rdfstore.SparqlQuery
+import ch.datascience.rdfstore.SparqlQuery.Prefixes
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects.KGProjectFinder.KGProjectInfo
 import eu.timepit.refined.auto._
-import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
-private trait UpdatesCreator[Interpretation[_]] {
-  def create(event:     TriplesGeneratedEvent)(implicit
-      maybeAccessToken: Option[AccessToken]
-  ): CurationUpdatesGroup[Interpretation]
+private trait UpdatesCreator {
+  def prepareUpdates(project: Project, kgProjectInfo: KGProjectInfo): List[SparqlQuery]
 }
 
-private class UpdatesCreatorImpl(
-    gitLab:              GitLabInfoFinder[IO],
-    kg:                  KGInfoFinder[IO],
-    updatesQueryCreator: UpdatesQueryCreator
-)(implicit ME:           MonadError[IO, Throwable], cs: ContextShift[IO])
-    extends UpdatesCreator[IO] {
+private object UpdatesCreator extends UpdatesCreator {
 
-  import updatesQueryCreator._
+  override def prepareUpdates(
+      project:       Project,
+      kgProjectInfo: KGProjectInfo
+  ): List[SparqlQuery] = List(nameDeletion(project, kgProjectInfo),
+                              maybeParentDeletion(project, kgProjectInfo),
+                              visibilityDeletion(project, kgProjectInfo)
+  ).flatten
 
-  override def create(
-      event:                   TriplesGeneratedEvent
-  )(implicit maybeAccessToken: Option[AccessToken]): CurationUpdatesGroup[IO] =
-    CurationUpdatesGroup[IO](
-      "Fork info updates",
-      () =>
-        EitherT {
-          gitLab
-            .findProject(event.project.path)
-            .flatMap(forkInfoUpdates)
-            .map(_.asRight[ProcessingRecoverableError])
-            .recover(maybeToRecoverableError)
-        }
-    )
-
-  private lazy val forkInfoUpdates: Option[GitLabProject] => IO[List[SparqlQuery]] = {
-    case `when project has a creator`(creator, gitLabProject) =>
-      OptionT(kg.findCreatorId(creator.gitLabId))
-        .map(existingUserResource => updateProjectAndSwapCreator(gitLabProject, existingUserResource))
-        .getOrElse(updateProjectAndAddCreator(gitLabProject, creator))
-    case `when project has no creator`(gitLabProject) =>
-      updateProjectAndUnlinkCreator(gitLabProject).pure[IO]
-    case _ =>
-      List.empty[SparqlQuery].pure[IO]
-  }
-
-  private object `when project has a creator` {
-    def unapply(maybeProject: Option[GitLabProject]): Option[(GitLabCreator, GitLabProject)] = maybeProject match {
-      case Some(project @ GitLabProject(_, _, _, _, _, Some(creator))) => (creator -> project).some
-      case _                                                           => None
-    }
-  }
-
-  private object `when project has no creator` {
-    def unapply(maybeProject: Option[GitLabProject]): Option[GitLabProject] = maybeProject match {
-      case Some(project @ GitLabProject(_, _, _, _, _, None)) => project.some
-      case _                                                  => None
-    }
-  }
-
-  private def updateProjectAndSwapCreator(gitLabProject: GitLabProject, existingUserResource: users.ResourceId) =
-    upsertName(gitLabProject.path, gitLabProject.name) ++
-      updateWasDerivedFrom(gitLabProject.path, gitLabProject.maybeParentPath) ++
-      swapCreator(gitLabProject.path, existingUserResource) ++
-      updateDateCreated(gitLabProject.path, gitLabProject.dateCreated) ++
-      upsertVisibility(gitLabProject.path, gitLabProject.visibility)
-
-  private def updateProjectAndAddCreator(gitLabProject: GitLabProject, creator: GitLabCreator) =
-    upsertName(gitLabProject.path, gitLabProject.name) ++
-      updateWasDerivedFrom(gitLabProject.path, gitLabProject.maybeParentPath) ++
-      addNewCreator(gitLabProject.path, creator) ++
-      updateDateCreated(gitLabProject.path, gitLabProject.dateCreated) ++
-      upsertVisibility(gitLabProject.path, gitLabProject.visibility)
-
-  private def updateProjectAndUnlinkCreator(gitLabProject: GitLabProject) =
-    upsertName(gitLabProject.path, gitLabProject.name) ++
-      updateWasDerivedFrom(gitLabProject.path, gitLabProject.maybeParentPath) ++
-      unlinkCreator(gitLabProject.path) ++
-      updateDateCreated(gitLabProject.path, gitLabProject.dateCreated) ++
-      upsertVisibility(gitLabProject.path, gitLabProject.visibility)
-
-  private lazy val maybeToRecoverableError
-      : PartialFunction[Throwable, Either[ProcessingRecoverableError, List[SparqlQuery]]] = {
-    case e @ (_: UnexpectedResponseException | _: ConnectivityException | _: ClientException) =>
-      Left[ProcessingRecoverableError, List[SparqlQuery]](
-        CurationRecoverableError("Problem with finding fork info", e)
+  private def nameDeletion(project: Project, kgProjectInfo: KGProjectInfo) =
+    Option.when(project.name != kgProjectInfo._1) {
+      val resource = project.resourceId.showAs[RdfResource]
+      SparqlQuery.of(
+        name = "transformation - project name delete",
+        Prefixes.of(schema -> "schema"),
+        s"""|DELETE { $resource schema:name ?name }
+            |WHERE  { $resource schema:name ?name }
+            |""".stripMargin
       )
+    }
+
+  private def maybeParentDeletion(project: Project, kgProjectInfo: KGProjectInfo): Option[SparqlQuery] = project match {
+    case p: ProjectWithParent =>
+      Option.when(kgProjectInfo._2.isEmpty || kgProjectInfo._2.exists(_ != p.parentResourceId)) {
+        val resource = project.resourceId.showAs[RdfResource]
+        SparqlQuery.of(
+          name = "transformation - project maybeParent delete",
+          Prefixes.of(prov -> "prov"),
+          s"""|DELETE { $resource prov:wasDerivedFrom ?maybeParent }
+              |WHERE  { $resource prov:wasDerivedFrom ?maybeParent }
+              |""".stripMargin
+        )
+      }
+    case _: ProjectWithoutParent => None
   }
-}
 
-private object IOUpdateFunctionsCreator {
-
-  import cats.effect.Timer
-  import ch.datascience.config.GitLab
-  import ch.datascience.control.Throttler
-
-  def apply(
-      gitLabThrottler:         Throttler[IO, GitLab],
-      logger:                  Logger[IO],
-      timeRecorder:            SparqlQueryTimeRecorder[IO]
-  )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[UpdatesCreator[IO]] =
-    for {
-      renkuBaseUrl     <- RenkuBaseUrl[IO]()
-      gitLabApiUrl     <- GitLabUrl[IO]().map(_.apiV4)
-      gitLabInfoFinder <- IOGitLabInfoFinder(gitLabThrottler, logger)
-      kgInfoFinder     <- IOKGInfoFinder(timeRecorder, logger)
-    } yield new UpdatesCreatorImpl(gitLabInfoFinder, kgInfoFinder, new UpdatesQueryCreator(renkuBaseUrl, gitLabApiUrl))
+  private def visibilityDeletion(project: Project, kgProjectInfo: KGProjectInfo) = Option.when(
+    project.visibility != kgProjectInfo._3
+  ) {
+    val resource = project.resourceId.showAs[RdfResource]
+    SparqlQuery.of(
+      name = "transformation - project visibility delete",
+      Prefixes.of(renku -> "renku"),
+      s"""|DELETE { $resource renku:projectVisibility ?visibility }
+          |WHERE  { $resource renku:projectVisibility ?visibility }
+          |""".stripMargin
+    )
+  }
 }

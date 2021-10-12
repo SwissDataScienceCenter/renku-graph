@@ -21,6 +21,7 @@ package ch.datascience.events.consumers
 import cats.data.EitherT
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
+import ch.datascience.events.EventRequestContent
 import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{exceptions, nonEmptyStrings}
@@ -82,8 +83,10 @@ class EventHandlerSpec extends AnyWordSpec with should.Matchers with MockFactory
     val processesLimiter = mock[ConcurrentProcessesLimiter[IO]]
     val anyCategoryName  = nonEmptyStrings().generateOne
 
-    val eventRequestContent =
-      EventRequestContent(json"""{ "categoryName": $anyCategoryName }""", nonEmptyStrings().generateOption)
+    val eventRequestContent = EventRequestContent(
+      json"""{ "categoryName": $anyCategoryName }""",
+      maybePayload = nonEmptyStrings().generateOption
+    )
 
     def handlerWithProcess(process: EventHandlingProcess[IO]): EventHandlerWithProcessLimiter[IO] =
       new EventHandlerWithProcessLimiter[IO](processesLimiter) {

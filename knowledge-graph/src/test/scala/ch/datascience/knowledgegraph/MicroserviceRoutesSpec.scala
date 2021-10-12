@@ -41,6 +41,7 @@ import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
 import ch.datascience.knowledgegraph.datasets.rest._
 import ch.datascience.knowledgegraph.graphql.{LineageQueryContext, QueryEndpoint, QueryRunner}
+import ch.datascience.knowledgegraph.projects.rest.ProjectEndpoint
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
@@ -350,7 +351,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
 
     val maybeAuthUser           = authUsers.generateOption
     val queryEndpoint           = mock[IOQueryEndpoint]
-    val projectEndpoint         = mock[IOProjectEndpointStub]
+    val projectEndpoint         = mock[ProjectEndpoint[IO]]
     val projectDatasetsEndpoint = mock[IOProjectDatasetsEndpointStub]
     val datasetsEndpoint        = mock[IODatasetEndpointStub]
     val datasetsSearchEndpoint  = mock[IODatasetsSearchEndpointStub]

@@ -18,18 +18,17 @@
 
 package ch.datascience.knowledgegraph.datasets.rest
 
-import cats.MonadError
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators.{renkuBaseUrls, renkuResourcesUrls}
+import ch.datascience.generators.CommonGraphGenerators.renkuResourcesUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets._
-import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Path
+import ch.datascience.graph.model.testentities._
 import ch.datascience.graph.model.users.{Affiliation, Email, Name => UserName}
+import ch.datascience.graph.model.{RenkuBaseUrl, projects}
 import ch.datascience.http.InfoMessage._
 import ch.datascience.http.rest.Links
 import ch.datascience.http.rest.Links.Rel.Self
@@ -38,7 +37,7 @@ import ch.datascience.http.server.EndpointTester._
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
-import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
+import ch.datascience.knowledgegraph.datasets.model
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
@@ -49,6 +48,7 @@ import org.http4s.Status._
 import org.http4s._
 import org.http4s.circe.jsonOf
 import org.http4s.headers.`Content-Type`
+import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -58,18 +58,28 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
 
   "getDataset" should {
 
-    "respond with OK and the found dataset" in new TestCase {
-      forAll(datasets) { dataset =>
+    "respond with OK and the found NonModifiedDataset" in new TestCase {
+      forAll(
+        Gen.oneOf(
+          anyProjectEntities
+            .addDataset(datasetEntities(provenanceImportedExternal))
+            .map((importedExternalToNonModified _).tupled),
+          anyProjectEntities
+            .addDatasetAndModification(datasetEntities(provenanceInternal))
+            .map { case (_ ::~ modified, project) => modified -> project }
+            .map((modifiedToModified _).tupled)
+        )
+      ) { dataset =>
         (datasetsFinder
           .findDataset(_: Identifier))
           .expects(dataset.id)
-          .returning(context.pure(Some(dataset)))
+          .returning(dataset.some.pure[IO])
 
-        val response = getDataset(dataset.id).unsafeRunSync()
+        val response = endpoint.getDataset(dataset.id).unsafeRunSync()
 
-        response.status                      shouldBe Ok
-        response.contentType                 shouldBe Some(`Content-Type`(MediaType.application.json))
-        response.as[Dataset].unsafeRunSync() shouldBe dataset
+        response.status                            shouldBe Ok
+        response.contentType                       shouldBe Some(`Content-Type`(MediaType.application.json))
+        response.as[model.Dataset].unsafeRunSync() shouldBe dataset
         response.as[Json].unsafeRunSync()._links shouldBe Links
           .of(
             Self                   -> Href(renkuResourcesUrl / "datasets" / dataset.id),
@@ -94,7 +104,20 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
               links shouldBe Links.of(Rel("project-details") -> Href(renkuResourcesUrl / "projects" / path))
             }
             .getOrElse(fail("No 'path' or 'project-details' links on the 'usedIn' elements"))
+        }
 
+        val Right(imagesJsons) = responseCursor.downField("images").as[List[Json]]
+        imagesJsons should have size dataset.images.size
+        imagesJsons.foreach { json =>
+          (json.hcursor.downField("location").as[ImageUri], json._links)
+            .mapN {
+              case (uri: ImageUri.Relative, links) =>
+                links shouldBe Links.of(Rel("view") -> Href(gitLabUrl / dataset.project.path / "raw" / "master" / uri))
+              case (uri: ImageUri.Absolute, links) =>
+                links shouldBe Links.of(Rel("view") -> Href(uri.show))
+              case (uri, links) => fail(s"$uri 'location' or $links 'view' links of unknown shape")
+            }
+            .getOrElse(fail("No 'location' or 'view' links on the 'images' elements"))
         }
 
         logger.loggedOnly(Warn(s"Finding '${dataset.id}' dataset finished${executionTimeRecorder.executionTimeInfo}"))
@@ -109,9 +132,9 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       (datasetsFinder
         .findDataset(_: Identifier))
         .expects(identifier)
-        .returning(context.pure(None))
+        .returning(Option.empty[model.Dataset].pure[IO])
 
-      val response = getDataset(identifier).unsafeRunSync()
+      val response = endpoint.getDataset(identifier).unsafeRunSync()
 
       response.status      shouldBe NotFound
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -129,9 +152,9 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       (datasetsFinder
         .findDataset(_: Identifier))
         .expects(identifier)
-        .returning(context.raiseError(exception))
+        .returning(exception.raiseError[IO, Option[model.Dataset]])
 
-      val response = getDataset(identifier).unsafeRunSync()
+      val response = endpoint.getDataset(identifier).unsafeRunSync()
 
       response.status      shouldBe InternalServerError
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -143,85 +166,80 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
   }
 
   private trait TestCase {
-    val context = MonadError[IO, Throwable]
     implicit val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
+    val gitLabUrl = gitLabUrls.generateOne
 
     val datasetsFinder        = mock[DatasetFinder[IO]]
     val renkuResourcesUrl     = renkuResourcesUrls.generateOne
     val logger                = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
-    val getDataset = new DatasetEndpoint[IO](
-      datasetsFinder,
-      renkuResourcesUrl,
-      executionTimeRecorder,
-      logger
-    ).getDataset _
+    val endpoint              = new DatasetEndpoint[IO](datasetsFinder, renkuResourcesUrl, gitLabUrl, executionTimeRecorder, logger)
   }
 
-  private implicit val datasetEntityDecoder: EntityDecoder[IO, Dataset] = jsonOf[IO, Dataset]
+  private implicit val datasetEntityDecoder: EntityDecoder[IO, model.Dataset] = jsonOf[IO, model.Dataset]
 
-  private implicit lazy val datasetDecoder: Decoder[Dataset] = cursor =>
+  private implicit lazy val datasetDecoder: Decoder[model.Dataset] = cursor =>
     for {
       id               <- cursor.downField("identifier").as[Identifier]
       title            <- cursor.downField("title").as[Title]
       name             <- cursor.downField("name").as[Name]
-      url              <- cursor.downField("url").as[Url]
+      resourceId       <- cursor.downField("url").as[ResourceId]
       maybeDescription <- cursor.downField("description").as[Option[Description]]
-      published        <- cursor.downField("published").as[(Set[DatasetCreator], Option[PublishedDate])]
+      published        <- cursor.downField("published").as[(Set[DatasetCreator], Option[DatePublished])]
       maybeDateCreated <- cursor.downField("created").as[Option[DateCreated]]
-      parts            <- cursor.downField("hasPart").as[List[DatasetPart]]
+      parts            <- cursor.downField("hasPart").as[List[model.DatasetPart]]
       project          <- cursor.downField("project").as[DatasetProject]
       usedIn           <- cursor.downField("usedIn").as[List[DatasetProject]]
       keywords         <- cursor.downField("keywords").as[List[Keyword]]
       maybeSameAs      <- cursor.downField("sameAs").as[Option[SameAs]]
       maybeDerivedFrom <- cursor.downField("derivedFrom").as[Option[DerivedFrom]]
       versions         <- cursor.downField("versions").as[DatasetVersions]
-      images           <- cursor.downField("images").as[List[ImageUri]]
-      dates <- Dates
-                 .from(maybeDateCreated, published._2)
-                 .leftMap(e => DecodingFailure(e.getMessage, Nil))
-    } yield maybeSameAs
-      .map { sameAs =>
-        NonModifiedDataset(id,
+      images           <- cursor.downField("images").as[List[ImageUri]](decodeList(imageUriDecoder))
+      date <-
+        maybeDateCreated
+          .orElse(published._2)
+          .widen[Date]
+          .map(_.asRight)
+          .getOrElse(DecodingFailure("No date found", Nil).asLeft)
+    } yield (maybeSameAs, maybeDateCreated, maybeDerivedFrom) match {
+      case (Some(sameAs), _, None) =>
+        NonModifiedDataset(resourceId,
+                           id,
                            title,
                            name,
-                           url,
                            sameAs,
                            versions,
                            maybeDescription,
                            published._1,
-                           dates,
+                           date,
                            parts,
                            project,
                            usedIn,
                            keywords,
                            images
         )
-      }
-      .orElse(
-        maybeDerivedFrom map { derivedFrom =>
-          ModifiedDataset(id,
-                          title,
-                          name,
-                          url,
-                          derivedFrom,
-                          versions,
-                          maybeDescription,
-                          published._1,
-                          dates,
-                          parts,
-                          project,
-                          usedIn,
-                          keywords,
-                          images
-          )
-        }
-      )
-      .getOrElse(fail("Cannot decode payload as Dataset"))
+      case (None, Some(dateCreated), Some(derivedFrom)) =>
+        ModifiedDataset(resourceId,
+                        id,
+                        title,
+                        name,
+                        derivedFrom,
+                        versions,
+                        maybeDescription,
+                        published._1,
+                        dateCreated,
+                        parts,
+                        project,
+                        usedIn,
+                        keywords,
+                        images
+        )
+      case _ => fail("Cannot decode payload as Dataset")
+    }
 
-  private implicit lazy val publishingDecoder: Decoder[(Set[DatasetCreator], Option[PublishedDate])] = cursor =>
+  private implicit lazy val publishingDecoder: Decoder[(Set[DatasetCreator], Option[DatePublished])] = cursor =>
     for {
-      maybeDate <- cursor.downField("datePublished").as[Option[PublishedDate]]
+      maybeDate <- cursor.downField("datePublished").as[Option[DatePublished]]
       creators  <- cursor.downField("creator").as[List[DatasetCreator]].map(_.toSet)
     } yield creators -> maybeDate
 
@@ -232,29 +250,21 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       maybeAffiliation <- cursor.downField("affiliation").as[Option[Affiliation]]
     } yield DatasetCreator(maybeEmail, name, maybeAffiliation)
 
-  private implicit lazy val partDecoder: Decoder[DatasetPart] = cursor =>
+  private implicit lazy val partDecoder: Decoder[model.DatasetPart] = cursor =>
     for {
-      name     <- cursor.downField("name").as[PartName]
       location <- cursor.downField("atLocation").as[PartLocation]
-    } yield DatasetPart(name, location)
+    } yield model.DatasetPart(location)
 
   private implicit lazy val projectDecoder: Decoder[DatasetProject] = cursor =>
     for {
-      path    <- cursor.downField("path").as[Path]
-      name    <- cursor.downField("name").as[projects.Name]
-      created <- cursor.downField("created").as[AddedToProject]
-    } yield DatasetProject(path, name, created)
-
-  private implicit lazy val addedToProjectDecoder: Decoder[AddedToProject] = cursor =>
-    for {
-      date            <- cursor.downField("dateCreated").as[DateCreatedInProject]
-      maybeAgentEmail <- cursor.downField("agent").downField("email").as[Option[Email]]
-      agentName       <- cursor.downField("agent").downField("name").as[UserName]
-    } yield AddedToProject(date, DatasetAgent(maybeAgentEmail, agentName))
+      path <- cursor.downField("path").as[Path]
+      name <- cursor.downField("name").as[projects.Name]
+    } yield DatasetProject(path, name)
 
   private implicit lazy val versionsDecoder: Decoder[DatasetVersions] = cursor =>
     for {
       initial <- cursor.downField("initial").as[InitialVersion]
     } yield DatasetVersions(initial)
 
+  private lazy val imageUriDecoder: Decoder[ImageUri] = _.downField("location").as[ImageUri]
 }

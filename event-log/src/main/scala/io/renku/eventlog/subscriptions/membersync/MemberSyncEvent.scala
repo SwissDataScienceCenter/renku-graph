@@ -26,7 +26,8 @@ import io.renku.eventlog.subscriptions.EventEncoder
 private final case class MemberSyncEvent(projectPath: projects.Path)
 
 private object MemberSyncEvent {
-  implicit lazy val show: Show[MemberSyncEvent] = Show.show(event => show"MemberSyncEvent ${event.projectPath}")
+  implicit lazy val show: Show[MemberSyncEvent] =
+    Show.show(event => show"MemberSyncEvent projectPath = ${event.projectPath}")
 }
 
 private object MemberSyncEventEncoder extends EventEncoder[MemberSyncEvent] {

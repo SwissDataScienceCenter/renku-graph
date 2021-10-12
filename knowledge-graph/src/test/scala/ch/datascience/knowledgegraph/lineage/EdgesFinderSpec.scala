@@ -19,19 +19,21 @@
 package ch.datascience.knowledgegraph.lineage
 
 import cats.effect.IO
+import cats.syntax.all._
+import ch.datascience.generators.CommonGraphGenerators.authUsers
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators.{authUsers, projectPaths}
-import ch.datascience.graph.model.projects.Visibility
+import ch.datascience.generators.Generators.fixed
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import ch.datascience.graph.model.testentities.CommandParameterBase.{CommandInput, CommandOutput}
+import ch.datascience.graph.model.testentities._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Warn
 import ch.datascience.knowledgegraph.lineage.model._
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.entities.bundles._
-import ch.datascience.rdfstore.entities.persons
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import ch.datascience.stubbing.ExternalServiceStubbing
 import io.renku.jsonld.EntityId
-import org.scalacheck.Gen
+import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -42,23 +44,29 @@ class EdgesFinderSpec extends AnyWordSpec with InMemoryRdfStore with ExternalSer
     "return all the edges of the given project " +
       "case when the user is not authenticated and the project is public" in new TestCase {
 
-        val (jsons, exemplarData) =
-          exemplarLineageFlow(projectPath, projectVisibility = Gen.oneOf(Some(Visibility.Public), None).generateOne)
-
-        loadToStore(jsons: _*)
-
+        val exemplarData = LineageExemplarData(projectEntities(visibilityPublic).generateOne)
         import exemplarData._
 
+        loadToStore(project)
+
         edgesFinder
-          .findEdges(projectPath, None)
+          .findEdges(project.path, maybeUser = None)
           .unsafeRunSync() shouldBe Map(
-          RunInfo(`sha8 renku run`.toEntityId, RunDate(`sha12 parquet date`)) -> (
-            Set(`sha3 zhbikes`.toNodeLocation, `sha7 clean_data`.toNodeLocation),
-            Set(`sha8 parquet`.toNodeLocation)
+          ExecutionInfo(activity1.asEntityId.show, RunDate(activity1.startTime.value)) -> (
+            Set(`zhbikes folder`.toNodeLocation, `clean_data entity`.toNodeLocation),
+            Set(`bikesparquet entity`.toNodeLocation)
           ),
-          RunInfo(`sha9 renku run`.toEntityId, RunDate(`sha12 parquet date`)) -> (
-            Set(`sha7 plot_data`.toNodeLocation, `sha8 parquet`.toNodeLocation),
-            Set(`sha9 grid_plot`.toNodeLocation, `sha9 cumulative`.toNodeLocation)
+          ExecutionInfo(activity2.asEntityId.show, RunDate(activity2.startTime.value)) -> (
+            Set(`plot_data entity`.toNodeLocation, `bikesparquet entity`.toNodeLocation),
+            Set(`grid_plot entity`.toNodeLocation, `cumulative entity`.toNodeLocation)
+          ),
+          ExecutionInfo(activity3.asEntityId.show, RunDate(activity3.startTime.value)) -> (
+            Set(`zhbikes folder`.toNodeLocation, `clean_data entity`.toNodeLocation),
+            Set(`bikesparquet entity`.toNodeLocation)
+          ),
+          ExecutionInfo(activity4.asEntityId.show, RunDate(activity4.startTime.value)) -> (
+            Set(`plot_data entity`.toNodeLocation, `bikesparquet entity`.toNodeLocation),
+            Set(`grid_plot entity`.toNodeLocation, `cumulative entity`.toNodeLocation)
           )
         )
 
@@ -67,25 +75,67 @@ class EdgesFinderSpec extends AnyWordSpec with InMemoryRdfStore with ExternalSer
         )
       }
 
+    /** in1   in2       in3   in2
+      *  \    /          \    /
+      *   plan            plan
+      *    |               |
+      *   out1            out2
+      */
+    "return all the edges including executions with overridden inputs/outputs" in new TestCase {
+
+      val project = projectEntities(visibilityPublic).generateOne
+
+      val in1  = entityLocations.generateOne
+      val in2  = entityLocations.generateOne
+      val out1 = entityLocations.generateOne
+      val plan = planEntities(CommandInput.fromLocation(in1),
+                              CommandInput.fromLocation(in2),
+                              CommandOutput.fromLocation(out1)
+      ).generateOne
+
+      val activity1 = executionPlanners(fixed(plan), project).generateOne
+        .planInputParameterValuesFromChecksum(in1 -> entityChecksums.generateOne, in2 -> entityChecksums.generateOne)
+        .buildProvenanceUnsafe()
+
+      val in3  = entityLocations.generateOne
+      val out2 = entityLocations.generateOne
+      val activity2 = executionPlanners(fixed(plan), project).generateOne
+        .planInputParameterOverrides(in1 -> Entity.InputEntity(in3, entityChecksums.generateOne))
+        .planInputParameterValuesFromChecksum(in2 -> entityChecksums.generateOne)
+        .planOutputParameterOverrides(out1 -> out2)
+        .buildProvenanceUnsafe()
+
+      loadToStore(project.addActivities(activity1, activity2))
+
+      edgesFinder
+        .findEdges(project.path, maybeUser = None)
+        .unsafeRunSync() shouldBe Map(
+        ExecutionInfo(activity1.asEntityId.show, RunDate(activity1.startTime.value)) -> (
+          Set(Node.Location(in1.value), Node.Location(in2.value)),
+          Set(Node.Location(out1.value))
+        ),
+        ExecutionInfo(activity2.asEntityId.show, RunDate(activity2.startTime.value)) -> (
+          Set(Node.Location(in3.value), Node.Location(in2.value)),
+          Set(Node.Location(out2.value))
+        )
+      )
+    }
+
     "return None if there's no lineage for the project " +
       "case when the user is not authenticated and the project is public" in new TestCase {
         edgesFinder
-          .findEdges(projectPath, None)
+          .findEdges(projectPaths.generateOne, maybeUser = None)
           .unsafeRunSync() shouldBe empty
       }
 
     "return None if the project is not public " +
       "case when the user is not a member of the project or not authenticated" in new TestCase {
-        val (jsons, _) =
-          exemplarLineageFlow(
-            projectPath,
-            projectVisibility = Gen.oneOf(Visibility.Private, Visibility.Internal).generateSome
-          )
+        val exemplarData = LineageExemplarData(projectEntities(visibilityNonPublic).generateOne)
 
-        loadToStore(jsons: _*)
+        loadToStore(exemplarData.project)
 
         edgesFinder
-          .findEdges(projectPath, authUsers.generateOption)
+          .findEdges(projectPaths.generateOne, authUsers.generateOption)
           .unsafeRunSync() shouldBe empty
 
         logger.logged(
@@ -96,40 +146,40 @@ class EdgesFinderSpec extends AnyWordSpec with InMemoryRdfStore with ExternalSer
     "return all the edges of the given project " +
       "case when the user is authenticated and is a member of the project" in new TestCase {
         val authUser = authUsers.generateOne
-        val user     = persons.generateOne.copy(maybeGitLabId = Some(authUser.id))
 
-        val (jsons, exemplarData) =
-          exemplarLineageFlow(projectPath,
-                              projectVisibility = Gen.oneOf(Visibility.Private, Visibility.Internal).generateSome,
-                              projectMembers = Set(user)
-          )
-
-        loadToStore(jsons: _*)
-
-        import exemplarData._
-
-        edgesFinder
-          .findEdges(projectPath, Some(authUser))
-          .unsafeRunSync() shouldBe Map(
-          RunInfo(`sha8 renku run`.toEntityId, RunDate(`sha12 parquet date`)) -> (
-            Set(`sha3 zhbikes`.toNodeLocation, `sha7 clean_data`.toNodeLocation),
-            Set(`sha8 parquet`.toNodeLocation)
-          ),
-          RunInfo(`sha9 renku run`.toEntityId, RunDate(`sha12 parquet date`)) -> (
-            Set(`sha7 plot_data`.toNodeLocation, `sha8 parquet`.toNodeLocation),
-            Set(`sha9 grid_plot`.toNodeLocation, `sha9 cumulative`.toNodeLocation)
+        val exemplarData = LineageExemplarData(
+          projectEntities(visibilityNonPublic).generateOne.copy(
+            members = Set(personEntities.generateOne.copy(maybeGitLabId = Some(authUser.id)))
           )
         )
+        import exemplarData._
 
-        logger.logged(
-          Warn(s"lineage - edges finished${executionTimeRecorder.executionTimeInfo}")
+        loadToStore(project)
+
+        edgesFinder
+          .findEdges(project.path, Some(authUser))
+          .unsafeRunSync() shouldBe Map(
+          ExecutionInfo(activity1.asEntityId.show, RunDate(activity1.startTime.value)) -> (
+            Set(`zhbikes folder`.toNodeLocation, `clean_data entity`.toNodeLocation),
+            Set(`bikesparquet entity`.toNodeLocation)
+          ),
+          ExecutionInfo(activity2.asEntityId.show, RunDate(activity2.startTime.value)) -> (
+            Set(`plot_data entity`.toNodeLocation, `bikesparquet entity`.toNodeLocation),
+            Set(`grid_plot entity`.toNodeLocation, `cumulative entity`.toNodeLocation)
+          ),
+          ExecutionInfo(activity3.asEntityId.show, RunDate(activity3.startTime.value)) -> (
+            Set(`zhbikes folder`.toNodeLocation, `clean_data entity`.toNodeLocation),
+            Set(`bikesparquet entity`.toNodeLocation)
+          ),
+          ExecutionInfo(activity4.asEntityId.show, RunDate(activity4.startTime.value)) -> (
+            Set(`plot_data entity`.toNodeLocation, `bikesparquet entity`.toNodeLocation),
+            Set(`grid_plot entity`.toNodeLocation, `cumulative entity`.toNodeLocation)
+          )
         )
       }
   }
 
   private trait TestCase {
-    val projectPath = projectPaths.generateOne
-
     val logger                = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
     val edgesFinder = new EdgesFinderImpl(

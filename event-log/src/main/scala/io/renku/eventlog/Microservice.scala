@@ -32,14 +32,13 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
-import io.renku.eventlog.events.EventEndpoint
-import io.renku.eventlog.eventspatching.IOEventsPatchingEndpoint
+import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
 import io.renku.eventlog.init.DbInitializer
 import io.renku.eventlog.metrics._
-import io.renku.eventlog.processingstatus.IOProcessingStatusEndpoint
-import io.renku.eventlog.statuschange.IOStatusChangeEndpoint
+import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
 import io.renku.eventlog.subscriptions._
 import natchez.Trace.Implicits.noop
+import org.typelevel.log4cats.Logger
 import pureconfig.ConfigSource
 
 import java.util.concurrent.ConcurrentHashMap
@@ -54,7 +53,10 @@ object Microservice extends IOMicroservice {
     ExecutionContext fromExecutorService newFixedThreadPool(ConfigSource.default.at("threads-number").loadOrThrow[Int])
 
   protected implicit override def contextShift: ContextShift[IO] = IO.contextShift(executionContext)
-  protected implicit override def timer:        Timer[IO]        = IO.timer(executionContext)
+
+  protected implicit override def timer: Timer[IO] = IO.timer(executionContext)
+
+  private implicit val logger: Logger[IO] = ApplicationLogger
 
   override def run(args: List[String]): IO[ExitCode] = for {
     sessionPoolResource <- new EventLogDbConfigProvider[IO]() map SessionPoolResource[IO, EventLogDB]
@@ -70,7 +72,7 @@ object Microservice extends IOMicroservice {
         metricsRegistry             <- MetricsRegistry()
         queriesExecTimes            <- QueriesExecutionTimes(metricsRegistry)
         statsFinder                 <- IOStatsFinder(sessionResource, queriesExecTimes)
-        eventLogMetrics             <- IOEventLogMetrics(statsFinder, ApplicationLogger, metricsRegistry)
+        eventLogMetrics             <- EventLogMetrics(metricsRegistry, statsFinder)
         awaitingGenerationGauge     <- AwaitingGenerationGauge(metricsRegistry, statsFinder)
         awaitingTransformationGauge <- AwaitingTransformationGauge(metricsRegistry, statsFinder)
         underTransformationGauge    <- UnderTransformationGauge(metricsRegistry, statsFinder)
@@ -103,28 +105,22 @@ object Microservice extends IOMicroservice {
                                            queriesExecTimes,
                                            ApplicationLogger
                                          )
+        statusChangeEventSubscription <- events.categories.statuschange.SubscriptionFactory(
+                                           sessionResource,
+                                           awaitingGenerationGauge,
+                                           underTriplesGenerationGauge,
+                                           awaitingTransformationGauge,
+                                           underTransformationGauge,
+                                           queriesExecTimes
+                                         )
         eventConsumersRegistry <- consumers.EventConsumersRegistry(
                                     creationSubscription,
                                     zombieEventsSubscription,
-                                    commitSyncRequestSubscription
+                                    commitSyncRequestSubscription,
+                                    statusChangeEventSubscription
                                   )
         eventEndpoint            <- EventEndpoint(eventConsumersRegistry)
-        processingStatusEndpoint <- IOProcessingStatusEndpoint(sessionResource, queriesExecTimes, ApplicationLogger)
-        eventsPatchingEndpoint <- IOEventsPatchingEndpoint(sessionResource,
-                                                           awaitingGenerationGauge,
-                                                           underTriplesGenerationGauge,
-                                                           queriesExecTimes,
-                                                           ApplicationLogger
-                                  )
-        statusChangeEndpoint <- IOStatusChangeEndpoint(
-                                  sessionResource,
-                                  awaitingGenerationGauge,
-                                  underTriplesGenerationGauge,
-                                  awaitingTransformationGauge,
-                                  underTransformationGauge,
-                                  queriesExecTimes,
-                                  ApplicationLogger
-                                )
+        processingStatusEndpoint <- ProcessingStatusEndpoint(sessionResource, queriesExecTimes, ApplicationLogger)
         eventProducersRegistry <- EventProducersRegistry(
                                     sessionResource,
                                     awaitingGenerationGauge,
@@ -134,13 +130,13 @@ object Microservice extends IOMicroservice {
                                     queriesExecTimes,
                                     ApplicationLogger
                                   )
-        subscriptionsEndpoint <- IOSubscriptionsEndpoint(eventProducersRegistry, ApplicationLogger)
+        subscriptionsEndpoint <- SubscriptionsEndpoint(eventProducersRegistry, ApplicationLogger)
         eventDetailsEndpoint  <- EventDetailsEndpoint(sessionResource, queriesExecTimes, ApplicationLogger)
+        eventsEndpoint        <- EventsEndpoint(sessionResource, queriesExecTimes)
         microserviceRoutes = new MicroserviceRoutes[IO](
                                eventEndpoint,
+                               eventsEndpoint,
                                processingStatusEndpoint,
-                               eventsPatchingEndpoint,
-                               statusChangeEndpoint,
                                subscriptionsEndpoint,
                                eventDetailsEndpoint,
                                new RoutesMetrics[IO](metricsRegistry)

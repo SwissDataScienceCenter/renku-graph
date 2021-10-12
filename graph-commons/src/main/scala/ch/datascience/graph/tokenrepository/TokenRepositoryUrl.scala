@@ -18,23 +18,23 @@
 
 package ch.datascience.graph.tokenrepository
 
-import cats.MonadError
-import ch.datascience.config.ConfigLoader.{find, stringTinyTypeReader}
+import cats.MonadThrow
+import ch.datascience.config.ConfigLoader.{find, urlTinyTypeReader}
 import ch.datascience.tinytypes.constraints.{Url, UrlOps}
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{TinyTypeFactory, UrlTinyType}
 import com.typesafe.config.{Config, ConfigFactory}
 import pureconfig.ConfigReader
 
-final class TokenRepositoryUrl private (val value: String) extends AnyVal with StringTinyType
+final class TokenRepositoryUrl private (val value: String) extends AnyVal with UrlTinyType
 object TokenRepositoryUrl
     extends TinyTypeFactory[TokenRepositoryUrl](new TokenRepositoryUrl(_))
     with Url
     with UrlOps[TokenRepositoryUrl] {
 
-  private implicit val configReader: ConfigReader[TokenRepositoryUrl] = stringTinyTypeReader(TokenRepositoryUrl)
+  private implicit val configReader: ConfigReader[TokenRepositoryUrl] = urlTinyTypeReader(TokenRepositoryUrl)
 
-  def apply[Interpretation[_]](
-      config:    Config = ConfigFactory.load
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[TokenRepositoryUrl] =
+  def apply[Interpretation[_]: MonadThrow](
+      config: Config = ConfigFactory.load
+  ): Interpretation[TokenRepositoryUrl] =
     find[Interpretation, TokenRepositoryUrl]("services.token-repository.url", config)
 }

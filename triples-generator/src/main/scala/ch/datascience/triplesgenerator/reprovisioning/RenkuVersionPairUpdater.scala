@@ -19,12 +19,11 @@
 package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.graph.Schemas._
-import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.RenkuVersionPair
+import ch.datascience.graph.model.{RenkuBaseUrl, RenkuVersionPair}
+import ch.datascience.graph.model.Schemas._
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
-import ch.datascience.rdfstore.{RdfStoreClientImpl, RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
+import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
 import io.renku.jsonld.EntityId
 import org.typelevel.log4cats.Logger
@@ -32,12 +31,10 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.ExecutionContext
 
 trait RenkuVersionPairUpdater[Interpretation[_]] {
-
   def update(versionPair: RenkuVersionPair): Interpretation[Unit]
 }
 
 private case object RenkuVersionPairJsonLD {
-  import ch.datascience.graph.Schemas._
 
   def id(implicit renkuBaseUrl: RenkuBaseUrl) = EntityId.of((renkuBaseUrl / "version-pair").toString)
   val objectType    = renku / "VersionPair"
@@ -52,6 +49,7 @@ private class RenkuVersionPairUpdaterImpl(rdfStoreConfig: RdfStoreConfig,
 )(implicit executionContext:                              ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
     with RenkuVersionPairUpdater[IO] {
+
   override def update(versionPair: RenkuVersionPair): IO[Unit] = updateWithNoResult {
     val entityId = (renkuBaseUrl / "version-pair").showAs[RdfResource]
     SparqlQuery.of(

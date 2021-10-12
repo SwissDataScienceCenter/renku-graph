@@ -23,10 +23,11 @@ import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
 import ch.datascience.http.client.{HttpRequest, RestClient}
-import ch.datascience.rdfstore.{JsonLDTriples, RdfStoreConfig, SparqlQueryTimeRecorder}
+import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.NonNegative
+import io.renku.jsonld.JsonLD
 import org.http4s.Uri
 import org.typelevel.log4cats.Logger
 
@@ -36,18 +37,17 @@ import scala.language.postfixOps
 import scala.util.control.NonFatal
 
 private trait TriplesUploader[Interpretation[_]] {
-  def upload(triples: JsonLDTriples): Interpretation[TriplesUploadResult]
+  def upload(triples: JsonLD): Interpretation[TriplesUploadResult]
 }
 
 private class TriplesUploaderImpl[Interpretation[_]: ConcurrentEffect: Timer](
     rdfStoreConfig:          RdfStoreConfig,
-    logger:                  Logger[Interpretation],
     timeRecorder:            SparqlQueryTimeRecorder[Interpretation],
     retryInterval:           FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     idleTimeout:             Duration = 6 minutes,
     requestTimeout:          Duration = 5 minutes
-)(implicit executionContext: ExecutionContext)
+)(implicit executionContext: ExecutionContext, logger: Logger[Interpretation])
     extends RestClient[Interpretation, Any](Throttler.noThrottling,
                                             logger,
                                             maybeTimeRecorder = timeRecorder.instance.some,
@@ -68,20 +68,19 @@ private class TriplesUploaderImpl[Interpretation[_]: ConcurrentEffect: Timer](
 
   private lazy val dataUploadUrl = rdfStoreConfig.fusekiBaseUrl / rdfStoreConfig.datasetName / "data"
 
-  def upload(triples: JsonLDTriples): Interpretation[TriplesUploadResult] = {
+  override def upload(triples: JsonLD): Interpretation[TriplesUploadResult] = {
     for {
       uri          <- validateUri(dataUploadUrl.value)
       uploadResult <- send(uploadRequest(uri, triples))(mapResponse)
     } yield uploadResult
   } recover withUploadingError
 
-  private def uploadRequest(uploadUri: Uri, triples: JsonLDTriples) =
-    HttpRequest(
-      request(POST, uploadUri, rdfStoreConfig.authCredentials)
-        .withEntity(triples.value)
-        .putHeaders(`Content-Type`(`ld+json`)),
-      name = "json-ld upload"
-    )
+  private def uploadRequest(uploadUri: Uri, triples: JsonLD) = HttpRequest(
+    request(POST, uploadUri, rdfStoreConfig.authCredentials)
+      .withEntity(triples.toJson)
+      .putHeaders(`Content-Type`(`ld+json`)),
+    name = "json-ld upload"
+  )
 
   private lazy val mapResponse: PartialFunction[(Status, Request[Interpretation], Response[Interpretation]),
                                                 Interpretation[TriplesUploadResult]
@@ -102,21 +101,18 @@ private class TriplesUploaderImpl[Interpretation[_]: ConcurrentEffect: Timer](
 }
 
 private object TriplesUploader {
-  def apply(rdfStoreConfig:    RdfStoreConfig,
-            logger:            Logger[IO],
-            timeRecorder:      SparqlQueryTimeRecorder[IO],
-            retryInterval:     FiniteDuration = SleepAfterConnectionIssue,
-            maxRetries:        Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-            idleTimeout:       Duration = 6 minutes,
-            requestTimeout:    Duration = 5 minutes
-  )(implicit executionContext: ExecutionContext, concurrentEffect: ConcurrentEffect[IO], timer: Timer[IO]) = IO(
-    new TriplesUploaderImpl[IO](rdfStoreConfig,
-                                logger,
-                                timeRecorder,
-                                retryInterval,
-                                maxRetries,
-                                idleTimeout,
-                                requestTimeout
-    )
+  def apply(rdfStoreConfig: RdfStoreConfig,
+            timeRecorder:   SparqlQueryTimeRecorder[IO],
+            retryInterval:  FiniteDuration = SleepAfterConnectionIssue,
+            maxRetries:     Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
+            idleTimeout:    Duration = 6 minutes,
+            requestTimeout: Duration = 5 minutes
+  )(implicit
+      executionContext: ExecutionContext,
+      concurrentEffect: ConcurrentEffect[IO],
+      timer:            Timer[IO],
+      logger:           Logger[IO]
+  ) = IO(
+    new TriplesUploaderImpl[IO](rdfStoreConfig, timeRecorder, retryInterval, maxRetries, idleTimeout, requestTimeout)
   )
 }
