@@ -42,10 +42,4 @@ class GlobalCommitSyncEventEncoderSpec extends AnyWordSpec with should.Matchers 
     }
 
   }
-
-  "encodePayload" should {
-    "return None" in {
-      GlobalCommitSyncEventEncoder.encodePayload(globalCommitSyncEvents.generateOne) shouldBe None
-    }
-  }
 }

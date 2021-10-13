@@ -127,8 +127,7 @@ object Microservice extends IOMicroservice {
                                     underTriplesGenerationGauge,
                                     awaitingTransformationGauge,
                                     underTransformationGauge,
-                                    queriesExecTimes,
-                                    ApplicationLogger
+                                    queriesExecTimes
                                   )
         subscriptionsEndpoint <- SubscriptionsEndpoint(eventProducersRegistry, ApplicationLogger)
         eventDetailsEndpoint  <- EventDetailsEndpoint(sessionResource, queriesExecTimes, ApplicationLogger)

@@ -31,7 +31,7 @@ private object Generators {
     eventId        <- compoundEventIds
     projectPath    <- projectPaths
     processingTime <- eventProcessingTimes
-    payload        <- eventPayloads
+    payload        <- zippedEventPayloads
   } yield ToTriplesGenerated(eventId, projectPath, processingTime, payload)
 
   lazy val toTripleStoreEvents = for {

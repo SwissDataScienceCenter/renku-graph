@@ -69,7 +69,12 @@ private class PayloadTypeChangerImpl[Interpretation[_]: BracketThrow: Logger](
   private lazy val migrate = for {
     _ <- execute(sql"TRUNCATE TABLE event_payload".command)
     _ <- execute(sql"ALTER TABLE event_payload ALTER payload TYPE bytea USING payload::bytea".command)
+    _ <- execute(sql"DROP INDEX IF EXISTS idx_schema_version".command)
     _ <- execute(sql"ALTER TABLE event_payload DROP COLUMN IF EXISTS schema_version".command)
+    _ <-
+      execute(
+        sql"ALTER TABLE event_payload DROP CONSTRAINT IF EXISTS event_payload_pkey, ADD PRIMARY KEY (event_id, project_id)".command
+      )
   } yield ()
 
 }

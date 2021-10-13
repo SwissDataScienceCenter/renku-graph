@@ -18,7 +18,6 @@
 
 package io.renku.eventlog.subscriptions.triplesgenerated
 
-import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import io.circe.Json
 import io.circe.literal._
@@ -26,9 +25,9 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class TriplesGeneratedEventEncoderSpec extends AnyWordSpec with should.Matchers {
-  "encodeEvent" should {
+  "encoderParts" should {
 
-    "serialize TriplesGeneratedEvent to Json" in {
+    "return formData part of TriplesGeneratedEvent to Json and Byte array" in {
       val event = triplesGeneratedEvents.generateOne
 
       val actualJson = TriplesGeneratedEventEncoder.encodeEvent(event)
@@ -44,12 +43,10 @@ class TriplesGeneratedEventEncoderSpec extends AnyWordSpec with should.Matchers 
   }
 
   "encodePayload" should {
-    "serialize TriplesGeneratedEvent payload to a string" in {
+    "serialize TriplesGeneratedEvent payload to a byte array" in {
       val event = triplesGeneratedEvents.generateOne
 
-      TriplesGeneratedEventEncoder.encodePayload(
-        event
-      ) shouldBe json"""{ "payload": ${event.payload.value}, "schemaVersion": ${event.schemaVersion.value} }""".noSpaces.some
+      TriplesGeneratedEventEncoder.encodePayload(event) shouldBe event.payload.value
     }
   }
 }

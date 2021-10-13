@@ -50,6 +50,7 @@ trait BooleanTinyType extends Any with TinyType {
 
 trait ByteArrayTinyType extends Any with TinyType {
   type V = Array[Byte]
+
 }
 
 object StringTinyType {

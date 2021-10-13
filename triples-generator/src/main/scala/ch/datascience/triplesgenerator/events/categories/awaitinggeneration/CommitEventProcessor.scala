@@ -22,7 +22,6 @@ import cats.MonadThrow
 import cats.data.EitherT
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.EventStatus.{GenerationNonRecoverableFailure, GenerationRecoverableFailure}
 import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
@@ -43,7 +42,7 @@ import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 private trait EventProcessor[Interpretation[_]] {
-  def process(event: CommitEvent, currentSchemaVersion: SchemaVersion): Interpretation[Unit]
+  def process(event: CommitEvent): Interpretation[Unit]
 }
 
 private class CommitEventProcessor[Interpretation[_]: MonadThrow](
@@ -60,11 +59,11 @@ private class CommitEventProcessor[Interpretation[_]: MonadThrow](
   import accessTokenFinder._
   import triplesGenerator._
 
-  def process(event: CommitEvent, currentSchemaVersion: SchemaVersion): Interpretation[Unit] =
+  def process(event: CommitEvent): Interpretation[Unit] =
     allEventsTimeRecorder.measureExecutionTime {
       for {
         maybeAccessToken <- findAccessToken(event.project.path) recoverWith rollbackEvent(event)
-        uploadingResult  <- generateAndUpdateStatus(event, currentSchemaVersion)(maybeAccessToken)
+        uploadingResult  <- generateAndUpdateStatus(event)(maybeAccessToken)
       } yield uploadingResult
     } flatMap logSummary recoverWith logError(event)
 
@@ -74,25 +73,23 @@ private class CommitEventProcessor[Interpretation[_]: MonadThrow](
   }
 
   private def generateAndUpdateStatus(
-      commit:                  CommitEvent,
-      currentSchemaVersion:    SchemaVersion
+      commit:                  CommitEvent
   )(implicit maybeAccessToken: Option[AccessToken]): Interpretation[TriplesGenerationResult] = EitherT {
     singleEventTimeRecorder
       .measureExecutionTime(generateTriples(commit).value)
-      .map(toTriplesGenerated(commit, currentSchemaVersion))
+      .map(toTriplesGenerated(commit))
   }.leftSemiflatMap(toRecoverableError(commit))
     .merge
     .recoverWith(toNonRecoverableFailure(commit))
     .flatTap(updateEventLog)
 
-  private def toTriplesGenerated(commit: CommitEvent, currentSchemaVersion: SchemaVersion): (
+  private def toTriplesGenerated(commit: CommitEvent): (
       (ElapsedTime, Either[ProcessingRecoverableError, JsonLDTriples])
   ) => Either[ProcessingRecoverableError, TriplesGenerationResult] = { case (elapsedTime, maybeTriples) =>
     maybeTriples.map { triples =>
       TriplesGenerated(
         commit,
         triples,
-        currentSchemaVersion,
         EventProcessingTime(Duration ofMillis elapsedTime.value)
       ): TriplesGenerationResult
     }
@@ -100,11 +97,10 @@ private class CommitEventProcessor[Interpretation[_]: MonadThrow](
 
   private def updateEventLog(uploadingResults: TriplesGenerationResult): Interpretation[Unit] = {
     uploadingResults match {
-      case TriplesGenerated(commit, triples, schemaVersion, processingTime) =>
+      case TriplesGenerated(commit, triples, processingTime) =>
         statusUpdater.toTriplesGenerated(CompoundEventId(commit.eventId, commit.project.id),
                                          commit.project.path,
                                          triples,
-                                         schemaVersion,
                                          processingTime
         )
       case RecoverableError(commit, message) =>
@@ -148,7 +144,7 @@ private class CommitEventProcessor[Interpretation[_]: MonadThrow](
   }
 
   private def logSummary: ((ElapsedTime, TriplesGenerationResult)) => Interpretation[Unit] = {
-    case (elapsedTime, uploadingResult @ TriplesGenerated(_, _, _, _)) =>
+    case (elapsedTime, uploadingResult @ TriplesGenerated(_, _, _)) =>
       logger.info(s"${logMessageCommon(uploadingResult.commit)} processed in ${elapsedTime}ms")
     case _ => ().pure[Interpretation]
   }
@@ -167,16 +163,15 @@ private class CommitEventProcessor[Interpretation[_]: MonadThrow](
     val cause: Throwable
   }
   private object TriplesGenerationResult {
-    case class TriplesGenerated(commit:         CommitEvent,
-                                triples:        JsonLDTriples,
-                                schemaVersion:  SchemaVersion,
-                                processingTime: EventProcessingTime
-    ) extends TriplesGenerationResult {
+    case class TriplesGenerated(commit: CommitEvent, triples: JsonLDTriples, processingTime: EventProcessingTime)
+        extends TriplesGenerationResult {
       override lazy val toString: String = TriplesGenerated.toString()
     }
+
     case class RecoverableError(commit: CommitEvent, cause: Throwable) extends GenerationError {
       override lazy val toString: String = GenerationRecoverableFailure.toString
     }
+
     case class NonRecoverableError(commit: CommitEvent, cause: Throwable) extends GenerationError {
       override lazy val toString: String = GenerationNonRecoverableFailure.toString()
     }

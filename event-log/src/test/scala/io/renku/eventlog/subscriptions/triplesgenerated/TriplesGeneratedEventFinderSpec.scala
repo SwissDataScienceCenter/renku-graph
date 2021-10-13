@@ -25,9 +25,8 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventStatus}
+import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventStatus, ZippedEventPayload}
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
@@ -62,16 +61,14 @@ private class TriplesGeneratedEventFinderSpec
           status = TriplesGenerated,
           eventDate = timestampsNotInTheFuture.generateAs(EventDate),
           projectId = projectId,
-          projectPath = projectPath,
-          payloadSchemaVersion = schemaVersion
+          projectPath = projectPath
         )
 
         createEvent(
           status = TransformationRecoverableFailure,
           timestamps(max = latestEventDate.value).generateAs(EventDate),
           projectId = projectId,
-          projectPath = projectPath,
-          payloadSchemaVersion = schemaVersion
+          projectPath = projectPath
         )
 
         findEvents(TransformingTriples) shouldBe List.empty
@@ -84,9 +81,10 @@ private class TriplesGeneratedEventFinderSpec
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
-        finder.popEvent().unsafeRunSync() shouldBe Some(
-          TriplesGeneratedEvent(event1Id, projectPath, eventPayload1, schemaVersion)
-        )
+        val Some(TriplesGeneratedEvent(actualEventId, actualPath, actualPayload)) = finder.popEvent().unsafeRunSync()
+        actualEventId     shouldBe event1Id
+        actualPath        shouldBe projectPath
+        actualPayload.value should contain theSameElementsAs eventPayload1.value
 
         findEvents(TransformingTriples).noBatchDate shouldBe List((event1Id, executionDate))
 
@@ -114,8 +112,7 @@ private class TriplesGeneratedEventFinderSpec
           status = TriplesGenerated,
           eventDate = timestampsNotInTheFuture.generateAs(EventDate),
           projectId = projectId,
-          projectPath = projectPath,
-          payloadSchemaVersion = schemaVersion
+          projectPath = projectPath
         )
 
         findEvents(TransformingTriples) shouldBe List.empty
@@ -128,9 +125,11 @@ private class TriplesGeneratedEventFinderSpec
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
-        finder.popEvent().unsafeRunSync() shouldBe Some(
-          TriplesGeneratedEvent(event1Id, projectPath, eventPayload1, schemaVersion)
-        )
+        val Some(TriplesGeneratedEvent(actualEvent1Id, actualEvent1Path, actualEvent1Payload)) =
+          finder.popEvent().unsafeRunSync()
+        actualEvent1Id          shouldBe event1Id
+        actualEvent1Path        shouldBe projectPath
+        actualEvent1Payload.value should contain theSameElementsAs eventPayload1.value
 
         findEvents(TransformingTriples).noBatchDate shouldBe List((event1Id, executionDate))
 
@@ -138,8 +137,7 @@ private class TriplesGeneratedEventFinderSpec
           status = TransformationRecoverableFailure,
           timestamps(min = latestEventDate.value, max = now).generateAs(EventDate),
           projectId = projectId,
-          projectPath = projectPath,
-          payloadSchemaVersion = schemaVersion
+          projectPath = projectPath
         )
 
         expectAwaitingTransformationGaugeDecrement(projectPath)
@@ -150,9 +148,11 @@ private class TriplesGeneratedEventFinderSpec
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
-        finder.popEvent().unsafeRunSync() shouldBe Some(
-          TriplesGeneratedEvent(event2Id, projectPath, eventPayload2, schemaVersion)
-        )
+        val Some(TriplesGeneratedEvent(actualEvent2Id, actualEvent2Path, actualEvent2Payload)) =
+          finder.popEvent().unsafeRunSync()
+        actualEvent2Id          shouldBe event2Id
+        actualEvent2Path        shouldBe projectPath
+        actualEvent2Payload.value should contain theSameElementsAs eventPayload2.value
 
         findEvents(TransformingTriples).noBatchDate shouldBe List((event1Id, executionDate), (event2Id, executionDate))
 
@@ -171,24 +171,21 @@ private class TriplesGeneratedEventFinderSpec
         val (event1Id, _, event1Date, _, eventPayload1) = createEvent(
           status = TriplesGenerated,
           projectId = projectId,
-          projectPath = projectPath,
-          payloadSchemaVersion = schemaVersion
+          projectPath = projectPath
         )
 
         val (_, _, event2Date, _, _) = createEvent(
           status = TransformationRecoverableFailure,
           executionDate = ExecutionDate(timestampsInTheFuture.generateOne),
           projectId = projectId,
-          projectPath = projectPath,
-          payloadSchemaVersion = schemaVersion
+          projectPath = projectPath
         )
 
         val (_, _, event3Date, _, _) = createEvent(
           status = TriplesGenerated,
           executionDate = ExecutionDate(timestampsInTheFuture.generateOne),
           projectId = projectId,
-          projectPath = projectPath,
-          payloadSchemaVersion = schemaVersion
+          projectPath = projectPath
         )
 
         findEvents(TransformingTriples) shouldBe List.empty
@@ -201,9 +198,10 @@ private class TriplesGeneratedEventFinderSpec
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
-        finder.popEvent().unsafeRunSync() shouldBe Some(
-          TriplesGeneratedEvent(event1Id, projectPath, eventPayload1, schemaVersion)
-        )
+        val Some(TriplesGeneratedEvent(actualEventId, actualPath, actualPayload)) = finder.popEvent().unsafeRunSync()
+        actualEventId     shouldBe event1Id
+        actualPath        shouldBe projectPath
+        actualPayload.value should contain theSameElementsAs eventPayload1.value
 
         findEvents(TransformingTriples).noBatchDate shouldBe List((event1Id, executionDate))
 
@@ -343,15 +341,14 @@ private class TriplesGeneratedEventFinderSpec
   private def readyStatuses = Gen
     .oneOf(EventStatus.TriplesGenerated, EventStatus.TransformationRecoverableFailure)
 
-  private def createEvent(status:               EventStatus,
-                          eventDate:            EventDate = eventDates.generateOne,
-                          executionDate:        ExecutionDate = executionDatesInThePast.generateOne,
-                          batchDate:            BatchDate = batchDates.generateOne,
-                          projectId:            Id = projectIds.generateOne,
-                          projectPath:          Path = projectPaths.generateOne,
-                          payloadSchemaVersion: SchemaVersion = projectSchemaVersions.generateOne,
-                          eventPayload:         EventPayload = eventPayloads.generateOne
-  ): (CompoundEventId, EventBody, EventDate, Path, EventPayload) = {
+  private def createEvent(status:        EventStatus,
+                          eventDate:     EventDate = eventDates.generateOne,
+                          executionDate: ExecutionDate = executionDatesInThePast.generateOne,
+                          batchDate:     BatchDate = batchDates.generateOne,
+                          projectId:     Id = projectIds.generateOne,
+                          projectPath:   Path = projectPaths.generateOne,
+                          eventPayload:  ZippedEventPayload = zippedEventPayloads.generateOne
+  ): (CompoundEventId, EventBody, EventDate, Path, ZippedEventPayload) = {
     val eventId   = compoundEventIds.generateOne.copy(projectId = projectId)
     val eventBody = eventBodies.generateOne
 
@@ -363,8 +360,7 @@ private class TriplesGeneratedEventFinderSpec
       eventBody,
       batchDate = batchDate,
       projectPath = projectPath,
-      maybeEventPayload = eventPayload.some,
-      maybeSchemaVersion = payloadSchemaVersion.some
+      maybeEventPayload = eventPayload.some
     )
 
     (eventId, eventBody, eventDate, projectPath, eventPayload)

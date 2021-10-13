@@ -78,7 +78,7 @@ private class DispatchRecoveryImpl[Interpretation[_]: MonadThrow: Logger](
 
 private object DispatchRecovery {
 
-  def apply(implicit
+  def apply()(implicit
       executionContext: ExecutionContext,
       concurrentEffect: ConcurrentEffect[IO],
       timer:            Timer[IO],

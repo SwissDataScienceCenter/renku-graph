@@ -70,20 +70,19 @@ object EventProducersRegistry {
       underTriplesGenerationGauge:    LabeledGauge[IO, projects.Path],
       awaitingTransformationGauge:    LabeledGauge[IO, projects.Path],
       underTransformationGauge:       LabeledGauge[IO, projects.Path],
-      queriesExecTimes:               LabeledHistogram[IO, SqlStatement.Name],
-      logger:                         Logger[IO]
+      queriesExecTimes:               LabeledHistogram[IO, SqlStatement.Name]
   )(implicit
       contextShift:     ContextShift[IO],
       timer:            Timer[IO],
-      executionContext: ExecutionContext
+      executionContext: ExecutionContext,
+      logger:           Logger[IO]
   ): IO[EventProducersRegistry[IO]] = for {
     subscriberTracker <- SubscriberTracker(sessionResource, queriesExecTimes)
     awaitingGenerationCategory <- awaitinggeneration.SubscriptionCategory(sessionResource,
                                                                           awaitingTriplesGenerationGauge,
                                                                           underTriplesGenerationGauge,
                                                                           queriesExecTimes,
-                                                                          subscriberTracker,
-                                                                          logger
+                                                                          subscriberTracker
                                   )
     memberSyncCategory <- membersync.SubscriptionCategory(sessionResource, queriesExecTimes, subscriberTracker, logger)
     commitSyncCategory <- commitsync.SubscriptionCategory(sessionResource, queriesExecTimes, subscriberTracker, logger)

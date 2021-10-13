@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator
 package events.categories.awaitinggeneration
 
-import cats.data.EitherT.fromOption
+import cats.data.EitherT
 import cats.effect.concurrent.Deferred
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.all._
@@ -28,7 +28,6 @@ import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
 import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
 import ch.datascience.events.{EventRequestContent, consumers}
-import ch.datascience.graph.model.RenkuVersionPair
 import ch.datascience.graph.model.events.{CategoryName, EventBody}
 import ch.datascience.metrics.MetricsRegistry
 import com.typesafe.config.{Config, ConfigFactory}
@@ -37,17 +36,14 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private[events] class EventHandler[Interpretation[_]: MonadThrow: ConcurrentEffect: ContextShift](
+private[events] class EventHandler[Interpretation[_]: MonadThrow: ConcurrentEffect: ContextShift: Logger](
     override val categoryName:  CategoryName,
     eventProcessor:             EventProcessor[Interpretation],
     eventBodyDeserializer:      EventBodyDeserializer[Interpretation],
     subscriptionMechanism:      SubscriptionMechanism[Interpretation],
-    concurrentProcessesLimiter: ConcurrentProcessesLimiter[Interpretation],
-    currentVersionPair:         RenkuVersionPair,
-    logger:                     Logger[Interpretation]
+    concurrentProcessesLimiter: ConcurrentProcessesLimiter[Interpretation]
 ) extends consumers.EventHandlerWithProcessLimiter[Interpretation](concurrentProcessesLimiter) {
 
-  import currentVersionPair.schemaVersion
   import eventBodyDeserializer.toCommitEvent
 
   override def createHandlingProcess(
@@ -59,14 +55,17 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow: ConcurrentEffe
     )
 
   private def startProcessEvent(requestContent: EventRequestContent, deferred: Deferred[Interpretation, Unit]) = for {
-    eventBody   <- fromOption[Interpretation](requestContent.maybePayload.map(EventBody.apply), BadRequest)
+    eventBody <- requestContent match {
+                   case EventRequestContent.WithPayload(_, payload: String) => EitherT.rightT(EventBody(payload))
+                   case _ => EitherT.leftT(BadRequest)
+                 }
     commitEvent <- toCommitEvent(eventBody).toRightT(recoverTo = BadRequest)
     result <- Concurrent[Interpretation]
-                .start(eventProcessor.process(commitEvent, schemaVersion) >> deferred.complete(()))
+                .start(eventProcessor.process(commitEvent) >> deferred.complete(()))
                 .toRightT
                 .map(_ => Accepted)
-                .semiflatTap(logger.log(commitEvent))
-                .leftSemiflatTap(logger.log(commitEvent))
+                .semiflatTap(Logger[Interpretation].log(commitEvent))
+                .leftSemiflatTap(Logger[Interpretation].log(commitEvent))
   } yield result
 
   private implicit lazy val eventInfoToString: Show[CommitEvent] = Show.show { event =>
@@ -77,15 +76,14 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow: ConcurrentEffe
 object EventHandler {
 
   def apply(
-      currentVersionPair:    RenkuVersionPair,
       metricsRegistry:       MetricsRegistry[IO],
       subscriptionMechanism: SubscriptionMechanism[IO],
-      logger:                Logger[IO],
       config:                Config = ConfigFactory.load()
   )(implicit
       contextShift:     ContextShift[IO],
       executionContext: ExecutionContext,
-      timer:            Timer[IO]
+      timer:            Timer[IO],
+      logger:           Logger[IO]
   ): IO[EventHandler[IO]] = for {
     eventProcessor           <- IOCommitEventProcessor(metricsRegistry, logger)
     generationProcesses      <- GenerationProcessesNumber[IO](config)
@@ -94,8 +92,6 @@ object EventHandler {
                                eventProcessor,
                                EventBodyDeserializer(),
                                subscriptionMechanism,
-                               concurrentProcessLimiter,
-                               currentVersionPair,
-                               logger
+                               concurrentProcessLimiter
   )
 }

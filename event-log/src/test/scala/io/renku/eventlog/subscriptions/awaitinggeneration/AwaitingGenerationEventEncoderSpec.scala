@@ -18,7 +18,6 @@
 
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
-import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import io.circe.literal._
 import org.scalatest.matchers.should
@@ -40,11 +39,12 @@ class AwaitingGenerationEventEncoderSpec extends AnyWordSpec with should.Matcher
       }"""
     }
   }
+
   "encodePayload" should {
     "serialize AwaitingGenerationEvent payload to a String" in {
       val event = awaitingGenerationEvents.generateOne
 
-      AwaitingGenerationEventEncoder.encodePayload(event) shouldBe event.body.value.some
+      AwaitingGenerationEventEncoder.encodePayload(event) shouldBe event.body.value
     }
   }
 }

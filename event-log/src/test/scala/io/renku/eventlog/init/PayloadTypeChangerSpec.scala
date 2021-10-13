@@ -66,6 +66,8 @@ class PayloadTypeChangerSpec extends AnyWordSpec with DbInitSpec with should.Mat
         }
       } shouldBe 0L
 
+      verifyIndexExists("event_payload", "idx_schema_version") shouldBe false
+
     }
 
     "do nothing if the payload is already a bytea" in new TestCase {

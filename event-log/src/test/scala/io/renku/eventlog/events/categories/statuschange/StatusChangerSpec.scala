@@ -71,8 +71,7 @@ class StatusChangerSpec
       val event: StatusChangeEvent = ToTriplesGenerated(eventId,
                                                         projectPaths.generateOne,
                                                         eventProcessingTimes.generateOne,
-                                                        eventPayloads.generateOne,
-                                                        projectSchemaVersions.generateOne
+                                                        zippedEventPayloads.generateOne
       )
 
       intercept[Exception] {
@@ -173,9 +172,9 @@ class StatusChangerSpec
   }
 
   private def updateResultsGen(event: StatusChangeEvent): Gen[DBUpdateResults] = event match {
-    case AllEventsToNew                              => Gen.const(DBUpdateResults.ForAllProjects)
-    case ToTriplesGenerated(_, projectPath, _, _, _) => genUpdateResult(projectPath)
-    case ToTriplesStore(_, projectPath, _)           => genUpdateResult(projectPath)
+    case AllEventsToNew                           => Gen.const(DBUpdateResults.ForAllProjects)
+    case ToTriplesGenerated(_, projectPath, _, _) => genUpdateResult(projectPath)
+    case ToTriplesStore(_, projectPath, _)        => genUpdateResult(projectPath)
     case ToFailure(_, projectPath, _, currentStatus, newStatus) =>
       Gen.const(
         DBUpdateResults.ForProjects(projectPath, Map(currentStatus -> -1, newStatus -> 1))

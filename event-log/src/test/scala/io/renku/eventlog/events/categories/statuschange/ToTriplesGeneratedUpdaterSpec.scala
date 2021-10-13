@@ -20,17 +20,17 @@ package io.renku.eventlog.events.categories.statuschange
 
 import cats.data.Kleisli
 import cats.effect.IO
+import cats.syntax.all._
 import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.timestamps
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventProcessingTimes}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
+import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
 import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
-import io.renku.eventlog.EventContentGenerators.{eventDates, eventPayloads}
+import io.renku.eventlog.EventContentGenerators.{eventDates, zippedEventPayloads}
 import io.renku.eventlog._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.ToTriplesGenerated
 import org.scalamock.scalatest.MockFactory
@@ -60,12 +60,8 @@ class ToTriplesGeneratedUpdaterSpec
       val event   = addEvent(GeneratingTriples, eventDate)
       val eventId = CompoundEventId(event._1, projectId)
 
-      val statusChangeEvent = ToTriplesGenerated(eventId,
-                                                 projectPath,
-                                                 eventProcessingTimes.generateOne,
-                                                 eventPayloads.generateOne,
-                                                 projectSchemaVersions.generateOne
-      )
+      val statusChangeEvent =
+        ToTriplesGenerated(eventId, projectPath, eventProcessingTimes.generateOne, zippedEventPayloads.generateOne)
 
       (deliveryInfoRemover.deleteDelivery _).expects(eventId).returning(Kleisli.pure(()))
 
@@ -81,16 +77,18 @@ class ToTriplesGeneratedUpdaterSpec
       )
 
       findFullEvent(eventId)
-        .map { case (_, status, _, maybePayload, processingTimes) =>
-          status        shouldBe TriplesGenerated
-          maybePayload  shouldBe Some(statusChangeEvent.payload)
-          processingTimes should contain(statusChangeEvent.processingTime)
+        .map {
+          case (_, status, _, Some(payload), processingTimes) =>
+            status        shouldBe TriplesGenerated
+            payload.value   should contain theSameElementsAs statusChangeEvent.payload.value
+            processingTimes should contain(statusChangeEvent.processingTime)
+          case _ => fail("No payload found for the main event")
         }
         .getOrElse(fail("No event found for the main event"))
 
       eventsToUpdate.map {
-        case (eventId, AwaitingDeletion, _, _, _, _) => findFullEvent(CompoundEventId(eventId, projectId)) shouldBe None
-        case (eventId, status, _, _, _, _) =>
+        case (eventId, AwaitingDeletion, _, _, _) => findFullEvent(CompoundEventId(eventId, projectId)) shouldBe None
+        case (eventId, status, _, _, _) =>
           findFullEvent(CompoundEventId(eventId, projectId))
             .map { case (_, status, _, maybePayload, processingTimes) =>
               status          shouldBe TriplesGenerated
@@ -100,12 +98,14 @@ class ToTriplesGeneratedUpdaterSpec
             .getOrElse(fail(s"No event found with old $status status"))
       }
 
-      eventsToSkip.map { case (eventId, originalStatus, originalMessage, originalPayload, _, originalProcessingTimes) =>
+      eventsToSkip.map { case (eventId, originalStatus, originalMessage, originalPayload, originalProcessingTimes) =>
         findFullEvent(CompoundEventId(eventId, projectId))
           .map { case (_, status, maybeMessage, maybePayload, processingTimes) =>
-            status          shouldBe originalStatus
-            maybeMessage    shouldBe originalMessage
-            maybePayload    shouldBe originalPayload
+            status       shouldBe originalStatus
+            maybeMessage shouldBe originalMessage
+            (maybePayload, originalPayload).mapN { (actualPayload, toSkipPayload) =>
+              actualPayload.value should contain theSameElementsAs toSkipPayload.value
+            }
             processingTimes shouldBe originalProcessingTimes
           }
           .getOrElse(fail(s"No event found with old $originalStatus status"))
@@ -114,16 +114,15 @@ class ToTriplesGeneratedUpdaterSpec
 
     "just clean the delivery info if the event is already in the TRIPLES_GENERATED" in new TestCase {
       val eventDate = eventDates.generateOne
-      val (olderEventId, olderEventStatus, _, _, _, _) =
+      val (olderEventId, olderEventStatus, _, _, _) =
         addEvent(New, timestamps(max = eventDate.value).generateAs(EventDate))
 
-      val (eventId, _, _, existingPayload, Some(schemaVersion), _) = addEvent(TriplesGenerated, eventDate)
+      val (eventId, _, _, existingPayload, _) = addEvent(TriplesGenerated, eventDate)
 
       val statusChangeEvent = ToTriplesGenerated(CompoundEventId(eventId, projectId),
                                                  projectPath,
                                                  eventProcessingTimes.generateOne,
-                                                 eventPayloads.generateOne,
-                                                 schemaVersion
+                                                 zippedEventPayloads.generateOne
       )
 
       (deliveryInfoRemover.deleteDelivery _).expects(statusChangeEvent.eventId).returning(Kleisli.pure(()))
@@ -134,8 +133,10 @@ class ToTriplesGeneratedUpdaterSpec
 
       findFullEvent(statusChangeEvent.eventId)
         .map { case (_, status, _, maybePayload, processingTimes) =>
-          status        shouldBe TriplesGenerated
-          maybePayload  shouldBe existingPayload
+          status shouldBe TriplesGenerated
+          (maybePayload, existingPayload).mapN { (actualPayload, payload) =>
+            actualPayload.value should contain theSameElementsAs payload.value
+          }
           processingTimes should not contain statusChangeEvent.processingTime
         }
         .getOrElse(fail("No event found for the main event"))
@@ -155,8 +156,7 @@ class ToTriplesGeneratedUpdaterSpec
       val event = ToTriplesGenerated(compoundEventIds.generateOne,
                                      projectPath,
                                      eventProcessingTimes.generateOne,
-                                     eventPayloads.generateOne,
-                                     projectSchemaVersions.generateOne
+                                     zippedEventPayloads.generateOne
       )
 
       (deliveryInfoRemover.deleteDelivery _).expects(event.eventId).returning(Kleisli.pure(()))
@@ -180,13 +180,10 @@ class ToTriplesGeneratedUpdaterSpec
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()
 
-    def addEvent(status: EventStatus, eventDate: EventDate): (EventId,
-                                                              EventStatus,
-                                                              Option[EventMessage],
-                                                              Option[EventPayload],
-                                                              Option[SchemaVersion],
-                                                              List[EventProcessingTime]
-    ) = storeGeneratedEvent(status, eventDate, projectId, projectPath)
+    def addEvent(status:    EventStatus,
+                 eventDate: EventDate
+    ): (EventId, EventStatus, Option[EventMessage], Option[ZippedEventPayload], List[EventProcessingTime]) =
+      storeGeneratedEvent(status, eventDate, projectId, projectPath)
 
     def findFullEvent(eventId: CompoundEventId) = {
       val maybeEvent     = findEvent(eventId)

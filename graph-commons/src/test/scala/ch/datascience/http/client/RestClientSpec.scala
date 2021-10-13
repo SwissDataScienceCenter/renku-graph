@@ -436,5 +436,6 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
             .build()
         )(mapResponseToInt)
     } yield response
+
   }
 }

@@ -20,33 +20,25 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 
 import cats.MonadThrow
 import cats.effect.IO
-import cats.syntax.all._
 import ch.datascience.events.consumers.Project
-import ch.datascience.graph.model.SchemaVersion
-import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
+import ch.datascience.graph.model.events.{CompoundEventId, ZippedEventPayload}
 
 private trait EventBodyDeserializer[Interpretation[_]] {
   def toEvent(eventId: CompoundEventId,
               project: Project,
-              body:    (EventBody, SchemaVersion)
+              body:    ZippedEventPayload
   ): Interpretation[TriplesGeneratedEvent]
 }
 
 private class EventBodyDeserializerImpl[Interpretation[_]: MonadThrow] extends EventBodyDeserializer[Interpretation] {
-  import io.renku.jsonld.parser.{parse => parserToJsonLD, _}
 
   override def toEvent(eventId: CompoundEventId,
                        project: Project,
-                       body:    (EventBody, SchemaVersion)
+                       body:    ZippedEventPayload
   ): Interpretation[TriplesGeneratedEvent] = MonadThrow[Interpretation].fromEither {
-    parserToJsonLD(body._1.value)
-      .map(jsonLD => TriplesGeneratedEvent(eventId.id, project, jsonLD, body._2))
-      .leftMap(toMeaningfulError(eventId))
+    TriplesGeneratedEvent(eventId.id, project, body)
   }
 
-  private def toMeaningfulError(eventId: CompoundEventId): ParsingFailure => ParsingFailure = { failure =>
-    ParsingFailure(s"TriplesGeneratedEvent cannot be deserialised: $eventId", failure)
-  }
 }
 
 private object EventBodyDeserializer {

@@ -38,10 +38,10 @@ import io.renku.eventlog.events.categories.creation.EventPersister.Result.{Creat
 import io.renku.eventlog.events.categories.creation.Generators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
+import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.global
-import org.scalatest.prop.TableDrivenPropertyChecks
 
 class EventHandlerSpec extends AnyWordSpec with MockFactory with TableDrivenPropertyChecks with should.Matchers {
 
@@ -76,7 +76,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with TableDrivenProp
     s"return $BadRequest if the eventJson is malformed" in new TestCase {
       val event = jsons.generateOne deepMerge json""" {"categoryName":${categoryName.value} }"""
 
-      val requestContent = eventRequestContents.generateOne.copy(event)
+      val requestContent = eventRequestContentNoPayloads.generateOne.copy(event)
 
       handler.createHandlingProcess(requestContent).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(
         BadRequest
@@ -88,7 +88,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with TableDrivenProp
     s"return $BadRequest if the skipped event does not contain a message" in new TestCase {
       val event = skippedEvents.generateOne.asJson.deepMerge(json""" {"message":${blankStrings().generateOne} }""")
 
-      val requestContent = eventRequestContents.generateOne.copy(event)
+      val requestContent = eventRequestContentNoPayloads.generateOne.copy(event)
 
       handler.createHandlingProcess(requestContent).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(
         BadRequest
@@ -102,7 +102,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with TableDrivenProp
         val event =
           newOrSkippedEvents.generateOne.asJson deepMerge json"""{"status": ${unacceptableStatus.value}}"""
 
-        val requestContent = eventRequestContents.generateOne.copy(event)
+        val requestContent = eventRequestContentNoPayloads.generateOne.copy(event)
 
         handler.createHandlingProcess(requestContent).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(
           BadRequest

@@ -23,9 +23,10 @@ import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import org.typelevel.log4cats.Logger
 import io.renku.eventlog.subscriptions._
+import io.renku.eventlog.subscriptions.triplesgenerated.TriplesGeneratedEventEncoder.{encodeEvent, encodePayload}
 import io.renku.eventlog.{EventLogDB, subscriptions}
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
@@ -60,7 +61,7 @@ private[subscriptions] object SubscriptionCategory {
                                              subscribers,
                                              eventFetcher,
                                              eventDelivery,
-                                             TriplesGeneratedEventEncoder,
+                                             EventEncoder(encodeEvent, encodePayload),
                                              dispatchRecovery,
                                              logger
                          )

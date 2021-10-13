@@ -18,16 +18,16 @@
 
 package ch.datascience.triplesgenerator.events.categories
 
-import cats.MonadThrow
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{BracketThrow, ContextShift, IO, Sync, Timer}
 import cats.syntax.all._
+import ch.datascience.compression.Zip
 import ch.datascience.data.ErrorMessage
 import ch.datascience.events
 import ch.datascience.events.EventRequestContent
 import ch.datascience.events.producers.EventSender
 import ch.datascience.graph.model.events.EventStatus.{FailureStatus, TriplesGenerated, TriplesStore}
-import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventProcessingTime, EventStatus}
-import ch.datascience.graph.model.{SchemaVersion, projects}
+import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventProcessingTime, EventStatus, ZippedEventPayload}
+import ch.datascience.graph.model.projects
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.tinytypes.json.TinyTypeEncoders
 import org.typelevel.log4cats.Logger
@@ -38,7 +38,6 @@ private trait EventStatusUpdater[Interpretation[_]] {
   def toTriplesGenerated(eventId:        CompoundEventId,
                          projectPath:    projects.Path,
                          payload:        JsonLDTriples,
-                         schemaVersion:  SchemaVersion,
                          processingTime: EventProcessingTime
   ): Interpretation[Unit]
 
@@ -58,7 +57,7 @@ private trait EventStatusUpdater[Interpretation[_]] {
   ): Interpretation[Unit]
 }
 
-private class EventStatusUpdaterImpl[Interpretation[_]: MonadThrow](
+private class EventStatusUpdaterImpl[Interpretation[_]: BracketThrow: Sync](
     eventSender:  EventSender[Interpretation],
     categoryName: CategoryName
 ) extends EventStatusUpdater[Interpretation]
@@ -69,33 +68,32 @@ private class EventStatusUpdaterImpl[Interpretation[_]: MonadThrow](
   override def toTriplesGenerated(eventId:        CompoundEventId,
                                   projectPath:    projects.Path,
                                   payload:        JsonLDTriples,
-                                  schemaVersion:  SchemaVersion,
                                   processingTime: EventProcessingTime
-  ): Interpretation[Unit] = eventSender.sendEvent(
-    eventContent = events.EventRequestContent(
-      event = json"""{
-        "categoryName": "EVENTS_STATUS_CHANGE",
-        "id": ${eventId.id},
-        "project": {
-          "id":   ${eventId.projectId},
-          "path": $projectPath
-        },
-        "newStatus": $TriplesGenerated,
-        "processingTime": $processingTime
-      }""",
-      maybePayload = json"""{
-        "payload": ${payload.value.noSpaces},
-        "schemaVersion": $schemaVersion
-      }""".noSpaces.some
-    ),
-    errorMessage = s"$categoryName: Change event status as $TriplesGenerated failed"
-  )
+  ): Interpretation[Unit] = for {
+    zippedContent <- Zip.zip(payload.value.noSpaces).map(ZippedEventPayload.apply)
+    eventSent <- eventSender.sendEvent(
+                   eventContent = events.EventRequestContent.WithPayload(
+                     event = json"""{
+                              "categoryName": "EVENTS_STATUS_CHANGE",
+                              "id": ${eventId.id},
+                              "project": {
+                                "id":   ${eventId.projectId},
+                                "path": $projectPath
+                              },
+                              "newStatus": $TriplesGenerated,
+                              "processingTime": $processingTime
+                            }""",
+                     payload = zippedContent
+                   ),
+                   errorMessage = s"$categoryName: Change event status as $TriplesGenerated failed"
+                 )
+  } yield eventSent
 
   override def toTriplesStore(eventId:        CompoundEventId,
                               projectPath:    projects.Path,
                               processingTime: EventProcessingTime
   ): Interpretation[Unit] = eventSender.sendEvent(
-    eventContent = EventRequestContent(json"""{ 
+    eventContent = EventRequestContent.NoPayload(json"""{ 
       "categoryName": "EVENTS_STATUS_CHANGE",
       "id": ${eventId.id},
       "project": {
@@ -129,7 +127,7 @@ private class EventStatusUpdaterImpl[Interpretation[_]: MonadThrow](
                          eventStatus: FailureStatus,
                          exception:   Throwable
   ): Interpretation[Unit] = eventSender.sendEvent(
-    eventContent = EventRequestContent(json"""{
+    eventContent = EventRequestContent.NoPayload(json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",
       "id":           ${eventId.id},
       "project": {

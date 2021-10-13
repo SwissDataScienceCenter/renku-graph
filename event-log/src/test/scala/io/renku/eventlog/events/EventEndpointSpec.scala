@@ -162,9 +162,7 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
       Vector(
         Part
           .formData[IO]("event", requestContent.event.noSpaces, `Content-Type`(MediaType.application.json))
-          .some,
-        requestContent.maybePayload.map(Part.formData[IO]("payload", _))
-      ).flatten
+      )
     )
     val request = Request(Method.POST, uri"events")
       .withEntity(multipartContent)

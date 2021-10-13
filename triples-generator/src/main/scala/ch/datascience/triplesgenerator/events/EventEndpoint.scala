@@ -18,7 +18,7 @@
 
 package ch.datascience.triplesgenerator.events
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.data.EitherT
 import cats.data.EitherT.right
 import cats.effect.{Effect, Timer}
@@ -39,11 +39,10 @@ trait EventEndpoint[Interpretation[_]] {
   def processEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]]
 }
 
-class EventEndpointImpl[Interpretation[_]: Effect](
+class EventEndpointImpl[Interpretation[_]: Effect: MonadThrow](
     eventConsumersRegistry: EventConsumersRegistry[Interpretation],
     reProvisioningStatus:   ReProvisioningStatus[Interpretation]
-)(implicit ME:              MonadError[Interpretation, Throwable])
-    extends Http4sDsl[Interpretation]
+) extends Http4sDsl[Interpretation]
     with EventEndpoint[Interpretation] {
 
   import cats.syntax.all._
@@ -59,9 +58,11 @@ class EventEndpointImpl[Interpretation[_]: Effect](
           multipart    <- toMultipart(request)
           eventJson    <- toEvent(multipart)
           maybePayload <- getPayload(multipart)
-          result <- right[Response[Interpretation]](
-                      eventConsumersRegistry.handle(EventRequestContent(eventJson, maybePayload)) >>= toHttpResult
-                    )
+          eventRequest = maybePayload match {
+                           case Some(payload) => EventRequestContent.WithPayload(eventJson, payload)
+                           case None          => EventRequestContent.NoPayload(eventJson)
+                         }
+          result <- right[Response[Interpretation]](eventConsumersRegistry.handle(eventRequest) >>= toHttpResult)
         } yield result
       }.merge recoverWith { case NonFatal(error) =>
         toHttpResult(EventSchedulingResult.SchedulingError(error))

@@ -248,6 +248,9 @@ abstract class RestClient[Interpretation[_]: ConcurrentEffect: Timer, Throttling
   implicit class RequestOps(request: Request[Interpretation]) {
     lazy val withMultipartBuilder: MultipartBuilder = new MultipartBuilder(request)
 
+    def withParts(parts: Vector[Part[Interpretation]]): Request[Interpretation] =
+      new MultipartBuilder(request, parts).build()
+
     class MultipartBuilder private[RequestOps] (request: Request[Interpretation],
                                                 parts:   Vector[Part[Interpretation]] = Vector.empty[Part[Interpretation]]
     ) {
@@ -286,7 +289,7 @@ object RestClient {
   def validateUri[Interpretation[_]: MonadThrow](uri: String): Interpretation[Uri] =
     MonadThrow[Interpretation].fromEither(Uri.fromString(uri))
 
-  trait PartEncoder[PartType] {
+  trait PartEncoder[-PartType] {
     def encode[Interpretation[_]](name: String, value: PartType): Part[Interpretation]
   }
 
@@ -311,7 +314,7 @@ object RestClient {
 
   }
 
-  implicit object ZipEncoder extends PartEncoder[ByteArrayTinyType with ZippedContent] {
+  implicit object ZipPartEncoder extends PartEncoder[ByteArrayTinyType with ZippedContent] {
 
     override def encode[Interpretation[_]](name:  String,
                                            value: ByteArrayTinyType with ZippedContent

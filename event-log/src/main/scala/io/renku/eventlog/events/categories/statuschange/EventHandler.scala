@@ -22,13 +22,12 @@ import cats.data.EitherT
 import cats.effect.{Concurrent, ContextShift, IO}
 import cats.syntax.all._
 import cats.{MonadThrow, Show}
-import ch.datascience.compression.Zip
 import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
 import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
 import ch.datascience.events.{EventRequestContent, consumers}
 import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventId, EventProcessingTime, EventStatus}
+import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.circe.DecodingFailure
@@ -126,7 +125,7 @@ private object EventHandler {
 
   private implicit lazy val eventTriplesGeneratedDecoder
       : EventRequestContent => Either[DecodingFailure, ToTriplesGenerated] = {
-    case EventRequestContent.WithPayload(event, payload) =>
+    case EventRequestContent.WithPayload(event, payload: Array[Byte]) =>
       for {
         id             <- event.hcursor.downField("id").as[EventId]
         projectId      <- event.hcursor.downField("project").downField("id").as[projects.Id]
@@ -136,19 +135,22 @@ private object EventHandler {
                case TriplesGenerated => Right(())
                case status           => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
              }
-        eventPayload <- Zip.unzip(payload)
-      } yield ToTriplesGenerated(CompoundEventId(id, projectId), projectPath, processingTime, eventPayload)
+      } yield ToTriplesGenerated(CompoundEventId(id, projectId),
+                                 projectPath,
+                                 processingTime,
+                                 ZippedEventPayload(payload)
+      )
     case _ => Left(DecodingFailure("Missing event payload", Nil))
   }
 
   private implicit lazy val eventTripleStoreDecoder: EventRequestContent => Either[DecodingFailure, ToTriplesStore] = {
-    case EventRequestContent(event, _) =>
+    request =>
       for {
-        id             <- event.hcursor.downField("id").as[EventId]
-        projectId      <- event.hcursor.downField("project").downField("id").as[projects.Id]
-        projectPath    <- event.hcursor.downField("project").downField("path").as[projects.Path]
-        processingTime <- event.hcursor.downField("processingTime").as[EventProcessingTime]
-        _ <- event.hcursor.downField("newStatus").as[EventStatus].flatMap {
+        id             <- request.event.hcursor.downField("id").as[EventId]
+        projectId      <- request.event.hcursor.downField("project").downField("id").as[projects.Id]
+        projectPath    <- request.event.hcursor.downField("project").downField("path").as[projects.Path]
+        processingTime <- request.event.hcursor.downField("processingTime").as[EventProcessingTime]
+        _ <- request.event.hcursor.downField("newStatus").as[EventStatus].flatMap {
                case TriplesStore => Right(())
                case status       => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
              }
@@ -156,37 +158,36 @@ private object EventHandler {
   }
 
   private implicit lazy val eventFailureDecoder
-      : EventRequestContent => Either[DecodingFailure, ToFailure[ProcessingStatus, FailureStatus]] = {
-    case EventRequestContent(event, _) =>
-      for {
-        id          <- event.hcursor.downField("id").as[EventId]
-        projectId   <- event.hcursor.downField("project").downField("id").as[projects.Id]
-        projectPath <- event.hcursor.downField("project").downField("path").as[projects.Path]
-        message     <- event.hcursor.downField("message").as[EventMessage]
-        eventId = CompoundEventId(id, projectId)
-        statusChangeEvent <- event.hcursor.downField("newStatus").as[EventStatus].flatMap {
-                               case status: GenerationRecoverableFailure =>
-                                 ToFailure(eventId, projectPath, message, GeneratingTriples, status).asRight
-                               case status: GenerationNonRecoverableFailure =>
-                                 ToFailure(eventId, projectPath, message, GeneratingTriples, status).asRight
-                               case status: TransformationRecoverableFailure =>
-                                 ToFailure(eventId, projectPath, message, TransformingTriples, status).asRight
-                               case status: TransformationNonRecoverableFailure =>
-                                 ToFailure(eventId, projectPath, message, TransformingTriples, status).asRight
-                               case status =>
-                                 DecodingFailure(s"Unrecognized event status $status", Nil)
-                                   .asLeft[ToFailure[ProcessingStatus, FailureStatus]]
-                             }
-      } yield statusChangeEvent
+      : EventRequestContent => Either[DecodingFailure, ToFailure[ProcessingStatus, FailureStatus]] = { request =>
+    for {
+      id          <- request.event.hcursor.downField("id").as[EventId]
+      projectId   <- request.event.hcursor.downField("project").downField("id").as[projects.Id]
+      projectPath <- request.event.hcursor.downField("project").downField("path").as[projects.Path]
+      message     <- request.event.hcursor.downField("message").as[EventMessage]
+      eventId = CompoundEventId(id, projectId)
+      statusChangeEvent <- request.event.hcursor.downField("newStatus").as[EventStatus].flatMap {
+                             case status: GenerationRecoverableFailure =>
+                               ToFailure(eventId, projectPath, message, GeneratingTriples, status).asRight
+                             case status: GenerationNonRecoverableFailure =>
+                               ToFailure(eventId, projectPath, message, GeneratingTriples, status).asRight
+                             case status: TransformationRecoverableFailure =>
+                               ToFailure(eventId, projectPath, message, TransformingTriples, status).asRight
+                             case status: TransformationNonRecoverableFailure =>
+                               ToFailure(eventId, projectPath, message, TransformingTriples, status).asRight
+                             case status =>
+                               DecodingFailure(s"Unrecognized event status $status", Nil)
+                                 .asLeft[ToFailure[ProcessingStatus, FailureStatus]]
+                           }
+    } yield statusChangeEvent
   }
 
   private implicit lazy val eventRollbackToNewDecoder: EventRequestContent => Either[DecodingFailure, RollbackToNew] = {
-    case EventRequestContent(event, _) =>
+    case request =>
       for {
-        id          <- event.hcursor.downField("id").as[EventId]
-        projectId   <- event.hcursor.downField("project").downField("id").as[projects.Id]
-        projectPath <- event.hcursor.downField("project").downField("path").as[projects.Path]
-        _ <- event.hcursor.downField("newStatus").as[EventStatus].flatMap {
+        id          <- request.event.hcursor.downField("id").as[EventId]
+        projectId   <- request.event.hcursor.downField("project").downField("id").as[projects.Id]
+        projectPath <- request.event.hcursor.downField("project").downField("path").as[projects.Path]
+        _ <- request.event.hcursor.downField("newStatus").as[EventStatus].flatMap {
                case New    => Right(())
                case status => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
              }
@@ -194,26 +195,25 @@ private object EventHandler {
   }
 
   private implicit lazy val eventRollbackToTriplesGeneratedDecoder
-      : EventRequestContent => Either[DecodingFailure, RollbackToTriplesGenerated] = {
-    case EventRequestContent(event, _) =>
-      for {
-        id          <- event.hcursor.downField("id").as[EventId]
-        projectId   <- event.hcursor.downField("project").downField("id").as[projects.Id]
-        projectPath <- event.hcursor.downField("project").downField("path").as[projects.Path]
-        _ <- event.hcursor.downField("newStatus").as[EventStatus].flatMap {
-               case TriplesGenerated => Right(())
-               case status           => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
-             }
-      } yield RollbackToTriplesGenerated(CompoundEventId(id, projectId), projectPath)
+      : EventRequestContent => Either[DecodingFailure, RollbackToTriplesGenerated] = { case request =>
+    for {
+      id          <- request.event.hcursor.downField("id").as[EventId]
+      projectId   <- request.event.hcursor.downField("project").downField("id").as[projects.Id]
+      projectPath <- request.event.hcursor.downField("project").downField("path").as[projects.Path]
+      _ <- request.event.hcursor.downField("newStatus").as[EventStatus].flatMap {
+             case TriplesGenerated => Right(())
+             case status           => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
+           }
+    } yield RollbackToTriplesGenerated(CompoundEventId(id, projectId), projectPath)
   }
 
   private implicit lazy val eventToAwaitingDeletionDecoder
-      : EventRequestContent => Either[DecodingFailure, ToAwaitingDeletion] = { case EventRequestContent(event, _) =>
+      : EventRequestContent => Either[DecodingFailure, ToAwaitingDeletion] = { request =>
     for {
-      id          <- event.hcursor.downField("id").as[EventId]
-      projectId   <- event.hcursor.downField("project").downField("id").as[projects.Id]
-      projectPath <- event.hcursor.downField("project").downField("path").as[projects.Path]
-      _ <- event.hcursor.downField("newStatus").as[EventStatus].flatMap {
+      id          <- request.event.hcursor.downField("id").as[EventId]
+      projectId   <- request.event.hcursor.downField("project").downField("id").as[projects.Id]
+      projectPath <- request.event.hcursor.downField("project").downField("path").as[projects.Path]
+      _ <- request.event.hcursor.downField("newStatus").as[EventStatus].flatMap {
              case AwaitingDeletion => Right(())
              case status           => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
            }

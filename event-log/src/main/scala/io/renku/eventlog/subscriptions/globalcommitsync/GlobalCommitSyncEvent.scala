@@ -22,7 +22,6 @@ import cats.Show
 import cats.implicits.showInterpolator
 import ch.datascience.events.consumers.Project
 import ch.datascience.graph.model.events.{CommitId, LastSyncedDate}
-import io.renku.eventlog.subscriptions.EventEncoder
 
 private final case class GlobalCommitSyncEvent(project:             Project,
                                                commits:             List[CommitId],
@@ -34,12 +33,13 @@ private object GlobalCommitSyncEvent {
     Show.show(event => show"GlobalCommitSyncEvent ${event.project}, numberOfCommits = ${event.commits.length}")
 }
 
-private object GlobalCommitSyncEventEncoder extends EventEncoder[GlobalCommitSyncEvent] {
+private object GlobalCommitSyncEventEncoder {
 
   import io.circe.Json
   import io.circe.literal._
 
-  override def encodeEvent(event: GlobalCommitSyncEvent): Json = json"""{
+  def encodeEvent(event: GlobalCommitSyncEvent): Json =
+    json"""{
         "categoryName": ${categoryName.value},
         "project": {
           "id":         ${event.project.id.value},
@@ -48,5 +48,4 @@ private object GlobalCommitSyncEventEncoder extends EventEncoder[GlobalCommitSyn
         "commits":      ${event.commits.map(_.value)}
       }"""
 
-  override def encodePayload(event: GlobalCommitSyncEvent): Option[String] = None
 }

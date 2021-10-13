@@ -56,7 +56,3 @@ object EventMessage extends TinyTypeFactory[EventMessage](new EventMessage(_)) w
 
   def apply(exception: Throwable): EventMessage = EventMessage(ErrorMessage.withStackTrace(exception).value)
 }
-
-final class EventPayload private (val value: Array[Byte]) extends AnyVal with ByteArrayTinyType
-
-object EventPayload extends TinyTypeFactory[EventPayload](new EventPayload(_))

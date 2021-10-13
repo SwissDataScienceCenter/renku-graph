@@ -23,7 +23,6 @@ import cats.implicits.{showInterpolator, toShow}
 import ch.datascience.events.consumers.Project
 import ch.datascience.graph.model.events.{CompoundEventId, LastSyncedDate}
 import ch.datascience.graph.model.projects
-import io.renku.eventlog.subscriptions.EventEncoder
 
 private sealed trait CommitSyncEvent
 
@@ -52,12 +51,12 @@ private object MinimalCommitSyncEvent {
   implicit lazy val show: Show[MinimalCommitSyncEvent] = Show.show(event => show"CommitSyncEvent ${event.project}")
 }
 
-private object CommitSyncEventEncoder extends EventEncoder[CommitSyncEvent] {
+private object CommitSyncEventEncoder {
 
   import io.circe.Json
   import io.circe.literal._
 
-  override def encodeEvent(event: CommitSyncEvent): Json = event match {
+  def encodeEvent(event: CommitSyncEvent): Json = event match {
     case FullCommitSyncEvent(eventId, projectPath, lastSyncedDate) => json"""{
         "categoryName": ${categoryName.value},
         "id":           ${eventId.id.value},
@@ -76,5 +75,4 @@ private object CommitSyncEventEncoder extends EventEncoder[CommitSyncEvent] {
       }"""
   }
 
-  override def encodePayload(event: CommitSyncEvent): Option[String] = None
 }

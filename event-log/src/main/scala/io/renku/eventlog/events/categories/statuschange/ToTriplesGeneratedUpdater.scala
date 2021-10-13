@@ -94,12 +94,12 @@ private class ToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow: Sync](
   private def updatePayload(event: ToTriplesGenerated) = measureExecutionTime {
     SqlStatement(name = "to_triples_generated - payload upload")
       .command(
-        sql"""INSERT INTO event_payload (event_id, project_id, payload, schema_version)
-              VALUES ($eventIdEncoder, $projectIdEncoder, $eventPayloadEncoder, $schemaVersionEncoder)
-              ON CONFLICT (event_id, project_id, schema_version)
+        sql"""INSERT INTO event_payload (event_id, project_id, payload)
+              VALUES ($eventIdEncoder, $projectIdEncoder, $zippedPayloadEncoder)
+              ON CONFLICT (event_id, project_id)
               DO UPDATE SET payload = EXCLUDED.payload;""".command
       )
-      .arguments(event.eventId.id ~ event.eventId.projectId ~ event.payload ~ event.schemaVersion)
+      .arguments(event.eventId.id ~ event.eventId.projectId ~ event.payload)
       .build
       .void
   }
