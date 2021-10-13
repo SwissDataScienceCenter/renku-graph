@@ -85,7 +85,7 @@ object EventHandler {
       timer:            Timer[IO],
       logger:           Logger[IO]
   ): IO[EventHandler[IO]] = for {
-    eventProcessor           <- IOCommitEventProcessor(metricsRegistry, logger)
+    eventProcessor           <- IOCommitEventProcessor(metricsRegistry)
     generationProcesses      <- GenerationProcessesNumber[IO](config)
     concurrentProcessLimiter <- ConcurrentProcessesLimiter(Refined.unsafeApply(generationProcesses.value))
   } yield new EventHandler[IO](categoryName,

@@ -38,21 +38,20 @@ private[subscriptions] object SubscriptionCategory {
       awaitingTransformationGauge: LabeledGauge[IO, projects.Path],
       underTransformationGauge:    LabeledGauge[IO, projects.Path],
       queriesExecTimes:            LabeledHistogram[IO, SqlStatement.Name],
-      subscriberTracker:           SubscriberTracker[IO],
-      logger:                      Logger[IO]
+      subscriberTracker:           SubscriberTracker[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
+      timer:            Timer[IO],
+      logger:           Logger[IO]
   ): IO[subscriptions.SubscriptionCategory[IO]] = for {
     subscribers <- Subscribers(name, subscriberTracker, logger)
-    eventFetcher <-
-      IOTriplesGeneratedEventFinder(sessionResource,
-                                    awaitingTransformationGauge,
-                                    underTransformationGauge,
-                                    queriesExecTimes
-      )
-    dispatchRecovery <- DispatchRecovery(logger)
+    eventFetcher <- IOTriplesGeneratedEventFinder(sessionResource,
+                                                  awaitingTransformationGauge,
+                                                  underTransformationGauge,
+                                                  queriesExecTimes
+                    )
+    dispatchRecovery <- DispatchRecovery()
     eventDelivery <- EventDelivery[TriplesGeneratedEvent](sessionResource,
                                                           compoundEventIdExtractor = (_: TriplesGeneratedEvent).id,
                                                           queriesExecTimes

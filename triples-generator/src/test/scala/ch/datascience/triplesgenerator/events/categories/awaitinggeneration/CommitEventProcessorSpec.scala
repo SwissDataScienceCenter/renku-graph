@@ -27,8 +27,6 @@ import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.EventStatus.New
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects.Path
@@ -38,13 +36,14 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.metrics.MetricsRegistry
-import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.IOCommitEventProcessor.eventsProcessingTimesBuilder
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import io.prometheus.client.Histogram
+import io.renku.jsonld.JsonLD
+import io.renku.jsonld.generators.JsonLDGenerators.jsonLDEntities
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Assertion
@@ -76,9 +75,9 @@ class CommitEventProcessorSpec
       givenFetchingAccessToken(commitEvent.project.path)
         .returning(maybeAccessToken.pure[Try])
 
-      successfulTriplesGeneration(commitEvent -> jsonLDTriples.generateOne)
+      successfulTriplesGeneration(commitEvent -> jsonLDEntities.generateOne)
 
-      eventProcessor.process(commitEvent, schemaVersion) shouldBe ().pure[Try]
+      eventProcessor.process(commitEvent) shouldBe ().pure[Try]
 
       logSummary(commitEvent)
 
@@ -96,11 +95,11 @@ class CommitEventProcessorSpec
       (triplesFinder
         .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
         .expects(commitEvent, maybeAccessToken)
-        .returning(EitherT.liftF(exception.raiseError[Try, JsonLDTriples]))
+        .returning(EitherT.liftF(exception.raiseError[Try, JsonLD]))
 
       expectEventMarkedAsNonRecoverableFailure(commitEvent, exception)
 
-      eventProcessor.process(commitEvent, schemaVersion) shouldBe ().pure[Try]
+      eventProcessor.process(commitEvent) shouldBe ().pure[Try]
 
       logError(commitEvent, exception)
     }
@@ -116,11 +115,11 @@ class CommitEventProcessorSpec
       (triplesFinder
         .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
         .expects(commitEvent, maybeAccessToken)
-        .returning(leftT[Try, JsonLDTriples](exception))
+        .returning(leftT[Try, JsonLD](exception))
 
       expectEventMarkedAsRecoverableFailure(commitEvent, exception)
 
-      eventProcessor.process(commitEvent, schemaVersion) shouldBe ().pure[Try]
+      eventProcessor.process(commitEvent) shouldBe ().pure[Try]
 
       logError(commitEvent, exception, exception.getMessage)
     }
@@ -135,7 +134,7 @@ class CommitEventProcessorSpec
 
       expectEventRolledBackToNew(commitEvent)
 
-      eventProcessor.process(commitEvent, schemaVersion) shouldBe ().pure[Try]
+      eventProcessor.process(commitEvent) shouldBe ().pure[Try]
 
       logger.getMessages(Error).map(_.message) shouldBe List(
         s"${logMessageCommon(commitEvent)}: commit Event processing failure"
@@ -162,11 +161,8 @@ class CommitEventProcessorSpec
         .expects(eventsProcessingTimesBuilder, *)
         .returning(IO.pure(eventsProcessingTimes))
 
-      val logger = TestLogger[IO]()
-      IOCommitEventProcessor(
-        metricsRegistry,
-        logger
-      ).unsafeRunSync()
+      implicit val logger: TestLogger[IO] = TestLogger[IO]()
+      IOCommitEventProcessor(metricsRegistry).unsafeRunSync()
     }
   }
 
@@ -177,7 +173,6 @@ class CommitEventProcessorSpec
   private trait TestCase {
 
     val maybeAccessToken = Gen.option(accessTokens).generateOne
-    val schemaVersion    = projectSchemaVersions.generateOne
 
     val accessTokenFinder       = mock[AccessTokenFinder[Try]]
     val triplesFinder           = mock[TriplesGenerator[Try]]
@@ -199,16 +194,16 @@ class CommitEventProcessorSpec
         .findAccessToken(_: Path)(_: Path => String))
         .expects(forProjectPath, projectPathToPath)
 
-    def successfulTriplesGeneration(commitAndTriples: (CommitEvent, JsonLDTriples)) = {
-      val (commit, triples) = commitAndTriples
+    def successfulTriplesGeneration(commitAndTriples: (CommitEvent, JsonLD)) = {
+      val (commit, payload) = commitAndTriples
       (triplesFinder
         .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
         .expects(commit, maybeAccessToken)
-        .returning(rightT[Try, ProcessingRecoverableError](triples))
+        .returning(rightT[Try, ProcessingRecoverableError](payload))
 
       expectEventMarkedAsTriplesGenerated(CompoundEventId(commit.eventId, commit.project.id),
                                           commit.project.path,
-                                          triples
+                                          payload
       )
     }
 
@@ -222,16 +217,12 @@ class CommitEventProcessorSpec
         .expects(commit.compoundEventId, commit.project.path, EventStatus.GenerationNonRecoverableFailure, exception)
         .returning(().pure[Try])
 
-    def expectEventMarkedAsTriplesGenerated(compoundEventId: CompoundEventId,
-                                            projectPath:     Path,
-                                            triples:         JsonLDTriples
-    ) =
+    def expectEventMarkedAsTriplesGenerated(compoundEventId: CompoundEventId, projectPath: Path, payload: JsonLD) =
       (eventStatusUpdater
-        .toTriplesGenerated(_: CompoundEventId, _: Path, _: JsonLDTriples, _: SchemaVersion, _: EventProcessingTime))
+        .toTriplesGenerated(_: CompoundEventId, _: Path, _: JsonLD, _: EventProcessingTime))
         .expects(compoundEventId,
                  projectPath,
-                 triples,
-                 schemaVersion,
+                 payload,
                  EventProcessingTime(Duration.ofMillis(singleEventTimeRecorder.elapsedTime.value))
         )
         .returning(().pure[Try])

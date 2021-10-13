@@ -20,11 +20,11 @@ package ch.datascience.triplesgenerator.events.categories.awaitinggeneration.tri
 
 import ammonite.ops.{Bytes, CommandResult, Path, ShelloutException}
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.{Renku, RepositoryPath}
+import io.renku.jsonld.generators.JsonLDGenerators.jsonLDEntities
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -37,10 +37,10 @@ class RenkuSpec extends AnyWordSpec with should.Matchers with MockFactory {
   "export" should {
 
     "return the 'renku export' output if renku export succeeds" in new TestCase {
-      val commandBody = jsonLDTriples.generateOne
+      val commandBody = jsonLDEntities.generateOne
       val commandResult = CommandResult(
         exitCode = 0,
-        chunks = Seq(Left(new Bytes(commandBody.value.noSpaces.getBytes())))
+        chunks = Seq(Left(new Bytes(commandBody.toJson.noSpaces.getBytes())))
       )
 
       renkuExport.expects(path.value).returning(commandResult)

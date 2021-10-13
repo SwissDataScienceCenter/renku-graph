@@ -29,12 +29,12 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.metrics.MetricsRegistry
-import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater
 import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater._
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator
 import io.prometheus.client.Histogram
+import io.renku.jsonld.JsonLD
 import org.typelevel.log4cats.Logger
 
 import java.time.Duration
@@ -59,13 +59,12 @@ private class CommitEventProcessor[Interpretation[_]: MonadThrow](
   import accessTokenFinder._
   import triplesGenerator._
 
-  def process(event: CommitEvent): Interpretation[Unit] =
-    allEventsTimeRecorder.measureExecutionTime {
-      for {
-        maybeAccessToken <- findAccessToken(event.project.path) recoverWith rollbackEvent(event)
-        uploadingResult  <- generateAndUpdateStatus(event)(maybeAccessToken)
-      } yield uploadingResult
-    } flatMap logSummary recoverWith logError(event)
+  def process(event: CommitEvent): Interpretation[Unit] = allEventsTimeRecorder.measureExecutionTime {
+    for {
+      maybeAccessToken <- findAccessToken(event.project.path) recoverWith rollbackEvent(event)
+      uploadingResult  <- generateAndUpdateStatus(event)(maybeAccessToken)
+    } yield uploadingResult
+  } flatMap logSummary recoverWith logError(event)
 
   private def logError(event: CommitEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
     case NonFatal(exception) =>
@@ -84,7 +83,7 @@ private class CommitEventProcessor[Interpretation[_]: MonadThrow](
     .flatTap(updateEventLog)
 
   private def toTriplesGenerated(commit: CommitEvent): (
-      (ElapsedTime, Either[ProcessingRecoverableError, JsonLDTriples])
+      (ElapsedTime, Either[ProcessingRecoverableError, JsonLD])
   ) => Either[ProcessingRecoverableError, TriplesGenerationResult] = { case (elapsedTime, maybeTriples) =>
     maybeTriples.map { triples =>
       TriplesGenerated(
@@ -163,7 +162,7 @@ private class CommitEventProcessor[Interpretation[_]: MonadThrow](
     val cause: Throwable
   }
   private object TriplesGenerationResult {
-    case class TriplesGenerated(commit: CommitEvent, triples: JsonLDTriples, processingTime: EventProcessingTime)
+    case class TriplesGenerated(commit: CommitEvent, payload: JsonLD, processingTime: EventProcessingTime)
         extends TriplesGenerationResult {
       override lazy val toString: String = TriplesGenerated.toString()
     }
@@ -189,16 +188,16 @@ private object IOCommitEventProcessor {
         50000000, 100000000, 500000000)
 
   def apply(
-      metricsRegistry: MetricsRegistry[IO],
-      logger:          Logger[IO]
+      metricsRegistry: MetricsRegistry[IO]
   )(implicit
       contextShift:     ContextShift[IO],
       executionContext: ExecutionContext,
-      timer:            Timer[IO]
+      timer:            Timer[IO],
+      logger:           Logger[IO]
   ): IO[CommitEventProcessor[IO]] = for {
     triplesGenerator        <- TriplesGenerator()
     accessTokenFinder       <- AccessTokenFinder(logger)
-    eventStatusUpdater      <- EventStatusUpdater(categoryName, logger)
+    eventStatusUpdater      <- EventStatusUpdater(categoryName)
     eventsProcessingTimes   <- metricsRegistry.register[Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
     allEventsTimeRecorder   <- ExecutionTimeRecorder[IO](logger, maybeHistogram = Some(eventsProcessingTimes))
     singleEventTimeRecorder <- ExecutionTimeRecorder[IO](logger, maybeHistogram = None)

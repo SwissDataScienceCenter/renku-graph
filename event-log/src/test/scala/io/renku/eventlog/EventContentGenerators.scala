@@ -18,11 +18,7 @@
 
 package io.renku.eventlog
 
-import cats.effect.IO
-import ch.datascience.compression.Zip
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.events.ZippedEventPayload
-import io.renku.jsonld.generators.JsonLDGenerators.jsonLDEntities
 import org.scalacheck.Gen
 
 object EventContentGenerators {
@@ -32,10 +28,5 @@ object EventContentGenerators {
   implicit val executionDates: Gen[ExecutionDate] = timestamps map ExecutionDate.apply
 
   implicit val eventMessages: Gen[EventMessage] = nonEmptyStrings() map EventMessage.apply
-
-  implicit val zippedEventPayloads: Gen[ZippedEventPayload] = for {
-    content <- jsonLDEntities
-    zipped = Zip.zip[IO](content.toJson.noSpaces).unsafeRunSync()
-  } yield ZippedEventPayload(zipped)
 
 }

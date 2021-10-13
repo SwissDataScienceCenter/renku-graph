@@ -294,13 +294,13 @@ object RestClient {
   }
 
   implicit object JsonPartEncoder extends PartEncoder[Json] {
+
     override def encode[Interpretation[_]](name: String, value: Json): Part[Interpretation] = Part
       .formData[Interpretation](name, encodeValue(value), contentType)
 
     private def encodeValue(value: Json): String = value.noSpaces
 
     private val contentType: `Content-Type` = `Content-Type`(MediaType.application.json)
-
   }
 
   implicit object StringPartEncoder extends PartEncoder[String] {
@@ -311,21 +311,19 @@ object RestClient {
     private def encodeValue(value: String): String = value
 
     private val contentType: `Content-Type` = `Content-Type`(MediaType.text.plain)
-
   }
 
   implicit object ZipPartEncoder extends PartEncoder[ByteArrayTinyType with ZippedContent] {
 
     override def encode[Interpretation[_]](name:  String,
                                            value: ByteArrayTinyType with ZippedContent
-    ): Part[Interpretation] =
-      Part(
-        Headers(
-          `Content-Disposition`("form-data", Map("name" -> name)) ::
-            Header("Content-Transfer-Encoding", "binary") ::
-            `Content-Type`(MediaType.application.zip) :: Nil
-        ),
-        Stream.emits(value.value)
-      )
+    ): Part[Interpretation] = Part(
+      Headers(
+        `Content-Disposition`("form-data", Map("name" -> name)) ::
+          Header("Content-Transfer-Encoding", "binary") ::
+          `Content-Type`(MediaType.application.zip) :: Nil
+      ),
+      body = Stream.emits(value.value)
+    )
   }
 }

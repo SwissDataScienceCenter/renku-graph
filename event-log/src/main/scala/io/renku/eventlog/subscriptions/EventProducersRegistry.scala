@@ -92,8 +92,7 @@ object EventProducersRegistry {
                                                                       awaitingTransformationGauge,
                                                                       underTransformationGauge,
                                                                       queriesExecTimes,
-                                                                      subscriberTracker,
-                                                                      logger
+                                                                      subscriberTracker
                                 )
     zombieEventsCategory <-
       zombieevents.SubscriptionCategory(sessionResource, queriesExecTimes, subscriberTracker, logger)

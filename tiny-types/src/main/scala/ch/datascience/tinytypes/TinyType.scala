@@ -44,23 +44,19 @@ trait JsonTinyType         extends Any with TinyType { type V = Json }
 trait InstantTinyType      extends Any with TinyType { type V = Instant }
 trait DurationTinyType     extends Any with TinyType { type V = Duration }
 trait LocalDateTinyType    extends Any with TinyType { type V = LocalDate }
-trait BooleanTinyType extends Any with TinyType {
-  type V = Boolean
-}
-
-trait ByteArrayTinyType extends Any with TinyType {
-  type V = Array[Byte]
-
-}
+trait BooleanTinyType      extends Any with TinyType { type V = Boolean }
+trait ByteArrayTinyType    extends Any with TinyType { type V = Array[Byte] }
 
 object StringTinyType {
   implicit val stringTinyTypeConverter: StringTinyType => List[PathSegment] =
     tinyType => List(PathSegment(tinyType.value))
 }
+
 object RelativePathTinyType {
   implicit val relativePathTinyTypeConverter: RelativePathTinyType => List[PathSegment] =
     tinyType => tinyType.value.split("\\/").toList.map(PathSegment.apply)
 }
+
 object IntTinyType {
   implicit val IntTinyTypeConverter: IntTinyType => List[PathSegment] =
     tinyType => List(PathSegment(tinyType.toString))

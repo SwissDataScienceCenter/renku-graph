@@ -21,16 +21,29 @@ package ch.datascience.events
 import ch.datascience.events
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{jsons, nonEmptyStrings}
-import org.scalacheck.Gen
+import ch.datascience.tinytypes.ByteArrayTinyType
+import ch.datascience.tinytypes.contenttypes.ZippedContent
+import org.scalacheck.Gen._
+import org.scalacheck.{Arbitrary, Gen}
 
 object Generators {
+
+  final case class ZippedContentTinyType(value: Array[Byte]) extends ByteArrayTinyType with ZippedContent
+
+  private val zippedContents: Gen[ByteArrayTinyType with ZippedContent] =
+    Arbitrary.arbByte.arbitrary
+      .toGeneratorOfList()
+      .map(_.toArray)
+      .generateAs(ZippedContentTinyType.apply)
+
   implicit val eventRequestContents: Gen[EventRequestContent] = for {
     event        <- jsons
-    maybePayload <- nonEmptyStrings().toGeneratorOfOptions
+    maybePayload <- oneOf(nonEmptyStrings(), zippedContents).toGeneratorOfOptions
   } yield maybePayload match {
     case Some(payload) => events.EventRequestContent.WithPayload(event, payload)
     case None          => events.EventRequestContent.NoPayload(event)
   }
 
-  implicit val eventRequestContentNoPayloads = jsons.map(events.EventRequestContent.NoPayload)
+  implicit val eventRequestContentNoPayloads: Gen[EventRequestContent.NoPayload] =
+    jsons.map(events.EventRequestContent.NoPayload)
 }

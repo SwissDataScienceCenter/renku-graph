@@ -101,18 +101,16 @@ private[globalcommitsync] class GlobalCommitEventSynchronizerImpl[Interpretation
 }
 
 private[globalcommitsync] object GlobalCommitEventSynchronizer {
-  def apply(gitLabThrottler:       Throttler[IO, GitLab],
-            executionTimeRecorder: ExecutionTimeRecorder[IO],
-            logger:                Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
+  def apply(gitLabThrottler: Throttler[IO, GitLab], executionTimeRecorder: ExecutionTimeRecorder[IO])(implicit
+      executionContext:      ExecutionContext,
+      contextShift:          ContextShift[IO],
+      timer:                 Timer[IO],
+      logger:                Logger[IO]
   ): IO[GlobalCommitEventSynchronizer[IO]] = for {
     accessTokenFinder         <- AccessTokenFinder(logger)
     gitLabCommitStatFetcher   <- GitLabCommitStatFetcher(gitLabThrottler, logger)
     gitLabCommitFetcher       <- GitLabCommitFetcher(gitLabThrottler, logger)
-    commitEventDeleter        <- CommitEventDeleter(logger)
+    commitEventDeleter        <- CommitEventDeleter()
     missingCommitEventCreator <- MissingCommitEventCreator(gitLabThrottler, logger)
   } yield new GlobalCommitEventSynchronizerImpl(
     accessTokenFinder,

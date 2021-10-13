@@ -131,12 +131,11 @@ class EventSenderSpec extends AnyWordSpec with ExternalServiceStubbing with shou
   private lazy val requestTimeout: FiniteDuration   = 1 second
 
   private trait TestCase {
-    val eventLogUrl: EventLogUrl = EventLogUrl(externalServiceBaseUrl)
-    val logger = TestLogger[IO]()
-    val onErrorSleep: FiniteDuration = 1 second
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val eventLogUrl:     EventLogUrl    = EventLogUrl(externalServiceBaseUrl)
+    val onErrorSleep:    FiniteDuration = 1 second
 
     val eventSender = new EventSenderImpl[IO](eventLogUrl,
-                                              logger,
                                               onErrorSleep,
                                               retryInterval = 100 millis,
                                               maxRetries = 2,

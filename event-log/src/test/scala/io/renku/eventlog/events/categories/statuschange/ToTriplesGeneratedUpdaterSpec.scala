@@ -24,13 +24,13 @@ import cats.syntax.all._
 import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.timestamps
-import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventProcessingTimes}
+import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventProcessingTimes, zippedEventPayloads}
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
 import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
-import io.renku.eventlog.EventContentGenerators.{eventDates, zippedEventPayloads}
+import io.renku.eventlog.EventContentGenerators.eventDates
 import io.renku.eventlog._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.ToTriplesGenerated
 import org.scalamock.scalatest.MockFactory

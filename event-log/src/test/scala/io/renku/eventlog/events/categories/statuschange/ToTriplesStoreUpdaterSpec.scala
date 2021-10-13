@@ -20,6 +20,7 @@ package io.renku.eventlog.events.categories.statuschange
 
 import cats.data.Kleisli
 import cats.effect.IO
+import cats.syntax.all._
 import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.timestamps
@@ -91,10 +92,10 @@ class ToTriplesStoreUpdaterSpec
       eventsToUpdate.map { case (eventId, status, _, originalPayload, originalProcessingTimes) =>
         findFullEvent(CompoundEventId(eventId, projectId))
           .map { case (_, status, maybeMessage, maybePayload, processingTimes) =>
-            status          shouldBe TriplesStore
-            maybeMessage    shouldBe None
-            maybePayload    shouldBe originalPayload
-            processingTimes shouldBe originalProcessingTimes
+            status               shouldBe TriplesStore
+            maybeMessage         shouldBe None
+            (maybePayload.map(_.value) -> originalPayload.map(_.value)) mapN (_ should contain theSameElementsAs _)
+            processingTimes      shouldBe originalProcessingTimes
           }
           .getOrElse(fail(s"No event found with old $status status"))
       }
@@ -102,10 +103,10 @@ class ToTriplesStoreUpdaterSpec
       eventsToSkip.map { case (eventId, originalStatus, originalMessage, originalPayload, originalProcessingTimes) =>
         findFullEvent(CompoundEventId(eventId, projectId))
           .map { case (_, status, maybeMessage, maybePayload, processingTimes) =>
-            status          shouldBe originalStatus
-            maybeMessage    shouldBe originalMessage
-            maybePayload    shouldBe originalPayload
-            processingTimes shouldBe originalProcessingTimes
+            status               shouldBe originalStatus
+            maybeMessage         shouldBe originalMessage
+            (maybePayload.map(_.value) -> originalPayload.map(_.value)) mapN (_ should contain theSameElementsAs _)
+            processingTimes      shouldBe originalProcessingTimes
           }
           .getOrElse(fail(s"No event found with old $originalStatus status"))
       }

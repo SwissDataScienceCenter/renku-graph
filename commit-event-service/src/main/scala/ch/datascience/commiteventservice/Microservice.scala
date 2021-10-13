@@ -32,6 +32,7 @@ import ch.datascience.microservices.IOMicroservice
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
+import org.typelevel.log4cats.Logger
 import pureconfig.ConfigSource
 
 import java.util.concurrent.ConcurrentHashMap
@@ -46,20 +47,20 @@ object Microservice extends IOMicroservice {
     ExecutionContext fromExecutorService newFixedThreadPool(ConfigSource.default.at("threads-number").loadOrThrow[Int])
 
   protected implicit override def contextShift: ContextShift[IO] = IO.contextShift(executionContext)
-
-  protected implicit override def timer: Timer[IO] = IO.timer(executionContext)
+  protected implicit override def timer:        Timer[IO]        = IO.timer(executionContext)
+  private implicit val logger:                  Logger[IO]       = ApplicationLogger
 
   override def run(args: List[String]): IO[ExitCode] = for {
-    certificateLoader     <- CertificateLoader[IO](ApplicationLogger)
+    certificateLoader     <- CertificateLoader[IO](logger)
     sentryInitializer     <- SentryInitializer[IO]()
     gitLabRateLimit       <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
     gitLabThrottler       <- Throttler[IO, GitLab](gitLabRateLimit)
-    executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
+    executionTimeRecorder <- ExecutionTimeRecorder[IO](logger)
     metricsRegistry       <- MetricsRegistry()
     commitSyncCategory <-
-      events.categories.commitsync.SubscriptionFactory(gitLabThrottler, ApplicationLogger, executionTimeRecorder)
+      events.categories.commitsync.SubscriptionFactory(gitLabThrottler, executionTimeRecorder)
     globalCommitSyncCategory <-
-      events.categories.globalcommitsync.SubscriptionFactory(gitLabThrottler, ApplicationLogger, executionTimeRecorder)
+      events.categories.globalcommitsync.SubscriptionFactory(gitLabThrottler, executionTimeRecorder)
     eventConsumersRegistry <- consumers.EventConsumersRegistry(commitSyncCategory, globalCommitSyncCategory)
     microserviceRoutes     <- MicroserviceRoutes(eventConsumersRegistry, metricsRegistry)
     exitcode <- microserviceRoutes.routes.use { routes =>

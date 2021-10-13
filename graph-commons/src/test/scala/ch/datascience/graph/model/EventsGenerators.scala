@@ -23,7 +23,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events._
-import org.scalacheck.Gen
+import org.scalacheck.{Arbitrary, Gen}
 
 import java.time.Duration
 
@@ -53,5 +53,10 @@ object EventsGenerators {
     javaDurations(min = Duration ofMinutes 10).map(EventProcessingTime.apply)
 
   implicit lazy val lastSyncedDates: Gen[LastSyncedDate] = timestampsNotInTheFuture.toGeneratorOf(LastSyncedDate)
+
+  implicit val zippedEventPayloads: Gen[ZippedEventPayload] = Arbitrary.arbByte.arbitrary
+    .toGeneratorOfList()
+    .map(_.toArray)
+    .generateAs(ZippedEventPayload.apply)
 
 }

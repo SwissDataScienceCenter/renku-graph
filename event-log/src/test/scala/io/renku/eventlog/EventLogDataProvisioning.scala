@@ -23,14 +23,14 @@ import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUr
 import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.timestampsNotInTheFuture
-import ch.datascience.graph.model.EventsGenerators.{eventBodies, eventIds, eventProcessingTimes}
+import ch.datascience.graph.model.EventsGenerators.{eventBodies, eventIds, eventProcessingTimes, zippedEventPayloads}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.events.EventStatus.{AwaitingDeletion, TransformationRecoverableFailure, TransformingTriples, TriplesGenerated, TriplesStore}
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.microservices.MicroserviceBaseUrl
-import io.renku.eventlog.EventContentGenerators.{eventMessages, zippedEventPayloads}
+import io.renku.eventlog.EventContentGenerators.eventMessages
 import skunk._
 import skunk.implicits._
 

@@ -19,10 +19,11 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 
 import ch.datascience.events.consumers.Project
-import ch.datascience.graph.model.events.{CompoundEventId, EventId, ZippedEventPayload}
+import ch.datascience.graph.model.events.{CompoundEventId, EventId}
 import ch.datascience.triplesgenerator.events.categories.models.CategoryEvent
+import io.renku.jsonld.JsonLD
 
-final case class TriplesGeneratedEvent(eventId: EventId, project: Project, triples: ZippedEventPayload)
+private final case class TriplesGeneratedEvent(eventId: EventId, project: Project, payload: JsonLD)
     extends Product
     with CategoryEvent {
   override val compoundEventId: CompoundEventId = CompoundEventId(eventId, project.id)

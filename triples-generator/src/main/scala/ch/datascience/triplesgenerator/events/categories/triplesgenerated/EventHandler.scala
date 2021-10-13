@@ -19,6 +19,7 @@
 package ch.datascience.triplesgenerator
 package events.categories.triplesgenerated
 
+import cats.data.EitherT
 import cats.data.EitherT.fromEither
 import cats.effect.concurrent.Deferred
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, IO, Timer}
@@ -31,7 +32,7 @@ import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
 import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, Project}
 import ch.datascience.events.{EventRequestContent, consumers}
 import ch.datascience.graph.model.SchemaVersion
-import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventBody}
+import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventBody, ZippedEventPayload}
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import com.typesafe.config.{Config, ConfigFactory}
@@ -69,8 +70,8 @@ private[events] class EventHandler[Interpretation[_]: ConcurrentEffect: MonadThr
     eventId <- fromEither(request.event.getEventId)
     project <- fromEither(request.event.getProject)
     payload <- request match {
-                 case EventRequestContent.WithPayload(_, payload) => payload
-                 case _                                           => BadRequest.asLeftT
+                 case EventRequestContent.WithPayload(_, payload: ZippedEventPayload) => EitherT.rightT(payload)
+                 case _ => EitherT.leftT(BadRequest)
                }
     event <- toEvent(eventId, project, payload).toRightT(recoverTo = BadRequest)
     result <- (ContextShift[Interpretation].shift *> Concurrent[Interpretation]

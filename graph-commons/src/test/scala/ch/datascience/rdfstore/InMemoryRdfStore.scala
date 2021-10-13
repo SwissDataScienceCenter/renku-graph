@@ -112,50 +112,47 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
     super.afterAll()
   }
 
-  protected def loadToStore(triples: Elem): Unit =
-    rdfConnectionResource
-      .use { connection =>
-        IO {
-          connection.load {
-            ModelFactory.createDefaultModel.read(new ByteArrayInputStream(triples.toString().getBytes), "")
-          }
+  protected def loadToStore(triples: Elem): Unit = rdfConnectionResource
+    .use { connection =>
+      IO {
+        connection.load {
+          ModelFactory.createDefaultModel.read(new ByteArrayInputStream(triples.toString().getBytes), "")
         }
       }
-      .unsafeRunSync()
+    }
+    .unsafeRunSync()
 
-  protected def loadToStore(triples: JsonLDTriples): Unit =
-    rdfConnectionResource
-      .use { connection =>
-        IO {
-          connection.load {
-            val model = ModelFactory.createDefaultModel()
-            RDFDataMgr.read(model, new ByteArrayInputStream(triples.value.noSpaces.getBytes(UTF_8)), null, Lang.JSONLD)
-            model
-          }
+  protected def loadToStore(triples: JsonLD): Unit = rdfConnectionResource
+    .use { connection =>
+      IO {
+        connection.load {
+          val model = ModelFactory.createDefaultModel()
+          RDFDataMgr.read(model, new ByteArrayInputStream(triples.toJson.noSpaces.getBytes(UTF_8)), null, Lang.JSONLD)
+          model
         }
       }
-      .unsafeRunSync()
+    }
+    .unsafeRunSync()
 
-  protected def loadToStore(jsonLDs: JsonLD*): Unit =
-    rdfConnectionResource
-      .use { connection =>
-        IO {
-          connection.load {
-            val model = ModelFactory.createDefaultModel()
+  protected def loadToStore(jsonLDs: JsonLD*): Unit = rdfConnectionResource
+    .use { connection =>
+      IO {
+        connection.load {
+          val model = ModelFactory.createDefaultModel()
 
-            val flattenedJsonLDs: Seq[JsonLD] =
-              jsonLDs.flatMap(_.flatten.toOption.flatMap(_.asArray).getOrElse(List.empty[JsonLD]))
-            RDFDataMgr.read(
-              model,
-              new ByteArrayInputStream(Json.arr(flattenedJsonLDs.map(_.toJson): _*).noSpaces.getBytes(UTF_8)),
-              null,
-              Lang.JSONLD
-            )
-            model
-          }
+          val flattenedJsonLDs: Seq[JsonLD] =
+            jsonLDs.flatMap(_.flatten.toOption.flatMap(_.asArray).getOrElse(List.empty[JsonLD]))
+          RDFDataMgr.read(
+            model,
+            new ByteArrayInputStream(Json.arr(flattenedJsonLDs.map(_.toJson): _*).noSpaces.getBytes(UTF_8)),
+            null,
+            Lang.JSONLD
+          )
+          model
         }
       }
-      .unsafeRunSync()
+    }
+    .unsafeRunSync()
 
   protected def loadToStore[T](objects: T*)(implicit encoder: JsonLDEncoder[T]): Unit = loadToStore(
     objects.map(encoder.apply): _*

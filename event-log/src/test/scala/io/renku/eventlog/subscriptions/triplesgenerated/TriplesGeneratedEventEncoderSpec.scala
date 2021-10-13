@@ -25,6 +25,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class TriplesGeneratedEventEncoderSpec extends AnyWordSpec with should.Matchers {
+
   "encoderParts" should {
 
     "return formData part of TriplesGeneratedEvent to Json and Byte array" in {
@@ -37,16 +38,14 @@ class TriplesGeneratedEventEncoderSpec extends AnyWordSpec with should.Matchers 
       actualJson.hcursor.downField("project").as[Json]        shouldBe Right(json"""{
                                                                                "id": ${event.id.projectId.value},
                                                                                "path": ${event.projectPath.value}
-                                                                              }""")
-
+                                                                             }""")
     }
   }
 
   "encodePayload" should {
     "serialize TriplesGeneratedEvent payload to a byte array" in {
       val event = triplesGeneratedEvents.generateOne
-
-      TriplesGeneratedEventEncoder.encodePayload(event) shouldBe event.payload.value
+      TriplesGeneratedEventEncoder.encodePayload(event).value should contain theSameElementsAs event.payload.value
     }
   }
 }

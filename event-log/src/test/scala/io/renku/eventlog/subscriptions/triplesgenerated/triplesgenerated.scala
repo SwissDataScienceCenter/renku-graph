@@ -20,7 +20,6 @@ package io.renku.eventlog.subscriptions
 
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import io.renku.eventlog.EventContentGenerators._
 import org.scalacheck.Gen
 
 package object triplesgenerated {

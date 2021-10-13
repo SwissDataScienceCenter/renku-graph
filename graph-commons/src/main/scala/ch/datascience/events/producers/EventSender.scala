@@ -46,16 +46,15 @@ trait EventSender[Interpretation[_]] {
   ): Interpretation[Unit]
 }
 
-class EventSenderImpl[Interpretation[_]: ConcurrentEffect: Timer](
+class EventSenderImpl[Interpretation[_]: ConcurrentEffect: Timer: Logger](
     eventLogUrl:             EventLogUrl,
-    logger:                  Logger[Interpretation],
     onErrorSleep:            FiniteDuration,
     retryInterval:           FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     requestTimeoutOverride:  Option[Duration] = None
 )(implicit executionContext: ExecutionContext)
     extends RestClient[Interpretation, Any](Throttler.noThrottling,
-                                            logger,
+                                            Logger[Interpretation],
                                             retryInterval = retryInterval,
                                             maxRetries = maxRetries,
                                             requestTimeoutOverride = requestTimeoutOverride
@@ -104,7 +103,7 @@ class EventSenderImpl[Interpretation[_]: ConcurrentEffect: Timer](
   }
 
   private def waitAndRetry(retry: Eval[Interpretation[Unit]], exception: Throwable, errorMessage: String) = for {
-    _      <- logger.error(exception)(errorMessage)
+    _      <- Logger[Interpretation].error(exception)(errorMessage)
     _      <- Timer[Interpretation] sleep onErrorSleep
     result <- retry.value
   } yield result
@@ -116,10 +115,12 @@ class EventSenderImpl[Interpretation[_]: ConcurrentEffect: Timer](
 }
 
 object EventSender {
-  def apply(
-      logger:    Logger[IO]
-  )(implicit ec: ExecutionContext, ce: ConcurrentEffect[IO], timer: Timer[IO]): IO[EventSender[IO]] =
-    for {
-      eventlogUrl <- EventLogUrl()
-    } yield new EventSenderImpl(eventlogUrl, logger, onErrorSleep = 15 seconds)
+  def apply()(implicit
+      ec:     ExecutionContext,
+      ce:     ConcurrentEffect[IO],
+      timer:  Timer[IO],
+      logger: Logger[IO]
+  ): IO[EventSender[IO]] = for {
+    eventLogUrl <- EventLogUrl()
+  } yield new EventSenderImpl(eventLogUrl, onErrorSleep = 15 seconds)
 }

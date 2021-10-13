@@ -107,15 +107,15 @@ private[events] object EventHandler {
   def apply(
       subscriptionMechanism: SubscriptionMechanism[IO],
       gitLabThrottler:       Throttler[IO, GitLab],
-      executionTimeRecorder: ExecutionTimeRecorder[IO],
-      logger:                Logger[IO]
+      executionTimeRecorder: ExecutionTimeRecorder[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
+      timer:            Timer[IO],
+      logger:           Logger[IO]
   ): IO[EventHandler[IO]] = for {
     concurrentProcessesLimiter    <- ConcurrentProcessesLimiter(processesLimit)
-    globalCommitEventSynchronizer <- GlobalCommitEventSynchronizer(gitLabThrottler, executionTimeRecorder, logger)
+    globalCommitEventSynchronizer <- GlobalCommitEventSynchronizer(gitLabThrottler, executionTimeRecorder)
   } yield new EventHandler[IO](categoryName,
                                globalCommitEventSynchronizer,
                                subscriptionMechanism,

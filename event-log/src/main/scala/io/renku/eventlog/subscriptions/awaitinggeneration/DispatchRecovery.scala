@@ -83,7 +83,6 @@ private object DispatchRecovery {
       concurrentEffect: ConcurrentEffect[IO],
       timer:            Timer[IO],
       logger:           Logger[IO]
-  ): IO[DispatchRecovery[IO, AwaitingGenerationEvent]] = for {
-    eventSender <- EventSender(logger)
-  } yield new DispatchRecoveryImpl[IO](eventSender)
+  ): IO[DispatchRecovery[IO, AwaitingGenerationEvent]] =
+    EventSender() map (new DispatchRecoveryImpl[IO](_))
 }

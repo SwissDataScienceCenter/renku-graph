@@ -68,9 +68,10 @@ private class CommitEventsRemoverImpl[Interpretation[_]: MonadThrow](
 
 private[categories] object CommitEventsRemover {
 
-  def apply(logger:     Logger[IO])(implicit
+  def apply()(implicit
       concurrentEffect: ConcurrentEffect[IO],
       timer:            Timer[IO],
-      executionContext: ExecutionContext
-  ): IO[CommitEventsRemover[IO]] = EventSender(logger) map (new CommitEventsRemoverImpl[IO](_))
+      executionContext: ExecutionContext,
+      logger:           Logger[IO]
+  ): IO[CommitEventsRemover[IO]] = EventSender() map (new CommitEventsRemoverImpl[IO](_))
 }

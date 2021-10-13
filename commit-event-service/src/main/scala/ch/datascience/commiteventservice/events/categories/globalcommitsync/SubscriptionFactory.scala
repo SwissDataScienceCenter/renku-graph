@@ -31,19 +31,17 @@ import scala.concurrent.ExecutionContext
 
 object SubscriptionFactory {
 
-  def apply(gitLabThrottler:       Throttler[IO, GitLab],
-            logger:                Logger[IO],
-            executionTimeRecorder: ExecutionTimeRecorder[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
+  def apply(gitLabThrottler: Throttler[IO, GitLab], executionTimeRecorder: ExecutionTimeRecorder[IO])(implicit
+      executionContext:      ExecutionContext,
+      contextShift:          ContextShift[IO],
+      timer:                 Timer[IO],
+      logger:                Logger[IO]
   ): IO[(EventHandler[IO], SubscriptionMechanism[IO])] = for {
     subscriptionMechanism <- SubscriptionMechanism(
                                categoryName,
                                categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort, Microservice.Identifier),
                                logger
                              )
-    handler <- EventHandler(subscriptionMechanism, gitLabThrottler, executionTimeRecorder, logger)
+    handler <- EventHandler(subscriptionMechanism, gitLabThrottler, executionTimeRecorder)
   } yield handler -> subscriptionMechanism
 }

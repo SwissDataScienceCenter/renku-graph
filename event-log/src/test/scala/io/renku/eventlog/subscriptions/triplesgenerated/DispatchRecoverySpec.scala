@@ -99,8 +99,8 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
   private trait TestCase {
     val event = triplesGeneratedEvents.generateOne
 
+    implicit val logger: TestLogger[Try] = TestLogger[Try]()
     val eventSender      = mock[EventSender[Try]]
-    val logger           = TestLogger[Try]()
-    val dispatchRecovery = new DispatchRecoveryImpl[Try](eventSender, logger)
+    val dispatchRecovery = new DispatchRecoveryImpl[Try](eventSender)
   }
 }

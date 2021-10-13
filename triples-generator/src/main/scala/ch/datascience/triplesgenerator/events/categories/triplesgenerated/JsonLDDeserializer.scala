@@ -72,7 +72,7 @@ private class JsonLDDeserializerImpl[Interpretation[_]: MonadThrow](
   private def extractProject(projectInfo: GitLabProjectInfo, event: TriplesGeneratedEvent) =
     EitherT.right[ProcessingRecoverableError] {
       for {
-        projects <- event.triples.cursor
+        projects <- event.payload.cursor
                       .as[List[Project]](decodeList(Project.decoder(projectInfo)))
                       .fold(raiseError(event), _.pure[Interpretation])
         project <- projects match {

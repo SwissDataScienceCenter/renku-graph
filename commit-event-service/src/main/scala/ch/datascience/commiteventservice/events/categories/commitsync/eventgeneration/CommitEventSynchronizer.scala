@@ -203,20 +203,18 @@ private[commitsync] class CommitEventSynchronizerImpl[Interpretation[_]: MonadTh
 }
 
 private[commitsync] object CommitEventSynchronizer {
-  def apply(gitLabThrottler:       Throttler[IO, GitLab],
-            executionTimeRecorder: ExecutionTimeRecorder[IO],
-            logger:                Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
+  def apply(gitLabThrottler: Throttler[IO, GitLab], executionTimeRecorder: ExecutionTimeRecorder[IO])(implicit
+      executionContext:      ExecutionContext,
+      contextShift:          ContextShift[IO],
+      timer:                 Timer[IO],
+      logger:                Logger[IO]
   ) = for {
     accessTokenFinder   <- AccessTokenFinder(logger)
     latestCommitFinder  <- LatestCommitFinder(gitLabThrottler, logger)
     eventDetailsFinder  <- EventDetailsFinder(logger)
     commitInfoFinder    <- CommitInfoFinder(gitLabThrottler, logger)
     commitToEventLog    <- CommitToEventLog(logger)
-    commitEventsRemover <- CommitEventsRemover(logger)
+    commitEventsRemover <- CommitEventsRemover()
   } yield new CommitEventSynchronizerImpl[IO](accessTokenFinder,
                                               latestCommitFinder,
                                               eventDetailsFinder,
