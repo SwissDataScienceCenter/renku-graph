@@ -46,5 +46,4 @@ private object AwaitingGenerationEventEncoder {
 
   def encodePayload(event: AwaitingGenerationEvent): String =
     event.body.value
-
 }

@@ -243,14 +243,7 @@ the new status.
 }
 ```
 
-`payload` part:
-
-```json
-{
-  "payload": "json-ld payload as string",
-  "schemaVersion": "8"
-}
-```
+`payload` part: binary of `application/zip` content-type
 
 #### Changing status of all project events older than the given one to `TRIPLES_STORE`
 

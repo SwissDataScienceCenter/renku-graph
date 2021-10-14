@@ -74,20 +74,7 @@ Accepts an event as multipart requests.
 }
 ```
 
-`payload` part as a string:
-
-```
-"JSON payload as string"
-```
-
-`payload` example:
-
-```json
-{
-  "payload": "json-ld payload as string",
-  "schemaVersion": "8"
-}
-```
+`payload` part: binary of `application/zip` content-type
 
 - **MEMBER_SYNC**
 

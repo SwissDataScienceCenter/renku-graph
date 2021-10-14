@@ -58,15 +58,14 @@ private[subscriptions] object SubscriptionCategory {
                                                             compoundEventIdExtractor = (_: AwaitingGenerationEvent).id,
                                                             queriesExecTimes
                      )
-    eventsDistributor <-
-      IOEventsDistributor(name,
-                          subscribers,
-                          eventFetcher,
-                          eventDelivery,
-                          EventEncoder(encodeEvent, encodePayload),
-                          dispatchRecovery,
-                          logger
-      )
+    eventsDistributor <- IOEventsDistributor(name,
+                                             subscribers,
+                                             eventFetcher,
+                                             eventDelivery,
+                                             EventEncoder(encodeEvent, encodePayload),
+                                             dispatchRecovery,
+                                             logger
+                         )
     deserializer <-
       SubscriptionRequestDeserializer[IO, SubscriptionCategoryPayload](name, SubscriptionCategoryPayload.apply)
   } yield new SubscriptionCategoryImpl[IO, SubscriptionCategoryPayload](name,
