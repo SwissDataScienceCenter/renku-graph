@@ -53,11 +53,12 @@ private[eventgeneration] class CommitEventDeleterImpl[Interpretation[_]: MonadTh
   }
 }
 private[eventgeneration] object CommitEventDeleter {
-  def apply(logger:     Logger[IO])(implicit
+  def apply()(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
+      timer:            Timer[IO],
+      logger:           Logger[IO]
   ): IO[CommitEventDeleter[IO]] = for {
-    commitEventsRemover <- CommitEventsRemover(logger)
+    commitEventsRemover <- CommitEventsRemover()
   } yield new CommitEventDeleterImpl[IO](commitEventsRemover)
 }

@@ -23,9 +23,10 @@ import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import org.typelevel.log4cats.Logger
 import io.renku.eventlog.subscriptions._
+import io.renku.eventlog.subscriptions.triplesgenerated.TriplesGeneratedEventEncoder.{encodeEvent, encodePayload}
 import io.renku.eventlog.{EventLogDB, subscriptions}
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
@@ -37,21 +38,20 @@ private[subscriptions] object SubscriptionCategory {
       awaitingTransformationGauge: LabeledGauge[IO, projects.Path],
       underTransformationGauge:    LabeledGauge[IO, projects.Path],
       queriesExecTimes:            LabeledHistogram[IO, SqlStatement.Name],
-      subscriberTracker:           SubscriberTracker[IO],
-      logger:                      Logger[IO]
+      subscriberTracker:           SubscriberTracker[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
+      timer:            Timer[IO],
+      logger:           Logger[IO]
   ): IO[subscriptions.SubscriptionCategory[IO]] = for {
     subscribers <- Subscribers(name, subscriberTracker, logger)
-    eventFetcher <-
-      IOTriplesGeneratedEventFinder(sessionResource,
-                                    awaitingTransformationGauge,
-                                    underTransformationGauge,
-                                    queriesExecTimes
-      )
-    dispatchRecovery <- DispatchRecovery(logger)
+    eventFetcher <- IOTriplesGeneratedEventFinder(sessionResource,
+                                                  awaitingTransformationGauge,
+                                                  underTransformationGauge,
+                                                  queriesExecTimes
+                    )
+    dispatchRecovery <- DispatchRecovery()
     eventDelivery <- EventDelivery[TriplesGeneratedEvent](sessionResource,
                                                           compoundEventIdExtractor = (_: TriplesGeneratedEvent).id,
                                                           queriesExecTimes
@@ -60,7 +60,7 @@ private[subscriptions] object SubscriptionCategory {
                                              subscribers,
                                              eventFetcher,
                                              eventDelivery,
-                                             TriplesGeneratedEventEncoder,
+                                             EventEncoder(encodeEvent, encodePayload),
                                              dispatchRecovery,
                                              logger
                          )

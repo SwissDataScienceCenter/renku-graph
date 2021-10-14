@@ -19,6 +19,7 @@
 package ch.datascience.tinytypes
 
 import ch.datascience.tinytypes.constraints.{Url, UrlOps}
+import ch.datascience.tinytypes.contenttypes.ZippedContent
 
 import java.time.{Duration, Instant, LocalDate}
 
@@ -43,14 +44,22 @@ object TestTinyTypes {
   implicit object IntTestType extends TinyTypeFactory[IntTestType](new IntTestType(_))
 
   class LongTestType private (val value: Long) extends AnyVal with LongTinyType
+
   implicit object LongTestType extends TinyTypeFactory[LongTestType](new LongTestType(_))
 
   class LocalDateTestType private (val value: LocalDate) extends AnyVal with LocalDateTinyType
+
   implicit object LocalDateTestType extends TinyTypeFactory[LocalDateTestType](new LocalDateTestType(_))
 
   class InstantTestType private (val value: Instant) extends AnyVal with InstantTinyType
+
   implicit object InstantTestType extends TinyTypeFactory[InstantTestType](new InstantTestType(_))
 
   class DurationTestType private (val value: Duration) extends AnyVal with DurationTinyType
+
   implicit object DurationTestType extends TinyTypeFactory[DurationTestType](new DurationTestType(_))
+
+  class ByteArrayTestType private (val value: Array[Byte]) extends AnyVal with ByteArrayTinyType with ZippedContent
+
+  implicit object ByteArrayTestType extends TinyTypeFactory[ByteArrayTestType](new ByteArrayTestType(_))
 }

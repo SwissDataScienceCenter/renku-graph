@@ -65,9 +65,8 @@ class EventHandlerSpec extends AnyWordSpec with should.Matchers with MockFactory
     }
 
     s"return $UnsupportedEventType if handler cannot support the request" in new TestCase {
-      val unsupportedEvent = EventRequestContent(
-        json"""{ "categoryName": ${nonEmptyStrings().generateOne} }""",
-        nonEmptyStrings().generateOption
+      val unsupportedEvent = EventRequestContent.NoPayload(
+        json"""{ "categoryName": ${nonEmptyStrings().generateOne} }"""
       )
 
       (for {
@@ -83,9 +82,8 @@ class EventHandlerSpec extends AnyWordSpec with should.Matchers with MockFactory
     val processesLimiter = mock[ConcurrentProcessesLimiter[IO]]
     val anyCategoryName  = nonEmptyStrings().generateOne
 
-    val eventRequestContent = EventRequestContent(
-      json"""{ "categoryName": $anyCategoryName }""",
-      maybePayload = nonEmptyStrings().generateOption
+    val eventRequestContent = EventRequestContent.NoPayload(
+      json"""{ "categoryName": $anyCategoryName }"""
     )
 
     def handlerWithProcess(process: EventHandlingProcess[IO]): EventHandlerWithProcessLimiter[IO] =

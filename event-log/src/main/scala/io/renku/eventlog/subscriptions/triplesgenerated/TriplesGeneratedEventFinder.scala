@@ -90,6 +90,7 @@ private class TriplesGeneratedEventFinderImpl[Interpretation[_]: Sync: BracketTh
             FROM (
               SELECT evt.event_id, evt.status
               FROM event evt
+              JOIN event_payload evt_payload ON evt.event_id = evt_payload.event_id AND evt.project_id = evt_payload.project_id
               WHERE evt.project_id = proj.project_id 
                 AND #${`status IN`(TransformingTriples, TriplesGenerated, TransformationRecoverableFailure)} 
                 AND execution_date <= $executionDateEncoder
@@ -112,25 +113,25 @@ private class TriplesGeneratedEventFinderImpl[Interpretation[_]: Sync: BracketTh
     val executionDate = ExecutionDate(now())
     SqlStatement(name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find oldest"))
       .select[projects.Path ~ projects.Id ~ ExecutionDate ~ ExecutionDate, TriplesGeneratedEvent](sql"""
-         SELECT evt.event_id, evt.project_id, $projectPathEncoder AS project_path, evt_payload.payload,  evt_payload.schema_version
+         SELECT evt.event_id, evt.project_id, $projectPathEncoder AS project_path, evt_payload.payload
          FROM (
-           SELECT project_id, max(event_date) AS max_event_date
-           FROM event
-           WHERE project_id = $projectIdEncoder
+           SELECT evt_int.project_id, max(event_date) AS max_event_date
+           FROM event evt_int
+           JOIN event_payload evt_payload ON evt_int.event_id = evt_payload.event_id AND evt_int.project_id = evt_payload.project_id
+           WHERE evt_int.project_id = $projectIdEncoder
              AND #${`status IN`(TriplesGenerated, TransformationRecoverableFailure)}
              AND execution_date < $executionDateEncoder
-           GROUP BY project_id
+           GROUP BY evt_int.project_id
          ) newest_event_date
          JOIN event evt ON newest_event_date.project_id = evt.project_id 
            AND newest_event_date.max_event_date = evt.event_date
            AND #${`status IN`(TriplesGenerated, TransformationRecoverableFailure)}
            AND execution_date < $executionDateEncoder
-         JOIN event_payload evt_payload ON evt.event_id = evt_payload.event_id
-           AND evt.project_id = evt_payload.project_id
+         JOIN event_payload evt_payload ON evt.event_id = evt_payload.event_id AND evt.project_id = evt_payload.project_id
          LIMIT 1
-         """.query(compoundEventIdDecoder ~ projectPathDecoder ~ eventPayloadDecoder ~ schemaVersionDecoder).map {
-        case eventId ~ projectPath ~ eventPayload ~ schema =>
-          TriplesGeneratedEvent(eventId, projectPath, eventPayload, schema)
+         """.query(compoundEventIdDecoder ~ projectPathDecoder ~ zippedPayloadDecoder).map {
+        case eventId ~ projectPath ~ eventPayload =>
+          TriplesGeneratedEvent(eventId, projectPath, eventPayload)
       })
       .arguments(idAndPath.path ~ idAndPath.id ~ executionDate ~ executionDate)
       .build(_.option)
@@ -156,7 +157,7 @@ private class TriplesGeneratedEventFinderImpl[Interpretation[_]: Sync: BracketTh
       ]] = {
     case None =>
       Kleisli.pure(Option.empty[TriplesGeneratedEvent])
-    case Some(event @ TriplesGeneratedEvent(id, _, _, _)) =>
+    case Some(event @ TriplesGeneratedEvent(id, _, _)) =>
       measureExecutionTime(updateStatus(id)) map toNoneIfEventAlreadyTaken(event)
   }
 

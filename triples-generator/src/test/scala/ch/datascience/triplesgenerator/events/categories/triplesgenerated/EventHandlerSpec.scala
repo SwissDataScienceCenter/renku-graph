@@ -27,9 +27,9 @@ import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
 import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, Project}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
+import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, zippedEventPayloads}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.CompoundEventId
+import ch.datascience.graph.model.events.{CompoundEventId, ZippedEventPayload}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
@@ -51,7 +51,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
         val triplesGeneratedEvent = triplesGeneratedEvents.generateOne
         (eventBodyDeserializer.toEvent _)
-          .expects(eventId, project, eventBody -> schemaVersion)
+          .expects(eventId, project, zippedPayload)
           .returning(triplesGeneratedEvent.pure[IO])
 
         (eventProcessor.process _)
@@ -59,7 +59,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
           .returning(().pure[IO])
 
         val requestContent: EventRequestContent =
-          requestContent((eventId, project).asJson(eventEncoder), bodyContent.some)
+          requestContent((eventId, project).asJson(eventEncoder), zippedPayload)
 
         handler.createHandlingProcess(requestContent).unsafeRunSyncProcess() shouldBe Right(Accepted)
 
@@ -70,20 +70,19 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
         )
       }
 
-    s"return $BadRequest if event body is not present" in new TestCase {
+    s"return $BadRequest if event payload is not present" in new TestCase {
 
-      val requestContent: EventRequestContent =
-        requestContent((eventId, project).asJson(eventEncoder), None)
+      val requestContent = EventRequestContent.NoPayload((eventId, project).asJson(eventEncoder))
 
       handler.createHandlingProcess(requestContent).unsafeRunSyncProcess() shouldBe Left(BadRequest)
 
       logger.expectNoLogs()
     }
 
-    s"return $BadRequest if event body is malformed" in new TestCase {
+    s"return $BadRequest if event payload is malformed" in new TestCase {
 
-      val requestContent: EventRequestContent =
-        requestContent((eventId, project).asJson(eventEncoder), jsons.generateOne.noSpaces.some)
+      val requestContent =
+        EventRequestContent.WithPayload((eventId, project).asJson(eventEncoder), jsons.generateOne.noSpaces)
 
       handler.createHandlingProcess(requestContent).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(
         BadRequest
@@ -96,19 +95,16 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
       val triplesGeneratedEvent = triplesGeneratedEvents.generateOne
       (eventBodyDeserializer.toEvent _)
-        .expects(eventId, project, eventBody -> schemaVersion)
+        .expects(eventId, project, zippedPayload)
         .returning(triplesGeneratedEvent.pure[IO])
 
       (eventProcessor.process _)
         .expects(triplesGeneratedEvent)
         .returning(exceptions.generateOne.raiseError[IO, Unit])
 
-      val requestContent: EventRequestContent =
-        requestContent((eventId, project).asJson(eventEncoder), bodyContent.some)
+      val requestContent: EventRequestContent = requestContent((eventId, project).asJson(eventEncoder), zippedPayload)
 
-      handler.createHandlingProcess(requestContent).unsafeRunSyncProcess() shouldBe Right(
-        Accepted
-      )
+      handler.createHandlingProcess(requestContent).unsafeRunSyncProcess() shouldBe Right(Accepted)
 
       logger.loggedOnly(
         Info(
@@ -121,12 +117,9 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
   private trait TestCase {
 
     val eventId       = compoundEventIds.generateOne
-    val eventBody     = eventBodies.generateOne
+    val zippedPayload = zippedEventPayloads.generateOne
     val projectPath   = projectPaths.generateOne
     val project       = Project(eventId.projectId, projectPath)
-    val schemaVersion = projectSchemaVersions.generateOne
-
-    val bodyContent = json"""{ "schemaVersion": ${schemaVersion.value}, "payload": ${eventBody.value} }""".noSpaces
 
     val eventProcessor             = mock[EventProcessor[IO]]
     val eventBodyDeserializer      = mock[EventBodyDeserializer[IO]]
@@ -136,17 +129,16 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
     (subscriptionMechanism.renewSubscription _).expects().returns(IO.unit)
 
-    val handler =
-      new EventHandler[IO](categoryName,
-                           eventBodyDeserializer,
-                           subscriptionMechanism,
-                           concurrentProcessesLimiter,
-                           eventProcessor,
-                           logger
-      )
+    val handler = new EventHandler[IO](categoryName,
+                                       eventBodyDeserializer,
+                                       subscriptionMechanism,
+                                       concurrentProcessesLimiter,
+                                       eventProcessor,
+                                       logger
+    )
 
-    def requestContent(event: Json, maybePayload: Option[String]): EventRequestContent =
-      events.EventRequestContent(event, maybePayload)
+    def requestContent(event: Json, payload: ZippedEventPayload): EventRequestContent =
+      events.EventRequestContent.WithPayload(event, payload)
   }
 
   private implicit lazy val eventEncoder: Encoder[(CompoundEventId, Project)] =

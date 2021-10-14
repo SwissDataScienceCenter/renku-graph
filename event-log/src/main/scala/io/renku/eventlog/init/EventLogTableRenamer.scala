@@ -33,22 +33,20 @@ private trait EventLogTableRenamer[Interpretation[_]] {
 }
 
 private object EventLogTableRenamer {
-  def apply[Interpretation[_]: BracketThrow](
-      sessionResource: SessionResource[Interpretation, EventLogDB],
-      logger:          Logger[Interpretation]
+  def apply[Interpretation[_]: BracketThrow: Logger](
+      sessionResource: SessionResource[Interpretation, EventLogDB]
   ): EventLogTableRenamer[Interpretation] =
-    new EventLogTableRenamerImpl(sessionResource, logger)
+    new EventLogTableRenamerImpl(sessionResource)
 }
 
-private class EventLogTableRenamerImpl[Interpretation[_]: BracketThrow](
-    sessionResource: SessionResource[Interpretation, EventLogDB],
-    logger:          Logger[Interpretation]
+private class EventLogTableRenamerImpl[Interpretation[_]: BracketThrow: Logger](
+    sessionResource: SessionResource[Interpretation, EventLogDB]
 ) extends EventLogTableRenamer[Interpretation]
     with EventTableCheck {
 
   override def run(): Interpretation[Unit] = sessionResource.useK {
     checkOldTableExists >>= {
-      case false => Kleisli.liftF(logger info "'event' table already exists")
+      case false => Kleisli.liftF(Logger[Interpretation] info "'event' table already exists")
       case true =>
         whenEventTableExists(
           dropOldTable(),
@@ -66,13 +64,13 @@ private class EventLogTableRenamerImpl[Interpretation[_]: BracketThrow](
   private def renameTable(): Kleisli[Interpretation, Session[Interpretation], Unit] =
     for {
       _ <- execute(sql"ALTER TABLE event_log RENAME TO event".command)
-      _ <- Kleisli.liftF(logger info "'event_log' table renamed to 'event'")
+      _ <- Kleisli.liftF(Logger[Interpretation] info "'event_log' table renamed to 'event'")
     } yield ()
 
   private def dropOldTable(): Kleisli[Interpretation, Session[Interpretation], Unit] =
     for {
       _ <- execute(sql"DROP TABLE IF EXISTS event_log".command)
-      _ <- Kleisli.liftF(logger info "'event_log' table dropped")
+      _ <- Kleisli.liftF(Logger[Interpretation] info "'event_log' table dropped")
     } yield ()
 
 }

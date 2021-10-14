@@ -399,8 +399,8 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           val newModificationDate =
             timestamps(min = newOrigDate.instant, max = projectInfo.dateCreated.value).generateAs[datasets.DateCreated]
           (
-            orig.copy(provenance = orig.provenance.copy(date = newOrigDate)),
-            modified.copy(provenance = modified.provenance.copy(date = newModificationDate))
+            orig.copy(provenance = orig.provenance.copy(date = newOrigDate), parts = Nil),
+            modified.copy(provenance = modified.provenance.copy(date = newModificationDate), parts = Nil)
           )
         }.generateOne
       val jsonLD = cliLikeJsonLD(

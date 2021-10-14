@@ -20,14 +20,14 @@ package io.renku.eventlog.events.categories.statuschange
 
 import cats.data.Kleisli
 import cats.effect.IO
+import cats.syntax.all._
 import ch.datascience.db.SqlStatement
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.timestamps
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventProcessingTimes}
 import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
-import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
+import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
 import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventContentGenerators.eventDates
@@ -89,24 +89,24 @@ class ToTriplesStoreUpdaterSpec
         }
         .getOrElse(fail("No event found for main event"))
 
-      eventsToUpdate.map { case (eventId, status, _, originalPayload, _, originalProcessingTimes) =>
+      eventsToUpdate.map { case (eventId, status, _, originalPayload, originalProcessingTimes) =>
         findFullEvent(CompoundEventId(eventId, projectId))
           .map { case (_, status, maybeMessage, maybePayload, processingTimes) =>
-            status          shouldBe TriplesStore
-            maybeMessage    shouldBe None
-            maybePayload    shouldBe originalPayload
-            processingTimes shouldBe originalProcessingTimes
+            status               shouldBe TriplesStore
+            maybeMessage         shouldBe None
+            (maybePayload.map(_.value) -> originalPayload.map(_.value)) mapN (_ should contain theSameElementsAs _)
+            processingTimes      shouldBe originalProcessingTimes
           }
           .getOrElse(fail(s"No event found with old $status status"))
       }
 
-      eventsToSkip.map { case (eventId, originalStatus, originalMessage, originalPayload, _, originalProcessingTimes) =>
+      eventsToSkip.map { case (eventId, originalStatus, originalMessage, originalPayload, originalProcessingTimes) =>
         findFullEvent(CompoundEventId(eventId, projectId))
           .map { case (_, status, maybeMessage, maybePayload, processingTimes) =>
-            status          shouldBe originalStatus
-            maybeMessage    shouldBe originalMessage
-            maybePayload    shouldBe originalPayload
-            processingTimes shouldBe originalProcessingTimes
+            status               shouldBe originalStatus
+            maybeMessage         shouldBe originalMessage
+            (maybePayload.map(_.value) -> originalPayload.map(_.value)) mapN (_ should contain theSameElementsAs _)
+            processingTimes      shouldBe originalProcessingTimes
           }
           .getOrElse(fail(s"No event found with old $originalStatus status"))
       }
@@ -138,17 +138,14 @@ class ToTriplesStoreUpdaterSpec
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()
 
-    def addEvent(status: EventStatus, eventDate: EventDate): (EventId,
-                                                              EventStatus,
-                                                              Option[EventMessage],
-                                                              Option[EventPayload],
-                                                              Option[SchemaVersion],
-                                                              List[EventProcessingTime]
-    ) = storeGeneratedEvent(status, eventDate, projectId, projectPath)
+    def addEvent(status:    EventStatus,
+                 eventDate: EventDate
+    ): (EventId, EventStatus, Option[EventMessage], Option[ZippedEventPayload], List[EventProcessingTime]) =
+      storeGeneratedEvent(status, eventDate, projectId, projectPath)
 
     def findFullEvent(
         eventId: CompoundEventId
-    ): Option[(EventId, EventStatus, Option[EventMessage], Option[EventPayload], List[EventProcessingTime])] = {
+    ): Option[(EventId, EventStatus, Option[EventMessage], Option[ZippedEventPayload], List[EventProcessingTime])] = {
       val maybeEvent     = findEvent(eventId)
       val maybePayload   = findPayload(eventId).map(_._2)
       val processingTime = findProcessingTime(eventId)

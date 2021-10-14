@@ -25,27 +25,28 @@ import io.renku.eventlog.InMemoryEventLogDb
 trait EventLogDbMigrations {
   self: InMemoryEventLogDb =>
 
-  private lazy val logger = TestLogger[IO]()
-
-  protected lazy val eventLogTableCreator:     Migration = EventLogTableCreator(sessionResource, logger)
-  protected lazy val projectPathAdder:         Migration = ProjectPathAdder(sessionResource, logger)
-  protected lazy val batchDateAdder:           Migration = BatchDateAdder(sessionResource, logger)
-  protected lazy val projectTableCreator:      Migration = ProjectTableCreator(sessionResource, logger)
-  protected lazy val projectPathRemover:       Migration = ProjectPathRemover(sessionResource, logger)
-  protected lazy val eventLogTableRenamer:     Migration = EventLogTableRenamer(sessionResource, logger)
-  protected lazy val eventStatusRenamer:       Migration = EventStatusRenamer(sessionResource, logger)
-  protected lazy val eventPayloadTableCreator: Migration = EventPayloadTableCreator(sessionResource, logger)
-  protected lazy val eventPayloadSchemaVersionAdder: Migration =
-    EventPayloadSchemaVersionAdder(sessionResource, logger)
-  protected lazy val subscriptionCategorySyncTimeTableCreator: Migration =
-    SubscriptionCategorySyncTimeTableCreator(sessionResource, logger)
-  protected lazy val statusesProcessingTimeTableCreator: Migration =
-    StatusesProcessingTimeTableCreator(sessionResource, logger)
-  protected lazy val subscriberTableCreator:    Migration = SubscriberTableCreator(sessionResource, logger)
-  protected lazy val eventDeliveryTableCreator: Migration = EventDeliveryTableCreator(sessionResource, logger)
-  protected lazy val timestampZoneAdder:        Migration = TimestampZoneAdder(sessionResource, logger)
+  private implicit lazy val logger = TestLogger[IO]()
 
   protected type Migration = { def run(): IO[Unit] }
+
+  protected lazy val eventLogTableCreator:     Migration = EventLogTableCreator(sessionResource)
+  protected lazy val projectPathAdder:         Migration = ProjectPathAdder(sessionResource)
+  protected lazy val batchDateAdder:           Migration = BatchDateAdder(sessionResource)
+  protected lazy val projectTableCreator:      Migration = ProjectTableCreator(sessionResource)
+  protected lazy val projectPathRemover:       Migration = ProjectPathRemover(sessionResource)
+  protected lazy val eventLogTableRenamer:     Migration = EventLogTableRenamer(sessionResource)
+  protected lazy val eventStatusRenamer:       Migration = EventStatusRenamer(sessionResource)
+  protected lazy val eventPayloadTableCreator: Migration = EventPayloadTableCreator(sessionResource)
+  protected lazy val eventPayloadSchemaVersionAdder: Migration =
+    EventPayloadSchemaVersionAdder(sessionResource)
+  protected lazy val subscriptionCategorySyncTimeTableCreator: Migration =
+    SubscriptionCategorySyncTimeTableCreator(sessionResource)
+  protected lazy val statusesProcessingTimeTableCreator: Migration =
+    StatusesProcessingTimeTableCreator(sessionResource)
+  protected lazy val subscriberTableCreator:    Migration = SubscriberTableCreator(sessionResource)
+  protected lazy val eventDeliveryTableCreator: Migration = EventDeliveryTableCreator(sessionResource)
+  protected lazy val timestampZoneAdder:        Migration = TimestampZoneAdder(sessionResource)
+  protected lazy val payloadTypeChanger:        Migration = PayloadTypeChanger(sessionResource)
 
   protected lazy val allMigrations: List[Migration] = List(
     eventLogTableCreator,
@@ -61,6 +62,7 @@ trait EventLogDbMigrations {
     statusesProcessingTimeTableCreator,
     subscriberTableCreator,
     eventDeliveryTableCreator,
-    timestampZoneAdder
+    timestampZoneAdder,
+    payloadTypeChanger
   )
 }

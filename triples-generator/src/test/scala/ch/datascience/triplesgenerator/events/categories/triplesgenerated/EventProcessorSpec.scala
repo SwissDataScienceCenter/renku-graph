@@ -31,7 +31,7 @@ import ch.datascience.graph.model.events.EventStatus.{TransformationNonRecoverab
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.model.testentities._
-import ch.datascience.graph.model.{SchemaVersion, entities, projects}
+import ch.datascience.graph.model.{entities, projects}
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
@@ -39,7 +39,7 @@ import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.interpreters.TestLogger.Matcher.NotRefEqual
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.metrics.MetricsRegistry
-import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
+import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.EventProcessor.eventsProcessingTimesBuilder
@@ -377,23 +377,6 @@ class EventProcessorSpec
         .expects(compoundEventId,
                  projectPath,
                  EventProcessingTime(Duration.ofMillis(executionTimeRecorder.elapsedTime.value))
-        )
-        .returning(context.unit)
-
-    def expectEventMarkedAsTriplesGenerated(event: TriplesGeneratedEvent) =
-      (eventStatusUpdater
-        .toTriplesGenerated(_: CompoundEventId,
-                            _: projects.Path,
-                            _: JsonLDTriples,
-                            _: SchemaVersion,
-                            _: EventProcessingTime
-        ))
-        .expects(
-          event.compoundEventId,
-          event.project.path,
-          JsonLDTriples(event.triples.toJson),
-          event.schemaVersion,
-          EventProcessingTime(Duration.ofMillis(executionTimeRecorder.elapsedTime.value))
         )
         .returning(context.unit)
 

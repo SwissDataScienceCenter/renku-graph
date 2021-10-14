@@ -18,18 +18,18 @@
 
 package ch.datascience.triplesgenerator.events.categories
 
-import cats.MonadThrow
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{BracketThrow, ContextShift, IO, Sync, Timer}
 import cats.syntax.all._
+import ch.datascience.compression.Zip
 import ch.datascience.data.ErrorMessage
 import ch.datascience.events
 import ch.datascience.events.EventRequestContent
 import ch.datascience.events.producers.EventSender
 import ch.datascience.graph.model.events.EventStatus.{FailureStatus, TriplesGenerated, TriplesStore}
-import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventProcessingTime, EventStatus}
-import ch.datascience.graph.model.{SchemaVersion, projects}
-import ch.datascience.rdfstore.JsonLDTriples
+import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventProcessingTime, EventStatus, ZippedEventPayload}
+import ch.datascience.graph.model.projects
 import ch.datascience.tinytypes.json.TinyTypeEncoders
+import io.renku.jsonld.JsonLD
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -37,8 +37,7 @@ import scala.concurrent.ExecutionContext
 private trait EventStatusUpdater[Interpretation[_]] {
   def toTriplesGenerated(eventId:        CompoundEventId,
                          projectPath:    projects.Path,
-                         payload:        JsonLDTriples,
-                         schemaVersion:  SchemaVersion,
+                         payload:        JsonLD,
                          processingTime: EventProcessingTime
   ): Interpretation[Unit]
 
@@ -58,44 +57,45 @@ private trait EventStatusUpdater[Interpretation[_]] {
   ): Interpretation[Unit]
 }
 
-private class EventStatusUpdaterImpl[Interpretation[_]: MonadThrow](
+private class EventStatusUpdaterImpl[Interpretation[_]: BracketThrow: Sync](
     eventSender:  EventSender[Interpretation],
-    categoryName: CategoryName
+    categoryName: CategoryName,
+    zipper:       Zip
 ) extends EventStatusUpdater[Interpretation]
     with TinyTypeEncoders {
 
   import io.circe.literal._
+  import zipper._
 
   override def toTriplesGenerated(eventId:        CompoundEventId,
                                   projectPath:    projects.Path,
-                                  payload:        JsonLDTriples,
-                                  schemaVersion:  SchemaVersion,
+                                  payload:        JsonLD,
                                   processingTime: EventProcessingTime
-  ): Interpretation[Unit] = eventSender.sendEvent(
-    eventContent = events.EventRequestContent(
-      event = json"""{
-        "categoryName": "EVENTS_STATUS_CHANGE",
-        "id": ${eventId.id},
-        "project": {
-          "id":   ${eventId.projectId},
-          "path": $projectPath
-        },
-        "newStatus": $TriplesGenerated,
-        "processingTime": $processingTime
-      }""",
-      maybePayload = json"""{
-        "payload": ${payload.value.noSpaces},
-        "schemaVersion": $schemaVersion
-      }""".noSpaces.some
-    ),
-    errorMessage = s"$categoryName: Change event status as $TriplesGenerated failed"
-  )
+  ): Interpretation[Unit] = for {
+    zippedContent <- zip(payload.toJson.noSpaces).map(ZippedEventPayload.apply)
+    _ <- eventSender.sendEvent(
+           eventContent = events.EventRequestContent.WithPayload(
+             event = json"""{
+                              "categoryName": "EVENTS_STATUS_CHANGE",
+                              "id": ${eventId.id},
+                              "project": {
+                                "id":   ${eventId.projectId},
+                                "path": $projectPath
+                              },
+                              "newStatus": $TriplesGenerated,
+                              "processingTime": $processingTime
+                            }""",
+             payload = zippedContent
+           ),
+           errorMessage = s"$categoryName: Change event status as $TriplesGenerated failed"
+         )
+  } yield ()
 
   override def toTriplesStore(eventId:        CompoundEventId,
                               projectPath:    projects.Path,
                               processingTime: EventProcessingTime
   ): Interpretation[Unit] = eventSender.sendEvent(
-    eventContent = EventRequestContent(json"""{ 
+    eventContent = EventRequestContent.NoPayload(json"""{ 
       "categoryName": "EVENTS_STATUS_CHANGE",
       "id": ${eventId.id},
       "project": {
@@ -112,7 +112,7 @@ private class EventStatusUpdaterImpl[Interpretation[_]: MonadThrow](
       eventId:               CompoundEventId,
       projectPath:           projects.Path
   )(implicit rollbackStatus: () => S): Interpretation[Unit] = eventSender.sendEvent(
-    eventContent = EventRequestContent(json"""{
+    eventContent = EventRequestContent.NoPayload(json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",
       "id":           ${eventId.id},
       "project": {
@@ -129,7 +129,7 @@ private class EventStatusUpdaterImpl[Interpretation[_]: MonadThrow](
                          eventStatus: FailureStatus,
                          exception:   Throwable
   ): Interpretation[Unit] = eventSender.sendEvent(
-    eventContent = EventRequestContent(json"""{
+    eventContent = EventRequestContent.NoPayload(json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",
       "id":           ${eventId.id},
       "project": {
@@ -149,13 +149,13 @@ private object EventStatusUpdater {
   implicit val rollbackToTriplesGenerated: () => EventStatus.TriplesGenerated = () => EventStatus.TriplesGenerated
 
   def apply(
-      categoryName: CategoryName,
-      logger:       Logger[IO]
+      categoryName: CategoryName
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
+      timer:            Timer[IO],
+      logger:           Logger[IO]
   ): IO[EventStatusUpdater[IO]] = for {
-    eventSender <- EventSender(logger)
-  } yield new EventStatusUpdaterImpl(eventSender, categoryName)
+    eventSender <- EventSender()
+  } yield new EventStatusUpdaterImpl(eventSender, categoryName, Zip)
 }

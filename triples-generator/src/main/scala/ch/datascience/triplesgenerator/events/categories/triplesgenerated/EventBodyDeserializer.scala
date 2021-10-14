@@ -19,34 +19,36 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 
 import cats.MonadThrow
-import cats.effect.IO
+import cats.effect.{BracketThrow, IO, Sync}
 import cats.syntax.all._
+import ch.datascience.compression.Zip
 import ch.datascience.events.consumers.Project
-import ch.datascience.graph.model.SchemaVersion
-import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
+import ch.datascience.graph.model.events.{CompoundEventId, ZippedEventPayload}
+import io.renku.jsonld.parser.ParsingFailure
+import io.renku.jsonld.{JsonLD, parser}
+
+import scala.util.control.NonFatal
 
 private trait EventBodyDeserializer[Interpretation[_]] {
-  def toEvent(eventId: CompoundEventId,
-              project: Project,
-              body:    (EventBody, SchemaVersion)
+  def toEvent(eventId:       CompoundEventId,
+              project:       Project,
+              zippedPayload: ZippedEventPayload
   ): Interpretation[TriplesGeneratedEvent]
 }
 
-private class EventBodyDeserializerImpl[Interpretation[_]: MonadThrow] extends EventBodyDeserializer[Interpretation] {
-  import io.renku.jsonld.parser.{parse => parserToJsonLD, _}
+private class EventBodyDeserializerImpl[Interpretation[_]: BracketThrow: Sync](zip: Zip = Zip)
+    extends EventBodyDeserializer[Interpretation] {
 
-  override def toEvent(eventId: CompoundEventId,
-                       project: Project,
-                       body:    (EventBody, SchemaVersion)
-  ): Interpretation[TriplesGeneratedEvent] = MonadThrow[Interpretation].fromEither {
-    parserToJsonLD(body._1.value)
-      .map(jsonLD => TriplesGeneratedEvent(eventId.id, project, jsonLD, body._2))
-      .leftMap(toMeaningfulError(eventId))
-  }
-
-  private def toMeaningfulError(eventId: CompoundEventId): ParsingFailure => ParsingFailure = { failure =>
-    ParsingFailure(s"TriplesGeneratedEvent cannot be deserialised: $eventId", failure)
-  }
+  override def toEvent(eventId:       CompoundEventId,
+                       project:       Project,
+                       zippedPayload: ZippedEventPayload
+  ): Interpretation[TriplesGeneratedEvent] = for {
+    unzipped <- zip.unzip[Interpretation](zippedPayload.value)
+    payload <- MonadThrow[Interpretation].fromEither(parser.parse(unzipped)).recoverWith { case NonFatal(error) =>
+                 ParsingFailure(s"TriplesGeneratedEvent cannot be deserialised: $eventId", error)
+                   .raiseError[Interpretation, JsonLD]
+               }
+  } yield TriplesGeneratedEvent(eventId.id, project, payload)
 }
 
 private object EventBodyDeserializer {

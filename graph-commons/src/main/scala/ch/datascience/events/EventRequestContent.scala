@@ -20,8 +20,14 @@ package ch.datascience.events
 
 import io.circe.Json
 
-case class EventRequestContent(event: Json, maybePayload: Option[String])
+sealed trait EventRequestContent {
+  val event: Json
+}
 
 object EventRequestContent {
-  def apply(event: Json): EventRequestContent = EventRequestContent(event, None)
+  def apply(event: Json): EventRequestContent = NoPayload(event)
+
+  case class NoPayload(event: Json) extends EventRequestContent
+
+  case class WithPayload[Payload](event: Json, payload: Payload) extends EventRequestContent
 }

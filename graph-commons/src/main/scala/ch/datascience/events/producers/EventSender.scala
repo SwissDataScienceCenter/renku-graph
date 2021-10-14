@@ -39,55 +39,73 @@ import scala.concurrent.duration.{Duration, FiniteDuration, _}
 import scala.language.postfixOps
 
 trait EventSender[Interpretation[_]] {
-  def sendEvent(eventContent: EventRequestContent, errorMessage: String): Interpretation[Unit]
+  def sendEvent(eventContent: EventRequestContent.NoPayload, errorMessage: String): Interpretation[Unit]
+
+  def sendEvent[PayloadType](eventContent: EventRequestContent.WithPayload[PayloadType], errorMessage: String)(implicit
+      partEncoder:                         RestClient.PartEncoder[PayloadType]
+  ): Interpretation[Unit]
 }
 
-class EventSenderImpl[Interpretation[_]: ConcurrentEffect: Timer](
+class EventSenderImpl[Interpretation[_]: ConcurrentEffect: Timer: Logger](
     eventLogUrl:             EventLogUrl,
-    logger:                  Logger[Interpretation],
     onErrorSleep:            FiniteDuration,
     retryInterval:           FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     requestTimeoutOverride:  Option[Duration] = None
 )(implicit executionContext: ExecutionContext)
     extends RestClient[Interpretation, Any](Throttler.noThrottling,
-                                            logger,
+                                            Logger[Interpretation],
                                             retryInterval = retryInterval,
                                             maxRetries = maxRetries,
                                             requestTimeoutOverride = requestTimeoutOverride
     )
     with EventSender[Interpretation] {
 
-  def sendEvent(eventContent: EventRequestContent, errorMessage: String): Interpretation[Unit] = {
-
-    def retryOnServerError(retry: Eval[Interpretation[Unit]]): PartialFunction[Throwable, Interpretation[Unit]] = {
-      case exception @ UnexpectedResponseException(ServiceUnavailable | GatewayTimeout | BadGateway, _) =>
-        waitAndRetry(retry, exception)
-      case exception @ (_: ConnectivityException | _: ClientException) =>
-        waitAndRetry(retry, exception)
-    }
-
-    def waitAndRetry(retry: Eval[Interpretation[Unit]], exception: Throwable) = for {
-      _      <- logger.error(exception)(errorMessage)
-      _      <- Timer[Interpretation] sleep onErrorSleep
-      result <- retry.value
-    } yield result
-
+  override def sendEvent(eventContent: EventRequestContent.NoPayload, errorMessage: String): Interpretation[Unit] =
     for {
       uri <- validateUri(s"$eventLogUrl/events")
       request = createRequest(uri, eventContent)
       sendingResult <-
         send(request)(responseMapping)
-          .recoverWith(retryOnServerError(Eval.always(sendEvent(eventContent, errorMessage))))
+          .recoverWith(retryOnServerError(Eval.always(sendEvent(eventContent, errorMessage)), errorMessage))
     } yield sendingResult
 
-  }
+  override def sendEvent[PayloadType](eventContent: EventRequestContent.WithPayload[PayloadType], errorMessage: String)(
+      implicit partEncoder:                         RestClient.PartEncoder[PayloadType]
+  ): Interpretation[Unit] = for {
+    uri <- validateUri(s"$eventLogUrl/events")
+    request = createRequest(uri, eventContent)
+    _ <- send(request)(responseMapping)
+           .recoverWith(retryOnServerError(Eval.always(sendEvent(eventContent, errorMessage)), errorMessage))
+  } yield ()
 
-  private def createRequest(uri: Uri, eventRequestContent: EventRequestContent) =
+  private def createRequest(uri: Uri, eventRequestContent: EventRequestContent.NoPayload) =
     request(POST, uri).withMultipartBuilder
       .addPart("event", eventRequestContent.event)
-      .maybeAddPart("payload", eventRequestContent.maybePayload)
       .build()
+
+  private def createRequest[PayloadType](uri: Uri, eventRequestContent: EventRequestContent.WithPayload[PayloadType])(
+      implicit partEncoder:                   RestClient.PartEncoder[PayloadType]
+  ) = request(POST, uri).withMultipartBuilder
+    .addPart("event", eventRequestContent.event)
+    .addPart("payload", eventRequestContent.payload)
+    .build()
+
+  private def retryOnServerError(
+      retry:        Eval[Interpretation[Unit]],
+      errorMessage: String
+  ): PartialFunction[Throwable, Interpretation[Unit]] = {
+    case exception @ UnexpectedResponseException(ServiceUnavailable | GatewayTimeout | BadGateway, _) =>
+      waitAndRetry(retry, exception, errorMessage)
+    case exception @ (_: ConnectivityException | _: ClientException) =>
+      waitAndRetry(retry, exception, errorMessage)
+  }
+
+  private def waitAndRetry(retry: Eval[Interpretation[Unit]], exception: Throwable, errorMessage: String) = for {
+    _      <- Logger[Interpretation].error(exception)(errorMessage)
+    _      <- Timer[Interpretation] sleep onErrorSleep
+    result <- retry.value
+  } yield result
 
   private lazy val responseMapping
       : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[Unit]] = {
@@ -96,10 +114,12 @@ class EventSenderImpl[Interpretation[_]: ConcurrentEffect: Timer](
 }
 
 object EventSender {
-  def apply(
-      logger:    Logger[IO]
-  )(implicit ec: ExecutionContext, ce: ConcurrentEffect[IO], timer: Timer[IO]): IO[EventSender[IO]] =
-    for {
-      eventlogUrl <- EventLogUrl()
-    } yield new EventSenderImpl(eventlogUrl, logger, onErrorSleep = 15 seconds)
+  def apply()(implicit
+      ec:     ExecutionContext,
+      ce:     ConcurrentEffect[IO],
+      timer:  Timer[IO],
+      logger: Logger[IO]
+  ): IO[EventSender[IO]] = for {
+    eventLogUrl <- EventLogUrl()
+  } yield new EventSenderImpl(eventLogUrl, onErrorSleep = 15 seconds)
 }

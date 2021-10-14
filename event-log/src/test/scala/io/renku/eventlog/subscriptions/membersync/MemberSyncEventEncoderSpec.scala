@@ -39,12 +39,4 @@ class MemberSyncEventEncoderSpec extends AnyWordSpec with should.Matchers {
       }"""
     }
   }
-
-  "encodePayload" should {
-    "return None" in {
-      val event = MemberSyncEvent(projectPaths.generateOne)
-
-      MemberSyncEventEncoder.encodePayload(event) shouldBe None
-    }
-  }
 }

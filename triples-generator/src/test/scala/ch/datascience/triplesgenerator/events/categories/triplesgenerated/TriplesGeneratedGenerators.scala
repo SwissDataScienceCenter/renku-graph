@@ -21,7 +21,6 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 import ch.datascience.events.consumers.ConsumersModelGenerators._
 import ch.datascience.generators.Generators.{exceptions, nonEmptyStrings}
 import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators.projectSchemaVersions
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
 import io.renku.jsonld.generators.JsonLDGenerators.jsonLDEntities
 import org.scalacheck.Gen
@@ -34,10 +33,9 @@ private object TriplesGeneratedGenerators {
   } yield TransformationRecoverableError(message, exception)
 
   implicit val triplesGeneratedEvents: Gen[TriplesGeneratedEvent] = for {
-    eventId       <- eventIds
-    project       <- projectsGen
-    entities      <- jsonLDEntities
-    schemaVersion <- projectSchemaVersions
-  } yield TriplesGeneratedEvent(eventId, project, entities, schemaVersion)
+    eventId  <- eventIds
+    project  <- projectsGen
+    entities <- jsonLDEntities
+  } yield TriplesGeneratedEvent(eventId, project, entities)
 
 }

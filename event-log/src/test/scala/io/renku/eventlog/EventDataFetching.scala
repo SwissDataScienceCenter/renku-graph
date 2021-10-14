@@ -19,7 +19,7 @@
 package io.renku.eventlog
 
 import cats.data.Kleisli
-import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventId, EventProcessingTime, EventStatus}
+import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
 import ch.datascience.graph.model.projects
 import skunk._
 import skunk.implicits._
@@ -45,13 +45,13 @@ trait EventDataFetching {
       }
     }
 
-  protected def findPayload(eventId: CompoundEventId): Option[(CompoundEventId, EventPayload)] = execute {
+  protected def findPayload(eventId: CompoundEventId): Option[(CompoundEventId, ZippedEventPayload)] = execute {
     Kleisli { session =>
-      val query: Query[EventId ~ projects.Id, (CompoundEventId, EventPayload)] =
+      val query: Query[EventId ~ projects.Id, (CompoundEventId, ZippedEventPayload)] =
         sql"""SELECT event_id, project_id, payload
               FROM event_payload
               WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder;"""
-          .query(eventIdDecoder ~ projectIdDecoder ~ eventPayloadDecoder)
+          .query(eventIdDecoder ~ projectIdDecoder ~ zippedPayloadDecoder)
           .map { case eventId ~ projectId ~ eventPayload =>
             (CompoundEventId(eventId, projectId), eventPayload)
           }

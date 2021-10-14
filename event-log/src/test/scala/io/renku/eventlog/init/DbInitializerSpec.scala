@@ -55,15 +55,15 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
   }
 
   private trait TestCase {
+
     import DbInitializer.Runnable
 
-    val migrator1 = mock[EventLogTableCreator[IO]]
-    val migrator2 = mock[EventPayloadTableCreator[IO]]
-    val logger    = TestLogger[IO]()
+    val migrator1       = mock[EventLogTableCreator[IO]]
+    val migrator2       = mock[EventPayloadTableCreator[IO]]
+    implicit val logger = TestLogger[IO]()
 
     val dbInitializer = new DbInitializerImpl[IO](
-      List[Runnable[IO, Unit]](migrator1, migrator2),
-      logger
+      List[Runnable[IO, Unit]](migrator1, migrator2)
     )
   }
 }

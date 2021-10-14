@@ -18,7 +18,7 @@
 
 package ch.datascience.commiteventservice.events
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.data.EitherT
 import cats.data.EitherT.right
 import cats.effect.Effect
@@ -38,10 +38,9 @@ trait EventEndpoint[Interpretation[_]] {
   def processEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]]
 }
 
-class EventEndpointImpl[Interpretation[_]: Effect](
+class EventEndpointImpl[Interpretation[_]: Effect: MonadThrow](
     eventConsumersRegistry: EventConsumersRegistry[Interpretation]
-)(implicit ME:              MonadError[Interpretation, Throwable])
-    extends Http4sDsl[Interpretation]
+) extends Http4sDsl[Interpretation]
     with EventEndpoint[Interpretation] {
 
   import org.http4s.circe._
@@ -51,8 +50,12 @@ class EventEndpointImpl[Interpretation[_]: Effect](
       multipart    <- toMultipart(request)
       eventJson    <- toEvent(multipart)
       maybePayload <- getPayload(multipart)
+      eventRequest = maybePayload match {
+                       case Some(payload) => EventRequestContent.WithPayload(eventJson, payload)
+                       case None          => EventRequestContent.NoPayload(eventJson)
+                     }
       result <- right[Response[Interpretation]](
-                  eventConsumersRegistry.handle(EventRequestContent(eventJson, maybePayload)) >>= toHttpResult
+                  eventConsumersRegistry.handle(eventRequest) >>= toHttpResult
                 )
     } yield result
   }.merge recoverWith { case NonFatal(error) =>

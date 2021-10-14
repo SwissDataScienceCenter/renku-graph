@@ -21,7 +21,6 @@ package events.categories.awaitinggeneration
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
-import ch.datascience.graph.model.RenkuVersionPair
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.subscriptions.PayloadComposer.payloadsComposerFactory
 import org.typelevel.log4cats.Logger
@@ -29,13 +28,13 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.ExecutionContext
 
 object SubscriptionFactory {
-  def apply(currentVersionPair: RenkuVersionPair, metricsRegistry: MetricsRegistry[IO], logger: Logger[IO])(implicit
-      executionContext:         ExecutionContext,
-      contextShift:             ContextShift[IO],
-      timer:                    Timer[IO]
+  def apply(metricsRegistry: MetricsRegistry[IO])(implicit
+      executionContext:      ExecutionContext,
+      contextShift:          ContextShift[IO],
+      timer:                 Timer[IO],
+      logger:                Logger[IO]
   ): IO[(EventHandler[IO], SubscriptionMechanism[IO])] = for {
     subscriptionMechanism <- SubscriptionMechanism(categoryName, payloadsComposerFactory, logger)
-    handler <-
-      EventHandler(currentVersionPair, metricsRegistry, subscriptionMechanism, logger)
+    handler               <- EventHandler(metricsRegistry, subscriptionMechanism)
   } yield handler -> subscriptionMechanism
 }

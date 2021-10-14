@@ -137,7 +137,7 @@ class EventHandlerSpec
     val handler =
       new EventHandler[IO](categoryName, commitEventSynchronizer, logger)
 
-    def requestContent(event: Json): EventRequestContent = events.EventRequestContent(event, None)
+    def requestContent(event: Json): EventRequestContent = events.EventRequestContent.NoPayload(event)
   }
 
   private implicit def eventEncoder[E <: CommitSyncEvent]: Encoder[E] = Encoder.instance[E] {

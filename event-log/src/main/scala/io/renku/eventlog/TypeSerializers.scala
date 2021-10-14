@@ -20,8 +20,8 @@ package io.renku.eventlog
 
 import ch.datascience.events.consumers.Project
 import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
-import ch.datascience.graph.model.events.{BatchDate, CommitId, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus}
-import ch.datascience.graph.model.{SchemaVersion, projects}
+import ch.datascience.graph.model.events.{BatchDate, CommitId, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
+import ch.datascience.graph.model.projects
 import ch.datascience.http.rest.paging.model.PerPage
 import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}
 import skunk.codec.all._
@@ -80,8 +80,8 @@ trait TypeSerializers {
   val eventProcessingTimeDecoder: Decoder[EventProcessingTime] = interval.map(EventProcessingTime.apply)
   val eventProcessingTimeEncoder: Encoder[EventProcessingTime] = interval.values.contramap(_.value)
 
-  val eventPayloadDecoder: Decoder[EventPayload] = text.map(EventPayload.apply)
-  val eventPayloadEncoder: Encoder[EventPayload] = text.values.contramap(_.value)
+  val zippedPayloadDecoder: Decoder[ZippedEventPayload] = bytea.map(ZippedEventPayload.apply)
+  val zippedPayloadEncoder: Encoder[ZippedEventPayload] = bytea.values.contramap(_.value)
 
   val eventStatusDecoder: Decoder[EventStatus] = varchar.map(EventStatus.apply)
   val eventStatusEncoder: Encoder[EventStatus] = varchar.values.contramap(_.value)
@@ -89,9 +89,6 @@ trait TypeSerializers {
     eventStatusEncoder.contramap((s: EventStatus.ProcessingStatus) => s: EventStatus)
   val eventFailureStatusEncoder: Encoder[EventStatus.FailureStatus] =
     eventStatusEncoder.contramap((s: EventStatus.FailureStatus) => s: EventStatus)
-
-  val schemaVersionDecoder: Decoder[SchemaVersion] = text.map(SchemaVersion.apply)
-  val schemaVersionEncoder: Encoder[SchemaVersion] = text.values.contramap(_.value)
 
   val compoundEventIdDecoder: Decoder[CompoundEventId] = (eventIdDecoder ~ projectIdDecoder).gmap[CompoundEventId]
 

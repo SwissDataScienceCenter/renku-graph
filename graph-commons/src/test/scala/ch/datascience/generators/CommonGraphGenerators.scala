@@ -45,7 +45,6 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import io.renku.jsonld.Schema
-import io.renku.jsonld.generators.JsonLDGenerators
 import org.http4s.Status
 import org.http4s.Status._
 import org.scalacheck.{Arbitrary, Gen}
@@ -195,10 +194,6 @@ object CommonGraphGenerators {
           lines.toList.mkString("-----BEGIN CERTIFICATE-----\n", "\n", "\n-----END CERTIFICATE-----")
         }
       }
-
-  implicit val jsonLDTriples: Gen[JsonLDTriples] = for {
-    jsonLD <- JsonLDGenerators.jsonLDEntities
-  } yield JsonLDTriples(jsonLD.toJson)
 
   implicit lazy val sparqlPrefixes: Gen[SparqlQuery.Prefix] = Gen.oneOf(
     SparqlQuery.Prefix("prov", Schemas.prov),

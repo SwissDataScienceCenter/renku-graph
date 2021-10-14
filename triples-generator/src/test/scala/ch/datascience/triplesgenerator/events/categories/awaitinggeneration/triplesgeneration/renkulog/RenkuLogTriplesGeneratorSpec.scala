@@ -33,12 +33,13 @@ import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.graph.model.events.{CommitId, EventId}
 import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
-import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.RepositoryPath
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.{CommitEvent, categoryName}
 import eu.timepit.refined.auto._
+import io.renku.jsonld.JsonLD
+import io.renku.jsonld.generators.JsonLDGenerators.jsonLDEntities
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -95,7 +96,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
         (renku
           .`export`(_: RepositoryPath))
           .expects(repositoryDirectory)
-          .returning(rightT[IO, ProcessingRecoverableError](triples))
+          .returning(rightT[IO, ProcessingRecoverableError](payload))
 
         (file
           .deleteDirectory(_: Path))
@@ -103,7 +104,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
           .returning(IO.unit)
           .atLeastOnce()
 
-        triplesGenerator.generateTriples(commitEvent).value.unsafeRunSync() shouldBe Right(triples)
+        triplesGenerator.generateTriples(commitEvent).value.unsafeRunSync() shouldBe Right(payload)
       }
 
     "create a temp directory, " +
@@ -157,7 +158,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
         (renku
           .`export`(_: RepositoryPath))
           .expects(repositoryDirectory)
-          .returning(rightT[IO, ProcessingRecoverableError](triples))
+          .returning(rightT[IO, ProcessingRecoverableError](payload))
 
         (file
           .deleteDirectory(_: Path))
@@ -165,7 +166,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
           .returning(IO.unit)
           .atLeastOnce()
 
-        triplesGenerator.generateTriples(commitEvent).value.unsafeRunSync() shouldBe Right(triples)
+        triplesGenerator.generateTriples(commitEvent).value.unsafeRunSync() shouldBe Right(payload)
       }
 
     "create a temp directory, " +
@@ -206,7 +207,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
         (renku
           .`export`(_: RepositoryPath))
           .expects(repositoryDirectory)
-          .returning(rightT[IO, ProcessingRecoverableError](triples))
+          .returning(rightT[IO, ProcessingRecoverableError](payload))
 
         (file
           .deleteDirectory(_: Path))
@@ -214,7 +215,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
           .returning(IO.unit)
           .atLeastOnce()
 
-        triplesGenerator.generateTriples(commitEvent).value.unsafeRunSync() shouldBe Right(triples)
+        triplesGenerator.generateTriples(commitEvent).value.unsafeRunSync() shouldBe Right(payload)
       }
 
     s"return $GenerationRecoverableError if 'renku export' returns one" in new TestCase {
@@ -619,7 +620,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
       (renku
         .`export`(_: RepositoryPath))
         .expects(repositoryDirectory)
-        .returning(EitherT.right[ProcessingRecoverableError](exception.raiseError[IO, JsonLDTriples]))
+        .returning(EitherT.right[ProcessingRecoverableError](exception.raiseError[IO, JsonLD]))
 
       (file
         .deleteDirectory(_: Path))
@@ -666,7 +667,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
       (renku
         .export(_: RepositoryPath))
         .expects(repositoryDirectory)
-        .returning(rightT(triples))
+        .returning(rightT(payload))
 
       val exception = exceptions.generateOne
       (file
@@ -704,8 +705,8 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
     implicit val repositoryDirectory: RepositoryPath = RepositoryPath(
       workDirectory / s"$repositoryName-$pathDifferentiator"
     )
-    val triples:           JsonLDTriples = jsonLDTriples.generateOne
-    val dirtyRepoFilePath: Path          = repositoryDirectory.value / ".gitattributes"
+    val payload:           JsonLD = jsonLDEntities.generateOne
+    val dirtyRepoFilePath: Path   = repositoryDirectory.value / ".gitattributes"
 
     val gitLabRepoUrlFinder = mock[IOGitLabRepoUrlFinder]
     val file                = mock[Commands.File]

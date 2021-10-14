@@ -67,22 +67,19 @@ object Microservice extends IOMicroservice {
   }
 
   override def run(args: List[String]): IO[ExitCode] = for {
-    config                  <- parseConfigArgs(args)
-    certificateLoader       <- CertificateLoader[IO](ApplicationLogger)
-    gitCertificateInstaller <- GitCertificateInstaller[IO](ApplicationLogger)
-    triplesGeneration       <- TriplesGeneration[IO]()
-    sentryInitializer       <- SentryInitializer[IO]()
-    metricsRegistry         <- MetricsRegistry()
-    renkuVersionPairs       <- IOVersionCompatibilityConfig(ApplicationLogger, config)
-    cliVersionCompatChecker <- IOCliVersionCompatibilityChecker(triplesGeneration, renkuVersionPairs)
-    gitLabRateLimit         <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
-    gitLabThrottler         <- Throttler[IO, GitLab](gitLabRateLimit)
-    sparqlTimeRecorder      <- SparqlQueryTimeRecorder(metricsRegistry)
-    awaitingGenerationSubscription <- events.categories.awaitinggeneration.SubscriptionFactory(renkuVersionPairs.head,
-                                                                                               metricsRegistry,
-                                                                                               ApplicationLogger
-                                      )
-    membersSyncSubscription <- events.categories.membersync.SubscriptionFactory(gitLabThrottler, sparqlTimeRecorder)
+    config                         <- parseConfigArgs(args)
+    certificateLoader              <- CertificateLoader[IO](ApplicationLogger)
+    gitCertificateInstaller        <- GitCertificateInstaller[IO](ApplicationLogger)
+    triplesGeneration              <- TriplesGeneration[IO]()
+    sentryInitializer              <- SentryInitializer[IO]()
+    metricsRegistry                <- MetricsRegistry()
+    renkuVersionPairs              <- IOVersionCompatibilityConfig(ApplicationLogger, config)
+    cliVersionCompatChecker        <- IOCliVersionCompatibilityChecker(triplesGeneration, renkuVersionPairs)
+    gitLabRateLimit                <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
+    gitLabThrottler                <- Throttler[IO, GitLab](gitLabRateLimit)
+    sparqlTimeRecorder             <- SparqlQueryTimeRecorder(metricsRegistry)
+    awaitingGenerationSubscription <- events.categories.awaitinggeneration.SubscriptionFactory(metricsRegistry)
+    membersSyncSubscription        <- events.categories.membersync.SubscriptionFactory(gitLabThrottler, sparqlTimeRecorder)
     triplesGeneratedSubscription <-
       events.categories.triplesgenerated.SubscriptionFactory(metricsRegistry, gitLabThrottler, sparqlTimeRecorder)
     eventConsumersRegistry <- consumers.EventConsumersRegistry(

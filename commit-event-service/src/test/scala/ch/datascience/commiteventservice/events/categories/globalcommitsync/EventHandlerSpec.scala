@@ -149,7 +149,7 @@ class EventHandlerSpec
                            logger
       )
 
-    def requestContent(event: Json): EventRequestContent = EventRequestContent(event, None)
+    def requestContent(event: Json): EventRequestContent = EventRequestContent.NoPayload(event)
   }
 
   private implicit def eventEncoder[E <: GlobalCommitSyncEvent]: Encoder[E] = Encoder.instance[E] {

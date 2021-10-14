@@ -22,7 +22,6 @@ import cats.Show
 import cats.syntax.all._
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.graph.model.projects
-import io.renku.eventlog.subscriptions.EventEncoder
 
 private final case class AwaitingGenerationEvent(id: CompoundEventId, projectPath: projects.Path, body: EventBody)
 
@@ -31,12 +30,13 @@ private object AwaitingGenerationEvent {
     Show.show(event => show"AwaitingGenerationEvent ${event.id}, projectPath = ${event.projectPath}")
 }
 
-private object AwaitingGenerationEventEncoder extends EventEncoder[AwaitingGenerationEvent] {
+private object AwaitingGenerationEventEncoder {
 
   import io.circe.Json
   import io.circe.literal.JsonStringContext
 
-  override def encodeEvent(event: AwaitingGenerationEvent): Json = json"""{
+  def encodeEvent(event: AwaitingGenerationEvent): Json =
+    json"""{
     "categoryName": ${SubscriptionCategory.name.value},
     "id":           ${event.id.id.value},
     "project": {
@@ -44,6 +44,6 @@ private object AwaitingGenerationEventEncoder extends EventEncoder[AwaitingGener
     }
   }"""
 
-  override def encodePayload(event: AwaitingGenerationEvent): Option[String] =
-    event.body.value.some
+  def encodePayload(event: AwaitingGenerationEvent): String =
+    event.body.value
 }

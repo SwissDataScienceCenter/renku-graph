@@ -71,12 +71,7 @@ private class EventsSenderImpl[Interpretation[_]: ConcurrentEffect: Timer, Categ
     for {
       uri <- validateUri(subscriberUrl.value)
       sendingResult <-
-        send(
-          request(POST, uri).withMultipartBuilder
-            .addPart("event", categoryEventEncoder.encodeEvent(categoryEvent))
-            .maybeAddPart("payload", categoryEventEncoder.encodePayload(categoryEvent))
-            .build()
-        )(mapResponse)
+        send(request(POST, uri).withParts(categoryEventEncoder.encodeParts(categoryEvent)))(mapResponse)
     } yield sendingResult
   } recoverWith exceptionToSendingResult
 

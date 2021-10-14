@@ -19,28 +19,32 @@
 package ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog
 
 import ammonite.ops.Path
-import cats.{MonadError, MonadThrow}
 import cats.data.EitherT
 import cats.effect.{ContextShift, IO, Timer}
+import cats.{MonadError, MonadThrow}
 import ch.datascience.config.ServiceUrl
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.{GitLabUrl, projects}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
-import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
+import io.renku.jsonld.JsonLD
+import io.renku.jsonld.parser._
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 private object Commands {
 
-  trait AbsolutePathTinyType extends Any with TinyType { type V = Path }
+  trait AbsolutePathTinyType extends Any with TinyType {
+    type V = Path
+  }
 
   final class RepositoryPath private (val value: Path) extends AnyVal with AbsolutePathTinyType
+
   object RepositoryPath extends TinyTypeFactory[RepositoryPath](new RepositoryPath(_))
 
   class GitLabRepoUrlFinder[Interpretation[_]: MonadThrow](gitLabUrl: GitLabUrl) {
@@ -164,16 +168,16 @@ private object Commands {
           }
         }
 
-    def export(implicit destinationDirectory: RepositoryPath): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] =
+    def export(implicit destinationDirectory: RepositoryPath): EitherT[IO, ProcessingRecoverableError, JsonLD] =
       EitherT {
         {
           for {
             triplesAsString <- IO(renkuExport(destinationDirectory.value).out.string.trim)
-            wrappedTriples  <- JsonLDTriples.parse[IO](triplesAsString)
+            wrappedTriples  <- IO.fromEither(parse(triplesAsString))
           } yield wrappedTriples.asRight[ProcessingRecoverableError]
         }.recoverWith {
           case ShelloutException(result) if result.exitCode == 137 =>
-            GenerationRecoverableError("Not enough memory").asLeft[JsonLDTriples].pure[IO]
+            GenerationRecoverableError("Not enough memory").asLeft[JsonLD].pure[IO]
         }
       }
   }

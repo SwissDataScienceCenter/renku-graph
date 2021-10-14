@@ -123,8 +123,8 @@ class ProjectTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Ma
   }
 
   private trait TestCase {
-    val logger       = TestLogger[IO]()
-    val tableCreator = new ProjectTableCreatorImpl[IO](sessionResource, logger)
+    implicit val logger = TestLogger[IO]()
+    val tableCreator    = new ProjectTableCreatorImpl[IO](sessionResource)
   }
 
   private def fetchProjectData: List[(Id, Path, EventDate)] = execute {

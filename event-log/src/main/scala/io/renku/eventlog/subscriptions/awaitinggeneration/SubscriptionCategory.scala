@@ -23,9 +23,10 @@ import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import org.typelevel.log4cats.Logger
 import io.renku.eventlog.subscriptions._
+import io.renku.eventlog.subscriptions.awaitinggeneration.AwaitingGenerationEventEncoder.{encodeEvent, encodePayload}
 import io.renku.eventlog.{EventLogDB, subscriptions}
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
@@ -38,12 +39,12 @@ private[subscriptions] object SubscriptionCategory {
       awaitingTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
       underTriplesGenerationGauge:    LabeledGauge[IO, projects.Path],
       queriesExecTimes:               LabeledHistogram[IO, SqlStatement.Name],
-      subscriberTracker:              SubscriberTracker[IO],
-      logger:                         Logger[IO]
+      subscriberTracker:              SubscriberTracker[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
+      timer:            Timer[IO],
+      logger:           Logger[IO]
   ): IO[subscriptions.SubscriptionCategory[IO]] = for {
     subscribers <- Subscribers(name, subscriberTracker, logger)
     eventFetcher <- IOAwaitingGenerationEventFinder(sessionResource,
@@ -52,7 +53,7 @@ private[subscriptions] object SubscriptionCategory {
                                                     underTriplesGenerationGauge,
                                                     queriesExecTimes
                     )
-    dispatchRecovery <- DispatchRecovery(logger)
+    dispatchRecovery <- DispatchRecovery()
     eventDelivery <- EventDelivery[AwaitingGenerationEvent](sessionResource,
                                                             compoundEventIdExtractor = (_: AwaitingGenerationEvent).id,
                                                             queriesExecTimes
@@ -61,7 +62,7 @@ private[subscriptions] object SubscriptionCategory {
                                              subscribers,
                                              eventFetcher,
                                              eventDelivery,
-                                             AwaitingGenerationEventEncoder,
+                                             EventEncoder(encodeEvent, encodePayload),
                                              dispatchRecovery,
                                              logger
                          )

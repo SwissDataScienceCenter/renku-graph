@@ -32,23 +32,21 @@ private trait StatusesProcessingTimeTableCreator[Interpretation[_]] {
 }
 
 private object StatusesProcessingTimeTableCreator {
-  def apply[Interpretation[_]: BracketThrow](
-      sessionResource: SessionResource[Interpretation, EventLogDB],
-      logger:          Logger[Interpretation]
+  def apply[Interpretation[_]: BracketThrow: Logger](
+      sessionResource: SessionResource[Interpretation, EventLogDB]
   ): StatusesProcessingTimeTableCreator[Interpretation] =
-    new StatusesProcessingTimeTableCreatorImpl[Interpretation](sessionResource, logger)
+    new StatusesProcessingTimeTableCreatorImpl[Interpretation](sessionResource)
 }
 
-private class StatusesProcessingTimeTableCreatorImpl[Interpretation[_]: BracketThrow](
-    sessionResource: SessionResource[Interpretation, EventLogDB],
-    logger:          Logger[Interpretation]
+private class StatusesProcessingTimeTableCreatorImpl[Interpretation[_]: BracketThrow: Logger](
+    sessionResource: SessionResource[Interpretation, EventLogDB]
 ) extends StatusesProcessingTimeTableCreator[Interpretation] {
 
   import cats.syntax.all._
 
   override def run(): Interpretation[Unit] = sessionResource.useK {
     checkTableExists >>= {
-      case true  => Kleisli.liftF(logger info "'status_processing_time' table exists")
+      case true  => Kleisli.liftF(Logger[Interpretation] info "'status_processing_time' table exists")
       case false => createTable()
     }
   }
@@ -68,7 +66,7 @@ private class StatusesProcessingTimeTableCreatorImpl[Interpretation[_]: BracketT
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id       ON status_processing_time(event_id)".command)
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id     ON status_processing_time(project_id)".command)
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_status         ON status_processing_time(status)".command)
-      _ <- Kleisli.liftF(logger info "'status_processing_time' table created")
+      _ <- Kleisli.liftF(Logger[Interpretation] info "'status_processing_time' table created")
       _ <- execute(foreignKeySql)
     } yield ()
 

@@ -34,19 +34,21 @@ trait EventStatusRenamer[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
-private case class EventStatusRenamerImpl[Interpretation[_]: BracketThrow](
-    sessionResource: SessionResource[Interpretation, EventLogDB],
-    logger:          Logger[Interpretation]
+private case class EventStatusRenamerImpl[Interpretation[_]: BracketThrow: Logger](
+    sessionResource: SessionResource[Interpretation, EventLogDB]
 ) extends EventStatusRenamer[Interpretation] {
 
   override def run(): Interpretation[Unit] = {
     for {
       _ <- renameAllStatuses(from = "PROCESSING", to = "GENERATING_TRIPLES")
-      _ <- logger.info(s"'PROCESSING' event status renamed to 'GENERATING_TRIPLES'")
+      _ <- Logger[Interpretation].info(s"'PROCESSING' event status renamed to 'GENERATING_TRIPLES'")
       _ <- renameAllStatuses(from = "RECOVERABLE_FAILURE", to = "GENERATION_RECOVERABLE_FAILURE")
-      _ <- logger.info(s"'RECOVERABLE_FAILURE' event status renamed to 'GENERATION_RECOVERABLE_FAILURE'")
+      _ <-
+        Logger[Interpretation].info(s"'RECOVERABLE_FAILURE' event status renamed to 'GENERATION_RECOVERABLE_FAILURE'")
       _ <- renameAllStatuses(from = "NON_RECOVERABLE_FAILURE", to = "GENERATION_NON_RECOVERABLE_FAILURE")
-      _ <- logger.info(s"'NON_RECOVERABLE_FAILURE' event status renamed to 'GENERATION_NON_RECOVERABLE_FAILURE'")
+      _ <- Logger[Interpretation].info(
+             s"'NON_RECOVERABLE_FAILURE' event status renamed to 'GENERATION_NON_RECOVERABLE_FAILURE'"
+           )
     } yield ()
   } recoverWith logging
 
@@ -56,14 +58,13 @@ private case class EventStatusRenamerImpl[Interpretation[_]: BracketThrow](
   }
 
   private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    logger.error(exception)(s"Renaming of events failed")
+    Logger[Interpretation].error(exception)(s"Renaming of events failed")
     exception.raiseError[Interpretation, Unit]
   }
 }
 
 private object EventStatusRenamer {
-  def apply[Interpretation[_]: BracketThrow](
-      sessionResource: SessionResource[Interpretation, EventLogDB],
-      logger:          Logger[Interpretation]
-  ): EventStatusRenamer[Interpretation] = EventStatusRenamerImpl(sessionResource, logger)
+  def apply[Interpretation[_]: BracketThrow: Logger](
+      sessionResource: SessionResource[Interpretation, EventLogDB]
+  ): EventStatusRenamer[Interpretation] = EventStatusRenamerImpl(sessionResource)
 }
