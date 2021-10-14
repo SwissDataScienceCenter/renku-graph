@@ -75,10 +75,9 @@ class EventSenderImpl[Interpretation[_]: ConcurrentEffect: Timer: Logger](
   ): Interpretation[Unit] = for {
     uri <- validateUri(s"$eventLogUrl/events")
     request = createRequest(uri, eventContent)
-    sendingResult <-
-      send(request)(responseMapping)
-        .recoverWith(retryOnServerError(Eval.always(sendEvent(eventContent, errorMessage)), errorMessage))
-  } yield sendingResult
+    _ <- send(request)(responseMapping)
+           .recoverWith(retryOnServerError(Eval.always(sendEvent(eventContent, errorMessage)), errorMessage))
+  } yield ()
 
   private def createRequest(uri: Uri, eventRequestContent: EventRequestContent.NoPayload) =
     request(POST, uri).withMultipartBuilder

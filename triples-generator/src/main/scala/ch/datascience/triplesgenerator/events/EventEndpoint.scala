@@ -53,14 +53,6 @@ class EventEndpointImpl[Interpretation[_]: Effect: MonadThrow](
   import ch.datascience.http.InfoMessage._
   import org.http4s._
 
-  private lazy val toHttpResult: EventSchedulingResult => Interpretation[Response[Interpretation]] = {
-    case EventSchedulingResult.Accepted             => Accepted(InfoMessage("Event accepted"))
-    case EventSchedulingResult.Busy                 => TooManyRequests(InfoMessage("Too many events to handle"))
-    case EventSchedulingResult.UnsupportedEventType => BadRequest(ErrorMessage("Unsupported Event Type"))
-    case EventSchedulingResult.BadRequest           => BadRequest(ErrorMessage("Malformed event"))
-    case EventSchedulingResult.SchedulingError(_)   => InternalServerError(ErrorMessage("Failed to schedule event"))
-  }
-
   override def processEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]] =
     reProvisioningStatus.isReProvisioning() >>= { isReProvisioning =>
       if (isReProvisioning) ServiceUnavailable(InfoMessage("Temporarily unavailable: currently re-provisioning"))
@@ -134,6 +126,14 @@ class EventEndpointImpl[Interpretation[_]: Effect: MonadThrow](
     case _ =>
       BadRequest(ErrorMessage("Event payload type unsupported")).map(_.asLeft[EventRequestContent])
   }
+
+  private lazy val toHttpResult: EventSchedulingResult => Interpretation[Response[Interpretation]] = {
+    case EventSchedulingResult.Accepted             => Accepted(InfoMessage("Event accepted"))
+    case EventSchedulingResult.Busy                 => TooManyRequests(InfoMessage("Too many events to handle"))
+    case EventSchedulingResult.UnsupportedEventType => BadRequest(ErrorMessage("Unsupported Event Type"))
+    case EventSchedulingResult.BadRequest           => BadRequest(ErrorMessage("Malformed event"))
+    case EventSchedulingResult.SchedulingError(_)   => InternalServerError(ErrorMessage("Failed to schedule event"))
+  }
 }
 
 object IOEventEndpoint {
@@ -147,5 +147,4 @@ object IOEventEndpoint {
       executionContext: ExecutionContext,
       timer:            Timer[IO]
   ): IO[EventEndpoint[IO]] = IO(new EventEndpointImpl[IO](eventConsumersRegistry, reProvisioningStatus))
-
 }

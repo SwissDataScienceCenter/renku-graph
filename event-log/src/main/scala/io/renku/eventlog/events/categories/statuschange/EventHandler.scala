@@ -125,7 +125,7 @@ private object EventHandler {
 
   private implicit lazy val eventTriplesGeneratedDecoder
       : EventRequestContent => Either[DecodingFailure, ToTriplesGenerated] = {
-    case EventRequestContent.WithPayload(event, payload: Array[Byte]) =>
+    case EventRequestContent.WithPayload(event, payload: ZippedEventPayload) =>
       for {
         id             <- event.hcursor.downField("id").as[EventId]
         projectId      <- event.hcursor.downField("project").downField("id").as[projects.Id]
@@ -135,11 +135,7 @@ private object EventHandler {
                case TriplesGenerated => Right(())
                case status           => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
              }
-      } yield ToTriplesGenerated(CompoundEventId(id, projectId),
-                                 projectPath,
-                                 processingTime,
-                                 ZippedEventPayload(payload)
-      )
+      } yield ToTriplesGenerated(CompoundEventId(id, projectId), projectPath, processingTime, payload)
     case _ => Left(DecodingFailure("Missing event payload", Nil))
   }
 

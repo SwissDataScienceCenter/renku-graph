@@ -27,6 +27,7 @@ import ch.datascience.events.EventRequestContent
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.events.ZippedEventPayload
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.metrics.TestLabeledHistogram
@@ -62,7 +63,7 @@ class EventHandlerSpec
         toTriplesGeneratedEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
           .map(event =>
-            EventRequestContent.WithPayload[Array[Byte]](event._1.asJson, event._1.payload.value) -> event._2
+            EventRequestContent.WithPayload[ZippedEventPayload](event._1.asJson, event._1.payload) -> event._2
           ),
         toTripleStoreEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))

@@ -73,9 +73,9 @@ private class EventStatusUpdaterImpl[Interpretation[_]: BracketThrow: Sync](
                                   processingTime: EventProcessingTime
   ): Interpretation[Unit] = for {
     zippedContent <- zip(payload.toJson.noSpaces).map(ZippedEventPayload.apply)
-    eventSent <- eventSender.sendEvent(
-                   eventContent = events.EventRequestContent.WithPayload(
-                     event = json"""{
+    _ <- eventSender.sendEvent(
+           eventContent = events.EventRequestContent.WithPayload(
+             event = json"""{
                               "categoryName": "EVENTS_STATUS_CHANGE",
                               "id": ${eventId.id},
                               "project": {
@@ -85,11 +85,11 @@ private class EventStatusUpdaterImpl[Interpretation[_]: BracketThrow: Sync](
                               "newStatus": $TriplesGenerated,
                               "processingTime": $processingTime
                             }""",
-                     payload = zippedContent
-                   ),
-                   errorMessage = s"$categoryName: Change event status as $TriplesGenerated failed"
-                 )
-  } yield eventSent
+             payload = zippedContent
+           ),
+           errorMessage = s"$categoryName: Change event status as $TriplesGenerated failed"
+         )
+  } yield ()
 
   override def toTriplesStore(eventId:        CompoundEventId,
                               projectPath:    projects.Path,
