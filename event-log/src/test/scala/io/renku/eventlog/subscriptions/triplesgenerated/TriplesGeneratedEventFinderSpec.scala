@@ -162,6 +162,89 @@ private class TriplesGeneratedEventFinderSpec
         )
       }
 
+    s"skip events in $TriplesGenerated status which do not have payload - within a project" in new TestCase {
+      val projectId   = projectIds.generateOne
+      val projectPath = projectPaths.generateOne
+
+      val event1Id   = compoundEventIds.generateOne.copy(projectId = projectId)
+      val event1Date = timestampsNotInTheFuture.generateAs(EventDate)
+      storeEvent(
+        event1Id,
+        TriplesGenerated,
+        executionDatesInThePast.generateOne,
+        event1Date,
+        eventBodies.generateOne,
+        projectPath = projectPath,
+        maybeEventPayload = None
+      )
+
+      val (event2Id, _, _, _, eventPayload2) = createEvent(
+        status = TriplesGenerated,
+        eventDate = timestamps(max = event1Date.value).generateAs(EventDate),
+        projectId = projectId,
+        projectPath = projectPath
+      )
+
+      expectAwaitingTransformationGaugeDecrement(projectPath)
+      expectUnderTransformationGaugeIncrement(projectPath)
+
+      givenPrioritisation(
+        takes = List(ProjectInfo(projectId, projectPath, event1Date, 0)),
+        returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
+      )
+
+      val Some(TriplesGeneratedEvent(actualEventId, actualEventPath, actualEventPayload)) =
+        finder.popEvent().unsafeRunSync()
+      actualEventId          shouldBe event2Id
+      actualEventPath        shouldBe projectPath
+      actualEventPayload.value should contain theSameElementsAs eventPayload2.value
+
+      findEvents(TransformingTriples).noBatchDate shouldBe List((event2Id, executionDate))
+    }
+
+    s"skip projects with events in $TriplesGenerated status which do not have payload" in new TestCase {
+      val event1ProjectId   = projectIds.generateOne
+      val event1ProjectPath = projectPaths.generateOne
+
+      val event1Id   = compoundEventIds.generateOne.copy(projectId = event1ProjectId)
+      val event1Date = timestampsNotInTheFuture.generateAs(EventDate)
+      storeEvent(
+        event1Id,
+        TriplesGenerated,
+        executionDatesInThePast.generateOne,
+        event1Date,
+        eventBodies.generateOne,
+        projectPath = event1ProjectPath,
+        maybeEventPayload = None
+      )
+
+      val event2ProjectId   = projectIds.generateOne
+      val event2ProjectPath = projectPaths.generateOne
+      val event2Date        = timestamps(max = event1Date.value).generateAs(EventDate)
+      val (event2Id, _, _, _, eventPayload2) = createEvent(
+        status = TriplesGenerated,
+        eventDate = event2Date,
+        projectId = event2ProjectId,
+        projectPath = event2ProjectPath
+      )
+
+      expectAwaitingTransformationGaugeDecrement(event2ProjectPath)
+      expectUnderTransformationGaugeIncrement(event2ProjectPath)
+
+      givenPrioritisation(
+        takes = List(ProjectInfo(event2ProjectId, event2ProjectPath, event2Date, 0)),
+        returns = List(ProjectIds(event2ProjectId, event2ProjectPath) -> MaxPriority)
+      )
+
+      val Some(TriplesGeneratedEvent(actualEventId, actualEventPath, actualEventPayload)) =
+        finder.popEvent().unsafeRunSync()
+      actualEventId          shouldBe event2Id
+      actualEventPath        shouldBe event2ProjectPath
+      actualEventPayload.value should contain theSameElementsAs eventPayload2.value
+
+      findEvents(TransformingTriples).noBatchDate shouldBe List((event2Id, executionDate))
+    }
+
     "return no event when execution date is in the future " +
       s"and status $TriplesGenerated or $TransformationRecoverableFailure " in new TestCase {
 
