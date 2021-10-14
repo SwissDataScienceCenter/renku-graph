@@ -19,16 +19,13 @@
 package io.renku.eventlog.subscriptions.triplesgenerated
 
 import cats.Show
-import ch.datascience.graph.model.events.CompoundEventId
-import ch.datascience.graph.model.{SchemaVersion, projects}
 import cats.syntax.all._
-import io.renku.eventlog.EventPayload
-import io.renku.eventlog.subscriptions.EventEncoder
+import ch.datascience.graph.model.events.{CompoundEventId, ZippedEventPayload}
+import ch.datascience.graph.model.projects
 
-private final case class TriplesGeneratedEvent(id:            CompoundEventId,
-                                               projectPath:   projects.Path,
-                                               payload:       EventPayload,
-                                               schemaVersion: SchemaVersion
+private final case class TriplesGeneratedEvent(id:          CompoundEventId,
+                                               projectPath: projects.Path,
+                                               payload:     ZippedEventPayload
 ) {
   override lazy val toString: String = s"$TriplesGeneratedEvent $id, projectPath = $projectPath"
 }
@@ -38,12 +35,12 @@ private object TriplesGeneratedEvent {
     Show.show(event => show"TriplesGeneratedEvent ${event.id}, projectPath = ${event.projectPath}")
 }
 
-private object TriplesGeneratedEventEncoder extends EventEncoder[TriplesGeneratedEvent] {
+private object TriplesGeneratedEventEncoder {
 
   import io.circe.Json
   import io.circe.literal.JsonStringContext
 
-  override def encodeEvent(event: TriplesGeneratedEvent): Json = json"""{
+  lazy val encodeEvent: TriplesGeneratedEvent => Json = event => json"""{
     "categoryName": ${SubscriptionCategory.name.value},
     "id":           ${event.id.id.value},
     "project": {
@@ -52,6 +49,5 @@ private object TriplesGeneratedEventEncoder extends EventEncoder[TriplesGenerate
     }
   }"""
 
-  override def encodePayload(event: TriplesGeneratedEvent): Option[String] =
-    json"""{"payload":${event.payload.value}, "schemaVersion": ${event.schemaVersion.value} }""".noSpaces.some
+  lazy val encodePayload: TriplesGeneratedEvent => ZippedEventPayload = event => event.payload
 }

@@ -35,13 +35,13 @@ import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 private class DispatchRecoveryImpl[Interpretation[_]: MonadThrow](
-    eventSender: EventSender[Interpretation],
-    logger:      Logger[Interpretation]
-) extends subscriptions.DispatchRecovery[Interpretation, TriplesGeneratedEvent]
+    eventSender:   EventSender[Interpretation]
+)(implicit logger: Logger[Interpretation])
+    extends subscriptions.DispatchRecovery[Interpretation, TriplesGeneratedEvent]
     with TinyTypeEncoders {
 
   override def returnToQueue(event: TriplesGeneratedEvent): Interpretation[Unit] = eventSender.sendEvent(
-    EventRequestContent(json"""{
+    EventRequestContent.NoPayload(json"""{
         "categoryName": "EVENTS_STATUS_CHANGE",
         "id":           ${event.id.id},
         "project": {
@@ -58,7 +58,7 @@ private class DispatchRecoveryImpl[Interpretation[_]: MonadThrow](
       event: TriplesGeneratedEvent
   ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
     eventSender.sendEvent(
-      EventRequestContent(json"""{
+      EventRequestContent.NoPayload(json"""{
         "categoryName": "EVENTS_STATUS_CHANGE",
         "id":           ${event.id.id},
         "project": {
@@ -76,11 +76,11 @@ private class DispatchRecoveryImpl[Interpretation[_]: MonadThrow](
 
 private object DispatchRecovery {
 
-  def apply(logger:     Logger[IO])(implicit
+  def apply()(implicit
       effect:           ConcurrentEffect[IO],
       timer:            Timer[IO],
-      executionContext: ExecutionContext
-  ): IO[DispatchRecovery[IO, TriplesGeneratedEvent]] = for {
-    eventSender <- EventSender(logger)
-  } yield new DispatchRecoveryImpl[IO](eventSender, logger)
+      executionContext: ExecutionContext,
+      logger:           Logger[IO]
+  ): IO[DispatchRecovery[IO, TriplesGeneratedEvent]] =
+    EventSender() map (new DispatchRecoveryImpl[IO](_))
 }

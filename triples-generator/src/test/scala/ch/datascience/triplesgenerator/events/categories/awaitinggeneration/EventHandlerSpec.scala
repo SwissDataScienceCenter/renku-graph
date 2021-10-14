@@ -32,7 +32,6 @@ import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.EventProcessingGenerators._
-import ch.datascience.triplesgenerator.generators.VersionGenerators.renkuVersionPairs
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
@@ -54,10 +53,10 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
           .returning(commitEvent.pure[IO])
 
         (eventProcessor.process _)
-          .expects(commitEvent, renkuVersionPair.schemaVersion)
+          .expects(commitEvent)
           .returning(().pure[IO])
 
-        val request = requestContent(commitEvent.compoundEventId.asJson(eventEncoder), eventBody.value.some)
+        val request = requestContent(commitEvent.compoundEventId.asJson(eventEncoder), eventBody.value)
 
         handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Right(Accepted)
 
@@ -70,7 +69,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
     s"return $BadRequest if event body is not correct" in new TestCase {
 
-      val request = requestContent(compoundEventIds.generateOne.asJson(eventEncoder), eventBody.value.some)
+      val request = requestContent(compoundEventIds.generateOne.asJson(eventEncoder), eventBody.value)
 
       (eventBodyDeserializer.toCommitEvent _)
         .expects(eventBody)
@@ -83,7 +82,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
     s"return $BadRequest if event body is not present" in new TestCase {
 
-      val request = requestContent(compoundEventIds.generateOne.asJson(eventEncoder), None)
+      val request = EventRequestContent.NoPayload(compoundEventIds.generateOne.asJson(eventEncoder))
 
       handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Left(BadRequest)
 
@@ -98,10 +97,10 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
         .returning(commitEvent.pure[IO])
 
       (eventProcessor.process _)
-        .expects(commitEvent, renkuVersionPair.schemaVersion)
+        .expects(commitEvent)
         .returning(exceptions.generateOne.raiseError[IO, Unit])
 
-      val request = requestContent(commitEvent.compoundEventId.asJson(eventEncoder), eventBody.value.some)
+      val request = requestContent(commitEvent.compoundEventId.asJson(eventEncoder), eventBody.value)
 
       handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Right(Accepted)
 
@@ -121,8 +120,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     val eventBodyDeserializer      = mock[EventBodyDeserializer[IO]]
     val concurrentProcessesLimiter = mock[ConcurrentProcessesLimiter[IO]]
     val subscriptionMechanism      = mock[SubscriptionMechanism[IO]]
-    val renkuVersionPair           = renkuVersionPairs.generateOne
-    val logger                     = TestLogger[IO]()
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
 
     (subscriptionMechanism.renewSubscription _).expects().returns(IO.unit)
 
@@ -130,13 +128,11 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
                                        eventProcessor,
                                        eventBodyDeserializer,
                                        subscriptionMechanism,
-                                       concurrentProcessesLimiter,
-                                       renkuVersionPair,
-                                       logger
+                                       concurrentProcessesLimiter
     )
 
-    def requestContent(event: Json, maybePayload: Option[String]): EventRequestContent =
-      EventRequestContent(event, maybePayload)
+    def requestContent(event: Json, payload: String): EventRequestContent.WithPayload[String] =
+      EventRequestContent.WithPayload(event, payload)
   }
 
   private implicit lazy val eventEncoder: Encoder[CompoundEventId] =

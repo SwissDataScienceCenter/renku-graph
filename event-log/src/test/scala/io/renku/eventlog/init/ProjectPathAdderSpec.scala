@@ -101,8 +101,8 @@ class ProjectPathAdderSpec
   }
 
   private trait TestCase {
-    val logger           = TestLogger[IO]()
-    val projectPathAdder = new ProjectPathAdderImpl[IO](sessionResource, logger)
+    implicit val logger  = TestLogger[IO]()
+    val projectPathAdder = new ProjectPathAdderImpl[IO](sessionResource)
   }
 
   private def checkColumnExists: Boolean = sessionResource

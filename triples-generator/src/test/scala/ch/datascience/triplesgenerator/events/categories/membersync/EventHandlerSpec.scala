@@ -81,7 +81,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     val logger              = TestLogger[IO]()
     val handler             = new EventHandler[IO](categoryName, membersSynchronizer, logger)
 
-    def requestContent(event: Json): EventRequestContent = EventRequestContent(event, None)
+    def requestContent(event: Json): EventRequestContent = EventRequestContent.NoPayload(event)
   }
 
   implicit lazy val eventEncoder: Encoder[projects.Path] =

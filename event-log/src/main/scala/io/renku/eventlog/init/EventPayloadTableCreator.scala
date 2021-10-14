@@ -32,16 +32,14 @@ private trait EventPayloadTableCreator[Interpretation[_]] {
 }
 
 private object EventPayloadTableCreator {
-  def apply[Interpretation[_]: BracketThrow](
-      sessionResource: SessionResource[Interpretation, EventLogDB],
-      logger:          Logger[Interpretation]
+  def apply[Interpretation[_]: BracketThrow: Logger](
+      sessionResource: SessionResource[Interpretation, EventLogDB]
   ): EventPayloadTableCreator[Interpretation] =
-    new EventPayloadTableCreatorImpl(sessionResource, logger)
+    new EventPayloadTableCreatorImpl(sessionResource)
 }
 
-private class EventPayloadTableCreatorImpl[Interpretation[_]: BracketThrow](
-    sessionResource: SessionResource[Interpretation, EventLogDB],
-    logger:          Logger[Interpretation]
+private class EventPayloadTableCreatorImpl[Interpretation[_]: BracketThrow: Logger](
+    sessionResource: SessionResource[Interpretation, EventLogDB]
 ) extends EventPayloadTableCreator[Interpretation]
     with EventTableCheck {
 
@@ -50,7 +48,7 @@ private class EventPayloadTableCreatorImpl[Interpretation[_]: BracketThrow](
   override def run(): Interpretation[Unit] = sessionResource.useK {
     whenEventTableExists(
       checkTableExists flatMap {
-        case true  => Kleisli.liftF(logger info "'event_payload' table exists")
+        case true  => Kleisli.liftF(Logger[Interpretation] info "'event_payload' table exists")
         case false => createTable()
       },
       otherwise = Kleisli.liftF(
@@ -73,7 +71,7 @@ private class EventPayloadTableCreatorImpl[Interpretation[_]: BracketThrow](
       _ <- execute(createTableSql)
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id ON event_payload(event_id)".command)
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON event_payload(project_id)".command)
-      _ <- Kleisli.liftF(logger info "'event_payload' table created")
+      _ <- Kleisli.liftF(Logger[Interpretation] info "'event_payload' table created")
       _ <- execute(foreignKeySql)
     } yield ()
 

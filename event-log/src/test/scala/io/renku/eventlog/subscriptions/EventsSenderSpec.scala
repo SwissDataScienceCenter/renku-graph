@@ -19,7 +19,6 @@
 package io.renku.eventlog.subscriptions
 
 import cats.effect.{ContextShift, IO, Timer}
-import cats.implicits.catsSyntaxOptionId
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -33,6 +32,7 @@ import io.renku.eventlog.subscriptions.EventsSender.SendingResult._
 import io.renku.eventlog.subscriptions.Generators.categoryNames
 import io.renku.eventlog.subscriptions.TestCategoryEvent._
 import org.http4s.Status._
+import org.http4s.multipart.Part
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -166,13 +166,10 @@ class EventsSenderSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
     def expectEventEncoding(event: TestCategoryEvent) = {
       val eventJson    = jsons.generateOne
       val eventPayload = nonEmptyStrings().generateOne
-      (categoryEventEncoder.encodeEvent _)
+      (categoryEventEncoder.encodeParts[IO] _)
         .expects(event)
-        .returning(eventJson)
+        .returning(Vector(Part.formData[IO]("event", eventJson.noSpaces), Part.formData[IO]("payload", eventPayload)))
 
-      (categoryEventEncoder.encodePayload _)
-        .expects(event)
-        .returning(eventPayload.some)
       (eventJson, eventPayload)
     }
   }

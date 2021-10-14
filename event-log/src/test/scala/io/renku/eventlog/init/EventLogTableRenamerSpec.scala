@@ -97,8 +97,8 @@ class EventLogTableRenamerSpec extends AnyWordSpec with DbInitSpec with should.M
   }
 
   private trait TestCase {
-    val logger       = TestLogger[IO]()
-    val tableRenamer = new EventLogTableRenamerImpl[IO](sessionResource, logger)
+    implicit val logger = TestLogger[IO]()
+    val tableRenamer    = new EventLogTableRenamerImpl[IO](sessionResource)
   }
 
   private def createEventLogTable(): Unit = execute[Unit] {

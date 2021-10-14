@@ -18,18 +18,21 @@
 
 package ch.datascience.triplesgenerator.events
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.data.EitherT
 import cats.data.EitherT.right
 import cats.effect.{Effect, Timer}
 import ch.datascience.events.EventRequestContent
+import ch.datascience.events.EventRequestContent.WithPayload
 import ch.datascience.events.consumers.{EventConsumersRegistry, EventSchedulingResult}
+import ch.datascience.graph.model.events.ZippedEventPayload
 import ch.datascience.http.ErrorMessage
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningStatus
 import io.circe.Json
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
-import org.http4s.multipart.Multipart
+import org.http4s.headers.`Content-Type`
+import org.http4s.multipart.{Multipart, Part}
 import org.http4s.{Request, Response}
 
 import scala.concurrent.ExecutionContext
@@ -39,11 +42,10 @@ trait EventEndpoint[Interpretation[_]] {
   def processEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]]
 }
 
-class EventEndpointImpl[Interpretation[_]: Effect](
+class EventEndpointImpl[Interpretation[_]: Effect: MonadThrow](
     eventConsumersRegistry: EventConsumersRegistry[Interpretation],
     reProvisioningStatus:   ReProvisioningStatus[Interpretation]
-)(implicit ME:              MonadError[Interpretation, Throwable])
-    extends Http4sDsl[Interpretation]
+) extends Http4sDsl[Interpretation]
     with EventEndpoint[Interpretation] {
 
   import cats.syntax.all._
@@ -52,29 +54,19 @@ class EventEndpointImpl[Interpretation[_]: Effect](
   import org.http4s._
 
   override def processEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]] =
-    reProvisioningStatus.isReProvisioning() flatMap { isReProvisioning =>
+    reProvisioningStatus.isReProvisioning() >>= { isReProvisioning =>
       if (isReProvisioning) ServiceUnavailable(InfoMessage("Temporarily unavailable: currently re-provisioning"))
       else {
         for {
-          multipart    <- toMultipart(request)
-          eventJson    <- toEvent(multipart)
-          maybePayload <- getPayload(multipart)
-          result <- right[Response[Interpretation]](
-                      eventConsumersRegistry.handle(EventRequestContent(eventJson, maybePayload)) >>= toHttpResult
-                    )
+          multipart      <- toMultipart(request)
+          eventJson      <- toEvent(multipart)
+          requestContent <- getRequestContent(multipart, eventJson)
+          result         <- right[Response[Interpretation]](eventConsumersRegistry.handle(requestContent) >>= toHttpResult)
         } yield result
       }.merge recoverWith { case NonFatal(error) =>
         toHttpResult(EventSchedulingResult.SchedulingError(error))
       }
     }
-
-  private lazy val toHttpResult: EventSchedulingResult => Interpretation[Response[Interpretation]] = {
-    case EventSchedulingResult.Accepted             => Accepted(InfoMessage("Event accepted"))
-    case EventSchedulingResult.Busy                 => TooManyRequests(InfoMessage("Too many events to handle"))
-    case EventSchedulingResult.UnsupportedEventType => BadRequest(ErrorMessage("Unsupported Event Type"))
-    case EventSchedulingResult.BadRequest           => BadRequest(ErrorMessage("Malformed event"))
-    case EventSchedulingResult.SchedulingError(_)   => InternalServerError(ErrorMessage("Failed to schedule event"))
-  }
 
   private def toMultipart(
       request: Request[Interpretation]
@@ -97,19 +89,51 @@ class EventEndpointImpl[Interpretation[_]: Effect](
         .getOrElse(BadRequest(ErrorMessage("Missing event part")).map(_.asLeft[Json]))
     }
 
-  private def getPayload(
-      multipart: Multipart[Interpretation]
-  ): EitherT[Interpretation, Response[Interpretation], Option[String]] = EitherT {
+  private def getRequestContent(
+      multipart: Multipart[Interpretation],
+      eventJson: Json
+  ): EitherT[Interpretation, Response[Interpretation], EventRequestContent] = EitherT {
+    import EventRequestContent._
     multipart.parts
       .find(_.name.contains("payload"))
-      .map {
-        _.as[String].map(_.some.asRight[Response[Interpretation]]).recoverWith { case NonFatal(_) =>
-          BadRequest(ErrorMessage("Malformed event payload")).map(_.asLeft[Option[String]])
-        }
+      .map { part =>
+        part.headers
+          .find(_.name == `Content-Type`.name)
+          .map(toEventRequestContent(part, eventJson))
+          .getOrElse(
+            BadRequest(ErrorMessage("Content-type not provided for payload")).map(_.asLeft[EventRequestContent])
+          )
       }
-      .getOrElse(Option.empty[String].asRight[Response[Interpretation]].pure[Interpretation])
+      .getOrElse(NoPayload(eventJson).asRight[Response[Interpretation]].widen[EventRequestContent].pure[Interpretation])
   }
 
+  private def toEventRequestContent(part:      Part[Interpretation],
+                                    eventJson: Json
+  ): Header => Interpretation[Either[Response[Interpretation], EventRequestContent]] = {
+    case header if header.value == `Content-Type`(MediaType.application.zip).value =>
+      part
+        .as[Array[Byte]]
+        .map(ZippedEventPayload)
+        .map(
+          WithPayload[ZippedEventPayload](eventJson, _)
+            .asRight[Response[Interpretation]]
+            .widen[EventRequestContent]
+        )
+    case header if header.value == `Content-Type`(MediaType.text.plain).value =>
+      part
+        .as[String]
+        .map(WithPayload[String](eventJson, _).asRight[Response[Interpretation]].widen[EventRequestContent])
+    case _ =>
+      BadRequest(ErrorMessage("Event payload type unsupported")).map(_.asLeft[EventRequestContent])
+  }
+
+  private lazy val toHttpResult: EventSchedulingResult => Interpretation[Response[Interpretation]] = {
+    case EventSchedulingResult.Accepted             => Accepted(InfoMessage("Event accepted"))
+    case EventSchedulingResult.Busy                 => TooManyRequests(InfoMessage("Too many events to handle"))
+    case EventSchedulingResult.UnsupportedEventType => BadRequest(ErrorMessage("Unsupported Event Type"))
+    case EventSchedulingResult.BadRequest           => BadRequest(ErrorMessage("Malformed event"))
+    case EventSchedulingResult.SchedulingError(_)   => InternalServerError(ErrorMessage("Failed to schedule event"))
+  }
 }
 
 object IOEventEndpoint {
@@ -123,5 +147,4 @@ object IOEventEndpoint {
       executionContext: ExecutionContext,
       timer:            Timer[IO]
   ): IO[EventEndpoint[IO]] = IO(new EventEndpointImpl[IO](eventConsumersRegistry, reProvisioningStatus))
-
 }

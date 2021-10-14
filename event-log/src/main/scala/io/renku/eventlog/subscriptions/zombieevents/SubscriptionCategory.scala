@@ -22,9 +22,10 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import ch.datascience.metrics.LabeledHistogram
-import org.typelevel.log4cats.Logger
 import io.renku.eventlog.subscriptions._
+import io.renku.eventlog.subscriptions.zombieevents.ZombieEventEncoder.encodeEvent
 import io.renku.eventlog.{EventLogDB, subscriptions}
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
@@ -47,7 +48,7 @@ private[subscriptions] object SubscriptionCategory {
                                              subscribers,
                                              eventsFinder,
                                              eventDelivery,
-                                             ZombieEventEncoder,
+                                             EventEncoder(encodeEvent),
                                              dispatchRecovery,
                                              logger
                          )

@@ -92,7 +92,7 @@ class EventPayloadTableCreatorSpec extends AnyWordSpec with DbInitSpec with shou
   }
 
   private trait TestCase {
-    val logger       = TestLogger[IO]()
-    val tableCreator = new EventPayloadTableCreatorImpl[IO](sessionResource, logger)
+    implicit val logger = TestLogger[IO]()
+    val tableCreator    = new EventPayloadTableCreatorImpl[IO](sessionResource)
   }
 }

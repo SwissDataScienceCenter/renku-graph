@@ -19,7 +19,7 @@
 package ch.datascience.events.producers
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.events.Generators.eventRequestContents
+import ch.datascience.events.Generators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.nonBlankStrings
 import ch.datascience.graph.config.EventLogUrl
@@ -49,7 +49,7 @@ class EventSenderSpec extends AnyWordSpec with ExternalServiceStubbing with shou
         }
 
         eventSender
-          .sendEvent(eventRequestContents.generateOne, nonBlankStrings().generateOne.value)
+          .sendEvent(eventRequestContentNoPayloads.generateOne, nonBlankStrings().generateOne.value)
           .unsafeRunSync() shouldBe ()
 
         reset()
@@ -80,7 +80,7 @@ class EventSenderSpec extends AnyWordSpec with ExternalServiceStubbing with shou
             .willReturn(aResponse().withStatus(Accepted.code))
         }
         eventSender
-          .sendEvent(eventRequestContents.generateOne, nonBlankStrings().generateOne.value)
+          .sendEvent(eventRequestContentNoPayloads.generateOne, nonBlankStrings().generateOne.value)
           .unsafeRunSync() shouldBe ()
 
         reset()
@@ -119,7 +119,7 @@ class EventSenderSpec extends AnyWordSpec with ExternalServiceStubbing with shou
       }
 
       eventSender
-        .sendEvent(eventRequestContents.generateOne, nonBlankStrings().generateOne.value)
+        .sendEvent(eventRequestContentNoPayloads.generateOne, nonBlankStrings().generateOne.value)
         .unsafeRunSync() shouldBe ()
 
       reset()
@@ -131,12 +131,11 @@ class EventSenderSpec extends AnyWordSpec with ExternalServiceStubbing with shou
   private lazy val requestTimeout: FiniteDuration   = 1 second
 
   private trait TestCase {
-    val eventLogUrl: EventLogUrl = EventLogUrl(externalServiceBaseUrl)
-    val logger = TestLogger[IO]()
-    val onErrorSleep: FiniteDuration = 1 second
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val eventLogUrl:     EventLogUrl    = EventLogUrl(externalServiceBaseUrl)
+    val onErrorSleep:    FiniteDuration = 1 second
 
     val eventSender = new EventSenderImpl[IO](eventLogUrl,
-                                              logger,
                                               onErrorSleep,
                                               retryInterval = 100 millis,
                                               maxRetries = 2,

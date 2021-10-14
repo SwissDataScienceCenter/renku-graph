@@ -42,7 +42,7 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
 
     s"change the status back to $New" in new TestCase {
 
-      val eventRequestContent = EventRequestContent(json"""{
+      val eventRequestContent = EventRequestContent.NoPayload(json"""{
         "categoryName": "EVENTS_STATUS_CHANGE",
         "id":           ${event.id.id},
         "project": {
@@ -52,7 +52,8 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
         "newStatus": $New
       }""")
 
-      (eventSender.sendEvent _)
+      (eventSender
+        .sendEvent(_: EventRequestContent.NoPayload, _: String))
         .expects(eventRequestContent, s"${SubscriptionCategory.name}: Marking event as $New failed")
         .returning(().pure[Try])
 
@@ -67,7 +68,7 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
       val exception  = exceptions.generateOne
       val subscriber = subscriberUrls.generateOne
 
-      val eventRequestContent = EventRequestContent(json"""{
+      val eventRequestContent = EventRequestContent.NoPayload(json"""{
         "categoryName": "EVENTS_STATUS_CHANGE",
         "id":           ${event.id.id},
         "project": {
@@ -78,7 +79,8 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
         "newStatus": $GenerationNonRecoverableFailure
       }""")
 
-      (eventSender.sendEvent _)
+      (eventSender
+        .sendEvent(_: EventRequestContent.NoPayload, _: String))
         .expects(eventRequestContent,
                  s"${SubscriptionCategory.name}: $event, url = $subscriber -> $GenerationNonRecoverableFailure"
         )
@@ -96,7 +98,7 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
     val event = awaitingGenerationEvents.generateOne
 
     val eventSender      = mock[EventSender[Try]]
-    val logger           = TestLogger[Try]()
-    val dispatchRecovery = new DispatchRecoveryImpl[Try](eventSender, logger)
+    implicit val logger  = TestLogger[Try]()
+    val dispatchRecovery = new DispatchRecoveryImpl[Try](eventSender)
   }
 }

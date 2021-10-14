@@ -54,10 +54,4 @@ class CommitSyncEventEncoderSpec extends AnyWordSpec with should.Matchers {
       }"""
     }
   }
-
-  "encodePayload" should {
-    "return None" in {
-      CommitSyncEventEncoder.encodePayload(commitSyncEvents.generateOne) shouldBe None
-    }
-  }
 }

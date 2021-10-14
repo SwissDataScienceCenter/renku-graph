@@ -40,25 +40,23 @@ private trait ProjectPathAdder[Interpretation[_]] {
 }
 
 private object ProjectPathAdder {
-  def apply[Interpretation[_]: BracketThrow](
-      sessionResource: SessionResource[Interpretation, EventLogDB],
-      logger:          Logger[Interpretation]
+  def apply[Interpretation[_]: BracketThrow: Logger](
+      sessionResource: SessionResource[Interpretation, EventLogDB]
   ): ProjectPathAdder[Interpretation] =
-    new ProjectPathAdderImpl(sessionResource, logger)
+    new ProjectPathAdderImpl(sessionResource)
 }
 
-private class ProjectPathAdderImpl[Interpretation[_]: BracketThrow](
-    sessionResource: SessionResource[Interpretation, EventLogDB],
-    logger:          Logger[Interpretation]
+private class ProjectPathAdderImpl[Interpretation[_]: BracketThrow: Logger](
+    sessionResource: SessionResource[Interpretation, EventLogDB]
 ) extends ProjectPathAdder[Interpretation]
     with EventTableCheck
     with TypeSerializers {
 
   override def run(): Interpretation[Unit] = sessionResource.useK {
     whenEventTableExists(
-      Kleisli.liftF(logger info "'project_path' column adding skipped"),
+      Kleisli.liftF(Logger[Interpretation] info "'project_path' column adding skipped"),
       otherwise = checkColumnExists >>= {
-        case true  => Kleisli.liftF(logger info "'project_path' column exists")
+        case true  => Kleisli.liftF(Logger[Interpretation] info "'project_path' column exists")
         case false => addColumn()
       }
     )
@@ -80,7 +78,7 @@ private class ProjectPathAdderImpl[Interpretation[_]: BracketThrow](
       _                  <- updatePaths(projectIdsAndPaths)
       _                  <- execute(sql"ALTER TABLE event_log ALTER COLUMN project_path SET NOT NULL".command)
       _                  <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_path ON event_log(project_path)".command)
-      _                  <- Kleisli.liftF(logger.info("'project_path' column added"))
+      _                  <- Kleisli.liftF(Logger[Interpretation].info("'project_path' column added"))
     } yield ()
   } recoverWith logging
 
@@ -125,7 +123,7 @@ private class ProjectPathAdderImpl[Interpretation[_]: BracketThrow](
   private lazy val logging: PartialFunction[Throwable, Kleisli[Interpretation, Session[Interpretation], Unit]] = {
     case NonFatal(exception) =>
       Kleisli.liftF(
-        logger
+        Logger[Interpretation]
           .error(exception)("'project_path' column adding failure")
           .flatMap(_ => exception.raiseError[Interpretation, Unit])
       )

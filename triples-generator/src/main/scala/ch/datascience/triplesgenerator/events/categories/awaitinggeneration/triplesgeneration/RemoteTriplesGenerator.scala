@@ -24,7 +24,6 @@ import ch.datascience.config.ConfigLoader
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.{AccessToken, RestClient}
 import ch.datascience.logging.ApplicationLogger
-import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.tinytypes.constraints.Url
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
@@ -32,6 +31,8 @@ import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.Comm
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import com.typesafe.config.{Config, ConfigFactory}
 import io.circe.Json
+import io.renku.jsonld.JsonLD
+import io.renku.jsonld.parser._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -72,15 +73,15 @@ private[awaitinggeneration] class RemoteTriplesGenerator(
 
   override def generateTriples(
       commitEvent:             CommitEvent
-  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] = EitherT {
+  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, JsonLD] = EitherT {
     {
       for {
         uri           <- validateUri(s"$serviceUrl/projects/${commitEvent.project.id}/commits/${commitEvent.commitId}")
         triplesInJson <- send(request(GET, uri))(mapResponse)
-        triples       <- IO.fromEither(JsonLDTriples from triplesInJson)
+        triples       <- IO.fromEither(parse(triplesInJson))
       } yield triples.asRight[ProcessingRecoverableError]
     } recoverWith { case UnauthorizedException =>
-      GenerationRecoverableError("Unauthorized exception").asLeft[JsonLDTriples].pure[IO]
+      GenerationRecoverableError("Unauthorized exception").asLeft[JsonLD].pure[IO]
     }
   }
 

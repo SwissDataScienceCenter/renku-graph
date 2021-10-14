@@ -22,6 +22,7 @@ import cats.Show
 import cats.syntax.all._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
+import ch.datascience.tinytypes.contenttypes.ZippedContent
 import ch.datascience.tinytypes.json.TinyTypeDecoders.{durationDecoder, instantDecoder}
 import ch.datascience.tinytypes.json.TinyTypeEncoders.durationEncoder
 import eu.timepit.refined.api.Refined
@@ -85,12 +86,21 @@ object events {
     }
   }
 
+  final class ZippedEventPayload private (val value: Array[Byte])
+      extends AnyVal
+      with ByteArrayTinyType
+      with ZippedContent
+
+  implicit object ZippedEventPayload extends TinyTypeFactory[ZippedEventPayload](new ZippedEventPayload(_))
+
   final class BatchDate private (val value: Instant) extends AnyVal with InstantTinyType
+
   implicit object BatchDate extends TinyTypeFactory[BatchDate](new BatchDate(_)) with InstantNotInTheFuture {
     def apply(clock: Clock): BatchDate = apply(clock.instant())
   }
 
   sealed trait EventStatus extends StringTinyType with Product with Serializable
+
   object EventStatus extends TinyTypeFactory[EventStatus](EventStatusInstantiator) {
 
     val all: Set[EventStatus] = Set(

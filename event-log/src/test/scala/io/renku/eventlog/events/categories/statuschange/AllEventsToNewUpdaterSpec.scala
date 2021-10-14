@@ -24,13 +24,13 @@ import ch.datascience.events.consumers.subscriptions.{subscriberIds, subscriberU
 import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{timestamps, timestampsNotInTheFuture}
-import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventProcessingTimes}
+import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventProcessingTimes, zippedEventPayloads}
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
-import io.renku.eventlog.EventContentGenerators.{eventMessages, eventPayloads}
+import io.renku.eventlog.EventContentGenerators.eventMessages
 import io.renku.eventlog._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.AllEventsToNew
 import org.scalacheck.Gen
@@ -115,9 +115,9 @@ class AllEventsToNewUpdaterSpec
           case _ => eventMessages.generateOption
         },
         maybeEventPayload = status match {
-          case EventStatus.TriplesStore | EventStatus.TriplesGenerated => eventPayloads.generateSome
-          case EventStatus.AwaitingDeletion                            => eventPayloads.generateOption
-          case _                                                       => eventPayloads.generateNone
+          case EventStatus.TriplesStore | EventStatus.TriplesGenerated => zippedEventPayloads.generateSome
+          case EventStatus.AwaitingDeletion                            => zippedEventPayloads.generateOption
+          case _                                                       => zippedEventPayloads.generateNone
         },
         projectPath = projectPath
       )

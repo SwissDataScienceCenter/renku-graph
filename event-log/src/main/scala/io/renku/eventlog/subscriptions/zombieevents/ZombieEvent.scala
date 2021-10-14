@@ -23,7 +23,6 @@ import cats.implicits.showInterpolator
 import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
-import io.renku.eventlog.subscriptions.EventEncoder
 
 private final class ZombieEventProcess private (val value: String) extends AnyVal with StringTinyType
 private object ZombieEventProcess extends TinyTypeFactory[ZombieEventProcess](new ZombieEventProcess(_))
@@ -43,12 +42,13 @@ private object ZombieEvent {
   )
 }
 
-private object ZombieEventEncoder extends EventEncoder[ZombieEvent] {
+private object ZombieEventEncoder {
 
   import io.circe.Json
   import io.circe.literal.JsonStringContext
 
-  override def encodeEvent(event: ZombieEvent): Json = json"""{
+  def encodeEvent(event: ZombieEvent): Json =
+    json"""{
     "categoryName": ${categoryName.value},
     "id":           ${event.eventId.id.value},
     "project": {
@@ -57,6 +57,4 @@ private object ZombieEventEncoder extends EventEncoder[ZombieEvent] {
     },
     "status":       ${event.status.value}
   }"""
-
-  override def encodePayload(categoryEvent: ZombieEvent): Option[String] = None
 }

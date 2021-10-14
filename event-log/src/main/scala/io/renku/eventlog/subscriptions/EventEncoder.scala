@@ -18,11 +18,35 @@
 
 package io.renku.eventlog.subscriptions
 
+import ch.datascience.http.client.RestClient.PartEncoder
 import io.circe.Json
+import org.http4s.multipart.Part
 
 private trait EventEncoder[CategoryEvent] {
+  def encodeParts[Interpretation[_]](event: CategoryEvent): Vector[Part[Interpretation]]
+}
 
-  def encodeEvent(categoryEvent:   CategoryEvent): Json
-  def encodePayload(categoryEvent: CategoryEvent): Option[String]
+private object EventEncoder {
+  def apply[CategoryEvent](
+      eventEncoder:           CategoryEvent => Json
+  )(implicit jsonPartEncoder: PartEncoder[Json]): EventEncoder[CategoryEvent] =
+    new EventEncoder[CategoryEvent] {
+      def encodeParts[Interpretation[_]](event: CategoryEvent): Vector[Part[Interpretation]] = Vector(
+        jsonPartEncoder.encode("event", eventEncoder(event))
+      )
+    }
 
+  def apply[CategoryEvent, PayloadType](
+      eventEncoder:   CategoryEvent => Json,
+      payloadEncoder: CategoryEvent => PayloadType
+  )(implicit
+      jsonPartEncoder:    PartEncoder[Json],
+      payloadPartEncoder: PartEncoder[PayloadType]
+  ): EventEncoder[CategoryEvent] =
+    new EventEncoder[CategoryEvent] {
+      def encodeParts[Interpretation[_]](event: CategoryEvent): Vector[Part[Interpretation]] = Vector(
+        jsonPartEncoder.encode("event", eventEncoder(event)),
+        payloadPartEncoder.encode("payload", payloadEncoder(event))
+      )
+    }
 }

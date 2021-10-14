@@ -59,7 +59,7 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
         .deserializeToModel(
           triplesGeneratedEvents.generateOne.copy(
             project = consumers.Project(projectIds.generateOne, project.path),
-            triples = JsonLD
+            payload = JsonLD
               .arr(project.asJsonLD :: project.datasets.flatMap(_.publicationEvents.map(_.asJsonLD)): _*)
               .flatten
               .fold(throw _, identity)
@@ -82,7 +82,7 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
         .deserializeToModel(
           triplesGeneratedEvents.generateOne.copy(
             project = eventProject,
-            triples = JsonLD.arr()
+            payload = JsonLD.arr()
           )
         )
         .value
@@ -102,7 +102,7 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
         .deserializeToModel(
           triplesGeneratedEvents.generateOne.copy(
             project = consumers.Project(projectIds.generateOne, projectPath),
-            triples = JsonLD.arr()
+            payload = JsonLD.arr()
           )
         )
         .value shouldBe Failure(exception)
@@ -132,7 +132,7 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
         .deserializeToModel(
           triplesGeneratedEvents.generateOne.copy(
             project = eventProject,
-            triples = triples
+            payload = triples
           )
         )
         .value
@@ -154,7 +154,7 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
         .deserializeToModel(
           triplesGeneratedEvents.generateOne.copy(
             project = eventProject,
-            triples = JsonLD
+            payload = JsonLD
               .arr(project.asJsonLD, otherProject.asJsonLD)
               .flatten
               .fold(throw _, identity)
@@ -177,7 +177,7 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
         .deserializeToModel(
           triplesGeneratedEvents.generateOne.copy(
             project = eventProject,
-            triples = JsonLD
+            payload = JsonLD
               .arr(project.asJsonLD,
                    JsonLD.entity(EntityId.of(httpUrls().generateOne),
                                  entities.Activity.entityTypes,

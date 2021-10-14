@@ -19,7 +19,8 @@
 package ch.datascience.triplesgenerator
 package events.categories.triplesgenerated
 
-import cats.data.EitherT.{fromEither, fromOption}
+import cats.data.EitherT
+import cats.data.EitherT.fromEither
 import cats.effect.concurrent.Deferred
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.all._
@@ -31,13 +32,12 @@ import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
 import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, Project}
 import ch.datascience.events.{EventRequestContent, consumers}
 import ch.datascience.graph.model.SchemaVersion
-import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventBody}
+import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventBody, ZippedEventPayload}
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
-import io.circe.parser.{parse => parseJson}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -67,12 +67,13 @@ private[events] class EventHandler[Interpretation[_]: ConcurrentEffect: MonadThr
     )
 
   private def startProcessingEvent(request: EventRequestContent, processing: Deferred[Interpretation, Unit]) = for {
-    eventId            <- fromEither(request.event.getEventId)
-    project            <- fromEither(request.event.getProject)
-    eventBodyString    <- fromOption(request.maybePayload, BadRequest)
-    eventBodyJson      <- fromEither(parseJson(eventBodyString)).leftMap(_ => BadRequest)
-    eventBodyAndSchema <- fromEither(eventBodyJson.as[(EventBody, SchemaVersion)]).leftMap(_ => BadRequest)
-    event              <- toEvent(eventId, project, eventBodyAndSchema).toRightT(recoverTo = BadRequest)
+    eventId <- fromEither(request.event.getEventId)
+    project <- fromEither(request.event.getProject)
+    payload <- request match {
+                 case EventRequestContent.WithPayload(_, payload: ZippedEventPayload) => EitherT.rightT(payload)
+                 case _ => EitherT.leftT(BadRequest)
+               }
+    event <- toEvent(eventId, project, payload).toRightT(recoverTo = BadRequest)
     result <- (ContextShift[Interpretation].shift *> Concurrent[Interpretation]
                 .start(process(event) >> processing.complete(()))).toRightT
                 .map(_ => Accepted)

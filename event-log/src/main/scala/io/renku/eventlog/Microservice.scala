@@ -68,7 +68,7 @@ object Microservice extends IOMicroservice {
       for {
         certificateLoader           <- CertificateLoader[IO](ApplicationLogger)
         sentryInitializer           <- SentryInitializer[IO]()
-        dbInitializer               <- DbInitializer(sessionResource, ApplicationLogger)
+        dbInitializer               <- DbInitializer(sessionResource)
         metricsRegistry             <- MetricsRegistry()
         queriesExecTimes            <- QueriesExecutionTimes(metricsRegistry)
         statsFinder                 <- IOStatsFinder(sessionResource, queriesExecTimes)
@@ -127,8 +127,7 @@ object Microservice extends IOMicroservice {
                                     underTriplesGenerationGauge,
                                     awaitingTransformationGauge,
                                     underTransformationGauge,
-                                    queriesExecTimes,
-                                    ApplicationLogger
+                                    queriesExecTimes
                                   )
         subscriptionsEndpoint <- SubscriptionsEndpoint(eventProducersRegistry, ApplicationLogger)
         eventDetailsEndpoint  <- EventDetailsEndpoint(sessionResource, queriesExecTimes, ApplicationLogger)

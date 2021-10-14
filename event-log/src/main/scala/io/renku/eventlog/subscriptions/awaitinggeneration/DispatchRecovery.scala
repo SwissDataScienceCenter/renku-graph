@@ -34,15 +34,14 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-private class DispatchRecoveryImpl[Interpretation[_]: MonadThrow](
-    eventSender: EventSender[Interpretation],
-    logger:      Logger[Interpretation]
+private class DispatchRecoveryImpl[Interpretation[_]: MonadThrow: Logger](
+    eventSender: EventSender[Interpretation]
 ) extends subscriptions.DispatchRecovery[Interpretation, AwaitingGenerationEvent]
     with TinyTypeEncoders {
 
   override def returnToQueue(event: AwaitingGenerationEvent): Interpretation[Unit] =
     eventSender.sendEvent(
-      EventRequestContent(
+      EventRequestContent.NoPayload(
         json"""{
           "categoryName": "EVENTS_STATUS_CHANGE",
           "id":           ${event.id.id},
@@ -60,7 +59,7 @@ private class DispatchRecoveryImpl[Interpretation[_]: MonadThrow](
       url:   SubscriberUrl,
       event: AwaitingGenerationEvent
   ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    val requestContent = EventRequestContent(
+    val requestContent = EventRequestContent.NoPayload(
       json"""{
         "categoryName": "EVENTS_STATUS_CHANGE",
         "id":           ${event.id.id},
@@ -73,17 +72,17 @@ private class DispatchRecoveryImpl[Interpretation[_]: MonadThrow](
       }"""
     )
     val errorMessage = s"${SubscriptionCategory.name}: $event, url = $url -> $GenerationNonRecoverableFailure"
-    eventSender.sendEvent(requestContent, errorMessage) >> logger.error(exception)(errorMessage)
+    eventSender.sendEvent(requestContent, errorMessage) >> Logger[Interpretation].error(exception)(errorMessage)
   }
 }
 
 private object DispatchRecovery {
 
-  def apply(logger:     Logger[IO])(implicit
+  def apply()(implicit
       executionContext: ExecutionContext,
       concurrentEffect: ConcurrentEffect[IO],
-      timer:            Timer[IO]
-  ): IO[DispatchRecovery[IO, AwaitingGenerationEvent]] = for {
-    eventSender <- EventSender(logger)
-  } yield new DispatchRecoveryImpl[IO](eventSender, logger)
+      timer:            Timer[IO],
+      logger:           Logger[IO]
+  ): IO[DispatchRecovery[IO, AwaitingGenerationEvent]] =
+    EventSender() map (new DispatchRecoveryImpl[IO](_))
 }

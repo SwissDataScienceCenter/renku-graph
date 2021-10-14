@@ -66,7 +66,7 @@ class EventPayloadSchemaVersionAdderSpec extends AnyWordSpec with DbInitSpec wit
   }
 
   private trait TestCase {
-    val logger       = TestLogger[IO]()
-    val tableCreator = new EventPayloadSchemaVersionAdderImpl[IO](sessionResource, logger)
+    implicit val logger = TestLogger[IO]()
+    val tableCreator    = new EventPayloadSchemaVersionAdderImpl[IO](sessionResource)
   }
 }

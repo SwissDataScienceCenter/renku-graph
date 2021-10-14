@@ -29,7 +29,4 @@ object EventContentGenerators {
 
   implicit val eventMessages: Gen[EventMessage] = nonEmptyStrings() map EventMessage.apply
 
-  implicit val eventPayloads: Gen[EventPayload] = for {
-    content <- jsons
-  } yield EventPayload(content.noSpaces)
 }

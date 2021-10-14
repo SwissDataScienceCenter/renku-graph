@@ -21,9 +21,10 @@ package io.renku.eventlog.subscriptions.commitsync
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.db.{SessionResource, SqlStatement}
 import ch.datascience.metrics.LabeledHistogram
-import org.typelevel.log4cats.Logger
 import io.renku.eventlog.subscriptions._
+import io.renku.eventlog.subscriptions.commitsync.CommitSyncEventEncoder.encodeEvent
 import io.renku.eventlog.{EventLogDB, subscriptions}
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
@@ -46,7 +47,7 @@ private[subscriptions] object SubscriptionCategory {
                                              subscribers,
                                              eventsFinder,
                                              eventDelivery,
-                                             CommitSyncEventEncoder,
+                                             EventEncoder(encodeEvent),
                                              dispatchRecovery,
                                              logger
                          )

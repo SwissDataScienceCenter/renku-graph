@@ -74,8 +74,8 @@ class ProjectPathRemoverSpec
   }
 
   private trait TestCase {
-    val logger             = TestLogger[IO]()
-    val projectPathRemover = new ProjectPathRemoverImpl[IO](sessionResource, logger)
+    implicit val logger    = TestLogger[IO]()
+    val projectPathRemover = new ProjectPathRemoverImpl[IO](sessionResource)
   }
 
   private def checkColumnExists: Boolean = sessionResource

@@ -43,7 +43,7 @@ class CommitEventsRemoverSpec extends AnyWordSpec with should.Matchers with Mock
 
     "send the toAwaitingDeletion status change event" in new TestCase {
 
-      val eventRequestContent = EventRequestContent(json"""{
+      val eventRequestContent = EventRequestContent.NoPayload(json"""{
         "categoryName": "EVENTS_STATUS_CHANGE",
         "id":           $commitId,
         "project": {
@@ -53,7 +53,8 @@ class CommitEventsRemoverSpec extends AnyWordSpec with should.Matchers with Mock
         "newStatus": $AwaitingDeletion
       }""")
 
-      (eventSender.sendEvent _)
+      (eventSender
+        .sendEvent(_: EventRequestContent.NoPayload, _: String))
         .expects(eventRequestContent, s"$categoryName: Marking event as $AwaitingDeletion failed")
         .returning(().pure[Try])
 
@@ -63,7 +64,8 @@ class CommitEventsRemoverSpec extends AnyWordSpec with should.Matchers with Mock
     "return Failed if sending the toAwaitingDeletion status change event fails" in new TestCase {
 
       val exception = exceptions.generateOne
-      (eventSender.sendEvent _)
+      (eventSender
+        .sendEvent(_: EventRequestContent.NoPayload, _: String))
         .expects(*, *)
         .returning(exception.raiseError[Try, Unit])
 

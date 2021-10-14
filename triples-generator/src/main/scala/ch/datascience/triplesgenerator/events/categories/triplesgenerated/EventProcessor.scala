@@ -223,7 +223,7 @@ private object EventProcessor {
     uploader              <- TransformationStepsRunner(timeRecorder)
     accessTokenFinder     <- AccessTokenFinder(logger)
     triplesCurator        <- TriplesCurator(timeRecorder)
-    eventStatusUpdater    <- EventStatusUpdater(categoryName, logger)
+    eventStatusUpdater    <- EventStatusUpdater(categoryName)
     eventsProcessingTimes <- metricsRegistry.register[Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
     executionTimeRecorder <- ExecutionTimeRecorder[IO](logger, maybeHistogram = Some(eventsProcessingTimes))
     jsonLDDeserializer    <- JsonLDDeserializer(gitLabThrottler, logger)

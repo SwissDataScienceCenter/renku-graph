@@ -18,6 +18,7 @@
 
 package ch.datascience.generators
 
+import cats.{Functor, Semigroupal}
 import cats.data.NonEmptyList
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -375,5 +376,16 @@ object Generators {
     }
 
     implicit def asArbitrary[T](implicit generator: Gen[T]): Arbitrary[T] = Arbitrary(generator)
+
+    implicit val semigroupalGen: Semigroupal[Gen] = new Semigroupal[Gen] {
+      override def product[A, B](fa: Gen[A], fb: Gen[B]): Gen[(A, B)] = for {
+        a <- fa
+        b <- fb
+      } yield a -> b
+    }
+
+    implicit val functorGen: Functor[Gen] = new Functor[Gen] {
+      override def map[A, B](fa: Gen[A])(f: A => B): Gen[B] = fa.map(f)
+    }
   }
 }

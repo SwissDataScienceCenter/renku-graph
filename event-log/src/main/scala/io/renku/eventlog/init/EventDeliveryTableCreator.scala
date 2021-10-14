@@ -31,16 +31,15 @@ private trait EventDeliveryTableCreator[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
-private class EventDeliveryTableCreatorImpl[Interpretation[_]: BracketThrow](
-    sessionResource: SessionResource[Interpretation, EventLogDB],
-    logger:          Logger[Interpretation]
+private class EventDeliveryTableCreatorImpl[Interpretation[_]: BracketThrow: Logger](
+    sessionResource: SessionResource[Interpretation, EventLogDB]
 ) extends EventDeliveryTableCreator[Interpretation] {
 
   import cats.syntax.all._
 
   override def run(): Interpretation[Unit] = sessionResource.useK {
     checkTableExists >>= {
-      case true  => Kleisli.liftF(logger info "'event_delivery' table exists")
+      case true  => Kleisli.liftF(Logger[Interpretation] info "'event_delivery' table exists")
       case false => createTable()
     }
   }
@@ -58,7 +57,7 @@ private class EventDeliveryTableCreatorImpl[Interpretation[_]: BracketThrow](
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id    ON event_delivery(event_id)".command)
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id  ON event_delivery(project_id)".command)
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_delivery_id ON event_delivery(delivery_id)".command)
-      _ <- Kleisli.liftF(logger info "'event_delivery' table created")
+      _ <- Kleisli.liftF(Logger[Interpretation] info "'event_delivery' table created")
       _ <- execute(foreignKeySql)
     } yield ()
 
@@ -78,9 +77,8 @@ private class EventDeliveryTableCreatorImpl[Interpretation[_]: BracketThrow](
 }
 
 private object EventDeliveryTableCreator {
-  def apply[Interpretation[_]: BracketThrow](
-      sessionResource: SessionResource[Interpretation, EventLogDB],
-      logger:          Logger[Interpretation]
+  def apply[Interpretation[_]: BracketThrow: Logger](
+      sessionResource: SessionResource[Interpretation, EventLogDB]
   ): EventDeliveryTableCreator[Interpretation] =
-    new EventDeliveryTableCreatorImpl(sessionResource, logger)
+    new EventDeliveryTableCreatorImpl(sessionResource)
 }
