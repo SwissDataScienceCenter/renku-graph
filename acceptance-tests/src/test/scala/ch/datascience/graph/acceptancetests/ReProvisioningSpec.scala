@@ -32,9 +32,9 @@ import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplici
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.{SchemaVersion, testentities}
 import ch.datascience.http.client.AccessToken
-import ch.datascience.triplesgenerator
 import io.circe.Json
 import io.renku.jsonld.syntax._
+import io.renku.triplesgenerator
 import org.http4s.Response
 import org.http4s.Status.Ok
 import org.scalactic.source.Position

@@ -28,6 +28,7 @@ import ch.datascience.graph.config.RenkuBaseUrlLoader
 import ch.datascience.graph.model.{GitLabApiUrl, GitLabUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.testentities.generators.EntitiesGenerators
 import ch.datascience.rdfstore.FusekiBaseUrl
+import io.renku.triplesgenerator
 import io.renku.eventlog
 import io.renku.webhookservice.Microservice
 import org.scalatest.{BeforeAndAfterAll, Suite}
