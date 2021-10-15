@@ -21,8 +21,8 @@ package ch.datascience.graph.acceptancetests.db
 import cats.effect.IO
 import ch.datascience.db.DBConfigProvider
 import ch.datascience.graph.acceptancetests.tooling.TestLogger
-import ch.datascience.tokenrepository.repository.{ProjectsTokensDB, ProjectsTokensDbConfigProvider}
 import com.dimafeng.testcontainers.FixedHostPortGenericContainer
+import io.renku.tokenrepository.repository.{ProjectsTokensDB, ProjectsTokensDbConfigProvider}
 
 object TokenRepository {
 
