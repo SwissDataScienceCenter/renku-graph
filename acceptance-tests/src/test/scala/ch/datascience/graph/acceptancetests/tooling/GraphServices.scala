@@ -29,6 +29,7 @@ import ch.datascience.graph.model.{GitLabApiUrl, GitLabUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.testentities.generators.EntitiesGenerators
 import ch.datascience.rdfstore.FusekiBaseUrl
 import io.renku.eventlog
+import io.renku.webhookservice.Microservice
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
 import scala.concurrent.ExecutionContext
@@ -92,7 +93,7 @@ object GraphServices {
   val knowledgeGraphClient:     KnowledgeGraphClient          = KnowledgeGraphClient()
   val eventLogClient:           EventLogClient.EventLogClient = EventLogClient()
 
-  private val webhookService = ServiceRun("webhook-service", webhookservice.Microservice, webhookServiceClient)
+  private val webhookService = ServiceRun("webhook-service", Microservice, webhookServiceClient)
   private val commitEventService = ServiceRun(
     "commit-event-service",
     commiteventservice.Microservice,

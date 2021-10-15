@@ -23,13 +23,13 @@ import ch.datascience.control.Throttler
 import ch.datascience.graph.model.projects
 import ch.datascience.http.client.{AccessToken, BasicAuthCredentials, RestClient}
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.webhookservice.crypto.HookTokenCrypto
-import ch.datascience.webhookservice.model.HookToken
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.string.Url
 import io.circe.Json
 import io.circe.literal._
+import io.renku.webhookservice.crypto.HookTokenCrypto
+import io.renku.webhookservice.model.HookToken
 import org.http4s.Status.Ok
 import org.http4s.{Header, Method, Response}
 import org.scalatest.matchers.should

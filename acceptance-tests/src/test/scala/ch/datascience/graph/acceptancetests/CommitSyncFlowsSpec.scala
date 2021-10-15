@@ -34,8 +34,8 @@ import ch.datascience.graph.model.events.EventId
 import ch.datascience.graph.model.events.EventStatus.TriplesStore
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.AccessToken
-import ch.datascience.webhookservice.model.HookToken
 import io.renku.eventlog.TypeSerializers
+import io.renku.webhookservice.model.HookToken
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.Eventually
