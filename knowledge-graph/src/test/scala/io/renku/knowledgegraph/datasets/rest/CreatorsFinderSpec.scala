@@ -1,0 +1,65 @@
+/*
+ * Copyright 2021 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package io.renku.knowledgegraph.datasets.rest
+
+import ch.datascience.generators.Generators.blankStrings
+import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.users.{Email, Name}
+import io.circe.literal._
+import io.renku.knowledgegraph.datasets.model.DatasetCreator
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+
+class CreatorsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+
+  import CreatorsFinder._
+
+  "dataset creator decoder" should {
+
+    "decode result-set with a blank affiliation to a DatasetCreator object" in {
+      forAll(userEmails, userNames, blankStrings()) { (email, name, affiliation) =>
+        resultSet(email, name, affiliation).as[List[DatasetCreator]] shouldBe Right {
+          List(DatasetCreator(Some(email), name, None))
+        }
+      }
+    }
+
+    "decode result-set with a non-blank affiliation to a DatasetCreator object" in {
+      forAll(userEmails, userNames, userAffiliations) { (email, name, affiliation) =>
+        resultSet(email, name, affiliation.toString).as[List[DatasetCreator]] shouldBe Right {
+          List(DatasetCreator(Some(email), name, Some(affiliation)))
+        }
+      }
+    }
+  }
+
+  private def resultSet(email: Email, name: Name, blank: String) = json"""
+  {
+    "results": {
+      "bindings": [
+        {
+          "email": {"value": ${email.value}},
+          "name": {"value": ${name.value}},
+          "affiliation": {"value": $blank}
+        }
+      ]
+    }
+  }"""
+}

@@ -28,7 +28,6 @@ import ch.datascience.graph.config.RenkuBaseUrlLoader
 import ch.datascience.graph.model.testentities.generators.EntitiesGenerators
 import ch.datascience.graph.model.{GitLabApiUrl, GitLabUrl, RenkuBaseUrl}
 import ch.datascience.rdfstore.FusekiBaseUrl
-import io.renku.webhookservice.Microservice
 import io.renku._
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
@@ -79,8 +78,6 @@ trait GraphServices extends BeforeAndAfterAll with EntitiesGenerators {
 
 object GraphServices {
 
-  import ch.datascience._
-
   implicit lazy val executionContext: ExecutionContext     = ExecutionContext.global
   implicit lazy val contextShift:     ContextShift[IO]     = IO.contextShift(executionContext)
   implicit lazy val concurrent:       ConcurrentEffect[IO] = IO.ioConcurrentEffect
@@ -93,7 +90,7 @@ object GraphServices {
   val knowledgeGraphClient:     KnowledgeGraphClient          = KnowledgeGraphClient()
   val eventLogClient:           EventLogClient.EventLogClient = EventLogClient()
 
-  private val webhookService = ServiceRun("webhook-service", Microservice, webhookServiceClient)
+  private val webhookService = ServiceRun("webhook-service", webhookservice.Microservice, webhookServiceClient)
   private val commitEventService = ServiceRun(
     "commit-event-service",
     commiteventservice.Microservice,
