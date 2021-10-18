@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.effect.IO
-import ch.datascience.interpreters.TestLogger
+import io.renku.interpreters.TestLogger
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk.implicits._

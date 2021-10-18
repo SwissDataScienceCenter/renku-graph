@@ -20,15 +20,15 @@ package io.renku.eventlog.subscriptions
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.http.ErrorMessage.ErrorMessage
-import ch.datascience.http.InfoMessage.InfoMessage
-import ch.datascience.http.server.EndpointTester._
-import ch.datascience.http.{ErrorMessage, InfoMessage}
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Error
 import io.renku.eventlog.subscriptions.EventProducersRegistry.{SubscriptionResult, SuccessfulSubscription, UnsupportedPayload}
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.http.ErrorMessage.ErrorMessage
+import io.renku.http.InfoMessage.InfoMessage
+import io.renku.http.server.EndpointTester._
+import io.renku.http.{ErrorMessage, InfoMessage}
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.Error
 import org.http4s.MediaType.application
 import org.http4s.Status._
 import org.http4s._

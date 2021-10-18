@@ -20,21 +20,21 @@ package io.renku.eventlog.subscriptions.globalcommitsync
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.db.SqlStatement
-import ch.datascience.events.consumers.ConsumersModelGenerators.projectsGen
-import ch.datascience.events.consumers.Project
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.EventStatus.AwaitingDeletion
-import ch.datascience.graph.model.events.{CommitId, CompoundEventId, EventStatus, LastSyncedDate}
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
+import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.subscriptions.SubscriptionDataProvisioning
 import io.renku.eventlog.{CreatedDate, EventDate, InMemoryEventLogDbSpec}
+import io.renku.events.consumers.ConsumersModelGenerators.projectsGen
+import io.renku.events.consumers.Project
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.EventsGenerators._
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.events.EventStatus.AwaitingDeletion
+import io.renku.graph.model.events.{CommitId, CompoundEventId, EventStatus, LastSyncedDate}
+import io.renku.graph.model.projects
+import io.renku.metrics.TestLabeledHistogram
 import org.scalacheck.Gen
 import org.scalamock.handlers.CallHandler2
 import org.scalamock.scalatest.MockFactory
@@ -42,8 +42,8 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk.data.Completion
 
-import java.time.{Duration, Instant}
 import java.time.temporal.ChronoUnit
+import java.time.{Duration, Instant}
 import scala.util.Random
 
 class GlobalCommitSyncEventFinderSpec

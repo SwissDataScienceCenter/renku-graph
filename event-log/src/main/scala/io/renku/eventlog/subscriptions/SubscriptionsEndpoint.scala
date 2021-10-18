@@ -20,9 +20,9 @@ package io.renku.eventlog.subscriptions
 
 import cats.MonadThrow
 import cats.effect.Effect
-import ch.datascience.http.ErrorMessage
 import io.circe.Json
 import io.renku.eventlog.subscriptions.EventProducersRegistry.{SubscriptionResult, UnsupportedPayload}
+import io.renku.http.ErrorMessage
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Request, Response}
 import org.typelevel.log4cats.Logger
@@ -41,8 +41,8 @@ class SubscriptionsEndpointImpl[Interpretation[_]: Effect: MonadThrow](
 
   import SubscriptionsEndpointImpl._
   import cats.syntax.all._
-  import ch.datascience.http.InfoMessage
-  import ch.datascience.http.InfoMessage._
+  import io.renku.http.InfoMessage
+  import io.renku.http.InfoMessage._
   import org.http4s.circe._
   import org.http4s.{Request, Response}
 

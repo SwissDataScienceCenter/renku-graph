@@ -20,7 +20,7 @@ package io.renku.jsonld
 
 import cats.syntax.all._
 import io.circe.{DecodingFailure, JsonNumber}
-import io.renku.jsonld.Cursor.{FlattenedArrayCursor, _}
+import io.renku.jsonld.Cursor._
 import io.renku.jsonld.JsonLD._
 import io.renku.jsonld.JsonLDDecoder.Result
 

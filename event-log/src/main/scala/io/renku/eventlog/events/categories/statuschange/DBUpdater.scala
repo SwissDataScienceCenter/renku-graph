@@ -20,10 +20,10 @@ package io.renku.eventlog.events.categories.statuschange
 
 import cats.data.Kleisli
 import cats.effect.{BracketThrow, Sync}
-import ch.datascience.db.SqlStatement
-import ch.datascience.graph.model.events.EventStatus.{FailureStatus, ProcessingStatus}
-import ch.datascience.metrics.LabeledHistogram
+import io.renku.db.SqlStatement
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.{AllEventsToNew, _}
+import io.renku.graph.model.events.EventStatus.{FailureStatus, ProcessingStatus}
+import io.renku.metrics.LabeledHistogram
 import skunk.Session
 
 private trait DBUpdater[Interpretation[_], E <: StatusChangeEvent] {

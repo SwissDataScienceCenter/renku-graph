@@ -19,11 +19,11 @@
 package io.renku.eventlog.subscriptions.globalcommitsync
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.metrics.LabeledHistogram
+import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog.subscriptions._
 import io.renku.eventlog.subscriptions.globalcommitsync.GlobalCommitSyncEventEncoder.encodeEvent
 import io.renku.eventlog.{EventLogDB, subscriptions}
+import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext

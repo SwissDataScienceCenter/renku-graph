@@ -18,9 +18,9 @@
 
 package io.renku.eventlog.subscriptions.membersync
 
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import io.circe.literal._
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.GraphModelGenerators.projectPaths
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 

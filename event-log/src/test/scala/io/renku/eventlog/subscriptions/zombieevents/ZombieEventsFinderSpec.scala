@@ -19,17 +19,17 @@
 package io.renku.eventlog.subscriptions.zombieevents
 
 import cats.syntax.all._
-import ch.datascience.generators.Generators.Implicits._
 import io.renku.eventlog.subscriptions.EventFinder
 import io.renku.eventlog.subscriptions.zombieevents.Generators.zombieEvents
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.Error
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.Try
-import ch.datascience.generators.Generators._
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Error
 
 class ZombieEventsFinderSpec extends AnyWordSpec with MockFactory with should.Matchers {
 

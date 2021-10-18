@@ -20,9 +20,9 @@ package io.renku.eventlog.subscriptions.zombieevents
 
 import cats.Show
 import cats.implicits.showInterpolator
-import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
-import ch.datascience.graph.model.projects
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import io.renku.graph.model.events.{CompoundEventId, EventStatus}
+import io.renku.graph.model.projects
+import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 
 private final class ZombieEventProcess private (val value: String) extends AnyVal with StringTinyType
 private object ZombieEventProcess extends TinyTypeFactory[ZombieEventProcess](new ZombieEventProcess(_))

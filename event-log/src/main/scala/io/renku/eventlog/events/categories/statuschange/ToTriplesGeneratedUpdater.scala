@@ -22,16 +22,16 @@ import cats.data.Kleisli
 import cats.effect.{BracketThrow, Sync}
 import cats.kernel.Monoid
 import cats.syntax.all._
-import ch.datascience.db.implicits._
-import ch.datascience.db.{DbClient, SqlStatement}
-import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{EventId, EventProcessingTime, EventStatus}
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.LabeledHistogram
 import eu.timepit.refined.auto._
+import io.renku.db.implicits._
+import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.ExecutionDate
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.ToTriplesGenerated
+import io.renku.graph.model.events.EventStatus._
+import io.renku.graph.model.events.{EventId, EventProcessingTime, EventStatus}
+import io.renku.graph.model.projects
+import io.renku.metrics.LabeledHistogram
 import skunk.data.Completion
 import skunk.implicits._
 import skunk.{Session, ~}

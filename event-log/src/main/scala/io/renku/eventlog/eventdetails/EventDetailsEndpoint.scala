@@ -20,15 +20,15 @@ package io.renku.eventlog.eventdetails
 
 import cats.effect.{Effect, IO}
 import cats.syntax.all._
-import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.graph.model.events.{CompoundEventId, EventDetails}
-import ch.datascience.http.InfoMessage._
-import ch.datascience.http.{ErrorMessage, InfoMessage}
-import ch.datascience.metrics.LabeledHistogram
 import io.circe.Encoder
 import io.circe.literal.JsonStringContext
 import io.circe.syntax.EncoderOps
+import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog.EventLogDB
+import io.renku.graph.model.events.{CompoundEventId, EventDetails}
+import io.renku.http.InfoMessage._
+import io.renku.http.{ErrorMessage, InfoMessage}
+import io.renku.metrics.LabeledHistogram
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger

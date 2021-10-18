@@ -18,10 +18,10 @@
 
 package io.renku.eventlog.init
 
-import ch.datascience.events.consumers.ConsumersModelGenerators.projectsGen
-import ch.datascience.generators.Generators.Implicits.GenOps
-import ch.datascience.graph.model.EventsGenerators.{batchDates, eventBodies, eventIds, eventStatuses}
 import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages}
+import io.renku.events.consumers.ConsumersModelGenerators.projectsGen
+import io.renku.generators.Generators.Implicits.GenOps
+import io.renku.graph.model.EventsGenerators.{batchDates, eventBodies, eventIds, eventStatuses}
 import model.Event
 import org.scalacheck.Gen
 

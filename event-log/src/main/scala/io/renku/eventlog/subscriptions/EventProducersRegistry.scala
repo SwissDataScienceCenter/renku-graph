@@ -21,13 +21,13 @@ package io.renku.eventlog.subscriptions
 import cats._
 import cats.effect.{ContextShift, Effect, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.circe.Json
+import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.subscriptions.EventProducersRegistry.{SubscriptionResult, SuccessfulSubscription, UnsupportedPayload}
 import io.renku.eventlog.subscriptions.SubscriptionCategory.{AcceptedRegistration, RejectedRegistration}
+import io.renku.graph.model.projects
+import io.renku.metrics.{LabeledGauge, LabeledHistogram}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext

@@ -20,7 +20,7 @@ package io.renku.eventlog.subscriptions.membersync
 
 import cats.Show
 import cats.implicits.showInterpolator
-import ch.datascience.graph.model.projects
+import io.renku.graph.model.projects
 
 private final case class MemberSyncEvent(projectPath: projects.Path)
 

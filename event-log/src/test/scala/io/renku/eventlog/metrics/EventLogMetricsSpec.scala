@@ -20,15 +20,15 @@ package io.renku.eventlog.metrics
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.events.{CategoryName, EventStatus}
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Error
-import ch.datascience.metrics.{LabeledGauge, SingleValueGauge}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.EventsGenerators._
+import io.renku.graph.model.events.{CategoryName, EventStatus}
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.Error
+import io.renku.metrics.{LabeledGauge, SingleValueGauge}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}

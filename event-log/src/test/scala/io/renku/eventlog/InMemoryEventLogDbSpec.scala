@@ -20,12 +20,12 @@ package io.renku.eventlog
 
 import cats.data.Kleisli
 import cats.syntax.all._
-import ch.datascience.db.DbSpec
+import io.renku.db.DbSpec
 import io.renku.eventlog.init.EventLogDbMigrations
 import org.scalatest.TestSuite
 import skunk._
-import skunk.implicits._
 import skunk.codec.all._
+import skunk.implicits._
 
 import scala.language.reflectiveCalls
 

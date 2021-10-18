@@ -20,9 +20,9 @@ package io.renku.eventlog.subscriptions.globalcommitsync
 
 import cats.effect.{BracketThrow, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import io.renku.eventlog.subscriptions
 import io.renku.eventlog.subscriptions.DispatchRecovery
+import io.renku.events.consumers.subscriptions.SubscriberUrl
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal

@@ -18,8 +18,8 @@
 
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
-import ch.datascience.generators.Generators.Implicits._
 import io.circe.literal._
+import io.renku.generators.Generators.Implicits._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 

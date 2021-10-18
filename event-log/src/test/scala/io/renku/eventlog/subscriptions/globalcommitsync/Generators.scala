@@ -18,9 +18,9 @@
 
 package io.renku.eventlog.subscriptions.globalcommitsync
 
-import ch.datascience.events.consumers.ConsumersModelGenerators._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators.{commitIds, lastSyncedDates}
+import io.renku.events.consumers.ConsumersModelGenerators._
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventsGenerators.{commitIds, lastSyncedDates}
 import org.scalacheck.Gen
 
 private object Generators {

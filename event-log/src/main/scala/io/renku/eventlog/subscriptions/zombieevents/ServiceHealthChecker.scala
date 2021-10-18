@@ -20,12 +20,12 @@ package io.renku.eventlog.subscriptions.zombieevents
 
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.control.Throttler
-import ch.datascience.http.client.RestClient
-import ch.datascience.http.client.RestClient.MaxRetriesAfterConnectionTimeout
-import ch.datascience.microservices.MicroserviceBaseUrl
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
+import io.renku.control.Throttler
+import io.renku.http.client.RestClient
+import io.renku.http.client.RestClient.MaxRetriesAfterConnectionTimeout
+import io.renku.microservices.MicroserviceBaseUrl
 import org.http4s.Status.Ok
 import org.http4s._
 import org.typelevel.log4cats.Logger

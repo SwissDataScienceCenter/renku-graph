@@ -22,16 +22,16 @@ import cats.MonadError
 import cats.data.OptionT
 import cats.effect.{BracketThrow, IO, Sync}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
-import ch.datascience.db.implicits._
-import ch.datascience.graph.model.events.EventStatus
-import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.projects.Id
-import ch.datascience.metrics.LabeledHistogram
 import eu.timepit.refined.api.RefType.applyRef
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
+import io.renku.db.implicits._
+import io.renku.db.{DbClient, SessionResource, SqlStatement}
 import io.renku.eventlog.EventLogDB
+import io.renku.graph.model.events.EventStatus
+import io.renku.graph.model.events.EventStatus._
+import io.renku.graph.model.projects.Id
+import io.renku.metrics.LabeledHistogram
 import skunk._
 import skunk.implicits._
 

@@ -19,13 +19,13 @@
 package io.renku.eventlog.subscriptions.triplesgenerated
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.graph.model.events.CategoryName
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
+import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog.subscriptions._
 import io.renku.eventlog.subscriptions.triplesgenerated.TriplesGeneratedEventEncoder.{encodeEvent, encodePayload}
 import io.renku.eventlog.{EventLogDB, subscriptions}
+import io.renku.graph.model.events.CategoryName
+import io.renku.graph.model.projects
+import io.renku.metrics.{LabeledGauge, LabeledHistogram}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext

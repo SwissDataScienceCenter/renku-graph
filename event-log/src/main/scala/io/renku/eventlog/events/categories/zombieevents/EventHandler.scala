@@ -22,16 +22,16 @@ import cats.data.EitherT.fromEither
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
 import cats.{Applicative, MonadThrow, Show}
-import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
-import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
-import ch.datascience.events.{EventRequestContent, consumers}
-import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventId, EventStatus}
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.circe.{Decoder, DecodingFailure}
+import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog._
+import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
+import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
+import io.renku.events.{EventRequestContent, consumers}
+import io.renku.graph.model.events.EventStatus._
+import io.renku.graph.model.events.{CategoryName, CompoundEventId, EventId, EventStatus}
+import io.renku.graph.model.projects
+import io.renku.metrics.{LabeledGauge, LabeledHistogram}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -47,8 +47,8 @@ private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurre
     logger:                             Logger[Interpretation]
 ) extends consumers.EventHandlerWithProcessLimiter[Interpretation](ConcurrentProcessesLimiter.withoutLimit) {
 
-  import ch.datascience.graph.model.projects
-  import ch.datascience.tinytypes.json.TinyTypeDecoders._
+  import io.renku.graph.model.projects
+  import io.renku.tinytypes.json.TinyTypeDecoders._
 
   override def createHandlingProcess(
       request: EventRequestContent

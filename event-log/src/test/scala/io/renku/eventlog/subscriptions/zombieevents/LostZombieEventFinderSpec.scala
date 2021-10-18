@@ -19,17 +19,17 @@
 package io.renku.eventlog.subscriptions.zombieevents
 
 import cats.syntax.all._
-import ch.datascience.db.SqlStatement
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.relativeTimestamps
-import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventStatuses}
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples}
-import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
-import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
+import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators.{eventDates, executionDates}
 import io.renku.eventlog.{EventMessage, ExecutionDate, InMemoryEventLogDbSpec}
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.relativeTimestamps
+import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventStatuses}
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples}
+import io.renku.graph.model.events.{CompoundEventId, EventStatus}
+import io.renku.metrics.TestLabeledHistogram
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

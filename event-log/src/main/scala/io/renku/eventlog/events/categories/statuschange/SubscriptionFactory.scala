@@ -19,12 +19,12 @@
 package io.renku.eventlog.events.categories.statuschange
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.events.consumers.EventHandler
-import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
+import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog.EventLogDB
+import io.renku.events.consumers.EventHandler
+import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.graph.model.projects
+import io.renku.metrics.{LabeledGauge, LabeledHistogram}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext

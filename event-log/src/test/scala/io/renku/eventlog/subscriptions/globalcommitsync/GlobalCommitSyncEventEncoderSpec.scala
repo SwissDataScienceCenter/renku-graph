@@ -18,9 +18,9 @@
 
 package io.renku.eventlog.subscriptions.globalcommitsync
 
-import ch.datascience.generators.Generators.Implicits._
 import io.circe.literal._
 import io.renku.eventlog.subscriptions.globalcommitsync.Generators.globalCommitSyncEvents
+import io.renku.generators.Generators.Implicits._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 

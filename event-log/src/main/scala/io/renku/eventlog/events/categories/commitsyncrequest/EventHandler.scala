@@ -22,14 +22,14 @@ import cats.data.EitherT.fromEither
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
 import cats.{MonadThrow, Show}
-import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
-import ch.datascience.events.consumers._
-import ch.datascience.events.{EventRequestContent, consumers}
-import ch.datascience.graph.model.events.CategoryName
-import ch.datascience.metrics.LabeledHistogram
 import io.circe.Decoder
+import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog.EventLogDB
+import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
+import io.renku.events.consumers._
+import io.renku.events.{EventRequestContent, consumers}
+import io.renku.graph.model.events.CategoryName
+import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -40,9 +40,9 @@ private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurre
     logger:                    Logger[Interpretation]
 ) extends consumers.EventHandlerWithProcessLimiter[Interpretation](ConcurrentProcessesLimiter.withoutLimit) {
 
-  import ch.datascience.graph.model.projects
-  import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import commitSyncForcer._
+  import io.renku.graph.model.projects
+  import io.renku.tinytypes.json.TinyTypeDecoders._
 
   override def createHandlingProcess(
       request: EventRequestContent

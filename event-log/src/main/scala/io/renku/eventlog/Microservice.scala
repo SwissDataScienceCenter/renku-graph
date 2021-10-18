@@ -19,24 +19,24 @@
 package io.renku.eventlog
 
 import cats.effect._
-import ch.datascience.config.certificates.CertificateLoader
-import ch.datascience.config.sentry.SentryInitializer
-import ch.datascience.db.{SessionPoolResource, SessionResource}
-import ch.datascience.events.consumers
-import ch.datascience.events.consumers.EventConsumersRegistry
-import ch.datascience.http.server.HttpServer
-import ch.datascience.logging.ApplicationLogger
-import ch.datascience.metrics._
-import ch.datascience.microservices.IOMicroservice
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
+import io.renku.config.certificates.CertificateLoader
+import io.renku.config.sentry.SentryInitializer
+import io.renku.db.{SessionPoolResource, SessionResource}
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
 import io.renku.eventlog.init.DbInitializer
 import io.renku.eventlog.metrics._
 import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
 import io.renku.eventlog.subscriptions._
+import io.renku.events.consumers
+import io.renku.events.consumers.EventConsumersRegistry
+import io.renku.http.server.HttpServer
+import io.renku.logging.ApplicationLogger
+import io.renku.metrics._
+import io.renku.microservices.IOMicroservice
 import natchez.Trace.Implicits.noop
 import org.typelevel.log4cats.Logger
 import pureconfig.ConfigSource

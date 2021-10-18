@@ -19,14 +19,14 @@
 package io.renku.eventlog.eventdetails
 
 import cats.syntax.all._
-import ch.datascience.db.SqlStatement
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventStatuses}
-import ch.datascience.graph.model.events.{CompoundEventId, EventDetails}
-import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
+import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.InMemoryEventLogDbSpec
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventStatuses}
+import io.renku.graph.model.events.{CompoundEventId, EventDetails}
+import io.renku.metrics.TestLabeledHistogram
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 

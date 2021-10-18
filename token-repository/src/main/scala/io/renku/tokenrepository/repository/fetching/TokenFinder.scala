@@ -1,0 +1,61 @@
+/*
+ * Copyright 2021 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package io.renku.tokenrepository.repository.fetching
+
+import cats.MonadError
+import cats.data.OptionT
+import cats.effect.{Async, ContextShift, IO}
+import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.graph.model.projects.{Id, Path}
+import io.renku.http.client.AccessToken
+import io.renku.metrics.LabeledHistogram
+import io.renku.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB}
+
+private class TokenFinder[Interpretation[_]: Async: MonadError[*[_], Throwable]](
+    tokenInRepoFinder: PersistedTokensFinder[Interpretation],
+    accessTokenCrypto: AccessTokenCrypto[Interpretation]
+) {
+
+  import accessTokenCrypto._
+
+  def findToken(projectPath: Path): OptionT[Interpretation, AccessToken] =
+    for {
+      encryptedToken <- tokenInRepoFinder.findToken(projectPath)
+      accessToken    <- OptionT.liftF(decrypt(encryptedToken))
+    } yield accessToken
+
+  def findToken(projectId: Id): OptionT[Interpretation, AccessToken] =
+    for {
+      encryptedToken <- tokenInRepoFinder.findToken(projectId)
+      accessToken    <- OptionT.liftF(decrypt(encryptedToken))
+    } yield accessToken
+}
+
+private object IOTokenFinder {
+  def apply(
+      sessionResource:     SessionResource[IO, ProjectsTokensDB],
+      queriesExecTimes:    LabeledHistogram[IO, SqlStatement.Name]
+  )(implicit contextShift: ContextShift[IO]): IO[TokenFinder[IO]] =
+    for {
+      accessTokenCrypto <- AccessTokenCrypto[IO]()
+    } yield new TokenFinder[IO](
+      new IOPersistedTokensFinder(sessionResource, queriesExecTimes),
+      accessTokenCrypto
+    )
+}

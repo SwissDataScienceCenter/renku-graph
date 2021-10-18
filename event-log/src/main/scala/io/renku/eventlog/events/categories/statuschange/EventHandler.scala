@@ -22,18 +22,18 @@ import cats.data.EitherT
 import cats.effect.{Concurrent, ContextShift, IO}
 import cats.syntax.all._
 import cats.{MonadThrow, Show}
-import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
-import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
-import ch.datascience.events.{EventRequestContent, consumers}
-import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.circe.DecodingFailure
+import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog.events.categories.statuschange.DBUpdater.EventUpdaterFactory
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent._
 import io.renku.eventlog.{EventLogDB, EventMessage}
+import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
+import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
+import io.renku.events.{EventRequestContent, consumers}
+import io.renku.graph.model.events.EventStatus._
+import io.renku.graph.model.events.{CategoryName, CompoundEventId, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
+import io.renku.graph.model.projects
+import io.renku.metrics.{LabeledGauge, LabeledHistogram}
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -117,7 +117,7 @@ private object EventHandler {
     statusChanger <- IO(new StatusChangerImpl[IO](sessionResource, gaugesUpdater))
   } yield new EventHandler[IO](categoryName, statusChanger, deliveryInfoRemover, queriesExecTimes)
 
-  import ch.datascience.tinytypes.json.TinyTypeDecoders._
+  import io.renku.tinytypes.json.TinyTypeDecoders._
 
   private def decode[E <: StatusChangeEvent](request: EventRequestContent)(implicit
       decoder:                                        EventRequestContent => Either[DecodingFailure, E]

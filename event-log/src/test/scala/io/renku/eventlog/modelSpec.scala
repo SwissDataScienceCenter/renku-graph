@@ -18,9 +18,9 @@
 
 package io.renku.eventlog
 
-import ch.datascience.data.ErrorMessage
-import ch.datascience.generators.Generators._
-import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, NonBlank}
+import io.renku.data.ErrorMessage
+import io.renku.generators.Generators._
+import io.renku.tinytypes.constraints.{InstantNotInTheFuture, NonBlank}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks

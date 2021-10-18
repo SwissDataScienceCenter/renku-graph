@@ -18,8 +18,8 @@
 
 package io.renku.eventlog.subscriptions
 
-import ch.datascience.http.client.RestClient.PartEncoder
 import io.circe.Json
+import io.renku.http.client.RestClient.PartEncoder
 import org.http4s.multipart.Part
 
 private trait EventEncoder[CategoryEvent] {

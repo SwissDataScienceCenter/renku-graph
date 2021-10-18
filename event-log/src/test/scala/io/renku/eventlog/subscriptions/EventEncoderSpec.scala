@@ -19,10 +19,10 @@
 package io.renku.eventlog.subscriptions
 
 import cats.effect.IO
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.http.server.EndpointTester.jsonEntityDecoder
 import io.circe.Json
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.http.server.EndpointTester.jsonEntityDecoder
 import org.http4s.MediaType
 import org.http4s.headers.`Content-Type`
 import org.scalatest.matchers.should

@@ -20,19 +20,19 @@ package io.renku.eventlog.events
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.db.SqlStatement
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.fixed
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
-import ch.datascience.graph.model.events.CompoundEventId
-import ch.datascience.http.rest.paging.PagingRequest
-import ch.datascience.http.rest.paging.model.{Page, PerPage}
-import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
+import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.eventlog.events.Generators._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.fixed
+import io.renku.graph.model.EventsGenerators._
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.graph.model.events.CompoundEventId
+import io.renku.http.rest.paging.PagingRequest
+import io.renku.http.rest.paging.model.{Page, PerPage}
+import io.renku.metrics.TestLabeledHistogram
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 

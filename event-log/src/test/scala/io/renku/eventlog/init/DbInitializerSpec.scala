@@ -19,11 +19,11 @@
 package io.renku.eventlog.init
 
 import cats.effect._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Info
-import ch.datascience.testtools.MockedRunnableCollaborators
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.testtools.MockedRunnableCollaborators
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

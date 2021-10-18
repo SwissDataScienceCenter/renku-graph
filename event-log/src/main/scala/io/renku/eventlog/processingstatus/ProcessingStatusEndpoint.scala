@@ -19,10 +19,10 @@
 package io.renku.eventlog.processingstatus
 
 import cats.MonadThrow
-import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.graph.model.projects
-import ch.datascience.http.ErrorMessage
-import ch.datascience.metrics.LabeledHistogram
+import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.graph.model.projects
+import io.renku.http.ErrorMessage
+import io.renku.metrics.LabeledHistogram
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
@@ -40,12 +40,12 @@ class ProcessingStatusEndpointImpl[Interpretation[_]: MonadThrow](
     with ProcessingStatusEndpoint[Interpretation] {
 
   import cats.syntax.all._
-  import ch.datascience.graph.model.projects
-  import ch.datascience.http.ErrorMessage._
-  import ch.datascience.http.InfoMessage
   import io.circe.Encoder
   import io.circe.literal._
   import io.circe.syntax._
+  import io.renku.graph.model.projects
+  import io.renku.http.ErrorMessage._
+  import io.renku.http.InfoMessage
   import org.http4s.Response
   import org.http4s.circe._
   import processingStatusFinder._

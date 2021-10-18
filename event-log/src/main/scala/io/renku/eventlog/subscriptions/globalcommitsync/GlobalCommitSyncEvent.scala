@@ -20,8 +20,8 @@ package io.renku.eventlog.subscriptions.globalcommitsync
 
 import cats.Show
 import cats.implicits.showInterpolator
-import ch.datascience.events.consumers.Project
-import ch.datascience.graph.model.events.{CommitId, LastSyncedDate}
+import io.renku.events.consumers.Project
+import io.renku.graph.model.events.{CommitId, LastSyncedDate}
 
 private final case class GlobalCommitSyncEvent(project:             Project,
                                                commits:             List[CommitId],

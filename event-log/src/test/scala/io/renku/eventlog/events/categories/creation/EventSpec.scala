@@ -18,12 +18,12 @@
 
 package io.renku.eventlog.events.categories.creation
 
-import ch.datascience.graph.model.events.CompoundEventId
+import Generators._
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.events.CompoundEventId
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-import ch.datascience.generators.Generators.Implicits._
-import org.scalatest.matchers.should
-import Generators._
 
 class EventSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 

@@ -19,9 +19,9 @@
 package io.renku.eventlog.subscriptions
 
 import cats.data.Kleisli
-import ch.datascience.graph.model.events.{CategoryName, LastSyncedDate}
-import ch.datascience.graph.model.projects
 import io.renku.eventlog.{EventLogDataProvisioning, InMemoryEventLogDb}
+import io.renku.graph.model.events.{CategoryName, LastSyncedDate}
+import io.renku.graph.model.projects
 import skunk._
 import skunk.implicits._
 
