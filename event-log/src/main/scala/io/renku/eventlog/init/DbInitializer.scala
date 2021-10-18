@@ -59,7 +59,6 @@ object DbInitializer {
         EventLogTableRenamer(sessionResource),
         EventStatusRenamer(sessionResource),
         EventPayloadTableCreator(sessionResource),
-        EventPayloadSchemaVersionAdder(sessionResource),
         SubscriptionCategorySyncTimeTableCreator(sessionResource),
         StatusesProcessingTimeTableCreator(sessionResource),
         SubscriberTableCreator(sessionResource),

@@ -38,11 +38,10 @@ import skunk.{Command, Query, ~}
 
 class PayloadTypeChangerSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
 
-  protected override lazy val migrationsToRun: List[Migration] =
-    allMigrations.takeWhile {
-      case _: PayloadTypeChangerImpl[_] => false
-      case _ => true
-    }
+  protected override lazy val migrationsToRun: List[Migration] = allMigrations.takeWhile {
+    case _: PayloadTypeChangerImpl[_] => false
+    case _ => true
+  }
 
   "run" should {
 
