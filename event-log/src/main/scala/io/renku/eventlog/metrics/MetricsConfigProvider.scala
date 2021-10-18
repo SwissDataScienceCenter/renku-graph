@@ -19,8 +19,8 @@
 package io.renku.eventlog.metrics
 
 import cats.MonadError
-import ch.datascience.config.MetricsConfigProvider
 import com.typesafe.config.{Config, ConfigFactory}
+import io.renku.config.MetricsConfigProvider
 
 import scala.concurrent.duration.FiniteDuration
 

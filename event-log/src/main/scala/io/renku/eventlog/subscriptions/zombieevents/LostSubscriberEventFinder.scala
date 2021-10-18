@@ -21,14 +21,14 @@ package io.renku.eventlog.subscriptions.zombieevents
 import cats.data.Kleisli
 import cats.effect.{BracketThrow, IO}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
-import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples}
-import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventStatus}
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.LabeledHistogram
 import eu.timepit.refined.api.Refined
+import io.renku.db.{DbClient, SessionResource, SqlStatement}
 import io.renku.eventlog.subscriptions.EventFinder
 import io.renku.eventlog.{EventLogDB, ExecutionDate, TypeSerializers}
+import io.renku.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples}
+import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus}
+import io.renku.graph.model.projects
+import io.renku.metrics.LabeledHistogram
 import skunk._
 import skunk.codec.all._
 import skunk.data.Completion

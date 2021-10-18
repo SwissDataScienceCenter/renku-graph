@@ -22,13 +22,13 @@ import cats.Parallel
 import cats.data.Kleisli
 import cats.effect.{BracketThrow, ConcurrentEffect, IO, Sync, Timer}
 import cats.syntax.all._
-import ch.datascience.db.implicits._
-import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
-import ch.datascience.events.consumers.subscriptions.SubscriberUrl
-import ch.datascience.metrics.LabeledHistogram
-import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
 import eu.timepit.refined.api.Refined
+import io.renku.db.implicits._
+import io.renku.db.{DbClient, SessionResource, SqlStatement}
 import io.renku.eventlog.{EventLogDB, Microservice, TypeSerializers}
+import io.renku.events.consumers.subscriptions.SubscriberUrl
+import io.renku.metrics.LabeledHistogram
+import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
 import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.data.Completion

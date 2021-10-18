@@ -20,12 +20,12 @@ package io.renku.eventlog.subscriptions
 
 import cats.Show
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
-import ch.datascience.control.Throttler
-import ch.datascience.events.consumers.subscriptions.SubscriberUrl
-import ch.datascience.graph.model.events.CategoryName
-import ch.datascience.http.client.RestClient
-import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException}
+import io.renku.control.Throttler
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
+import io.renku.events.consumers.subscriptions.SubscriberUrl
+import io.renku.graph.model.events.CategoryName
+import io.renku.http.client.RestClient
+import io.renku.http.client.RestClientError.{ClientException, ConnectivityException}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext

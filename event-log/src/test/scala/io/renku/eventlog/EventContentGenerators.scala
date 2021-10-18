@@ -18,7 +18,7 @@
 
 package io.renku.eventlog
 
-import ch.datascience.generators.Generators._
+import io.renku.generators.Generators._
 import org.scalacheck.Gen
 
 object EventContentGenerators {

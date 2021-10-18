@@ -22,9 +22,9 @@ import cats.Applicative
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.events.consumers.subscriptions.SubscriberUrl
-import ch.datascience.graph.model.events.CategoryName
-import ch.datascience.tinytypes.{InstantTinyType, TinyTypeFactory}
+import io.renku.events.consumers.subscriptions.SubscriberUrl
+import io.renku.graph.model.events.CategoryName
+import io.renku.tinytypes.{InstantTinyType, TinyTypeFactory}
 import org.typelevel.log4cats.Logger
 
 import java.time.Instant

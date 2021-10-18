@@ -18,12 +18,12 @@
 
 package io.renku.eventlog
 
-import ch.datascience.events.consumers.Project
-import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
-import ch.datascience.graph.model.events.{BatchDate, CommitId, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
-import ch.datascience.graph.model.projects
-import ch.datascience.http.rest.paging.model.PerPage
-import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}
+import io.renku.events.consumers.Project
+import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
+import io.renku.graph.model.events.{BatchDate, CommitId, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
+import io.renku.graph.model.projects
+import io.renku.http.rest.paging.model.PerPage
+import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}
 import skunk.codec.all._
 import skunk.{Decoder, Encoder}
 

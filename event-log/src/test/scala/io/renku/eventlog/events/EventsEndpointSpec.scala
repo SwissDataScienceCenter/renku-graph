@@ -20,28 +20,28 @@ package io.renku.eventlog.events
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators.{pagingRequests, pagingResponses}
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.config.EventLogUrl
-import ch.datascience.graph.model.EventsGenerators.eventStatuses
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.{EventId, EventProcessingTime, EventStatus}
-import ch.datascience.graph.model.projects
-import ch.datascience.http.ErrorMessage
-import ch.datascience.http.ErrorMessage._
-import ch.datascience.http.client.UrlEncoder.urlEncode
-import ch.datascience.http.rest.paging.PagingRequest.Decoders.{page, perPage}
-import ch.datascience.http.rest.paging.model.Total
-import ch.datascience.http.rest.paging.{PagingHeaders, PagingResponse}
-import ch.datascience.http.server.EndpointTester._
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Error
-import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import io.circe.Decoder
 import io.renku.eventlog.events.EventsEndpoint._
 import io.renku.eventlog.events.Generators.eventInfos
 import io.renku.eventlog.{EventDate, EventMessage, ExecutionDate}
+import io.renku.generators.CommonGraphGenerators.{pagingRequests, pagingResponses}
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.config.EventLogUrl
+import io.renku.graph.model.EventsGenerators.eventStatuses
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.events.{EventId, EventProcessingTime, EventStatus}
+import io.renku.graph.model.projects
+import io.renku.http.ErrorMessage
+import io.renku.http.ErrorMessage._
+import io.renku.http.client.UrlEncoder.urlEncode
+import io.renku.http.rest.paging.PagingRequest.Decoders.{page, perPage}
+import io.renku.http.rest.paging.model.Total
+import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
+import io.renku.http.server.EndpointTester._
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.Error
+import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.EntityDecoder
 import org.http4s.MediaType._
 import org.http4s.Status.{InternalServerError, Ok}

@@ -19,13 +19,13 @@
 package io.renku.eventlog.events.categories.statuschange
 
 import cats.syntax.all._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.nonNegativeInts
-import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.events.EventStatus
-import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.LabeledGauge
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.nonNegativeInts
+import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.events.EventStatus
+import io.renku.graph.model.events.EventStatus._
+import io.renku.graph.model.projects
+import io.renku.metrics.LabeledGauge
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

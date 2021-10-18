@@ -19,18 +19,18 @@
 package io.renku.eventlog.subscriptions
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.events.consumers.subscriptions.SubscriberUrl
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.http.client.RestClientError.ClientException
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Error
-import ch.datascience.interpreters.TestLogger.LogMessage.MessageAndThrowable
-import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult._
 import io.renku.eventlog.subscriptions.Generators.categoryNames
 import io.renku.eventlog.subscriptions.TestCategoryEvent._
+import io.renku.events.consumers.subscriptions.SubscriberUrl
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.http.client.RestClientError.ClientException
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.Error
+import io.renku.interpreters.TestLogger.LogMessage.MessageAndThrowable
+import io.renku.stubbing.ExternalServiceStubbing
 import org.http4s.Status._
 import org.http4s.multipart.Part
 import org.scalamock.scalatest.MockFactory

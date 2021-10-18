@@ -22,10 +22,10 @@ import cats.data.OptionT
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.all._
 import cats.{MonadError, Parallel}
-import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.metrics.LabeledHistogram
+import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.subscriptions.EventFinder
+import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext

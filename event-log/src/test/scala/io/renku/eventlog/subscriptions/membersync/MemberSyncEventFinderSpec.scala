@@ -19,17 +19,16 @@
 package io.renku.eventlog.subscriptions
 package membersync
 
-import ch.datascience.db.SqlStatement
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.LastSyncedDate
-import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
+import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators._
-import io.renku.eventlog.subscriptions.SubscriptionDataProvisioning
 import io.renku.eventlog.{EventDate, InMemoryEventLogDbSpec}
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.EventsGenerators._
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.events.LastSyncedDate
+import io.renku.metrics.TestLabeledHistogram
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

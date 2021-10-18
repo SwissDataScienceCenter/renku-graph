@@ -19,12 +19,12 @@
 package io.renku.eventlog.subscriptions
 
 import cats.syntax.all._
-import ch.datascience.events.consumers.subscriptions._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
 import io.circe.Json
 import io.circe.literal._
 import io.renku.eventlog.subscriptions.Generators._
+import io.renku.events.consumers.subscriptions._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

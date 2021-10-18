@@ -22,16 +22,16 @@ import cats.Applicative
 import cats.data.{Kleisli, NonEmptyList}
 import cats.effect.{BracketThrow, IO}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
-import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events._
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import eu.timepit.refined.auto._
+import io.renku.db.{DbClient, SessionResource, SqlStatement}
 import io.renku.eventlog._
 import io.renku.eventlog.events.categories.creation.Event.{NewEvent, SkippedEvent}
 import io.renku.eventlog.events.categories.creation.EventPersister.Result
 import io.renku.eventlog.events.categories.creation.EventPersister.Result._
+import io.renku.graph.model.events.EventStatus._
+import io.renku.graph.model.events._
+import io.renku.graph.model.projects
+import io.renku.metrics.{LabeledGauge, LabeledHistogram}
 import skunk._
 import skunk.implicits._
 

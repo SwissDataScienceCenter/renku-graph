@@ -19,8 +19,8 @@
 package io.renku.eventlog
 
 import cats.data.Kleisli
-import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
-import ch.datascience.graph.model.projects
+import io.renku.graph.model.events.{BatchDate, CompoundEventId, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
+import io.renku.graph.model.projects
 import skunk._
 import skunk.implicits._
 

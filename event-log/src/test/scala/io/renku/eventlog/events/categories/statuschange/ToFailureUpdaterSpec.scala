@@ -19,19 +19,19 @@
 package io.renku.eventlog.events.categories.statuschange
 
 import cats.effect.IO
-import ch.datascience.db.SqlStatement
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.{timestamps, timestampsNotInTheFuture}
-import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventIds}
-import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
-import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
+import io.renku.db.SqlStatement
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
+import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventIds}
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.graph.model.events.{CompoundEventId, EventStatus}
 import EventStatus._
-import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
 import io.renku.eventlog._
 import EventContentGenerators.{eventDates, eventMessages}
 import cats.data.Kleisli
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.{AllowedCombination, ToFailure}
+import io.renku.metrics.TestLabeledHistogram
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

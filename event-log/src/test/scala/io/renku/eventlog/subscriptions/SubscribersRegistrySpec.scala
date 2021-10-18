@@ -20,12 +20,12 @@ package io.renku.eventlog.subscriptions
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.events.consumers.subscriptions.SubscriberUrl
-import ch.datascience.generators.Generators.Implicits.GenOps
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.{Debug, Info}
 import eu.timepit.refined.auto._
 import io.renku.eventlog.subscriptions.Generators._
+import io.renku.events.consumers.subscriptions.SubscriberUrl
+import io.renku.generators.Generators.Implicits.GenOps
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.{Debug, Info}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should

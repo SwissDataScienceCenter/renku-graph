@@ -18,10 +18,10 @@
 
 package io.renku.eventlog.events.categories.creation
 
-import ch.datascience.events.consumers.ConsumersModelGenerators.projectsGen
-import ch.datascience.graph.model.EventsGenerators.{batchDates, eventBodies, eventIds}
 import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages}
 import io.renku.eventlog.events.categories.creation.Event.{NewEvent, SkippedEvent}
+import io.renku.events.consumers.ConsumersModelGenerators.projectsGen
+import io.renku.graph.model.EventsGenerators.{batchDates, eventBodies, eventIds}
 import org.scalacheck.Gen
 
 private object Generators {

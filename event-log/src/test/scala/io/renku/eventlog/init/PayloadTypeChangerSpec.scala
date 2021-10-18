@@ -20,16 +20,16 @@ package io.renku.eventlog.init
 
 import cats.data.Kleisli
 import cats.effect.IO
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.nonEmptyStrings
-import ch.datascience.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies, eventStatuses}
-import ch.datascience.graph.model.GraphModelGenerators.{projectPaths, projectSchemaVersions}
-import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventStatus}
-import ch.datascience.graph.model.projects
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Info
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.{CreatedDate, EventDate, ExecutionDate}
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.nonEmptyStrings
+import io.renku.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies, eventStatuses}
+import io.renku.graph.model.GraphModelGenerators.{projectPaths, projectSchemaVersions}
+import io.renku.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventStatus}
+import io.renku.graph.model.projects
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.Info
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk.codec.all._

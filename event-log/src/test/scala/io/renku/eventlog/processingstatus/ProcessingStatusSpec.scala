@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.processingstatus
 
-import ch.datascience.generators.Generators._
+import io.renku.generators.Generators._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks

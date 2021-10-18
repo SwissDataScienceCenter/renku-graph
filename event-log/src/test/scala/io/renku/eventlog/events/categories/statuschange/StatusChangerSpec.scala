@@ -22,21 +22,21 @@ import cats.Applicative
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, SqlStatement}
-import ch.datascience.events.consumers.subscriptions.{subscriberIds, subscriberUrls}
-import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.{exceptions, nonNegativeInts}
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{EventId, EventStatus}
-import ch.datascience.graph.model.projects
 import eu.timepit.refined.auto._
+import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog._
 import io.renku.eventlog.events.categories.statuschange.Generators._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent._
+import io.renku.events.consumers.subscriptions.{subscriberIds, subscriberUrls}
+import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.{exceptions, nonNegativeInts}
+import io.renku.graph.model.EventsGenerators._
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.events.EventStatus._
+import io.renku.graph.model.events.{EventId, EventStatus}
+import io.renku.graph.model.projects
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

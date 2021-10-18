@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.events.categories
 
-import ch.datascience.graph.model.events.CategoryName
+import io.renku.graph.model.events.CategoryName
 
 package object zombieevents {
   private[zombieevents] val categoryName: CategoryName = CategoryName("ZOMBIE_CHASING")

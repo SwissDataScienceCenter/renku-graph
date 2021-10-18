@@ -20,13 +20,13 @@ package io.renku.eventlog.events.categories.statuschange
 
 import cats.data.Kleisli
 import cats.effect.{BracketThrow, Sync}
-import ch.datascience.db.{DbClient, SqlStatement}
-import ch.datascience.graph.model.events.EventStatus
-import ch.datascience.metrics.LabeledHistogram
 import eu.timepit.refined.auto._
+import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.ExecutionDate
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.AllEventsToNew
+import io.renku.graph.model.events.EventStatus
+import io.renku.metrics.LabeledHistogram
 import skunk.implicits._
 
 import java.time.Instant

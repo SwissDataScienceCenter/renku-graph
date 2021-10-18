@@ -21,15 +21,15 @@ package io.renku.eventlog.events
 import cats.data.Kleisli
 import cats.effect.{BracketThrow, Concurrent, ConcurrentEffect, IO}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
-import ch.datascience.graph.model.events.{EventId, EventStatus}
-import ch.datascience.graph.model.projects
-import ch.datascience.http.rest.paging.Paging.PagedResultsFinder
-import ch.datascience.http.rest.paging.model.{PerPage, Total}
-import ch.datascience.http.rest.paging.{Paging, PagingRequest, PagingResponse}
-import ch.datascience.metrics.LabeledHistogram
+import io.renku.db.{DbClient, SessionResource, SqlStatement}
 import io.renku.eventlog._
 import io.renku.eventlog.events.EventsEndpoint.{EventInfo, Request, StatusProcessingTime}
+import io.renku.graph.model.events.{EventId, EventStatus}
+import io.renku.graph.model.projects
+import io.renku.http.rest.paging.Paging.PagedResultsFinder
+import io.renku.http.rest.paging.model.{PerPage, Total}
+import io.renku.http.rest.paging.{Paging, PagingRequest, PagingResponse}
+import io.renku.metrics.LabeledHistogram
 
 private trait EventsFinder[Interpretation[_]] {
   def findEvents(request: EventsEndpoint.Request): Interpretation[PagingResponse[EventInfo]]
@@ -42,8 +42,8 @@ private class EventsFinderImpl[Interpretation[_]: BracketThrow: Concurrent](
     with EventsFinder[Interpretation]
     with Paging[EventInfo] {
 
-  import ch.datascience.db.implicits._
   import eu.timepit.refined.auto._
+  import io.renku.db.implicits._
   import skunk._
   import skunk.codec.numeric._
   import skunk.implicits._

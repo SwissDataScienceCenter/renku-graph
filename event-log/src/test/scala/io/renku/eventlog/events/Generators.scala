@@ -18,14 +18,14 @@
 
 package io.renku.eventlog.events
 
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators.{eventIds, eventProcessingTimes, eventStatuses}
-import ch.datascience.graph.model.events.EventStatus
 import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages, executionDates}
 import io.renku.eventlog.events.EventsEndpoint.{EventInfo, StatusProcessingTime}
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventsGenerators.{eventIds, eventProcessingTimes, eventStatuses}
+import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.events.EventStatus
+import io.renku.graph.model.projects
 import org.scalacheck.Gen
-import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.projects
 
 private object Generators {
 

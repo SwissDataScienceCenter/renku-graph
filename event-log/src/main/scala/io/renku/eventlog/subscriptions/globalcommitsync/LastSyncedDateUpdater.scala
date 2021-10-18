@@ -19,13 +19,13 @@
 package io.renku.eventlog.subscriptions.globalcommitsync
 
 import cats.effect.{BracketThrow, IO}
-import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
-import ch.datascience.graph.model.events.{CategoryName, LastSyncedDate}
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.LabeledHistogram
 import eu.timepit.refined.api.Refined
+import io.renku.db.{DbClient, SessionResource, SqlStatement}
 import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.subscriptions.SubscriptionTypeSerializers
+import io.renku.graph.model.events.{CategoryName, LastSyncedDate}
+import io.renku.graph.model.projects
+import io.renku.metrics.LabeledHistogram
 import skunk.data.Completion
 import skunk.implicits.{toIdOps, toStringOps}
 import skunk.~

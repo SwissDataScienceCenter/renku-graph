@@ -20,21 +20,21 @@ package io.renku.eventlog
 
 import cats.effect.{Clock, IO}
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators.pagingRequests
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.nonEmptyStrings
-import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventStatuses}
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.http.ErrorMessage.ErrorMessage
-import ch.datascience.http.InfoMessage.InfoMessage
-import ch.datascience.http.rest.paging.PagingRequest
-import ch.datascience.http.server.EndpointTester._
-import ch.datascience.http.{ErrorMessage, InfoMessage}
-import ch.datascience.interpreters.TestRoutesMetrics
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
 import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
 import io.renku.eventlog.subscriptions.SubscriptionsEndpoint
+import io.renku.generators.CommonGraphGenerators.pagingRequests
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.nonEmptyStrings
+import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventStatuses}
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.http.ErrorMessage.ErrorMessage
+import io.renku.http.InfoMessage.InfoMessage
+import io.renku.http.rest.paging.PagingRequest
+import io.renku.http.server.EndpointTester._
+import io.renku.http.{ErrorMessage, InfoMessage}
+import io.renku.interpreters.TestRoutesMetrics
 import org.http4s.MediaType.application
 import org.http4s.Method.{GET, POST}
 import org.http4s.Status._

@@ -20,8 +20,8 @@ package io.renku.eventlog.metrics
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.model.events.{CategoryName, EventStatus}
-import ch.datascience.metrics._
+import io.renku.graph.model.events.{CategoryName, EventStatus}
+import io.renku.metrics._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._

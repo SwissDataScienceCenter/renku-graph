@@ -21,20 +21,20 @@ package io.renku.eventlog
 import cats.data.ValidatedNel
 import cats.effect.{Clock, ConcurrentEffect, ContextShift, Resource}
 import cats.syntax.all._
-import ch.datascience.graph.http.server.binders._
-import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
-import ch.datascience.graph.model.projects
-import ch.datascience.http.ErrorMessage
-import ch.datascience.http.ErrorMessage._
-import ch.datascience.http.rest.paging.PagingRequest
-import ch.datascience.http.rest.paging.PagingRequest.Decoders.{page, perPage}
-import ch.datascience.http.rest.paging.model.{Page, PerPage}
-import ch.datascience.http.server.QueryParameterTools.{resourceNotFound, toBadRequest}
-import ch.datascience.metrics.RoutesMetrics
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
 import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
 import io.renku.eventlog.subscriptions.SubscriptionsEndpoint
+import io.renku.graph.http.server.binders._
+import io.renku.graph.model.events.{CompoundEventId, EventStatus}
+import io.renku.graph.model.projects
+import io.renku.http.ErrorMessage
+import io.renku.http.ErrorMessage._
+import io.renku.http.rest.paging.PagingRequest
+import io.renku.http.rest.paging.PagingRequest.Decoders.{page, perPage}
+import io.renku.http.rest.paging.model.{Page, PerPage}
+import io.renku.http.server.QueryParameterTools.{resourceNotFound, toBadRequest}
+import io.renku.metrics.RoutesMetrics
 import org.http4s._
 import org.http4s.dsl.Http4sDsl
 

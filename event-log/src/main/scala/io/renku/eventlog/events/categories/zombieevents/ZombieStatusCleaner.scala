@@ -21,13 +21,13 @@ package io.renku.eventlog.events.categories.zombieevents
 import cats.data.Kleisli
 import cats.effect.BracketThrow
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
-import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, New, TransformingTriples, TriplesGenerated}
-import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventStatus}
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.LabeledHistogram
 import eu.timepit.refined.auto._
+import io.renku.db.{DbClient, SessionResource, SqlStatement}
 import io.renku.eventlog.{EventLogDB, ExecutionDate, TypeSerializers}
+import io.renku.graph.model.events.EventStatus.{GeneratingTriples, New, TransformingTriples, TriplesGenerated}
+import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus}
+import io.renku.graph.model.projects
+import io.renku.metrics.LabeledHistogram
 import skunk._
 import skunk.data.Completion
 import skunk.implicits._

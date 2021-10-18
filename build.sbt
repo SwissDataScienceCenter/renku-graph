@@ -1,4 +1,4 @@
-organization := "ch.datascience"
+organization := "io.renku"
 name := "renku-graph"
 scalaVersion := "2.13.6"
 
@@ -182,7 +182,7 @@ lazy val acceptanceTests = Project(
 )
 
 lazy val commonSettings = Seq(
-  organization := "ch.datascience",
+  organization := "io.renku",
   scalaVersion := "2.13.6",
   publish / skip := true,
   publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo"))),

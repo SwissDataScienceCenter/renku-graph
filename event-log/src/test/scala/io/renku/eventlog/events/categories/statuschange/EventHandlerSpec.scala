@@ -22,21 +22,21 @@ package statuschange
 import cats.Show
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
-import ch.datascience.db.SqlStatement
-import ch.datascience.events.EventRequestContent
-import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.events.ZippedEventPayload
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
-import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
 import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
+import io.renku.db.SqlStatement
 import io.renku.eventlog.events.categories.statuschange.Generators._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent._
+import io.renku.events.EventRequestContent
+import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.events.ZippedEventPayload
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.{Error, Info}
+import io.renku.metrics.TestLabeledHistogram
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}

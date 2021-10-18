@@ -19,8 +19,8 @@
 package io.renku.eventlog.init
 
 import cats.effect.IO
-import ch.datascience.interpreters.TestLogger
 import io.renku.eventlog.InMemoryEventLogDb
+import io.renku.interpreters.TestLogger
 
 trait EventLogDbMigrations {
   self: InMemoryEventLogDb =>

@@ -19,18 +19,18 @@
 package io.renku.eventlog
 
 import cats.data.Kleisli
-import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl, subscriberIds, subscriberUrls}
-import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.timestampsNotInTheFuture
-import ch.datascience.graph.model.EventsGenerators.{eventBodies, eventIds, eventProcessingTimes, zippedEventPayloads}
-import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.events.EventStatus.{AwaitingDeletion, TransformationRecoverableFailure, TransformingTriples, TriplesGenerated, TriplesStore}
-import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
-import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.Path
-import ch.datascience.microservices.MicroserviceBaseUrl
 import io.renku.eventlog.EventContentGenerators.eventMessages
+import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl, subscriberIds, subscriberUrls}
+import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.timestampsNotInTheFuture
+import io.renku.graph.model.EventsGenerators.{eventBodies, eventIds, eventProcessingTimes, zippedEventPayloads}
+import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, TransformationRecoverableFailure, TransformingTriples, TriplesGenerated, TriplesStore}
+import io.renku.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
+import io.renku.graph.model.projects
+import io.renku.graph.model.projects.Path
+import io.renku.microservices.MicroserviceBaseUrl
 import skunk._
 import skunk.implicits._
 

@@ -19,12 +19,12 @@
 package io.renku.eventlog.subscriptions.zombieevents
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
-import ch.datascience.metrics.LabeledHistogram
+import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog.subscriptions._
 import io.renku.eventlog.subscriptions.zombieevents.ZombieEventEncoder.encodeEvent
 import io.renku.eventlog.{EventLogDB, subscriptions}
+import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
+import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext

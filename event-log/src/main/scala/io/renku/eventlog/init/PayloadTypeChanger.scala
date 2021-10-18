@@ -21,7 +21,7 @@ package io.renku.eventlog.init
 import cats.data.Kleisli
 import cats.effect.BracketThrow
 import cats.syntax.all._
-import ch.datascience.db.SessionResource
+import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
 import org.typelevel.log4cats.Logger
 import skunk.codec.all.varchar

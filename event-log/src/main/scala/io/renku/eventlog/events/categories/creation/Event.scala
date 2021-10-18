@@ -18,9 +18,9 @@
 
 package io.renku.eventlog.events.categories.creation
 
-import ch.datascience.events.consumers.Project
-import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventStatus}
 import io.renku.eventlog.{CompoundId, EventDate, EventMessage}
+import io.renku.events.consumers.Project
+import io.renku.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventStatus}
 
 private sealed trait Event extends CompoundId {
   def id:        EventId

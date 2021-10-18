@@ -18,9 +18,9 @@
 
 package io.renku.eventlog.subscriptions.triplesgenerated
 
-import ch.datascience.generators.Generators.Implicits._
 import io.circe.Json
 import io.circe.literal._
+import io.renku.generators.Generators.Implicits._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
