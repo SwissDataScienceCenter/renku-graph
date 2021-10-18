@@ -18,6 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails
 
+import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.entities
