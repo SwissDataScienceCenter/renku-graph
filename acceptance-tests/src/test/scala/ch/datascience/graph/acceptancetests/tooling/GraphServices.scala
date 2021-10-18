@@ -28,8 +28,8 @@ import ch.datascience.graph.config.RenkuBaseUrlLoader
 import ch.datascience.graph.model.testentities.generators.EntitiesGenerators
 import ch.datascience.graph.model.{GitLabApiUrl, GitLabUrl, RenkuBaseUrl}
 import ch.datascience.rdfstore.FusekiBaseUrl
-import io.renku.{eventlog, tokenrepository, triplesgenerator}
 import io.renku.webhookservice.Microservice
+import io.renku._
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
 import scala.concurrent.ExecutionContext

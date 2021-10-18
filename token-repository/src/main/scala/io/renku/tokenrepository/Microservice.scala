@@ -33,29 +33,31 @@ import io.renku.tokenrepository.repository.init.{DbInitializer, IODbInitializer}
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import io.renku.tokenrepository.repository.{ProjectsTokensDB, ProjectsTokensDbConfigProvider}
 import natchez.Trace.Implicits.noop
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
 object Microservice extends IOMicroservice {
 
-  override def run(args: List[String]): IO[ExitCode] =
-    for {
-      sessionPoolResource <- new ProjectsTokensDbConfigProvider[IO]() map SessionPoolResource[IO, ProjectsTokensDB]
-      exitCode            <- runMicroservice(sessionPoolResource)
-    } yield exitCode
+  private implicit val logger: Logger[IO] = ApplicationLogger
+
+  override def run(args: List[String]): IO[ExitCode] = for {
+    sessionPoolResource <- new ProjectsTokensDbConfigProvider[IO]() map SessionPoolResource[IO, ProjectsTokensDB]
+    exitCode            <- runMicroservice(sessionPoolResource)
+  } yield exitCode
 
   private def runMicroservice(
       sessionPoolResource: Resource[IO, SessionResource[IO, ProjectsTokensDB]]
   ) = sessionPoolResource.use { sessionResource =>
     for {
-      certificateLoader      <- CertificateLoader[IO](ApplicationLogger)
+      certificateLoader      <- CertificateLoader[IO](logger)
       sentryInitializer      <- SentryInitializer[IO]()
       metricsRegistry        <- MetricsRegistry()
       queriesExecTimes       <- QueriesExecutionTimes(metricsRegistry)
-      fetchTokenEndpoint     <- IOFetchTokenEndpoint(sessionResource, queriesExecTimes, ApplicationLogger)
-      associateTokenEndpoint <- IOAssociateTokenEndpoint(sessionResource, queriesExecTimes, ApplicationLogger)
-      dbInitializer          <- IODbInitializer(sessionResource, queriesExecTimes, ApplicationLogger)
-      deleteTokenEndpoint    <- IODeleteTokenEndpoint(sessionResource, queriesExecTimes, ApplicationLogger)
+      fetchTokenEndpoint     <- IOFetchTokenEndpoint(sessionResource, queriesExecTimes, logger)
+      associateTokenEndpoint <- IOAssociateTokenEndpoint(sessionResource, queriesExecTimes, logger)
+      dbInitializer          <- IODbInitializer(sessionResource, queriesExecTimes, logger)
+      deleteTokenEndpoint    <- IODeleteTokenEndpoint(sessionResource, queriesExecTimes, logger)
       microserviceRoutes = new MicroserviceRoutes[IO](
                              fetchTokenEndpoint,
                              associateTokenEndpoint,
