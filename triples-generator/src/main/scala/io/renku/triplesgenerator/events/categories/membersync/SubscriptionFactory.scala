@@ -19,11 +19,11 @@
 package io.renku.triplesgenerator.events.categories.membersync
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.config.GitLab
-import ch.datascience.control.Throttler
-import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
-import ch.datascience.events.consumers.subscriptions.SubscriptionPayloadComposer.categoryAndUrlPayloadsComposerFactory
-import ch.datascience.rdfstore.SparqlQueryTimeRecorder
+import io.renku.config.GitLab
+import io.renku.control.Throttler
+import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.categoryAndUrlPayloadsComposerFactory
+import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.Microservice
 import org.typelevel.log4cats.Logger
 

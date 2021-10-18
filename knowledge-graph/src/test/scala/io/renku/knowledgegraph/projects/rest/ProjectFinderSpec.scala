@@ -21,15 +21,15 @@ package io.renku.knowledgegraph.projects.rest
 import cats.data.OptionT
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.exceptions
-import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.projects.Path
-import ch.datascience.graph.model.testentities.generators.EntitiesGenerators._
-import ch.datascience.graph.tokenrepository.AccessTokenFinder
-import ch.datascience.graph.tokenrepository.AccessTokenFinder.projectPathToPath
-import ch.datascience.http.client.AccessToken
+import io.renku.generators.CommonGraphGenerators._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.exceptions
+import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.projects.Path
+import io.renku.graph.model.testentities.generators.EntitiesGenerators._
+import io.renku.graph.tokenrepository.AccessTokenFinder
+import io.renku.graph.tokenrepository.AccessTokenFinder.projectPathToPath
+import io.renku.http.client.AccessToken
 import io.renku.knowledgegraph.projects.model
 import io.renku.knowledgegraph.projects.rest.Converters._
 import io.renku.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject

@@ -20,22 +20,22 @@ package io.renku.triplesgenerator.events.categories
 
 import cats.effect.{BracketThrow, IO, Sync}
 import cats.syntax.all._
-import ch.datascience.compression.Zip
-import ch.datascience.data.ErrorMessage
-import ch.datascience.events.EventRequestContent
-import ch.datascience.events.producers.EventSender
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events
-import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.http.client.RestClient._
-import ch.datascience.tinytypes.ByteArrayTinyType
-import ch.datascience.tinytypes.contenttypes.ZippedContent
-import ch.datascience.tinytypes.json.TinyTypeEncoders
 import io.circe.literal._
+import io.renku.compression.Zip
+import io.renku.data.ErrorMessage
+import io.renku.events.EventRequestContent
+import io.renku.events.producers.EventSender
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.EventsGenerators._
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.events
+import io.renku.graph.model.events.EventStatus._
+import io.renku.http.client.RestClient._
 import io.renku.jsonld.generators.JsonLDGenerators.jsonLDEntities
+import io.renku.tinytypes.ByteArrayTinyType
+import io.renku.tinytypes.contenttypes.ZippedContent
+import io.renku.tinytypes.json.TinyTypeEncoders
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

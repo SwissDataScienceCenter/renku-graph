@@ -19,17 +19,17 @@
 package io.renku.webhookservice.tokenrepository
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators.projectIds
-import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
-import ch.datascience.http.ErrorMessage
-import ch.datascience.http.ErrorMessage._
-import ch.datascience.http.client.AccessToken
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.syntax._
+import io.renku.generators.CommonGraphGenerators._
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.GraphModelGenerators.projectIds
+import io.renku.graph.tokenrepository.TokenRepositoryUrl
+import io.renku.http.ErrorMessage
+import io.renku.http.ErrorMessage._
+import io.renku.http.client.AccessToken
+import io.renku.interpreters.TestLogger
+import io.renku.stubbing.ExternalServiceStubbing
 import org.http4s.Status
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

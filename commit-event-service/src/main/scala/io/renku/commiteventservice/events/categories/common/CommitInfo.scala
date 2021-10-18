@@ -18,8 +18,8 @@
 
 package io.renku.commiteventservice.events.categories.common
 
-import ch.datascience.graph.model.events._
-import ch.datascience.graph.model.users.{Email, Name}
+import io.renku.graph.model.events._
+import io.renku.graph.model.users.{Email, Name}
 
 private[categories] case class CommitInfo(
     id:            CommitId,
@@ -33,8 +33,8 @@ private[categories] case class CommitInfo(
 private[categories] object CommitInfo {
 
   import cats.syntax.all._
-  import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import io.circe._
+  import io.renku.tinytypes.json.TinyTypeDecoders._
 
   implicit val commitInfoDecoder: Decoder[CommitInfo] = cursor =>
     for {

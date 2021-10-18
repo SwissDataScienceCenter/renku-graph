@@ -22,12 +22,12 @@ import cats.MonadThrow
 import cats.data.NonEmptyList
 import cats.effect.Timer
 import cats.syntax.all._
-import ch.datascience.graph.config.RenkuBaseUrlLoader
-import ch.datascience.graph.model.RenkuVersionPair
-import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
-import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
-import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import com.typesafe.config.{Config, ConfigFactory}
+import io.renku.graph.config.RenkuBaseUrlLoader
+import io.renku.graph.model.RenkuVersionPair
+import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
+import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder}
+import io.renku.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.FiniteDuration

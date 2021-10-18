@@ -22,20 +22,20 @@ import ProcessingStatusGenerator._
 import cats.MonadError
 import cats.data.OptionT
 import cats.effect.IO
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.exceptions
-import ch.datascience.graph.model.GraphModelGenerators.projectIds
-import ch.datascience.graph.model.projects.Id
-import ch.datascience.http.InfoMessage._
-import ch.datascience.http.client.AccessToken
-import ch.datascience.http.server.EndpointTester._
-import ch.datascience.http.{ErrorMessage, InfoMessage}
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
-import ch.datascience.logging.TestExecutionTimeRecorder
 import io.circe.Json
 import io.circe.literal._
 import io.circe.syntax._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.exceptions
+import io.renku.graph.model.GraphModelGenerators.projectIds
+import io.renku.graph.model.projects.Id
+import io.renku.http.InfoMessage._
+import io.renku.http.client.AccessToken
+import io.renku.http.server.EndpointTester._
+import io.renku.http.{ErrorMessage, InfoMessage}
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.{Error, Warn}
+import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.webhookservice.eventprocessing.ProcessingStatusFetcher.ProcessingStatus
 import io.renku.webhookservice.hookvalidation.HookValidator
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}

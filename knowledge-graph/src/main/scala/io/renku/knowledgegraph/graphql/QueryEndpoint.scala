@@ -21,9 +21,9 @@ package io.renku.knowledgegraph.graphql
 import cats.MonadError
 import cats.effect._
 import cats.syntax.all._
-import ch.datascience.http.ErrorMessage
-import ch.datascience.http.server.security.model.AuthUser
 import io.circe.Json
+import io.renku.http.ErrorMessage
+import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.lineage.graphql.QueryFields
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{EntityDecoder, Request, Response}
@@ -108,7 +108,7 @@ private object QueryEndpoint {
 
 object IOQueryEndpoint {
 
-  import ch.datascience.rdfstore.SparqlQueryTimeRecorder
+  import io.renku.rdfstore.SparqlQueryTimeRecorder
 
   def apply(
       timeRecorder: SparqlQueryTimeRecorder[IO],

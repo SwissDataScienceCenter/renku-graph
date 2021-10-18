@@ -18,8 +18,8 @@
 
 package io.renku.triplesgenerator.generators
 
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.RenkuVersionPair
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.RenkuVersionPair
 import org.scalacheck.Gen
 
 object VersionGenerators {

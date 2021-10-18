@@ -19,17 +19,17 @@
 package io.renku.eventlog.events.categories.statuschange
 
 import cats.effect.IO
-import ch.datascience.db.SqlStatement
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.timestampsNotInTheFuture
-import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventIds, eventStatuses}
-import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
-import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventStatus}
+import io.renku.db.SqlStatement
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.timestampsNotInTheFuture
+import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventIds, eventStatuses}
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus}
 import EventStatus._
-import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
 import io.renku.eventlog._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.ToAwaitingDeletion
+import io.renku.metrics.TestLabeledHistogram
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

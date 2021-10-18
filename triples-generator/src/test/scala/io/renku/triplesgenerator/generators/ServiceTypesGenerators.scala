@@ -18,9 +18,9 @@
 
 package io.renku.triplesgenerator.generators
 
-import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.generators.Generators._
-import ch.datascience.rdfstore.{DatasetName, FusekiBaseUrl}
+import io.renku.generators.CommonGraphGenerators._
+import io.renku.generators.Generators._
+import io.renku.rdfstore.{DatasetName, FusekiBaseUrl}
 import io.renku.triplesgenerator.config.DatasetType.{Mem, TDB}
 import io.renku.triplesgenerator.config._
 import org.scalacheck.Gen

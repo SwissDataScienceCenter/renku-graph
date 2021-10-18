@@ -19,11 +19,11 @@
 package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.graph.model.datasets.{DerivedFrom, InternalSameAs, ResourceId, SameAs, TopmostDerivedFrom, TopmostSameAs}
-import ch.datascience.rdfstore.SparqlQuery.Prefixes
-import ch.datascience.rdfstore._
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
+import io.renku.graph.model.datasets.{DerivedFrom, InternalSameAs, ResourceId, SameAs, TopmostDerivedFrom, TopmostSameAs}
+import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -52,9 +52,9 @@ private class KGDatasetInfoFinderImpl(
     with KGDatasetInfoFinder[IO] {
 
   import cats.syntax.all._
-  import ch.datascience.graph.model.Schemas.{renku, schema}
-  import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import eu.timepit.refined.auto._
+  import io.renku.graph.model.Schemas.{renku, schema}
+  import io.renku.tinytypes.json.TinyTypeDecoders._
 
   override def findParentTopmostSameAs(sameAs: InternalSameAs)(implicit
       ev:                                      InternalSameAs.type

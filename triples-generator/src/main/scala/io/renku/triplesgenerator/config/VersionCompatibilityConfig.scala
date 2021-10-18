@@ -22,8 +22,8 @@ import cats.MonadError
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.graph.model.{CliVersion, RenkuVersionPair, SchemaVersion}
 import com.typesafe.config.{Config, ConfigFactory}
+import io.renku.graph.model.{CliVersion, RenkuVersionPair, SchemaVersion}
 import org.typelevel.log4cats.Logger
 import pureconfig.ConfigReader
 
@@ -33,7 +33,7 @@ trait VersionCompatibilityConfig
 private object VersionCompatibilityConfig extends VersionCompatibilityConfig {
 
   import cats.syntax.all._
-  import ch.datascience.config.ConfigLoader._
+  import io.renku.config.ConfigLoader._
 
   private val separator = "->"
 

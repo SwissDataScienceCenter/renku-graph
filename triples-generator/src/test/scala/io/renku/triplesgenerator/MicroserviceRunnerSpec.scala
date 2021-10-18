@@ -19,14 +19,14 @@
 package io.renku.triplesgenerator
 
 import cats.effect._
-import ch.datascience.config.certificates.CertificateLoader
-import ch.datascience.events.consumers.EventConsumersRegistry
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.http.server.IOHttpServer
-import ch.datascience.interpreters.TestLogger.Level.Error
-import ch.datascience.interpreters.{IOSentryInitializer, TestLogger}
-import ch.datascience.testtools.MockedRunnableCollaborators
+import io.renku.config.certificates.CertificateLoader
+import io.renku.events.consumers.EventConsumersRegistry
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.http.server.IOHttpServer
+import io.renku.interpreters.TestLogger.Level.Error
+import io.renku.interpreters.{IOSentryInitializer, TestLogger}
+import io.renku.testtools.MockedRunnableCollaborators
 import io.renku.triplesgenerator.config.certificates.GitCertificateInstaller
 import io.renku.triplesgenerator.init.CliVersionCompatibilityVerifier
 import io.renku.triplesgenerator.reprovisioning.ReProvisioning

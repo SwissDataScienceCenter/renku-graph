@@ -18,21 +18,21 @@
 
 package io.renku.eventlog.metrics
 
-import ch.datascience.db.SqlStatement
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.{nonEmptyList, timestamps}
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventStatus, LastSyncedDate}
-import ch.datascience.graph.model.projects.{Id, Path}
-import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
+import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog._
 import io.renku.eventlog.subscriptions._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.{nonEmptyList, timestamps}
+import io.renku.graph.model.EventsGenerators._
+import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.events.EventStatus._
+import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus, LastSyncedDate}
+import io.renku.graph.model.projects.{Id, Path}
+import io.renku.metrics.TestLabeledHistogram
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 

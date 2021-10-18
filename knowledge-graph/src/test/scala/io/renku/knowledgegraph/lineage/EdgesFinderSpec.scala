@@ -20,20 +20,20 @@ package io.renku.knowledgegraph.lineage
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators.authUsers
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.fixed
-import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.testentities.CommandParameterBase.{CommandInput, CommandOutput}
-import ch.datascience.graph.model.testentities._
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Warn
-import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
-import ch.datascience.stubbing.ExternalServiceStubbing
+import io.renku.generators.CommonGraphGenerators.authUsers
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.fixed
+import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.testentities.CommandParameterBase.{CommandInput, CommandOutput}
+import io.renku.graph.model.testentities._
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.Warn
 import io.renku.jsonld.EntityId
 import io.renku.jsonld.syntax._
 import io.renku.knowledgegraph.lineage.model._
+import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.stubbing.ExternalServiceStubbing
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 

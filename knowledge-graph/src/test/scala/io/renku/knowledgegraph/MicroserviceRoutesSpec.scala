@@ -21,21 +21,21 @@ package io.renku.knowledgegraph
 import cats.data.{Kleisli, OptionT}
 import cats.effect.{Clock, IO, Resource}
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.projects.Path
-import ch.datascience.http.ErrorMessage.ErrorMessage
-import ch.datascience.http.InfoMessage._
-import ch.datascience.http.rest.SortBy
-import ch.datascience.http.rest.SortBy.Direction
-import ch.datascience.http.rest.paging.PagingRequest
-import ch.datascience.http.rest.paging.model.{Page, PerPage}
-import ch.datascience.http.server.EndpointTester._
-import ch.datascience.http.server.security.model.AuthUser
-import ch.datascience.http.{ErrorMessage, InfoMessage}
-import ch.datascience.interpreters.TestRoutesMetrics
+import io.renku.generators.CommonGraphGenerators._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.projects.Path
+import io.renku.http.ErrorMessage.ErrorMessage
+import io.renku.http.InfoMessage._
+import io.renku.http.rest.SortBy
+import io.renku.http.rest.SortBy.Direction
+import io.renku.http.rest.paging.PagingRequest
+import io.renku.http.rest.paging.model.{Page, PerPage}
+import io.renku.http.server.EndpointTester._
+import io.renku.http.server.security.model.AuthUser
+import io.renku.http.{ErrorMessage, InfoMessage}
+import io.renku.interpreters.TestRoutesMetrics
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.{Phrase, query}
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._

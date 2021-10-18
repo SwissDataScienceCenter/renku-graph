@@ -23,14 +23,14 @@ import cats.effect.concurrent.Deferred
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.all._
 import cats.{MonadThrow, Show}
-import ch.datascience.events.consumers.EventSchedulingResult._
-import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
-import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
-import ch.datascience.events.{EventRequestContent, consumers}
-import ch.datascience.graph.model.events.{CategoryName, EventBody}
-import ch.datascience.metrics.MetricsRegistry
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
+import io.renku.events.consumers.EventSchedulingResult._
+import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
+import io.renku.events.{EventRequestContent, consumers}
+import io.renku.graph.model.events.{CategoryName, EventBody}
+import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext

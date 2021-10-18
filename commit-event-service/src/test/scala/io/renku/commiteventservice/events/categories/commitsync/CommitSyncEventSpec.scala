@@ -19,7 +19,7 @@
 package io.renku.commiteventservice.events.categories.commitsync
 
 import io.renku.commiteventservice.events.categories.commitsync.Generators._
-import ch.datascience.generators.Generators.Implicits._
+import io.renku.generators.Generators.Implicits._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 

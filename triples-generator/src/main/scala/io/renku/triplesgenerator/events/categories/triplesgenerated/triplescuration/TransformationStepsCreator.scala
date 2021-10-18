@@ -19,7 +19,7 @@
 package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration
 
 import cats.MonadThrow
-import ch.datascience.rdfstore.SparqlQueryTimeRecorder
+import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.DatasetTransformer

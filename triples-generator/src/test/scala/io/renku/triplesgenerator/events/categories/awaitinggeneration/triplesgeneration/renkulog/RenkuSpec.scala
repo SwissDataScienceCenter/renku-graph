@@ -20,8 +20,8 @@ package io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesge
 
 import ammonite.ops.{Bytes, CommandResult, Path, ShelloutException}
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
 import io.renku.jsonld.generators.JsonLDGenerators.jsonLDEntities
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.{Renku, RepositoryPath}

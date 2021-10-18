@@ -20,12 +20,12 @@ package io.renku.knowledgegraph.datasets.rest
 
 import ProjectDatasetsFinder.{ProjectDataset, SameAsOrDerived}
 import cats.effect.{ConcurrentEffect, IO, Timer}
-import ch.datascience.graph.model.RenkuBaseUrl
-import ch.datascience.graph.model.datasets.{DerivedFrom, Identifier, ImageUri, InitialVersion, Name, SameAs, Title}
-import ch.datascience.graph.model.projects.{Path, ResourceId}
-import ch.datascience.graph.model.views.RdfResource
-import ch.datascience.rdfstore.SparqlQuery.Prefixes
-import ch.datascience.rdfstore._
+import io.renku.graph.model.RenkuBaseUrl
+import io.renku.graph.model.datasets.{DerivedFrom, Identifier, ImageUri, InitialVersion, Name, SameAs, Title}
+import io.renku.graph.model.projects.{Path, ResourceId}
+import io.renku.graph.model.views.RdfResource
+import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -57,8 +57,8 @@ private class ProjectDatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Tim
     with ProjectDatasetsFinder[Interpretation] {
 
   import ProjectDatasetsFinderImpl._
-  import ch.datascience.graph.model.Schemas._
   import eu.timepit.refined.auto._
+  import io.renku.graph.model.Schemas._
 
   def findProjectDatasets(projectPath: Path): Interpretation[List[ProjectDataset]] =
     queryExpecting[List[ProjectDataset]](using = query(projectPath))
@@ -98,7 +98,7 @@ private object ProjectDatasetsFinderImpl {
   import io.circe.Decoder.decodeList
 
   private implicit val recordsDecoder: Decoder[List[ProjectDataset]] = {
-    import ch.datascience.tinytypes.json.TinyTypeDecoders._
+    import io.renku.tinytypes.json.TinyTypeDecoders._
 
     def sameAsOrDerived(from: SameAs, and: Option[DerivedFrom]): SameAsOrDerived = from -> and match {
       case (_, Some(derivedFrom)) => Right(derivedFrom)

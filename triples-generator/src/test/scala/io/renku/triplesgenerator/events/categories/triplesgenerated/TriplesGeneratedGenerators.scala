@@ -18,9 +18,9 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated
 
-import ch.datascience.events.consumers.ConsumersModelGenerators._
-import ch.datascience.generators.Generators.{exceptions, nonEmptyStrings}
-import ch.datascience.graph.model.EventsGenerators._
+import io.renku.events.consumers.ConsumersModelGenerators._
+import io.renku.generators.Generators.{exceptions, nonEmptyStrings}
+import io.renku.graph.model.EventsGenerators._
 import io.renku.jsonld.generators.JsonLDGenerators.jsonLDEntities
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
 import org.scalacheck.Gen

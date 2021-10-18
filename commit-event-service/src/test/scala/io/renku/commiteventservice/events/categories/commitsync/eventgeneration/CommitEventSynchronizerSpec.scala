@@ -25,21 +25,20 @@ import io.renku.commiteventservice.events.categories.commitsync.{categoryName, l
 import io.renku.commiteventservice.events.categories.common.Generators.commitInfos
 import io.renku.commiteventservice.events.categories.common.UpdateResult._
 import io.renku.commiteventservice.events.categories.common._
-import ch.datascience.events.consumers.Project
-import ch.datascience.generators.CommonGraphGenerators.personalAccessTokens
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators.{batchDates, commitIds}
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.Id
-import ch.datascience.graph.tokenrepository.AccessTokenFinder
-import ch.datascience.graph.tokenrepository.AccessTokenFinder._
-import ch.datascience.http.client.AccessToken
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level._
-import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
-import ch.datascience.logging.TestExecutionTimeRecorder
-import io.renku.commiteventservice.events.categories.common.CommitEventsRemover
+import io.renku.events.consumers.Project
+import io.renku.generators.CommonGraphGenerators.personalAccessTokens
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.EventsGenerators.{batchDates, commitIds}
+import io.renku.graph.model.events.CommitId
+import io.renku.graph.model.projects.Id
+import io.renku.graph.tokenrepository.AccessTokenFinder
+import io.renku.graph.tokenrepository.AccessTokenFinder._
+import io.renku.http.client.AccessToken
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level._
+import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
+import io.renku.logging.TestExecutionTimeRecorder
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

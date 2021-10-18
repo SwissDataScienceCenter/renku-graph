@@ -19,7 +19,7 @@
 package io.renku.knowledgegraph
 
 import cats.syntax.all._
-import ch.datascience.graph.model.entities.{Activity, Entity}
+import io.renku.graph.model.entities.{Activity, Entity}
 import io.renku.jsonld.EntityId
 import io.renku.knowledgegraph.lineage.model._
 

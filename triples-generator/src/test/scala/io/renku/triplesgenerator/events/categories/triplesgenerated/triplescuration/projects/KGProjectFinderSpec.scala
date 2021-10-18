@@ -20,13 +20,13 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescura
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.entities
-import ch.datascience.graph.model.testentities._
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.entities
+import io.renku.graph.model.testentities._
+import io.renku.interpreters.TestLogger
+import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks

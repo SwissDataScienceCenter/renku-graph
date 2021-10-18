@@ -22,10 +22,10 @@ import cats.MonadThrow
 import cats.data.EitherT
 import cats.effect.{ConcurrentEffect, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.config.{GitLabUrlLoader, RenkuBaseUrlLoader}
-import ch.datascience.graph.model.entities.Project
-import ch.datascience.graph.model.{GitLabApiUrl, GitLabUrl, RenkuBaseUrl}
-import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
+import io.renku.graph.config.{GitLabUrlLoader, RenkuBaseUrlLoader}
+import io.renku.graph.model.entities.Project
+import io.renku.graph.model.{GitLabApiUrl, GitLabUrl, RenkuBaseUrl}
+import io.renku.rdfstore.{RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep
 import org.typelevel.log4cats.Logger

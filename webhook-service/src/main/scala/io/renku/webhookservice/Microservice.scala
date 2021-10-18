@@ -19,14 +19,14 @@
 package io.renku.webhookservice
 
 import cats.effect._
-import ch.datascience.config.GitLab
-import ch.datascience.config.certificates.CertificateLoader
-import ch.datascience.config.sentry.SentryInitializer
-import ch.datascience.control.{RateLimit, Throttler}
-import ch.datascience.http.server.HttpServer
-import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
-import ch.datascience.metrics.MetricsRegistry
-import ch.datascience.microservices.IOMicroservice
+import io.renku.config.GitLab
+import io.renku.config.certificates.CertificateLoader
+import io.renku.config.sentry.SentryInitializer
+import io.renku.control.{RateLimit, Throttler}
+import io.renku.http.server.HttpServer
+import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder}
+import io.renku.metrics.MetricsRegistry
+import io.renku.microservices.IOMicroservice
 import pureconfig.ConfigSource
 
 import java.util.concurrent.Executors.newFixedThreadPool

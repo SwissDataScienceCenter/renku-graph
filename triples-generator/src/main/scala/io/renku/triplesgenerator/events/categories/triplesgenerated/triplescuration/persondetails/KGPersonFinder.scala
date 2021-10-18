@@ -21,14 +21,14 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescura
 import cats.data.OptionT
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.model.Schemas.schema
-import ch.datascience.graph.model.entities.Person
-import ch.datascience.graph.model.users
-import ch.datascience.graph.model.users.{Email, GitLabId, ResourceId}
-import ch.datascience.graph.model.views.SparqlValueEncoder.sparqlEncode
-import ch.datascience.rdfstore.SparqlQuery.Prefixes
-import ch.datascience.rdfstore._
 import io.circe.DecodingFailure
+import io.renku.graph.model.Schemas.schema
+import io.renku.graph.model.entities.Person
+import io.renku.graph.model.users
+import io.renku.graph.model.users.{Email, GitLabId, ResourceId}
+import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
+import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -127,7 +127,7 @@ private class KGPersonFinderImpl(rdfStoreConfig: RdfStoreConfig,
 
   private def recordsDecoder(person: Person): Decoder[Option[Person]] = { cursor =>
     import Decoder._
-    import ch.datascience.tinytypes.json.TinyTypeDecoders._
+    import io.renku.tinytypes.json.TinyTypeDecoders._
 
     val personEntities: Decoder[Person] = { cursor =>
       for {

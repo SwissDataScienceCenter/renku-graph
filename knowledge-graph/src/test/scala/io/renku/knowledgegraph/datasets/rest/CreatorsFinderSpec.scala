@@ -18,10 +18,10 @@
 
 package io.renku.knowledgegraph.datasets.rest
 
-import ch.datascience.generators.Generators.blankStrings
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.users.{Email, Name}
 import io.circe.literal._
+import io.renku.generators.Generators.blankStrings
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.users.{Email, Name}
 import io.renku.knowledgegraph.datasets.model.DatasetCreator
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

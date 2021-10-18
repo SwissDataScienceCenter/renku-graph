@@ -18,9 +18,9 @@
 
 package io.renku.triplesgenerator.config
 
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.nonEmptyStrings
 import com.typesafe.config.ConfigFactory
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.nonEmptyStrings
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 

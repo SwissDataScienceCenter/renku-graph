@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories.membersync
 
-import ch.datascience.rdfstore.SparqlQuery
+import io.renku.rdfstore.SparqlQuery
 
 private trait QuerySender[Interpretation[_]] {
 

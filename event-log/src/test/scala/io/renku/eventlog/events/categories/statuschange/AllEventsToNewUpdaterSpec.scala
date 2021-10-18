@@ -19,20 +19,20 @@
 package io.renku.eventlog.events.categories.statuschange
 
 import cats.effect.IO
-import ch.datascience.db.SqlStatement
-import ch.datascience.events.consumers.subscriptions.{subscriberIds, subscriberUrls}
-import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.{timestamps, timestampsNotInTheFuture}
-import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventProcessingTimes, zippedEventPayloads}
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventStatus}
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
+import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators.eventMessages
 import io.renku.eventlog._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.AllEventsToNew
+import io.renku.events.consumers.subscriptions.{subscriberIds, subscriberUrls}
+import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
+import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventProcessingTimes, zippedEventPayloads}
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus}
+import io.renku.graph.model.projects
+import io.renku.metrics.TestLabeledHistogram
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

@@ -18,9 +18,9 @@
 
 package io.renku.eventlog.events
 
-import ch.datascience.events
-import ch.datascience.events.EventRequestContent
 import io.circe.Json
+import io.renku.events
+import io.renku.events.EventRequestContent
 
 package object categories {
   def requestContent(event: Json): EventRequestContent = events.EventRequestContent.NoPayload(event)

@@ -20,8 +20,8 @@ package io.renku.webhookservice.crypto
 
 import cats.MonadError
 import cats.effect.IO
-import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.generators.Generators.Implicits._
+import io.renku.generators.CommonGraphGenerators._
+import io.renku.generators.Generators.Implicits._
 
 class IOHookTokenCrypto()(implicit ME: MonadError[IO, Throwable])
     extends HookTokenCrypto[IO](aesCryptoSecrets.generateOne)

@@ -20,13 +20,13 @@ package io.renku.knowledgegraph.projects.rest
 
 import KGProjectFinder._
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
-import ch.datascience.graph.config.RenkuBaseUrlLoader
-import ch.datascience.graph.model.projects._
-import ch.datascience.graph.model.views.RdfResource
-import ch.datascience.graph.model.{RenkuBaseUrl, SchemaVersion, users}
-import ch.datascience.logging.ApplicationLogger
-import ch.datascience.rdfstore.SparqlQuery.Prefixes
-import ch.datascience.rdfstore._
+import io.renku.graph.config.RenkuBaseUrlLoader
+import io.renku.graph.model.projects._
+import io.renku.graph.model.views.RdfResource
+import io.renku.graph.model.{RenkuBaseUrl, SchemaVersion, users}
+import io.renku.logging.ApplicationLogger
+import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -45,9 +45,9 @@ private class KGProjectFinderImpl[Interpretation[_]: ConcurrentEffect: Timer](
     with KGProjectFinder[Interpretation] {
 
   import cats.syntax.all._
-  import ch.datascience.graph.model.Schemas._
   import eu.timepit.refined.auto._
   import io.circe.Decoder
+  import io.renku.graph.model.Schemas._
 
   override def findProject(path: Path): Interpretation[Option[KGProject]] = {
     implicit val decoder: Decoder[List[KGProject]] = recordsDecoder(path)
@@ -89,9 +89,9 @@ private class KGProjectFinderImpl[Interpretation[_]: ConcurrentEffect: Timer](
 
   private def recordsDecoder(path: Path): Decoder[List[KGProject]] = {
     import Decoder._
-    import ch.datascience.graph.model.projects._
-    import ch.datascience.graph.model.users
-    import ch.datascience.tinytypes.json.TinyTypeDecoders._
+    import io.renku.graph.model.projects._
+    import io.renku.graph.model.users
+    import io.renku.tinytypes.json.TinyTypeDecoders._
 
     val project: Decoder[KGProject] = { cursor =>
       for {

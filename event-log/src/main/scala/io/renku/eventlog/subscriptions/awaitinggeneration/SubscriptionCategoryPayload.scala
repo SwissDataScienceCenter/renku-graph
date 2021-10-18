@@ -18,9 +18,9 @@
 
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
-import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import io.renku.eventlog.subscriptions
 import io.renku.eventlog.subscriptions.Capacity
+import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 
 private case class SubscriptionCategoryPayload(subscriberUrl: SubscriberUrl,
                                                subscriberId:  SubscriberId,

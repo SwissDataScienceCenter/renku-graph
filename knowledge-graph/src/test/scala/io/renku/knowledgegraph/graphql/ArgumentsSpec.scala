@@ -18,12 +18,12 @@
 
 package io.renku.knowledgegraph.graphql
 
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import sangria.ast.StringValue

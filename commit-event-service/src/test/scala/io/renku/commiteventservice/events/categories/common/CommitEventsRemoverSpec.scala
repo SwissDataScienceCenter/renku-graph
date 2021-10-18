@@ -19,18 +19,18 @@
 package io.renku.commiteventservice.events.categories.common
 
 import cats.syntax.all._
+import io.circe.literal._
 import io.renku.commiteventservice.events.categories.commitsync.categoryName
 import io.renku.commiteventservice.events.categories.common.UpdateResult.{Deleted, Failed}
-import ch.datascience.events.EventRequestContent
-import ch.datascience.events.consumers.Project
-import ch.datascience.events.producers.EventSender
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators.commitIds
-import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
-import ch.datascience.graph.model.events.EventStatus.AwaitingDeletion
-import ch.datascience.tinytypes.json.TinyTypeEncoders
-import io.circe.literal._
+import io.renku.events.EventRequestContent
+import io.renku.events.consumers.Project
+import io.renku.events.producers.EventSender
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.EventsGenerators.commitIds
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.graph.model.events.EventStatus.AwaitingDeletion
+import io.renku.tinytypes.json.TinyTypeEncoders
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

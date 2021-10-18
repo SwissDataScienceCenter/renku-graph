@@ -19,7 +19,7 @@
 package io.renku.tokenrepository.repository.init
 
 import cats.effect.IO
-import ch.datascience.db.SessionResource
+import io.renku.db.SessionResource
 import io.renku.tokenrepository.repository.ProjectsTokensDB
 import org.typelevel.log4cats.Logger
 

@@ -20,8 +20,8 @@ package io.renku.triplesgenerator.reprovisioning
 
 import cats.data.NonEmptyList
 import cats.syntax.all._
-import ch.datascience.generators.Generators.Implicits._
 import eu.timepit.refined.auto._
+import io.renku.generators.Generators.Implicits._
 import io.renku.triplesgenerator.generators.VersionGenerators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

@@ -19,11 +19,11 @@
 package io.renku.knowledgegraph.lineage
 
 import cats.syntax.all._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.Schemas.schema
-import ch.datascience.graph.model.entities.{Activity, Entity}
 import eu.timepit.refined.auto._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.Schemas.schema
+import io.renku.graph.model.entities.{Activity, Entity}
 import io.renku.knowledgegraph.lineage.LineageGenerators._
 import io.renku.knowledgegraph.lineage.model.{Edge, Lineage, Node}
 import org.scalacheck.Gen

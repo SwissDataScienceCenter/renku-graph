@@ -21,14 +21,14 @@ package io.renku.eventlog.subscriptions
 import cats.MonadError
 import cats.effect.{BracketThrow, IO}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
-import ch.datascience.events.consumers.subscriptions.SubscriberUrl
-import ch.datascience.graph.model.events.{CompoundEventId, EventId}
-import ch.datascience.graph.model.{events, projects}
-import ch.datascience.metrics.LabeledHistogram
-import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
 import eu.timepit.refined.auto._
+import io.renku.db.{DbClient, SessionResource, SqlStatement}
 import io.renku.eventlog.{EventLogDB, Microservice, TypeSerializers}
+import io.renku.events.consumers.subscriptions.SubscriberUrl
+import io.renku.graph.model.events.{CompoundEventId, EventId}
+import io.renku.graph.model.{events, projects}
+import io.renku.metrics.LabeledHistogram
+import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
 import skunk._
 import skunk.data.Completion
 import skunk.implicits._

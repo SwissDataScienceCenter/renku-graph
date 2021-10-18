@@ -20,16 +20,16 @@ package io.renku.triplesgenerator.events.categories.membersync
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.config.GitLab
-import ch.datascience.control.Throttler
-import ch.datascience.graph.config.GitLabUrlLoader
-import ch.datascience.graph.model.GitLabApiUrl
-import ch.datascience.graph.model.projects.Path
-import ch.datascience.graph.model.users.{GitLabId, Name}
-import ch.datascience.http.client.UrlEncoder.urlEncode
-import ch.datascience.http.client.{AccessToken, RestClient}
-import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import io.circe.Decoder
+import io.renku.config.GitLab
+import io.renku.control.Throttler
+import io.renku.graph.config.GitLabUrlLoader
+import io.renku.graph.model.GitLabApiUrl
+import io.renku.graph.model.projects.Path
+import io.renku.graph.model.users.{GitLabId, Name}
+import io.renku.http.client.UrlEncoder.urlEncode
+import io.renku.http.client.{AccessToken, RestClient}
+import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.Method.GET
 import org.http4s._
 import org.http4s.circe.jsonOf
@@ -108,7 +108,7 @@ private class IOGitLabProjectMembersFinder(
     response.headers.get(CaseInsensitiveString("X-Next-Page")).flatMap(_.value.toIntOption)
 
   private implicit lazy val projectDecoder: EntityDecoder[IO, List[GitLabProjectMember]] = {
-    import ch.datascience.graph.model.users
+    import io.renku.graph.model.users
 
     implicit val decoder: Decoder[GitLabProjectMember] = { cursor =>
       for {

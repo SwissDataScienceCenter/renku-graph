@@ -20,13 +20,13 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescura
 
 import cats.MonadThrow
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.entities
-import ch.datascience.graph.model.testentities._
-import ch.datascience.http.client.RestClientError
-import ch.datascience.http.client.RestClientError.UnauthorizedException
+import io.renku.generators.CommonGraphGenerators._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.entities
+import io.renku.graph.model.testentities._
+import io.renku.http.client.RestClientError
+import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.triplesgenerator.events.categories.triplesgenerated.ProjectFunctions
 import io.renku.triplesgenerator.events.categories.triplesgenerated.ProjectFunctions._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.ResultData

@@ -18,13 +18,13 @@
 
 package io.renku.webhookservice.crypto
 
-import ch.datascience.crypto.AesCrypto.Secret
-import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
 import com.typesafe.config.ConfigFactory
 import eu.timepit.refined.api.RefType
 import eu.timepit.refined.auto._
+import io.renku.crypto.AesCrypto.Secret
+import io.renku.generators.CommonGraphGenerators._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
 import io.renku.webhookservice.WebhookServiceGenerators._
 import io.renku.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import io.renku.webhookservice.model.HookToken

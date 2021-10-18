@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories.membersync
 
-import ch.datascience.graph.model.GraphModelGenerators.{userGitLabIds, userNames, userResourceIds}
+import io.renku.graph.model.GraphModelGenerators.{userGitLabIds, userNames, userResourceIds}
 import org.scalacheck.Gen
 
 private object Generators {

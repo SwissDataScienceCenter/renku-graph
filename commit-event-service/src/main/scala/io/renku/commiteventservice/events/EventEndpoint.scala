@@ -23,11 +23,11 @@ import cats.data.EitherT
 import cats.data.EitherT.right
 import cats.effect.Effect
 import cats.syntax.all._
-import ch.datascience.events.EventRequestContent
-import ch.datascience.events.consumers.{EventConsumersRegistry, EventSchedulingResult}
-import ch.datascience.http.InfoMessage._
-import ch.datascience.http.{ErrorMessage, InfoMessage}
 import io.circe.Json
+import io.renku.events.EventRequestContent
+import io.renku.events.consumers.{EventConsumersRegistry, EventSchedulingResult}
+import io.renku.http.InfoMessage._
+import io.renku.http.{ErrorMessage, InfoMessage}
 import org.http4s.dsl.Http4sDsl
 import org.http4s.multipart.Multipart
 import org.http4s.{Request, Response}

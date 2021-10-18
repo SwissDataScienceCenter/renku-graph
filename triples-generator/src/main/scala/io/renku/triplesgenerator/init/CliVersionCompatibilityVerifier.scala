@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.graph.model.{CliVersion, RenkuVersionPair}
+import io.renku.graph.model.{CliVersion, RenkuVersionPair}
 import io.renku.triplesgenerator.config.TriplesGeneration
 import io.renku.triplesgenerator.config.TriplesGeneration.{RemoteTriplesGeneration, RenkuLog}
 

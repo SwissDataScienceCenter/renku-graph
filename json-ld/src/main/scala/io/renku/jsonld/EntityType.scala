@@ -20,7 +20,7 @@ package io.renku.jsonld
 
 import cats.Show
 import cats.syntax.all._
-import io.circe.{Decoder, DecodingFailure, Encoder, Json}
+import io.circe._
 
 sealed abstract class EntityType(val value: String) extends Product with Serializable
 

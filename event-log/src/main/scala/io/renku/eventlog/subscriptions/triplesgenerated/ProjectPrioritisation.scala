@@ -18,13 +18,13 @@
 
 package io.renku.eventlog.subscriptions.triplesgenerated
 
-import ch.datascience.graph.model.projects
-import ch.datascience.tinytypes.{BigDecimalTinyType, TinyTypeFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.eventlog.EventDate
 import io.renku.eventlog.subscriptions.ProjectIds
 import io.renku.eventlog.subscriptions.triplesgenerated.ProjectPrioritisation.{Priority, ProjectInfo}
+import io.renku.graph.model.projects
+import io.renku.tinytypes.{BigDecimalTinyType, TinyTypeFactory}
 
 import java.time.Duration
 

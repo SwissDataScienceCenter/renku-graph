@@ -19,7 +19,7 @@
 package io.renku.eventlog.events.categories
 
 import cats.data.Kleisli
-import ch.datascience.graph.model.events.CategoryName
+import io.renku.graph.model.events.CategoryName
 import skunk.Session
 
 package object statuschange {

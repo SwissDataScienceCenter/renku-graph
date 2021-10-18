@@ -21,9 +21,9 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated
 import cats.MonadThrow
 import cats.effect.{BracketThrow, IO, Sync}
 import cats.syntax.all._
-import ch.datascience.compression.Zip
-import ch.datascience.events.consumers.Project
-import ch.datascience.graph.model.events.{CompoundEventId, ZippedEventPayload}
+import io.renku.compression.Zip
+import io.renku.events.consumers.Project
+import io.renku.graph.model.events.{CompoundEventId, ZippedEventPayload}
 import io.renku.jsonld.parser.ParsingFailure
 import io.renku.jsonld.{JsonLD, parser}
 

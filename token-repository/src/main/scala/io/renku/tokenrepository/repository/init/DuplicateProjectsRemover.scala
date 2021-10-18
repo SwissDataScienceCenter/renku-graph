@@ -21,7 +21,7 @@ package io.renku.tokenrepository.repository.init
 import cats.data.Kleisli
 import cats.effect.Bracket
 import cats.syntax.all._
-import ch.datascience.db.SessionResource
+import io.renku.db.SessionResource
 import io.renku.tokenrepository.repository.ProjectsTokensDB
 import org.typelevel.log4cats.Logger
 import skunk.implicits._

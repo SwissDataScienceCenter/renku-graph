@@ -21,9 +21,9 @@ package io.renku.eventlog.subscriptions
 import cats.Semigroup
 import cats.data.OptionT
 import cats.effect.Effect
-import ch.datascience.graph.model.events.CategoryName
 import io.circe.Json
 import io.renku.eventlog.subscriptions.SubscriptionCategory._
+import io.renku.graph.model.events.CategoryName
 
 private trait SubscriptionCategory[Interpretation[_]] {
 

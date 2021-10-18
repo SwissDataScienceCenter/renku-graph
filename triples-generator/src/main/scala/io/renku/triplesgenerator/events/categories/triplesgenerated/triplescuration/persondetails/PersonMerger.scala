@@ -20,7 +20,7 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescura
 
 import cats.MonadThrow
 import cats.syntax.all._
-import ch.datascience.graph.model.entities.Person
+import io.renku.graph.model.entities.Person
 
 private trait PersonMerger {
 

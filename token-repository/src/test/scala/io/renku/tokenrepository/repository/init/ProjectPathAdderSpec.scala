@@ -21,16 +21,16 @@ package io.renku.tokenrepository.repository.init
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.db.SqlStatement
-import ch.datascience.generators.CommonGraphGenerators.accessTokens
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.projects.{Id, Path}
-import ch.datascience.http.client.AccessToken
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Info
-import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
+import io.renku.db.SqlStatement
+import io.renku.generators.CommonGraphGenerators.accessTokens
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.projects.{Id, Path}
+import io.renku.http.client.AccessToken
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.metrics.TestLabeledHistogram
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import io.renku.tokenrepository.repository.RepositoryGenerators.encryptedAccessTokens
 import io.renku.tokenrepository.repository.association.ProjectPathFinder

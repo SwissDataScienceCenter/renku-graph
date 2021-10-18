@@ -19,12 +19,12 @@
 package io.renku.triplesgenerator.init
 
 import cats.MonadError
-import ch.datascience.graph.model.CliVersion
+import io.renku.graph.model.CliVersion
 import pureconfig.ConfigReader
 
 private[init] object CliVersionLoader {
 
-  import ch.datascience.config.ConfigLoader._
+  import io.renku.config.ConfigLoader._
 
   private implicit val cliVersionLoader: ConfigReader[CliVersion] = stringTinyTypeReader(CliVersion)
 

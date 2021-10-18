@@ -18,10 +18,10 @@
 
 package io.renku.commiteventservice.events.categories.common
 
-import io.renku.commiteventservice.events.categories.common.UpdateResult._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
 import eu.timepit.refined.auto._
+import io.renku.commiteventservice.events.categories.common.UpdateResult._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

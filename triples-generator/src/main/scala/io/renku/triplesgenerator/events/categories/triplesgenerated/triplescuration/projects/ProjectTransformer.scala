@@ -21,9 +21,9 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescura
 import cats.data.EitherT
 import cats.effect._
 import cats.syntax.all._
-import ch.datascience.http.client.RestClientError._
-import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import eu.timepit.refined.auto._
+import io.renku.http.client.RestClientError._
+import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{ResultData, Transformation}

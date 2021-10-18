@@ -19,16 +19,16 @@
 package io.renku.knowledgegraph.graphql
 
 import cats.effect.IO
-import ch.datascience.generators.CommonGraphGenerators.authUsers
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.http.ErrorMessage
-import ch.datascience.http.ErrorMessage._
-import ch.datascience.http.server.EndpointTester._
-import ch.datascience.http.server.security.model.AuthUser
 import io.circe.Json
 import io.circe.literal._
 import io.circe.syntax._
+import io.renku.generators.CommonGraphGenerators.authUsers
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.http.ErrorMessage
+import io.renku.http.ErrorMessage._
+import io.renku.http.server.EndpointTester._
+import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.lineage.LineageFinder
 import org.http4s.MediaType._
 import org.http4s.Status._

@@ -20,9 +20,9 @@ package io.renku.eventlog.subscriptions.commitsync
 
 import cats.Show
 import cats.implicits.{showInterpolator, toShow}
-import ch.datascience.events.consumers.Project
-import ch.datascience.graph.model.events.{CompoundEventId, LastSyncedDate}
-import ch.datascience.graph.model.projects
+import io.renku.events.consumers.Project
+import io.renku.graph.model.events.{CompoundEventId, LastSyncedDate}
+import io.renku.graph.model.projects
 
 private sealed trait CommitSyncEvent
 

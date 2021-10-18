@@ -19,8 +19,8 @@
 package io.renku.triplesgenerator.init
 
 import cats.syntax.all._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators._
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.GraphModelGenerators._
 import io.renku.triplesgenerator.config.TriplesGeneration.RenkuLog
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

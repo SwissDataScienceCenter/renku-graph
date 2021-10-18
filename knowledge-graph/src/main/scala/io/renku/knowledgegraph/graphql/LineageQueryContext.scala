@@ -19,9 +19,9 @@
 package io.renku.knowledgegraph.graphql
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.http.server.security.model.AuthUser
-import ch.datascience.rdfstore.SparqlQueryTimeRecorder
+import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.lineage.LineageFinder
+import io.renku.rdfstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext

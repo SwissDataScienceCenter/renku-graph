@@ -19,15 +19,15 @@
 package io.renku.knowledgegraph.datasets.rest
 
 import cats.syntax.all._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.datasets.ResourceId
-import ch.datascience.graph.model.testentities._
-import ch.datascience.graph.model.{RenkuBaseUrl, datasets, testentities}
-import ch.datascience.tinytypes.json.TinyTypeEncoders
 import io.circe.literal._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.datasets.ResourceId
+import io.renku.graph.model.testentities._
+import io.renku.graph.model.{RenkuBaseUrl, datasets, testentities}
 import io.renku.jsonld.syntax._
 import io.renku.knowledgegraph.datasets.model
+import io.renku.tinytypes.json.TinyTypeEncoders
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks

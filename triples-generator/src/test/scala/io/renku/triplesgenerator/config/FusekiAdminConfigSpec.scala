@@ -18,9 +18,9 @@
 
 package io.renku.triplesgenerator.config
 
-import ch.datascience.config.ConfigLoader.ConfigLoadingException
-import ch.datascience.generators.Generators.Implicits._
 import com.typesafe.config.ConfigFactory
+import io.renku.config.ConfigLoader.ConfigLoadingException
+import io.renku.generators.Generators.Implicits._
 import io.renku.triplesgenerator.generators.ServiceTypesGenerators._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

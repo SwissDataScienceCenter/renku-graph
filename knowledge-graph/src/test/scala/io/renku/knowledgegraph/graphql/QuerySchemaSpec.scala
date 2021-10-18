@@ -19,12 +19,12 @@
 package io.renku.knowledgegraph.graphql
 
 import cats.effect.IO
-import ch.datascience.generators.CommonGraphGenerators.authUsers
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.projects.Path
-import ch.datascience.http.server.security.model.AuthUser
 import io.circe.Json
 import io.circe.literal._
+import io.renku.generators.CommonGraphGenerators.authUsers
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.projects.Path
+import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.lineage
 import io.renku.knowledgegraph.lineage.LineageFinder
 import io.renku.knowledgegraph.lineage.LineageGenerators._

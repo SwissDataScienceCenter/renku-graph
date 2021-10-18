@@ -19,11 +19,11 @@
 package io.renku.tokenrepository.repository.init
 
 import cats.effect.IO
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.projects
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Info
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.projects
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.tokenrepository.repository.InMemoryProjectsTokensDbSpec
 import io.renku.tokenrepository.repository.RepositoryGenerators.encryptedAccessTokens
 import org.scalatest.matchers.should

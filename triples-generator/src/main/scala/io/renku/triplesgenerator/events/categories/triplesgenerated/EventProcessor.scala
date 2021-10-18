@@ -22,15 +22,15 @@ import cats.MonadThrow
 import cats.data.EitherT.right
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.model.events.EventStatus.TriplesGenerated
-import ch.datascience.graph.model.events.{EventProcessingTime, EventStatus}
-import ch.datascience.graph.tokenrepository.AccessTokenFinder
-import ch.datascience.http.client.AccessToken
-import ch.datascience.logging.ExecutionTimeRecorder
-import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
-import ch.datascience.metrics.MetricsRegistry
-import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import io.prometheus.client.Histogram
+import io.renku.graph.model.events.EventStatus.TriplesGenerated
+import io.renku.graph.model.events.{EventProcessingTime, EventStatus}
+import io.renku.graph.tokenrepository.AccessTokenFinder
+import io.renku.http.client.AccessToken
+import io.renku.logging.ExecutionTimeRecorder
+import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
+import io.renku.metrics.MetricsRegistry
+import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater._
@@ -199,8 +199,8 @@ private class EventProcessorImpl[Interpretation[_]: MonadThrow](
 
 private object EventProcessor {
 
-  import ch.datascience.config.GitLab
-  import ch.datascience.control.Throttler
+  import io.renku.config.GitLab
+  import io.renku.control.Throttler
 
   private[events] lazy val eventsProcessingTimesBuilder =
     Histogram

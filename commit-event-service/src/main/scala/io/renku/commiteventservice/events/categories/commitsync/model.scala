@@ -19,8 +19,8 @@
 package io.renku.commiteventservice.events.categories.commitsync
 
 import cats.Show
-import ch.datascience.events.consumers.Project
-import ch.datascience.graph.model.events.{CommitId, LastSyncedDate}
+import io.renku.events.consumers.Project
+import io.renku.graph.model.events.{CommitId, LastSyncedDate}
 
 private sealed trait CommitSyncEvent { val project: Project }
 

@@ -20,16 +20,16 @@ package io.renku.knowledgegraph.datasets.rest
 
 import cats.effect.{ConcurrentEffect, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.model.Schemas._
-import ch.datascience.graph.model.datasets.Identifier
-import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.{Path, ResourceId}
-import ch.datascience.rdfstore.SparqlQuery.Prefixes
-import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
 import io.circe.Decoder.decodeList
 import io.circe.DecodingFailure
+import io.renku.graph.model.Schemas._
+import io.renku.graph.model.datasets.Identifier
+import io.renku.graph.model.projects
+import io.renku.graph.model.projects.{Path, ResourceId}
 import io.renku.knowledgegraph.datasets.model.DatasetProject
+import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -78,7 +78,7 @@ private object ProjectsFinder {
   import io.circe.Decoder
 
   private implicit val projectsDecoder: Decoder[List[DatasetProject]] = {
-    import ch.datascience.tinytypes.json.TinyTypeDecoders._
+    import io.renku.tinytypes.json.TinyTypeDecoders._
 
     def toProjectPath(projectPath: ResourceId) =
       projectPath

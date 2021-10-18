@@ -21,12 +21,12 @@ package io.renku.webhookservice
 import cats.Eval
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.control.Throttler
-import ch.datascience.graph.config.EventLogUrl
-import ch.datascience.http.client.RestClient
-import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
+import io.renku.control.Throttler
+import io.renku.graph.config.EventLogUrl
+import io.renku.http.client.RestClient
+import io.renku.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
 import io.renku.webhookservice.model.CommitSyncRequest
 import org.http4s.Status.{Accepted, BadGateway, GatewayTimeout, ServiceUnavailable}
 import org.http4s.{Status, Uri}

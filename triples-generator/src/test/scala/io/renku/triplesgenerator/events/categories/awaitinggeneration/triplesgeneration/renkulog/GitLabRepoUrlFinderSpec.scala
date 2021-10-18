@@ -19,13 +19,13 @@
 package io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog
 
 import cats.MonadError
-import ch.datascience.config.ServiceUrl
-import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.GitLabUrl
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.http.client.AccessToken
+import io.renku.config.ServiceUrl
+import io.renku.generators.CommonGraphGenerators._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.GitLabUrl
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.http.client.AccessToken
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.GitLabRepoUrlFinder
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

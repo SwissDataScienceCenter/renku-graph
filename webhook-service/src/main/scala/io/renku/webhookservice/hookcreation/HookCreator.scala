@@ -24,10 +24,10 @@ import cats.MonadError
 import cats.data.EitherT
 import cats.effect._
 import cats.syntax.all._
-import ch.datascience.config.GitLab
-import ch.datascience.control.Throttler
-import ch.datascience.graph.model.projects.Id
-import ch.datascience.http.client.AccessToken
+import io.renku.config.GitLab
+import io.renku.control.Throttler
+import io.renku.graph.model.projects.Id
+import io.renku.http.client.AccessToken
 import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.hookcreation.project.ProjectInfoFinder
 import io.renku.webhookservice.hookvalidation.HookValidator

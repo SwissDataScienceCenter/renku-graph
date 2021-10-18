@@ -18,12 +18,12 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects
 
-import ch.datascience.graph.model.Schemas._
-import ch.datascience.graph.model.entities.{Project, ProjectWithParent, ProjectWithoutParent}
-import ch.datascience.graph.model.views.RdfResource
-import ch.datascience.rdfstore.SparqlQuery
-import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import eu.timepit.refined.auto._
+import io.renku.graph.model.Schemas._
+import io.renku.graph.model.entities.{Project, ProjectWithParent, ProjectWithoutParent}
+import io.renku.graph.model.views.RdfResource
+import io.renku.rdfstore.SparqlQuery
+import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects.KGProjectFinder.KGProjectInfo
 
 private trait UpdatesCreator {

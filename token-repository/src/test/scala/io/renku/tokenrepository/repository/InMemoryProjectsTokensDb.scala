@@ -21,8 +21,8 @@ package io.renku.tokenrepository.repository
 import cats.data.Kleisli
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
-import ch.datascience.db.SessionResource
 import com.dimafeng.testcontainers._
+import io.renku.db.SessionResource
 import natchez.Trace.Implicits.noop
 import org.scalatest.Suite
 import org.testcontainers.utility.DockerImageName

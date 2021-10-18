@@ -18,13 +18,13 @@
 
 package io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration
 
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects
-import ch.datascience.tinytypes.constraints.NonNegativeInt
-import ch.datascience.tinytypes.json.TinyTypeDecoders._
-import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
 import io.circe.{Decoder, HCursor}
 import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.ProjectCommitStats.CommitCount
+import io.renku.graph.model.events.CommitId
+import io.renku.graph.model.projects
+import io.renku.tinytypes.constraints.NonNegativeInt
+import io.renku.tinytypes.json.TinyTypeDecoders._
+import io.renku.tinytypes.{IntTinyType, TinyTypeFactory}
 
 private[globalcommitsync] final case class CommitWithParents(id:        CommitId,
                                                              projectId: projects.Id,

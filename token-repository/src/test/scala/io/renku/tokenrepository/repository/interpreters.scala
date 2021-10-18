@@ -19,7 +19,7 @@
 package io.renku.tokenrepository.repository
 
 import cats.effect.IO
-import ch.datascience.generators.CommonGraphGenerators.aesCryptoSecrets
-import ch.datascience.generators.Generators.Implicits._
+import io.renku.generators.CommonGraphGenerators.aesCryptoSecrets
+import io.renku.generators.Generators.Implicits._
 
 private class IOAccessTokenCrypto extends AccessTokenCrypto[IO](aesCryptoSecrets.generateOne)

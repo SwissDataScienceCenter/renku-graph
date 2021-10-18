@@ -18,11 +18,11 @@
 
 package io.renku.knowledgegraph.metrics
 
-import ch.datascience.graph.model.Schemas
-import ch.datascience.tinytypes.constraints.NonBlank
-import ch.datascience.tinytypes.json.TinyTypeDecoders.longDecoder
-import ch.datascience.tinytypes.{LongTinyType, StringTinyType, TinyTypeFactory}
 import io.circe.Decoder
+import io.renku.graph.model.Schemas
+import io.renku.tinytypes.constraints.NonBlank
+import io.renku.tinytypes.json.TinyTypeDecoders.longDecoder
+import io.renku.tinytypes.{LongTinyType, StringTinyType, TinyTypeFactory}
 
 private final class Count private (val value: Long) extends AnyVal with LongTinyType
 private object Count extends TinyTypeFactory[Count](new Count(_)) {

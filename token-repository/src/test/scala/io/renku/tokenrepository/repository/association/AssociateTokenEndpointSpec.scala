@@ -20,18 +20,18 @@ package io.renku.tokenrepository.repository.association
 
 import cats.MonadError
 import cats.effect.IO
-import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.projects.Id
-import ch.datascience.http.client.AccessToken
-import ch.datascience.http.server.EndpointTester._
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Error
 import io.circe.Json
 import io.circe.literal._
 import io.circe.syntax.EncoderOps
+import io.renku.generators.CommonGraphGenerators._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.projects.Id
+import io.renku.http.client.AccessToken
+import io.renku.http.server.EndpointTester._
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.Error
 import org.http4s._
 import org.http4s.headers.`Content-Type`
 import org.http4s.implicits._

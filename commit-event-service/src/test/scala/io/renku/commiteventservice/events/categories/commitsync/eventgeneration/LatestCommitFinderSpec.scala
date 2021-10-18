@@ -19,19 +19,19 @@
 package io.renku.commiteventservice.events.categories.commitsync.eventgeneration
 
 import cats.effect.{ConcurrentEffect, IO, Timer}
-import io.renku.commiteventservice.events.categories.common.Generators._
-import io.renku.commiteventservice.events.categories.common.CommitInfo
-import ch.datascience.control.Throttler
-import ch.datascience.generators.CommonGraphGenerators.{oauthAccessTokens, personalAccessTokens}
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GitLabUrl
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.http.client.RestClientError.UnauthorizedException
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Json
 import io.circe.literal._
+import io.renku.commiteventservice.events.categories.common.CommitInfo
+import io.renku.commiteventservice.events.categories.common.Generators._
+import io.renku.control.Throttler
+import io.renku.generators.CommonGraphGenerators.{oauthAccessTokens, personalAccessTokens}
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.GitLabUrl
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.http.client.RestClientError.UnauthorizedException
+import io.renku.interpreters.TestLogger
+import io.renku.stubbing.ExternalServiceStubbing
 import org.http4s.Status
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

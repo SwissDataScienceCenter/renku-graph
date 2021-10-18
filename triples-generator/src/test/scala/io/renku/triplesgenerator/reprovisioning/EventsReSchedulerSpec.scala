@@ -19,11 +19,11 @@
 package io.renku.triplesgenerator.reprovisioning
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.graph.config.EventLogUrl
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.literal._
+import io.renku.graph.config.EventLogUrl
+import io.renku.interpreters.TestLogger
+import io.renku.stubbing.ExternalServiceStubbing
 import org.http4s.Status.{Accepted, BadRequest}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

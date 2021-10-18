@@ -20,16 +20,16 @@ package io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesge
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.config.ConfigLoader
-import ch.datascience.control.Throttler
-import ch.datascience.http.client.{AccessToken, RestClient}
-import ch.datascience.logging.ApplicationLogger
-import ch.datascience.tinytypes.constraints.Url
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import com.typesafe.config.{Config, ConfigFactory}
 import io.circe.Json
+import io.renku.config.ConfigLoader
+import io.renku.control.Throttler
+import io.renku.http.client.{AccessToken, RestClient}
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.parser._
+import io.renku.logging.ApplicationLogger
+import io.renku.tinytypes.constraints.Url
+import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.CommitEvent
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
@@ -64,7 +64,7 @@ private[awaitinggeneration] class RemoteTriplesGenerator(
 
   import cats.data.EitherT
   import cats.effect._
-  import ch.datascience.http.client.RestClientError.UnauthorizedException
+  import io.renku.http.client.RestClientError.UnauthorizedException
   import org.http4s.Method.GET
   import org.http4s.Status.Unauthorized
   import org.http4s._

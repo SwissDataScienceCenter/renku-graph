@@ -21,13 +21,13 @@ package io.renku.eventlog.events.categories.commitsyncrequest
 import cats.data.Kleisli
 import cats.effect.BracketThrow
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
-import ch.datascience.graph.model.events.CategoryName
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.LabeledHistogram
 import eu.timepit.refined.api.Refined
+import io.renku.db.{DbClient, SessionResource, SqlStatement}
 import io.renku.eventlog.subscriptions.{SubscriptionTypeSerializers, commitsync}
 import io.renku.eventlog.{EventDate, EventLogDB, TypeSerializers}
+import io.renku.graph.model.events.CategoryName
+import io.renku.graph.model.projects
+import io.renku.metrics.LabeledHistogram
 import skunk._
 import skunk.data.Completion
 import skunk.implicits._

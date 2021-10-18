@@ -21,30 +21,30 @@ package io.renku.knowledgegraph.projects.rest
 import ProjectsGenerators._
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators.{authUsers, renkuResourcesUrls}
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.SchemaVersion
-import ch.datascience.graph.model.projects._
-import ch.datascience.graph.model.users.{Email, Name => UserName}
-import ch.datascience.http.InfoMessage._
-import ch.datascience.http.rest.Links
-import ch.datascience.http.rest.Links.{Href, Rel}
-import ch.datascience.http.server.EndpointTester._
-import ch.datascience.http.{ErrorMessage, InfoMessage}
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
-import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import io.circe.syntax._
 import io.circe.{Decoder, DecodingFailure, Json}
+import io.renku.generators.CommonGraphGenerators.{authUsers, renkuResourcesUrls}
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.SchemaVersion
+import io.renku.graph.model.projects._
+import io.renku.graph.model.users.{Email, Name => UserName}
+import io.renku.http.InfoMessage._
+import io.renku.http.rest.Links
+import io.renku.http.rest.Links.{Href, Rel}
+import io.renku.http.server.EndpointTester._
+import io.renku.http.{ErrorMessage, InfoMessage}
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.{Error, Warn}
 import io.renku.knowledgegraph.projects.model.Forking.ForksCount
 import io.renku.knowledgegraph.projects.model.Permissions.{AccessLevel, GroupAccessLevel, ProjectAccessLevel}
 import io.renku.knowledgegraph.projects.model.Project._
 import io.renku.knowledgegraph.projects.model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
 import io.renku.knowledgegraph.projects.model.Urls._
 import io.renku.knowledgegraph.projects.model._
+import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s._

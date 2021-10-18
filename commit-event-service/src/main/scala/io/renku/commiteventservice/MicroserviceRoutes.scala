@@ -19,9 +19,9 @@
 package io.renku.commiteventservice
 
 import cats.effect.{Clock, ConcurrentEffect, ContextShift, IO, Resource, Timer}
-import ch.datascience.events.consumers.EventConsumersRegistry
-import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.commiteventservice.events.EventEndpoint
+import io.renku.events.consumers.EventConsumersRegistry
+import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import org.http4s.dsl.Http4sDsl
 
 import scala.concurrent.ExecutionContext

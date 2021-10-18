@@ -19,15 +19,15 @@
 package io.renku.triplesgenerator.events.categories.membersync
 
 import cats.syntax.all._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.testentities._
-import ch.datascience.graph.model.users.{Email, GitLabId}
-import ch.datascience.graph.model.views.RdfResource
-import ch.datascience.graph.model.{projects, users}
-import ch.datascience.rdfstore.InMemoryRdfStore
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.testentities._
+import io.renku.graph.model.users.{Email, GitLabId}
+import io.renku.graph.model.views.RdfResource
+import io.renku.graph.model.{projects, users}
 import io.renku.jsonld.syntax._
+import io.renku.rdfstore.InMemoryRdfStore
 import io.renku.triplesgenerator.events.categories.membersync.Generators._
 import io.renku.triplesgenerator.events.categories.membersync.PersonOps._
 import org.scalatest.matchers.should

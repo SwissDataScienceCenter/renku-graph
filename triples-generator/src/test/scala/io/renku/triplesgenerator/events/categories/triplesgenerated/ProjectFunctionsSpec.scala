@@ -19,9 +19,9 @@
 package io.renku.triplesgenerator.events.categories.triplesgenerated
 
 import cats.syntax.all._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model._
-import ch.datascience.graph.model.testentities.{::~, activityEntities, anyProjectEntities, anyVisibility, creatorsLens, datasetAndModificationEntities, datasetEntities, personEntities, planEntities, projectEntities, projectWithParentEntities, provenanceInternal, provenanceLens, provenanceNonModified, _}
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model._
+import io.renku.graph.model.testentities.{::~, activityEntities, anyProjectEntities, anyVisibility, creatorsLens, datasetAndModificationEntities, datasetEntities, personEntities, planEntities, projectEntities, projectWithParentEntities, provenanceInternal, provenanceLens, provenanceNonModified, _}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks

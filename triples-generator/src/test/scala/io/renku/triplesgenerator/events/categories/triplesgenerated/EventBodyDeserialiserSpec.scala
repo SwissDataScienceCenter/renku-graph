@@ -20,13 +20,13 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated
 
 import cats.effect.{BracketThrow, IO, Sync}
 import cats.syntax.all._
-import ch.datascience.compression.Zip
-import ch.datascience.events.consumers.Project
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.exceptions
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.ZippedEventPayload
+import io.renku.compression.Zip
+import io.renku.events.consumers.Project
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.exceptions
+import io.renku.graph.model.EventsGenerators._
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.events.ZippedEventPayload
 import io.renku.jsonld.generators.JsonLDGenerators._
 import io.renku.jsonld.parser.ParsingFailure
 import org.scalacheck.Arbitrary

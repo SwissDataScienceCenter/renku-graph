@@ -20,10 +20,10 @@ package io.renku.tokenrepository.repository.fetching
 
 import cats.data.OptionT
 import cats.effect._
-import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
-import ch.datascience.graph.model.projects.{Id, Path}
-import ch.datascience.metrics.LabeledHistogram
 import eu.timepit.refined.auto._
+import io.renku.db.{DbClient, SessionResource, SqlStatement}
+import io.renku.graph.model.projects.{Id, Path}
+import io.renku.metrics.LabeledHistogram
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import io.renku.tokenrepository.repository.{ProjectsTokensDB, TokenRepositoryTypeSerializers}
 import skunk.implicits._

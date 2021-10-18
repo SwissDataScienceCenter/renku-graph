@@ -18,9 +18,9 @@
 
 package io.renku.webhookservice
 
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.GraphModelGenerators._
 import eu.timepit.refined.api.Refined
+import io.renku.generators.Generators._
+import io.renku.graph.model.GraphModelGenerators._
 import io.renku.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import io.renku.webhookservice.hookcreation.project.ProjectInfo
 import io.renku.webhookservice.model._

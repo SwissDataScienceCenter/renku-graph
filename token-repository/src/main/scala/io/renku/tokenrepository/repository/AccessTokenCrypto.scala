@@ -21,10 +21,6 @@ package io.renku.tokenrepository.repository
 import AccessTokenCrypto.EncryptedAccessToken
 import cats.MonadError
 import cats.syntax.all._
-import ch.datascience.crypto.AesCrypto
-import ch.datascience.crypto.AesCrypto.Secret
-import ch.datascience.http.client.AccessToken
-import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.W
 import eu.timepit.refined.api.{RefType, Refined}
@@ -32,6 +28,10 @@ import eu.timepit.refined.pureconfig._
 import eu.timepit.refined.string.MatchesRegex
 import io.circe._
 import io.circe.parser._
+import io.renku.crypto.AesCrypto
+import io.renku.crypto.AesCrypto.Secret
+import io.renku.http.client.AccessToken
+import io.renku.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 
 import scala.util.control.NonFatal
 
@@ -96,7 +96,7 @@ private class AccessTokenCrypto[Interpretation[_]: MonadError[*[_], Throwable]](
 
 private object AccessTokenCrypto {
 
-  import ch.datascience.config.ConfigLoader._
+  import io.renku.config.ConfigLoader._
 
   def apply[Interpretation[_]: MonadError[*[_], Throwable]](
       config: Config = ConfigFactory.load()

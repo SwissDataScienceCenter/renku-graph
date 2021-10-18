@@ -20,14 +20,14 @@ package io.renku.webhookservice
 
 import cats.effect.{Clock, ConcurrentEffect, ContextShift, IO, Resource, Timer}
 import cats.syntax.all._
-import ch.datascience.config.GitLab
-import ch.datascience.control.Throttler
-import ch.datascience.graph.http.server.binders.ProjectId
-import ch.datascience.graph.http.server.security.GitLabAuthenticator
-import ch.datascience.http.server.security.Authentication
-import ch.datascience.http.server.security.model.AuthUser
-import ch.datascience.logging.ExecutionTimeRecorder
-import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
+import io.renku.config.GitLab
+import io.renku.control.Throttler
+import io.renku.graph.http.server.binders.ProjectId
+import io.renku.graph.http.server.security.GitLabAuthenticator
+import io.renku.http.server.security.Authentication
+import io.renku.http.server.security.model.AuthUser
+import io.renku.logging.ExecutionTimeRecorder
+import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.eventprocessing.{HookEventEndpoint, IOHookEventEndpoint, ProcessingStatusEndpoint}
 import io.renku.webhookservice.hookcreation.{HookCreationEndpoint, IOHookCreationEndpoint}

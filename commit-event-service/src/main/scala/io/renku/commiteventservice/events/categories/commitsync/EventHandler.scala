@@ -23,15 +23,15 @@ import cats.data.EitherT
 import cats.data.EitherT.fromEither
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.config.GitLab
-import ch.datascience.control.Throttler
-import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
-import ch.datascience.events.consumers._
-import ch.datascience.events.{EventRequestContent, consumers}
-import ch.datascience.graph.model.events.{CategoryName, CommitId, LastSyncedDate}
-import ch.datascience.logging.ExecutionTimeRecorder
 import io.circe.Decoder
 import io.renku.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer
+import io.renku.config.GitLab
+import io.renku.control.Throttler
+import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
+import io.renku.events.consumers._
+import io.renku.events.{EventRequestContent, consumers}
+import io.renku.graph.model.events.{CategoryName, CommitId, LastSyncedDate}
+import io.renku.logging.ExecutionTimeRecorder
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -43,9 +43,9 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow: ContextShift: 
     logger:                    Logger[Interpretation]
 ) extends consumers.EventHandlerWithProcessLimiter[Interpretation](ConcurrentProcessesLimiter.withoutLimit) {
 
-  import ch.datascience.graph.model.projects
-  import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import commitEventSynchronizer._
+  import io.renku.graph.model.projects
+  import io.renku.tinytypes.json.TinyTypeDecoders._
 
   override def createHandlingProcess(
       request: EventRequestContent

@@ -23,17 +23,17 @@ import cats.data.EitherT
 import cats.data.EitherT._
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
-import ch.datascience.config.ServiceUrl
-import ch.datascience.events.consumers.Project
-import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators.projectIds
-import ch.datascience.graph.model.events.{CommitId, EventId}
-import ch.datascience.graph.model.projects
-import ch.datascience.http.client.AccessToken
 import eu.timepit.refined.auto._
+import io.renku.config.ServiceUrl
+import io.renku.events.consumers.Project
+import io.renku.generators.CommonGraphGenerators._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.EventsGenerators._
+import io.renku.graph.model.GraphModelGenerators.projectIds
+import io.renku.graph.model.events.{CommitId, EventId}
+import io.renku.graph.model.projects
+import io.renku.http.client.AccessToken
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.generators.JsonLDGenerators.jsonLDEntities
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError

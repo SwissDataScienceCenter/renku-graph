@@ -20,20 +20,20 @@ package io.renku.webhookservice.eventprocessing
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators.commitIds
-import ch.datascience.graph.model.GraphModelGenerators.projectIds
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.http.ErrorMessage._
-import ch.datascience.http.client.RestClientError.UnauthorizedException
-import ch.datascience.http.server.EndpointTester._
-import ch.datascience.http.{ErrorMessage, InfoMessage}
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Info
 import io.circe.Json
 import io.circe.literal._
 import io.circe.syntax._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.EventsGenerators.commitIds
+import io.renku.graph.model.GraphModelGenerators.projectIds
+import io.renku.graph.model.events.CommitId
+import io.renku.http.ErrorMessage._
+import io.renku.http.client.RestClientError.UnauthorizedException
+import io.renku.http.server.EndpointTester._
+import io.renku.http.{ErrorMessage, InfoMessage}
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.webhookservice.CommitSyncRequestSender
 import io.renku.webhookservice.WebhookServiceGenerators._
 import io.renku.webhookservice.crypto.HookTokenCrypto.SerializedHookToken

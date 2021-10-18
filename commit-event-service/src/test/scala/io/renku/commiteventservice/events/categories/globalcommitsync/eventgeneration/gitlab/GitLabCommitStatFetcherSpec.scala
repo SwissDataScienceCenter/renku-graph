@@ -20,22 +20,21 @@ package io.renku.commiteventservice.events.categories.globalcommitsync.eventgene
 
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.all._
+import com.github.tomakehurst.wiremock.client.WireMock._
+import io.circe.literal.JsonStringContext
 import io.renku.commiteventservice.events.categories.globalcommitsync.Generators.commitCounts
 import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.ProjectCommitStats
 import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.ProjectCommitStats.CommitCount
-import ch.datascience.control.Throttler
-import ch.datascience.generators.CommonGraphGenerators.personalAccessTokens
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators.commitIds
-import ch.datascience.graph.model.GraphModelGenerators.projectIds
-import ch.datascience.graph.model.{GitLabUrl, projects}
-import ch.datascience.http.client.AccessToken
-import ch.datascience.http.client.RestClientError.UnauthorizedException
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.stubbing.ExternalServiceStubbing
-import com.github.tomakehurst.wiremock.client.WireMock._
-import io.circe.literal.JsonStringContext
-import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.ProjectCommitStats.CommitCount
+import io.renku.control.Throttler
+import io.renku.generators.CommonGraphGenerators.personalAccessTokens
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventsGenerators.commitIds
+import io.renku.graph.model.GraphModelGenerators.projectIds
+import io.renku.graph.model.{GitLabUrl, projects}
+import io.renku.http.client.AccessToken
+import io.renku.http.client.RestClientError.UnauthorizedException
+import io.renku.interpreters.TestLogger
+import io.renku.stubbing.ExternalServiceStubbing
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

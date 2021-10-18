@@ -22,14 +22,14 @@ import ammonite.ops.Path
 import cats.data.EitherT
 import cats.effect.{ContextShift, IO, Timer}
 import cats.{MonadError, MonadThrow}
-import ch.datascience.config.ServiceUrl
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.{GitLabUrl, projects}
-import ch.datascience.http.client.AccessToken
-import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
+import io.renku.config.ServiceUrl
+import io.renku.graph.model.events.CommitId
+import io.renku.graph.model.{GitLabUrl, projects}
+import io.renku.http.client.AccessToken
+import io.renku.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.parser._
+import io.renku.tinytypes.{TinyType, TinyTypeFactory}
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.CommitEvent
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError

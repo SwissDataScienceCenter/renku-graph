@@ -20,20 +20,20 @@ package io.renku.commiteventservice.events.categories.globalcommitsync
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import io.renku.commiteventservice.events.categories.globalcommitsync.Generators.globalCommitSyncEventsNonZero
-import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.GlobalCommitEventSynchronizer
-import ch.datascience.events.EventRequestContent
-import ch.datascience.events.consumers.ConcurrentProcessesLimiter
-import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
-import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.{exceptions, jsons}
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
-import ch.datascience.tinytypes.json.TinyTypeEncoders._
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
+import io.renku.commiteventservice.events.categories.globalcommitsync.Generators.globalCommitSyncEventsNonZero
+import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.GlobalCommitEventSynchronizer
+import io.renku.events.EventRequestContent
+import io.renku.events.consumers.ConcurrentProcessesLimiter
+import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
+import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.{exceptions, jsons}
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.{Error, Info}
+import io.renku.tinytypes.json.TinyTypeEncoders._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should

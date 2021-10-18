@@ -19,16 +19,16 @@
 package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets
 
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators.{clientExceptions, connectivityExceptions, sparqlQueries, unexpectedResponseExceptions}
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.exceptions
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{DerivedFrom, InternalSameAs, ResourceId, TopmostDerivedFrom, TopmostSameAs}
-import ch.datascience.graph.model.entities
-import ch.datascience.graph.model.testentities._
-import ch.datascience.http.client.RestClientError
-import ch.datascience.http.client.RestClientError.UnauthorizedException
-import ch.datascience.rdfstore.SparqlQuery
+import io.renku.generators.CommonGraphGenerators.{clientExceptions, connectivityExceptions, sparqlQueries, unexpectedResponseExceptions}
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.exceptions
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.datasets.{DerivedFrom, InternalSameAs, ResourceId, TopmostDerivedFrom, TopmostSameAs}
+import io.renku.graph.model.entities
+import io.renku.graph.model.testentities._
+import io.renku.http.client.RestClientError
+import io.renku.http.client.RestClientError.UnauthorizedException
+import io.renku.rdfstore.SparqlQuery
 import io.renku.triplesgenerator.events.categories.triplesgenerated.ProjectFunctions
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
 import org.scalacheck.Gen

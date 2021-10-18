@@ -19,12 +19,12 @@
 package io.renku.triplesgenerator.events.categories.awaitinggeneration
 
 import cats.syntax.all._
-import ch.datascience.events.consumers.Project
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.{EventBody, EventId}
 import io.circe._
+import io.renku.events.consumers.Project
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventsGenerators._
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.events.{EventBody, EventId}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 

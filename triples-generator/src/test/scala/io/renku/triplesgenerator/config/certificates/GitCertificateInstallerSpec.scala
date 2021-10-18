@@ -20,12 +20,12 @@ package io.renku.triplesgenerator.config.certificates
 
 import cats.Applicative
 import cats.syntax.all._
-import ch.datascience.config.certificates.Certificate
-import ch.datascience.generators.CommonGraphGenerators.certificates
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
+import io.renku.config.certificates.Certificate
+import io.renku.generators.CommonGraphGenerators.certificates
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

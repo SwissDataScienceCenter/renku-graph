@@ -19,10 +19,10 @@
 package io.renku.commiteventservice.events.categories.common
 
 import cats.MonadError
-import io.renku.commiteventservice.events.categories.common.Generators._
-import ch.datascience.generators.Generators.Implicits._
 import io.circe.Json
 import io.circe.parser._
+import io.renku.commiteventservice.events.categories.common.Generators._
+import io.renku.generators.Generators.Implicits._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks

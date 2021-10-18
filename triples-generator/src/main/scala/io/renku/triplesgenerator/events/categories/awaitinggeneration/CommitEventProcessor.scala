@@ -22,15 +22,15 @@ import cats.MonadThrow
 import cats.data.EitherT
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.model.events.EventStatus.{GenerationNonRecoverableFailure, GenerationRecoverableFailure}
-import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
-import ch.datascience.graph.tokenrepository.AccessTokenFinder
-import ch.datascience.http.client.AccessToken
-import ch.datascience.logging.ExecutionTimeRecorder
-import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
-import ch.datascience.metrics.MetricsRegistry
 import io.prometheus.client.Histogram
+import io.renku.graph.model.events.EventStatus.{GenerationNonRecoverableFailure, GenerationRecoverableFailure}
+import io.renku.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
+import io.renku.graph.tokenrepository.AccessTokenFinder
+import io.renku.http.client.AccessToken
 import io.renku.jsonld.JsonLD
+import io.renku.logging.ExecutionTimeRecorder
+import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
+import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater._

@@ -18,16 +18,16 @@
 
 package io.renku.commiteventservice.events.categories.globalcommitsync
 
+import eu.timepit.refined.api.Refined
 import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.ProjectCommitStats
 import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.ProjectCommitStats.CommitCount
-import ch.datascience.events.consumers.Project
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators.commitIds
-import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects
-import eu.timepit.refined.api.Refined
+import io.renku.events.consumers.Project
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.EventsGenerators.commitIds
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.graph.model.events.CommitId
+import io.renku.graph.model.projects
 import org.scalacheck.Gen
 
 private object Generators {

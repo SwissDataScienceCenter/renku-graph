@@ -19,11 +19,11 @@
 package io.renku.triplesgenerator.events.categories.membersync
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.graph.model.Schemas.{rdf, schema}
-import ch.datascience.graph.model.users
-import ch.datascience.graph.model.users.{GitLabId, ResourceId}
-import ch.datascience.rdfstore.SparqlQuery.Prefixes
-import ch.datascience.rdfstore._
+import io.renku.graph.model.Schemas.{rdf, schema}
+import io.renku.graph.model.users
+import io.renku.graph.model.users.{GitLabId, ResourceId}
+import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -52,7 +52,7 @@ private class KGPersonFinderImpl(
 
   private implicit lazy val recordsDecoder: Decoder[Set[(GitLabId, ResourceId)]] = { cursor =>
     import Decoder._
-    import ch.datascience.tinytypes.json.TinyTypeDecoders._
+    import io.renku.tinytypes.json.TinyTypeDecoders._
 
     val tuples: Decoder[(GitLabId, ResourceId)] = { cursor =>
       for {

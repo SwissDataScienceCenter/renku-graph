@@ -19,11 +19,11 @@
 package io.renku.tokenrepository.repository.association
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.config.GitLab
-import ch.datascience.control.{RateLimit, Throttler}
-import ch.datascience.graph.config.GitLabUrlLoader
-import ch.datascience.graph.model.{GitLabUrl, projects}
-import ch.datascience.http.client.{AccessToken, RestClient}
+import io.renku.config.GitLab
+import io.renku.control.{RateLimit, Throttler}
+import io.renku.graph.config.GitLabUrlLoader
+import io.renku.graph.model.{GitLabUrl, projects}
+import io.renku.http.client.{AccessToken, RestClient}
 import org.http4s.circe.jsonOf
 import org.typelevel.log4cats.Logger
 
@@ -46,8 +46,8 @@ private class IOProjectPathFinder(
 
   import cats.effect._
   import cats.syntax.all._
-  import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import io.circe._
+  import io.renku.tinytypes.json.TinyTypeDecoders._
   import org.http4s.Method.GET
   import org.http4s.Status.Unauthorized
   import org.http4s._

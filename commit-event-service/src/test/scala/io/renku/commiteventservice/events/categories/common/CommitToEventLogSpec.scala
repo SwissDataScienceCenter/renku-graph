@@ -19,20 +19,21 @@
 package io.renku.commiteventservice.events.categories.common
 
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.renku.commiteventservice.events.categories.commitsync.categoryName
 import io.renku.commiteventservice.events.categories.common.CommitEvent._
 import io.renku.commiteventservice.events.categories.common.Generators._
 import io.renku.commiteventservice.events.categories.common.UpdateResult._
-import ch.datascience.events.consumers.Project
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.events._
-import eu.timepit.refined.auto._
+import io.renku.events.consumers.ConsumersModelGenerators.projectsGen
+import io.renku.events.consumers.Project
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.events._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import ch.datascience.events.consumers.ConsumersModelGenerators.projectsGen
+
 import java.time.Instant
 import scala.util._
 

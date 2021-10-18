@@ -19,12 +19,12 @@
 package io.renku.eventlog.subscriptions
 
 import cats.effect.{BracketThrow, IO}
-import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
-import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
-import ch.datascience.metrics.LabeledHistogram
-import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
 import eu.timepit.refined.auto._
+import io.renku.db.{DbClient, SessionResource, SqlStatement}
 import io.renku.eventlog.{EventLogDB, Microservice, TypeSerializers}
+import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
+import io.renku.metrics.LabeledHistogram
+import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
 import skunk._
 import skunk.data.Completion
 import skunk.implicits._

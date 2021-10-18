@@ -20,18 +20,18 @@ package io.renku.eventlog.events.categories.creation
 
 import cats.data.Kleisli
 import cats.effect.IO
-import ch.datascience.db.SqlStatement
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{CompoundEventId, EventBody, EventId, EventStatus}
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
+import io.renku.db.SqlStatement
 import io.renku.eventlog._
 import io.renku.eventlog.events.categories.creation.EventPersister.Result._
 import io.renku.eventlog.events.categories.creation.Generators._
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventsGenerators._
+import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.events.EventStatus._
+import io.renku.graph.model.events.{CompoundEventId, EventBody, EventId, EventStatus}
+import io.renku.graph.model.projects
+import io.renku.metrics.{LabeledGauge, TestLabeledHistogram}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

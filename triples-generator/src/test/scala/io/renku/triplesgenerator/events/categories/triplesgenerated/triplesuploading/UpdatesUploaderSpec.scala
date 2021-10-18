@@ -19,18 +19,18 @@
 package io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.generators.CommonGraphGenerators.{rdfStoreConfigs, sparqlQueries}
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.http.client.UrlEncoder.urlEncode
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.{FusekiBaseUrl, SparqlQuery, SparqlQueryTimeRecorder}
-import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER
 import eu.timepit.refined.auto._
+import io.renku.generators.CommonGraphGenerators.{rdfStoreConfigs, sparqlQueries}
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.http.client.UrlEncoder.urlEncode
+import io.renku.interpreters.TestLogger
+import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.rdfstore.{FusekiBaseUrl, SparqlQuery, SparqlQueryTimeRecorder}
+import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult.{DeliverySuccess, InvalidUpdatesFailure, RecoverableFailure}
 import org.http4s.Status
 import org.scalatest.matchers.should

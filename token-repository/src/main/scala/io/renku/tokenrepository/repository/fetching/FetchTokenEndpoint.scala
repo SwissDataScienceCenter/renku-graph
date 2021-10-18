@@ -21,13 +21,13 @@ package io.renku.tokenrepository.repository.fetching
 import cats.data.OptionT
 import cats.effect.{ContextShift, Effect, IO}
 import cats.syntax.all._
-import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.graph.model.projects
-import ch.datascience.http.ErrorMessage._
-import ch.datascience.http.client.AccessToken
-import ch.datascience.http.{ErrorMessage, InfoMessage}
-import ch.datascience.metrics.LabeledHistogram
 import io.circe.syntax._
+import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.graph.model.projects
+import io.renku.http.ErrorMessage._
+import io.renku.http.client.AccessToken
+import io.renku.http.{ErrorMessage, InfoMessage}
+import io.renku.metrics.LabeledHistogram
 import io.renku.tokenrepository.repository.ProjectsTokensDB
 import org.http4s.Response
 import org.http4s.circe._

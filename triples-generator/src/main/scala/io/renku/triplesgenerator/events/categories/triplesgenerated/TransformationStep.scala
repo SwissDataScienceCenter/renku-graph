@@ -19,10 +19,10 @@
 package io.renku.triplesgenerator.events.categories.triplesgenerated
 
 import cats.data.EitherT
-import ch.datascience.graph.model.entities.Project
-import ch.datascience.rdfstore.SparqlQuery
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
+import io.renku.graph.model.entities.Project
+import io.renku.rdfstore.SparqlQuery
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{Transformation, TransformationStepResult}
 

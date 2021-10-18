@@ -21,15 +21,15 @@ package io.renku.commiteventservice.events.categories.common
 import cats.MonadThrow
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.events.EventRequestContent
-import ch.datascience.events.consumers.Project
-import ch.datascience.events.producers.EventSender
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.events.EventStatus.AwaitingDeletion
-import ch.datascience.tinytypes.json.TinyTypeEncoders
 import io.circe.literal._
 import io.renku.commiteventservice.events.categories.commitsync.categoryName
 import io.renku.commiteventservice.events.categories.common.UpdateResult._
+import io.renku.events.EventRequestContent
+import io.renku.events.consumers.Project
+import io.renku.events.producers.EventSender
+import io.renku.graph.model.events.CommitId
+import io.renku.graph.model.events.EventStatus.AwaitingDeletion
+import io.renku.tinytypes.json.TinyTypeEncoders
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext

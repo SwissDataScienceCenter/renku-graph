@@ -18,8 +18,8 @@
 
 package io.renku.knowledgegraph.datasets.rest
 
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators._
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.GraphModelGenerators._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 

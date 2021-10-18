@@ -18,12 +18,12 @@
 
 package io.renku.eventlog
 
-import ch.datascience.data.ErrorMessage
-import ch.datascience.graph.model.events.CompoundEventId
-import ch.datascience.tinytypes._
-import ch.datascience.tinytypes.constraints.{BoundedInstant, InstantNotInTheFuture, NonBlank}
-import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import io.circe.Decoder
+import io.renku.data.ErrorMessage
+import io.renku.graph.model.events.CompoundEventId
+import io.renku.tinytypes._
+import io.renku.tinytypes.constraints.{BoundedInstant, InstantNotInTheFuture, NonBlank}
+import io.renku.tinytypes.json.TinyTypeDecoders._
 
 import java.time.Instant
 

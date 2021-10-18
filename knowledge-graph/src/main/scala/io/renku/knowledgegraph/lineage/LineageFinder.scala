@@ -21,9 +21,9 @@ package io.renku.knowledgegraph.lineage
 import cats.MonadThrow
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.model.projects.Path
-import ch.datascience.http.server.security.model.AuthUser
-import ch.datascience.rdfstore.SparqlQueryTimeRecorder
+import io.renku.graph.model.projects.Path
+import io.renku.http.server.security.model.AuthUser
+import io.renku.rdfstore.SparqlQueryTimeRecorder
 import model.Node.Location
 import model._
 import org.typelevel.log4cats.Logger

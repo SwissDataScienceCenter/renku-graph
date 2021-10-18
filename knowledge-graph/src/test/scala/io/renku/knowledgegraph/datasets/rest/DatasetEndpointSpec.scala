@@ -20,30 +20,30 @@ package io.renku.knowledgegraph.datasets.rest
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators.renkuResourcesUrls
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets._
-import ch.datascience.graph.model.projects.Path
-import ch.datascience.graph.model.testentities._
-import ch.datascience.graph.model.users.{Affiliation, Email, Name => UserName}
-import ch.datascience.graph.model.{RenkuBaseUrl, projects}
-import ch.datascience.http.InfoMessage._
-import ch.datascience.http.rest.Links
-import ch.datascience.http.rest.Links.Rel.Self
-import ch.datascience.http.rest.Links.{Href, Rel}
-import ch.datascience.http.server.EndpointTester._
-import ch.datascience.http.{ErrorMessage, InfoMessage}
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
-import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import io.circe.Decoder._
 import io.circe.syntax._
 import io.circe.{Decoder, DecodingFailure, Json}
+import io.renku.generators.CommonGraphGenerators.renkuResourcesUrls
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.datasets._
+import io.renku.graph.model.projects.Path
+import io.renku.graph.model.testentities._
+import io.renku.graph.model.users.{Affiliation, Email, Name => UserName}
+import io.renku.graph.model.{RenkuBaseUrl, projects}
+import io.renku.http.InfoMessage._
+import io.renku.http.rest.Links
+import io.renku.http.rest.Links.Rel.Self
+import io.renku.http.rest.Links.{Href, Rel}
+import io.renku.http.server.EndpointTester._
+import io.renku.http.{ErrorMessage, InfoMessage}
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.{Error, Warn}
 import io.renku.knowledgegraph.datasets.model
 import io.renku.knowledgegraph.datasets.model._
+import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.circe.jsonOf

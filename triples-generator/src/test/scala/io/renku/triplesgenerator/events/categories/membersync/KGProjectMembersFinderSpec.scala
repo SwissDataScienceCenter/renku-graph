@@ -19,12 +19,12 @@
 package io.renku.triplesgenerator.events.categories.membersync
 
 import cats.effect.IO
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.testentities._
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.testentities._
+import io.renku.interpreters.TestLogger
+import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.triplesgenerator.events.categories.membersync.PersonOps._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

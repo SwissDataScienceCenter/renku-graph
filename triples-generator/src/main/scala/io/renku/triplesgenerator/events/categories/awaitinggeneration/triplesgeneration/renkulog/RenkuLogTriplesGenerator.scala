@@ -22,9 +22,9 @@ import cats.Applicative
 import cats.data.EitherT
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.config.GitLabUrlLoader
-import ch.datascience.graph.model.projects
-import ch.datascience.http.client.AccessToken
+import io.renku.graph.config.GitLabUrlLoader
+import io.renku.graph.model.projects
+import io.renku.http.client.AccessToken
 import io.renku.jsonld.JsonLD
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator

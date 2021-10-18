@@ -19,9 +19,9 @@
 package io.renku.knowledgegraph.datasets.rest
 
 import cats.effect.IO
-import ch.datascience.config.renku
-import ch.datascience.graph.model.GitLabUrl
-import ch.datascience.logging.ExecutionTimeRecorder
+import io.renku.config.renku
+import io.renku.graph.model.GitLabUrl
+import io.renku.logging.ExecutionTimeRecorder
 import org.typelevel.log4cats.Logger
 
 class IOProjectDatasetsEndpointStub(projectDatasetsFinder: ProjectDatasetsFinder[IO],

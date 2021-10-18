@@ -20,23 +20,23 @@ package io.renku.knowledgegraph.projects.rest
 
 import ProjectsGenerators._
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.control.Throttler
-import ch.datascience.generators.CommonGraphGenerators.{oauthAccessTokens, personalAccessTokens}
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.blankStrings
-import ch.datascience.graph.model
-import ch.datascience.graph.model.GitLabUrl
-import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
-import ch.datascience.http.client.UrlEncoder.urlEncode
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Json
 import io.circe.literal._
+import io.renku.control.Throttler
+import io.renku.generators.CommonGraphGenerators.{oauthAccessTokens, personalAccessTokens}
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.blankStrings
+import io.renku.graph.model
+import io.renku.graph.model.GitLabUrl
+import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
+import io.renku.http.client.UrlEncoder.urlEncode
+import io.renku.interpreters.TestLogger
 import io.renku.knowledgegraph.projects.model.Permissions
 import io.renku.knowledgegraph.projects.model.Permissions._
 import io.renku.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
+import io.renku.stubbing.ExternalServiceStubbing
 import org.http4s.Status
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

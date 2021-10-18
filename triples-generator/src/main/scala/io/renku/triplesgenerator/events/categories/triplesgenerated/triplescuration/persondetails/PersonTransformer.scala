@@ -22,9 +22,9 @@ import cats.MonadThrow
 import cats.data.EitherT
 import cats.effect.{ContextShift, Timer}
 import cats.syntax.all._
-import ch.datascience.http.client.RestClientError._
-import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import eu.timepit.refined.auto._
+import io.renku.http.client.RestClientError._
+import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{ResultData, Transformation}
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError

@@ -20,16 +20,16 @@ package io.renku.triplesgenerator.events.categories
 
 import cats.effect.{BracketThrow, ContextShift, IO, Sync, Timer}
 import cats.syntax.all._
-import ch.datascience.compression.Zip
-import ch.datascience.data.ErrorMessage
-import ch.datascience.events
-import ch.datascience.events.EventRequestContent
-import ch.datascience.events.producers.EventSender
-import ch.datascience.graph.model.events.EventStatus.{FailureStatus, TriplesGenerated, TriplesStore}
-import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventProcessingTime, EventStatus, ZippedEventPayload}
-import ch.datascience.graph.model.projects
-import ch.datascience.tinytypes.json.TinyTypeEncoders
+import io.renku.compression.Zip
+import io.renku.data.ErrorMessage
+import io.renku.events
+import io.renku.events.EventRequestContent
+import io.renku.events.producers.EventSender
+import io.renku.graph.model.events.EventStatus.{FailureStatus, TriplesGenerated, TriplesStore}
+import io.renku.graph.model.events.{CategoryName, CompoundEventId, EventProcessingTime, EventStatus, ZippedEventPayload}
+import io.renku.graph.model.projects
 import io.renku.jsonld.JsonLD
+import io.renku.tinytypes.json.TinyTypeEncoders
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext

@@ -19,12 +19,12 @@
 package io.renku.triplesgenerator.reprovisioning
 
 import cats.effect.IO
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.{CliVersion, RenkuVersionPair, SchemaVersion}
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.{CliVersion, RenkuVersionPair, SchemaVersion}
+import io.renku.interpreters.TestLogger
+import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.triplesgenerator.generators.VersionGenerators._
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec

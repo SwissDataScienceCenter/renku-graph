@@ -19,11 +19,11 @@
 package io.renku.eventlog.eventdetails
 
 import cats.effect.{BracketThrow, IO}
-import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
-import ch.datascience.graph.model.events.{CompoundEventId, EventBody, EventDetails, EventId}
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.LabeledHistogram
+import io.renku.db.{DbClient, SessionResource, SqlStatement}
 import io.renku.eventlog.{EventLogDB, TypeSerializers}
+import io.renku.graph.model.events.{CompoundEventId, EventBody, EventDetails, EventId}
+import io.renku.graph.model.projects
+import io.renku.metrics.LabeledHistogram
 import skunk._
 import skunk.implicits._
 

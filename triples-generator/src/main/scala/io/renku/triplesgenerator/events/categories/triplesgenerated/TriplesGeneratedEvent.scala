@@ -18,8 +18,8 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated
 
-import ch.datascience.events.consumers.Project
-import ch.datascience.graph.model.events.{CompoundEventId, EventId}
+import io.renku.events.consumers.Project
+import io.renku.graph.model.events.{CompoundEventId, EventId}
 import io.renku.jsonld.JsonLD
 import io.renku.triplesgenerator.events.categories.models.CategoryEvent
 

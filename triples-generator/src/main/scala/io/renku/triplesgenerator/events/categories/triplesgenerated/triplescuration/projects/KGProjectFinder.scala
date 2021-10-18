@@ -21,9 +21,9 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescura
 import cats.MonadThrow
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.model.projects
-import ch.datascience.rdfstore.SparqlQuery.Prefixes
-import ch.datascience.rdfstore._
+import io.renku.graph.model.projects
+import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.rdfstore._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects.KGProjectFinder.KGProjectInfo
 import org.typelevel.log4cats.Logger
 
@@ -47,8 +47,8 @@ private class KGProjectFinderImpl(
   import eu.timepit.refined.auto._
   import io.circe.Decoder
   import Decoder._
-  import ch.datascience.graph.model.Schemas._
-  import ch.datascience.tinytypes.json.TinyTypeDecoders._
+  import io.renku.graph.model.Schemas._
+  import io.renku.tinytypes.json.TinyTypeDecoders._
 
   override def find(resourceId: projects.ResourceId): IO[Option[KGProjectInfo]] =
     queryExpecting[List[KGProjectInfo]](using = query(resourceId)) >>= toSingleResult(resourceId)

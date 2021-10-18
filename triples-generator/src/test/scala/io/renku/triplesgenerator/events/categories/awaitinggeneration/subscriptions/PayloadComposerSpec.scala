@@ -19,12 +19,12 @@
 package io.renku.triplesgenerator.events.categories.awaitinggeneration.subscriptions
 
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.{exceptions, positiveInts}
-import ch.datascience.graph.model.EventsGenerators.categoryNames
-import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier, MicroserviceUrlFinder}
 import io.circe.literal._
+import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.{exceptions, positiveInts}
+import io.renku.graph.model.EventsGenerators.categoryNames
+import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier, MicroserviceUrlFinder}
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.GenerationProcessesNumber
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

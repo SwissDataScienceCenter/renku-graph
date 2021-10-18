@@ -21,11 +21,11 @@ package io.renku.commiteventservice.events.categories.globalcommitsync.eventgene
 import cats.MonadThrow
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.events.consumers.Project
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.http.client.AccessToken
 import io.renku.commiteventservice.events.categories.common.UpdateResult.Failed
 import io.renku.commiteventservice.events.categories.common.{CommitEventsRemover, SynchronizationSummary}
+import io.renku.events.consumers.Project
+import io.renku.graph.model.events.CommitId
+import io.renku.http.client.AccessToken
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext

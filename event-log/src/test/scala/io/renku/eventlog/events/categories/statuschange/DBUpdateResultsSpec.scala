@@ -18,14 +18,14 @@
 
 package io.renku.eventlog.events.categories.statuschange
 
-import org.scalatest.wordspec.AnyWordSpec
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.EventStatus
-import io.renku.eventlog.events.categories.statuschange.DBUpdateResults.ForProjects
-import org.scalacheck.Gen
 import cats.syntax.all._
+import io.renku.eventlog.events.categories.statuschange.DBUpdateResults.ForProjects
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.events.EventStatus
+import org.scalacheck.Gen
 import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 class DBUpdateResultsSpec extends AnyWordSpec with should.Matchers {
   "combine" should {

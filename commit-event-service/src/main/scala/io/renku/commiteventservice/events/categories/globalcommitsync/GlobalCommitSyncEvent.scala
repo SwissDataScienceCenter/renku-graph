@@ -19,8 +19,8 @@
 package io.renku.commiteventservice.events.categories.globalcommitsync
 
 import cats.Show
-import ch.datascience.events.consumers.Project
-import ch.datascience.graph.model.events.CommitId
+import io.renku.events.consumers.Project
+import io.renku.graph.model.events.CommitId
 
 private final case class GlobalCommitSyncEvent(project: Project, commits: List[CommitId]) {
   override lazy val toString: String =

@@ -19,12 +19,12 @@
 package io.renku.eventlog.metrics
 
 import cats.effect.IO
-import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
+import io.renku.graph.model.events.EventStatus._
+import io.renku.graph.model.projects
+import io.renku.metrics._
 
 object AwaitingGenerationGauge {
 

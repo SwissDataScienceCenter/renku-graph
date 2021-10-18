@@ -23,8 +23,8 @@ import cats.syntax.all._
 import io.renku.eventlog.InMemoryEventLogDb
 import org.scalatest.{BeforeAndAfter, Suite}
 import skunk._
-import skunk.implicits._
 import skunk.codec.all._
+import skunk.implicits._
 
 import scala.language.reflectiveCalls
 

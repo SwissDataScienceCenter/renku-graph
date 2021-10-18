@@ -20,8 +20,8 @@ package io.renku.knowledgegraph.lineage
 
 import cats.MonadThrow
 import cats.syntax.all._
-import ch.datascience.tinytypes.{InstantTinyType, TinyTypeFactory}
 import io.renku.jsonld.{EntityId, EntityType}
+import io.renku.tinytypes.{InstantTinyType, TinyTypeFactory}
 import model.Node.Location
 
 import java.time.Instant
@@ -66,13 +66,13 @@ object model {
   final case class Node(location: Node.Location, label: Node.Label, types: Set[Node.Type])
 
   object Node {
-    import ch.datascience.tinytypes.constraints.NonBlank
-    import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+    import io.renku.tinytypes.constraints.NonBlank
+    import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 
     final class Id private (val value: String) extends AnyVal with StringTinyType
     object Id extends TinyTypeFactory[Id](new Id(_)) with NonBlank {
-      import ch.datascience.graph.model.views.RdfResource
-      import ch.datascience.tinytypes.Renderer
+      import io.renku.graph.model.views.RdfResource
+      import io.renku.tinytypes.Renderer
 
       implicit object RdfResourceRenderer extends Renderer[RdfResource, Id] {
         override def render(value: Id): String = s"<$value>"
@@ -102,7 +102,7 @@ object model {
     implicit class NodeOps(node: Node) {
 
       import SingleWordType._
-      import ch.datascience.graph.model.entities.{Activity, Entity}
+      import io.renku.graph.model.entities.{Activity, Entity}
 
       lazy val singleWordType: Either[Exception, SingleWordType] = node.types.map(t => EntityType.of(t.show)) match {
         case types if Activity.entityTypes.toList.toSet === types     => Right(ProcessRun)

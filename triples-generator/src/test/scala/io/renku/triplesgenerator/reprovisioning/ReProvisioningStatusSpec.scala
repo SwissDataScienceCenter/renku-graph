@@ -20,15 +20,15 @@ package io.renku.triplesgenerator.reprovisioning
 
 import cats.effect.IO
 import cats.effect.concurrent.Ref
-import ch.datascience.events.consumers.EventConsumersRegistry
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators.renkuBaseUrls
-import ch.datascience.graph.model.Schemas._
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.SparqlQuery.Prefixes
-import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQuery, SparqlQueryTimeRecorder}
 import eu.timepit.refined.auto._
+import io.renku.events.consumers.EventConsumersRegistry
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.GraphModelGenerators.renkuBaseUrls
+import io.renku.graph.model.Schemas._
+import io.renku.interpreters.TestLogger
+import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.rdfstore.{InMemoryRdfStore, SparqlQuery, SparqlQueryTimeRecorder}
 import io.renku.triplesgenerator.reprovisioning.ReProvisioningJsonLD.{Running, objectType}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

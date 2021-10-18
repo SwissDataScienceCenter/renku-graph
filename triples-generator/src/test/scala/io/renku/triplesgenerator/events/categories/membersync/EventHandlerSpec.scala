@@ -19,19 +19,19 @@
 package io.renku.triplesgenerator.events.categories.membersync
 
 import cats.effect.IO
-import ch.datascience.events.EventRequestContent
-import ch.datascience.events.consumers.EventHandlingProcess
-import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.projects
-import ch.datascience.http.server.EndpointTester._
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Info
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
+import io.renku.events.EventRequestContent
+import io.renku.events.consumers.EventHandlingProcess
+import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.projects
+import io.renku.http.server.EndpointTester._
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.Info
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

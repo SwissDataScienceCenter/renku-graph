@@ -20,13 +20,13 @@ package io.renku.knowledgegraph.metrics
 
 import cats.effect.IO
 import cats.implicits.toShow
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.testentities._
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import eu.timepit.refined.auto._
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.testentities._
+import io.renku.interpreters.TestLogger
 import io.renku.jsonld.Property
+import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks

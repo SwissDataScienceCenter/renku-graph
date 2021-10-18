@@ -19,13 +19,12 @@
 package io.renku.eventlog.subscriptions
 
 import Generators._
-import ch.datascience.events.consumers.subscriptions._
-import ch.datascience.generators.Generators.Implicits._
+import cats.implicits.toShow
+import io.renku.events.consumers.subscriptions._
+import io.renku.generators.Generators.Implicits._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-
-import cats.implicits.toShow
 
 class SubscriptionInfoSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 

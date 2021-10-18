@@ -22,13 +22,13 @@ import cats.data.EitherT.fromEither
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
 import cats.{MonadThrow, Show}
-import ch.datascience.config.GitLab
-import ch.datascience.control.Throttler
-import ch.datascience.events.consumers.EventSchedulingResult.Accepted
-import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
-import ch.datascience.events.{EventRequestContent, consumers}
-import ch.datascience.graph.model.events.CategoryName
-import ch.datascience.rdfstore.SparqlQueryTimeRecorder
+import io.renku.config.GitLab
+import io.renku.control.Throttler
+import io.renku.events.consumers.EventSchedulingResult.Accepted
+import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
+import io.renku.events.{EventRequestContent, consumers}
+import io.renku.graph.model.events.CategoryName
+import io.renku.rdfstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -39,7 +39,7 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow: ContextShift: 
     logger:                    Logger[Interpretation]
 ) extends consumers.EventHandlerWithProcessLimiter[Interpretation](ConcurrentProcessesLimiter.withoutLimit) {
 
-  import ch.datascience.graph.model.projects
+  import io.renku.graph.model.projects
   import membersSynchronizer._
 
   override def createHandlingProcess(

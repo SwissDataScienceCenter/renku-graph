@@ -19,11 +19,11 @@
 package io.renku.tokenrepository.repository.init
 
 import cats.effect._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.exceptions
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
-import ch.datascience.testtools.MockedRunnableCollaborators
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.exceptions
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.{Error, Info}
+import io.renku.testtools.MockedRunnableCollaborators
 import io.renku.tokenrepository.repository.InMemoryProjectsTokensDb
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

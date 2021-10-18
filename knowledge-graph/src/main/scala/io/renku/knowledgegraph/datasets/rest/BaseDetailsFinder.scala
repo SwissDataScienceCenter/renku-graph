@@ -20,14 +20,14 @@ package io.renku.knowledgegraph.datasets.rest
 
 import cats.effect.{ConcurrentEffect, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.model.datasets.{Identifier, ImageUri, Keyword}
-import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.Path
-import ch.datascience.rdfstore.SparqlQuery.Prefixes
-import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
 import io.circe.{DecodingFailure, HCursor}
+import io.renku.graph.model.datasets.{Identifier, ImageUri, Keyword}
+import io.renku.graph.model.projects
+import io.renku.graph.model.projects.Path
 import io.renku.knowledgegraph.datasets.model.Dataset
+import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -40,7 +40,7 @@ private class BaseDetailsFinder[Interpretation[_]: ConcurrentEffect: Timer](
     extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder) {
 
   import BaseDetailsFinder._
-  import ch.datascience.graph.model.Schemas._
+  import io.renku.graph.model.Schemas._
 
   def findBaseDetails(identifier: Identifier): Interpretation[Option[Dataset]] =
     queryExpecting[List[Dataset]](using = queryForDatasetDetails(identifier)) >>= toSingleDataset
@@ -132,9 +132,9 @@ private object BaseDetailsFinder {
 
   import io.circe.Decoder
   import Decoder._
-  import ch.datascience.graph.model.datasets._
-  import ch.datascience.tinytypes.json.TinyTypeDecoders._
+  import io.renku.graph.model.datasets._
   import io.renku.knowledgegraph.datasets.model._
+  import io.renku.tinytypes.json.TinyTypeDecoders._
 
   private lazy val createDataset: (ResourceId,
                                    Identifier,

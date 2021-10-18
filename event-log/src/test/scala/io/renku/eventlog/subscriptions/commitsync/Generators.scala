@@ -18,12 +18,12 @@
 
 package io.renku.eventlog.subscriptions.commitsync
 
-import ch.datascience.events.consumers.ConsumersModelGenerators.projectsGen
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.timestampsNotInTheFuture
-import ch.datascience.graph.model.EventsGenerators.compoundEventIds
-import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.events.LastSyncedDate
+import io.renku.events.consumers.ConsumersModelGenerators.projectsGen
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.timestampsNotInTheFuture
+import io.renku.graph.model.EventsGenerators.compoundEventIds
+import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.events.LastSyncedDate
 import org.scalacheck.Gen
 
 private object Generators {

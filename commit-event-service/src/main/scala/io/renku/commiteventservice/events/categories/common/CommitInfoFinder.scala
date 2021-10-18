@@ -20,13 +20,13 @@ package io.renku.commiteventservice.events.categories.common
 
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.config.GitLab
-import ch.datascience.control.Throttler
-import ch.datascience.graph.config.GitLabUrlLoader
-import ch.datascience.graph.model.GitLabUrl
-import ch.datascience.graph.model.events._
-import ch.datascience.graph.model.projects.Id
-import ch.datascience.http.client.{AccessToken, RestClient}
+import io.renku.config.GitLab
+import io.renku.control.Throttler
+import io.renku.graph.config.GitLabUrlLoader
+import io.renku.graph.model.GitLabUrl
+import io.renku.graph.model.events._
+import io.renku.graph.model.projects.Id
+import io.renku.http.client.{AccessToken, RestClient}
 import org.http4s.Status.NotFound
 import org.http4s.circe.jsonOf
 import org.http4s.{EntityDecoder, Status}
@@ -56,7 +56,7 @@ private[categories] class CommitInfoFinderImpl[Interpretation[_]: ConcurrentEffe
     with CommitInfoFinder[Interpretation] {
 
   import CommitInfo._
-  import ch.datascience.http.client.RestClientError.UnauthorizedException
+  import io.renku.http.client.RestClientError.UnauthorizedException
   import org.http4s.Method.GET
   import org.http4s.Status.{Ok, Unauthorized}
   import org.http4s.{Request, Response}

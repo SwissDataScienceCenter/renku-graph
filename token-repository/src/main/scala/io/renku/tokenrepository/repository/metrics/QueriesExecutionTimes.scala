@@ -19,9 +19,9 @@
 package io.renku.tokenrepository.repository.metrics
 
 import cats.effect.IO
-import ch.datascience.db.SqlStatement
-import ch.datascience.metrics.{Histogram, LabeledHistogram, MetricsRegistry}
 import eu.timepit.refined.auto._
+import io.renku.db.SqlStatement
+import io.renku.metrics.{Histogram, LabeledHistogram, MetricsRegistry}
 
 object QueriesExecutionTimes {
 

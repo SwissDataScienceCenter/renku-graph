@@ -22,25 +22,25 @@ import cats.MonadError
 import cats.data.EitherT
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.control.Throttler
-import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.entities.Project
-import ch.datascience.graph.model.events.EventStatus.{TransformationNonRecoverableFailure, TransformationRecoverableFailure, TriplesGenerated}
-import ch.datascience.graph.model.events._
-import ch.datascience.graph.model.projects.Path
-import ch.datascience.graph.model.testentities._
-import ch.datascience.graph.model.{entities, projects}
-import ch.datascience.graph.tokenrepository.AccessTokenFinder
-import ch.datascience.http.client.AccessToken
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
-import ch.datascience.interpreters.TestLogger.Matcher.NotRefEqual
-import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.metrics.MetricsRegistry
-import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import io.prometheus.client.Histogram
+import io.renku.control.Throttler
+import io.renku.generators.CommonGraphGenerators._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.entities.Project
+import io.renku.graph.model.events.EventStatus.{TransformationNonRecoverableFailure, TransformationRecoverableFailure, TriplesGenerated}
+import io.renku.graph.model.events._
+import io.renku.graph.model.projects.Path
+import io.renku.graph.model.testentities._
+import io.renku.graph.model.{entities, projects}
+import io.renku.graph.tokenrepository.AccessTokenFinder
+import io.renku.http.client.AccessToken
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.{Error, Info}
+import io.renku.interpreters.TestLogger.Matcher.NotRefEqual
+import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.metrics.MetricsRegistry
+import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater
 import io.renku.triplesgenerator.events.categories.triplesgenerated.EventProcessor.eventsProcessingTimesBuilder

@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories.membersync
 
-import ch.datascience.graph.model.testentities.Person
+import io.renku.graph.model.testentities.Person
 
 private object PersonOps {
 

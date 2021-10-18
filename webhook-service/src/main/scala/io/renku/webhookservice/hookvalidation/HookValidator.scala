@@ -23,14 +23,14 @@ import ProjectHookVerifier.HookIdentifier
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import cats.{Applicative, MonadError}
-import ch.datascience.config.GitLab
-import ch.datascience.control.Throttler
-import ch.datascience.graph.config.GitLabUrlLoader
-import ch.datascience.graph.model.projects.Id
-import ch.datascience.graph.tokenrepository.{AccessTokenFinder, AccessTokenFinderImpl, TokenRepositoryUrl}
-import ch.datascience.http.client.AccessToken
-import ch.datascience.http.client.RestClientError.UnauthorizedException
-import ch.datascience.logging.ApplicationLogger
+import io.renku.config.GitLab
+import io.renku.control.Throttler
+import io.renku.graph.config.GitLabUrlLoader
+import io.renku.graph.model.projects.Id
+import io.renku.graph.tokenrepository.{AccessTokenFinder, AccessTokenFinderImpl, TokenRepositoryUrl}
+import io.renku.http.client.AccessToken
+import io.renku.http.client.RestClientError.UnauthorizedException
+import io.renku.logging.ApplicationLogger
 import io.renku.webhookservice.model.ProjectHookUrl
 import io.renku.webhookservice.tokenrepository._
 import org.typelevel.log4cats.Logger

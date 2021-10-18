@@ -18,12 +18,12 @@
 
 package io.renku.knowledgegraph.projects.rest
 
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.{httpUrls => urls, _}
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.projects.Path
-import ch.datascience.graph.model.projects.ResourceId._
-import ch.datascience.graph.model.testentities.generators.EntitiesGenerators._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.{httpUrls => urls, _}
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.projects.Path
+import io.renku.graph.model.projects.ResourceId._
+import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.knowledgegraph.projects.model.Forking.ForksCount
 import io.renku.knowledgegraph.projects.model.Permissions.{apply => _, _}
 import io.renku.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount, Tag}

@@ -20,11 +20,11 @@ package io.renku.commiteventservice.events.categories.common
 
 import io.renku.commiteventservice.events.categories.common
 import io.renku.commiteventservice.events.categories.common.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
-import ch.datascience.events.consumers.ConsumersModelGenerators._
-import ch.datascience.generators.Generators.listOf
-import ch.datascience.graph.model.EventsGenerators.{batchDates, commitIds, commitMessages, committedDates}
-import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths, projectVisibilities, userEmails, userNames}
-import ch.datascience.graph.model.events.CommitId
+import io.renku.events.consumers.ConsumersModelGenerators._
+import io.renku.generators.Generators.listOf
+import io.renku.graph.model.EventsGenerators.{batchDates, commitIds, commitMessages, committedDates}
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths, projectVisibilities, userEmails, userNames}
+import io.renku.graph.model.events.CommitId
 import org.scalacheck.Gen
 import org.scalacheck.Gen.choose
 

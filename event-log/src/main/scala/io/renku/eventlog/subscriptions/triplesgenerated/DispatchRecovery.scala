@@ -21,14 +21,14 @@ package io.renku.eventlog.subscriptions.triplesgenerated
 import cats.MonadThrow
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.events.EventRequestContent
-import ch.datascience.events.consumers.subscriptions.SubscriberUrl
-import ch.datascience.events.producers.EventSender
-import ch.datascience.graph.model.events.EventStatus.{TransformationNonRecoverableFailure, TriplesGenerated}
-import ch.datascience.tinytypes.json.TinyTypeEncoders
 import io.circe.literal._
 import io.renku.eventlog.subscriptions.DispatchRecovery
 import io.renku.eventlog.{EventMessage, subscriptions}
+import io.renku.events.EventRequestContent
+import io.renku.events.consumers.subscriptions.SubscriberUrl
+import io.renku.events.producers.EventSender
+import io.renku.graph.model.events.EventStatus.{TransformationNonRecoverableFailure, TriplesGenerated}
+import io.renku.tinytypes.json.TinyTypeEncoders
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext

@@ -20,11 +20,11 @@ package io.renku.triplesgenerator.config
 
 import cats.MonadError
 import cats.syntax.all._
-import ch.datascience.config.ConfigLoader
-import ch.datascience.http.client.{BasicAuthCredentials, BasicAuthPassword, BasicAuthUsername}
-import ch.datascience.rdfstore.{DatasetName, FusekiBaseUrl}
-import ch.datascience.tinytypes.StringTinyType
 import com.typesafe.config.{Config, ConfigFactory}
+import io.renku.config.ConfigLoader
+import io.renku.http.client.{BasicAuthCredentials, BasicAuthPassword, BasicAuthUsername}
+import io.renku.rdfstore.{DatasetName, FusekiBaseUrl}
+import io.renku.tinytypes.StringTinyType
 import pureconfig.ConfigReader
 import pureconfig.error.CannotConvert
 
@@ -38,7 +38,7 @@ final case class FusekiAdminConfig(
 object FusekiAdminConfig {
 
   import ConfigLoader._
-  import ch.datascience.http.client.BasicAuthConfigReaders._
+  import io.renku.http.client.BasicAuthConfigReaders._
 
   def apply[Interpretation[_]](
       config:    Config = ConfigFactory.load()

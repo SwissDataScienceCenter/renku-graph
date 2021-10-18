@@ -18,9 +18,9 @@
 
 package io.renku.knowledgegraph.graphql
 
-import ch.datascience.tinytypes.{From, TinyType, TypeName}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
+import io.renku.tinytypes.{From, TinyType, TypeName}
 import sangria.ast
 import sangria.schema.{ScalarType, valueOutput}
 import sangria.validation.ValueCoercionViolation

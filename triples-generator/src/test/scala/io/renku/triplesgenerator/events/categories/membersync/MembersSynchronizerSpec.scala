@@ -19,18 +19,18 @@
 package io.renku.triplesgenerator.events.categories.membersync
 
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators.{accessTokens, sparqlQueries}
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.Path
-import ch.datascience.graph.tokenrepository.AccessTokenFinder
-import ch.datascience.graph.tokenrepository.AccessTokenFinder.projectPathToPath
-import ch.datascience.http.client.AccessToken
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
-import ch.datascience.logging.TestExecutionTimeRecorder
+import io.renku.generators.CommonGraphGenerators.{accessTokens, sparqlQueries}
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.projects
+import io.renku.graph.model.projects.Path
+import io.renku.graph.tokenrepository.AccessTokenFinder
+import io.renku.graph.tokenrepository.AccessTokenFinder.projectPathToPath
+import io.renku.http.client.AccessToken
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.{Error, Info}
+import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.triplesgenerator.events.categories.membersync.Generators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

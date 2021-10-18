@@ -20,8 +20,8 @@ package io.renku.eventlog.events.categories.statuschange
 
 import cats.Monoid
 import cats.syntax.all._
-import ch.datascience.graph.model.events.EventStatus
-import ch.datascience.graph.model.projects
+import io.renku.graph.model.events.EventStatus
+import io.renku.graph.model.projects
 
 private sealed trait DBUpdateResults
 

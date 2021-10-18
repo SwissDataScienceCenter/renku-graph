@@ -21,11 +21,11 @@ package io.renku.commiteventservice.events.categories.common
 import cats.MonadThrow
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.control.Throttler
-import ch.datascience.graph.config.EventLogUrl
-import ch.datascience.graph.model.events.EventBody
-import ch.datascience.http.client.RestClient
 import io.renku.commiteventservice.events.categories.common.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
+import io.renku.control.Throttler
+import io.renku.graph.config.EventLogUrl
+import io.renku.graph.model.events.EventBody
+import io.renku.http.client.RestClient
 import org.http4s.Status
 import org.http4s.Status.Accepted
 import org.typelevel.log4cats.Logger

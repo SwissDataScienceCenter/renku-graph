@@ -18,13 +18,13 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.{MonadThrow, Show}
 import cats.data.OptionT
 import cats.effect.{ContextShift, Effect, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.events.consumers.subscriptions.SubscriberUrl
-import ch.datascience.graph.model.events.CategoryName
+import cats.{MonadThrow, Show}
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
+import io.renku.events.consumers.subscriptions.SubscriberUrl
+import io.renku.graph.model.events.CategoryName
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext

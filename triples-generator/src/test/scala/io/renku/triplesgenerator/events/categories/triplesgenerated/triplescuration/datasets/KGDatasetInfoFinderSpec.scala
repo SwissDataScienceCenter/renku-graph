@@ -20,18 +20,17 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescura
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{DerivedFrom, SameAs, TopmostDerivedFrom}
-import ch.datascience.graph.model.entities
-import ch.datascience.graph.model.testentities.Dataset._
-import ch.datascience.graph.model.testentities._
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.SparqlQuery.Prefixes
-import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.datasets.{DerivedFrom, SameAs, TopmostDerivedFrom}
+import io.renku.graph.model.entities
+import io.renku.graph.model.testentities._
+import io.renku.interpreters.TestLogger
 import io.renku.jsonld.EntityId
+import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.rdfstore._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 

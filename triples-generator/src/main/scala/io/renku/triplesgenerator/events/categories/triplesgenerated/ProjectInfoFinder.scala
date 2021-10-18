@@ -21,17 +21,17 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated
 import cats.data.{EitherT, OptionT}
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.config.GitLab
-import ch.datascience.control.Throttler
-import ch.datascience.graph.config.GitLabUrlLoader
-import ch.datascience.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
-import ch.datascience.graph.model.{GitLabApiUrl, projects, users}
-import ch.datascience.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
-import ch.datascience.http.client.UrlEncoder.urlEncode
-import ch.datascience.http.client.{AccessToken, RestClient}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.circe.Decoder
+import io.renku.config.GitLab
+import io.renku.control.Throttler
+import io.renku.graph.config.GitLabUrlLoader
+import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
+import io.renku.graph.model.{GitLabApiUrl, projects, users}
+import io.renku.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
+import io.renku.http.client.UrlEncoder.urlEncode
+import io.renku.http.client.{AccessToken, RestClient}
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
 import org.http4s.Method.GET
@@ -77,8 +77,8 @@ private class ProjectInfoFinderImpl(
     )
     with ProjectInfoFinder[IO] {
 
-  import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import io.circe.Decoder.decodeOption
+  import io.renku.tinytypes.json.TinyTypeDecoders._
 
   private type ProjectAndCreator = (GitLabProjectInfo, Option[users.GitLabId])
 

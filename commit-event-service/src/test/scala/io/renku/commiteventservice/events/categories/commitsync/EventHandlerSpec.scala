@@ -20,18 +20,18 @@ package io.renku.commiteventservice.events.categories.commitsync
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import io.renku.commiteventservice.events.categories.commitsync.Generators._
-import io.renku.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer
-import ch.datascience.events
-import ch.datascience.events.EventRequestContent
-import ch.datascience.events.consumers.EventSchedulingResult._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
+import io.renku.commiteventservice.events.categories.commitsync.Generators._
+import io.renku.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer
+import io.renku.events
+import io.renku.events.EventRequestContent
+import io.renku.events.consumers.EventSchedulingResult._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should

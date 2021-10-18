@@ -21,18 +21,18 @@ package io.renku.eventlog.subscriptions.globalcommitsync
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.db.SqlStatement.Name
-import ch.datascience.events.consumers.ConsumersModelGenerators.projectsGen
-import io.renku.eventlog.EventContentGenerators.eventDates
-import ch.datascience.events.consumers.Project
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators.lastSyncedDates
-import ch.datascience.graph.model.events.{CategoryName, LastSyncedDate}
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
+import io.renku.db.SqlStatement.Name
+import io.renku.eventlog.EventContentGenerators.eventDates
 import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.eventlog.subscriptions.SubscriptionDataProvisioning
+import io.renku.events.consumers.ConsumersModelGenerators.projectsGen
+import io.renku.events.consumers.Project
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventsGenerators.lastSyncedDates
+import io.renku.graph.model.events.{CategoryName, LastSyncedDate}
+import io.renku.graph.model.projects
+import io.renku.metrics.TestLabeledHistogram
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

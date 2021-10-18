@@ -21,19 +21,19 @@ package io.renku.knowledgegraph.datasets.rest
 import ProjectDatasetsFinder.ProjectDataset
 import cats.effect._
 import cats.syntax.all._
-import ch.datascience.config.renku
-import ch.datascience.graph.config.{GitLabUrlLoader, RenkuBaseUrlLoader}
-import ch.datascience.graph.model.datasets.{DerivedFrom, ImageUri, SameAs}
-import ch.datascience.graph.model.{GitLabUrl, projects}
-import ch.datascience.http.ErrorMessage
-import ch.datascience.http.InfoMessage._
-import ch.datascience.http.rest.Links._
-import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
-import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
-import ch.datascience.tinytypes.json.TinyTypeEncoders
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
+import io.renku.config.renku
+import io.renku.graph.config.{GitLabUrlLoader, RenkuBaseUrlLoader}
+import io.renku.graph.model.datasets.{DerivedFrom, ImageUri, SameAs}
+import io.renku.graph.model.{GitLabUrl, projects}
+import io.renku.http.ErrorMessage
+import io.renku.http.InfoMessage._
+import io.renku.http.rest.Links._
+import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder}
+import io.renku.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
+import io.renku.tinytypes.json.TinyTypeEncoders
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger

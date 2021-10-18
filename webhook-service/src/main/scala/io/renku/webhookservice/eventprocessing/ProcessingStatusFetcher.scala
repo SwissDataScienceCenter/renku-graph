@@ -22,13 +22,13 @@ import ProcessingStatusFetcher.ProcessingStatus
 import cats.data.OptionT
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.control.Throttler
-import ch.datascience.graph.config.EventLogUrl
-import ch.datascience.graph.model.projects
-import ch.datascience.http.client.RestClient
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.circe.Decoder
+import io.renku.control.Throttler
+import io.renku.graph.config.EventLogUrl
+import io.renku.graph.model.projects
+import io.renku.http.client.RestClient
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext

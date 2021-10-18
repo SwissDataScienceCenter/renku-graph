@@ -20,8 +20,8 @@ package io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesge
 
 import cats.data.EitherT
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.http.client.AccessToken
 import com.typesafe.config.{Config, ConfigFactory}
+import io.renku.http.client.AccessToken
 import io.renku.jsonld.JsonLD
 import io.renku.triplesgenerator.config.TriplesGeneration
 import io.renku.triplesgenerator.config.TriplesGeneration.{RemoteTriplesGeneration, RenkuLog}

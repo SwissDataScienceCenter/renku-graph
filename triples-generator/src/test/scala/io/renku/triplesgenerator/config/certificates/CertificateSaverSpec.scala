@@ -18,8 +18,8 @@
 
 package io.renku.triplesgenerator.config.certificates
 
-import ch.datascience.generators.CommonGraphGenerators.certificates
-import ch.datascience.generators.Generators.Implicits._
+import io.renku.generators.CommonGraphGenerators.certificates
+import io.renku.generators.Generators.Implicits._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 

@@ -19,11 +19,11 @@
 package io.renku.eventlog.metrics
 
 import cats.effect.IO
-import ch.datascience.graph.model.events.EventStatus
-import ch.datascience.graph.model.events.EventStatus.TransformingTriples
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.{Gauge, LabeledGauge, MetricsRegistry}
 import eu.timepit.refined.auto._
+import io.renku.graph.model.events.EventStatus
+import io.renku.graph.model.events.EventStatus.TransformingTriples
+import io.renku.graph.model.projects
+import io.renku.metrics.{Gauge, LabeledGauge, MetricsRegistry}
 
 object UnderTransformationGauge {
 

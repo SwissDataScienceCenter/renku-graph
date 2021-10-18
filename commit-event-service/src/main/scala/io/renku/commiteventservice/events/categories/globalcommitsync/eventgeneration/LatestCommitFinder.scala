@@ -21,16 +21,16 @@ package io.renku.commiteventservice.events.categories.globalcommitsync.eventgene
 import cats.data.OptionT
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.config.GitLab
-import ch.datascience.control.Throttler
-import ch.datascience.graph.config.GitLabUrlLoader
-import ch.datascience.graph.model.GitLabUrl
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.Id
-import ch.datascience.http.client.{AccessToken, RestClient}
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
 import io.renku.commiteventservice.events.categories.common.CommitInfo
+import io.renku.config.GitLab
+import io.renku.control.Throttler
+import io.renku.graph.config.GitLabUrlLoader
+import io.renku.graph.model.GitLabUrl
+import io.renku.graph.model.events.CommitId
+import io.renku.graph.model.projects.Id
+import io.renku.http.client.{AccessToken, RestClient}
 import org.http4s.circe.jsonOf
 import org.http4s.{EntityDecoder, Status}
 import org.typelevel.log4cats.Logger
@@ -52,7 +52,7 @@ private class LatestCommitFinderImpl[Interpretation[_]: ConcurrentEffect: Timer]
     extends RestClient(gitLabThrottler, logger)
     with LatestCommitFinder[Interpretation] {
 
-  import ch.datascience.http.client.RestClientError.UnauthorizedException
+  import io.renku.http.client.RestClientError.UnauthorizedException
   import org.http4s.Method.GET
   import org.http4s.Status._
   import org.http4s.{Request, Response}

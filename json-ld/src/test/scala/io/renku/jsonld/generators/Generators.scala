@@ -18,9 +18,6 @@
 
 package io.renku.jsonld.generators
 
-import java.time._
-import java.time.temporal.ChronoUnit.{DAYS, MINUTES => MINS}
-
 import cats.data.NonEmptyList
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -31,6 +28,8 @@ import io.circe.{Encoder, Json}
 import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen}
 
+import java.time._
+import java.time.temporal.ChronoUnit.{DAYS, MINUTES => MINS}
 import scala.annotation.tailrec
 import scala.concurrent.duration._
 import scala.language.{implicitConversions, postfixOps}

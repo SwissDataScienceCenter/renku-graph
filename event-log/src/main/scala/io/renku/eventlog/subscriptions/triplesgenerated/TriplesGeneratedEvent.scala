@@ -20,8 +20,8 @@ package io.renku.eventlog.subscriptions.triplesgenerated
 
 import cats.Show
 import cats.syntax.all._
-import ch.datascience.graph.model.events.{CompoundEventId, ZippedEventPayload}
-import ch.datascience.graph.model.projects
+import io.renku.graph.model.events.{CompoundEventId, ZippedEventPayload}
+import io.renku.graph.model.projects
 
 private final case class TriplesGeneratedEvent(id:          CompoundEventId,
                                                projectPath: projects.Path,

@@ -20,18 +20,18 @@ package io.renku.commiteventservice.events.categories.commitsync.eventgeneration
 
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.control.Throttler
-import ch.datascience.graph.config.EventLogUrl
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects
-import ch.datascience.http.client.RestClient
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
 import io.circe.parser.parse
 import io.renku.commiteventservice.events.categories.common.CommitWithParents
+import io.renku.control.Throttler
+import io.renku.graph.config.EventLogUrl
+import io.renku.graph.model.events.CommitId
+import io.renku.graph.model.projects
+import io.renku.http.client.RestClient
 import org.http4s.Status.{NotFound, Ok}
-import org.http4s.circe.jsonOf
 import org.http4s._
+import org.http4s.circe.jsonOf
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -77,7 +77,7 @@ private class EventDetailsFinderImpl[Interpretation[_]: ContextShift: Timer: Con
     case (NotFound, _, _)  => Option.empty[CommitWithParents].pure[Interpretation]
   }
 
-  import ch.datascience.tinytypes.json.TinyTypeDecoders._
+  import io.renku.tinytypes.json.TinyTypeDecoders._
   private implicit val commitDetailsEntityDecoder: EntityDecoder[Interpretation, CommitWithParents] = {
     implicit val commitDecoder: Decoder[CommitWithParents] = cursor =>
       for {

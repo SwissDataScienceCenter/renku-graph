@@ -19,9 +19,9 @@
 package io.renku.knowledgegraph.lineage
 
 import cats.syntax.all._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.entities.{Activity, Entity}
 import eu.timepit.refined.auto._
+import io.renku.generators.Generators._
+import io.renku.graph.model.entities.{Activity, Entity}
 import io.renku.knowledgegraph.lineage.model._
 import org.scalacheck.Gen
 

@@ -22,17 +22,17 @@ import cats.Applicative
 import cats.effect.concurrent.Ref
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.events.consumers.EventConsumersRegistry
-import ch.datascience.graph.config.RenkuBaseUrlLoader
-import ch.datascience.graph.model.RenkuBaseUrl
-import ch.datascience.graph.model.Schemas.rdf
-import ch.datascience.rdfstore.SparqlQuery.Prefixes
-import ch.datascience.rdfstore._
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.auto._
 import io.circe.Decoder.decodeList
 import io.circe.{Decoder, DecodingFailure}
+import io.renku.events.consumers.EventConsumersRegistry
+import io.renku.graph.config.RenkuBaseUrlLoader
+import io.renku.graph.model.RenkuBaseUrl
+import io.renku.graph.model.Schemas.rdf
 import io.renku.jsonld.EntityId
+import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
 import java.util.concurrent.TimeUnit
@@ -193,7 +193,7 @@ object ReProvisioningStatus {
 
 private case object ReProvisioningJsonLD {
 
-  import ch.datascience.graph.model.Schemas._
+  import io.renku.graph.model.Schemas._
 
   def id(implicit renkuBaseUrl: RenkuBaseUrl) = EntityId.of((renkuBaseUrl / "re-provisioning").toString)
 

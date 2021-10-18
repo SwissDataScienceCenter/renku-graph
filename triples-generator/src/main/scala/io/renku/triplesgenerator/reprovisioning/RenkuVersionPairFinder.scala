@@ -20,12 +20,12 @@ package io.renku.triplesgenerator.reprovisioning
 
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.model.Schemas._
-import ch.datascience.graph.model.views.RdfResource
-import ch.datascience.graph.model.{RenkuBaseUrl, RenkuVersionPair}
-import ch.datascience.rdfstore.SparqlQuery.Prefixes
-import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
+import io.renku.graph.model.Schemas._
+import io.renku.graph.model.views.RdfResource
+import io.renku.graph.model.{RenkuBaseUrl, RenkuVersionPair}
+import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext

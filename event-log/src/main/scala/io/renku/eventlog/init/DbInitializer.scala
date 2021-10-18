@@ -20,7 +20,7 @@ package io.renku.eventlog.init
 
 import cats.effect.{BracketThrow, ContextShift, IO}
 import cats.syntax.all._
-import ch.datascience.db.SessionResource
+import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.init.DbInitializer._
 import org.typelevel.log4cats.Logger

@@ -20,21 +20,21 @@ package io.renku.knowledgegraph.datasets.rest
 
 import cats.effect._
 import cats.syntax.all._
-import ch.datascience.config._
-import ch.datascience.config.renku.ResourceUrl
-import ch.datascience.graph.config.GitLabUrlLoader
-import ch.datascience.graph.model.datasets.{Date, DatePublished, ImageUri}
-import ch.datascience.graph.model.{GitLabUrl, projects}
-import ch.datascience.http.ErrorMessage
-import ch.datascience.http.InfoMessage._
-import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
-import ch.datascience.http.rest.paging.PagingRequest
-import ch.datascience.http.server.security.model.AuthUser
-import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
-import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
-import ch.datascience.tinytypes.constraints.NonBlank
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import io.renku.config._
+import io.renku.config.renku.ResourceUrl
+import io.renku.graph.config.GitLabUrlLoader
+import io.renku.graph.model.datasets.{Date, DatePublished, ImageUri}
+import io.renku.graph.model.{GitLabUrl, projects}
+import io.renku.http.ErrorMessage
+import io.renku.http.InfoMessage._
+import io.renku.http.rest.Links.{Href, Link, Rel, _links}
+import io.renku.http.rest.paging.PagingRequest
+import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.datasets.model.DatasetCreator
+import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder}
+import io.renku.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
+import io.renku.tinytypes.constraints.NonBlank
+import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 import org.http4s._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.dsl.impl.OptionalValidatingQueryParamDecoderMatcher
@@ -55,11 +55,11 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect: MonadThrow](
   import DatasetsSearchEndpoint.Query._
   import DatasetsSearchEndpoint.Sort
   import PagingRequest.Decoders._
-  import ch.datascience.json.JsonOps._
-  import ch.datascience.tinytypes.json.TinyTypeEncoders._
   import executionTimeRecorder._
   import io.circe.literal._
   import io.circe.{Encoder, Json}
+  import io.renku.json.JsonOps._
+  import io.renku.tinytypes.json.TinyTypeEncoders._
 
   def searchForDatasets(maybePhrase: Option[Phrase],
                         sort:        Sort.By,
@@ -176,7 +176,7 @@ object DatasetsSearchEndpoint {
     }
   }
 
-  object Sort extends ch.datascience.http.rest.SortBy {
+  object Sort extends io.renku.http.rest.SortBy {
 
     type PropertyType = SearchProperty
 

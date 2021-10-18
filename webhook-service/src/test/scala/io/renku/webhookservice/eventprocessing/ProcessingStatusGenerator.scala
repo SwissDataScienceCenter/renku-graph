@@ -18,8 +18,8 @@
 
 package io.renku.webhookservice.eventprocessing
 
-import ch.datascience.generators.Generators._
 import eu.timepit.refined.api.Refined
+import io.renku.generators.Generators._
 import io.renku.webhookservice.eventprocessing.ProcessingStatusFetcher.ProcessingStatus
 import org.scalacheck.Gen
 

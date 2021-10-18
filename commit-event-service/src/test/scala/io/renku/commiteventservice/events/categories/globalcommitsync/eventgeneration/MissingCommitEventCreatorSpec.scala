@@ -19,19 +19,19 @@
 package io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration
 
 import cats.syntax.all._
+import eu.timepit.refined.api.Refined
 import io.renku.commiteventservice.events.categories.common.Generators.{commitInfos => commitInfosGen}
 import io.renku.commiteventservice.events.categories.common.UpdateResult.{Created, Skipped}
-import io.renku.commiteventservice.events.categories.common.{CommitInfo, CommitInfoFinder, CommitToEventLog, SynchronizationSummary}
+import io.renku.commiteventservice.events.categories.common._
 import io.renku.commiteventservice.events.categories.globalcommitsync.Generators._
-import ch.datascience.events.consumers.Project
-import ch.datascience.generators.CommonGraphGenerators.personalAccessTokens
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.exceptions
-import ch.datascience.graph.model.EventsGenerators.{batchDates, commitIds}
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects
-import ch.datascience.http.client.AccessToken
-import eu.timepit.refined.api.Refined
+import io.renku.events.consumers.Project
+import io.renku.generators.CommonGraphGenerators.personalAccessTokens
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.exceptions
+import io.renku.graph.model.EventsGenerators.{batchDates, commitIds}
+import io.renku.graph.model.events.CommitId
+import io.renku.graph.model.projects
+import io.renku.http.client.AccessToken
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

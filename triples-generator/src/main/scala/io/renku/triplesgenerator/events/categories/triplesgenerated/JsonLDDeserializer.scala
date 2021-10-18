@@ -22,14 +22,14 @@ import cats.data.EitherT
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import cats.{Applicative, MonadThrow}
-import ch.datascience.config.GitLab
-import ch.datascience.control.Throttler
-import ch.datascience.graph.config.RenkuBaseUrlLoader
-import ch.datascience.graph.model.RenkuBaseUrl
-import ch.datascience.graph.model.entities.Project.GitLabProjectInfo
-import ch.datascience.graph.model.entities._
-import ch.datascience.http.client.AccessToken
 import io.circe.DecodingFailure
+import io.renku.config.GitLab
+import io.renku.control.Throttler
+import io.renku.graph.config.RenkuBaseUrlLoader
+import io.renku.graph.model.RenkuBaseUrl
+import io.renku.graph.model.entities.Project.GitLabProjectInfo
+import io.renku.graph.model.entities._
+import io.renku.http.client.AccessToken
 import io.renku.jsonld.JsonLDDecoder.decodeList
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import org.typelevel.log4cats.Logger

@@ -21,10 +21,10 @@ package io.renku.eventlog.subscriptions
 import cats.effect.IO
 import cats.implicits.{catsSyntaxApplicativeErrorId, catsSyntaxApplicativeId}
 import cats.syntax.all._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
 import io.renku.eventlog.subscriptions.Generators._
 import io.renku.eventlog.subscriptions.SubscriptionCategory._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

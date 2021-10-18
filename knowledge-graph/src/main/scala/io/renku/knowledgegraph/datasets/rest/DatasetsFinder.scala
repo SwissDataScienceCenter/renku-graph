@@ -24,20 +24,20 @@ import DatasetsSearchEndpoint.Sort
 import cats.Parallel
 import cats.effect.{ConcurrentEffect, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.model.Schemas._
-import ch.datascience.graph.model.datasets.{Date, DateCreated, DatePublished, Description, Identifier, ImageUri, Keyword, Name, Title}
-import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.Visibility
-import ch.datascience.http.rest.paging.Paging.PagedResultsFinder
-import ch.datascience.http.rest.paging.{Paging, PagingRequest, PagingResponse}
-import ch.datascience.http.server.security.model.AuthUser
-import ch.datascience.rdfstore.SparqlQuery.Prefixes
-import ch.datascience.rdfstore._
-import ch.datascience.tinytypes.constraints.NonNegativeInt
-import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
 import eu.timepit.refined.auto._
 import io.circe.DecodingFailure
+import io.renku.graph.model.Schemas._
+import io.renku.graph.model.datasets.{Date, DateCreated, DatePublished, Description, Identifier, ImageUri, Keyword, Name, Title}
+import io.renku.graph.model.projects
+import io.renku.graph.model.projects.Visibility
+import io.renku.http.rest.paging.Paging.PagedResultsFinder
+import io.renku.http.rest.paging.{Paging, PagingRequest, PagingResponse}
+import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.datasets.model.DatasetCreator
+import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.rdfstore._
+import io.renku.tinytypes.constraints.NonNegativeInt
+import io.renku.tinytypes.{IntTinyType, TinyTypeFactory}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -212,7 +212,7 @@ private object DatasetsFinderImpl {
   import io.circe.Decoder
 
   implicit val recordDecoder: Decoder[DatasetSearchResult] = { cursor =>
-    import ch.datascience.tinytypes.json.TinyTypeDecoders._
+    import io.renku.tinytypes.json.TinyTypeDecoders._
 
     def toListOfImageUrls(urlString: Option[String]): List[ImageUri] =
       urlString

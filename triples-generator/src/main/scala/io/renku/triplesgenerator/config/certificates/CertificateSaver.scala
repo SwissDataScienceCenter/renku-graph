@@ -19,7 +19,7 @@
 package io.renku.triplesgenerator.config.certificates
 
 import cats.MonadError
-import ch.datascience.config.certificates.Certificate
+import io.renku.config.certificates.Certificate
 
 import java.io.{File, PrintWriter}
 import java.nio.file.{Files, Path, Paths}

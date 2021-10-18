@@ -20,9 +20,9 @@ package io.renku.triplesgenerator.reprovisioning
 
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.control.Throttler
-import ch.datascience.graph.config.EventLogUrl
-import ch.datascience.http.client.RestClient
+import io.renku.control.Throttler
+import io.renku.graph.config.EventLogUrl
+import io.renku.http.client.RestClient
 import org.http4s.Method.POST
 import org.typelevel.log4cats.Logger
 

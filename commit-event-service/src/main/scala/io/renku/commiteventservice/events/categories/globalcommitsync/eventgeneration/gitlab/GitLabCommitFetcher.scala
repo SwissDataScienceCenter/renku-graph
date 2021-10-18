@@ -20,16 +20,16 @@ package io.renku.commiteventservice.events.categories.globalcommitsync.eventgene
 
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.config.GitLab
-import ch.datascience.control.Throttler
-import ch.datascience.graph.config.GitLabUrlLoader
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.{GitLabApiUrl, projects}
-import ch.datascience.http.client.RestClientError.UnauthorizedException
-import ch.datascience.http.client.{AccessToken, RestClient}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.commiteventservice.events.categories.common.CommitInfo
+import io.renku.config.GitLab
+import io.renku.control.Throttler
+import io.renku.graph.config.GitLabUrlLoader
+import io.renku.graph.model.events.CommitId
+import io.renku.graph.model.{GitLabApiUrl, projects}
+import io.renku.http.client.RestClientError.UnauthorizedException
+import io.renku.http.client.{AccessToken, RestClient}
 import org.http4s.Method.GET
 import org.http4s.Status.{NotFound, Ok, Unauthorized}
 import org.http4s._

@@ -20,22 +20,22 @@ package io.renku.knowledgegraph.datasets.rest
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{Identifier, ImageUri, InitialVersion, Name, Title}
-import ch.datascience.graph.model.projects.Path
-import ch.datascience.http.ErrorMessage
-import ch.datascience.http.InfoMessage._
-import ch.datascience.http.server.EndpointTester._
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
-import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.tinytypes.json.TinyTypeEncoders
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
+import io.renku.generators.CommonGraphGenerators._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.datasets.{Identifier, ImageUri, InitialVersion, Name, Title}
+import io.renku.graph.model.projects.Path
+import io.renku.http.ErrorMessage
+import io.renku.http.InfoMessage._
+import io.renku.http.server.EndpointTester._
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.{Error, Warn}
+import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.tinytypes.json.TinyTypeEncoders
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`

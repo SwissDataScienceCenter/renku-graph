@@ -20,9 +20,9 @@ package io.renku.knowledgegraph.metrics
 
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.logging.ApplicationLogger
-import ch.datascience.metrics._
-import ch.datascience.rdfstore.SparqlQueryTimeRecorder
+import io.renku.logging.ApplicationLogger
+import io.renku.metrics._
+import io.renku.rdfstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -34,9 +34,8 @@ trait KGMetrics[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
-class KGMetricsImpl[Interpretation[_]: ConcurrentEffect: Timer](
+class KGMetricsImpl[Interpretation[_]: ConcurrentEffect: Timer: Logger](
     statsFinder:    StatsFinder[Interpretation],
-    logger:         Logger[Interpretation],
     countsGauge:    LabeledGauge[Interpretation, EntityLabel],
     initialDelay:   FiniteDuration = KGMetrics.initialDelay,
     countsInterval: FiniteDuration = KGMetrics.countsInterval
@@ -62,7 +61,7 @@ class KGMetricsImpl[Interpretation[_]: ConcurrentEffect: Timer](
 
   private lazy val logAndRetry: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
     for {
-      _ <- logger.error(exception)("Problem with gathering metrics")
+      _ <- Logger[Interpretation].error(exception)("Problem with gathering metrics")
       _ <- Timer[Interpretation] sleep initialDelay
     } yield ()
   }
@@ -79,10 +78,14 @@ object KGMetrics {
   private[metrics] val countsInterval: FiniteDuration = 1 minute
 
   def apply(
-      metricsRegistry:     MetricsRegistry[IO],
-      timeRecorder:        SparqlQueryTimeRecorder[IO],
-      logger:              Logger[IO]
-  )(implicit contextShift: ContextShift[IO], timer: Timer[IO], executionContext: ExecutionContext): IO[KGMetrics[IO]] =
+      metricsRegistry: MetricsRegistry[IO],
+      timeRecorder:    SparqlQueryTimeRecorder[IO]
+  )(implicit
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO],
+      executionContext: ExecutionContext,
+      logger:           Logger[IO]
+  ): IO[KGMetrics[IO]] =
     for {
       statsFinder <- StatsFinder(timeRecorder, ApplicationLogger)
       entitiesCountGauge <-
@@ -91,6 +94,5 @@ object KGMetrics {
           help = "Total object by type.",
           labelName = "entities"
         )(metricsRegistry)
-
-    } yield new KGMetricsImpl(statsFinder, logger, entitiesCountGauge)
+    } yield new KGMetricsImpl(statsFinder, entitiesCountGauge)
 }

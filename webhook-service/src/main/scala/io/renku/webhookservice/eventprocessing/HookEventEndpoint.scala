@@ -21,12 +21,12 @@ package io.renku.webhookservice.eventprocessing
 import cats.MonadError
 import cats.effect._
 import cats.syntax.all._
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.{Id, Path}
-import ch.datascience.http.ErrorMessage._
-import ch.datascience.http.client.RestClientError.UnauthorizedException
-import ch.datascience.http.{ErrorMessage, InfoMessage}
 import io.circe.Decoder
+import io.renku.graph.model.events.CommitId
+import io.renku.graph.model.projects.{Id, Path}
+import io.renku.http.ErrorMessage._
+import io.renku.http.client.RestClientError.UnauthorizedException
+import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.webhookservice.CommitSyncRequestSender
 import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
@@ -121,7 +121,7 @@ class HookEventEndpointImpl[Interpretation[_]: MonadError[*[_], Throwable]](
 private object HookEventEndpoint {
 
   private implicit val projectDecoder: Decoder[Project] = cursor => {
-    import ch.datascience.tinytypes.json.TinyTypeDecoders._
+    import io.renku.tinytypes.json.TinyTypeDecoders._
     for {
       id   <- cursor.downField("id").as[Id]
       path <- cursor.downField("path_with_namespace").as[Path]
@@ -129,7 +129,7 @@ private object HookEventEndpoint {
   }
 
   implicit val pushEventDecoder: Decoder[(CommitId, CommitSyncRequest)] = cursor => {
-    import ch.datascience.tinytypes.json.TinyTypeDecoders._
+    import io.renku.tinytypes.json.TinyTypeDecoders._
     for {
       commitId <- cursor.downField("after").as[CommitId]
       project  <- cursor.downField("project").as[Project]

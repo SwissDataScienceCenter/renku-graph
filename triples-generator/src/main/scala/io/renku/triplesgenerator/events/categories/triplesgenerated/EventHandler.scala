@@ -24,19 +24,19 @@ import cats.effect.concurrent.Deferred
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.all._
 import cats.{MonadThrow, Show}
-import ch.datascience.config.{ConfigLoader, GitLab}
-import ch.datascience.control.Throttler
-import ch.datascience.events.consumers.EventSchedulingResult._
-import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
-import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, Project}
-import ch.datascience.events.{EventRequestContent, consumers}
-import ch.datascience.graph.model.SchemaVersion
-import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventBody, ZippedEventPayload}
-import ch.datascience.metrics.MetricsRegistry
-import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
+import io.renku.config.{ConfigLoader, GitLab}
+import io.renku.control.Throttler
+import io.renku.events.consumers.EventSchedulingResult._
+import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, Project}
+import io.renku.events.{EventRequestContent, consumers}
+import io.renku.graph.model.SchemaVersion
+import io.renku.graph.model.events.{CategoryName, CompoundEventId, EventBody, ZippedEventPayload}
+import io.renku.metrics.MetricsRegistry
+import io.renku.rdfstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -50,10 +50,10 @@ private[events] class EventHandler[Interpretation[_]: ConcurrentEffect: MonadThr
     logger:                     Logger[Interpretation]
 ) extends consumers.EventHandlerWithProcessLimiter[Interpretation](concurrentProcessesLimiter) {
 
-  import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import eventBodyDeserializer._
   import eventProcessor._
   import io.circe.Decoder
+  import io.renku.tinytypes.json.TinyTypeDecoders._
 
   private type IdAndBody = (CompoundEventId, EventBody)
 

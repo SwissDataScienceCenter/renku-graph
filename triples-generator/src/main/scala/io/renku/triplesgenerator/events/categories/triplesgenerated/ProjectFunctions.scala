@@ -18,9 +18,9 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated
 
-import ch.datascience.graph.model.entities.Dataset.Provenance
-import ch.datascience.graph.model.entities.Dataset.Provenance.{ImportedInternal, Modified}
-import ch.datascience.graph.model.entities._
+import io.renku.graph.model.entities.Dataset.Provenance
+import io.renku.graph.model.entities.Dataset.Provenance.{ImportedInternal, Modified}
+import io.renku.graph.model.entities._
 import monocle.{Lens, Traversal}
 
 private trait ProjectFunctions {

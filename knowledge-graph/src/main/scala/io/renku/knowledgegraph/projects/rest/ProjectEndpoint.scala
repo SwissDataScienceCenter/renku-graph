@@ -20,17 +20,17 @@ package io.renku.knowledgegraph.projects.rest
 
 import cats.effect._
 import cats.syntax.all._
-import ch.datascience.config.{GitLab, renku}
-import ch.datascience.control.Throttler
-import ch.datascience.graph.model.projects
-import ch.datascience.http.InfoMessage._
-import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
-import ch.datascience.http.server.security.model.AuthUser
-import ch.datascience.http.{ErrorMessage, InfoMessage}
-import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
-import ch.datascience.rdfstore.SparqlQueryTimeRecorder
+import io.renku.config.{GitLab, renku}
+import io.renku.control.Throttler
+import io.renku.graph.model.projects
+import io.renku.http.InfoMessage._
+import io.renku.http.rest.Links.{Href, Link, Rel, _links}
+import io.renku.http.server.security.model.AuthUser
+import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.knowledgegraph.projects.model.Permissions._
 import io.renku.knowledgegraph.projects.model._
+import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder}
+import io.renku.rdfstore.SparqlQueryTimeRecorder
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger

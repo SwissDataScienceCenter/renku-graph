@@ -20,7 +20,7 @@ package io.renku.jsonld.flatten
 
 import cats.syntax.all._
 import io.renku.jsonld.JsonLD._
-import io.renku.jsonld.{EntityId, JsonLD, Property, Reverse}
+import io.renku.jsonld._
 
 import scala.annotation.tailrec
 

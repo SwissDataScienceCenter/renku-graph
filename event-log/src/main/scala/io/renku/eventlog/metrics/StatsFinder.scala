@@ -21,16 +21,16 @@ package io.renku.eventlog.metrics
 import cats.data.NonEmptyList
 import cats.effect.{BracketThrow, ContextShift, IO, Sync}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
-import ch.datascience.db.implicits._
-import ch.datascience.graph.model.events.{CategoryName, EventStatus, LastSyncedDate}
-import ch.datascience.graph.model.projects.Path
-import ch.datascience.metrics.LabeledHistogram
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
+import io.renku.db.implicits._
+import io.renku.db.{DbClient, SessionResource, SqlStatement}
 import io.renku.eventlog._
-import io.renku.eventlog.subscriptions.{SubscriptionTypeSerializers, commitsync, globalcommitsync, membersync}
+import io.renku.eventlog.subscriptions._
+import io.renku.graph.model.events.{CategoryName, EventStatus, LastSyncedDate}
+import io.renku.graph.model.projects.Path
+import io.renku.metrics.LabeledHistogram
 import skunk._
 import skunk.codec.all._
 import skunk.implicits._

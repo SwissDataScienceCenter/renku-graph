@@ -20,12 +20,12 @@ package io.renku.knowledgegraph.metrics
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.Schemas.{prov, schema}
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Error
-import ch.datascience.metrics.LabeledGauge
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.Schemas.{prov, schema}
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.Error
+import io.renku.metrics.LabeledGauge
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
@@ -56,6 +56,8 @@ class KGMetricsSpec extends AnyWordSpec with MockFactory with Eventually with In
           .atLeastOnce()
       }
 
+      sleep(500)
+
       metrics.run().unsafeRunAsyncAndForget()
 
       sleep(1000)
@@ -82,6 +84,8 @@ class KGMetricsSpec extends AnyWordSpec with MockFactory with Eventually with In
           .atLeastOnce()
       }
 
+      sleep(500)
+
       metrics.run().start.unsafeRunAsyncAndForget()
 
       sleep(1000)
@@ -100,11 +104,10 @@ class KGMetricsSpec extends AnyWordSpec with MockFactory with Eventually with In
   }
 
   private trait TestCase extends TestGauges {
+    implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
     lazy val statsFinder = mock[StatsFinder[IO]]
-    lazy val logger      = TestLogger[IO]()
     lazy val metrics = new KGMetricsImpl(
       statsFinder,
-      logger,
       countsGauge,
       initialDelay = 100 millis,
       countsInterval = 500 millis

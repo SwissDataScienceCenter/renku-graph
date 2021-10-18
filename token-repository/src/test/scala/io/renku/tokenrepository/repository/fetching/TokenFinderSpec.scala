@@ -21,11 +21,11 @@ package io.renku.tokenrepository.repository.fetching
 import cats.MonadError
 import cats.data.OptionT
 import cats.effect.IO
-import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.projects.{Id, Path}
+import io.renku.generators.CommonGraphGenerators._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.projects.{Id, Path}
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import io.renku.tokenrepository.repository.IOAccessTokenCrypto
 import io.renku.tokenrepository.repository.RepositoryGenerators._

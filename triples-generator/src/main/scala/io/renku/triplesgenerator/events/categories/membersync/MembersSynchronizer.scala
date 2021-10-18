@@ -21,13 +21,13 @@ package io.renku.triplesgenerator.events.categories.membersync
 import cats.MonadThrow
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.config.GitLab
-import ch.datascience.control.Throttler
-import ch.datascience.graph.model.projects
-import ch.datascience.graph.tokenrepository.AccessTokenFinder
-import ch.datascience.logging.ExecutionTimeRecorder
-import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
-import ch.datascience.rdfstore._
+import io.renku.config.GitLab
+import io.renku.control.Throttler
+import io.renku.graph.model.projects
+import io.renku.graph.tokenrepository.AccessTokenFinder
+import io.renku.logging.ExecutionTimeRecorder
+import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
+import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -48,8 +48,8 @@ private class MembersSynchronizerImpl[Interpretation[_]: MonadThrow](
     executionTimeRecorder:      ExecutionTimeRecorder[Interpretation]
 ) extends MembersSynchronizer[Interpretation] {
 
-  import ch.datascience.graph.tokenrepository.AccessTokenFinder._
   import executionTimeRecorder._
+  import io.renku.graph.tokenrepository.AccessTokenFinder._
 
   override def synchronizeMembers(projectPath: projects.Path): Interpretation[Unit] = measureExecutionTime {
     for {

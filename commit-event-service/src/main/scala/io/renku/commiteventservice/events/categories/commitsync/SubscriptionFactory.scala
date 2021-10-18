@@ -19,12 +19,12 @@
 package io.renku.commiteventservice.events.categories.commitsync
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.config.GitLab
-import ch.datascience.control.Throttler
-import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
-import ch.datascience.events.consumers.subscriptions.SubscriptionPayloadComposer.categoryAndUrlPayloadsComposerFactory
-import ch.datascience.logging.ExecutionTimeRecorder
 import io.renku.commiteventservice.Microservice
+import io.renku.config.GitLab
+import io.renku.control.Throttler
+import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.categoryAndUrlPayloadsComposerFactory
+import io.renku.logging.ExecutionTimeRecorder
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext

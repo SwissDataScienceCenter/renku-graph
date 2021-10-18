@@ -20,32 +20,32 @@ package io.renku.knowledgegraph.datasets.rest
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.config.renku
-import ch.datascience.config.renku.ResourceUrl
-import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets._
-import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.testentities.generators.EntitiesGenerators._
-import ch.datascience.http.ErrorMessage
-import ch.datascience.http.InfoMessage._
-import ch.datascience.http.rest.paging.PagingRequest.Decoders.{page, perPage}
-import ch.datascience.http.rest.paging.model.Total
-import ch.datascience.http.rest.paging.{PagingHeaders, PagingResponse}
-import ch.datascience.http.server.EndpointTester._
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
-import ch.datascience.logging.TestExecutionTimeRecorder
 import eu.timepit.refined.auto._
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
+import io.renku.config.renku
+import io.renku.config.renku.ResourceUrl
+import io.renku.generators.CommonGraphGenerators._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.datasets._
+import io.renku.graph.model.projects
+import io.renku.graph.model.testentities.generators.EntitiesGenerators._
+import io.renku.http.ErrorMessage
+import io.renku.http.InfoMessage._
+import io.renku.http.rest.paging.PagingRequest.Decoders.{page, perPage}
+import io.renku.http.rest.paging.model.Total
+import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
+import io.renku.http.server.EndpointTester._
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.{Error, Warn}
 import io.renku.knowledgegraph.datasets.model.DatasetCreator
 import io.renku.knowledgegraph.datasets.rest.DatasetsFinder.{DatasetSearchResult, ProjectsCount}
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.{Phrase, query}
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
+import io.renku.logging.TestExecutionTimeRecorder
 import org.http4s.MediaType.application
 import org.http4s.Status._
 import org.http4s.headers.`Content-Type`
@@ -139,8 +139,8 @@ class DatasetsSearchEndpointSpec
   private lazy val gitLabUrl = gitLabUrls.generateOne
 
   private trait TestCase {
-    import ch.datascience.json.JsonOps._
-    import ch.datascience.tinytypes.json.TinyTypeEncoders._
+    import io.renku.json.JsonOps._
+    import io.renku.tinytypes.json.TinyTypeEncoders._
 
     val maybePhrase   = phrases.generateOption
     val sort          = searchEndpointSorts.generateOne

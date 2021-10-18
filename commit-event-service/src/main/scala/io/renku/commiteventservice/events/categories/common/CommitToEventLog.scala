@@ -20,11 +20,11 @@ package io.renku.commiteventservice.events.categories.common
 
 import cats.effect._
 import cats.syntax.all._
-import ch.datascience.events.consumers.Project
-import ch.datascience.graph.model.events.BatchDate
 import io.renku.commiteventservice.events.categories.commitsync.categoryName
 import io.renku.commiteventservice.events.categories.common.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
 import io.renku.commiteventservice.events.categories.common.UpdateResult._
+import io.renku.events.consumers.Project
+import io.renku.graph.model.events.BatchDate
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext

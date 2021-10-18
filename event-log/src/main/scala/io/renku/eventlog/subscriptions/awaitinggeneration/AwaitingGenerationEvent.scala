@@ -20,8 +20,8 @@ package io.renku.eventlog.subscriptions.awaitinggeneration
 
 import cats.Show
 import cats.syntax.all._
-import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
-import ch.datascience.graph.model.projects
+import io.renku.graph.model.events.{CompoundEventId, EventBody}
+import io.renku.graph.model.projects
 
 private final case class AwaitingGenerationEvent(id: CompoundEventId, projectPath: projects.Path, body: EventBody)
 

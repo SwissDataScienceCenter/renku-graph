@@ -20,19 +20,19 @@ package io.renku.knowledgegraph.datasets.rest
 
 import cats.effect._
 import cats.syntax.all._
-import ch.datascience.config.renku
-import ch.datascience.graph.config.GitLabUrlLoader
-import ch.datascience.graph.model.GitLabUrl
-import ch.datascience.graph.model.datasets.{Date, DateCreated, DatePublished, Identifier, ImageUri}
-import ch.datascience.http.InfoMessage._
-import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
-import ch.datascience.http.{ErrorMessage, InfoMessage}
-import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
-import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
+import io.renku.config.renku
+import io.renku.graph.config.GitLabUrlLoader
+import io.renku.graph.model.GitLabUrl
+import io.renku.graph.model.datasets.{Date, DateCreated, DatePublished, Identifier, ImageUri}
+import io.renku.http.InfoMessage._
+import io.renku.http.rest.Links.{Href, Link, Rel, _links}
+import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.knowledgegraph.datasets.model._
+import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder}
+import io.renku.rdfstore.SparqlQueryTimeRecorder
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
@@ -48,8 +48,8 @@ class DatasetEndpoint[Interpretation[_]: Effect](
     logger:                Logger[Interpretation]
 ) extends Http4sDsl[Interpretation] {
 
-  import ch.datascience.tinytypes.json.TinyTypeEncoders._
   import executionTimeRecorder._
+  import io.renku.tinytypes.json.TinyTypeEncoders._
   import org.http4s.circe._
 
   def getDataset(identifier: Identifier): Interpretation[Response[Interpretation]] = measureExecutionTime {

@@ -20,17 +20,17 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated
 
 import cats.data.EitherT
 import cats.syntax.all._
-import ch.datascience.events.consumers
-import ch.datascience.generators.CommonGraphGenerators.accessTokens
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model._
-import ch.datascience.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
-import ch.datascience.graph.model.testentities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
-import ch.datascience.graph.model.testentities._
-import ch.datascience.graph.model.testentities.generators.EntitiesGenerators.ActivityGenFactory
-import ch.datascience.http.client.AccessToken
+import io.renku.events.consumers
+import io.renku.generators.CommonGraphGenerators.accessTokens
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model._
+import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
+import io.renku.graph.model.testentities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
+import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.generators.EntitiesGenerators.ActivityGenFactory
+import io.renku.http.client.AccessToken
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, JsonLD, Property}
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError

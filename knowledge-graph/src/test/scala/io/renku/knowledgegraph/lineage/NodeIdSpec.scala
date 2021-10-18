@@ -19,8 +19,8 @@
 package io.renku.knowledgegraph.lineage
 
 import LineageGenerators._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.views.RdfResource
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.views.RdfResource
 import io.renku.knowledgegraph.lineage.model.Node
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

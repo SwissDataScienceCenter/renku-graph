@@ -19,13 +19,13 @@
 package io.renku.knowledgegraph.datasets.rest
 
 import cats.effect.{ConcurrentEffect, Timer}
-import ch.datascience.graph.model.Schemas._
-import ch.datascience.graph.model.datasets._
-import ch.datascience.rdfstore.SparqlQuery.Prefixes
-import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
 import io.circe.Decoder.decodeList
+import io.renku.graph.model.Schemas._
+import io.renku.graph.model.datasets._
 import io.renku.knowledgegraph.datasets.model.DatasetPart
+import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -68,7 +68,7 @@ private object PartsFinder {
   import io.circe.Decoder
 
   private implicit val partsDecoder: Decoder[List[DatasetPart]] = {
-    import ch.datascience.tinytypes.json.TinyTypeDecoders._
+    import io.renku.tinytypes.json.TinyTypeDecoders._
 
     implicit val datasetDecoder: Decoder[DatasetPart] = { cursor =>
       for {

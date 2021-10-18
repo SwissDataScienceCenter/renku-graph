@@ -18,12 +18,12 @@
 
 package io.renku.commiteventservice.events.categories.common
 
-import ch.datascience.events.consumers.Project
-import ch.datascience.graph.model.events.EventStatus.{New, Skipped}
-import ch.datascience.graph.model.events.{BatchDate, CommitId, CommitMessage, CommittedDate, CompoundEventId, EventId, EventStatus}
-import ch.datascience.graph.model.projects.{Id, Path, Visibility}
-import ch.datascience.graph.model.users.Email
-import ch.datascience.graph.model.{projects, users}
+import io.renku.events.consumers.Project
+import io.renku.graph.model.events.EventStatus.{New, Skipped}
+import io.renku.graph.model.events.{BatchDate, CommitId, CommitMessage, CommittedDate, CompoundEventId, EventId, EventStatus}
+import io.renku.graph.model.projects.{Id, Path, Visibility}
+import io.renku.graph.model.users.Email
+import io.renku.graph.model.{projects, users}
 
 private[categories] final case class ProjectInfo(
     id:         Id,

@@ -20,10 +20,10 @@ package io.renku.knowledgegraph.datasets.rest
 
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.model.datasets.{Identifier, ImageUri, Keyword}
-import ch.datascience.logging.ApplicationLogger
-import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
+import io.renku.graph.model.datasets.{Identifier, ImageUri, Keyword}
 import io.renku.knowledgegraph.datasets.model._
+import io.renku.logging.ApplicationLogger
+import io.renku.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext

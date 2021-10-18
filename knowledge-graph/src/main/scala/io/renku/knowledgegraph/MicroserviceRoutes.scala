@@ -21,23 +21,23 @@ package io.renku.knowledgegraph
 import cats.data.{EitherT, Validated, ValidatedNel}
 import cats.effect.{Clock, ConcurrentEffect, ContextShift, IO, Resource, Timer}
 import cats.syntax.all._
-import ch.datascience.config.GitLab
-import ch.datascience.control.{RateLimit, Throttler}
-import ch.datascience.graph.http.server.security.GitLabAuthenticator
-import ch.datascience.graph.model
-import ch.datascience.http.rest.SortBy.Direction
-import ch.datascience.http.rest.paging.PagingRequest
-import ch.datascience.http.rest.paging.PagingRequest.Decoders._
-import ch.datascience.http.rest.paging.model.{Page, PerPage}
-import ch.datascience.http.server.QueryParameterTools._
-import ch.datascience.http.server.security.Authentication
-import ch.datascience.http.server.security.model.AuthUser
-import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
-import ch.datascience.rdfstore.SparqlQueryTimeRecorder
+import io.renku.config.GitLab
+import io.renku.control.{RateLimit, Throttler}
+import io.renku.graph.http.server.security.GitLabAuthenticator
+import io.renku.graph.model
+import io.renku.http.rest.SortBy.Direction
+import io.renku.http.rest.paging.PagingRequest
+import io.renku.http.rest.paging.PagingRequest.Decoders._
+import io.renku.http.rest.paging.model.{Page, PerPage}
+import io.renku.http.server.QueryParameterTools._
+import io.renku.http.server.security.Authentication
+import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import io.renku.knowledgegraph.datasets.rest._
 import io.renku.knowledgegraph.graphql.{IOQueryEndpoint, QueryEndpoint}
 import io.renku.knowledgegraph.projects.rest.ProjectEndpoint
+import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
+import io.renku.rdfstore.SparqlQueryTimeRecorder
 import org.http4s.dsl.Http4sDsl
 import org.http4s.server.AuthMiddleware
 import org.http4s.{AuthedRoutes, ParseFailure, Response}
@@ -113,8 +113,8 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
 
   private implicit class PathPartsOps(parts: List[String]) {
     import cats.MonadError
-    import ch.datascience.http.InfoMessage
-    import ch.datascience.http.InfoMessage._
+    import io.renku.http.InfoMessage
+    import io.renku.http.InfoMessage._
     import org.http4s.{Response, Status}
 
     private implicit val ME: MonadError[F, Throwable] = implicitly[MonadError[F, Throwable]]

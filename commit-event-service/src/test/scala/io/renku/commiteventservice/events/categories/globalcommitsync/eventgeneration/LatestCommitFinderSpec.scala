@@ -20,20 +20,20 @@ package io.renku.commiteventservice.events.categories.globalcommitsync.eventgene
 
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.all._
-import io.renku.commiteventservice.events.categories.common.CommitInfo
-import io.renku.commiteventservice.events.categories.common.Generators.commitInfos
-import ch.datascience.control.Throttler
-import ch.datascience.generators.CommonGraphGenerators.personalAccessTokens
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GitLabUrl
-import ch.datascience.graph.model.GraphModelGenerators.projectIds
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Json
 import io.circe.literal._
+import io.renku.commiteventservice.events.categories.common.CommitInfo
+import io.renku.commiteventservice.events.categories.common.Generators.commitInfos
+import io.renku.control.Throttler
+import io.renku.generators.CommonGraphGenerators.personalAccessTokens
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventsGenerators._
+import io.renku.graph.model.GitLabUrl
+import io.renku.graph.model.GraphModelGenerators.projectIds
+import io.renku.graph.model.events.CommitId
+import io.renku.interpreters.TestLogger
+import io.renku.stubbing.ExternalServiceStubbing
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

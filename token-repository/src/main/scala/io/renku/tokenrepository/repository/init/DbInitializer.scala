@@ -21,8 +21,8 @@ package io.renku.tokenrepository.repository.init
 import cats.data.Kleisli
 import cats.effect._
 import cats.syntax.all._
-import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.metrics.LabeledHistogram
+import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.metrics.LabeledHistogram
 import io.renku.tokenrepository.repository.{ProjectsTokensDB, init}
 import org.typelevel.log4cats.Logger
 

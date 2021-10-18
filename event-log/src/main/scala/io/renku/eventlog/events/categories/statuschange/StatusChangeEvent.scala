@@ -19,10 +19,10 @@
 package io.renku.eventlog.events.categories.statuschange
 
 import cats.Show
-import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, ZippedEventPayload}
-import ch.datascience.graph.model.projects
 import io.renku.eventlog.EventMessage
+import io.renku.graph.model.events.EventStatus._
+import io.renku.graph.model.events.{CompoundEventId, EventProcessingTime, ZippedEventPayload}
+import io.renku.graph.model.projects
 
 private sealed trait StatusChangeEvent extends Product with Serializable
 

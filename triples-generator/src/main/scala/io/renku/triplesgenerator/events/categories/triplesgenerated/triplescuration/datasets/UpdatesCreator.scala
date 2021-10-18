@@ -18,14 +18,14 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets
 
-import ch.datascience.graph.model.Schemas.{renku, schema}
-import ch.datascience.graph.model.datasets
-import ch.datascience.graph.model.datasets.{ResourceId, TopmostDerivedFrom, TopmostSameAs}
-import ch.datascience.graph.model.entities.Dataset
-import ch.datascience.graph.model.entities.Dataset.Provenance
-import ch.datascience.rdfstore.SparqlQuery
-import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import eu.timepit.refined.auto._
+import io.renku.graph.model.Schemas.{renku, schema}
+import io.renku.graph.model.datasets
+import io.renku.graph.model.datasets.{ResourceId, TopmostDerivedFrom, TopmostSameAs}
+import io.renku.graph.model.entities.Dataset
+import io.renku.graph.model.entities.Dataset.Provenance
+import io.renku.rdfstore.SparqlQuery
+import io.renku.rdfstore.SparqlQuery.Prefixes
 
 private trait UpdatesCreator {
 

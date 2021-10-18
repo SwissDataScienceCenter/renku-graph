@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories
 
-import ch.datascience.graph.model.events.CategoryName
+import io.renku.graph.model.events.CategoryName
 
 package object awaitinggeneration {
   val categoryName: CategoryName = CategoryName("AWAITING_GENERATION")

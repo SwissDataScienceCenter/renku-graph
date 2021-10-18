@@ -20,12 +20,12 @@ package io.renku.webhookservice.hookvalidation
 
 import ProjectHookVerifier.HookIdentifier
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.config.GitLab
-import ch.datascience.control.Throttler
-import ch.datascience.graph.model.GitLabUrl
-import ch.datascience.graph.model.projects.Id
-import ch.datascience.http.client.{AccessToken, RestClient}
 import io.circe.Decoder.decodeList
+import io.renku.config.GitLab
+import io.renku.control.Throttler
+import io.renku.graph.model.GitLabUrl
+import io.renku.graph.model.projects.Id
+import io.renku.http.client.{AccessToken, RestClient}
 import io.renku.webhookservice.model.ProjectHookUrl
 import org.typelevel.log4cats.Logger
 
@@ -51,8 +51,8 @@ private class IOProjectHookVerifier(
     with ProjectHookVerifier[IO] {
 
   import cats.effect._
-  import ch.datascience.http.client.RestClientError.UnauthorizedException
   import io.circe._
+  import io.renku.http.client.RestClientError.UnauthorizedException
   import org.http4s.Method.GET
   import org.http4s.Status.Unauthorized
   import org.http4s._

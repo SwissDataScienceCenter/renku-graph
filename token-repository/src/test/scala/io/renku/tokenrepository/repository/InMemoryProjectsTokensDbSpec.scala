@@ -21,8 +21,8 @@ package io.renku.tokenrepository.repository
 import AccessTokenCrypto.EncryptedAccessToken
 import cats.data.Kleisli
 import cats.effect.IO
-import ch.datascience.db.DbSpec
-import ch.datascience.graph.model.projects.{Id, Path}
+import io.renku.db.DbSpec
+import io.renku.graph.model.projects.{Id, Path}
 import org.scalatest.TestSuite
 import skunk._
 import skunk.codec.all._

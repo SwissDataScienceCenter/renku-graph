@@ -20,12 +20,12 @@ package io.renku.webhookservice
 
 import cats.MonadThrow
 import cats.syntax.all._
-import ch.datascience.config.ConfigLoader.{find, urlTinyTypeReader}
-import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.Id
-import ch.datascience.tinytypes.constraints.{Url, UrlOps}
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory, UrlTinyType}
 import com.typesafe.config.{Config, ConfigFactory}
+import io.renku.config.ConfigLoader.{find, urlTinyTypeReader}
+import io.renku.graph.model.projects
+import io.renku.graph.model.projects.Id
+import io.renku.tinytypes.constraints.{Url, UrlOps}
+import io.renku.tinytypes.{StringTinyType, TinyTypeFactory, UrlTinyType}
 import pureconfig.ConfigReader
 
 object model {

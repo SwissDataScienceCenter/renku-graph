@@ -20,13 +20,13 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuplo
 
 import cats.data.EitherT
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators.sparqlQueries
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.GraphModelGenerators.userNames
-import ch.datascience.graph.model.entities
-import ch.datascience.graph.model.testentities._
 import eu.timepit.refined.auto._
+import io.renku.generators.CommonGraphGenerators.sparqlQueries
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.GraphModelGenerators.userNames
+import io.renku.graph.model.entities
+import io.renku.graph.model.testentities._
 import io.renku.jsonld.syntax._
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep

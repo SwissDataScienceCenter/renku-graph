@@ -20,11 +20,11 @@ package io.renku.eventlog.events.categories.statuschange
 
 import cats.data.Kleisli
 import cats.effect.{BracketThrow, IO}
-import ch.datascience.db.{DbClient, SqlStatement}
-import ch.datascience.graph.model.events.{CompoundEventId, EventId}
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.LabeledHistogram
+import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers
+import io.renku.graph.model.events.{CompoundEventId, EventId}
+import io.renku.graph.model.projects
+import io.renku.metrics.LabeledHistogram
 import skunk.Session
 import skunk.data.Completion
 

@@ -19,18 +19,18 @@
 package io.renku.webhookservice.hookcreation.project
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.control.Throttler
-import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GitLabUrl
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.projects.Visibility
-import ch.datascience.http.client.AccessToken
-import ch.datascience.http.client.RestClientError.UnauthorizedException
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.literal._
+import io.renku.control.Throttler
+import io.renku.generators.CommonGraphGenerators._
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.GitLabUrl
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.projects.Visibility
+import io.renku.http.client.AccessToken
+import io.renku.http.client.RestClientError.UnauthorizedException
+import io.renku.interpreters.TestLogger
+import io.renku.stubbing.ExternalServiceStubbing
 import org.http4s.Status
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

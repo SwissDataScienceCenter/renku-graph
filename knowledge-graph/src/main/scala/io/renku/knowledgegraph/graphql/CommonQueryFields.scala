@@ -19,8 +19,8 @@
 package io.renku.knowledgegraph.graphql
 
 import Arguments._
-import ch.datascience.graph.model.projects.Path
 import eu.timepit.refined.auto._
+import io.renku.graph.model.projects.Path
 import sangria.schema._
 
 object CommonQueryFields {

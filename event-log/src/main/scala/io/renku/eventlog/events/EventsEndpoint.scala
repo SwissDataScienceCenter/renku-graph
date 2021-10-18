@@ -21,17 +21,17 @@ package io.renku.eventlog.events
 import cats.effect.{ConcurrentEffect, Effect, IO}
 import cats.syntax.all._
 import cats.{MonadThrow, Show}
-import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.graph.config.EventLogUrl
-import ch.datascience.graph.model.events.{EventId, EventProcessingTime, EventStatus}
-import ch.datascience.graph.model.projects
-import ch.datascience.http.ErrorMessage
-import ch.datascience.http.rest.paging.PagingRequest
-import ch.datascience.http.rest.paging.PagingRequest.Decoders.{page, perPage}
-import ch.datascience.metrics.LabeledHistogram
 import io.circe.{Encoder, Json}
+import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog._
 import io.renku.eventlog.events.EventsEndpoint.EventInfo
+import io.renku.graph.config.EventLogUrl
+import io.renku.graph.model.events.{EventId, EventProcessingTime, EventStatus}
+import io.renku.graph.model.projects
+import io.renku.http.ErrorMessage
+import io.renku.http.rest.paging.PagingRequest
+import io.renku.http.rest.paging.PagingRequest.Decoders.{page, perPage}
+import io.renku.metrics.LabeledHistogram
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
@@ -47,7 +47,7 @@ class EventsEndpointImpl[Interpretation[_]: Effect: MonadThrow: Logger](eventsFi
 ) extends Http4sDsl[Interpretation]
     with EventsEndpoint[Interpretation] {
 
-  import ch.datascience.http.ErrorMessage._
+  import io.renku.http.ErrorMessage._
 
   override def findEvents(request: EventsEndpoint.Request): Interpretation[Response[Interpretation]] =
     eventsFinder

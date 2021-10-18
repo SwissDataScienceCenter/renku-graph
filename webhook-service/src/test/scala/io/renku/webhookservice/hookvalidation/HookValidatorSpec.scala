@@ -20,15 +20,15 @@ package io.renku.webhookservice.hookvalidation
 
 import HookValidator.NoAccessTokenException
 import cats.MonadError
-import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.exceptions
-import ch.datascience.graph.model.projects.Id
-import ch.datascience.graph.tokenrepository.AccessTokenFinder
-import ch.datascience.http.client.AccessToken
-import ch.datascience.http.client.RestClientError.UnauthorizedException
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
+import io.renku.generators.CommonGraphGenerators._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.exceptions
+import io.renku.graph.model.projects.Id
+import io.renku.graph.tokenrepository.AccessTokenFinder
+import io.renku.http.client.AccessToken
+import io.renku.http.client.RestClientError.UnauthorizedException
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.webhookservice.WebhookServiceGenerators._
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
 import io.renku.webhookservice.hookvalidation.ProjectHookVerifier.HookIdentifier

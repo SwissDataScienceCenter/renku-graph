@@ -19,8 +19,8 @@
 package io.renku.tokenrepository.repository
 
 import cats.MonadError
-import ch.datascience.db.DBConfigProvider
 import eu.timepit.refined.auto._
+import io.renku.db.DBConfigProvider
 
 sealed trait ProjectsTokensDB
 

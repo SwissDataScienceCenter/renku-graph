@@ -19,14 +19,15 @@
 package io.renku.knowledgegraph
 
 import cats.effect._
-import ch.datascience.config.certificates.CertificateLoader
-import ch.datascience.config.sentry.SentryInitializer
-import ch.datascience.http.server.HttpServer
-import ch.datascience.logging.ApplicationLogger
-import ch.datascience.metrics.MetricsRegistry
-import ch.datascience.microservices.IOMicroservice
-import ch.datascience.rdfstore.SparqlQueryTimeRecorder
+import io.renku.config.certificates.CertificateLoader
+import io.renku.config.sentry.SentryInitializer
+import io.renku.http.server.HttpServer
 import io.renku.knowledgegraph.metrics.KGMetrics
+import io.renku.logging.ApplicationLogger
+import io.renku.metrics.MetricsRegistry
+import io.renku.microservices.IOMicroservice
+import io.renku.rdfstore.SparqlQueryTimeRecorder
+import org.typelevel.log4cats.Logger
 import pureconfig.ConfigSource
 
 import java.util.concurrent.Executors.newFixedThreadPool
@@ -37,25 +38,22 @@ object Microservice extends IOMicroservice {
   protected implicit override val executionContext: ExecutionContext =
     ExecutionContext fromExecutorService newFixedThreadPool(ConfigSource.default.at("threads-number").loadOrThrow[Int])
 
-  protected implicit override def contextShift: ContextShift[IO] =
-    IO.contextShift(executionContext)
-
-  protected implicit override def timer: Timer[IO] =
-    IO.timer(executionContext)
+  private implicit val logger:                  Logger[IO]       = ApplicationLogger
+  protected implicit override def contextShift: ContextShift[IO] = IO.contextShift(executionContext)
+  protected implicit override def timer:        Timer[IO]        = IO.timer(executionContext)
 
   override def run(args: List[String]): IO[ExitCode] = for {
-    certificateLoader  <- CertificateLoader[IO](ApplicationLogger)
+    certificateLoader  <- CertificateLoader[IO](logger)
     sentryInitializer  <- SentryInitializer[IO]()
     metricsRegistry    <- MetricsRegistry()
     sparqlTimeRecorder <- SparqlQueryTimeRecorder(metricsRegistry)
-    kgMetrics          <- KGMetrics(metricsRegistry, sparqlTimeRecorder, ApplicationLogger)
-    microserviceRoutes <- MicroserviceRoutes(metricsRegistry, sparqlTimeRecorder, ApplicationLogger)
+    kgMetrics          <- KGMetrics(metricsRegistry, sparqlTimeRecorder)
+    microserviceRoutes <- MicroserviceRoutes(metricsRegistry, sparqlTimeRecorder, logger)
     exicode <- microserviceRoutes.routes.use { routes =>
                  val httpServer = new HttpServer[IO](serverPort = 9004, routes)
                  new MicroserviceRunner(certificateLoader, sentryInitializer, httpServer, kgMetrics).run()
                }
   } yield exicode
-
 }
 
 private class MicroserviceRunner(

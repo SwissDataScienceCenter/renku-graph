@@ -22,13 +22,13 @@ import HookCreator.CreationResult
 import HookCreator.CreationResult.{HookCreated, HookExisted}
 import cats.effect._
 import cats.syntax.all._
-import ch.datascience.config.GitLab
-import ch.datascience.control.Throttler
-import ch.datascience.graph.model.projects.Id
-import ch.datascience.http.ErrorMessage._
-import ch.datascience.http.client.RestClientError.UnauthorizedException
-import ch.datascience.http.server.security.model.AuthUser
-import ch.datascience.http.{ErrorMessage, InfoMessage}
+import io.renku.config.GitLab
+import io.renku.control.Throttler
+import io.renku.graph.model.projects.Id
+import io.renku.http.ErrorMessage._
+import io.renku.http.client.RestClientError.UnauthorizedException
+import io.renku.http.server.security.model.AuthUser
+import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.hookcreation
 import io.renku.webhookservice.model.ProjectHookUrl

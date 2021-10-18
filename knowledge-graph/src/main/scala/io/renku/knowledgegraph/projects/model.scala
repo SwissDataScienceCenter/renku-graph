@@ -20,14 +20,14 @@ package io.renku.knowledgegraph.projects
 
 import cats.data.Validated
 import cats.syntax.all._
-import ch.datascience.graph.model.projects.{DateCreated, Description, Id, Name, Path, Visibility}
-import ch.datascience.graph.model.{SchemaVersion, users}
-import ch.datascience.tinytypes._
-import ch.datascience.tinytypes.constraints._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.Positive
+import io.renku.graph.model.projects.{DateCreated, Description, Id, Name, Path, Visibility}
+import io.renku.graph.model.{SchemaVersion, users}
+import io.renku.tinytypes._
+import io.renku.tinytypes.constraints._
 import model.Statistics._
 
 import java.net.{MalformedURLException, URL}

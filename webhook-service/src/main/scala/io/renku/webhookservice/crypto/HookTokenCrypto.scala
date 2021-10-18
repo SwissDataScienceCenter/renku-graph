@@ -21,10 +21,6 @@ package io.renku.webhookservice.crypto
 import HookTokenCrypto.SerializedHookToken
 import cats.MonadError
 import cats.syntax.all._
-import ch.datascience.crypto.AesCrypto
-import ch.datascience.crypto.AesCrypto.Secret
-import ch.datascience.graph.model.projects.Id
-import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.W
 import eu.timepit.refined.api.{RefType, Refined}
@@ -32,6 +28,10 @@ import eu.timepit.refined.pureconfig._
 import eu.timepit.refined.string.MatchesRegex
 import io.circe.parser._
 import io.circe.{Decoder, HCursor, Json}
+import io.renku.crypto.AesCrypto
+import io.renku.crypto.AesCrypto.Secret
+import io.renku.graph.model.projects.Id
+import io.renku.tinytypes.json.TinyTypeDecoders._
 import io.renku.webhookservice.model.HookToken
 
 import scala.util.control.NonFatal
@@ -78,7 +78,7 @@ class HookTokenCrypto[Interpretation[_]](
 }
 
 object HookTokenCrypto {
-  import ch.datascience.config.ConfigLoader._
+  import io.renku.config.ConfigLoader._
 
   def apply[Interpretation[_]](
       config:    Config = ConfigFactory.load()

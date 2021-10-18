@@ -26,7 +26,7 @@ final case class RenkuPythonDevVersion(version: String) extends Product with Ser
 
 object RenkuPythonDevVersionConfig {
 
-  import ch.datascience.config.ConfigLoader._
+  import io.renku.config.ConfigLoader._
 
   implicit val reader: ConfigReader[Option[RenkuPythonDevVersion]] = ConfigReader[Option[String]].map {
     case Some(version) if version.trim.isEmpty => None

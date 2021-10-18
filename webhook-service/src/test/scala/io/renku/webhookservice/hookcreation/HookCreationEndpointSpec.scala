@@ -19,20 +19,20 @@
 package io.renku.webhookservice.hookcreation
 
 import cats.effect.IO
-import ch.datascience.generators.CommonGraphGenerators.authUsers
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators.projectIds
-import ch.datascience.graph.model.projects.Id
-import ch.datascience.http.ErrorMessage
-import ch.datascience.http.ErrorMessage._
-import ch.datascience.http.client.AccessToken
-import ch.datascience.http.client.RestClientError.UnauthorizedException
-import ch.datascience.http.server.EndpointTester._
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Error
 import io.circe.Json
 import io.circe.literal._
 import io.circe.syntax._
+import io.renku.generators.CommonGraphGenerators.authUsers
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.GraphModelGenerators.projectIds
+import io.renku.graph.model.projects.Id
+import io.renku.http.ErrorMessage
+import io.renku.http.ErrorMessage._
+import io.renku.http.client.AccessToken
+import io.renku.http.client.RestClientError.UnauthorizedException
+import io.renku.http.server.EndpointTester._
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.webhookservice.hookcreation.HookCreator.CreationResult.{HookCreated, HookExisted}
 import org.http4s.Status._
 import org.http4s._

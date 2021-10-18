@@ -19,8 +19,8 @@
 package io.renku.triplesgenerator.events.categories.awaitinggeneration
 
 import cats.MonadError
-import ch.datascience.config.ConfigLoader
-import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
+import io.renku.config.ConfigLoader
+import io.renku.tinytypes.{IntTinyType, TinyTypeFactory}
 
 private[events] final class GenerationProcessesNumber private (val value: Int) extends AnyVal with IntTinyType
 private object GenerationProcessesNumber

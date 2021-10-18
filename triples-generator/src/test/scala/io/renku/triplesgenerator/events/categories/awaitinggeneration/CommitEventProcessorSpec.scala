@@ -24,21 +24,21 @@ import cats.data.EitherT
 import cats.data.EitherT.{leftT, rightT}
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.events.EventStatus.New
-import ch.datascience.graph.model.events._
-import ch.datascience.graph.model.projects.Path
-import ch.datascience.graph.tokenrepository.AccessTokenFinder
-import ch.datascience.http.client.AccessToken
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
-import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.metrics.MetricsRegistry
 import io.prometheus.client.Histogram
+import io.renku.generators.CommonGraphGenerators._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.events.EventStatus.New
+import io.renku.graph.model.events._
+import io.renku.graph.model.projects.Path
+import io.renku.graph.tokenrepository.AccessTokenFinder
+import io.renku.http.client.AccessToken
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.generators.JsonLDGenerators.jsonLDEntities
+import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.IOCommitEventProcessor.eventsProcessingTimesBuilder

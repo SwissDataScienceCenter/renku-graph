@@ -21,10 +21,10 @@ package io.renku.tokenrepository.repository.init
 import cats.data.Kleisli
 import cats.effect._
 import cats.syntax.all._
-import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.{Id, Path}
-import ch.datascience.metrics.LabeledHistogram
+import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.graph.model.projects
+import io.renku.graph.model.projects.{Id, Path}
+import io.renku.metrics.LabeledHistogram
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import io.renku.tokenrepository.repository.association.{IOProjectPathFinder, ProjectPathFinder}
 import io.renku.tokenrepository.repository.deletion.TokenRemover

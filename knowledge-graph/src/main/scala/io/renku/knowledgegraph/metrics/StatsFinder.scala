@@ -20,12 +20,12 @@ package io.renku.knowledgegraph.metrics
 
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.rdfstore.SparqlQuery.Prefixes
-import ch.datascience.rdfstore._
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import eu.timepit.refined.auto._
 import io.circe.Decoder.decodeList
 import io.circe.{Decoder, DecodingFailure}
+import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.rdfstore._
+import io.renku.tinytypes.{TinyType, TinyTypeFactory}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -43,7 +43,7 @@ private class StatsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer](
     with StatsFinder[Interpretation] {
 
   import EntityCount._
-  import ch.datascience.graph.model.Schemas._
+  import io.renku.graph.model.Schemas._
 
   override def entitiesCount(): Interpretation[Map[EntityLabel, Count]] =
     queryExpecting[List[(EntityLabel, Count)]](using = query) map (_.toMap)

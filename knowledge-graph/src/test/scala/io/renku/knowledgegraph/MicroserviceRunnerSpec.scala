@@ -20,13 +20,13 @@ package io.renku.knowledgegraph
 
 import cats.MonadError
 import cats.effect.{ContextShift, ExitCode, IO}
-import ch.datascience.config.certificates.CertificateLoader
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.exceptions
-import ch.datascience.http.server.IOHttpServer
-import ch.datascience.interpreters.IOSentryInitializer
-import ch.datascience.testtools.MockedRunnableCollaborators
+import io.renku.config.certificates.CertificateLoader
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.exceptions
+import io.renku.http.server.IOHttpServer
+import io.renku.interpreters.IOSentryInitializer
 import io.renku.knowledgegraph.metrics.KGMetrics
+import io.renku.testtools.MockedRunnableCollaborators
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

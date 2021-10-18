@@ -19,8 +19,8 @@
 package io.renku.tokenrepository.repository.deletion
 
 import cats.effect._
-import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.metrics.LabeledHistogram
+import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.metrics.LabeledHistogram
 import io.renku.tokenrepository.repository.ProjectsTokensDB
 import org.typelevel.log4cats.Logger
 

@@ -21,13 +21,13 @@ package io.renku.eventlog.init
 import cats.data.Kleisli
 import cats.effect.{Bracket, BracketThrow}
 import cats.syntax.all._
-import ch.datascience.db.SessionResource
-import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.{Id, Path}
-import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import io.circe.parser._
 import io.circe.{Decoder, HCursor}
+import io.renku.db.SessionResource
 import io.renku.eventlog.{EventLogDB, TypeSerializers}
+import io.renku.graph.model.projects
+import io.renku.graph.model.projects.{Id, Path}
+import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.codec.all._

@@ -21,12 +21,12 @@ package io.renku.commiteventservice.events.categories.globalcommitsync.eventgene
 import cats.MonadThrow
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.config.GitLab
-import ch.datascience.control.Throttler
-import ch.datascience.events.consumers.Project
-import ch.datascience.graph.model.events.{BatchDate, CommitId}
-import ch.datascience.http.client.AccessToken
 import io.renku.commiteventservice.events.categories.common._
+import io.renku.config.GitLab
+import io.renku.control.Throttler
+import io.renku.events.consumers.Project
+import io.renku.graph.model.events.{BatchDate, CommitId}
+import io.renku.http.client.AccessToken
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext

@@ -18,8 +18,8 @@
 
 package io.renku.triplesgenerator.events.categories.awaitinggeneration
 
-import ch.datascience.events.consumers.Project
-import ch.datascience.graph.model.events._
+import io.renku.events.consumers.Project
+import io.renku.graph.model.events._
 import io.renku.triplesgenerator.events.categories.models.CategoryEvent
 
 private final case class CommitEvent(eventId: EventId, project: Project, commitId: CommitId) extends CategoryEvent {

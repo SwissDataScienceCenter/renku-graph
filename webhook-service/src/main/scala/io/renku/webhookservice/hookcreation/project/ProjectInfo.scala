@@ -18,7 +18,7 @@
 
 package io.renku.webhookservice.hookcreation.project
 
-import ch.datascience.graph.model.projects.{Id, Path, Visibility}
+import io.renku.graph.model.projects.{Id, Path, Visibility}
 import io.renku.webhookservice.model.Project
 
 final case class ProjectInfo(

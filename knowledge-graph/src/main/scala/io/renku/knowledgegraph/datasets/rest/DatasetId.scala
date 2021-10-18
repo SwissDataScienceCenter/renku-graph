@@ -18,7 +18,7 @@
 
 package io.renku.knowledgegraph.datasets.rest
 
-import ch.datascience.graph.model.datasets
+import io.renku.graph.model.datasets
 
 object DatasetId {
   def unapply(value: String): Option[datasets.Identifier] = datasets.Identifier.from(value).toOption

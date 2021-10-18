@@ -18,10 +18,10 @@
 
 package io.renku.knowledgegraph.datasets
 
-import ch.datascience.graph.model.datasets._
-import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.Path
-import ch.datascience.graph.model.users.{Affiliation, Email, Name => UserName}
+import io.renku.graph.model.datasets._
+import io.renku.graph.model.projects
+import io.renku.graph.model.projects.Path
+import io.renku.graph.model.users.{Affiliation, Email, Name => UserName}
 
 object model {
 

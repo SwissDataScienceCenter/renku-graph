@@ -19,13 +19,13 @@
 package io.renku.webhookservice.hookcreation.project
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.config.GitLab
-import ch.datascience.control.Throttler
-import ch.datascience.graph.config.GitLabUrlLoader
-import ch.datascience.graph.model.projects.Visibility
-import ch.datascience.graph.model.projects.Visibility.Public
-import ch.datascience.graph.model.{GitLabUrl, projects}
-import ch.datascience.http.client.{AccessToken, RestClient}
+import io.renku.config.GitLab
+import io.renku.control.Throttler
+import io.renku.graph.config.GitLabUrlLoader
+import io.renku.graph.model.projects.Visibility
+import io.renku.graph.model.projects.Visibility.Public
+import io.renku.graph.model.{GitLabUrl, projects}
+import io.renku.http.client.{AccessToken, RestClient}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -46,9 +46,9 @@ private[hookcreation] class ProjectInfoFinderImpl(
     with ProjectInfoFinder[IO] {
 
   import cats.effect._
-  import ch.datascience.http.client.RestClientError.UnauthorizedException
-  import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import io.circe._
+  import io.renku.http.client.RestClientError.UnauthorizedException
+  import io.renku.tinytypes.json.TinyTypeDecoders._
   import org.http4s.Method.GET
   import org.http4s.Status.Unauthorized
   import org.http4s._

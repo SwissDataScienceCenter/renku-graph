@@ -21,18 +21,18 @@ package io.renku.eventlog.events.categories.statuschange
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.db.SqlStatement
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.timestamps
-import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventProcessingTimes, zippedEventPayloads}
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
-import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
+import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators.eventDates
 import io.renku.eventlog._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.ToTriplesGenerated
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.timestamps
+import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventProcessingTimes, zippedEventPayloads}
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.events.EventStatus._
+import io.renku.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
+import io.renku.metrics.TestLabeledHistogram
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

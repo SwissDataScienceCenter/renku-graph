@@ -19,12 +19,12 @@
 package io.renku.tokenrepository
 
 import cats.effect._
-import ch.datascience.config.certificates.CertificateLoader
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.http.server.IOHttpServer
-import ch.datascience.interpreters.IOSentryInitializer
-import ch.datascience.testtools.MockedRunnableCollaborators
+import io.renku.config.certificates.CertificateLoader
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.http.server.IOHttpServer
+import io.renku.interpreters.IOSentryInitializer
+import io.renku.testtools.MockedRunnableCollaborators
 import io.renku.tokenrepository.repository.init.IODbInitializer
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

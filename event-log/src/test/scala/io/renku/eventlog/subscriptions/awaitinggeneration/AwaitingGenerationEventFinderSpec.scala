@@ -19,21 +19,21 @@
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
 import cats.effect.IO
-import ch.datascience.db.SqlStatement
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventStatus}
-import ch.datascience.graph.model.projects.{Id, Path}
-import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
+import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog._
 import io.renku.eventlog.subscriptions.ProjectIds
 import io.renku.eventlog.subscriptions.awaitinggeneration.ProjectPrioritisation.Priority.MaxPriority
 import io.renku.eventlog.subscriptions.awaitinggeneration.ProjectPrioritisation.{Priority, ProjectInfo}
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.EventsGenerators._
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.events.EventStatus._
+import io.renku.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventStatus}
+import io.renku.graph.model.projects.{Id, Path}
+import io.renku.metrics.{LabeledGauge, TestLabeledHistogram}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

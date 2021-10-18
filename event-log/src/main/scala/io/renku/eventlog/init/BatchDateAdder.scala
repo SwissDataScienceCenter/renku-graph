@@ -21,9 +21,9 @@ package io.renku.eventlog.init
 import cats.data.Kleisli
 import cats.effect.BracketThrow
 import cats.syntax.all._
-import ch.datascience.db.SessionResource
-import ch.datascience.graph.model.events.BatchDate
+import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
+import io.renku.graph.model.events.BatchDate
 import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.codec.all.timestamp

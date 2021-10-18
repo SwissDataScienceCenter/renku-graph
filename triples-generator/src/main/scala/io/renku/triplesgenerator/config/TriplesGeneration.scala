@@ -28,7 +28,7 @@ object TriplesGeneration {
   final case object RemoteTriplesGeneration extends TriplesGeneration
 
   import cats.syntax.all._
-  import ch.datascience.config.ConfigLoader._
+  import io.renku.config.ConfigLoader._
 
   def apply[Interpretation[_]](
       config:    Config = ConfigFactory.load

@@ -19,13 +19,13 @@
 package io.renku.eventlog.subscriptions.zombieevents
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.httpUrls
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.microservices.MicroserviceBaseUrl
-import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.auto._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.httpUrls
+import io.renku.interpreters.TestLogger
+import io.renku.microservices.MicroserviceBaseUrl
+import io.renku.stubbing.ExternalServiceStubbing
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 

@@ -19,9 +19,9 @@
 package io.renku.webhookservice
 
 import WebhookServiceGenerators._
-import ch.datascience.config.ConfigLoader.ConfigLoadingException
-import ch.datascience.generators.Generators.Implicits._
 import com.typesafe.config.ConfigFactory
+import io.renku.config.ConfigLoader.ConfigLoadingException
+import io.renku.generators.Generators.Implicits._
 import model.SelfUrl
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

@@ -19,12 +19,12 @@
 package io.renku.knowledgegraph.datasets
 
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators.sortBys
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.datasets._
-import ch.datascience.graph.model.testentities.{Dataset, HavingInvalidationTime, Person, Project}
-import ch.datascience.graph.model.{RenkuBaseUrl, testentities}
 import eu.timepit.refined.auto._
+import io.renku.generators.CommonGraphGenerators.sortBys
+import io.renku.generators.Generators._
+import io.renku.graph.model.datasets._
+import io.renku.graph.model.testentities.{Dataset, HavingInvalidationTime, Person, Project}
+import io.renku.graph.model.{RenkuBaseUrl, testentities}
 import io.renku.jsonld.syntax._
 import io.renku.knowledgegraph.datasets.model._
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase

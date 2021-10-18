@@ -21,9 +21,9 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated
 import cats.data.{EitherT, OptionT}
 import cats.syntax.all._
 import cats.{MonadError, MonadThrow}
-import ch.datascience.graph.model.entities.Project
 import io.circe.Decoder.decodeString
 import io.circe.{Decoder, Json}
+import io.renku.graph.model.entities.Project
 import io.renku.jsonld.{EntityId, Property}
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 

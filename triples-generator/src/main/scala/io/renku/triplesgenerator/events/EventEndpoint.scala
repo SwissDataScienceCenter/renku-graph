@@ -22,12 +22,12 @@ import cats.MonadThrow
 import cats.data.EitherT
 import cats.data.EitherT.right
 import cats.effect.{Effect, Timer}
-import ch.datascience.events.EventRequestContent
-import ch.datascience.events.EventRequestContent.WithPayload
-import ch.datascience.events.consumers.{EventConsumersRegistry, EventSchedulingResult}
-import ch.datascience.graph.model.events.ZippedEventPayload
-import ch.datascience.http.ErrorMessage
 import io.circe.Json
+import io.renku.events.EventRequestContent
+import io.renku.events.EventRequestContent.WithPayload
+import io.renku.events.consumers.{EventConsumersRegistry, EventSchedulingResult}
+import io.renku.graph.model.events.ZippedEventPayload
+import io.renku.http.ErrorMessage
 import io.renku.triplesgenerator.reprovisioning.ReProvisioningStatus
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
@@ -49,8 +49,8 @@ class EventEndpointImpl[Interpretation[_]: Effect: MonadThrow](
     with EventEndpoint[Interpretation] {
 
   import cats.syntax.all._
-  import ch.datascience.http.InfoMessage
-  import ch.datascience.http.InfoMessage._
+  import io.renku.http.InfoMessage
+  import io.renku.http.InfoMessage._
   import org.http4s._
 
   override def processEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]] =

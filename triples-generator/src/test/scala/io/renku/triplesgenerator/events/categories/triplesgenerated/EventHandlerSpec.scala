@@ -20,22 +20,22 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.events
-import ch.datascience.events.EventRequestContent
-import ch.datascience.events.consumers.EventSchedulingResult._
-import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
-import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, Project}
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, zippedEventPayloads}
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.{CompoundEventId, ZippedEventPayload}
-import ch.datascience.http.server.EndpointTester._
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Info
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
+import io.renku.events
+import io.renku.events.EventRequestContent
+import io.renku.events.consumers.EventSchedulingResult._
+import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, Project}
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.EventsGenerators.{compoundEventIds, zippedEventPayloads}
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.events.{CompoundEventId, ZippedEventPayload}
+import io.renku.http.server.EndpointTester._
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

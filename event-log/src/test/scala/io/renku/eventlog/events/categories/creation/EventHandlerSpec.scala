@@ -22,20 +22,20 @@ package creation
 import cats.MonadError
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
-import ch.datascience.events.Generators._
-import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, SchedulingError}
-import ch.datascience.events.consumers.Project
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.events.EventStatus
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level._
 import io.circe.literal.JsonStringContext
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.eventlog.events.categories.creation.Event.{NewEvent, SkippedEvent}
 import io.renku.eventlog.events.categories.creation.EventPersister.Result.{Created, Existed}
 import io.renku.eventlog.events.categories.creation.Generators._
+import io.renku.events.Generators._
+import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest, SchedulingError}
+import io.renku.events.consumers.Project
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.events.EventStatus
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks

@@ -18,10 +18,10 @@
 
 package io.renku.triplesgenerator.events.categories.awaitinggeneration
 
-import ch.datascience.events.consumers.ConsumersModelGenerators._
-import ch.datascience.generators.Generators.nonEmptyStrings
-import ch.datascience.graph.model.EventsGenerators.commitIds
-import ch.datascience.graph.model.events.EventId
+import io.renku.events.consumers.ConsumersModelGenerators._
+import io.renku.generators.Generators.nonEmptyStrings
+import io.renku.graph.model.EventsGenerators.commitIds
+import io.renku.graph.model.events.EventId
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import org.scalacheck.Gen
 

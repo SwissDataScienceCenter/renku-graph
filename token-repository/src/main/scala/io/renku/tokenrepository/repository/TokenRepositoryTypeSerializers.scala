@@ -20,7 +20,7 @@ package io.renku.tokenrepository.repository
 
 import AccessTokenCrypto.EncryptedAccessToken
 import cats.syntax.all._
-import ch.datascience.graph.model.projects
+import io.renku.graph.model.projects
 import skunk.codec.all.{int4, varchar}
 import skunk.{Decoder, Encoder}
 

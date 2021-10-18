@@ -19,8 +19,8 @@
 package io.renku.tokenrepository.repository
 
 import AccessTokenCrypto.EncryptedAccessToken
-import ch.datascience.generators.Generators._
 import eu.timepit.refined.api.RefType
+import io.renku.generators.Generators._
 import org.scalacheck.Gen
 
 private object RepositoryGenerators {

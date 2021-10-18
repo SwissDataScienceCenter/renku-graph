@@ -21,12 +21,12 @@ package io.renku.knowledgegraph.projects.rest
 import cats.data.OptionT
 import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
-import ch.datascience.config.GitLab
-import ch.datascience.control.Throttler
-import ch.datascience.graph.model.projects.Path
-import ch.datascience.graph.tokenrepository.AccessTokenFinder
-import ch.datascience.graph.tokenrepository.AccessTokenFinder._
-import ch.datascience.http.server.security.model.AuthUser
+import io.renku.config.GitLab
+import io.renku.control.Throttler
+import io.renku.graph.model.projects.Path
+import io.renku.graph.tokenrepository.AccessTokenFinder
+import io.renku.graph.tokenrepository.AccessTokenFinder._
+import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.projects.model._
 import io.renku.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
 import io.renku.knowledgegraph.projects.rest.KGProjectFinder.{KGProject, Parent}
@@ -94,7 +94,7 @@ private class ProjectFinderImpl[Interpretation[_]: MonadThrow](
 
 private object ProjectFinder {
   import cats.effect.{ContextShift, IO, Timer}
-  import ch.datascience.rdfstore.SparqlQueryTimeRecorder
+  import io.renku.rdfstore.SparqlQueryTimeRecorder
   import org.typelevel.log4cats.Logger
 
   def apply(

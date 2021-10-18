@@ -19,8 +19,8 @@
 package io.renku.triplesgenerator
 
 import cats.effect.{Clock, ConcurrentEffect, Resource}
-import ch.datascience.metrics.RoutesMetrics
 import com.typesafe.config.Config
+import io.renku.metrics.RoutesMetrics
 import io.renku.triplesgenerator.events.EventEndpoint
 import org.http4s.dsl.Http4sDsl
 

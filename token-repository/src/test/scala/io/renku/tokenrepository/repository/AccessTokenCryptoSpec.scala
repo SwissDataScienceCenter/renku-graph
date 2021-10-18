@@ -18,14 +18,14 @@
 
 package io.renku.tokenrepository.repository
 
-import ch.datascience.crypto.AesCrypto.Secret
-import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.http.client.AccessToken
 import com.typesafe.config.ConfigFactory
 import eu.timepit.refined.api.RefType
 import eu.timepit.refined.auto._
+import io.renku.crypto.AesCrypto.Secret
+import io.renku.generators.CommonGraphGenerators._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.http.client.AccessToken
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

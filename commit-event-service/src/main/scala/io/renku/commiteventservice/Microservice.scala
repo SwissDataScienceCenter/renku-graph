@@ -19,19 +19,19 @@
 package io.renku.commiteventservice
 
 import cats.effect.{CancelToken, ContextShift, ExitCode, Fiber, IO, Timer}
-import ch.datascience.config.GitLab
-import ch.datascience.config.certificates.CertificateLoader
-import ch.datascience.config.sentry.SentryInitializer
-import ch.datascience.control.{RateLimit, Throttler}
-import ch.datascience.events.consumers
-import ch.datascience.events.consumers.EventConsumersRegistry
-import ch.datascience.http.server.HttpServer
-import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
-import ch.datascience.metrics.MetricsRegistry
-import ch.datascience.microservices.IOMicroservice
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
+import io.renku.config.GitLab
+import io.renku.config.certificates.CertificateLoader
+import io.renku.config.sentry.SentryInitializer
+import io.renku.control.{RateLimit, Throttler}
+import io.renku.events.consumers
+import io.renku.events.consumers.EventConsumersRegistry
+import io.renku.http.server.HttpServer
+import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder}
+import io.renku.metrics.MetricsRegistry
+import io.renku.microservices.IOMicroservice
 import org.typelevel.log4cats.Logger
 import pureconfig.ConfigSource
 

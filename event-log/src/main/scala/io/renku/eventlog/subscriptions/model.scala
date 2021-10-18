@@ -20,12 +20,12 @@ package io.renku.eventlog.subscriptions
 
 import cats.Show
 import cats.implicits.showInterpolator
-import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
-import ch.datascience.graph.model.projects
-import ch.datascience.tinytypes._
-import ch.datascience.tinytypes.constraints.{NonNegativeInt, Url}
-import ch.datascience.tinytypes.json.TinyTypeDecoders.{intDecoder, stringDecoder}
 import io.circe.Decoder
+import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
+import io.renku.graph.model.projects
+import io.renku.tinytypes._
+import io.renku.tinytypes.constraints.{NonNegativeInt, Url}
+import io.renku.tinytypes.json.TinyTypeDecoders.{intDecoder, stringDecoder}
 
 private final case class ProjectIds(id: projects.Id, path: projects.Path)
 

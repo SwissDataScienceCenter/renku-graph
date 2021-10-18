@@ -21,16 +21,16 @@ package io.renku.webhookservice.eventprocessing
 import cats.data.OptionT
 import cats.effect._
 import cats.syntax.all._
-import ch.datascience.config.GitLab
-import ch.datascience.control.Throttler
-import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.Id
-import ch.datascience.http.ErrorMessage._
-import ch.datascience.http.{ErrorMessage, InfoMessage}
-import ch.datascience.logging.ExecutionTimeRecorder
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
+import io.renku.config.GitLab
+import io.renku.control.Throttler
+import io.renku.graph.model.projects
+import io.renku.graph.model.projects.Id
+import io.renku.http.ErrorMessage._
+import io.renku.http.{ErrorMessage, InfoMessage}
+import io.renku.logging.ExecutionTimeRecorder
 import io.renku.webhookservice.eventprocessing.ProcessingStatusFetcher.ProcessingStatus
 import io.renku.webhookservice.hookvalidation
 import io.renku.webhookservice.hookvalidation.HookValidator

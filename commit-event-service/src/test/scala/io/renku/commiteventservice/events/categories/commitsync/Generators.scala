@@ -18,9 +18,9 @@
 
 package io.renku.commiteventservice.events.categories.commitsync
 
-import ch.datascience.events.consumers.Project
-import ch.datascience.graph.model.EventsGenerators.{commitIds, lastSyncedDates}
-import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.events.consumers.Project
+import io.renku.graph.model.EventsGenerators.{commitIds, lastSyncedDates}
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import org.scalacheck.Gen
 
 private object Generators {

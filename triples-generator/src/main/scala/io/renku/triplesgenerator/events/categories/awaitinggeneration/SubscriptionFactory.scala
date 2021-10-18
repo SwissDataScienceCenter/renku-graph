@@ -19,8 +19,8 @@
 package io.renku.triplesgenerator.events.categories.awaitinggeneration
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
-import ch.datascience.metrics.MetricsRegistry
+import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.subscriptions.PayloadComposer.payloadsComposerFactory
 import org.typelevel.log4cats.Logger
 

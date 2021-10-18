@@ -20,10 +20,10 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescura
 
 import cats.MonadThrow
 import cats.data.EitherT
-import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
 import eu.timepit.refined.auto._
+import io.renku.generators.CommonGraphGenerators._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.ResultData
 import org.scalacheck.Gen

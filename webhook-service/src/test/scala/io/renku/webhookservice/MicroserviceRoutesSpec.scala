@@ -20,13 +20,13 @@ package io.renku.webhookservice
 
 import cats.data.OptionT
 import cats.effect.{Clock, IO}
-import ch.datascience.generators.CommonGraphGenerators.authUsers
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.projects
-import ch.datascience.http.server.EndpointTester._
-import ch.datascience.http.server.security.model.AuthUser
-import ch.datascience.interpreters.TestRoutesMetrics
+import io.renku.generators.CommonGraphGenerators.authUsers
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.projects
+import io.renku.http.server.EndpointTester._
+import io.renku.http.server.security.model.AuthUser
+import io.renku.interpreters.TestRoutesMetrics
 import io.renku.webhookservice.eventprocessing.{HookEventEndpoint, ProcessingStatusEndpoint}
 import io.renku.webhookservice.hookcreation.HookCreationEndpoint
 import io.renku.webhookservice.hookvalidation.HookValidationEndpoint

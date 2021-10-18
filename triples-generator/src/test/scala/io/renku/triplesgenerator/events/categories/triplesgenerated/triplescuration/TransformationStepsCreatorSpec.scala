@@ -18,8 +18,8 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration
 
-import ch.datascience.generators.Generators.Implicits._
 import eu.timepit.refined.auto._
+import io.renku.generators.Generators.Implicits._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.Generators._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.DatasetTransformer
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails.PersonTransformer

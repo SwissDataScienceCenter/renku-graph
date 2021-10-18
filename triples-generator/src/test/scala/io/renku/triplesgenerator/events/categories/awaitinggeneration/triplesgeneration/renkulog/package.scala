@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration
 
-import ch.datascience.generators.Generators.relativePaths
+import io.renku.generators.Generators.relativePaths
 import org.scalacheck.Gen
 
 import java.nio.file.Paths

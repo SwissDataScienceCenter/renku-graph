@@ -20,8 +20,8 @@ package io.renku.triplesgenerator
 
 import cats.effect.{Clock, IO}
 import cats.syntax.all._
-import ch.datascience.http.server.EndpointTester._
-import ch.datascience.interpreters.TestRoutesMetrics
+import io.renku.http.server.EndpointTester._
+import io.renku.interpreters.TestRoutesMetrics
 import io.renku.triplesgenerator.events.EventEndpoint
 import org.http4s.Method.POST
 import org.http4s.Status._

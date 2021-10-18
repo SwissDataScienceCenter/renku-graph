@@ -20,10 +20,10 @@ package io.renku.webhookservice.tokenrepository
 
 import cats.effect.{ConcurrentEffect, Timer}
 import cats.syntax.all._
-import ch.datascience.control.Throttler
-import ch.datascience.graph.model.projects.Id
-import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
-import ch.datascience.http.client.RestClient
+import io.renku.control.Throttler
+import io.renku.graph.model.projects.Id
+import io.renku.graph.tokenrepository.TokenRepositoryUrl
+import io.renku.http.client.RestClient
 import org.http4s.Status
 import org.typelevel.log4cats.Logger
 

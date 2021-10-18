@@ -22,19 +22,19 @@ import cats.MonadThrow
 import cats.data.StateT
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.config.GitLab
-import ch.datascience.control.Throttler
-import ch.datascience.events.consumers.Project
-import ch.datascience.graph.model.events.{BatchDate, CommitId}
-import ch.datascience.graph.tokenrepository.AccessTokenFinder
-import ch.datascience.graph.tokenrepository.AccessTokenFinder._
-import ch.datascience.http.client.AccessToken
-import ch.datascience.logging.ExecutionTimeRecorder
-import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.commiteventservice.events.categories.commitsync._
 import io.renku.commiteventservice.events.categories.common.SynchronizationSummary._
 import io.renku.commiteventservice.events.categories.common.UpdateResult._
 import io.renku.commiteventservice.events.categories.common._
+import io.renku.config.GitLab
+import io.renku.control.Throttler
+import io.renku.events.consumers.Project
+import io.renku.graph.model.events.{BatchDate, CommitId}
+import io.renku.graph.tokenrepository.AccessTokenFinder
+import io.renku.graph.tokenrepository.AccessTokenFinder._
+import io.renku.http.client.AccessToken
+import io.renku.logging.ExecutionTimeRecorder
+import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext

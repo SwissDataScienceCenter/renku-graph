@@ -18,12 +18,12 @@
 
 package io.renku.triplesgenerator.events.categories.awaitinggeneration.subscriptions
 
-import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
-import ch.datascience.graph.model.events.CategoryName
+import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
+import io.renku.graph.model.events.CategoryName
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.GenerationProcessesNumber
 
 private final case class Payload(categoryName: CategoryName, subscriber: Subscriber)
-    extends ch.datascience.events.consumers.subscriptions.SubscriptionPayload
+    extends io.renku.events.consumers.subscriptions.SubscriptionPayload
 
 private object Payload {
   import io.circe.Encoder
@@ -45,4 +45,4 @@ private final case class Subscriber(
     url:      SubscriberUrl,
     id:       SubscriberId,
     capacity: GenerationProcessesNumber
-) extends ch.datascience.events.consumers.subscriptions.Subscriber
+) extends io.renku.events.consumers.subscriptions.Subscriber

@@ -21,12 +21,12 @@ package io.renku.triplesgenerator.events.categories.awaitinggeneration
 import cats.MonadThrow
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.events.consumers.Project
-import ch.datascience.graph.model.events._
-import ch.datascience.graph.model.projects.{Id, Path}
-import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import io.circe.parser._
 import io.circe.{Decoder, DecodingFailure, Error, ParsingFailure}
+import io.renku.events.consumers.Project
+import io.renku.graph.model.events._
+import io.renku.graph.model.projects.{Id, Path}
+import io.renku.tinytypes.json.TinyTypeDecoders._
 
 private trait EventBodyDeserializer[Interpretation[_]] {
   def toCommitEvent(eventBody: EventBody): Interpretation[CommitEvent]

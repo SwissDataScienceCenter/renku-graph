@@ -18,11 +18,11 @@
 
 package io.renku.eventlog.events.categories.statuschange
 
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.EventStatus._
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent._
+import io.renku.graph.model.EventsGenerators._
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.events.EventStatus._
 import org.scalacheck.Gen
 
 private object Generators {

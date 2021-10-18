@@ -20,11 +20,6 @@ package io.renku.webhookservice
 
 import WebhookServiceGenerators._
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.config.EventLogUrl
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Info
-import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER
 import com.github.tomakehurst.wiremock.stubbing.Scenario
@@ -32,6 +27,11 @@ import eu.timepit.refined.auto._
 import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.config.EventLogUrl
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.stubbing.ExternalServiceStubbing
 import model.CommitSyncRequest
 import org.http4s.Status._
 import org.scalamock.scalatest.MockFactory

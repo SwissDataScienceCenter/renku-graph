@@ -19,8 +19,8 @@
 package io.renku.webhookservice
 
 import WebhookServiceGenerators._
-import ch.datascience.generators.Generators.Implicits._
 import com.typesafe.config.ConfigFactory
+import io.renku.generators.Generators.Implicits._
 import model.ProjectHookUrl
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

@@ -19,13 +19,13 @@
 package io.renku.tokenrepository
 
 import cats.effect._
-import ch.datascience.config.certificates.CertificateLoader
-import ch.datascience.config.sentry.SentryInitializer
-import ch.datascience.db.{SessionPoolResource, SessionResource}
-import ch.datascience.http.server.HttpServer
-import ch.datascience.logging.ApplicationLogger
-import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
-import ch.datascience.microservices.IOMicroservice
+import io.renku.config.certificates.CertificateLoader
+import io.renku.config.sentry.SentryInitializer
+import io.renku.db.{SessionPoolResource, SessionResource}
+import io.renku.http.server.HttpServer
+import io.renku.logging.ApplicationLogger
+import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
+import io.renku.microservices.IOMicroservice
 import io.renku.tokenrepository.repository.association.IOAssociateTokenEndpoint
 import io.renku.tokenrepository.repository.deletion.IODeleteTokenEndpoint
 import io.renku.tokenrepository.repository.fetching.IOFetchTokenEndpoint

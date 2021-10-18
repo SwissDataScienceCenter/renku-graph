@@ -20,16 +20,16 @@ package io.renku.knowledgegraph.lineage
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.config.RenkuBaseUrlLoader
-import ch.datascience.graph.model.Schemas._
-import ch.datascience.graph.model.projects.ResourceId
-import ch.datascience.graph.model.views.RdfResource
-import ch.datascience.graph.model.{RenkuBaseUrl, projects}
-import ch.datascience.rdfstore.SparqlQuery.Prefixes
-import ch.datascience.rdfstore._
-import ch.datascience.tinytypes.json.TinyTypeDecoders
 import eu.timepit.refined.auto._
 import io.circe.Decoder
+import io.renku.graph.config.RenkuBaseUrlLoader
+import io.renku.graph.model.Schemas._
+import io.renku.graph.model.projects.ResourceId
+import io.renku.graph.model.views.RdfResource
+import io.renku.graph.model.{RenkuBaseUrl, projects}
+import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.rdfstore._
+import io.renku.tinytypes.json.TinyTypeDecoders
 import model.{ExecutionInfo, Node}
 import org.typelevel.log4cats.Logger
 

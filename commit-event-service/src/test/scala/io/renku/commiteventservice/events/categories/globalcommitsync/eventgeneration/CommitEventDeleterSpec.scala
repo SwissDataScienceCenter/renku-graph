@@ -16,18 +16,18 @@
  * limitations under the License.
  */
 
-package io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration
+package io.renku.commiteventservice.events.categories.globalcommitsync
+package eventgeneration
 
 import cats.syntax.all._
 import io.renku.commiteventservice.events.categories.common.UpdateResult.{Deleted, Failed}
 import io.renku.commiteventservice.events.categories.common.{CommitEventsRemover, SynchronizationSummary, UpdateResult}
-import ch.datascience.events.consumers.ConsumersModelGenerators.projectsGen
-import ch.datascience.generators.CommonGraphGenerators.personalAccessTokens
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.{exceptions, nonEmptyStrings}
-import ch.datascience.graph.model.EventsGenerators.commitIds
-import ch.datascience.http.client.AccessToken
-import io.renku.commiteventservice.events.categories.common.CommitEventsRemover
+import io.renku.events.consumers.ConsumersModelGenerators.projectsGen
+import io.renku.generators.CommonGraphGenerators.personalAccessTokens
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.{exceptions, nonEmptyStrings}
+import io.renku.graph.model.EventsGenerators.commitIds
+import io.renku.http.client.AccessToken
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

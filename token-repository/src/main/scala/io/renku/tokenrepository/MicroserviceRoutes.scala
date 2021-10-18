@@ -19,8 +19,8 @@
 package io.renku.tokenrepository
 
 import cats.effect.{Clock, ConcurrentEffect, Resource}
-import ch.datascience.graph.http.server.binders.{ProjectId, ProjectPath}
-import ch.datascience.metrics.RoutesMetrics
+import io.renku.graph.http.server.binders.{ProjectId, ProjectPath}
+import io.renku.metrics.RoutesMetrics
 import io.renku.tokenrepository.repository.association.AssociateTokenEndpoint
 import io.renku.tokenrepository.repository.deletion.DeleteTokenEndpoint
 import io.renku.tokenrepository.repository.fetching.FetchTokenEndpoint

@@ -18,10 +18,10 @@
 
 package io.renku.eventlog.subscriptions
 
-import ch.datascience.events.consumers.subscriptions._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.{nonBlankStrings, positiveInts}
-import ch.datascience.graph.model.events.CategoryName
+import io.renku.events.consumers.subscriptions._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.{nonBlankStrings, positiveInts}
+import io.renku.graph.model.events.CategoryName
 import org.scalacheck.Gen
 
 private object Generators {

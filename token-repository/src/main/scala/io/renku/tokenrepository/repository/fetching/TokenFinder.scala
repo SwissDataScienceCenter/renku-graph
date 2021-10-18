@@ -21,10 +21,10 @@ package io.renku.tokenrepository.repository.fetching
 import cats.MonadError
 import cats.data.OptionT
 import cats.effect.{Async, ContextShift, IO}
-import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.graph.model.projects.{Id, Path}
-import ch.datascience.http.client.AccessToken
-import ch.datascience.metrics.LabeledHistogram
+import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.graph.model.projects.{Id, Path}
+import io.renku.http.client.AccessToken
+import io.renku.metrics.LabeledHistogram
 import io.renku.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB}
 
 private class TokenFinder[Interpretation[_]: Async: MonadError[*[_], Throwable]](

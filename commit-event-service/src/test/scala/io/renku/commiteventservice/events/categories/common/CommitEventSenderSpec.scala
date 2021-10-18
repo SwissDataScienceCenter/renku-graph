@@ -20,17 +20,17 @@ package io.renku.commiteventservice.events.categories.common
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
-import io.renku.commiteventservice.events.categories.common.CommitEvent._
-import io.renku.commiteventservice.events.categories.common.Generators._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.config.EventLogUrl
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
+import io.renku.commiteventservice.events.categories.common.CommitEvent._
+import io.renku.commiteventservice.events.categories.common.Generators._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.config.EventLogUrl
+import io.renku.interpreters.TestLogger
+import io.renku.stubbing.ExternalServiceStubbing
 import org.http4s.Status._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

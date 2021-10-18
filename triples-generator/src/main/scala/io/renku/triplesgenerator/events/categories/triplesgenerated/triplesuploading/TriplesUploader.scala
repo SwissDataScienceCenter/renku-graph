@@ -20,14 +20,14 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuplo
 
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.control.Throttler
-import ch.datascience.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
-import ch.datascience.http.client.{HttpRequest, RestClient}
-import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.NonNegative
+import io.renku.control.Throttler
+import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
+import io.renku.http.client.{HttpRequest, RestClient}
 import io.renku.jsonld.JsonLD
+import io.renku.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import org.http4s.Uri
 import org.typelevel.log4cats.Logger
 

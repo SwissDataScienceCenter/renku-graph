@@ -20,20 +20,6 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.control.Throttler
-import ch.datascience.generators.CommonGraphGenerators.accessTokens
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
-import ch.datascience.graph.model.projects.Path
-import ch.datascience.graph.model.testentities.generators.EntitiesGenerators._
-import ch.datascience.graph.model.{GitLabUrl, users}
-import ch.datascience.http.client.AccessToken
-import ch.datascience.http.client.UrlEncoder._
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.json.JsonOps._
-import ch.datascience.stubbing.ExternalServiceStubbing
-import ch.datascience.tinytypes.json.TinyTypeEncoders
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER
@@ -41,6 +27,20 @@ import eu.timepit.refined.auto._
 import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
+import io.renku.control.Throttler
+import io.renku.generators.CommonGraphGenerators.accessTokens
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
+import io.renku.graph.model.projects.Path
+import io.renku.graph.model.testentities.generators.EntitiesGenerators._
+import io.renku.graph.model.{GitLabUrl, users}
+import io.renku.http.client.AccessToken
+import io.renku.http.client.UrlEncoder._
+import io.renku.interpreters.TestLogger
+import io.renku.json.JsonOps._
+import io.renku.stubbing.ExternalServiceStubbing
+import io.renku.tinytypes.json.TinyTypeEncoders
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import org.http4s.Status.{Forbidden, ServiceUnavailable, Unauthorized}
 import org.scalatest.matchers.should

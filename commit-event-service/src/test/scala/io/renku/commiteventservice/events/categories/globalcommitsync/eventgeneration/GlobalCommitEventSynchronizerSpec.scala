@@ -25,21 +25,21 @@ import io.renku.commiteventservice.events.categories.globalcommitsync.Generators
 import io.renku.commiteventservice.events.categories.globalcommitsync.categoryName
 import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.ProjectCommitStats.CommitCount
 import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.gitlab.{GitLabCommitFetcher, GitLabCommitStatFetcher}
-import ch.datascience.events.consumers.Project
-import ch.datascience.generators.CommonGraphGenerators.personalAccessTokens
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.exceptions
-import ch.datascience.graph.model.EventsGenerators.commitIds
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.Id
-import ch.datascience.graph.tokenrepository.AccessTokenFinder
-import ch.datascience.graph.tokenrepository.AccessTokenFinder.projectIdToPath
-import ch.datascience.http.client.AccessToken
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
-import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
-import ch.datascience.logging.TestExecutionTimeRecorder
+import io.renku.events.consumers.Project
+import io.renku.generators.CommonGraphGenerators.personalAccessTokens
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.exceptions
+import io.renku.graph.model.EventsGenerators.commitIds
+import io.renku.graph.model.events.CommitId
+import io.renku.graph.model.projects
+import io.renku.graph.model.projects.Id
+import io.renku.graph.tokenrepository.AccessTokenFinder
+import io.renku.graph.tokenrepository.AccessTokenFinder.projectIdToPath
+import io.renku.http.client.AccessToken
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.{Error, Info}
+import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
+import io.renku.logging.TestExecutionTimeRecorder
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

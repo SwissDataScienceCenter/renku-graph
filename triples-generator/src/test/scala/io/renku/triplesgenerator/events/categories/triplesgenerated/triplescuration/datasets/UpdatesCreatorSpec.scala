@@ -19,13 +19,13 @@
 package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets
 
 import cats.syntax.all._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{SameAs, TopmostDerivedFrom, TopmostSameAs}
-import ch.datascience.graph.model.testentities._
-import ch.datascience.graph.model.{entities, projects}
-import ch.datascience.rdfstore.InMemoryRdfStore
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.datasets.{SameAs, TopmostDerivedFrom, TopmostSameAs}
+import io.renku.graph.model.testentities._
+import io.renku.graph.model.{entities, projects}
+import io.renku.rdfstore.InMemoryRdfStore
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec

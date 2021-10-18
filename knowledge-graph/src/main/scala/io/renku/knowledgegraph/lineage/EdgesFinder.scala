@@ -20,16 +20,16 @@ package io.renku.knowledgegraph.lineage
 
 import cats.effect._
 import cats.syntax.all._
-import ch.datascience.graph.config.RenkuBaseUrlLoader
-import ch.datascience.graph.model.RenkuBaseUrl
-import ch.datascience.graph.model.Schemas._
-import ch.datascience.graph.model.projects.{Path, ResourceId, Visibility}
-import ch.datascience.graph.model.views.RdfResource
-import ch.datascience.http.server.security.model.AuthUser
-import ch.datascience.rdfstore.SparqlQuery.Prefixes
-import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
+import io.renku.graph.config.RenkuBaseUrlLoader
+import io.renku.graph.model.RenkuBaseUrl
+import io.renku.graph.model.Schemas._
+import io.renku.graph.model.projects.{Path, ResourceId, Visibility}
+import io.renku.graph.model.views.RdfResource
+import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.EntityId
+import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.rdfstore._
 import model._
 import org.typelevel.log4cats.Logger
 
@@ -97,7 +97,7 @@ private class EdgesFinderImpl(
   import io.circe.Decoder
 
   private implicit val edgesDecoder: Decoder[Set[EdgeData]] = {
-    import ch.datascience.tinytypes.json.TinyTypeDecoders._
+    import io.renku.tinytypes.json.TinyTypeDecoders._
 
     implicit val locationDecoder: Decoder[Node.Location] = stringDecoder(Node.Location)
 

@@ -19,7 +19,7 @@
 package io.renku.triplesgenerator.reprovisioning
 
 import cats.data.NonEmptyList
-import ch.datascience.graph.model.{CliVersion, RenkuVersionPair, SchemaVersion}
+import io.renku.graph.model.{CliVersion, RenkuVersionPair, SchemaVersion}
 
 trait ReProvisionJudge {
 

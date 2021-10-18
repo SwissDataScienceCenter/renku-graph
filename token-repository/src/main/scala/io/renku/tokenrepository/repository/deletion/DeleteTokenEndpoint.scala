@@ -21,11 +21,11 @@ package io.renku.tokenrepository.repository.deletion
 import cats.MonadError
 import cats.effect.{ContextShift, Effect, IO}
 import cats.syntax.all._
-import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.graph.model.projects.Id
-import ch.datascience.http.ErrorMessage
-import ch.datascience.http.ErrorMessage._
-import ch.datascience.metrics.LabeledHistogram
+import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.graph.model.projects.Id
+import io.renku.http.ErrorMessage
+import io.renku.http.ErrorMessage._
+import io.renku.metrics.LabeledHistogram
 import io.renku.tokenrepository.repository.ProjectsTokensDB
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl

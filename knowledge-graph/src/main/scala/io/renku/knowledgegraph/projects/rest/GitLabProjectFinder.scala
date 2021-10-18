@@ -21,12 +21,12 @@ package io.renku.knowledgegraph.projects.rest
 import GitLabProjectFinder.GitLabProject
 import cats.data.OptionT
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
-import ch.datascience.config.GitLab
-import ch.datascience.control.Throttler
-import ch.datascience.graph.config.GitLabUrlLoader
-import ch.datascience.graph.model.projects.{Description, Id, Visibility}
-import ch.datascience.graph.model.{GitLabUrl, projects}
-import ch.datascience.http.client.{AccessToken, RestClient}
+import io.renku.config.GitLab
+import io.renku.control.Throttler
+import io.renku.graph.config.GitLabUrlLoader
+import io.renku.graph.model.projects.{Description, Id, Visibility}
+import io.renku.graph.model.{GitLabUrl, projects}
+import io.renku.http.client.{AccessToken, RestClient}
 import io.renku.knowledgegraph.projects.model.Forking.ForksCount
 import io.renku.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount, Tag}
 import io.renku.knowledgegraph.projects.model._
@@ -50,9 +50,9 @@ private class GitLabProjectFinderImpl[Interpretation[_]: ConcurrentEffect: Timer
     with GitLabProjectFinder[Interpretation] {
 
   import cats.syntax.all._
-  import ch.datascience.http.client.UrlEncoder.urlEncode
-  import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import io.circe._
+  import io.renku.http.client.UrlEncoder.urlEncode
+  import io.renku.tinytypes.json.TinyTypeDecoders._
   import org.http4s.Method.GET
   import org.http4s._
   import org.http4s.circe.jsonOf

@@ -20,10 +20,10 @@ package io.renku.tokenrepository.repository.deletion
 
 import cats.effect.BracketThrow
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
-import ch.datascience.graph.model.projects.Id
-import ch.datascience.metrics.LabeledHistogram
 import eu.timepit.refined.auto._
+import io.renku.db.{DbClient, SessionResource, SqlStatement}
+import io.renku.graph.model.projects.Id
+import io.renku.metrics.LabeledHistogram
 import io.renku.tokenrepository.repository.{ProjectsTokensDB, TokenRepositoryTypeSerializers}
 import skunk.data.Completion
 import skunk.implicits._

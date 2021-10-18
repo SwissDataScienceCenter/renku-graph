@@ -20,16 +20,16 @@ package io.renku.triplesgenerator.events.categories.membersync
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.graph.config.{GitLabUrlLoader, RenkuBaseUrlLoader}
-import ch.datascience.graph.model.Schemas.{rdf, schema}
-import ch.datascience.graph.model._
-import ch.datascience.graph.model.projects.ResourceId
-import ch.datascience.graph.model.users.GitLabId
-import ch.datascience.graph.model.views.RdfResource
-import ch.datascience.graph.model.views.SparqlValueEncoder.sparqlEncode
-import ch.datascience.rdfstore.SparqlQuery
-import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import eu.timepit.refined.auto._
+import io.renku.graph.config.{GitLabUrlLoader, RenkuBaseUrlLoader}
+import io.renku.graph.model.Schemas.{rdf, schema}
+import io.renku.graph.model._
+import io.renku.graph.model.projects.ResourceId
+import io.renku.graph.model.users.GitLabId
+import io.renku.graph.model.views.RdfResource
+import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
+import io.renku.rdfstore.SparqlQuery
+import io.renku.rdfstore.SparqlQuery.Prefixes
 
 private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl) {
 

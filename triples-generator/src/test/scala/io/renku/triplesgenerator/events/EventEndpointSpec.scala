@@ -20,20 +20,20 @@ package io.renku.triplesgenerator.events
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.events.EventRequestContent
-import ch.datascience.events.Generators._
-import ch.datascience.events.consumers._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators.zippedEventPayloads
-import ch.datascience.http.ErrorMessage.ErrorMessage
-import ch.datascience.http.InfoMessage._
-import ch.datascience.http.client.RestClient._
-import ch.datascience.http.server.EndpointTester._
-import ch.datascience.http.{ErrorMessage, InfoMessage}
-import ch.datascience.tinytypes.ByteArrayTinyType
-import ch.datascience.tinytypes.contenttypes.ZippedContent
 import io.circe.Json
+import io.renku.events.EventRequestContent
+import io.renku.events.Generators._
+import io.renku.events.consumers._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.EventsGenerators.zippedEventPayloads
+import io.renku.http.ErrorMessage.ErrorMessage
+import io.renku.http.InfoMessage._
+import io.renku.http.client.RestClient._
+import io.renku.http.server.EndpointTester._
+import io.renku.http.{ErrorMessage, InfoMessage}
+import io.renku.tinytypes.ByteArrayTinyType
+import io.renku.tinytypes.contenttypes.ZippedContent
 import io.renku.triplesgenerator.reprovisioning.ReProvisioningStatus
 import org.http4s.MediaType._
 import org.http4s.Status._

@@ -21,17 +21,17 @@ package commitsyncrequest
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.events.consumers.EventSchedulingResult._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.{exceptions, jsons}
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.projects
-import ch.datascience.http.server.EndpointTester._
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
+import io.renku.events.consumers.EventSchedulingResult._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.{exceptions, jsons}
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.projects
+import io.renku.http.server.EndpointTester._
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should

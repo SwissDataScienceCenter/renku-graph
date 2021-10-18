@@ -21,17 +21,17 @@ package io.renku.webhookservice.eventprocessing
 import ProcessingStatusGenerator._
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.config.EventLogUrl
-import ch.datascience.graph.model.GraphModelGenerators.projectIds
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.api.Refined
 import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.config.EventLogUrl
+import io.renku.graph.model.GraphModelGenerators.projectIds
+import io.renku.interpreters.TestLogger
+import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.webhookservice.eventprocessing.ProcessingStatusFetcher.ProcessingStatus
 import org.http4s.Status
 import org.scalatest.matchers.should

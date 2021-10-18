@@ -19,8 +19,8 @@
 package io.renku.knowledgegraph.projects.rest
 
 import cats.syntax.all._
-import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.testentities._
+import io.renku.graph.model.projects
+import io.renku.graph.model.testentities._
 import io.renku.jsonld.syntax._
 import io.renku.knowledgegraph.projects.rest.KGProjectFinder._
 

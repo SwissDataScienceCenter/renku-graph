@@ -18,7 +18,7 @@
 
 package io.renku.commiteventservice.events.categories
 
-import ch.datascience.graph.model.events.CategoryName
+import io.renku.graph.model.events.CategoryName
 
 package object commitsync {
   val categoryName: CategoryName = CategoryName("COMMIT_SYNC")

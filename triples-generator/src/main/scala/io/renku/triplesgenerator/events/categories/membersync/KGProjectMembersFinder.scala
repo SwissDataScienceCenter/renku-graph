@@ -19,14 +19,14 @@
 package io.renku.triplesgenerator.events.categories.membersync
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.graph.config.RenkuBaseUrlLoader
-import ch.datascience.graph.model.Schemas.{rdf, schema}
-import ch.datascience.graph.model.projects.{Path, ResourceId}
-import ch.datascience.graph.model.users.GitLabId
-import ch.datascience.graph.model.views.RdfResource
-import ch.datascience.graph.model.{RenkuBaseUrl, projects, users}
-import ch.datascience.rdfstore.SparqlQuery.Prefixes
-import ch.datascience.rdfstore._
+import io.renku.graph.config.RenkuBaseUrlLoader
+import io.renku.graph.model.Schemas.{rdf, schema}
+import io.renku.graph.model.projects.{Path, ResourceId}
+import io.renku.graph.model.users.GitLabId
+import io.renku.graph.model.views.RdfResource
+import io.renku.graph.model.{RenkuBaseUrl, projects, users}
+import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -53,7 +53,7 @@ private class KGProjectMembersFinderImpl(
 
   private implicit lazy val recordsDecoder: Decoder[Set[KGProjectMember]] = { cursor =>
     import Decoder._
-    import ch.datascience.tinytypes.json.TinyTypeDecoders._
+    import io.renku.tinytypes.json.TinyTypeDecoders._
 
     val member: Decoder[KGProjectMember] = { cursor =>
       for {

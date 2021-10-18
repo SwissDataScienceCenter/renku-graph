@@ -21,9 +21,9 @@ package io.renku.commiteventservice
 import cats.effect.{Clock, IO}
 import cats.syntax.all._
 import io.renku.commiteventservice.events.EventEndpoint
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.http.server.EndpointTester._
-import ch.datascience.interpreters.TestRoutesMetrics
+import io.renku.generators.Generators.Implicits._
+import io.renku.http.server.EndpointTester._
+import io.renku.interpreters.TestRoutesMetrics
 import org.http4s.Method.{GET, POST}
 import org.http4s.Status._
 import org.http4s._
