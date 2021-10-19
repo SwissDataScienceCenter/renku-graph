@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.BracketThrow
+import cats.effect.MonadCancelThrow
 import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
 import org.typelevel.log4cats.Logger
@@ -31,7 +31,7 @@ private trait SubscriberTableCreator[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
-private class SubscriberTableCreatorImpl[Interpretation[_]: BracketThrow: Logger](
+private class SubscriberTableCreatorImpl[Interpretation[_]: MonadCancelThrow: Logger](
     sessionResource: SessionResource[Interpretation, EventLogDB]
 ) extends SubscriberTableCreator[Interpretation] {
 
@@ -51,14 +51,13 @@ private class SubscriberTableCreatorImpl[Interpretation[_]: BracketThrow: Logger
     Kleisli(_.unique(query).recover { case _ => false })
   }
 
-  private def createTable(): Kleisli[Interpretation, Session[Interpretation], Unit] =
-    for {
-      _ <- execute(createTableSql)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_delivery_id ON subscriber(delivery_id)".command)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_delivery_url ON subscriber(delivery_url)".command)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_source_url ON subscriber(source_url)".command)
-      _ <- Kleisli.liftF(Logger[Interpretation] info "'subscriber' table created")
-    } yield ()
+  private def createTable(): Kleisli[Interpretation, Session[Interpretation], Unit] = for {
+    _ <- execute(createTableSql)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_delivery_id ON subscriber(delivery_id)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_delivery_url ON subscriber(delivery_url)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_source_url ON subscriber(source_url)".command)
+    _ <- Kleisli.liftF(Logger[Interpretation] info "'subscriber' table created")
+  } yield ()
 
   private lazy val createTableSql: Command[Void] =
     sql"""
@@ -73,8 +72,7 @@ private class SubscriberTableCreatorImpl[Interpretation[_]: BracketThrow: Logger
 }
 
 private object SubscriberTableCreator {
-  def apply[Interpretation[_]: BracketThrow: Logger](
+  def apply[Interpretation[_]: MonadCancelThrow: Logger](
       sessionResource: SessionResource[Interpretation, EventLogDB]
-  ): SubscriberTableCreator[Interpretation] =
-    new SubscriberTableCreatorImpl(sessionResource)
+  ): SubscriberTableCreator[Interpretation] = new SubscriberTableCreatorImpl(sessionResource)
 }

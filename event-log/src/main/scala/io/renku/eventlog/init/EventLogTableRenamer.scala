@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.BracketThrow
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
@@ -33,13 +33,12 @@ private trait EventLogTableRenamer[Interpretation[_]] {
 }
 
 private object EventLogTableRenamer {
-  def apply[Interpretation[_]: BracketThrow: Logger](
+  def apply[Interpretation[_]: MonadCancelThrow: Logger](
       sessionResource: SessionResource[Interpretation, EventLogDB]
-  ): EventLogTableRenamer[Interpretation] =
-    new EventLogTableRenamerImpl(sessionResource)
+  ): EventLogTableRenamer[Interpretation] = new EventLogTableRenamerImpl(sessionResource)
 }
 
-private class EventLogTableRenamerImpl[Interpretation[_]: BracketThrow: Logger](
+private class EventLogTableRenamerImpl[Interpretation[_]: MonadCancelThrow: Logger](
     sessionResource: SessionResource[Interpretation, EventLogDB]
 ) extends EventLogTableRenamer[Interpretation]
     with EventTableCheck {
@@ -61,16 +60,13 @@ private class EventLogTableRenamerImpl[Interpretation[_]: BracketThrow: Logger](
     Kleisli(_.unique(query).recover { case _ => false })
   }
 
-  private def renameTable(): Kleisli[Interpretation, Session[Interpretation], Unit] =
-    for {
-      _ <- execute(sql"ALTER TABLE event_log RENAME TO event".command)
-      _ <- Kleisli.liftF(Logger[Interpretation] info "'event_log' table renamed to 'event'")
-    } yield ()
+  private def renameTable(): Kleisli[Interpretation, Session[Interpretation], Unit] = for {
+    _ <- execute(sql"ALTER TABLE event_log RENAME TO event".command)
+    _ <- Kleisli.liftF(Logger[Interpretation] info "'event_log' table renamed to 'event'")
+  } yield ()
 
-  private def dropOldTable(): Kleisli[Interpretation, Session[Interpretation], Unit] =
-    for {
-      _ <- execute(sql"DROP TABLE IF EXISTS event_log".command)
-      _ <- Kleisli.liftF(Logger[Interpretation] info "'event_log' table dropped")
-    } yield ()
-
+  private def dropOldTable(): Kleisli[Interpretation, Session[Interpretation], Unit] = for {
+    _ <- execute(sql"DROP TABLE IF EXISTS event_log".command)
+    _ <- Kleisli.liftF(Logger[Interpretation] info "'event_log' table dropped")
+  } yield ()
 }

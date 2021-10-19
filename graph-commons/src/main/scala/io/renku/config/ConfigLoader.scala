@@ -18,8 +18,8 @@
 
 package io.renku.config
 
-import cats.MonadError
 import cats.syntax.all._
+import cats.{MonadError, MonadThrow}
 import com.typesafe.config.Config
 import io.renku.tinytypes._
 import pureconfig._
@@ -37,19 +37,17 @@ object ConfigLoader {
     override def getMessage: String = failures.toList.map(_.description).mkString("; ")
   }
 
-  def find[Interpretation[_], T](
+  def find[Interpretation[_]: MonadThrow, T](
       key:           String,
       config:        Config
-  )(implicit reader: ConfigReader[T], ME: MonadError[Interpretation, Throwable]): Interpretation[T] =
-    fromEither {
-      ConfigSource.fromConfig(config).at(key).load[T]
-    }
+  )(implicit reader: ConfigReader[T]): Interpretation[T] = fromEither {
+    ConfigSource.fromConfig(config).at(key).load[T]
+  }
 
-  private def fromEither[Interpretation[_], T](
+  private def fromEither[Interpretation[_]: MonadThrow, T](
       loadedConfig: ConfigReaderFailures Either T
-  )(implicit ME:    MonadError[Interpretation, Throwable]): Interpretation[T] =
-    ME.fromEither[T] {
-
+  ): Interpretation[T] =
+    MonadThrow[Interpretation].fromEither[T] {
       loadedConfig leftMap (new ConfigLoadingException(_))
     }
 

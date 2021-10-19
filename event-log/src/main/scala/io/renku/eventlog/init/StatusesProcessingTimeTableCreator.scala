@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.BracketThrow
+import cats.effect.MonadCancelThrow
 import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
 import org.typelevel.log4cats.Logger
@@ -32,13 +32,13 @@ private trait StatusesProcessingTimeTableCreator[Interpretation[_]] {
 }
 
 private object StatusesProcessingTimeTableCreator {
-  def apply[Interpretation[_]: BracketThrow: Logger](
+  def apply[Interpretation[_]: MonadCancelThrow: Logger](
       sessionResource: SessionResource[Interpretation, EventLogDB]
   ): StatusesProcessingTimeTableCreator[Interpretation] =
     new StatusesProcessingTimeTableCreatorImpl[Interpretation](sessionResource)
 }
 
-private class StatusesProcessingTimeTableCreatorImpl[Interpretation[_]: BracketThrow: Logger](
+private class StatusesProcessingTimeTableCreatorImpl[Interpretation[_]: MonadCancelThrow: Logger](
     sessionResource: SessionResource[Interpretation, EventLogDB]
 ) extends StatusesProcessingTimeTableCreator[Interpretation] {
 
@@ -60,15 +60,14 @@ private class StatusesProcessingTimeTableCreatorImpl[Interpretation[_]: BracketT
     }
   }
 
-  private def createTable() =
-    for {
-      _ <- execute(createTableSql)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id       ON status_processing_time(event_id)".command)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id     ON status_processing_time(project_id)".command)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_status         ON status_processing_time(status)".command)
-      _ <- Kleisli.liftF(Logger[Interpretation] info "'status_processing_time' table created")
-      _ <- execute(foreignKeySql)
-    } yield ()
+  private def createTable() = for {
+    _ <- execute(createTableSql)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id       ON status_processing_time(event_id)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id     ON status_processing_time(project_id)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_status         ON status_processing_time(status)".command)
+    _ <- Kleisli.liftF(Logger[Interpretation] info "'status_processing_time' table created")
+    _ <- execute(foreignKeySql)
+  } yield ()
 
   private lazy val createTableSql: Command[Void] =
     sql"""

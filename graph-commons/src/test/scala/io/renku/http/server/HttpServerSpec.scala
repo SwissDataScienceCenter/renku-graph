@@ -24,16 +24,15 @@ import io.circe.literal._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.httpPorts
 import io.renku.http.server.EndpointTester._
+import io.renku.testtools.IOSpec
 import org.http4s._
-import org.http4s.client.blaze.BlazeClientBuilder
+import org.http4s.blaze.client.BlazeClientBuilder
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.`Content-Type`
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
-class HttpServerSpec extends AnyWordSpec with Http4sDsl[IO] with should.Matchers {
+class HttpServerSpec extends AnyWordSpec with IOSpec with Http4sDsl[IO] with should.Matchers {
 
   "run" should {
 
@@ -56,19 +55,12 @@ class HttpServerSpec extends AnyWordSpec with Http4sDsl[IO] with should.Matchers
   }
 
   private def execute(request: Request[IO]): Response[IO] =
-    BlazeClientBuilder[IO](global).resource
-      .use { httpClient =>
-        httpClient.run(request).use { response =>
-          IO.pure(response)
-        }
-      }
+    BlazeClientBuilder[IO].resource
+      .use(_.run(request).use(response => IO.pure(response)))
       .unsafeRunSync()
-
-  private implicit lazy val timer:        Timer[IO]        = IO.timer(global)
-  private implicit lazy val contextShift: ContextShift[IO] = IO.contextShift(global)
 
   private lazy val port    = httpPorts.generateOne
   private lazy val baseUri = Uri.unsafeFromString(s"http://localhost:$port")
   private lazy val routes  = HttpRoutes.of[IO] { case GET -> Root / "resource" => Ok("response") }
-  new HttpServer[IO](port.value, routes).run().unsafeRunAsyncAndForget()
+  HttpServer[IO](port.value, routes).run().unsafeRunAndForget()
 }

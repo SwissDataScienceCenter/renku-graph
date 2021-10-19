@@ -21,7 +21,7 @@ package io.renku.events.consumers
 import cats.Show
 import cats.data.EitherT
 import cats.effect.Concurrent
-import cats.effect.concurrent.Deferred
+import cats.effect.kernel.Deferred
 import cats.syntax.all._
 import io.renku.graph.model.projects
 

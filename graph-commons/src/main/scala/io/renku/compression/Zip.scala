@@ -19,7 +19,7 @@
 package io.renku.compression
 
 import cats.MonadThrow
-import cats.effect.{BracketThrow, Resource, Sync}
+import cats.effect.{MonadCancelThrow, Resource, Sync}
 import cats.syntax.all._
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
@@ -29,13 +29,13 @@ import scala.io.{Codec, Source}
 import scala.util.control.NonFatal
 
 trait Zip {
-  def zip[Interpretation[_]:   BracketThrow: Sync](content: String):      Interpretation[Array[Byte]]
-  def unzip[Interpretation[_]: BracketThrow: Sync](bytes:   Array[Byte]): Interpretation[String]
+  def zip[Interpretation[_]:   MonadCancelThrow: Sync](content: String):      Interpretation[Array[Byte]]
+  def unzip[Interpretation[_]: MonadCancelThrow: Sync](bytes:   Array[Byte]): Interpretation[String]
 }
 
 object Zip extends Zip {
 
-  def zip[Interpretation[_]: BracketThrow: Sync](content: String): Interpretation[Array[Byte]] = {
+  def zip[Interpretation[_]: MonadCancelThrow: Sync](content: String): Interpretation[Array[Byte]] = {
     val newStreams = MonadThrow[Interpretation].catchNonFatal {
       val arrOutputStream = new ByteArrayOutputStream(content.length)
       (arrOutputStream, new GZIPOutputStream(arrOutputStream))
@@ -57,14 +57,14 @@ object Zip extends Zip {
 
     Resource
       .make[Interpretation, (ByteArrayOutputStream, GZIPOutputStream)](newStreams)(closeStreams)
-      .use[Interpretation, Array[Byte]] { case (arrayOutputStream, zipOutputStream) =>
+      .use { case (arrayOutputStream, zipOutputStream) =>
         MonadThrow[Interpretation].catchNonFatal(zipContent(arrayOutputStream, zipOutputStream, content))
       } recoverWith { case NonFatal(error) =>
       new Exception("Zipping content failed", error).raiseError[Interpretation, Array[Byte]]
     }
   }
 
-  def unzip[Interpretation[_]: BracketThrow: Sync](bytes: Array[Byte]): Interpretation[String] =
+  def unzip[Interpretation[_]: MonadCancelThrow: Sync](bytes: Array[Byte]): Interpretation[String] =
     Resource
       .make[Interpretation, GZIPInputStream] {
         MonadThrow[Interpretation].catchNonFatal(new GZIPInputStream(new ByteArrayInputStream(bytes)))

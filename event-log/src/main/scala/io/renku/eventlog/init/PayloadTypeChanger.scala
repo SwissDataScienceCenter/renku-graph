@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.BracketThrow
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
@@ -33,12 +33,12 @@ private trait PayloadTypeChanger[Interpretation[_]] {
 }
 
 private object PayloadTypeChanger {
-  def apply[Interpretation[_]: BracketThrow: Logger](
+  def apply[Interpretation[_]: MonadCancelThrow: Logger](
       sessionResource: SessionResource[Interpretation, EventLogDB]
   ): PayloadTypeChanger[Interpretation] = new PayloadTypeChangerImpl(sessionResource)
 }
 
-private class PayloadTypeChangerImpl[Interpretation[_]: BracketThrow: Logger](
+private class PayloadTypeChangerImpl[Interpretation[_]: MonadCancelThrow: Logger](
     sessionResource: SessionResource[Interpretation, EventLogDB]
 ) extends PayloadTypeChanger[Interpretation] {
 

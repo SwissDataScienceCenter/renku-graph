@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.{Bracket, BracketThrow}
+import cats.effect.MonadCancelThrow
 import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
 import org.typelevel.log4cats.Logger
@@ -32,13 +32,12 @@ private trait EventPayloadTableCreator[Interpretation[_]] {
 }
 
 private object EventPayloadTableCreator {
-  def apply[Interpretation[_]: BracketThrow: Logger](
+  def apply[Interpretation[_]: MonadCancelThrow: Logger](
       sessionResource: SessionResource[Interpretation, EventLogDB]
-  ): EventPayloadTableCreator[Interpretation] =
-    new EventPayloadTableCreatorImpl(sessionResource)
+  ): EventPayloadTableCreator[Interpretation] = new EventPayloadTableCreatorImpl(sessionResource)
 }
 
-private class EventPayloadTableCreatorImpl[Interpretation[_]: BracketThrow: Logger](
+private class EventPayloadTableCreatorImpl[Interpretation[_]: MonadCancelThrow: Logger](
     sessionResource: SessionResource[Interpretation, EventLogDB]
 ) extends EventPayloadTableCreator[Interpretation]
     with EventTableCheck {
@@ -52,7 +51,7 @@ private class EventPayloadTableCreatorImpl[Interpretation[_]: BracketThrow: Logg
         case false => createTable()
       },
       otherwise = Kleisli.liftF(
-        Bracket[Interpretation, Throwable].raiseError(
+        MonadCancelThrow[Interpretation].raiseError(
           new Exception("Event table missing; creation of event_payload is not possible")
         )
       )
@@ -61,19 +60,17 @@ private class EventPayloadTableCreatorImpl[Interpretation[_]: BracketThrow: Logg
 
   private def checkTableExists: Kleisli[Interpretation, Session[Interpretation], Boolean] = {
     val query: Query[Void, Boolean] =
-      sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_payload')"
-        .query(bool)
+      sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_payload')".query(bool)
     Kleisli(_.unique(query).recover { case _ => false })
   }
 
-  private def createTable(): Kleisli[Interpretation, Session[Interpretation], Unit] =
-    for {
-      _ <- execute(createTableSql)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id ON event_payload(event_id)".command)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON event_payload(project_id)".command)
-      _ <- Kleisli.liftF(Logger[Interpretation] info "'event_payload' table created")
-      _ <- execute(foreignKeySql)
-    } yield ()
+  private def createTable(): Kleisli[Interpretation, Session[Interpretation], Unit] = for {
+    _ <- execute(createTableSql)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id ON event_payload(event_id)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON event_payload(project_id)".command)
+    _ <- Kleisli.liftF(Logger[Interpretation] info "'event_payload' table created")
+    _ <- execute(foreignKeySql)
+  } yield ()
 
   private lazy val createTableSql: Command[Void] =
     sql"""

@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.BracketThrow
+import cats.effect.MonadCancelThrow
 import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
 import org.typelevel.log4cats.Logger
@@ -32,13 +32,12 @@ private trait ProjectTableCreator[Interpretation[_]] {
 }
 
 private object ProjectTableCreator {
-  def apply[Interpretation[_]: BracketThrow: Logger](
+  def apply[Interpretation[_]: MonadCancelThrow: Logger](
       sessionResource: SessionResource[Interpretation, EventLogDB]
-  ): ProjectTableCreator[Interpretation] =
-    new ProjectTableCreatorImpl(sessionResource)
+  ): ProjectTableCreator[Interpretation] = new ProjectTableCreatorImpl(sessionResource)
 }
 
-private class ProjectTableCreatorImpl[Interpretation[_]: BracketThrow: Logger](
+private class ProjectTableCreatorImpl[Interpretation[_]: MonadCancelThrow: Logger](
     sessionResource: SessionResource[Interpretation, EventLogDB]
 ) extends ProjectTableCreator[Interpretation]
     with EventTableCheck {

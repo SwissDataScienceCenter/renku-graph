@@ -18,50 +18,42 @@
 
 package io.renku.events.consumers.subscriptions
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.MonadThrow
+import cats.effect.kernel.{Async, Temporal}
+import cats.syntax.all._
 import io.circe.Json
 import io.renku.control.Throttler
 import io.renku.graph.config.EventLogUrl
 import io.renku.http.client.RestClient
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
 private trait SubscriptionSender[Interpretation[_]] {
   def postToEventLog(subscriptionPayload: Json): Interpretation[Unit]
 }
 
-private class IOSubscriptionSender(
-    eventLogUrl:             EventLogUrl,
-    logger:                  Logger[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends RestClient[IO, IOSubscriptionSender](Throttler.noThrottling, logger)
-    with SubscriptionSender[IO] {
+private class SubscriptionSenderImpl[Interpretation[_]: Async: Temporal: Logger](
+    eventLogUrl: EventLogUrl
+) extends RestClient[Interpretation, SubscriptionSender[Interpretation]](Throttler.noThrottling)
+    with SubscriptionSender[Interpretation] {
 
-  import cats.effect._
   import org.http4s.Method.POST
   import org.http4s.Status.Accepted
   import org.http4s.circe._
   import org.http4s.{Request, Response, Status}
 
-  override def postToEventLog(subscriptionPayload: Json): IO[Unit] = for {
+  override def postToEventLog(subscriptionPayload: Json): Interpretation[Unit] = for {
     uri           <- validateUri(s"$eventLogUrl/subscriptions")
     sendingResult <- send(request(POST, uri).withEntity(subscriptionPayload))(mapResponse)
   } yield sendingResult
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
-    case (Accepted, _, _) => IO.unit
+  private lazy val mapResponse
+      : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[Unit]] = {
+    case (Accepted, _, _) => MonadThrow[Interpretation].unit
   }
 }
 
-private object IOSubscriptionSender {
-  def apply(
-      logger: Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[SubscriptionSender[IO]] = for {
-    eventLogUrl <- EventLogUrl[IO]()
-  } yield new IOSubscriptionSender(eventLogUrl, logger)
+private object SubscriptionSender {
+  def apply[Interpretation[_]: Async: Temporal: Logger]: Interpretation[SubscriptionSender[Interpretation]] = for {
+    eventLogUrl <- EventLogUrl[Interpretation]()
+  } yield new SubscriptionSenderImpl(eventLogUrl)
 }

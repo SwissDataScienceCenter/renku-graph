@@ -19,7 +19,8 @@
 package io.renku.http.server
 
 import cats.data.{Kleisli, OptionT}
-import cats.effect.{ContextShift, IO, Resource, Sync}
+import cats.effect.unsafe.IORuntime
+import cats.effect.{Concurrent, IO, Resource}
 import cats.syntax.all._
 import eu.timepit.refined.api.RefType
 import io.circe._
@@ -32,11 +33,7 @@ import org.http4s.circe.{jsonEncoderOf, jsonOf}
 import org.http4s.headers.`Content-Type`
 import org.http4s.server.AuthMiddleware
 
-import scala.concurrent.ExecutionContext
-
 object EndpointTester {
-
-  implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
 
   implicit val jsonEntityDecoder:     EntityDecoder[IO, Json]       = jsonOf[IO, Json]
   implicit val jsonListEntityDecoder: EntityDecoder[IO, List[Json]] = jsonOf[IO, List[Json]]
@@ -44,7 +41,8 @@ object EndpointTester {
 
   implicit class ResourceEndpointOps(endpoint: Resource[IO, Kleisli[IO, Request[IO], Response[IO]]]) {
 
-    def call(request: Request[IO]) = new {
+    def call(request: Request[IO])(implicit runtime: IORuntime) = new {
+
       private val runResponse: Response[IO] = endpoint.use(_.run(request)).unsafeRunSync()
 
       lazy val status:      Status                 = runResponse.status
@@ -68,7 +66,7 @@ object EndpointTester {
       .leftMap(error => DecodingFailure(s"Cannot deserialize 'message' to ErrorMessage: $error", Nil))
   }
 
-  implicit def errorMessageEntityDecoder[F[_]: Sync]: EntityDecoder[F, ErrorMessage] = jsonOf[F, ErrorMessage]
+  implicit def errorMessageEntityDecoder[F[_]: Concurrent]: EntityDecoder[F, ErrorMessage] = jsonOf[F, ErrorMessage]
 
   implicit class JsonOps(json: Json) {
     import io.circe.Decoder

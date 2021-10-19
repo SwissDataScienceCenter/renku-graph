@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.{Bracket, BracketThrow}
+import cats.effect.{Bracket, BracketThrow, MonadCancel, MonadCancelThrow}
 import cats.syntax.all._
 import io.circe.parser._
 import io.circe.{Decoder, HCursor}
@@ -40,13 +40,13 @@ private trait ProjectPathAdder[Interpretation[_]] {
 }
 
 private object ProjectPathAdder {
-  def apply[Interpretation[_]: BracketThrow: Logger](
+  def apply[Interpretation[_]: MonadCancelThrow: Logger](
       sessionResource: SessionResource[Interpretation, EventLogDB]
   ): ProjectPathAdder[Interpretation] =
     new ProjectPathAdderImpl(sessionResource)
 }
 
-private class ProjectPathAdderImpl[Interpretation[_]: BracketThrow: Logger](
+private class ProjectPathAdderImpl[Interpretation[_]: MonadCancelThrow: Logger](
     sessionResource: SessionResource[Interpretation, EventLogDB]
 ) extends ProjectPathAdder[Interpretation]
     with EventTableCheck
@@ -92,7 +92,7 @@ private class ProjectPathAdderImpl[Interpretation[_]: BracketThrow: Logger](
     bodies.map(parseToProjectIdAndPath).sequence
 
   private def parseToProjectIdAndPath(body: String): Interpretation[(Id, Path)] =
-    Bracket[Interpretation, Throwable].fromEither {
+    MonadCancelThrow[Interpretation].fromEither {
       for {
         json  <- parse(body)
         tuple <- json.as[(Id, Path)]

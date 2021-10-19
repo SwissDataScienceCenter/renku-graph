@@ -18,8 +18,9 @@
 
 package io.renku.logging
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.effect.Clock
+import cats.effect.kernel.Sync
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
@@ -29,33 +30,26 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.duration.TimeUnit
 import scala.util.Try
 
 object TestExecutionTimeRecorder {
 
-  def apply[Interpretation[_]](
-      logger:         Logger[Interpretation],
+  def apply[Interpretation[_]: Sync: Logger](
       maybeHistogram: Option[Histogram] = None
-  )(implicit ME:      MonadError[Interpretation, Throwable]): TestExecutionTimeRecorder[Interpretation] =
-    new TestExecutionTimeRecorder[Interpretation](
-      threshold = elapsedTimes.generateOne,
-      logger,
-      maybeHistogram
-    )
+  ): TestExecutionTimeRecorder[Interpretation] =
+    new TestExecutionTimeRecorder[Interpretation](threshold = elapsedTimes.generateOne, maybeHistogram)
 
   private implicit def clock[Interpretation[_]]: Clock[Interpretation] = new Clock[Interpretation] {
-    override def realTime(unit: TimeUnit)  = ???
-    override def monotonic(unit: TimeUnit) = ???
+    override def realTime    = ???
+    override def monotonic   = ???
+    override def applicative = ???
   }
 }
 
-class TestExecutionTimeRecorder[Interpretation[_]](
+class TestExecutionTimeRecorder[Interpretation[_]: Sync: Logger: Clock](
     threshold:      ElapsedTime,
-    logger:         Logger[Interpretation],
     maybeHistogram: Option[Histogram]
-)(implicit clock:   Clock[Interpretation], ME: MonadError[Interpretation, Throwable])
-    extends ExecutionTimeRecorder[Interpretation](threshold, logger, maybeHistogram) {
+) extends ExecutionTimeRecorder[Interpretation](threshold, maybeHistogram) {
 
   val elapsedTime:            ElapsedTime = threshold
   lazy val executionTimeInfo: String      = s" in ${threshold}ms"
@@ -65,7 +59,7 @@ class TestExecutionTimeRecorder[Interpretation[_]](
       maybeHistogramLabel: Option[String Refined NonEmpty] = None
   ): Interpretation[(ElapsedTime, BlockOut)] =
     for {
-      _ <- ME.unit
+      _ <- MonadThrow[Interpretation].unit
       maybeHistogramTimer = startTimer(maybeHistogramLabel)
       result <- block
       _ = maybeHistogramTimer map (_.observeDuration())

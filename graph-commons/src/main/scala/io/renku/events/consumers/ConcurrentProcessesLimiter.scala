@@ -20,8 +20,8 @@ package io.renku.events.consumers
 
 import cats.MonadThrow
 import cats.data.EitherT
-import cats.effect.concurrent.Semaphore
-import cats.effect.{Concurrent, ContextShift, IO}
+import cats.effect.std.Semaphore
+import cats.effect.{Concurrent, IO}
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
@@ -38,7 +38,7 @@ object ConcurrentProcessesLimiter {
 
   def apply(
       processesCount:    Int Refined Positive
-  )(implicit concurrent: Concurrent[IO], contextShift: ContextShift[IO]): IO[ConcurrentProcessesLimiter[IO]] = for {
+  )(implicit concurrent: Concurrent[IO]): IO[ConcurrentProcessesLimiter[IO]] = for {
     semaphore <- Semaphore(processesCount.value)
   } yield new ConcurrentProcessesLimiterImpl[IO](processesCount, semaphore)
 
@@ -65,7 +65,7 @@ object ConcurrentProcessesLimiter {
     }
 }
 
-class ConcurrentProcessesLimiterImpl[Interpretation[_]: MonadThrow: ContextShift: Concurrent](
+class ConcurrentProcessesLimiterImpl[Interpretation[_]: MonadThrow: Concurrent](
     processesCount: Int Refined Positive,
     semaphore:      Semaphore[Interpretation]
 ) extends ConcurrentProcessesLimiter[Interpretation] {

@@ -20,11 +20,13 @@ package io.renku.db
 
 import cats.data.Kleisli
 import cats.effect._
+import cats.effect.std.Console
+import fs2.io.net.Network
 import io.renku.db.DBConfigProvider.DBConfig
 import natchez.Trace
 import skunk.{Session, Transaction}
 
-class SessionResource[Interpretation[_]: BracketThrow, TargetDB](
+class SessionResource[Interpretation[_]: MonadCancelThrow, TargetDB](
     resource: Resource[Interpretation, Session[Interpretation]]
 ) {
 
@@ -37,11 +39,10 @@ class SessionResource[Interpretation[_]: BracketThrow, TargetDB](
   ): Interpretation[ResultType] = resource.use { session =>
     session.transaction.use(transaction => query.run((transaction, session)))
   }
-
 }
 
 object SessionPoolResource {
-  def apply[Interpretation[_]: Concurrent: ContextShift: Trace, TargetDB](
+  def apply[Interpretation[_]: Concurrent: Trace: Network: Console, TargetDB](
       dbConfig: DBConfig[TargetDB]
   ): Resource[Interpretation, SessionResource[Interpretation, TargetDB]] =
     Session

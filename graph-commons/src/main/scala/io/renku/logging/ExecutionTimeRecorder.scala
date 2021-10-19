@@ -18,8 +18,7 @@
 
 package io.renku.logging
 
-import cats.MonadError
-import cats.effect.Clock
+import cats.effect.{Clock, Sync}
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
@@ -34,37 +33,34 @@ import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 import scala.util.Try
 
-class ExecutionTimeRecorder[Interpretation[_]](
-    threshold:      ElapsedTime,
-    logger:         Logger[Interpretation],
-    maybeHistogram: Option[Histogram]
-)(implicit clock:   Clock[Interpretation], ME: MonadError[Interpretation, Throwable]) {
+class ExecutionTimeRecorder[Interpretation[_]: Sync: Clock: Logger](threshold: ElapsedTime,
+                                                                    maybeHistogram: Option[Histogram]
+) {
 
-  // format: off
-  def measureExecutionTime[BlockOut](block: => Interpretation[BlockOut], 
-                                     maybeHistogramLabel: Option[String Refined NonEmpty] = None): Interpretation[(ElapsedTime, BlockOut)] =
-    for {
-      startTime           <- clock monotonic MILLISECONDS
-      maybeHistogramTimer = startTimer(maybeHistogramLabel)
-      result              <- block
-      _                   = maybeHistogramTimer map (_.observeDuration())
-      endTime             <- clock monotonic MILLISECONDS
-      elapsedTime         <- ME.fromEither(ElapsedTime.from(endTime - startTime))
-    } yield (elapsedTime, result)
-  // format: on
-
-  private def startTimer(maybeHistogramLabel: Option[String Refined NonEmpty]) =
-    maybeHistogram flatMap { histogram =>
-      Try {
-        maybeHistogramLabel
-          .map(label => histogram.labels(label.value).startTimer())
-          .getOrElse(histogram.startTimer())
-      }.toOption.orElse {
-        val histogramName = histogram.describe().asScala.headOption.map(_.name).getOrElse("Execution Time Recorder")
-        logger.error(s"$histogramName histogram labels not configured correctly")
-        None
+  def measureExecutionTime[BlockOut](block:               => Interpretation[BlockOut],
+                                     maybeHistogramLabel: Option[String Refined NonEmpty] = None
+  ): Interpretation[(ElapsedTime, BlockOut)] =
+    Clock[Interpretation]
+      .timed {
+        for {
+          maybeHistogramTimer <- Sync[Interpretation].blocking(startTimer(maybeHistogramLabel))
+          result              <- block
+          _                   <- Sync[Interpretation].blocking(maybeHistogramTimer.map(_.observeDuration()))
+        } yield result
       }
+      .map { case (elapsedTime, result) => ElapsedTime(elapsedTime) -> result }
+
+  private def startTimer(maybeHistogramLabel: Option[String Refined NonEmpty]) = maybeHistogram >>= { histogram =>
+    Try {
+      maybeHistogramLabel
+        .map(label => histogram.labels(label.value).startTimer())
+        .getOrElse(histogram.startTimer())
+    }.toOption.orElse {
+      val histogramName = histogram.describe().asScala.headOption.map(_.name).getOrElse("Execution Time Recorder")
+      Logger[Interpretation].error(s"$histogramName histogram labels not configured correctly")
+      None
     }
+  }
 
   def logExecutionTimeWhen[BlockOut](
       condition: PartialFunction[BlockOut, String]
@@ -89,23 +85,17 @@ class ExecutionTimeRecorder[Interpretation[_]](
       condition:   PartialFunction[BlockOut, String]
   ): Unit =
     if (elapsedTime.value >= threshold.value)
-      (condition lift blockOut) foreach (message => logger.warn(s"$message in ${elapsedTime}ms"))
+      (condition lift blockOut) foreach (message => Logger[Interpretation].warn(s"$message in ${elapsedTime}ms"))
 }
 
 object ExecutionTimeRecorder {
 
-  def apply[Interpretation[_]](
-      logger:         Logger[Interpretation],
+  def apply[Interpretation[_]: Sync: Clock: Logger](
       config:         Config = ConfigFactory.load(),
       maybeHistogram: Option[Histogram] = None
-  )(implicit
-      clock: Clock[Interpretation],
-      ME:    MonadError[Interpretation, Throwable]
-  ): Interpretation[ExecutionTimeRecorder[Interpretation]] =
-    for {
-      duration  <- find[Interpretation, FiniteDuration]("logging.elapsed-time-threshold", config)
-      threshold <- ME.fromEither(ElapsedTime from duration.toMillis)
-    } yield new ExecutionTimeRecorder(threshold, logger, maybeHistogram)
+  ): Interpretation[ExecutionTimeRecorder[Interpretation]] = for {
+    duration <- find[Interpretation, FiniteDuration]("logging.elapsed-time-threshold", config)
+  } yield new ExecutionTimeRecorder(ElapsedTime(duration), maybeHistogram)
 
   class ElapsedTime private (val value: Long) extends AnyVal with LongTinyType
   object ElapsedTime extends TinyTypeFactory[ElapsedTime](new ElapsedTime(_)) {
@@ -113,5 +103,7 @@ object ExecutionTimeRecorder {
       check = _ >= 0,
       message = (_: Long) => s"$typeName cannot be < 0"
     )
+
+    def apply(elapsedTime: FiniteDuration): ElapsedTime = ElapsedTime(elapsedTime.toMillis)
   }
 }

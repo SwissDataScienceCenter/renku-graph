@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.BracketThrow
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
@@ -37,13 +37,12 @@ private trait BatchDateAdder[Interpretation[_]] {
 }
 
 private object BatchDateAdder {
-  def apply[Interpretation[_]: BracketThrow: Logger](
+  def apply[Interpretation[_]: MonadCancelThrow: Logger](
       sessionResource: SessionResource[Interpretation, EventLogDB]
-  ): BatchDateAdder[Interpretation] =
-    new BatchDateAdderImpl(sessionResource)
+  ): BatchDateAdder[Interpretation] = new BatchDateAdderImpl(sessionResource)
 }
 
-private class BatchDateAdderImpl[Interpretation[_]: BracketThrow: Logger](
+private class BatchDateAdderImpl[Interpretation[_]: MonadCancelThrow: Logger](
     sessionResource: SessionResource[Interpretation, EventLogDB]
 ) extends BatchDateAdder[Interpretation]
     with EventTableCheck {

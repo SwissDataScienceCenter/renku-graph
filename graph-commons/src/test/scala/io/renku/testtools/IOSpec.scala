@@ -16,17 +16,22 @@
  * limitations under the License.
  */
 
-package io.renku.http.server
+package io.renku.testtools
 
-import cats.effect.{ContextShift, ExitCode, IO, Timer}
-import org.http4s.HttpRoutes
+import cats.effect.unsafe
+import cats.effect.unsafe.IORuntime
+import org.scalatest.Suite
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.ExecutionContext.global
 
-class IOHttpServer(
-    serverPort:    Int,
-    serviceRoutes: HttpRoutes[IO]
-)(implicit timer:  Timer[IO], contextShift: ContextShift[IO], executionContext: ExecutionContext)
-    extends HttpServer[IO](serverPort, serviceRoutes) {
-  override def run(): IO[ExitCode] = ???
+trait IOSpec {
+  self: Suite =>
+
+  private def createIORuntime: unsafe.IORuntime = {
+    val (blocking, blockingSD)   = unsafe.IORuntime.createDefaultBlockingExecutionContext()
+    val (scheduler, schedulerSD) = unsafe.IORuntime.createDefaultScheduler()
+    unsafe.IORuntime(global, blocking, scheduler, { () => blockingSD(); schedulerSD(); }, unsafe.IORuntimeConfig())
+  }
+
+  implicit val ioRuntime: IORuntime = createIORuntime
 }

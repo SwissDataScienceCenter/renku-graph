@@ -27,6 +27,7 @@ import io.renku.http.ErrorMessage._
 import io.renku.http.server.EndpointTester._
 import io.renku.http.server.security.EndpointSecurityException.AuthenticationFailure
 import io.renku.http.server.security.model.AuthUser
+import io.renku.testtools.IOSpec
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{AuthedRoutes, Request, Response}
 import org.scalamock.scalatest.MockFactory
@@ -36,7 +37,12 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.util.Try
 
-class AuthenticationSpec extends AnyWordSpec with should.Matchers with MockFactory with ScalaCheckPropertyChecks {
+class AuthenticationSpec
+    extends AnyWordSpec
+    with IOSpec
+    with should.Matchers
+    with MockFactory
+    with ScalaCheckPropertyChecks {
 
   "authenticateInNeeded" should {
 

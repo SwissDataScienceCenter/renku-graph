@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.BracketThrow
+import cats.effect.MonadCancelThrow
 import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
 import org.typelevel.log4cats.Logger
@@ -31,7 +31,7 @@ private trait EventDeliveryTableCreator[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
-private class EventDeliveryTableCreatorImpl[Interpretation[_]: BracketThrow: Logger](
+private class EventDeliveryTableCreatorImpl[Interpretation[_]: MonadCancelThrow: Logger](
     sessionResource: SessionResource[Interpretation, EventLogDB]
 ) extends EventDeliveryTableCreator[Interpretation] {
 
@@ -51,15 +51,14 @@ private class EventDeliveryTableCreatorImpl[Interpretation[_]: BracketThrow: Log
     Kleisli(_.unique(query).recover { case _ => false })
   }
 
-  private def createTable(): Kleisli[Interpretation, Session[Interpretation], Unit] =
-    for {
-      _ <- execute(createTableSql)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id    ON event_delivery(event_id)".command)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id  ON event_delivery(project_id)".command)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_delivery_id ON event_delivery(delivery_id)".command)
-      _ <- Kleisli.liftF(Logger[Interpretation] info "'event_delivery' table created")
-      _ <- execute(foreignKeySql)
-    } yield ()
+  private def createTable(): Kleisli[Interpretation, Session[Interpretation], Unit] = for {
+    _ <- execute(createTableSql)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id    ON event_delivery(event_id)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id  ON event_delivery(project_id)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_delivery_id ON event_delivery(delivery_id)".command)
+    _ <- Kleisli.liftF(Logger[Interpretation] info "'event_delivery' table created")
+    _ <- execute(foreignKeySql)
+  } yield ()
 
   private lazy val createTableSql: Command[Void] = sql"""
     CREATE TABLE IF NOT EXISTS event_delivery(
@@ -77,8 +76,7 @@ private class EventDeliveryTableCreatorImpl[Interpretation[_]: BracketThrow: Log
 }
 
 private object EventDeliveryTableCreator {
-  def apply[Interpretation[_]: BracketThrow: Logger](
+  def apply[Interpretation[_]: MonadCancelThrow: Logger](
       sessionResource: SessionResource[Interpretation, EventLogDB]
-  ): EventDeliveryTableCreator[Interpretation] =
-    new EventDeliveryTableCreatorImpl(sessionResource)
+  ): EventDeliveryTableCreator[Interpretation] = new EventDeliveryTableCreatorImpl(sessionResource)
 }

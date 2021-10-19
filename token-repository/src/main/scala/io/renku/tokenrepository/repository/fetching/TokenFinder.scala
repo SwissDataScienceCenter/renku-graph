@@ -49,13 +49,12 @@ private class TokenFinder[Interpretation[_]: Async: MonadError[*[_], Throwable]]
 
 private object IOTokenFinder {
   def apply(
-      sessionResource:     SessionResource[IO, ProjectsTokensDB],
-      queriesExecTimes:    LabeledHistogram[IO, SqlStatement.Name]
-  )(implicit contextShift: ContextShift[IO]): IO[TokenFinder[IO]] =
-    for {
-      accessTokenCrypto <- AccessTokenCrypto[IO]()
-    } yield new TokenFinder[IO](
-      new IOPersistedTokensFinder(sessionResource, queriesExecTimes),
-      accessTokenCrypto
-    )
+      sessionResource:  SessionResource[IO, ProjectsTokensDB],
+      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
+  ): IO[TokenFinder[IO]] = for {
+    accessTokenCrypto <- AccessTokenCrypto[IO]()
+  } yield new TokenFinder[IO](
+    new IOPersistedTokensFinder(sessionResource, queriesExecTimes),
+    accessTokenCrypto
+  )
 }

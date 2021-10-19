@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.init
 
-import cats.effect.{BracketThrow, ContextShift, IO}
+import cats.effect.{IO, MonadCancelThrow}
 import cats.syntax.all._
 import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
@@ -32,7 +32,7 @@ trait DbInitializer[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
-class DbInitializerImpl[Interpretation[_]: BracketThrow: Logger](migrators: List[Runnable[Interpretation, Unit]])
+class DbInitializerImpl[Interpretation[_]: MonadCancelThrow: Logger](migrators: List[Runnable[Interpretation, Unit]])
     extends DbInitializer[Interpretation] {
 
   override def run(): Interpretation[Unit] = {
@@ -46,9 +46,7 @@ class DbInitializerImpl[Interpretation[_]: BracketThrow: Logger](migrators: List
 }
 
 object DbInitializer {
-  def apply(
-      sessionResource:     SessionResource[IO, EventLogDB]
-  )(implicit contextShift: ContextShift[IO], logger: Logger[IO]): IO[DbInitializer[IO]] = IO {
+  def apply(sessionResource: SessionResource[IO, EventLogDB])(implicit logger: Logger[IO]): IO[DbInitializer[IO]] = IO {
     new DbInitializerImpl[IO](
       migrators = List[Runnable[IO, Unit]](
         EventLogTableCreator(sessionResource),

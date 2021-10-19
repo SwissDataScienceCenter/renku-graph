@@ -18,13 +18,14 @@
 
 package io.renku.rdfstore
 
-import cats.MonadError
-import cats.effect.{Clock, IO}
+import cats.MonadThrow
+import cats.effect.{Clock, Sync}
+import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import io.prometheus.client.Histogram
-import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder}
+import io.renku.logging.ExecutionTimeRecorder
 import org.typelevel.log4cats.Logger
 
 class SparqlQueryTimeRecorder[Interpretation[_]](val instance: ExecutionTimeRecorder[Interpretation])
@@ -42,13 +43,10 @@ object SparqlQueryTimeRecorder {
 
   import io.renku.metrics.MetricsRegistry
 
-  def apply(
-      metricsRegistry: MetricsRegistry[IO],
-      logger:          Logger[IO] = ApplicationLogger
-  )(implicit clock:    Clock[IO], ME: MonadError[IO, Throwable]): IO[SparqlQueryTimeRecorder[IO]] =
-    for {
-      histogram             <- metricsRegistry.register[Histogram, Histogram.Builder](queriesExecutionTimesHistogram)
-      executionTimeRecorder <- ExecutionTimeRecorder[IO](logger, maybeHistogram = Some(histogram))
-    } yield new SparqlQueryTimeRecorder(executionTimeRecorder)
-
+  def apply[Interpretation[_]: Sync: Clock: Logger: MonadThrow](
+      metricsRegistry: MetricsRegistry[Interpretation]
+  ): Interpretation[SparqlQueryTimeRecorder[Interpretation]] = for {
+    histogram             <- metricsRegistry.register[Histogram, Histogram.Builder](queriesExecutionTimesHistogram)
+    executionTimeRecorder <- ExecutionTimeRecorder[Interpretation](maybeHistogram = Some(histogram))
+  } yield new SparqlQueryTimeRecorder(executionTimeRecorder)
 }

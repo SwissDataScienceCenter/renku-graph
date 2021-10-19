@@ -54,7 +54,7 @@ object Microservice extends IOMicroservice {
       sentryInitializer      <- SentryInitializer[IO]()
       metricsRegistry        <- MetricsRegistry()
       queriesExecTimes       <- QueriesExecutionTimes(metricsRegistry)
-      fetchTokenEndpoint     <- IOFetchTokenEndpoint(sessionResource, queriesExecTimes, logger)
+      fetchTokenEndpoint     <- IOFetchTokenEndpoint(sessionResource, queriesExecTimes)
       associateTokenEndpoint <- IOAssociateTokenEndpoint(sessionResource, queriesExecTimes, logger)
       dbInitializer          <- IODbInitializer(sessionResource, queriesExecTimes, logger)
       deleteTokenEndpoint    <- IODeleteTokenEndpoint(sessionResource, queriesExecTimes, logger)

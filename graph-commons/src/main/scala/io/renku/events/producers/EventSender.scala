@@ -19,7 +19,7 @@
 package io.renku.events.producers
 
 import cats.Eval
-import cats.effect.{ConcurrentEffect, IO, Timer}
+import cats.effect.{Async, Temporal}
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
@@ -34,8 +34,7 @@ import org.http4s.Status.{Accepted, BadGateway, GatewayTimeout, NotFound, Servic
 import org.http4s._
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.{Duration, FiniteDuration, _}
+import scala.concurrent.duration._
 import scala.language.postfixOps
 
 trait EventSender[Interpretation[_]] {
@@ -46,18 +45,16 @@ trait EventSender[Interpretation[_]] {
   ): Interpretation[Unit]
 }
 
-class EventSenderImpl[Interpretation[_]: ConcurrentEffect: Timer: Logger](
-    eventLogUrl:             EventLogUrl,
-    onErrorSleep:            FiniteDuration,
-    retryInterval:           FiniteDuration = SleepAfterConnectionIssue,
-    maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-    requestTimeoutOverride:  Option[Duration] = None
-)(implicit executionContext: ExecutionContext)
-    extends RestClient[Interpretation, Any](Throttler.noThrottling,
-                                            Logger[Interpretation],
-                                            retryInterval = retryInterval,
-                                            maxRetries = maxRetries,
-                                            requestTimeoutOverride = requestTimeoutOverride
+class EventSenderImpl[Interpretation[_]: Async: Temporal: Logger](
+    eventLogUrl:            EventLogUrl,
+    onErrorSleep:           FiniteDuration,
+    retryInterval:          FiniteDuration = SleepAfterConnectionIssue,
+    maxRetries:             Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
+    requestTimeoutOverride: Option[Duration] = None
+) extends RestClient[Interpretation, Any](Throttler.noThrottling,
+                                          retryInterval = retryInterval,
+                                          maxRetries = maxRetries,
+                                          requestTimeoutOverride = requestTimeoutOverride
     )
     with EventSender[Interpretation] {
 
@@ -103,7 +100,7 @@ class EventSenderImpl[Interpretation[_]: ConcurrentEffect: Timer: Logger](
 
   private def waitAndRetry(retry: Eval[Interpretation[Unit]], exception: Throwable, errorMessage: String) = for {
     _      <- Logger[Interpretation].error(exception)(errorMessage)
-    _      <- Timer[Interpretation] sleep onErrorSleep
+    _      <- Temporal[Interpretation] sleep onErrorSleep
     result <- retry.value
   } yield result
 
@@ -114,12 +111,7 @@ class EventSenderImpl[Interpretation[_]: ConcurrentEffect: Timer: Logger](
 }
 
 object EventSender {
-  def apply()(implicit
-      ec:     ExecutionContext,
-      ce:     ConcurrentEffect[IO],
-      timer:  Timer[IO],
-      logger: Logger[IO]
-  ): IO[EventSender[IO]] = for {
-    eventLogUrl <- EventLogUrl()
+  def apply[Interpretation[_]: Async: Temporal: Logger]: Interpretation[EventSender[Interpretation]] = for {
+    eventLogUrl <- EventLogUrl[Interpretation]()
   } yield new EventSenderImpl(eventLogUrl, onErrorSleep = 15 seconds)
 }

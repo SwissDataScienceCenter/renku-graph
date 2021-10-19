@@ -18,7 +18,9 @@
 
 package io.renku.graph.http.server.security
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.Async
+import cats.effect.kernel.Temporal
+import cats.syntax.all._
 import io.renku.config.GitLab
 import io.renku.control.Throttler
 import io.renku.graph.config.GitLabUrlLoader
@@ -29,17 +31,12 @@ import io.renku.http.server.security.model.AuthUser
 import io.renku.http.server.security.{Authenticator, EndpointSecurityException}
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
+class GitLabAuthenticatorImpl[Interpretation[_]: Async: Temporal: Logger](
+    gitLabApiUrl:    GitLabApiUrl,
+    gitLabThrottler: Throttler[Interpretation, GitLab]
+) extends RestClient(gitLabThrottler)
+    with Authenticator[Interpretation] {
 
-class GitLabAuthenticatorImpl(
-    gitLabApiUrl:            GitLabApiUrl,
-    gitLabThrottler:         Throttler[IO, GitLab],
-    logger:                  Logger[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends RestClient(gitLabThrottler, logger)
-    with Authenticator[IO] {
-
-  import cats.effect._
   import cats.syntax.all._
   import io.circe._
   import org.http4s.Method.GET
@@ -47,21 +44,25 @@ class GitLabAuthenticatorImpl(
   import org.http4s.circe.jsonOf
   import org.http4s.dsl.io._
 
-  override def authenticate(accessToken: AccessToken): IO[Either[EndpointSecurityException, AuthUser]] = for {
-    uri      <- validateUri(s"$gitLabApiUrl/user")
-    authUser <- send(request(GET, uri, accessToken))(mapResponse(accessToken))
-  } yield authUser
+  override def authenticate(accessToken: AccessToken): Interpretation[Either[EndpointSecurityException, AuthUser]] =
+    for {
+      uri      <- validateUri(s"$gitLabApiUrl/user")
+      authUser <- send(request(GET, uri, accessToken))(mapResponse(accessToken))
+    } yield authUser
 
   private def mapResponse(
       accessToken: AccessToken
-  ): PartialFunction[(Status, Request[IO], Response[IO]), IO[Either[EndpointSecurityException, AuthUser]]] = {
+  ): PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[
+    Either[EndpointSecurityException, AuthUser]
+  ]] = {
     case (Ok, _, response) =>
-      implicit val entityDecoder: EntityDecoder[IO, AuthUser] = decoder(accessToken)
-      response.as[AuthUser] map (Right(_))
-    case (NotFound | Unauthorized | Forbidden, _, _) => Left(AuthenticationFailure).pure[IO]
+      implicit val entityDecoder: EntityDecoder[Interpretation, AuthUser] = decoder(accessToken)
+      response.as[AuthUser] map (_.asRight[EndpointSecurityException])
+    case (NotFound | Unauthorized | Forbidden, _, _) =>
+      AuthenticationFailure.asLeft[AuthUser].leftWiden[EndpointSecurityException].pure[Interpretation]
   }
 
-  private def decoder(accessToken: AccessToken): EntityDecoder[IO, AuthUser] = {
+  private def decoder(accessToken: AccessToken): EntityDecoder[Interpretation, AuthUser] = {
 
     import io.renku.graph.model.users
     import io.renku.tinytypes.json.TinyTypeDecoders._
@@ -70,20 +71,15 @@ class GitLabAuthenticatorImpl(
       cursor.downField("id").as[users.GitLabId].map(AuthUser(_, accessToken))
     }
 
-    jsonOf[IO, AuthUser]
+    jsonOf[Interpretation, AuthUser]
   }
 }
 
 object GitLabAuthenticator {
 
-  def apply(
-      gitLabThrottler: Throttler[IO, GitLab],
-      logger:          Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[Authenticator[IO]] = for {
-    gitLabApiUrl <- GitLabUrlLoader[IO]().map(_.apiV4)
-  } yield new GitLabAuthenticatorImpl(gitLabApiUrl, gitLabThrottler, logger)
+  def apply[Interpretation[_]: Async: Temporal: Logger](
+      gitLabThrottler: Throttler[Interpretation, GitLab]
+  ): Interpretation[Authenticator[Interpretation]] = for {
+    gitLabApiUrl <- GitLabUrlLoader[Interpretation]().map(_.apiV4)
+  } yield new GitLabAuthenticatorImpl(gitLabApiUrl, gitLabThrottler)
 }

@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.BracketThrow
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
@@ -33,13 +33,12 @@ private trait TimestampZoneAdder[Interpretation[_]] {
 }
 
 private object TimestampZoneAdder {
-  def apply[Interpretation[_]: BracketThrow: Logger](
+  def apply[Interpretation[_]: MonadCancelThrow: Logger](
       sessionResource: SessionResource[Interpretation, EventLogDB]
-  ): TimestampZoneAdder[Interpretation] =
-    TimestampZoneAdderImpl(sessionResource)
+  ): TimestampZoneAdder[Interpretation] = TimestampZoneAdderImpl(sessionResource)
 }
 
-private case class TimestampZoneAdderImpl[Interpretation[_]: BracketThrow: Logger](
+private case class TimestampZoneAdderImpl[Interpretation[_]: MonadCancelThrow: Logger](
     sessionResource: SessionResource[Interpretation, EventLogDB]
 ) extends TimestampZoneAdder[Interpretation]
     with EventTableCheck {
@@ -99,5 +98,4 @@ private case class TimestampZoneAdderImpl[Interpretation[_]: BracketThrow: Logge
           sql"ALTER table project ALTER latest_event_date TYPE timestamptz USING latest_event_date AT TIME ZONE 'CEST' ".command
         )
     } yield ()
-
 }

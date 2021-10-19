@@ -50,14 +50,8 @@ import scala.util.control.NonFatal
 
 object Microservice extends IOMicroservice {
 
-  val ServicePort: Int Refined Positive = 9002
-
-  protected implicit override val executionContext: ExecutionContext =
-    ExecutionContext fromExecutorService newFixedThreadPool(ConfigSource.default.at("threads-number").loadOrThrow[Int])
-
-  protected implicit override def contextShift: ContextShift[IO] = IO.contextShift(executionContext)
-  protected implicit override def timer:        Timer[IO]        = IO.timer(executionContext)
-  private implicit val logger:                  Logger[IO]       = ApplicationLogger
+  val ServicePort:             Int Refined Positive = 9002
+  private implicit val logger: Logger[IO]           = ApplicationLogger
 
   private def parseConfigArgs(args: List[String]): IO[Config] = IO {
     args.headOption match {

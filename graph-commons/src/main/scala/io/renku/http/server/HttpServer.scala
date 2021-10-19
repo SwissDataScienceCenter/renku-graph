@@ -21,20 +21,24 @@ package io.renku.http.server
 import cats.data.Kleisli
 import cats.effect._
 import cats.syntax.all._
-import org.http4s.server.blaze._
+import org.http4s.blaze.server._
 import org.http4s.{HttpRoutes, Request, Response}
 
-import scala.concurrent.ExecutionContext
+trait HttpServer[F[_]] {
+  def run(): F[ExitCode]
+}
 
-class HttpServer[F[_]: ConcurrentEffect](
-    serverPort:    Int,
-    serviceRoutes: HttpRoutes[F]
-)(implicit timer:  Timer[F], executionContext: ExecutionContext) {
+object HttpServer {
+  def apply[F[_]: Async](serverPort: Int, serviceRoutes: HttpRoutes[F]): HttpServer[F] =
+    new HttpServerImpl[F](serverPort, serviceRoutes)
+}
+
+class HttpServerImpl[F[_]: Async](serverPort: Int, serviceRoutes: HttpRoutes[F]) extends HttpServer[F] {
 
   import QueryParameterTools.resourceNotFound
 
   def run(): F[ExitCode] =
-    BlazeServerBuilder[F](executionContext)
+    BlazeServerBuilder[F]
       .bindHttp(serverPort, "0.0.0.0")
       .withHttpApp(serviceRoutes.orNotFound)
       .serve

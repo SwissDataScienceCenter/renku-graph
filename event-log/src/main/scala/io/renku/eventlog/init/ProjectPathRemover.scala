@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.BracketThrow
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
@@ -33,13 +33,12 @@ private trait ProjectPathRemover[Interpretation[_]] {
 }
 
 private object ProjectPathRemover {
-  def apply[Interpretation[_]: BracketThrow: Logger](
+  def apply[Interpretation[_]: MonadCancelThrow: Logger](
       sessionResource: SessionResource[Interpretation, EventLogDB]
-  ): ProjectPathRemover[Interpretation] =
-    new ProjectPathRemoverImpl(sessionResource)
+  ): ProjectPathRemover[Interpretation] = new ProjectPathRemoverImpl(sessionResource)
 }
 
-private class ProjectPathRemoverImpl[Interpretation[_]: BracketThrow: Logger](
+private class ProjectPathRemoverImpl[Interpretation[_]: MonadCancelThrow: Logger](
     sessionResource: SessionResource[Interpretation, EventLogDB]
 ) extends ProjectPathRemover[Interpretation]
     with EventTableCheck {
@@ -66,10 +65,8 @@ private class ProjectPathRemoverImpl[Interpretation[_]: BracketThrow: Logger](
     }
   }
 
-  private def removeColumn(): Kleisli[Interpretation, Session[Interpretation], Unit] =
-    for {
-      _ <- execute(sql"ALTER TABLE event_log DROP COLUMN IF EXISTS project_path".command)
-      _ <- Kleisli.liftF(Logger[Interpretation] info "'project_path' column removed")
-    } yield ()
-
+  private def removeColumn(): Kleisli[Interpretation, Session[Interpretation], Unit] = for {
+    _ <- execute(sql"ALTER TABLE event_log DROP COLUMN IF EXISTS project_path".command)
+    _ <- Kleisli.liftF(Logger[Interpretation] info "'project_path' column removed")
+  } yield ()
 }

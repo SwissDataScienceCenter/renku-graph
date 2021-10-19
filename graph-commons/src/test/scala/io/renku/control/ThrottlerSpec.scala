@@ -22,16 +22,16 @@ import cats.effect._
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.control.RateLimitUnit._
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.util.concurrent.ConcurrentHashMap
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 import scala.language.postfixOps
 
-class ThrottlerSpec extends AnyWordSpec with should.Matchers {
+class ThrottlerSpec extends AnyWordSpec with IOSpec with should.Matchers {
 
   "Throttler" should {
 
@@ -42,15 +42,15 @@ class ThrottlerSpec extends AnyWordSpec with should.Matchers {
       val startTime = {
         for {
           throttler <- Throttler[IO, ThrottlingTarget](RateLimit(10L, per = Second))
-          startTime <- clock.monotonic(MILLISECONDS)
+          startTime <- Clock[IO].monotonic
           _         <- processConcurrently(tasksNumber, use = throttler)
         } yield startTime
       }.unsafeRunSync()
 
-      val startDelays = tasksStartDelays(startTime)
+      val startDelays = tasksStartDelays(startTime.toMillis)
       startDelays.sum / startDelays.size should be >= 100L
 
-      totalTasksStartDelay(startTime) should be > (tasksNumber * 100L)
+      totalTasksStartDelay(startTime.toMillis) should be > (tasksNumber * 100L)
     }
 
     "not sequence work items but process them in parallel" in new TestCase {
@@ -60,12 +60,12 @@ class ThrottlerSpec extends AnyWordSpec with should.Matchers {
       val startTime = {
         for {
           throttler <- Throttler[IO, ThrottlingTarget](RateLimit(200L, per = Second))
-          startTime <- clock.monotonic(MILLISECONDS)
+          startTime <- Clock[IO].monotonic
           _         <- processConcurrently(tasksNumber, use = throttler, taskProcessingTime = Some(1000 millis))
         } yield startTime
       }.unsafeRunSync()
 
-      totalTasksStartDelay(startTime) should be < (tasksNumber * 1000L)
+      totalTasksStartDelay(startTime.toMillis) should be < (tasksNumber * 1000L)
     }
   }
 
@@ -77,20 +77,14 @@ class ThrottlerSpec extends AnyWordSpec with should.Matchers {
 
       val startTime = {
         for {
-          startTime <- clock.monotonic(MILLISECONDS)
+          startTime <- Clock[IO].monotonic
           _         <- processConcurrently(tasksNumber, use = Throttler.noThrottling[IO, Any])
         } yield startTime
       }.unsafeRunSync()
 
-      tasksStartDelays(startTime) foreach { delay =>
-        delay should be < 100L
-      }
+      tasksStartDelays(startTime.toMillis) foreach { delay => delay should be < 100L }
     }
   }
-
-  private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
-  private implicit val timer:        Timer[IO]        = IO.timer(ExecutionContext.global)
-  private lazy val clock:            Clock[IO]        = timer.clock
 
   private trait TestCase {
 
@@ -106,9 +100,9 @@ class ThrottlerSpec extends AnyWordSpec with should.Matchers {
                                              taskProcessingTime: Option[FiniteDuration]
     ): IO[Unit] = for {
       _          <- throttler.acquire()
-      greenLight <- clock.monotonic(MILLISECONDS)
-      _          <- register.put(name.toString, greenLight).pure[IO]
-      _          <- taskProcessingTime.map(timer.sleep) getOrElse IO.unit
+      greenLight <- Clock[IO].monotonic
+      _          <- register.put(name.toString, greenLight.toMillis).pure[IO]
+      _          <- taskProcessingTime.map(Temporal[IO].sleep) getOrElse IO.unit
       _          <- throttler.release()
     } yield ()
 

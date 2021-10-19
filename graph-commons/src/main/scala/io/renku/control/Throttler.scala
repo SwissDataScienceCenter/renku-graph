@@ -18,8 +18,9 @@
 
 package io.renku.control
 
-import cats.effect.concurrent.{Ref, Semaphore}
-import cats.effect.{Concurrent, Timer}
+import cats.effect.kernel.Clock
+import cats.effect.std.Semaphore
+import cats.effect.{Concurrent, Ref, Temporal}
 import cats.syntax.all._
 import cats.{Applicative, MonadThrow}
 
@@ -32,7 +33,7 @@ trait Throttler[Interpretation[_], ThrottlingTarget] {
   def release(): Interpretation[Unit]
 }
 
-final class StandardThrottler[Interpretation[_]: MonadThrow: Timer, ThrottlingTarget] private[control] (
+final class StandardThrottler[Interpretation[_]: MonadThrow: Temporal: Clock, ThrottlingTarget] private[control] (
     rateLimit:         RateLimit[ThrottlingTarget],
     semaphore:         Semaphore[Interpretation],
     workersStartTimes: Ref[Interpretation, List[Long]]
@@ -41,13 +42,12 @@ final class StandardThrottler[Interpretation[_]: MonadThrow: Timer, ThrottlingTa
   private val MinTimeGap       = (rateLimit.per.multiplierFor(NANOSECONDS) / rateLimit.items.value).toLong
   private val NextAttemptSleep = FiniteDuration(MinTimeGap / 10, TimeUnit.NANOSECONDS)
 
-  override def acquire(): Interpretation[Unit] =
-    for {
-      _          <- semaphore.acquire
-      startTimes <- workersStartTimes.get
-      now        <- Timer[Interpretation].clock.monotonic(NANOSECONDS)
-      _          <- verifyThroughput(startTimes, now)
-    } yield ()
+  override def acquire(): Interpretation[Unit] = for {
+    _          <- semaphore.acquire
+    startTimes <- workersStartTimes.get
+    now        <- Clock[Interpretation].monotonic
+    _          <- verifyThroughput(startTimes, now.toNanos)
+  } yield ()
 
   private def verifyThroughput(startTimes: List[Long], now: Long) =
     if (notTooEarly(startTimes, now)) for {
@@ -57,7 +57,7 @@ final class StandardThrottler[Interpretation[_]: MonadThrow: Timer, ThrottlingTa
     else
       for {
         _ <- semaphore.release
-        _ <- Timer[Interpretation] sleep NextAttemptSleep
+        _ <- Temporal[Interpretation] sleep NextAttemptSleep
         _ <- acquire()
       } yield ()
 
@@ -70,26 +70,21 @@ final class StandardThrottler[Interpretation[_]: MonadThrow: Timer, ThrottlingTa
     durations.forall(_ >= MinTimeGap)
   }
 
-  override def release(): Interpretation[Unit] =
-    for {
-      _ <- semaphore.acquire
-      _ <- workersStartTimes.modify(old => old.tail -> old)
-      _ <- semaphore.release
-    } yield ()
+  override def release(): Interpretation[Unit] = for {
+    _ <- semaphore.acquire
+    _ <- workersStartTimes.modify(old => old.tail -> old)
+    _ <- semaphore.release
+  } yield ()
 }
 
 object Throttler {
 
-  def apply[Interpretation[_], ThrottlingTarget](
+  def apply[Interpretation[_]: Concurrent: Temporal: Clock, ThrottlingTarget](
       rateLimit: RateLimit[ThrottlingTarget]
-  )(implicit
-      F:     Concurrent[Interpretation],
-      timer: Timer[Interpretation]
-  ): Interpretation[Throttler[Interpretation, ThrottlingTarget]] =
-    for {
-      semaphore         <- Semaphore[Interpretation](1)
-      workersStartTimes <- timer.clock.monotonic(NANOSECONDS) flatMap (now => Ref.of(List(now)))
-    } yield new StandardThrottler[Interpretation, ThrottlingTarget](rateLimit, semaphore, workersStartTimes)
+  ): Interpretation[Throttler[Interpretation, ThrottlingTarget]] = for {
+    semaphore         <- Semaphore[Interpretation](1)
+    workersStartTimes <- Clock[Interpretation].monotonic flatMap (now => Ref.of(List(now.toNanos)))
+  } yield new StandardThrottler[Interpretation, ThrottlingTarget](rateLimit, semaphore, workersStartTimes)
 
   def noThrottling[Interpretation[_]: Applicative, ThrottlingTarget]: Throttler[Interpretation, ThrottlingTarget] =
     new Throttler[Interpretation, ThrottlingTarget] {

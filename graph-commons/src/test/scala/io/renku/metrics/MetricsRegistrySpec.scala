@@ -21,12 +21,13 @@ package io.renku.metrics
 import com.typesafe.config.ConfigFactory
 import io.prometheus.client.{Gauge => LibGauge}
 import io.renku.metrics.MetricsRegistry.{DisabledMetricsRegistry, EnabledMetricsRegistry}
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.jdk.CollectionConverters._
 
-class MetricsRegistrySpec extends AnyWordSpec with should.Matchers {
+class MetricsRegistrySpec extends AnyWordSpec with IOSpec with should.Matchers {
 
   "apply" should {
 

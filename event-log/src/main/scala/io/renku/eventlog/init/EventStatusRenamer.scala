@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.BracketThrow
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
@@ -34,7 +34,7 @@ trait EventStatusRenamer[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
-private case class EventStatusRenamerImpl[Interpretation[_]: BracketThrow: Logger](
+private case class EventStatusRenamerImpl[Interpretation[_]: MonadCancelThrow: Logger](
     sessionResource: SessionResource[Interpretation, EventLogDB]
 ) extends EventStatusRenamer[Interpretation] {
 
@@ -64,7 +64,7 @@ private case class EventStatusRenamerImpl[Interpretation[_]: BracketThrow: Logge
 }
 
 private object EventStatusRenamer {
-  def apply[Interpretation[_]: BracketThrow: Logger](
+  def apply[Interpretation[_]: MonadCancelThrow: Logger](
       sessionResource: SessionResource[Interpretation, EventLogDB]
   ): EventStatusRenamer[Interpretation] = EventStatusRenamerImpl(sessionResource)
 }

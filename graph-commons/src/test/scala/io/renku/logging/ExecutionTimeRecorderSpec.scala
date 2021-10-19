@@ -18,8 +18,7 @@
 
 package io.renku.logging
 
-import cats.MonadError
-import cats.effect.Clock
+import cats.effect.{Clock, IO, Temporal}
 import cats.syntax.all._
 import com.typesafe.config.ConfigFactory
 import eu.timepit.refined.api.Refined
@@ -32,7 +31,7 @@ import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
-import org.scalacheck.Gen
+import io.renku.testtools.IOSpec
 import org.scalacheck.Gen.finiteDuration
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -41,10 +40,12 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
-import scala.util.{Success, Try}
+import scala.language.postfixOps
+import scala.util.Try
 
 class ExecutionTimeRecorderSpec
     extends AnyWordSpec
+    with IOSpec
     with MockFactory
     with ScalaCheckPropertyChecks
     with should.Matchers {
@@ -53,59 +54,41 @@ class ExecutionTimeRecorderSpec
 
     "measure execution time of the given block and provide it to the output" in new TestCase {
 
-      val startTime = Gen.choose(0L, 10000000L).generateOne
-      (clock
-        .monotonic(_: TimeUnit))
-        .expects(MILLISECONDS)
-        .returning(startTime.pure[Try])
+      val elapsedTime = durations(min = 100 millis, max = 500 millis).map(ElapsedTime(_)).generateOne
+      val blockOut    = nonEmptyStrings().generateOne
+      block.expects().returning(Temporal[IO].delayBy(blockOut.pure[IO], elapsedTime.value millis))
 
-      val elapsedTime = elapsedTimes.generateOne
-      (clock
-        .monotonic(_: TimeUnit))
-        .expects(MILLISECONDS)
-        .returning((startTime + elapsedTime.value).pure[Try])
+      val actualElapsedTime -> actualOut = executionTimeRecorder.measureExecutionTime[String](block()).unsafeRunSync()
 
-      val blockOut = nonEmptyStrings().generateOne
-      block.expects().returning(blockOut.pure[Try])
-
-      executionTimeRecorder.measureExecutionTime[String] {
-        block()
-      } shouldBe (elapsedTime -> blockOut).pure[Try]
+      actualElapsedTime should be > elapsedTime
+      actualOut       shouldBe blockOut
     }
 
     "let the block failure propagate" in new TestCase {
 
-      val startTime = Gen.choose(0L, 10000000L).generateOne
-      (clock
-        .monotonic(_: TimeUnit))
-        .expects(MILLISECONDS)
-        .returning(startTime.pure[Try])
-
       val exception = exceptions.generateOne
-      block.expects().returning(exception.raiseError[Try, String])
+      block.expects().returning(exception.raiseError[IO, String])
 
-      executionTimeRecorder.measureExecutionTime[String] {
-        block()
-      } shouldBe exception.raiseError[Try, String]
+      intercept[Exception] {
+        executionTimeRecorder
+          .measureExecutionTime[String](block())
+          .unsafeRunSync()
+      } shouldBe exception
     }
 
     "made the given histogram to collect process' execution time - case without a label" in new TestCase {
       val histogram                      = Histogram.build("metric", "help").create()
-      override val executionTimeRecorder = new ExecutionTimeRecorder(loggingThreshold, logger, Some(histogram))
-
-      (clock
-        .monotonic(_: TimeUnit))
-        .expects(MILLISECONDS)
-        .returning(positiveLongs().generateOne.value.pure[Try])
+      override val executionTimeRecorder = new ExecutionTimeRecorder(loggingThreshold, Some(histogram))
 
       val blockOut = nonEmptyStrings().generateOne
-      block.expects().returning(blockOut.pure[Try])
+      block.expects().returning(blockOut.pure[IO])
 
       val blockExecutionTime = positiveInts(max = 100).generateOne.value
-      executionTimeRecorder.measureExecutionTime[String] {
-        Thread sleep blockExecutionTime
-        block()
-      }
+      executionTimeRecorder
+        .measureExecutionTime[String] {
+          Temporal[IO].delayBy(block(), blockExecutionTime millis)
+        }
+        .unsafeRunSync()
 
       val Some(sample) = histogram.collect().asScala.flatMap(_.samples.asScala).lastOption
       sample.value                should be >= blockExecutionTime.toDouble / 1000
@@ -115,23 +98,18 @@ class ExecutionTimeRecorderSpec
     "made the given histogram to collect process' execution time - case with a label" in new TestCase {
       val label: String Refined NonEmpty = "label"
       val histogram                      = Histogram.build("metric", "help").labelNames(label.value).create()
-      override val executionTimeRecorder = new ExecutionTimeRecorder(loggingThreshold, logger, Some(histogram))
-
-      (clock
-        .monotonic(_: TimeUnit))
-        .expects(MILLISECONDS)
-        .returning(positiveLongs().generateOne.value.pure[Try])
+      override val executionTimeRecorder = new ExecutionTimeRecorder(loggingThreshold, Some(histogram))
 
       val blockOut = nonEmptyStrings().generateOne
-      block.expects().returning(blockOut.pure[Try])
+      block.expects().returning(blockOut.pure[IO])
 
       val blockExecutionTime = positiveInts(max = 100).generateOne.value
-      executionTimeRecorder.measureExecutionTime[String]({
-                                                           Thread sleep blockExecutionTime
-                                                           block()
-                                                         },
-                                                         Some(label)
-      )
+      executionTimeRecorder
+        .measureExecutionTime[String](
+          Temporal[IO].delayBy(block(), blockExecutionTime millis),
+          Some(label)
+        )
+        .unsafeRunSync()
 
       val Some(sample) = histogram.collect().asScala.flatMap(_.samples.asScala).lastOption
       sample.value              should be >= blockExecutionTime.toDouble / 1000
@@ -142,21 +120,17 @@ class ExecutionTimeRecorderSpec
       val label: String Refined NonEmpty = "label"
       val histogramName                  = "metric"
       val histogram                      = Histogram.build(histogramName, "help").labelNames(label.value).create()
-      override val executionTimeRecorder = new ExecutionTimeRecorder(loggingThreshold, logger, Some(histogram))
-
-      (clock
-        .monotonic(_: TimeUnit))
-        .expects(MILLISECONDS)
-        .returning(positiveLongs().generateOne.value.pure[Try])
+      override val executionTimeRecorder = new ExecutionTimeRecorder(loggingThreshold, Some(histogram))
 
       val blockOut = nonEmptyStrings().generateOne
-      block.expects().returning(blockOut.pure[Try])
+      block.expects().returning(blockOut.pure[IO])
 
       val blockExecutionTime = positiveInts(max = 100).generateOne.value
-      executionTimeRecorder.measureExecutionTime[String] {
-        Thread sleep blockExecutionTime
-        block()
-      }
+      executionTimeRecorder
+        .measureExecutionTime[String] {
+          Temporal[IO].delayBy(block(), blockExecutionTime millis)
+        }
+        .unsafeRunSync()
 
       histogram.collect().asScala.flatMap(_.samples.asScala).lastOption shouldBe None
 
@@ -245,8 +219,7 @@ class ExecutionTimeRecorderSpec
   "apply" should {
 
     "read the logging threshold from 'logging.elapsed-time-threshold' and instantiate the recorder with it" in {
-      implicit val clock: Clock[Try] = mock[Clock[Try]]
-      val context = MonadError[Try, Throwable]
+      implicit val clock: Clock[IO] = mock[Clock[IO]]
 
       forAll(finiteDuration retryUntil (_.toMillis > 0)) { threshold =>
         val config = ConfigFactory.parseMap(
@@ -257,16 +230,17 @@ class ExecutionTimeRecorderSpec
           ).asJava
         )
 
-        val logger                         = TestLogger[Try]()
-        val Success(executionTimeRecorder) = ExecutionTimeRecorder[Try](logger, config)
+        implicit val logger: TestLogger[IO] = TestLogger[IO]()
+        val executionTimeRecorder = ExecutionTimeRecorder[IO](config).unsafeRunSync()
 
         val elapsedTime           = ElapsedTime(threshold.toMillis)
         val blockOut              = nonEmptyStrings().generateOne
         val blockExecutionMessage = "block executed"
 
-        context.pure(elapsedTime -> blockOut) map executionTimeRecorder.logExecutionTimeWhen { case _ =>
-          blockExecutionMessage
-        } shouldBe context.pure(blockOut)
+        (elapsedTime -> blockOut)
+          .pure[IO]
+          .map(executionTimeRecorder.logExecutionTimeWhen { case _ => blockExecutionMessage })
+          .unsafeRunSync() shouldBe blockOut
 
         logger.loggedOnly(Warn(s"$blockExecutionMessage in ${elapsedTime}ms"))
       }
@@ -275,11 +249,10 @@ class ExecutionTimeRecorderSpec
 
   private trait TestCase {
 
-    val block = mockFunction[Try[String]]
+    val block = mockFunction[IO[String]]
 
-    val loggingThreshold = ElapsedTime(1000)
-    val logger           = TestLogger[Try]()
-    implicit val clock: Clock[Try] = mock[Clock[Try]]
-    val executionTimeRecorder = new ExecutionTimeRecorder(loggingThreshold, logger, maybeHistogram = None)
+    val loggingThreshold = ElapsedTime(1000 millis)
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val executionTimeRecorder = new ExecutionTimeRecorder[IO](loggingThreshold, maybeHistogram = None)
   }
 }

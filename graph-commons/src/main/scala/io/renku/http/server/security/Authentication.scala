@@ -29,6 +29,7 @@ import org.http4s.AuthScheme.Bearer
 import org.http4s.Credentials.Token
 import org.http4s.headers.Authorization
 import org.http4s.{AuthedRoutes, Request}
+import org.typelevel.ci._
 
 private trait Authentication[Interpretation[_]] {
   def authenticateIfNeeded
@@ -41,7 +42,6 @@ private class AuthenticationImpl[Interpretation[_]](
 )(implicit ME:     MonadError[Interpretation, Throwable])
     extends Authentication[Interpretation] {
 
-  import org.http4s.util.CaseInsensitiveString
   import org.http4s.{Header, Request}
 
   override val authenticateIfNeeded
@@ -64,16 +64,18 @@ private class AuthenticationImpl[Interpretation[_]](
 
   private implicit class RequestOps(request: Request[Interpretation]) {
 
+    import Header.Select._
+
     lazy val getBearerToken: Option[AccessToken] =
-      request.headers.get(Authorization) flatMap {
+      request.headers.get(singleHeaders(Authorization.headerInstance)) >>= {
         case Authorization(Token(Bearer, token)) => OAuthAccessToken(token).some
         case _                                   => None
       }
 
     lazy val getPrivateAccessToken: Option[AccessToken] =
-      request.headers.get(CaseInsensitiveString("PRIVATE-TOKEN")) flatMap {
-        case Header(_, token) => PersonalAccessToken(token).some
-        case _                => None
+      request.headers.get(ci"PRIVATE-TOKEN").map(_.toList) >>= {
+        case Header.Raw(_, token) :: _ => PersonalAccessToken(token).some
+        case _                         => None
       }
   }
 }

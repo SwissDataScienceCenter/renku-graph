@@ -33,30 +33,20 @@ import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
 import io.renku.eventlog.subscriptions._
 import io.renku.events.consumers
 import io.renku.events.consumers.EventConsumersRegistry
+import io.renku.graph.model.projects
 import io.renku.http.server.HttpServer
 import io.renku.logging.ApplicationLogger
 import io.renku.metrics._
 import io.renku.microservices.IOMicroservice
 import natchez.Trace.Implicits.noop
 import org.typelevel.log4cats.Logger
-import pureconfig.ConfigSource
 
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors.newFixedThreadPool
-import scala.concurrent.ExecutionContext
 
 object Microservice extends IOMicroservice {
 
-  val ServicePort: Int Refined Positive = 9005
-
-  protected implicit override val executionContext: ExecutionContext =
-    ExecutionContext fromExecutorService newFixedThreadPool(ConfigSource.default.at("threads-number").loadOrThrow[Int])
-
-  protected implicit override def contextShift: ContextShift[IO] = IO.contextShift(executionContext)
-
-  protected implicit override def timer: Timer[IO] = IO.timer(executionContext)
-
-  private implicit val logger: Logger[IO] = ApplicationLogger
+  val ServicePort:             Int Refined Positive = 9005
+  private implicit val logger: Logger[IO]           = ApplicationLogger
 
   override def run(args: List[String]): IO[ExitCode] = for {
     sessionPoolResource <- new EventLogDbConfigProvider[IO]() map SessionPoolResource[IO, EventLogDB]
@@ -77,14 +67,13 @@ object Microservice extends IOMicroservice {
         awaitingTransformationGauge <- AwaitingTransformationGauge(metricsRegistry, statsFinder)
         underTransformationGauge    <- UnderTransformationGauge(metricsRegistry, statsFinder)
         underTriplesGenerationGauge <- UnderTriplesGenerationGauge(metricsRegistry, statsFinder)
-        metricsResetScheduler <- IOGaugeResetScheduler(
+        metricsResetScheduler <- GaugeResetScheduler[IO, projects.Path](
                                    List(awaitingGenerationGauge,
                                         underTriplesGenerationGauge,
                                         awaitingTransformationGauge,
                                         underTransformationGauge
                                    ),
-                                   MetricsConfigProvider(),
-                                   ApplicationLogger
+                                   MetricsConfigProvider()
                                  )
         creationSubscription <- events.categories.creation.SubscriptionFactory(sessionResource,
                                                                                awaitingGenerationGauge,
@@ -168,7 +157,7 @@ private class MicroserviceRunner(
     eventConsumersRegistry:   EventConsumersRegistry[IO],
     metricsResetScheduler:    GaugeResetScheduler[IO],
     httpServer:               HttpServer[IO],
-    subProcessesCancelTokens: ConcurrentHashMap[CancelToken[IO], Unit]
+    subProcessesCancelTokens: ConcurrentHashMap[IO[Unit], Unit]
 )(implicit contextShift:      ContextShift[IO]) {
 
   def run(): IO[ExitCode] = for {
@@ -182,7 +171,7 @@ private class MicroserviceRunner(
     result <- httpServer.run()
   } yield result
 
-  private def gatherCancelToken(fiber: Fiber[IO, Unit]): Fiber[IO, Unit] = {
+  private def gatherCancelToken(fiber: Fiber[IO, Throwable, Unit]): Fiber[IO, Throwable, Unit] = {
     subProcessesCancelTokens.put(fiber.cancel, ())
     fiber
   }

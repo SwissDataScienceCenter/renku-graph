@@ -24,20 +24,21 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage.ErrorMessage
+import io.renku.testtools.IOSpec
 import org.http4s.ParseFailure
 import org.http4s.Status._
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class QueryParameterToolsSpec extends AnyWordSpec with should.Matchers {
+class QueryParameterToolsSpec extends AnyWordSpec with IOSpec with should.Matchers {
 
   import QueryParameterTools._
 
   "toBadRequest" should {
 
     "return a BAD_REQUEST response containing JSON body with information about the query parameter name and validation errors" in {
-      val parseFailuresList  = nonEmptyList(parseFailures).generateOne
+      val parseFailuresList  = parseFailures.generateNonEmptyList()
       val badRequestResponse = toBadRequest[IO]
 
       val response = badRequestResponse(parseFailuresList).unsafeRunSync()
@@ -49,7 +50,7 @@ class QueryParameterToolsSpec extends AnyWordSpec with should.Matchers {
     }
   }
 
-  private val parseFailures: Gen[ParseFailure] = for {
+  private lazy val parseFailures: Gen[ParseFailure] = for {
     sanitized <- nonEmptyStrings()
     details   <- nonEmptyStrings()
   } yield ParseFailure(sanitized, details)

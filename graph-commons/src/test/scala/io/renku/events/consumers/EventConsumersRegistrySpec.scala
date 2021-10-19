@@ -19,20 +19,19 @@
 package io.renku.events.consumers
 
 import ConsumersModelGenerators._
-import cats.Parallel
-import cats.effect.{ContextShift, IO}
+import cats.effect.IO
 import cats.syntax.all._
 import io.renku.events.consumers.EventSchedulingResult._
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.global
+class EventConsumersRegistrySpec extends AnyWordSpec with IOSpec with should.Matchers with MockFactory {
 
-class EventConsumersRegistrySpec extends AnyWordSpec with should.Matchers with MockFactory {
   "run" should {
 
     "start all the subscriptionMechanisms" in new TestCase {
@@ -44,7 +43,7 @@ class EventConsumersRegistrySpec extends AnyWordSpec with should.Matchers with M
         .expects()
         .returning(IO.unit)
 
-      registry.run().unsafeRunSync() shouldBe ((): Unit)
+      registry.run().unsafeRunSync() shouldBe ()
     }
 
     "fail if one of the subscriptionMechanisms fails to start" in new TestCase {
@@ -73,7 +72,7 @@ class EventConsumersRegistrySpec extends AnyWordSpec with should.Matchers with M
         .expects()
         .returning(IO.unit)
 
-      registry.renewAllSubscriptions().unsafeRunSync() shouldBe ((): Unit)
+      registry.renewAllSubscriptions().unsafeRunSync() shouldBe ()
     }
   }
 
@@ -144,9 +143,6 @@ class EventConsumersRegistrySpec extends AnyWordSpec with should.Matchers with M
       }.getMessage shouldBe exception.getMessage
     }
   }
-
-  private implicit lazy val cs:       ContextShift[IO] = IO.contextShift(global)
-  private implicit lazy val parallel: Parallel[IO]     = IO.ioParallel
 
   private trait TestCase {
     val requestContent = eventRequestContents.generateOne

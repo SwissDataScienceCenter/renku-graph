@@ -18,7 +18,7 @@
 
 package io.renku.events.consumers.subscriptions
 
-import cats.effect.{IO, Timer}
+import cats.effect.IO
 import cats.syntax.all._
 import io.circe.Json
 import io.circe.literal._
@@ -27,6 +27,7 @@ import io.renku.generators.Generators.{exceptions, jsons}
 import io.renku.graph.model.EventsGenerators.categoryNames
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
+import io.renku.testtools.IOSpec
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
 import org.scalatest.time.{Millis, Seconds, Span}
@@ -34,12 +35,11 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 import scala.language.{postfixOps, reflectiveCalls}
 
-class SubscriptionMechanismSpec extends AnyWordSpec with Eventually with should.Matchers {
+class SubscriptionMechanismSpec extends AnyWordSpec with IOSpec with Eventually with should.Matchers {
 
   implicit override val patienceConfig: PatienceConfig = PatienceConfig(
     timeout = scaled(Span(3, Seconds)),
@@ -97,7 +97,7 @@ class SubscriptionMechanismSpec extends AnyWordSpec with Eventually with should.
 
       subscriptionSender.`expected postToEventLog responses`.add(payload -> IO.unit)
 
-      subscriber.run().unsafeRunAsyncAndForget()
+      subscriber.run().unsafeRunAndForget()
 
       eventually {
         logger.loggedOnly(
@@ -124,7 +124,7 @@ class SubscriptionMechanismSpec extends AnyWordSpec with Eventually with should.
 
       subscriptionSender.`expected postToEventLog responses`.add(payload -> IO.unit)
 
-      subscriber.run().unsafeRunAsyncAndForget()
+      subscriber.run().unsafeRunAndForget()
 
       eventually {
         logger.loggedOnly(
@@ -151,7 +151,7 @@ class SubscriptionMechanismSpec extends AnyWordSpec with Eventually with should.
       subscriptionSender.`expected postToEventLog responses`.add(payload -> exception.raiseError[IO, Unit])
       subscriptionSender.`expected postToEventLog responses`.add(payload -> IO.unit)
 
-      subscriber.run().unsafeRunAsyncAndForget()
+      subscriber.run().unsafeRunAndForget()
 
       eventually {
         logger.loggedOnly(
@@ -162,8 +162,6 @@ class SubscriptionMechanismSpec extends AnyWordSpec with Eventually with should.
       }
     }
   }
-
-  private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
 
   private trait TestCase {
     val categoryName = categoryNames.generateOne
@@ -189,11 +187,10 @@ class SubscriptionMechanismSpec extends AnyWordSpec with Eventually with should.
           .getOrElse(`expected postToEventLog responses`.asScala.last._2)
     }
 
-    val logger = TestLogger[IO]()
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val subscriber = new SubscriptionMechanismImpl(categoryName,
                                                    payloadComposer,
                                                    subscriptionSender,
-                                                   logger,
                                                    initialDelay = 5 millis,
                                                    renewDelay = 500 millis
     )

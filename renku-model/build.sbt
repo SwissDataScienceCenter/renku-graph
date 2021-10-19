@@ -19,6 +19,5 @@
 organization := "io.renku"
 name := "renku-model"
 
-val monocleVersion = "2.1.0"
 //libraryDependencies += "dev.optics" %% "monocle-core" % 3.x.x // to be used when circe-optics starts to use is
-libraryDependencies += "com.github.julien-truffaut" %% "monocle-core" % monocleVersion
+libraryDependencies += "com.github.julien-truffaut" %% "monocle-core" % "2.1.0"

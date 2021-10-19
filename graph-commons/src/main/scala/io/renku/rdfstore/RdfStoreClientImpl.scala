@@ -20,6 +20,7 @@ package io.renku.rdfstore
 
 import cats.MonadError
 import cats.effect._
+import cats.effect.kernel.Temporal
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
@@ -30,28 +31,25 @@ import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepA
 import io.renku.http.client.{HttpRequest, RestClient}
 import io.renku.http.rest.paging.Paging.PagedResultsFinder
 import io.renku.http.rest.paging.PagingRequest
-import org.http4s.{Header, Uri}
+import org.http4s.MediaRange._
+import org.http4s.{MediaType, Uri}
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
-abstract class RdfStoreClientImpl[Interpretation[_]: ConcurrentEffect: Timer](
-    rdfStoreConfig:          RdfStoreConfig,
-    logger:                  Logger[Interpretation],
-    timeRecorder:            SparqlQueryTimeRecorder[Interpretation],
-    retryInterval:           FiniteDuration = SleepAfterConnectionIssue,
-    maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-    idleTimeoutOverride:     Option[Duration] = None,
-    requestTimeoutOverride:  Option[Duration] = None
-)(implicit executionContext: ExecutionContext)
-    extends RestClient[Interpretation, RdfStoreClientImpl[Interpretation]](Throttler.noThrottling,
-                                                                           logger,
-                                                                           Some(timeRecorder.instance),
-                                                                           retryInterval,
-                                                                           maxRetries,
-                                                                           idleTimeoutOverride,
-                                                                           requestTimeoutOverride
+abstract class RdfStoreClientImpl[Interpretation[_]: Async: Temporal: Logger](
+    rdfStoreConfig:         RdfStoreConfig,
+    timeRecorder:           SparqlQueryTimeRecorder[Interpretation],
+    retryInterval:          FiniteDuration = SleepAfterConnectionIssue,
+    maxRetries:             Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
+    idleTimeoutOverride:    Option[Duration] = None,
+    requestTimeoutOverride: Option[Duration] = None
+) extends RestClient[Interpretation, RdfStoreClientImpl[Interpretation]](Throttler.noThrottling,
+                                                                         Some(timeRecorder.instance),
+                                                                         retryInterval,
+                                                                         maxRetries,
+                                                                         idleTimeoutOverride,
+                                                                         requestTimeoutOverride
     ) {
 
   import RdfStoreClientImpl._
@@ -99,7 +97,7 @@ abstract class RdfStoreClientImpl[Interpretation[_]: ConcurrentEffect: Timer](
     request(POST, uri, rdfStoreConfig.authCredentials)
       .withEntity(toEntity(queryType, query))
       .putHeaders(`Content-Type`(`x-www-form-urlencoded`),
-                  Header(Accept.name.value, "application/sparql-results+json")
+                  Accept(new MediaType(`application/*`.mainType, "sparql-results+json"))
       ),
     name = query.name
   )

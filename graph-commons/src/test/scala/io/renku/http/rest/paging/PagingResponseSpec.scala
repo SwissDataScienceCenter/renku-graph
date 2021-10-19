@@ -25,6 +25,7 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.http.rest.paging.model.{PerPage, Total}
+import io.renku.testtools.IOSpec
 import io.renku.tinytypes.TestTinyTypes.UrlTestType
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
@@ -33,7 +34,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.util.{Failure, Success, Try}
 
-class PagingResponseSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class PagingResponseSpec extends AnyWordSpec with IOSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "from" should {
 
@@ -173,7 +174,7 @@ class PagingResponseSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
 
       httpResponse.status                         shouldBe Ok
       httpResponse.contentType                    shouldBe Some(`Content-Type`(application.json))
-      httpResponse.headers.toList                   should contain allElementsOf PagingHeaders.from(response)
+      httpResponse.headers.headers                  should contain allElementsOf PagingHeaders.from(response)
       httpResponse.as[List[Json]].unsafeRunSync() shouldBe response.results.map(_.asJson)
     }
   }

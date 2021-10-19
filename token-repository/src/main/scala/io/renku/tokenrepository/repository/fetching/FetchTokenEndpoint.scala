@@ -18,8 +18,9 @@
 
 package io.renku.tokenrepository.repository.fetching
 
+import cats.MonadThrow
 import cats.data.OptionT
-import cats.effect.{ContextShift, Effect, IO}
+import cats.effect.IO
 import cats.syntax.all._
 import io.circe.syntax._
 import io.renku.db.{SessionResource, SqlStatement}
@@ -36,10 +37,8 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-class FetchTokenEndpoint[Interpretation[_]: Effect](
-    tokenFinder: TokenFinder[Interpretation],
-    logger:      Logger[Interpretation]
-) extends Http4sDsl[Interpretation] {
+class FetchTokenEndpoint[Interpretation[_]: MonadThrow: Logger](tokenFinder: TokenFinder[Interpretation])
+    extends Http4sDsl[Interpretation] {
 
   def fetchToken[ID](
       projectIdentifier: ID
@@ -61,7 +60,7 @@ class FetchTokenEndpoint[Interpretation[_]: Effect](
       projectIdentifier: ID
   ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = { case NonFatal(exception) =>
     val errorMessage = ErrorMessage(s"Finding token for project: $projectIdentifier failed")
-    logger.error(exception)(errorMessage.value)
+    Logger[Interpretation].error(exception)(errorMessage.value)
     InternalServerError(errorMessage)
   }
 
@@ -71,11 +70,9 @@ class FetchTokenEndpoint[Interpretation[_]: Effect](
 
 object IOFetchTokenEndpoint {
   def apply(
-      sessionResource:     SessionResource[IO, ProjectsTokensDB],
-      queriesExecTimes:    LabeledHistogram[IO, SqlStatement.Name],
-      logger:              Logger[IO]
-  )(implicit contextShift: ContextShift[IO]): IO[FetchTokenEndpoint[IO]] =
-    for {
-      tokenFinder <- IOTokenFinder(sessionResource, queriesExecTimes)
-    } yield new FetchTokenEndpoint[IO](tokenFinder, logger)
+      sessionResource:  SessionResource[IO, ProjectsTokensDB],
+      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
+  )(implicit logger:    Logger[IO]): IO[FetchTokenEndpoint[IO]] = for {
+    tokenFinder <- IOTokenFinder(sessionResource, queriesExecTimes)
+  } yield new FetchTokenEndpoint[IO](tokenFinder)
 }

@@ -18,7 +18,6 @@
 
 package io.renku.http.server.security
 
-import cats.effect.Effect
 import io.renku.graph.model.users
 import io.renku.http.client.AccessToken
 import org.http4s.Response
@@ -28,7 +27,7 @@ object model {
 }
 
 sealed trait EndpointSecurityException extends Exception with Product with Serializable {
-  def toHttpResponse[Interpretation[_]: Effect]: Response[Interpretation]
+  def toHttpResponse[Interpretation[_]]: Response[Interpretation]
 }
 
 object EndpointSecurityException {
@@ -41,7 +40,7 @@ object EndpointSecurityException {
 
     override lazy val getMessage: String = "User authentication failure"
 
-    override def toHttpResponse[Interpretation[_]: Effect]: Response[Interpretation] =
+    override def toHttpResponse[Interpretation[_]]: Response[Interpretation] =
       Response[Interpretation](Status.Unauthorized).withEntity(ErrorMessage(getMessage))
   }
   type AuthenticationFailure = AuthenticationFailure.type
@@ -50,7 +49,7 @@ object EndpointSecurityException {
 
     override lazy val getMessage: String = "User not authorized failure"
 
-    override def toHttpResponse[Interpretation[_]: Effect]: Response[Interpretation] =
+    override def toHttpResponse[Interpretation[_]]: Response[Interpretation] =
       Response[Interpretation](Status.NotFound).withEntity(ErrorMessage(getMessage))
   }
   type AuthorizationFailure = AuthorizationFailure.type

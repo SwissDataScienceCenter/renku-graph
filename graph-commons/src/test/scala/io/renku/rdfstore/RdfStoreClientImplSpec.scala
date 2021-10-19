@@ -18,7 +18,7 @@
 
 package io.renku.rdfstore
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.auto._
 import io.circe.Json
@@ -33,6 +33,7 @@ import io.renku.http.rest.paging.model.{Page, PerPage, Total}
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.stubbing.ExternalServiceStubbing
+import io.renku.testtools.IOSpec
 import org.http4s.Status.{BadRequest, Ok}
 import org.http4s.{Request, Response, Status}
 import org.scalamock.scalatest.MockFactory
@@ -40,13 +41,18 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Try
 
-class RdfStoreClientImplSpec extends AnyWordSpec with ExternalServiceStubbing with MockFactory with should.Matchers {
+class RdfStoreClientImplSpec
+    extends AnyWordSpec
+    with IOSpec
+    with ExternalServiceStubbing
+    with MockFactory
+    with should.Matchers {
 
   "IORdfStoreClient" should {
     type IORdfStoreClient = RdfStoreClientImpl[IO]
+
     "be a IORestClient" in new QueryClientTestCase {
       client shouldBe a[IORdfStoreClient]
       client shouldBe a[RestClient[IO, _]]
@@ -342,14 +348,11 @@ class RdfStoreClientImplSpec extends AnyWordSpec with ExternalServiceStubbing wi
     )
   }
 
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO]        = IO.timer(global)
-
   private class TestRdfClientImpl(
       val query:      SparqlQuery,
-      rdfStoreConfig: RdfStoreConfig,
-      logger:         Logger[IO] = TestLogger[IO]()
-  ) extends RdfStoreClientImpl(rdfStoreConfig, logger, new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))) {
+      rdfStoreConfig: RdfStoreConfig
+  )(implicit logger:  Logger[IO] = TestLogger[IO]())
+      extends RdfStoreClientImpl(rdfStoreConfig, new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO]())) {
 
     def sendUpdate: IO[Unit] = updateWithNoResult(query)
 
@@ -358,10 +361,9 @@ class RdfStoreClientImplSpec extends AnyWordSpec with ExternalServiceStubbing wi
     ): IO[ResultType] = updateWitMapping(query, mapResponse)
   }
 
-  private class TestRdfQueryClientImpl(val query:      SparqlQuery,
-                                       rdfStoreConfig: RdfStoreConfig,
-                                       logger:         Logger[IO] = TestLogger[IO]()
-  ) extends RdfStoreClientImpl(rdfStoreConfig, logger, new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger)))
+  private class TestRdfQueryClientImpl(val query: SparqlQuery, rdfStoreConfig: RdfStoreConfig)(implicit
+      logger:                                     Logger[IO] = TestLogger[IO]()
+  ) extends RdfStoreClientImpl(rdfStoreConfig, new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO]()))
       with Paging[String] {
 
     def callRemote: IO[Json] = queryExpecting[Json](query)

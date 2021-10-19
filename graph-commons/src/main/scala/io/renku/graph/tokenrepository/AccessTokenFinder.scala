@@ -18,24 +18,21 @@
 
 package io.renku.graph.tokenrepository
 
-import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
+import cats.effect.Async
+import cats.effect.kernel.Temporal
 import cats.syntax.all._
 import io.renku.control.Throttler
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.http.client.{AccessToken, RestClient}
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
 trait AccessTokenFinder[Interpretation[_]] {
   def findAccessToken[ID](projectId: ID)(implicit toPathSegment: ID => String): Interpretation[Option[AccessToken]]
 }
 
-class AccessTokenFinderImpl[Interpretation[_]: ConcurrentEffect: Timer](
-    tokenRepositoryUrl:      TokenRepositoryUrl,
-    logger:                  Logger[Interpretation]
-)(implicit executionContext: ExecutionContext)
-    extends RestClient[Interpretation, AccessTokenFinder[Interpretation]](Throttler.noThrottling, logger)
+class AccessTokenFinderImpl[Interpretation[_]: Async: Temporal: Logger](
+    tokenRepositoryUrl: TokenRepositoryUrl
+) extends RestClient[Interpretation, AccessTokenFinder[Interpretation]](Throttler.noThrottling)
     with AccessTokenFinder[Interpretation] {
 
   import org.http4s.Method.GET
@@ -67,14 +64,8 @@ object AccessTokenFinder {
   implicit val projectPathToPath: Path => String = path => urlEncode(path.value)
   implicit val projectIdToPath:   Id => String   = _.toString
 
-  def apply(
-      logger: Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[AccessTokenFinder[IO]] =
+  def apply[Interpretation[_]: Async: Temporal: Logger]: Interpretation[AccessTokenFinder[Interpretation]] =
     for {
-      tokenRepositoryUrl <- TokenRepositoryUrl[IO]()
-    } yield new AccessTokenFinderImpl[IO](tokenRepositoryUrl, logger)
+      tokenRepositoryUrl <- TokenRepositoryUrl[Interpretation]()
+    } yield new AccessTokenFinderImpl[Interpretation](tokenRepositoryUrl)
 }

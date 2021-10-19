@@ -18,15 +18,13 @@
 
 package io.renku.events.consumers
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
 import io.renku.events.EventRequestContent
 import io.renku.events.consumers.EventSchedulingResult.UnsupportedEventType
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.graph.model.events.CategoryName
-
-import scala.concurrent.ExecutionContext
 
 trait EventConsumersRegistry[Interpretation[_]] {
   def handle(requestContent: EventRequestContent): Interpretation[EventSchedulingResult]
@@ -71,11 +69,8 @@ class EventConsumersRegistryImpl[Interpretation[_]: MonadThrow: Parallel](
 }
 
 object EventConsumersRegistry {
-  def apply(subscriptionFactories: (EventHandler[IO], SubscriptionMechanism[IO])*)(implicit
-      executionContext:            ExecutionContext,
-      contextShift:                ContextShift[IO],
-      timer:                       Timer[IO]
-  ): IO[EventConsumersRegistry[IO]] = IO {
-    new EventConsumersRegistryImpl[IO](subscriptionFactories.toList.map(_._1), subscriptionFactories.toList.map(_._2))
-  }
+  def apply(subscriptionFactories: (EventHandler[IO], SubscriptionMechanism[IO])*): IO[EventConsumersRegistry[IO]] =
+    IO {
+      new EventConsumersRegistryImpl[IO](subscriptionFactories.toList.map(_._1), subscriptionFactories.toList.map(_._2))
+    }
 }

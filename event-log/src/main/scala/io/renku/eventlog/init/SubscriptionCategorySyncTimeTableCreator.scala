@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.BracketThrow
+import cats.effect.MonadCancelThrow
 import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
 import org.typelevel.log4cats.Logger
@@ -32,13 +32,13 @@ private trait SubscriptionCategorySyncTimeTableCreator[Interpretation[_]] {
 }
 
 private object SubscriptionCategorySyncTimeTableCreator {
-  def apply[Interpretation[_]: BracketThrow: Logger](
+  def apply[Interpretation[_]: MonadCancelThrow: Logger](
       sessionResource: SessionResource[Interpretation, EventLogDB]
   ): SubscriptionCategorySyncTimeTableCreator[Interpretation] =
     new SubscriptionCategorySyncTimeTableCreatorImpl[Interpretation](sessionResource)
 }
 
-private class SubscriptionCategorySyncTimeTableCreatorImpl[Interpretation[_]: BracketThrow: Logger](
+private class SubscriptionCategorySyncTimeTableCreatorImpl[Interpretation[_]: MonadCancelThrow: Logger](
     sessionResource: SessionResource[Interpretation, EventLogDB]
 ) extends SubscriptionCategorySyncTimeTableCreator[Interpretation] {
 
@@ -60,23 +60,22 @@ private class SubscriptionCategorySyncTimeTableCreatorImpl[Interpretation[_]: Br
     )
   }
 
-  private def createTable(): Kleisli[Interpretation, Session[Interpretation], Unit] =
-    for {
-      _ <- execute(createTableSql)
-      _ <- execute(
-             sql"CREATE INDEX IF NOT EXISTS idx_project_id       ON subscription_category_sync_time(project_id)".command
-           )
-      _ <-
-        execute(
-          sql"CREATE INDEX IF NOT EXISTS idx_category_name    ON subscription_category_sync_time(category_name)".command
-        )
-      _ <-
-        execute(
-          sql"CREATE INDEX IF NOT EXISTS idx_last_synced      ON subscription_category_sync_time(last_synced)".command
-        )
-      _ <- Kleisli.liftF(Logger[Interpretation] info "'subscription_category_sync_time' table created")
-      _ <- execute(foreignKeySql)
-    } yield ()
+  private def createTable(): Kleisli[Interpretation, Session[Interpretation], Unit] = for {
+    _ <- execute(createTableSql)
+    _ <- execute(
+           sql"CREATE INDEX IF NOT EXISTS idx_project_id ON subscription_category_sync_time(project_id)".command
+         )
+    _ <-
+      execute(
+        sql"CREATE INDEX IF NOT EXISTS idx_category_name ON subscription_category_sync_time(category_name)".command
+      )
+    _ <-
+      execute(
+        sql"CREATE INDEX IF NOT EXISTS idx_last_synced ON subscription_category_sync_time(last_synced)".command
+      )
+    _ <- Kleisli.liftF(Logger[Interpretation] info "'subscription_category_sync_time' table created")
+    _ <- execute(foreignKeySql)
+  } yield ()
 
   private lazy val createTableSql: Command[Void] =
     sql"""

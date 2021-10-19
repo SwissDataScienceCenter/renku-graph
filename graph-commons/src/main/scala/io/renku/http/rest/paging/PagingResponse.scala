@@ -24,6 +24,7 @@ import io.renku.http.rest.paging.PagingResponse.PagingInfo
 import io.renku.http.rest.paging.model.Total
 import io.renku.tinytypes.UrlTinyType
 import io.renku.tinytypes.constraints.UrlOps
+import org.http4s.Header
 
 final class PagingResponse[Result] private (val results: List[Result], val pagingInfo: PagingInfo) {
   override lazy val toString: String = s"PagingResponse(pagingInfo: $pagingInfo, results: $results)"
@@ -59,7 +60,6 @@ object PagingResponse {
 
   implicit class ResponseOps[Result](response: PagingResponse[Result]) {
 
-    import cats.effect.Effect
     import io.circe.syntax._
     import io.circe.{Encoder, Json}
     import org.http4s.circe.jsonEncoderOf
@@ -72,16 +72,16 @@ object PagingResponse {
         new IllegalArgumentException("Cannot update Paging Results as there's different number of results")
           .raiseError[Interpretation, PagingResponse[Result]]
 
-    def toHttpResponse[Interpretation[_]: Effect, ResourceUrl <: UrlTinyType](implicit
+    def toHttpResponse[Interpretation[_], ResourceUrl <: UrlTinyType](implicit
         resourceUrl:    ResourceUrl,
         resourceUrlOps: UrlOps[ResourceUrl],
         encoder:        Encoder[Result]
     ): Response[Interpretation] =
-      Response(Status.Ok)
+      Response[Interpretation](Status.Ok)
         .withEntity(response.results.asJson)
-        .putHeaders(PagingHeaders.from(response).toSeq: _*)
+        .putHeaders(PagingHeaders.from(response).toSeq.map(Header.ToRaw.rawToRaw): _*)
 
-    private implicit def resultsEntityEncoder[Interpretation[_]: Effect](implicit
+    private implicit def resultsEntityEncoder[Interpretation[_]](implicit
         encoder: Encoder[Result]
     ): EntityEncoder[Interpretation, Json] = jsonEncoderOf[Interpretation, Json]
   }

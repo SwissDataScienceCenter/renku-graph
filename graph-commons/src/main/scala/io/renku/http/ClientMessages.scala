@@ -18,7 +18,6 @@
 
 package io.renku.http
 
-import cats.Applicative
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.collection.NonEmpty
 import io.circe._
@@ -38,8 +37,7 @@ object ErrorMessage {
     Json.obj("message" -> Json.fromString(message.value))
   }
 
-  implicit def errorMessageEntityEncoder[F[_]: Applicative]: EntityEncoder[F, ErrorMessage] =
-    jsonEncoderOf[F, ErrorMessage]
+  implicit def errorMessageEntityEncoder[F[_]]: EntityEncoder[F, ErrorMessage] = jsonEncoderOf[F, ErrorMessage]
 }
 
 object InfoMessage {
@@ -58,6 +56,5 @@ object InfoMessage {
     Json.obj("message" -> Json.fromString(message.value))
   }
 
-  implicit def infoMessageEntityEncoder[F[_]: Applicative]: EntityEncoder[F, InfoMessage] =
-    jsonEncoderOf[F, InfoMessage]
+  implicit def infoMessageEntityEncoder[F[_]]: EntityEncoder[F, InfoMessage] = jsonEncoderOf[F, InfoMessage]
 }

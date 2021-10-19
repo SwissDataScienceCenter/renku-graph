@@ -18,7 +18,7 @@
 
 package io.renku.http.client
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.http.Fault
@@ -37,12 +37,12 @@ import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Warn
 import io.renku.logging.{ExecutionTimeRecorder, TestExecutionTimeRecorder}
 import io.renku.stubbing.ExternalServiceStubbing
+import io.renku.testtools.IOSpec
 import io.renku.tinytypes.ByteArrayTinyType
 import io.renku.tinytypes.TestTinyTypes.ByteArrayTestType
 import io.renku.tinytypes.contenttypes.ZippedContent
 import org.http4s.MediaType._
 import org.http4s.Method.{GET, POST}
-import org.http4s.blaze.pipeline.{Command => Http4sCommand}
 import org.http4s.circe.jsonOf
 import org.http4s.client.ConnectionFailure
 import org.http4s.{multipart => _, _}
@@ -51,15 +51,20 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.typelevel.log4cats.Logger
 
+import java.net.SocketException
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeoutException
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 import scala.language.postfixOps
 import scala.util.Random
 
-class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockFactory with should.Matchers {
+class RestClientSpec
+    extends AnyWordSpec
+    with IOSpec
+    with ExternalServiceStubbing
+    with MockFactory
+    with should.Matchers {
 
   "send" should {
 
@@ -88,7 +93,7 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
 
         verifyThrottling()
 
-        override val client = new TestRestClient(hostUrl, throttler, logger, maybeTimeRecorder = None)
+        override val client = new TestRestClient(hostUrl, throttler, maybeTimeRecorder = None)
 
         client.callRemote(mapResponseToInt).unsafeRunSync() shouldBe 1
 
@@ -240,13 +245,13 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
     }
 
     "fail after retrying if there is a persistent connectivity problem" in {
-      val logger = TestLogger[IO]()
+      implicit val logger: TestLogger[IO] = TestLogger[IO]()
 
       val exceptionMessage =
         "Error connecting to http://localhost:1024 using address localhost:1024 (unresolved: false)"
 
       val exception = intercept[ConnectivityException] {
-        new TestRestClient(ServiceUrl("http://localhost:1024"), Throttler.noThrottling, logger, None)
+        new TestRestClient(ServiceUrl("http://localhost:1024"), Throttler.noThrottling, None)
           .callRemote(mapResponseToInt)
           .unsafeRunSync()
       }
@@ -264,22 +269,22 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
 
         stubFor {
           get("/resource")
-            .willReturn(aResponse.withFault(fault))
+            .willReturn(aResponse withFault fault)
         }
 
         verifyThrottling()
 
-        val exceptionMessage = Http4sCommand.EOF.toString
-
         val exception = intercept[ConnectivityException] {
           client.callRemote(mapResponseToInt).unsafeRunSync()
         }
-        exception.getMessage shouldBe s"GET $hostUrl/resource error: $exceptionMessage"
-        exception.getCause   shouldBe a[Http4sCommand.EOF.type]
+
+        exception.getCause shouldBe a[SocketException]
+        val causeMessage = exception.getCause.getMessage
+        exception.getMessage shouldBe s"GET $hostUrl/resource error: $causeMessage"
 
         logger.loggedOnly(
-          Warn(s"GET $hostUrl/resource timed out -> retrying attempt 1 error: $exceptionMessage"),
-          Warn(s"GET $hostUrl/resource timed out -> retrying attempt 2 error: $exceptionMessage")
+          Warn(s"GET $hostUrl/resource timed out -> retrying attempt 1 error: $causeMessage"),
+          Warn(s"GET $hostUrl/resource timed out -> retrying attempt 2 error: $causeMessage")
         )
       }
     }
@@ -296,7 +301,6 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
       val exception = intercept[ClientException] {
         new TestRestClient(hostUrl,
                            Throttler.noThrottling,
-                           logger,
                            maybeTimeRecorder = None,
                            idleTimeoutOverride = idleTimeout.some
         ).callRemote(mapResponseToInt).unsafeRunSync()
@@ -319,7 +323,6 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
       val exception = intercept[ClientException] {
         new TestRestClient(hostUrl,
                            Throttler.noThrottling,
-                           logger,
                            maybeTimeRecorder = None,
                            maybeRequestTimeoutOverride = requestTimeout.some
         ).callRemote(mapResponseToInt).unsafeRunSync()
@@ -377,11 +380,11 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
 
   private trait TestCase {
     val histogramLabel: String Refined NonEmpty = "label"
-    val histogram             = Histogram.build("histogram", "help").labelNames(histogramLabel.value).create()
-    val throttler             = mock[Throttler[IO, Any]]
-    val logger                = TestLogger[IO]()
-    val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger, Some(histogram))
-    val client                = new TestRestClient(hostUrl, throttler, logger, Some(executionTimeRecorder))
+    val histogram = Histogram.build("histogram", "help").labelNames(histogramLabel.value).create()
+    val throttler = mock[Throttler[IO, Any]]
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val executionTimeRecorder = TestExecutionTimeRecorder[IO](Some(histogram))
+    val client                = new TestRestClient(hostUrl, throttler, Some(executionTimeRecorder))
 
     def verifyThrottling() = inSequence {
       (throttler.acquire _).expects().returning(IO.unit)
@@ -389,8 +392,6 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
     }
   }
 
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO]        = IO.timer(global)
   private lazy val hostUrl = ServiceUrl(externalServiceBaseUrl)
 
   lazy val mapResponseToInt: PartialFunction[(Status, Request[IO], Response[IO]), IO[Int]] = {
@@ -399,17 +400,16 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
 
   private class TestRestClient(hostUrl:                     ServiceUrl,
                                throttler:                   Throttler[IO, Any],
-                               logger:                      Logger[IO],
                                maybeTimeRecorder:           Option[ExecutionTimeRecorder[IO]],
                                idleTimeoutOverride:         Option[Duration] = None,
                                maybeRequestTimeoutOverride: Option[Duration] = None
-  ) extends RestClient(throttler,
-                       logger,
-                       maybeTimeRecorder,
-                       retryInterval = 1 millisecond,
-                       maxRetries = 2,
-                       idleTimeoutOverride,
-                       maybeRequestTimeoutOverride
+  )(implicit logger:                                        Logger[IO])
+      extends RestClient(throttler,
+                         maybeTimeRecorder,
+                         retryInterval = 1 millisecond,
+                         maxRetries = 2,
+                         idleTimeoutOverride,
+                         maybeRequestTimeoutOverride
       ) {
 
     def callRemote[O](mapping: PartialFunction[(Status, Request[IO], Response[IO]), IO[O]]): IO[O] = for {
@@ -436,6 +436,5 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
             .build()
         )(mapResponseToInt)
     } yield response
-
   }
 }
