@@ -164,10 +164,10 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Sync: Paralle
       acc :++ List.fill((priority.value * 10).setScale(2, RoundingMode.HALF_UP).toInt)(projectIdAndPath)
     }
 
-  private lazy val markAsProcessing: Option[AwaitingGenerationEvent] => Kleisli[Interpretation,
-                                                                                Session[Interpretation],
-                                                                                Option[AwaitingGenerationEvent]
-  ] = {
+  private lazy val markAsProcessing
+      : Option[AwaitingGenerationEvent] => Kleisli[Interpretation, Session[Interpretation], Option[
+        AwaitingGenerationEvent
+      ]] = {
     case None =>
       Kleisli.pure(Option.empty[AwaitingGenerationEvent])
     case Some(event @ AwaitingGenerationEvent(id, _, _)) =>
