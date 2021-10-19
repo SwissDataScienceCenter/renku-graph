@@ -18,7 +18,6 @@
 
 organization := "io.renku"
 name := "generators"
-scalaVersion := "2.13.6"
 
 val refinedVersion = "0.9.26"
 libraryDependencies += "eu.timepit" %% "refined" % refinedVersion
