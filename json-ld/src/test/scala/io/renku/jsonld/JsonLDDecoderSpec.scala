@@ -440,9 +440,9 @@ class JsonLDDecoderSpec
     def apply(name: String, child: Child): Parent =
       Parent(EntityId.of(s"parent/$name"), entityTypes, name, child)
   }
-  private sealed trait ChildTrait extends Entity
-  private case class Child(name: String) extends ChildTrait
-  private object ChildA extends Child("a")
+  private sealed trait ChildTrait                                      extends Entity
+  private case class Child(name: String)                               extends ChildTrait
+  private object ChildA                                                extends Child("a")
   private case class OptionalValueContainer(maybeName: Option[String]) extends Entity
   private case class ValuesContainer(name: String, tags: List[String]) extends Entity
   private case class ParentsContainer(name: String, parents: List[Parent])

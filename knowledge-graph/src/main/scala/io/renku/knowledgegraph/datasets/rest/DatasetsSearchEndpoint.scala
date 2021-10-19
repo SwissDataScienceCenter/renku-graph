@@ -127,7 +127,7 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect: MonadThrow](
         "creator": $creators,
         "datePublished": $date
       }"""
-      case (creators, _)                   => json"""{
+      case (creators, _) => json"""{
         "creator": $creators
       }"""
     }

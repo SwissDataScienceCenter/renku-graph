@@ -237,8 +237,8 @@ object Generators {
     implicit val mapEncoder: Encoder[Map[String, Any]] = Encoder.instance[Map[String, Any]] { map =>
       Json.obj(
         map.map {
-          case (key, value: String) => key -> Json.fromString(value)
-          case (key, value: Number) => key -> Json.fromBigDecimal(value.doubleValue())
+          case (key, value: String)  => key -> Json.fromString(value)
+          case (key, value: Number)  => key -> Json.fromBigDecimal(value.doubleValue())
           case (key, value: Boolean) => key -> Json.fromBoolean(value)
           case (key, value: List[_]) => key -> Json.arr(value.map(_.toString).map(Json.fromString): _*)
           case (_, value) =>

@@ -70,7 +70,7 @@ private[events] class EventHandler[Interpretation[_]: ConcurrentEffect: MonadThr
     project <- fromEither(request.event.getProject)
     payload <- request match {
                  case EventRequestContent.WithPayload(_, payload: ZippedEventPayload) => EitherT.rightT(payload)
-                 case _ => EitherT.leftT(BadRequest)
+                 case _                                                               => EitherT.leftT(BadRequest)
                }
     event <- toEvent(eventId, project, payload).toRightT(recoverTo = BadRequest)
     result <- (ContextShift[Interpretation].shift *> Concurrent[Interpretation]

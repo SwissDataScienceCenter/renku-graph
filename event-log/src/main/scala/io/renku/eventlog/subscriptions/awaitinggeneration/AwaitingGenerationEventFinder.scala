@@ -29,7 +29,7 @@ import io.renku.db.implicits._
 import io.renku.db.{DbClient, SessionResource, SqlStatement}
 import io.renku.eventlog._
 import io.renku.eventlog.subscriptions.awaitinggeneration.ProjectPrioritisation.{Priority, ProjectInfo}
-import io.renku.eventlog.subscriptions.{EventFinder, ProjectIds, Subscribers, SubscriptionTypeSerializers}
+import io.renku.eventlog.subscriptions._
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus}
 import io.renku.graph.model.projects
@@ -164,9 +164,10 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Sync: Paralle
       acc :++ List.fill((priority.value * 10).setScale(2, RoundingMode.HALF_UP).toInt)(projectIdAndPath)
     }
 
-  private lazy val markAsProcessing: Option[AwaitingGenerationEvent] => Kleisli[Interpretation, Session[
-    Interpretation
-  ], Option[AwaitingGenerationEvent]] = {
+  private lazy val markAsProcessing: Option[AwaitingGenerationEvent] => Kleisli[Interpretation,
+                                                                                Session[Interpretation],
+                                                                                Option[AwaitingGenerationEvent]
+  ] = {
     case None =>
       Kleisli.pure(Option.empty[AwaitingGenerationEvent])
     case Some(event @ AwaitingGenerationEvent(id, _, _)) =>

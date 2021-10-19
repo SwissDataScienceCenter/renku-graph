@@ -91,7 +91,7 @@ private class ProcessingStatusFetcherImpl[Interpretation[_]: ConcurrentEffect: T
   override def fetchProcessingStatus(projectId: projects.Id): OptionT[Interpretation, ProcessingStatus] =
     OptionT {
       for {
-        uri          <- validateUri(s"$eventLogUrl/processing-status") map (_.withQueryParam("project-id", projectId.toString))
+        uri <- validateUri(s"$eventLogUrl/processing-status") map (_.withQueryParam("project-id", projectId.toString))
         latestEvents <- send(request(GET, uri))(mapResponse)
       } yield latestEvents
     }

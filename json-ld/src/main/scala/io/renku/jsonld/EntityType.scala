@@ -26,7 +26,7 @@ sealed abstract class EntityType(val value: String) extends Product with Seriali
 
 object EntityType {
 
-  def of(url:      String):   EntityType = UrlEntityType(url)
+  def of(url: String):        EntityType = UrlEntityType(url)
   def of(property: Property): EntityType = UrlEntityType(property.url)
 
   private[jsonld] final case class UrlEntityType(override val value: String) extends EntityType(value)
@@ -43,9 +43,9 @@ object EntityType {
 import cats.data.NonEmptyList
 
 final case class EntityTypes(list: NonEmptyList[EntityType]) {
-  lazy val toList: List[EntityType] = list.toList
-  def contains(types: EntityType*): Boolean = (types diff list.toList).isEmpty
-  def contains(types: EntityTypes): Boolean = contains(types.toList: _*)
+  lazy val toList:                  List[EntityType] = list.toList
+  def contains(types: EntityType*): Boolean          = (types diff list.toList).isEmpty
+  def contains(types: EntityTypes): Boolean          = contains(types.toList: _*)
 
   override def hashCode(): Int = list.toList.toSet.hashCode()
 
@@ -58,7 +58,7 @@ final case class EntityTypes(list: NonEmptyList[EntityType]) {
 object EntityTypes {
 
   def of(first: EntityType, other: EntityType*): EntityTypes = EntityTypes(NonEmptyList.of(first, other: _*))
-  def of(first: Property, other:   Property*): EntityTypes = EntityTypes {
+  def of(first: Property, other: Property*): EntityTypes = EntityTypes {
     NonEmptyList.of(first, other: _*) map EntityType.of
   }
 

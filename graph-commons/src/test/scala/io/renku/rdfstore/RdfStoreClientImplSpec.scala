@@ -138,7 +138,7 @@ class RdfStoreClientImplSpec extends AnyWordSpec with ExternalServiceStubbing wi
       val allItems      = nonEmptyList(nonBlankStrings(), minElements = 5).generateOne.map(_.value).toList
       val pagingRequest = PagingRequest(Page.first, PerPage(4))
       val pageItems     = allItems.take(pagingRequest.perPage.value)
-      val responseBody  = json"""{
+      val responseBody = json"""{
         "results": {
           "bindings": $pageItems
         }
@@ -185,7 +185,7 @@ class RdfStoreClientImplSpec extends AnyWordSpec with ExternalServiceStubbing wi
       val allItems      = nonEmptyList(nonBlankStrings(), minElements = 5).generateOne.map(_.value).toList
       val pagingRequest = PagingRequest(Page.first, PerPage(4))
       val pageItems     = allItems.take(pagingRequest.perPage.value)
-      val responseBody  = json"""{
+      val responseBody = json"""{
         "results": {
           "bindings": $pageItems
         }

@@ -33,9 +33,12 @@ private trait EdgesTrimmer[Interpretation[_]] {
   */
 private class EdgesTrimmerImpl[Interpretation[_]: MonadThrow]() extends EdgesTrimmer[Interpretation] {
 
-  /** @param edges Edges from the whole project
-    * @param location location of file the user selected in the UI
-    * @return Trimmed graph with only nodes connected to the location
+  /** @param edges
+    *   Edges from the whole project
+    * @param location
+    *   location of file the user selected in the UI
+    * @return
+    *   Trimmed graph with only nodes connected to the location
     */
   def trim(edges: EdgeMap, location: Location): Interpretation[EdgeMap] = {
 

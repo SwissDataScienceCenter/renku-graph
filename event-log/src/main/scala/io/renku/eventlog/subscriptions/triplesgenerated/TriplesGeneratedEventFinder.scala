@@ -50,7 +50,7 @@ private class TriplesGeneratedEventFinderImpl[Interpretation[_]: Sync: BracketTh
     now:                         () => Instant = () => Instant.now,
     projectsFetchingLimit:       Int Refined Positive,
     projectPrioritisation:       ProjectPrioritisation,
-    pickRandomlyFrom:            List[ProjectIds] => Option[ProjectIds] = ids => ids.get((Random nextInt ids.size).toLong)
+    pickRandomlyFrom: List[ProjectIds] => Option[ProjectIds] = ids => ids.get((Random nextInt ids.size).toLong)
 ) extends DbClient(Some(queriesExecTimes))
     with EventFinder[Interpretation, TriplesGeneratedEvent]
     with SubscriptionTypeSerializers {

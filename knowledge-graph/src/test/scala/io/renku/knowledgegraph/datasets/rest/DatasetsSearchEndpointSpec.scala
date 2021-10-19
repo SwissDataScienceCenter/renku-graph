@@ -96,7 +96,7 @@ class DatasetsSearchEndpointSpec
       response.status                         shouldBe Ok
       response.contentType                    shouldBe Some(`Content-Type`(application.json))
       response.as[List[Json]].unsafeRunSync() shouldBe empty
-      response.headers.toList                   should contain allElementsOf PagingHeaders.from[IO, ResourceUrl](pagingResponse)
+      response.headers.toList should contain allElementsOf PagingHeaders.from[IO, ResourceUrl](pagingResponse)
 
       logger.loggedOnly(warn(maybePhrase))
     }

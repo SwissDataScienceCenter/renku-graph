@@ -78,7 +78,7 @@ private class SubscribersRegistry(
 
   def findAvailableSubscriber(): IO[Deferred[IO, SubscriberUrl]] = for {
     subscriberUrlReference <- Deferred[IO, SubscriberUrl]
-    _                      <- maybeSubscriberUrl map subscriberUrlReference.complete getOrElse makeCallerToWait(subscriberUrlReference)
+    _ <- maybeSubscriberUrl map subscriberUrlReference.complete getOrElse makeCallerToWait(subscriberUrlReference)
   } yield subscriberUrlReference
 
   private def maybeSubscriberUrl = Random
@@ -151,7 +151,7 @@ private class SubscribersRegistry(
 private object SubscribersRegistry {
 
   private final class CheckupTime private (val value: Instant) extends InstantTinyType
-  private object CheckupTime extends TinyTypeFactory[CheckupTime](new CheckupTime(_))
+  private object CheckupTime                                   extends TinyTypeFactory[CheckupTime](new CheckupTime(_))
 
   def apply(
       categoryName:    CategoryName,

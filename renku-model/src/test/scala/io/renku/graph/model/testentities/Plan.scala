@@ -38,9 +38,9 @@ case class Plan(id:                        Id,
                 successCodes:              List[SuccessCode]
 ) {
   private val commandParameters: List[CommandParameterBase] = commandParameterFactories.map(_.apply(this))
-  val parameters:                List[CommandParameter]     = commandParameters.collect { case param: CommandParameter => param }
-  val inputs:                    List[CommandInput]         = commandParameters.collect { case in: CommandInput => in }
-  val outputs:                   List[CommandOutput]        = commandParameters.collect { case out: CommandOutput => out }
+  val parameters: List[CommandParameter] = commandParameters.collect { case param: CommandParameter => param }
+  val inputs:     List[CommandInput]     = commandParameters.collect { case in: CommandInput => in }
+  val outputs:    List[CommandOutput]    = commandParameters.collect { case out: CommandOutput => out }
 
   def getInput(location: Location): Option[CommandInput] = inputs.find(_.defaultValue.value == location)
 }

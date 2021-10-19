@@ -52,7 +52,7 @@ private class ToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow: Sync](
   override def updateDB(event: ToTriplesGenerated): UpdateResult[Interpretation] =
     deleteDelivery(event.eventId) >> updateStatus(event) >>= {
       case results if results.statusCounts.isEmpty => Kleisli.pure(results)
-      case results                                 => updateDependentData(event).map(_ combine results).widen[DBUpdateResults]
+      case results => updateDependentData(event).map(_ combine results).widen[DBUpdateResults]
     }
 
   override def onRollback(event: ToTriplesGenerated) = deleteDelivery(event.eventId)

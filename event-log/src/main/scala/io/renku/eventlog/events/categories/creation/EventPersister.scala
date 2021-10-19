@@ -201,7 +201,7 @@ private object EventPersister {
 
   object Result {
     case class Created(event: Event) extends Result
-    case object Existed extends Result
+    case object Existed              extends Result
   }
 }
 

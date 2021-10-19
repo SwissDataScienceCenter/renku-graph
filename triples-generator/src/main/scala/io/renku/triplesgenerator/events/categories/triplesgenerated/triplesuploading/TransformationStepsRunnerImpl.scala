@@ -55,7 +55,7 @@ private[triplesgenerated] class TransformationStepsRunnerImpl[Interpretation[_]:
   ): Interpretation[TriplesUploadResult] =
     runAllSteps(project, steps) >>= {
       case (updatedProject, _: DeliverySuccess) => encodeAndSend(updatedProject)
-      case (_, failure) => failure.pure[Interpretation]
+      case (_, failure)                         => failure.pure[Interpretation]
     }
 
   private def runAllSteps(project: Project,
@@ -64,7 +64,7 @@ private[triplesgenerated] class TransformationStepsRunnerImpl[Interpretation[_]:
     steps.foldLeft((project, DeliverySuccess: TriplesUploadResult).pure[Interpretation])((lastStepResults, nextStep) =>
       lastStepResults >>= {
         case (_, _: TriplesUploadFailure) => lastStepResults
-        case (previousMetadata, _) => runSingleStep(nextStep, previousMetadata)
+        case (previousMetadata, _)        => runSingleStep(nextStep, previousMetadata)
       }
     )
 
@@ -140,8 +140,8 @@ private[triplesgenerated] object TriplesUploadResult {
     val message: String = "Delivery success"
   }
 
-  sealed trait TriplesUploadFailure extends TriplesUploadResult
-  final case class RecoverableFailure(message: String) extends Exception(message) with TriplesUploadFailure
+  sealed trait TriplesUploadFailure                       extends TriplesUploadResult
+  final case class RecoverableFailure(message: String)    extends Exception(message) with TriplesUploadFailure
   final case class InvalidTriplesFailure(message: String) extends Exception(message) with TriplesUploadFailure
   final case class InvalidUpdatesFailure(message: String) extends Exception(message) with TriplesUploadFailure
 }

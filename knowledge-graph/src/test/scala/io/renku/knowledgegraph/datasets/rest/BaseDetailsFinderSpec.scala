@@ -114,7 +114,7 @@ class BaseDetailsFinderSpec
         case date: datasets.DatePublished => json"""{
           "maybeDatePublished": {"value": $date}
         }"""
-        case date: datasets.DateCreated   => json"""{
+        case date: datasets.DateCreated => json"""{
           "maybeDateCreated": {"value": $date}
         }"""
       }

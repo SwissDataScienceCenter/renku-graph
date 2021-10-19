@@ -132,7 +132,7 @@ class QueryEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
     val queryRunner   = mock[IOQueryRunner]
     val handleQuery   = new QueryEndpoint[IO](queryRunner).handleQuery _
 
-    private val queryWithNoVariables     = """{ resource { property } }"""
+    private val queryWithNoVariables = """{ resource { property } }"""
     lazy val queryWithNoVariablesPayload = json"""
       {                                                      
         "query": $queryWithNoVariables
@@ -142,7 +142,7 @@ class QueryEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
       ()
     }
 
-    private val queryWithVariables     = """query($variable: Type!) { resource(variable: $variable) { property } }"""
+    private val queryWithVariables = """query($variable: Type!) { resource(variable: $variable) { property } }"""
     lazy val queryWithVariablesPayload = json"""
       {
         "query": $queryWithVariables,

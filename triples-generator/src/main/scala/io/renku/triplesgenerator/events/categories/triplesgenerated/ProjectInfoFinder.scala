@@ -156,8 +156,8 @@ private class ProjectInfoFinderImpl(
       username <- cursor.downField("username").as[users.Username]
     } yield ProjectMember(name, username, gitLabId)
 
-  private implicit lazy val memberEntityDecoder: EntityDecoder[IO, ProjectMember]       = jsonOf[IO, ProjectMember]
-  private implicit lazy val membersDecoder:      EntityDecoder[IO, List[ProjectMember]] = jsonOf[IO, List[ProjectMember]]
+  private implicit lazy val memberEntityDecoder: EntityDecoder[IO, ProjectMember] = jsonOf[IO, ProjectMember]
+  private implicit lazy val membersDecoder: EntityDecoder[IO, List[ProjectMember]] = jsonOf[IO, List[ProjectMember]]
 
   private def fetchMembers(
       url:        String,

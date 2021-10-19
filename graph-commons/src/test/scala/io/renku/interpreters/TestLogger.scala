@@ -149,7 +149,7 @@ object TestLogger {
     val message: String
   }
   object LogMessage {
-    final case class Message(message: String) extends LogMessage
+    final case class Message(message: String)                                               extends LogMessage
     final case class MessageAndThrowableMatcher(message: String, throwableMatcher: Matcher) extends LogMessage
     final case class MessageAndThrowable(message: String, throwable: Throwable) extends LogMessage {
       override def equals(other: Any): Boolean = other match {

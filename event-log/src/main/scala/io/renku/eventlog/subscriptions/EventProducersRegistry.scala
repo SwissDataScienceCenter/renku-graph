@@ -61,7 +61,7 @@ private[subscriptions] class EventProducersRegistryImpl[Interpretation[_]: Effec
 object EventProducersRegistry {
 
   sealed trait SubscriptionResult
-  final case object SuccessfulSubscription extends SubscriptionResult
+  final case object SuccessfulSubscription             extends SubscriptionResult
   final case class UnsupportedPayload(message: String) extends SubscriptionResult
 
   def apply(

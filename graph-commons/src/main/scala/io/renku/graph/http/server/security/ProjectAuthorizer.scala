@@ -139,6 +139,6 @@ class ProjectAuthorizerImpl(
     case (Nil, _)                                                                            => rightT(())
     case ((Public, _) :: Nil, _)                                                             => rightT(())
     case ((_, projectMembers) :: Nil, Some(authUser)) if projectMembers contains authUser.id => rightT(())
-    case _                                                                                   => leftT(AuthorizationFailure)
+    case _ => leftT(AuthorizationFailure)
   }
 }

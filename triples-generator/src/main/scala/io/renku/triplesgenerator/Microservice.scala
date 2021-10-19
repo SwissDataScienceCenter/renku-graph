@@ -79,7 +79,7 @@ object Microservice extends IOMicroservice {
     gitLabThrottler                <- Throttler[IO, GitLab](gitLabRateLimit)
     sparqlTimeRecorder             <- SparqlQueryTimeRecorder(metricsRegistry)
     awaitingGenerationSubscription <- events.categories.awaitinggeneration.SubscriptionFactory(metricsRegistry)
-    membersSyncSubscription        <- events.categories.membersync.SubscriptionFactory(gitLabThrottler, sparqlTimeRecorder)
+    membersSyncSubscription <- events.categories.membersync.SubscriptionFactory(gitLabThrottler, sparqlTimeRecorder)
     triplesGeneratedSubscription <-
       events.categories.triplesgenerated.SubscriptionFactory(metricsRegistry, gitLabThrottler, sparqlTimeRecorder)
     eventConsumersRegistry <- consumers.EventConsumersRegistry(
@@ -87,8 +87,8 @@ object Microservice extends IOMicroservice {
                                 membersSyncSubscription,
                                 triplesGeneratedSubscription
                               )
-    reProvisioningStatus    <- ReProvisioningStatus(eventConsumersRegistry, ApplicationLogger, sparqlTimeRecorder)
-    reProvisioning          <- IOReProvisioning(reProvisioningStatus, renkuVersionPairs, sparqlTimeRecorder, ApplicationLogger)
+    reProvisioningStatus <- ReProvisioningStatus(eventConsumersRegistry, ApplicationLogger, sparqlTimeRecorder)
+    reProvisioning <- IOReProvisioning(reProvisioningStatus, renkuVersionPairs, sparqlTimeRecorder, ApplicationLogger)
     eventProcessingEndpoint <- IOEventEndpoint(eventConsumersRegistry, reProvisioningStatus)
     microserviceRoutes =
       new MicroserviceRoutes[IO](eventProcessingEndpoint, new RoutesMetrics[IO](metricsRegistry), config.some).routes

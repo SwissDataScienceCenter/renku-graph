@@ -48,7 +48,7 @@ private class StatusChangerImpl[Interpretation[_]: BracketThrow](
         for {
           savepoint     <- Kleisli.liftF(transaction.savepoint)
           updateResults <- dbUpdater.updateDB(event) recoverWith rollback(transaction)(savepoint)(event)
-          _             <- Kleisli.liftF(updateGauges(updateResults)) recoverWith { case NonFatal(_) => Kleisli.pure(()) }
+          _ <- Kleisli.liftF(updateGauges(updateResults)) recoverWith { case NonFatal(_) => Kleisli.pure(()) }
         } yield ()
       } run session
     }

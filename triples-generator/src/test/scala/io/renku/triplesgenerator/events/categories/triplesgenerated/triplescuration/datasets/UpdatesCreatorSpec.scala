@@ -109,10 +109,10 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
         val (child2, _) = anyProjectEntities.importDataset(parent2).generateOne
 
         val entitiesGrandparent = grandparent.to[entities.Dataset[entities.Dataset.Provenance.Internal]]
-        val entitiesParent1     = parent1.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
-        val entitiesChild1      = child1.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
-        val entitiesParent2     = parent2.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
-        val entitiesChild2      = child2.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
+        val entitiesParent1 = parent1.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
+        val entitiesChild1  = child1.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
+        val entitiesParent2 = parent2.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
+        val entitiesChild2  = child2.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
 
         loadToStore(entitiesGrandparent, entitiesParent1, entitiesChild1, entitiesParent2, entitiesChild2)
 
@@ -157,7 +157,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
       "in case of imported external dataset, " +
       "find datasets which have sameAs pointing to the deleted dataset " +
       "update their sameAs to their topmostSameAs" in {
-        val grandparent  = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne.copy(parts = Nil)
+        val grandparent = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne.copy(parts = Nil)
         val (parent1, _) = anyProjectEntities.importDataset(grandparent).generateOne
         val (child1, _)  = anyProjectEntities.importDataset(parent1).generateOne
         val parent2 = {
@@ -168,10 +168,10 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
         val (child2, _) = anyProjectEntities.importDataset(parent2).generateOne
 
         val entitiesGrandparent = grandparent.to[entities.Dataset[entities.Dataset.Provenance.ImportedExternal]]
-        val entitiesParent1     = parent1.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorExternal]]
-        val entitiesChild1      = child1.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorExternal]]
-        val entitiesParent2     = parent2.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorExternal]]
-        val entitiesChild2      = child2.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorExternal]]
+        val entitiesParent1 = parent1.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorExternal]]
+        val entitiesChild1  = child1.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorExternal]]
+        val entitiesParent2 = parent2.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorExternal]]
+        val entitiesChild2  = child2.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorExternal]]
 
         loadToStore(entitiesGrandparent, entitiesParent1, entitiesChild1, entitiesParent2, entitiesChild2)
 

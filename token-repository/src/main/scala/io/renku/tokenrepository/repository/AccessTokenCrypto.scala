@@ -63,7 +63,7 @@ private class AccessTokenCrypto[Interpretation[_]: MonadError[*[_], Throwable]](
       EncryptedAccessToken.from(value)
     }
 
-  private implicit val accessTokenDecoder: Decoder[AccessToken] = (cursor: HCursor) => {
+  private implicit val accessTokenDecoder: Decoder[AccessToken] = (cursor: HCursor) =>
     for {
       maybeOauth    <- cursor.downField("oauth").as[Option[String]].flatMap(to(OAuthAccessToken.from))
       maybePersonal <- cursor.downField("personal").as[Option[String]].flatMap(to(PersonalAccessToken.from))
@@ -71,7 +71,6 @@ private class AccessTokenCrypto[Interpretation[_]: MonadError[*[_], Throwable]](
                                  ifNone = DecodingFailure("Access token cannot be deserialized", Nil)
                )
     } yield token
-  }
 
   private def to[T <: AccessToken](
       from: String => Either[IllegalArgumentException, T]

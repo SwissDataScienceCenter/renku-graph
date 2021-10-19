@@ -117,7 +117,7 @@ class ConcurrentProcessesLimiterImpl[Interpretation[_]: MonadThrow: ContextShift
   private def releasingSemaphore[O]: PartialFunction[Throwable, Interpretation[O]] = { case NonFatal(exception) =>
     semaphore.available flatMap {
       case available if available == processesCount.value => exception.raiseError[Interpretation, O]
-      case _                                              => semaphore.release flatMap { _ => exception.raiseError[Interpretation, O] }
+      case _ => semaphore.release flatMap { _ => exception.raiseError[Interpretation, O] }
     }
   }
 }

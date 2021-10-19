@@ -113,7 +113,7 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
           decodeList(entities.ParameterValue.decoder(activity.plan.to[entities.Plan].copy(parameters = Nil)))
         )
 
-      failure         shouldBe a[DecodingFailure]
+      failure shouldBe a[DecodingFailure]
       failure.message shouldBe s"ParameterValue points to a non-existing command parameter ${activity.plan.to[entities.Plan].parameters.map(_.resourceId).head}"
     }
 
@@ -133,7 +133,7 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
           decodeList(entities.ParameterValue.decoder(activity.plan.to[entities.Plan].copy(inputs = Nil)))
         )
 
-      failure         shouldBe a[DecodingFailure]
+      failure shouldBe a[DecodingFailure]
       failure.message shouldBe s"ParameterValue points to a non-existing command parameter ${activity.plan.to[entities.Plan].inputs.map(_.resourceId).head}"
     }
 
@@ -151,7 +151,7 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
           decodeList(entities.ParameterValue.decoder(activity.plan.to[entities.Plan].copy(outputs = Nil)))
         )
 
-      failure         shouldBe a[DecodingFailure]
+      failure shouldBe a[DecodingFailure]
       failure.message shouldBe s"ParameterValue points to a non-existing command parameter ${activity.plan.to[entities.Plan].outputs.map(_.resourceId).head}"
     }
   }

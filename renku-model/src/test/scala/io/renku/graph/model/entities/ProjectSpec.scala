@@ -428,7 +428,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       val resourceId    = projects.ResourceId(projectInfo.path)
       val maybeCreator  = projectInfo.maybeCreator.map(_.toPayloadPerson)
       val members       = projectInfo.members.map(_.toPayloadPerson)
-      val dataset1      = datasetEntities(provenanceImportedExternal).withDateBefore(projectInfo.dateCreated).generateOne
+      val dataset1 = datasetEntities(provenanceImportedExternal).withDateBefore(projectInfo.dateCreated).generateOne
       val dataset2 =
         datasetEntities(provenanceImportedInternalAncestorExternal).withDateBefore(projectInfo.dateCreated).generateOne
       val dataset3 =

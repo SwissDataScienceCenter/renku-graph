@@ -32,13 +32,8 @@ class ReProvisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFac
   "isReProvisioningNeeded" should {
     "return true when the config schema version is different than the current schema version" in new TestCase {
       // Compat matrix
-      /**  current cli version is 1.2.1
-        *  current schema version 12
-        * [1.2.3 -> 13, 1.2.1 -> 12]
-        * OR for a RollBack
-        * current cli version is 1.2.1
-        *  current schema version 12
-        * [1.2.3 -> 11, 1.2.1 -> 12]
+      /** current cli version is 1.2.1 current schema version 12 [1.2.3 -> 13, 1.2.1 -> 12] OR for a RollBack current
+        * cli version is 1.2.1 current schema version 12 [1.2.3 -> 11, 1.2.1 -> 12]
         */
       val newVersionPair = renkuVersionPairs.generateNonEmptyList(2, 2)
 
@@ -47,9 +42,7 @@ class ReProvisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFac
 
     "return true when the last two schema versions are the same but the cli versions are different" in new TestCase {
       // Compat matrix
-      /**  current cli version is 1.2.1
-        *  current schema version 13
-        * [1.2.3 -> 13, 1.2.1 -> 13]
+      /** current cli version is 1.2.1 current schema version 13 [1.2.3 -> 13, 1.2.1 -> 13]
         */
       val newVersionPair =
         renkuVersionPairs.generateNonEmptyList(2, 2).map(_.copy(schemaVersion = currentVersionPair.schemaVersion))
@@ -59,9 +52,7 @@ class ReProvisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFac
 
     "return false when the schema version is the same and the cli version is different" in new TestCase {
 
-      /** current cli version is 1.2.1
-        *  current schema version 13
-        * Compat matrix: [1.2.3 -> 13]
+      /** current cli version is 1.2.1 current schema version 13 Compat matrix: [1.2.3 -> 13]
         */
       val newVersionPair = renkuVersionPairs.generateOne.copy(schemaVersion = currentVersionPair.schemaVersion)
 

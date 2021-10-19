@@ -118,7 +118,7 @@ class HookValidatorImpl[Interpretation[_]: MonadError[*[_], Throwable]](
 
   private sealed abstract class Token(val value: AccessToken)
   private object Token {
-    case class GivenToken(override val value: AccessToken) extends Token(value)
+    case class GivenToken(override val value: AccessToken)  extends Token(value)
     case class StoredToken(override val value: AccessToken) extends Token(value)
   }
 }

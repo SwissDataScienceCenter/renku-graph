@@ -150,7 +150,7 @@ class EventHandlerSpec
         },
         "lastSynced":   ${lastSynced.value}
       }"""
-    case MinimalCommitSyncEvent(project)              => json"""{
+    case MinimalCommitSyncEvent(project) => json"""{
         "categoryName": "COMMIT_SYNC",
         "project": {
           "id":         ${project.id.value},

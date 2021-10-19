@@ -56,7 +56,7 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow: ConcurrentEffe
   private def startProcessEvent(requestContent: EventRequestContent, deferred: Deferred[Interpretation, Unit]) = for {
     eventBody <- requestContent match {
                    case EventRequestContent.WithPayload(_, payload: String) => EitherT.rightT(EventBody(payload))
-                   case _ => EitherT.leftT(BadRequest)
+                   case _                                                   => EitherT.leftT(BadRequest)
                  }
     commitEvent <- toCommitEvent(eventBody).toRightT(recoverTo = BadRequest)
     result <- Concurrent[Interpretation]

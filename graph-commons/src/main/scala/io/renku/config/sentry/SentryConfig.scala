@@ -68,7 +68,7 @@ object SentryConfig {
       with UrlOps[SentryBaseUrl]
 
   class ServiceName private (val value: String) extends AnyVal with StringTinyType
-  implicit object ServiceName extends TinyTypeFactory[ServiceName](new ServiceName(_)) with NonBlank
+  implicit object ServiceName                   extends TinyTypeFactory[ServiceName](new ServiceName(_)) with NonBlank
 
   class SentryStackTracePackage private (val value: String) extends AnyVal with StringTinyType
   implicit object SentryStackTracePackage

@@ -37,10 +37,10 @@ sealed trait EventSchedulingResult extends Product with Serializable
 
 object EventSchedulingResult {
   type Accepted = Accepted.type
-  case object Accepted             extends EventSchedulingResult
-  case object Busy                 extends EventSchedulingResult
-  case object UnsupportedEventType extends EventSchedulingResult
-  case object BadRequest           extends EventSchedulingResult
+  case object Accepted                                   extends EventSchedulingResult
+  case object Busy                                       extends EventSchedulingResult
+  case object UnsupportedEventType                       extends EventSchedulingResult
+  case object BadRequest                                 extends EventSchedulingResult
   final case class SchedulingError(throwable: Throwable) extends EventSchedulingResult
 
   implicit def show[SE <: EventSchedulingResult]: Show[SE] = Show.show {

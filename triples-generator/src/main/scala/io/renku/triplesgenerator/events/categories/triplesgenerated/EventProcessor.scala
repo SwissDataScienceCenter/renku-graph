@@ -208,7 +208,7 @@ private object EventProcessor {
       .name("triples_transformation_processing_times")
       .help("Triples transformation processing times")
       .buckets(.1, .5, 1, 5, 10, 50, 100, 500, 1000, 5000, 10000, 50000, 100000, 500000, 1000000, 5000000, 10000000,
-        50000000, 100000000, 500000000)
+               50000000, 100000000, 500000000)
 
   def apply(
       metricsRegistry: MetricsRegistry[IO],

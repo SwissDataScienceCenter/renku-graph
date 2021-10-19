@@ -61,7 +61,7 @@ class EventEndpointImpl[Interpretation[_]: Effect: MonadThrow](
           multipart      <- toMultipart(request)
           eventJson      <- toEvent(multipart)
           requestContent <- getRequestContent(multipart, eventJson)
-          result         <- right[Response[Interpretation]](eventConsumersRegistry.handle(requestContent) >>= toHttpResult)
+          result <- right[Response[Interpretation]](eventConsumersRegistry.handle(requestContent) >>= toHttpResult)
         } yield result
       }.merge recoverWith { case NonFatal(error) =>
         toHttpResult(EventSchedulingResult.SchedulingError(error))

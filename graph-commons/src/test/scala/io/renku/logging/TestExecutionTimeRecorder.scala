@@ -45,7 +45,7 @@ object TestExecutionTimeRecorder {
     )
 
   private implicit def clock[Interpretation[_]]: Clock[Interpretation] = new Clock[Interpretation] {
-    override def realTime(unit:  TimeUnit) = ???
+    override def realTime(unit: TimeUnit)  = ???
     override def monotonic(unit: TimeUnit) = ???
   }
 }

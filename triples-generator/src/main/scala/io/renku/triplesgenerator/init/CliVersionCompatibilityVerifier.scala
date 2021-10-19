@@ -32,7 +32,7 @@ trait CliVersionCompatibilityVerifier[Interpretation[_]] {
 
 private class CliVersionCompatibilityVerifierImpl[Interpretation[_]](cliVersion:        CliVersion,
                                                                      renkuVersionPairs: NonEmptyList[RenkuVersionPair]
-)(implicit ME:                                                                          MonadError[Interpretation, Throwable])
+)(implicit ME: MonadError[Interpretation, Throwable])
     extends CliVersionCompatibilityVerifier[Interpretation] {
   override def run(): Interpretation[Unit] =
     if (cliVersion != renkuVersionPairs.head.cliVersion)

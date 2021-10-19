@@ -84,7 +84,7 @@ private class EventDeliveryImpl[Interpretation[_]: BracketThrow, CategoryEvent](
 
   private lazy val toResult: Completion => Interpretation[Unit] = {
     case Completion.Insert(0 | 1) => ().pure[Interpretation]
-    case _                        => new Exception("Inserted more than one record to the event_delivery").raiseError[Interpretation, Unit]
+    case _ => new Exception("Inserted more than one record to the event_delivery").raiseError[Interpretation, Unit]
   }
 }
 

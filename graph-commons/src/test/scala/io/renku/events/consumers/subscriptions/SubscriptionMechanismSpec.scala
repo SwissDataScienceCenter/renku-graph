@@ -87,7 +87,7 @@ class SubscriptionMechanismSpec extends AnyWordSpec with Eventually with should.
 
       val subscriberId  = subscriberIds.generateOne
       val subscriberUrl = subscriberUrls.generateOne
-      val payload       = jsons.generateOne.deepMerge(json"""{
+      val payload = jsons.generateOne.deepMerge(json"""{
         "subscriber": {
           "id": ${subscriberId.value},
           "url": ${subscriberUrl.value}
@@ -114,7 +114,7 @@ class SubscriptionMechanismSpec extends AnyWordSpec with Eventually with should.
       )
       val subscriberId  = subscriberIds.generateOne
       val subscriberUrl = subscriberUrls.generateOne
-      val payload       = jsons.generateOne.deepMerge(json"""{
+      val payload = jsons.generateOne.deepMerge(json"""{
         "subscriber": {
           "id": ${subscriberId.value},
           "url": ${subscriberUrl.value}
@@ -138,7 +138,7 @@ class SubscriptionMechanismSpec extends AnyWordSpec with Eventually with should.
 
       val subscriberId  = subscriberIds.generateOne
       val subscriberUrl = subscriberUrls.generateOne
-      val payload       = jsons.generateOne.deepMerge(json"""{
+      val payload = jsons.generateOne.deepMerge(json"""{
         "subscriber": {
           "id": ${subscriberId.value},
           "url": ${subscriberUrl.value}

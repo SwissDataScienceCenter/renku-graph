@@ -39,9 +39,9 @@ trait JsonLDArrayMerge extends JsonLDMerge {
 
   private lazy val separateEdgesAndEntities: Seq[JsonLD] => (List[JsonLDEdge], List[JsonLDEntity]) =
     _.foldLeft(List.empty[JsonLDEdge] -> List.empty[JsonLDEntity]) {
-      case ((edges, entities), edge: JsonLDEdge) => (edges ::: edge :: Nil) -> entities
-      case ((edges, entities), entity: JsonLDEntity) => edges -> (entities ::: entity :: Nil)
-      case ((edges, entities), _) => edges -> entities
+      case ((edges, entities), edge: JsonLDEdge)     => (edges ::: edge :: Nil) -> entities
+      case ((edges, entities), entity: JsonLDEntity) => edges                   -> (entities ::: entity :: Nil)
+      case ((edges, entities), _)                    => edges                   -> entities
     }
 
   private def validateFlattened(jsons: Seq[JsonLD]) =
@@ -52,7 +52,7 @@ trait JsonLDArrayMerge extends JsonLDMerge {
   private lazy val findIllegalEntities: Seq[JsonLD] => Option[JsonLD] =
     _.find {
       case _: JsonLDEdge | _: JsonLDEntity => false
-      case _ => true
+      case _                               => true
     }
 
   private def mergeEdges(edgesGrouped: Map[EntityId, List[JsonLDEdge]]): JsonLDEntity => JsonLDEntity = { entity =>

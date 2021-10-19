@@ -37,16 +37,16 @@ trait RenkuVersionPairUpdater[Interpretation[_]] {
 private case object RenkuVersionPairJsonLD {
 
   def id(implicit renkuBaseUrl: RenkuBaseUrl) = EntityId.of((renkuBaseUrl / "version-pair").toString)
-  val objectType    = renku / "VersionPair"
-  val cliVersion    = renku / "cliVersion"
-  val schemaVersion = renku / "schemaVersion"
+  val objectType                              = renku / "VersionPair"
+  val cliVersion                              = renku / "cliVersion"
+  val schemaVersion                           = renku / "schemaVersion"
 }
 
 private class RenkuVersionPairUpdaterImpl(rdfStoreConfig: RdfStoreConfig,
                                           renkuBaseUrl:   RenkuBaseUrl,
                                           logger:         Logger[IO],
                                           timeRecorder:   SparqlQueryTimeRecorder[IO]
-)(implicit executionContext:                              ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
     with RenkuVersionPairUpdater[IO] {
 

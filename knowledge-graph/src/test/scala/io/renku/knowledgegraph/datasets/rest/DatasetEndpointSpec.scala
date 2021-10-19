@@ -173,7 +173,7 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
     val renkuResourcesUrl     = renkuResourcesUrls.generateOne
     val logger                = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
-    val endpoint              = new DatasetEndpoint[IO](datasetsFinder, renkuResourcesUrl, gitLabUrl, executionTimeRecorder, logger)
+    val endpoint = new DatasetEndpoint[IO](datasetsFinder, renkuResourcesUrl, gitLabUrl, executionTimeRecorder, logger)
   }
 
   private implicit val datasetEntityDecoder: EntityDecoder[IO, model.Dataset] = jsonOf[IO, model.Dataset]

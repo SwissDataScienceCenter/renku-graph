@@ -55,22 +55,22 @@ abstract class Cursor {
 
   def getEntityTypes: JsonLDDecoder.Result[EntityTypes] = jsonLD match {
     case JsonLDEntity(_, entityTypes, _, _) => Right(entityTypes)
-    case _                                  => Left(DecodingFailure("No EntityTypes found on non-JsonLDEntity object", Nil))
+    case _ => Left(DecodingFailure("No EntityTypes found on non-JsonLDEntity object", Nil))
   }
 
   def downEntityId: Cursor = jsonLD match {
     case JsonLDEntity(entityId, _, _, _) => PropertyCursor(this, Property("@id"), entityId.asJsonLD)
     case _: JsonLDEntityId[_] => this
     case JsonLDArray(Seq(jsonLDEntityId @ JsonLDEntityId(_))) => PropertyCursor(this, Property("@id"), jsonLDEntityId)
-    case JsonLDArray(items) if items.size != 1                => Empty(s"Expected @id but got an array of size ${items.size}")
-    case jsonLD                                               => Empty(s"Expected @id but got a ${jsonLD.getClass.getSimpleName}")
+    case JsonLDArray(items) if items.size != 1 => Empty(s"Expected @id but got an array of size ${items.size}")
+    case jsonLD                                => Empty(s"Expected @id but got a ${jsonLD.getClass.getSimpleName}")
   }
 
   def downType(searchedTypes: EntityTypes): Cursor = downType(searchedTypes.toList: _*)
 
   def downType(searchedTypes: EntityType*): Cursor = jsonLD match {
     case JsonLDEntity(_, types, _, _) if (searchedTypes diff types.list.toList).isEmpty => this
-    case _                                                                              => Empty(s"Cannot find entity of ${searchedTypes.map(_.show).mkString("; ")} type")
+    case _ => Empty(s"Cannot find entity of ${searchedTypes.map(_.show).mkString("; ")} type")
   }
 
   lazy val downArray: Cursor = jsonLD match {
@@ -93,7 +93,7 @@ abstract class Cursor {
               case cursor => PropertyCursor(cursor, name, entityId)
             }
           case (name, value: JsonLDValue[_]) => PropertyCursor(this, name, value)
-          case (name, entity: JsonLDEntity) => PropertyCursor(this, name, entity)
+          case (name, entity: JsonLDEntity)  => PropertyCursor(this, name, entity)
           case (_, entities: JsonLDArray) =>
             this match {
               case cursor: FlattenedJsonCursor => FlattenedArrayCursor(cursor, entities, cursor.allEntities)

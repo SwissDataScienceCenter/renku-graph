@@ -30,7 +30,7 @@ object model {
 
   private[lineage] final case class ExecutionInfo(entityId: EntityId, date: RunDate)
   private[lineage] final class RunDate private (val value: Instant) extends AnyVal with InstantTinyType
-  private[lineage] implicit object RunDate extends TinyTypeFactory[RunDate](new RunDate(_))
+  private[lineage] implicit object RunDate                          extends TinyTypeFactory[RunDate](new RunDate(_))
   private[lineage] type FromAndToNodes = (Set[Node.Location], Set[Node.Location])
   private[lineage] type EdgeMapEntry   = (ExecutionInfo, FromAndToNodes)
   private[lineage] type EdgeMap        = Map[ExecutionInfo, FromAndToNodes]
@@ -80,13 +80,13 @@ object model {
     }
 
     final class Label private (val value: String) extends AnyVal with StringTinyType
-    object Label extends TinyTypeFactory[Label](new Label(_)) with NonBlank
+    object Label                                  extends TinyTypeFactory[Label](new Label(_)) with NonBlank
 
     final class Type private (val value: String) extends AnyVal with StringTinyType
-    object Type extends TinyTypeFactory[Type](new Type(_)) with NonBlank
+    object Type                                  extends TinyTypeFactory[Type](new Type(_)) with NonBlank
 
     final class Location private (val value: String) extends AnyVal with StringTinyType
-    object Location extends TinyTypeFactory[Location](new Location(_))
+    object Location                                  extends TinyTypeFactory[Location](new Location(_))
 
     sealed trait SingleWordType extends Product with Serializable {
       val name: String
@@ -108,7 +108,7 @@ object model {
         case types if Activity.entityTypes.toList.toSet === types     => Right(ProcessRun)
         case types if Entity.folderEntityTypes.toList.toSet === types => Right(Directory)
         case types if Entity.fileEntityTypes.toList.toSet === types   => Right(File)
-        case types                                                    => Left(new Exception(s"${types.map(_.show).mkString(", ")} cannot be converted to a NodeType"))
+        case types => Left(new Exception(s"${types.map(_.show).mkString(", ")} cannot be converted to a NodeType"))
       }
     }
   }

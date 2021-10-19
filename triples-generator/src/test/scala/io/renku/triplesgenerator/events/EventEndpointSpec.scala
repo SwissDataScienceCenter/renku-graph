@@ -247,7 +247,7 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
   }
 
   private def eventRequestEquals(eventRequestContent: EventRequestContent): EventRequestContent => Boolean = {
-    case requestContent @ EventRequestContent.NoPayload(_) => requestContent == eventRequestContent
+    case requestContent @ EventRequestContent.NoPayload(_)              => requestContent == eventRequestContent
     case requestContent @ EventRequestContent.WithPayload(_, _: String) => requestContent == eventRequestContent
     case EventRequestContent.WithPayload(event, actualPayload: ByteArrayTinyType) =>
       eventRequestContent match {

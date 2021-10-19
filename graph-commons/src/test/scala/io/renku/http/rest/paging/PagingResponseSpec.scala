@@ -105,7 +105,7 @@ class PagingResponseSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
 
             val Failure(exception) = PagingResponse.from[Try, NonBlank](results.toList, request, total)
 
-            exception            shouldBe an[IllegalArgumentException]
+            exception shouldBe an[IllegalArgumentException]
             exception.getMessage shouldBe s"PagingResponse cannot be instantiated for ${results.size} results, total: $total, page: $page and perPage: ${perPage.value}"
           }
         }
@@ -120,7 +120,7 @@ class PagingResponseSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
 
             val Failure(exception) = PagingResponse.from[Try, NonBlank](results, request, total)
 
-            exception            shouldBe an[IllegalArgumentException]
+            exception shouldBe an[IllegalArgumentException]
             exception.getMessage shouldBe s"PagingResponse cannot be instantiated for ${results.size} results, total: $total, page: $page and perPage: $perPage"
           }
         }

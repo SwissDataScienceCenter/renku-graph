@@ -45,14 +45,14 @@ private class JsonLDParser() extends Parser {
   private def parseObject(jsonObject: JsonObject): Either[ParsingFailure, JsonLD] = {
     val propsMap = jsonObject.toMap
     (propsMap.get("@id"), propsMap.get("@type"), propsMap.get("@reverse"), propsMap.get("@value")) match {
-      case (Some(entityId), Some(types), maybeReverse, None)                             => jsonObject.toJsonLdEntity(entityId, types, maybeReverse)
+      case (Some(entityId), Some(types), maybeReverse, None) => jsonObject.toJsonLdEntity(entityId, types, maybeReverse)
       case (Some(entityId), None, None, None) if !propsMap.view.keys.exists(notReserved) => toJsonLDEntityId(entityId)
-      case (Some(entityId), None, None, None)                                            => toJsonLDEdge(entityId, propsMap)
-      case (None, maybeTypes, None, Some(value))                                         => toJsonLDValue(maybeTypes, value)
-      case (Some(_), None, Some(_), None)                                                => ParsingFailure("Entity with reverse but no type").asLeft[JsonLD]
-      case (None, _, _, _)                                                               => ParsingFailure("Entity without @id").asLeft[JsonLD]
-      case (Some(_), Some(_), _, Some(_))                                                => ParsingFailure("Invalid entity").asLeft[JsonLD]
-      case (Some(_), None, _, Some(_))                                                   => ParsingFailure("Entity with @id and @value but no @type").asLeft[JsonLD]
+      case (Some(entityId), None, None, None)    => toJsonLDEdge(entityId, propsMap)
+      case (None, maybeTypes, None, Some(value)) => toJsonLDValue(maybeTypes, value)
+      case (Some(_), None, Some(_), None)        => ParsingFailure("Entity with reverse but no type").asLeft[JsonLD]
+      case (None, _, _, _)                       => ParsingFailure("Entity without @id").asLeft[JsonLD]
+      case (Some(_), Some(_), _, Some(_))        => ParsingFailure("Invalid entity").asLeft[JsonLD]
+      case (Some(_), None, _, Some(_)) => ParsingFailure("Entity with @id and @value but no @type").asLeft[JsonLD]
     }
   }
 

@@ -78,7 +78,7 @@ class CommitSyncForcerSpec
         forcer.forceCommitSync(projectId, projectPath).unsafeRunSync() shouldBe ()
 
         findSyncTime(projectId, commitsync.categoryName) shouldBe None
-        findProjects                                     shouldBe List((projectId, projectPath, EventDate(Instant.EPOCH)))
+        findProjects shouldBe List((projectId, projectPath, EventDate(Instant.EPOCH)))
 
         queriesExecTimes.verifyExecutionTimeMeasured("commit_sync_request - delete last_synced")
         queriesExecTimes.verifyExecutionTimeMeasured("commit_sync_request - insert project")
@@ -99,7 +99,7 @@ class CommitSyncForcerSpec
         forcer.forceCommitSync(projectId, projectPath).unsafeRunSync() shouldBe ()
 
         findSyncTime(projectId, commitsync.categoryName) shouldBe None
-        findProjects.map(proj => proj._1 -> proj._2) shouldBe List(projectId -> projectPath)
+        findProjects.map(proj => proj._1 -> proj._2)     shouldBe List(projectId -> projectPath)
 
         queriesExecTimes.verifyExecutionTimeMeasured("commit_sync_request - delete last_synced")
       }

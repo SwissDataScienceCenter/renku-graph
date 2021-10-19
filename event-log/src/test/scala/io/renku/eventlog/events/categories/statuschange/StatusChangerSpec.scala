@@ -167,7 +167,7 @@ class StatusChangerSpec
   }
 
   private implicit val genApplicative: Applicative[Gen] = new Applicative[Gen] {
-    override def pure[A](x:   A) = Gen.const(x)
+    override def pure[A](x: A) = Gen.const(x)
     override def ap[A, B](ff: Gen[A => B])(fa: Gen[A]): Gen[B] = ff.flatMap(f => fa.map(f))
   }
 

@@ -144,10 +144,10 @@ class ProjectEndpointImpl[Interpretation[_]: Effect](
       "projectAccess": ${projectAccessLevel.accessLevel},
       "groupAccess":   ${groupAccessLevel.accessLevel}
     }"""
-    case ProjectPermissions(accessLevel)                                  => json"""{
+    case ProjectPermissions(accessLevel) => json"""{
       "projectAccess": ${accessLevel.accessLevel}
     }"""
-    case GroupPermissions(accessLevel)                                    => json"""{
+    case GroupPermissions(accessLevel) => json"""{
       "groupAccess": ${accessLevel.accessLevel}
     }"""
   }

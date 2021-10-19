@@ -76,7 +76,7 @@ class ProjectDatasetsEndpoint[Interpretation[_]: Effect](
   }
 
   private implicit val sameAsOrDerivedEncoder: Encoder[SameAsOrDerived] = Encoder.instance[SameAsOrDerived] {
-    case Left(sameAs: SameAs) => json"""{"sameAs": ${sameAs.toString}}"""
+    case Left(sameAs: SameAs)            => json"""{"sameAs": ${sameAs.toString}}"""
     case Right(derivedFrom: DerivedFrom) => json"""{"derivedFrom": ${derivedFrom.toString}}"""
   }
 

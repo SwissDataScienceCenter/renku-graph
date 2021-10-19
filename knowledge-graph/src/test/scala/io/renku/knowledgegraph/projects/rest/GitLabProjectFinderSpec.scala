@@ -185,11 +185,11 @@ class GitLabProjectFinderSpec
       "project_access": ${toJson(project)},
       "group_access":   ${toJson(group)}
     }"""
-    case ProjectPermissions(project)                => json"""{
+    case ProjectPermissions(project) => json"""{
       "project_access": ${toJson(project)},
       "group_access":   ${Json.Null}
     }"""
-    case GroupPermissions(group)                    => json"""{
+    case GroupPermissions(group) => json"""{
       "project_access": ${Json.Null},
       "group_access":   ${toJson(group)}
     }"""

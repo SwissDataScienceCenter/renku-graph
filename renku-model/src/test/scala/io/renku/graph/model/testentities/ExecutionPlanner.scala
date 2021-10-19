@@ -142,7 +142,7 @@ final case class ExecutionPlanner(plan:                     Plan,
   private lazy val createGenerationFactories: ValidatedNel[String, List[Activity => Generation]] = plan.outputs
     .foldLeft(List.empty[LocationCommandOutput]) {
       case (commandOutputs, output: LocationCommandOutput) => commandOutputs :+ output
-      case (commandOutputs, _) => commandOutputs
+      case (commandOutputs, _)                             => commandOutputs
     }
     .map(output =>
       outputsValueOverrides

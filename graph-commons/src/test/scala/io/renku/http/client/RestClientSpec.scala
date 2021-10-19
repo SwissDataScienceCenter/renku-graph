@@ -209,7 +209,7 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
       }
 
       exception.getMessage shouldBe s"""GET $hostUrl/resource returned ${Status.Ok}; error: For input string: "non int""""
-      exception.getCause   shouldBe a[NumberFormatException]
+      exception.getCause shouldBe a[NumberFormatException]
     }
 
     "fail if remote responds with a body which causes json parsing failures" in new TestCase {
@@ -223,7 +223,7 @@ class RestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockF
       verifyThrottling()
 
       val customDecodingFailure = nonEmptyStrings().generateOne
-      implicit val decoder:       Decoder[Boolean]           = Decoder.instance(_ => DecodingFailure(customDecodingFailure, Nil).asLeft)
+      implicit val decoder: Decoder[Boolean] = Decoder.instance(_ => DecodingFailure(customDecodingFailure, Nil).asLeft)
       implicit val entityDecoder: EntityDecoder[IO, Boolean] = jsonOf[IO, Boolean]
 
       lazy val mapResponseToBoolean: PartialFunction[(Status, Request[IO], Response[IO]), IO[Boolean]] = {

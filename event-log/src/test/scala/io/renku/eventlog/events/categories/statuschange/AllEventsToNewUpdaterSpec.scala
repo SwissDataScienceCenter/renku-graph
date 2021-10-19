@@ -79,7 +79,7 @@ class AllEventsToNewUpdaterSpec
         (eventId.id, EventStatus.New, None, None, List())
       }
 
-      findEvent(CompoundEventId(skippedEvent, skippedEventProjectId)).map(_._2)                   shouldBe Some(EventStatus.Skipped)
+      findEvent(CompoundEventId(skippedEvent, skippedEventProjectId)).map(_._2) shouldBe Some(EventStatus.Skipped)
       findEvent(CompoundEventId(awaitingDeletionEvent, awaitingDeletionEventProjectId)).map(_._2) shouldBe None
       findAllDeliveries                                                                           shouldBe Nil
     }

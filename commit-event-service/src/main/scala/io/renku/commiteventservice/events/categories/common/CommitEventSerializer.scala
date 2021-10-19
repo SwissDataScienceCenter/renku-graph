@@ -47,7 +47,7 @@ private class CommitEventSerializer[Interpretation[_]: MonadThrow] {
         "username": ${person.name.value},
         "email"   : ${person.email.value}
       }"""
-    case person: Person           => json"""{
+    case person: Person => json"""{
         "username": ${person.name.value}
       }"""
   }

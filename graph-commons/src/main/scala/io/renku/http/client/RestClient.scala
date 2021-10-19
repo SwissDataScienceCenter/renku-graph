@@ -252,7 +252,7 @@ abstract class RestClient[Interpretation[_]: ConcurrentEffect: Timer, Throttling
       new MultipartBuilder(request, parts).build()
 
     class MultipartBuilder private[RequestOps] (request: Request[Interpretation],
-                                                parts:   Vector[Part[Interpretation]] = Vector.empty[Part[Interpretation]]
+                                                parts: Vector[Part[Interpretation]] = Vector.empty[Part[Interpretation]]
     ) {
       def addPart[PartType](name: String, value: PartType)(implicit
           encoder:                PartEncoder[PartType]

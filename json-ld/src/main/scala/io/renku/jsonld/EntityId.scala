@@ -34,7 +34,7 @@ abstract class EntityId extends Product with Serializable {
 object EntityId {
 
   def of[T](value: T)(implicit convert: T => EntityId): EntityId = convert(value)
-  def blank: EntityId = BlankNodeEntityId(UUID.randomUUID())
+  def blank:                                            EntityId = BlankNodeEntityId(UUID.randomUUID())
 
   private[jsonld] final case class StandardEntityId(override val value: String) extends EntityId {
     type Value = String

@@ -117,7 +117,7 @@ private class GitLabProjectFinderImpl[Interpretation[_]: ConcurrentEffect: Timer
                          case (Some(project), Some(group)) => Right(Permissions(project, group))
                          case (Some(project), None)        => Right(Permissions(project))
                          case (None, Some(group))          => Right(Permissions(group))
-                         case _                            => Left(DecodingFailure("permissions has neither project_access nor group_access", Nil))
+                         case _ => Left(DecodingFailure("permissions has neither project_access nor group_access", Nil))
                        }
       } yield permissions
     }

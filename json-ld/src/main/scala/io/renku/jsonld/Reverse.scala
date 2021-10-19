@@ -71,7 +71,7 @@ object Reverse {
 
   private object `value which is neither Entity nor Array(Entity)` {
     def unapply(tuple: (Property, JsonLD)): Option[Exception] = tuple match {
-      case (_, _: JsonLDEntity) => None
+      case (_, _: JsonLDEntity)   => None
       case (_, JsonLDEntityId(_)) => None
       case (property, JsonLDArray(jsons)) =>
         jsons find nonEntity match {
@@ -100,6 +100,6 @@ object Reverse {
   implicit val jsonEncoder: Encoder[Reverse] = Encoder.instance {
     case Reverse(properties) if properties.isEmpty   => Json.Null
     case Reverse(properties) if properties.size == 1 => Json.obj(properties.head._1.url -> properties.head._2.toJson)
-    case Reverse(props)                              => Json.obj(props.map { case (prop, value) => prop.url -> value.toJson }.toSeq: _*)
+    case Reverse(props) => Json.obj(props.map { case (prop, value) => prop.url -> value.toJson }.toSeq: _*)
   }
 }

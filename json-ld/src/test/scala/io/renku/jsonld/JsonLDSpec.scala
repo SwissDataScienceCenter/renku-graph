@@ -490,14 +490,14 @@ class JsonLDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
   "equals & hashCode" should {
     "return true for two JsonLDArrays with the same elements in the same order" in {
       forAll(nonEmptyList(jsonLDEntities)) { entities =>
-        JsonLD.arr(entities.toList: _*) shouldBe JsonLD.arr(entities.toList: _*)
+        JsonLD.arr(entities.toList: _*)            shouldBe JsonLD.arr(entities.toList: _*)
         JsonLD.arr(entities.toList: _*).hashCode() shouldBe JsonLD.arr(entities.toList: _*).hashCode()
       }
     }
 
     "return true for two JsonLDArrays with the same elements in *different* order" in {
       forAll(nonEmptyList(jsonLDEntities)) { entities =>
-        JsonLD.arr(entities.toList: _*) shouldBe JsonLD.arr(Random.shuffle(entities.toList): _*)
+        JsonLD.arr(entities.toList: _*)            shouldBe JsonLD.arr(Random.shuffle(entities.toList): _*)
         JsonLD.arr(entities.toList: _*).hashCode() shouldBe JsonLD.arr(Random.shuffle(entities.toList): _*).hashCode()
       }
     }

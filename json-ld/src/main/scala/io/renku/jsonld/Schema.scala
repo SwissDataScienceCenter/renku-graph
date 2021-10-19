@@ -21,9 +21,9 @@ package io.renku.jsonld
 import cats.Show
 
 abstract class Schema(url: String, separator: String) extends Product with Serializable {
-  def /(name: String): Property = Property(s"$url$separator$name")
-  def /(name: Number): Property = Property(s"$url$separator$name")
-  def asPrefix(name: String): String = s"PREFIX $name: <$url$separator>"
+  def /(name: String):        Property = Property(s"$url$separator$name")
+  def /(name: Number):        Property = Property(s"$url$separator$name")
+  def asPrefix(name: String): String   = s"PREFIX $name: <$url$separator>"
 
   override lazy val toString: String = s"$url$separator"
 }
@@ -38,7 +38,7 @@ object Property {
 
 object Schema {
 
-  def from(baseUrl: String): Schema = SlashSeparatorSchema(baseUrl)
+  def from(baseUrl: String):                    Schema = SlashSeparatorSchema(baseUrl)
   def from(baseUrl: String, separator: String): Schema = CustomSeparatorSchema(baseUrl, separator)
 
   private[jsonld] final case class SlashSeparatorSchema(value: String) extends Schema(value, separator = "/")
