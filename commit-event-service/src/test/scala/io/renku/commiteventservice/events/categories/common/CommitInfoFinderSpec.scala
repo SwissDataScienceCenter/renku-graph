@@ -286,6 +286,6 @@ class CommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSer
       "parent_ids":      ${parents.map(_.value)}
     }"""
 
-    val finder = new CommitInfoFinderImpl(gitLabUrl, Throttler.noThrottling, TestLogger())
+    val finder = new CommitInfoFinderImpl[IO](gitLabUrl, Throttler.noThrottling, TestLogger())
   }
 }

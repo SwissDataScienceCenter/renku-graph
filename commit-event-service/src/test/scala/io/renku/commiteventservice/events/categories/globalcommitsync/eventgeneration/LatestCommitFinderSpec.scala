@@ -66,7 +66,7 @@ class LatestCommitFinderSpec extends AnyWordSpec with MockFactory with ExternalS
     val projectId = projectIds.generateOne
     val commitId  = commitIds.generateOne
 
-    val latestCommitFinder = new LatestCommitFinderImpl(gitLabUrl, Throttler.noThrottling, TestLogger())
+    val latestCommitFinder = new LatestCommitFinderImpl[IO](gitLabUrl, Throttler.noThrottling, TestLogger())
   }
 
   private def commitsJson(from: CommitId) =
