@@ -19,7 +19,7 @@
 package io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration
 
 import cats.MonadThrow
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{Async, Temporal}
 import cats.syntax.all._
 import io.renku.commiteventservice.events.categories.common._
 import io.renku.config.GitLab
@@ -28,8 +28,6 @@ import io.renku.events.consumers.Project
 import io.renku.graph.model.events.{BatchDate, CommitId}
 import io.renku.http.client.AccessToken
 import org.typelevel.log4cats.Logger
-
-import scala.concurrent.ExecutionContext
 
 private[eventgeneration] trait MissingCommitEventCreator[Interpretation[_]] {
   def createMissingCommits(project: Project, commitsToCreate: List[CommitId])(implicit
@@ -57,12 +55,10 @@ private[eventgeneration] class MissingCommitEventCreatorImpl[Interpretation[_]: 
 }
 
 private[eventgeneration] object MissingCommitEventCreator {
-  def apply(gitLabThrottler: Throttler[IO, GitLab], logger: Logger[IO])(implicit
-      executionContext:      ExecutionContext,
-      contextShift:          ContextShift[IO],
-      timer:                 Timer[IO]
-  ): IO[MissingCommitEventCreator[IO]] = for {
-    commitInfoFinder <- CommitInfoFinder(gitLabThrottler, logger)
-    commitToEventLog <- CommitToEventLog(logger)
-  } yield new MissingCommitEventCreatorImpl[IO](commitInfoFinder, commitToEventLog)
+  def apply[Interpretation[_]: Async: Temporal: Logger](
+      gitLabThrottler: Throttler[Interpretation, GitLab]
+  ): Interpretation[MissingCommitEventCreator[Interpretation]] = for {
+    commitInfoFinder <- CommitInfoFinder(gitLabThrottler)
+    commitToEventLog <- CommitToEventLog[Interpretation]
+  } yield new MissingCommitEventCreatorImpl[Interpretation](commitInfoFinder, commitToEventLog)
 }

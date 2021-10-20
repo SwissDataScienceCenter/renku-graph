@@ -18,21 +18,25 @@
 
 package io.renku.commiteventservice.events.categories.commitsync.eventgeneration
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.renku.commiteventservice.events.categories.common.Generators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.config.EventLogUrl
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
+import io.renku.testtools.IOSpec
 import org.http4s.Status.{Created, NotFound, Ok}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
-class EventDetailsFinderSpec extends AnyWordSpec with MockFactory with ExternalServiceStubbing with should.Matchers {
+class EventDetailsFinderSpec
+    extends AnyWordSpec
+    with IOSpec
+    with MockFactory
+    with ExternalServiceStubbing
+    with should.Matchers {
 
   "checkIfExists" should {
 
@@ -68,12 +72,10 @@ class EventDetailsFinderSpec extends AnyWordSpec with MockFactory with ExternalS
     }
   }
 
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO]        = IO.timer(global)
-
   private trait TestCase {
+    private implicit val logger: TestLogger[IO] = TestLogger()
     val event              = newCommitEvents.generateOne
     val eventLogUrl        = EventLogUrl(externalServiceBaseUrl)
-    val eventDetailsFinder = new EventDetailsFinderImpl[IO](eventLogUrl, TestLogger())
+    val eventDetailsFinder = new EventDetailsFinderImpl[IO](eventLogUrl)
   }
 }

@@ -21,7 +21,7 @@ package io.renku.commiteventservice.events
 import cats.MonadThrow
 import cats.data.EitherT
 import cats.data.EitherT.right
-import cats.effect.Effect
+import cats.effect.kernel.Concurrent
 import cats.syntax.all._
 import io.circe.Json
 import io.renku.events.EventRequestContent
@@ -38,7 +38,7 @@ trait EventEndpoint[Interpretation[_]] {
   def processEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]]
 }
 
-class EventEndpointImpl[Interpretation[_]: Effect: MonadThrow](
+class EventEndpointImpl[Interpretation[_]: Concurrent](
     eventConsumersRegistry: EventConsumersRegistry[Interpretation]
 ) extends Http4sDsl[Interpretation]
     with EventEndpoint[Interpretation] {
@@ -106,11 +106,9 @@ class EventEndpointImpl[Interpretation[_]: Effect: MonadThrow](
 }
 
 object EventEndpoint {
-  import cats.effect.{ContextShift, IO}
-
-  def apply(
-      subscriptionsRegistry: EventConsumersRegistry[IO]
-  )(implicit contextShift:   ContextShift[IO]): IO[EventEndpoint[IO]] = IO {
-    new EventEndpointImpl[IO](subscriptionsRegistry)
+  def apply[Interpretation[_]: MonadThrow: Concurrent](
+      subscriptionsRegistry: EventConsumersRegistry[Interpretation]
+  ): Interpretation[EventEndpoint[Interpretation]] = MonadThrow[Interpretation].catchNonFatal {
+    new EventEndpointImpl[Interpretation](subscriptionsRegistry)
   }
 }

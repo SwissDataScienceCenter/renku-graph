@@ -169,44 +169,42 @@ class GlobalCommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers
         logSummary(event.project, executionTimeRecorder.elapsedTime, deleted = event.commits.length)
       )
     }
-
   }
 
   private trait TestCase {
 
     val maybeAccessToken = personalAccessTokens.generateOption
 
+    implicit val logger: TestLogger[Try] = TestLogger()
     val accessTokenFinder         = mock[AccessTokenFinder[Try]]
     val gitLabCommitStatFetcher   = mock[GitLabCommitStatFetcher[Try]]
     val gitLabCommitFetcher       = mock[GitLabCommitFetcher[Try]]
     val commitEventDeleter        = mock[CommitEventDeleter[Try]]
     val missingCommitEventCreator = mock[MissingCommitEventCreator[Try]]
-    val logger                    = TestLogger[Try]()
-    val executionTimeRecorder     = TestExecutionTimeRecorder[Try](logger)
+    val executionTimeRecorder     = TestExecutionTimeRecorder[Try]()
     val commitEventSynchronizer = new GlobalCommitEventSynchronizerImpl[Try](accessTokenFinder,
                                                                              gitLabCommitStatFetcher,
                                                                              gitLabCommitFetcher,
                                                                              commitEventDeleter,
                                                                              missingCommitEventCreator,
-                                                                             executionTimeRecorder,
-                                                                             logger
+                                                                             executionTimeRecorder
     )
 
     def givenAccessTokenIsFound(projectId: Id) = (accessTokenFinder
       .findAccessToken(_: Id)(_: Id => String))
       .expects(projectId, projectIdToPath)
-      .returning(Success(maybeAccessToken))
+      .returning(maybeAccessToken.pure[Try])
 
     def givenNoCommitsInGL(projectId: Id) = {
       (gitLabCommitStatFetcher
         .fetchCommitStats(_: projects.Id)(_: Option[AccessToken]))
         .expects(projectId, maybeAccessToken)
-        .returning(Success(Some(ProjectCommitStats(None, 0))))
+        .returning(Some(ProjectCommitStats(None, 0)).pure[Try])
 
       (gitLabCommitFetcher
         .fetchGitLabCommits(_: projects.Id)(_: Option[AccessToken]))
         .expects(projectId, maybeAccessToken)
-        .returning(Success(List.empty[CommitId]))
+        .returning(List.empty[CommitId].pure[Try])
     }
 
     def givenProjectDoesntExistInGL404(projectId: Id) =
@@ -216,43 +214,43 @@ class GlobalCommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers
       (gitLabCommitStatFetcher
         .fetchCommitStats(_: projects.Id)(_: Option[AccessToken]))
         .expects(projectId, maybeAccessToken)
-        .returning(Success(Some(ProjectCommitStats(Some(commits.head), commits.length))))
+        .returning(Some(ProjectCommitStats(Some(commits.head), commits.length)).pure[Try])
 
     def givenNotCommitStatsExistsInGL404(projectId: Id) =
       (gitLabCommitStatFetcher
         .fetchCommitStats(_: projects.Id)(_: Option[AccessToken]))
         .expects(projectId, maybeAccessToken)
-        .returning(Success(None))
+        .returning(None.pure[Try])
 
     def givenCommitsInGL(projectId: Id, commits: List[CommitId]) =
       (gitLabCommitFetcher
         .fetchGitLabCommits(_: projects.Id)(_: Option[AccessToken]))
         .expects(projectId, maybeAccessToken)
-        .returning(Success(commits))
+        .returning(commits.pure[Try])
 
     def expectEventsDeletedSuccessfully(project: Project, commits: List[CommitId]) =
       (commitEventDeleter
         .deleteExtraneousCommits(_: Project, _: List[CommitId])(_: Option[AccessToken]))
         .expects(project, commits, maybeAccessToken)
-        .returning(Success(SynchronizationSummary().updated(Deleted, commits.length)))
+        .returning(SynchronizationSummary().updated(Deleted, commits.length).pure[Try])
 
     def givenNothingToDelete(project: Project) =
       (commitEventDeleter
         .deleteExtraneousCommits(_: Project, _: List[CommitId])(_: Option[AccessToken]))
         .expects(project, List.empty[CommitId], maybeAccessToken)
-        .returning(Success(SynchronizationSummary()))
+        .returning(SynchronizationSummary().pure[Try])
 
     def expectNewCommitsToBeCreated(project: Project, newCommits: List[CommitId]) =
       (missingCommitEventCreator
         .createMissingCommits(_: Project, _: List[CommitId])(_: Option[AccessToken]))
         .expects(project, newCommits, maybeAccessToken)
-        .returning(Success(SynchronizationSummary().updated(Created, newCommits.length)))
+        .returning(SynchronizationSummary().updated(Created, newCommits.length).pure[Try])
 
     def givenNothingToCreate(project: Project) =
       (missingCommitEventCreator
         .createMissingCommits(_: Project, _: List[CommitId])(_: Option[AccessToken]))
         .expects(project, List.empty[CommitId], maybeAccessToken)
-        .returning(Success(SynchronizationSummary()))
+        .returning(SynchronizationSummary().pure[Try])
   }
 
   private def logSummary(project:     Project,
@@ -262,9 +260,7 @@ class GlobalCommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers
                          skipped:     Int = 0,
                          deleted:     Int = 0,
                          failed:      Int = 0
-  ) =
-    Info(
-      s"$categoryName: projectId = ${project.id}, projectPath = ${project.path} -> events generation result: $created created, $existed existed, $skipped skipped, $deleted deleted, $failed failed in ${elapsedTime}ms"
-    )
-
+  ) = Info(
+    s"$categoryName: projectId = ${project.id}, projectPath = ${project.path} -> events generation result: $created created, $existed existed, $skipped skipped, $deleted deleted, $failed failed in ${elapsedTime}ms"
+  )
 }

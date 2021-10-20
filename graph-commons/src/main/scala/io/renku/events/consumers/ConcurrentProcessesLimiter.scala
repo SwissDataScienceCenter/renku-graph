@@ -20,8 +20,8 @@ package io.renku.events.consumers
 
 import cats.MonadThrow
 import cats.data.EitherT
+import cats.effect.Concurrent
 import cats.effect.std.Semaphore
-import cats.effect.{Concurrent, IO}
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
@@ -30,17 +30,16 @@ import io.renku.events.consumers.EventSchedulingResult.{Accepted, Busy, Scheduli
 import scala.util.control.NonFatal
 
 trait ConcurrentProcessesLimiter[Interpretation[_]] {
-
   def tryExecuting(scheduledProcess: EventHandlingProcess[Interpretation]): Interpretation[EventSchedulingResult]
 }
 
 object ConcurrentProcessesLimiter {
 
-  def apply(
-      processesCount:    Int Refined Positive
-  )(implicit concurrent: Concurrent[IO]): IO[ConcurrentProcessesLimiter[IO]] = for {
+  def apply[Interpretation[_]: Concurrent](
+      processesCount: Int Refined Positive
+  ): Interpretation[ConcurrentProcessesLimiter[Interpretation]] = for {
     semaphore <- Semaphore(processesCount.value)
-  } yield new ConcurrentProcessesLimiterImpl[IO](processesCount, semaphore)
+  } yield new ConcurrentProcessesLimiterImpl[Interpretation](processesCount, semaphore)
 
   def withoutLimit[Interpretation[_]: MonadThrow: Concurrent]: ConcurrentProcessesLimiter[Interpretation] =
     new ConcurrentProcessesLimiter[Interpretation] {

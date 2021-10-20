@@ -23,18 +23,18 @@ import io.renku.config.certificates.CertificateLoader
 import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.http.server.IOHttpServer
+import io.renku.http.server.HttpServer
 import io.renku.interpreters.IOSentryInitializer
-import io.renku.testtools.MockedRunnableCollaborators
+import io.renku.testtools.{IOSpec, MockedRunnableCollaborators}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.util.concurrent.ConcurrentHashMap
-import scala.concurrent.ExecutionContext.Implicits.global
 
 class MicroserviceRunnerSpec
     extends AnyWordSpec
+    with IOSpec
     with MockedRunnableCollaborators
     with MockFactory
     with should.Matchers {
@@ -98,20 +98,17 @@ class MicroserviceRunnerSpec
     }
   }
 
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO]        = IO.timer(global)
-
   private trait TestCase {
     val certificateLoader      = mock[CertificateLoader[IO]]
     val sentryInitializer      = mock[IOSentryInitializer]
     val eventConsumersRegistry = mock[EventConsumersRegistry[IO]]
-    val httpServer             = mock[IOHttpServer]
+    val httpServer             = mock[HttpServer[IO]]
     val runner = new MicroserviceRunner(
       certificateLoader,
       sentryInitializer,
       eventConsumersRegistry,
       httpServer,
-      new ConcurrentHashMap[CancelToken[IO], Unit]()
+      new ConcurrentHashMap[IO[Unit], Unit]()
     )
   }
 }

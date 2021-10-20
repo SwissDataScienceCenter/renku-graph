@@ -18,7 +18,8 @@
 
 package io.renku.commiteventservice.events.categories.globalcommitsync
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect._
+import cats.syntax.all._
 import io.renku.commiteventservice.Microservice
 import io.renku.config.GitLab
 import io.renku.control.Throttler
@@ -27,20 +28,15 @@ import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.categ
 import io.renku.logging.ExecutionTimeRecorder
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
 object SubscriptionFactory {
 
-  def apply(gitLabThrottler: Throttler[IO, GitLab], executionTimeRecorder: ExecutionTimeRecorder[IO])(implicit
-      executionContext:      ExecutionContext,
-      contextShift:          ContextShift[IO],
-      timer:                 Timer[IO],
-      logger:                Logger[IO]
-  ): IO[(EventHandler[IO], SubscriptionMechanism[IO])] = for {
+  def apply[Interpretation[_]: Async: Spawn: Concurrent: Temporal: Logger](
+      gitLabThrottler:       Throttler[Interpretation, GitLab],
+      executionTimeRecorder: ExecutionTimeRecorder[Interpretation]
+  ): Interpretation[(EventHandler[Interpretation], SubscriptionMechanism[Interpretation])] = for {
     subscriptionMechanism <- SubscriptionMechanism(
                                categoryName,
-                               categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort, Microservice.Identifier),
-                               logger
+                               categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort, Microservice.Identifier)
                              )
     handler <- EventHandler(subscriptionMechanism, gitLabThrottler, executionTimeRecorder)
   } yield handler -> subscriptionMechanism

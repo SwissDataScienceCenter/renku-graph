@@ -18,7 +18,7 @@
 
 package io.renku.commiteventservice
 
-import cats.effect.{CancelToken, ContextShift, ExitCode, Fiber, IO, Timer}
+import cats.effect.{ExitCode, FiberIO, IO}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
@@ -30,47 +30,36 @@ import io.renku.events.consumers
 import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.http.server.HttpServer
 import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder}
-import io.renku.metrics.MetricsRegistry
+import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.microservices.IOMicroservice
 import org.typelevel.log4cats.Logger
-import pureconfig.ConfigSource
 
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors.newFixedThreadPool
-import scala.concurrent.ExecutionContext
 
 object Microservice extends IOMicroservice {
 
-  val ServicePort: Int Refined Positive = 9006
-
-  protected implicit override val executionContext: ExecutionContext =
-    ExecutionContext fromExecutorService newFixedThreadPool(ConfigSource.default.at("threads-number").loadOrThrow[Int])
-
-  protected implicit override def contextShift: ContextShift[IO] = IO.contextShift(executionContext)
-  protected implicit override def timer:        Timer[IO]        = IO.timer(executionContext)
-  private implicit val logger:                  Logger[IO]       = ApplicationLogger
+  val ServicePort:             Int Refined Positive = 9006
+  private implicit val logger: Logger[IO]           = ApplicationLogger
 
   override def run(args: List[String]): IO[ExitCode] = for {
-    certificateLoader     <- CertificateLoader[IO](logger)
-    sentryInitializer     <- SentryInitializer[IO]()
+    certificateLoader     <- CertificateLoader[IO]
+    sentryInitializer     <- SentryInitializer[IO]
     gitLabRateLimit       <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
     gitLabThrottler       <- Throttler[IO, GitLab](gitLabRateLimit)
-    executionTimeRecorder <- ExecutionTimeRecorder[IO](logger)
-    metricsRegistry       <- MetricsRegistry()
+    executionTimeRecorder <- ExecutionTimeRecorder[IO]()
     commitSyncCategory <-
       events.categories.commitsync.SubscriptionFactory(gitLabThrottler, executionTimeRecorder)
     globalCommitSyncCategory <-
       events.categories.globalcommitsync.SubscriptionFactory(gitLabThrottler, executionTimeRecorder)
     eventConsumersRegistry <- consumers.EventConsumersRegistry(commitSyncCategory, globalCommitSyncCategory)
-    microserviceRoutes     <- MicroserviceRoutes(eventConsumersRegistry, metricsRegistry)
+    metricsRegistry        <- MetricsRegistry()
+    microserviceRoutes     <- MicroserviceRoutes(eventConsumersRegistry, new RoutesMetrics[IO](metricsRegistry))
     exitcode <- microserviceRoutes.routes.use { routes =>
-                  val httpServer = new HttpServer[IO](serverPort = ServicePort.value, routes)
-
                   new MicroserviceRunner(
                     certificateLoader,
                     sentryInitializer,
                     eventConsumersRegistry,
-                    httpServer,
+                    HttpServer[IO](serverPort = ServicePort.value, routes),
                     subProcessesCancelTokens
                   ).run()
                 }
@@ -81,8 +70,8 @@ class MicroserviceRunner(certificateLoader:        CertificateLoader[IO],
                          sentryInitializer:        SentryInitializer[IO],
                          eventConsumersRegistry:   EventConsumersRegistry[IO],
                          httpServer:               HttpServer[IO],
-                         subProcessesCancelTokens: ConcurrentHashMap[CancelToken[IO], Unit]
-)(implicit contextShift:                           ContextShift[IO]) {
+                         subProcessesCancelTokens: ConcurrentHashMap[IO[Unit], Unit]
+) {
 
   def run(): IO[ExitCode] = for {
     _      <- certificateLoader.run()
@@ -91,7 +80,7 @@ class MicroserviceRunner(certificateLoader:        CertificateLoader[IO],
     result <- httpServer.run()
   } yield result
 
-  private def gatherCancelToken(fiber: Fiber[IO, Unit]): Fiber[IO, Unit] = {
+  private def gatherCancelToken(fiber: FiberIO[Unit]): FiberIO[Unit] = {
     subProcessesCancelTokens.put(fiber.cancel, ())
     fiber
   }

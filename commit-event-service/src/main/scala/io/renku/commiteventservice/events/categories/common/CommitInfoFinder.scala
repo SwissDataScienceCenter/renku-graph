@@ -18,7 +18,7 @@
 
 package io.renku.commiteventservice.events.categories.common
 
-import cats.effect.{ConcurrentEffect, IO, Timer}
+import cats.effect.{Async, Temporal}
 import cats.syntax.all._
 import io.renku.config.GitLab
 import io.renku.control.Throttler
@@ -31,8 +31,6 @@ import org.http4s.Status.NotFound
 import org.http4s.circe.jsonOf
 import org.http4s.{EntityDecoder, Status}
 import org.typelevel.log4cats.Logger
-
-import scala.concurrent.ExecutionContext
 
 private[categories] trait CommitInfoFinder[Interpretation[_]] {
   def findCommitInfo(
@@ -47,12 +45,10 @@ private[categories] trait CommitInfoFinder[Interpretation[_]] {
   ): Interpretation[Option[CommitInfo]]
 }
 
-private[categories] class CommitInfoFinderImpl[Interpretation[_]: ConcurrentEffect: Timer](
-    gitLabUrl:               GitLabUrl,
-    gitLabThrottler:         Throttler[Interpretation, GitLab],
-    logger:                  Logger[Interpretation]
-)(implicit executionContext: ExecutionContext)
-    extends RestClient(gitLabThrottler, logger)
+private[categories] class CommitInfoFinderImpl[Interpretation[_]: Async: Temporal: Logger](
+    gitLabUrl:       GitLabUrl,
+    gitLabThrottler: Throttler[Interpretation, GitLab]
+) extends RestClient(gitLabThrottler)
     with CommitInfoFinder[Interpretation] {
 
   import CommitInfo._
@@ -75,11 +71,10 @@ private[categories] class CommitInfoFinderImpl[Interpretation[_]: ConcurrentEffe
       mapResponse: PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[
         ResultType
       ]]
-  )(implicit maybeAccessToken: Option[AccessToken]) =
-    for {
-      uri    <- validateUri(s"$gitLabUrl/api/v4/projects/$projectId/repository/commits/$commitId")
-      result <- send(request(GET, uri, maybeAccessToken))(mapResponse)
-    } yield result
+  )(implicit maybeAccessToken: Option[AccessToken]) = for {
+    uri    <- validateUri(s"$gitLabUrl/api/v4/projects/$projectId/repository/commits/$commitId")
+    result <- send(request(GET, uri, maybeAccessToken))(mapResponse)
+  } yield result
 
   private lazy val mapToCommitOrThrow
       : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[CommitInfo]] = {
@@ -100,11 +95,9 @@ private[categories] class CommitInfoFinderImpl[Interpretation[_]: ConcurrentEffe
 }
 
 private[categories] object CommitInfoFinder {
-  def apply(gitLabThrottler: Throttler[IO, GitLab], logger: Logger[IO])(implicit
-      executionContext:      ExecutionContext,
-      concurrentEffect:      ConcurrentEffect[IO],
-      timer:                 Timer[IO]
-  ): IO[CommitInfoFinderImpl[IO]] = for {
-    gitLabUrl <- GitLabUrlLoader[IO]()
-  } yield new CommitInfoFinderImpl[IO](gitLabUrl, gitLabThrottler, logger)
+  def apply[Interpretation[_]: Async: Temporal: Logger](
+      gitLabThrottler: Throttler[Interpretation, GitLab]
+  ): Interpretation[CommitInfoFinderImpl[Interpretation]] = for {
+    gitLabUrl <- GitLabUrlLoader[Interpretation]()
+  } yield new CommitInfoFinderImpl[Interpretation](gitLabUrl, gitLabThrottler)
 }

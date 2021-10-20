@@ -19,7 +19,7 @@
 package io.renku.commiteventservice.events.categories.common
 
 import cats.MonadThrow
-import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
+import cats.effect.{Async, Temporal}
 import cats.syntax.all._
 import io.renku.commiteventservice.events.categories.common.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
 import io.renku.control.Throttler
@@ -30,18 +30,14 @@ import org.http4s.Status
 import org.http4s.Status.Accepted
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
 private[categories] trait CommitEventSender[Interpretation[_]] {
   def send(commitEvent: CommitEvent): Interpretation[Unit]
 }
 
-private[categories] class CommitEventSenderImpl[Interpretation[_]: MonadThrow: ContextShift: Timer: ConcurrentEffect](
-    eventLogUrl:             EventLogUrl,
-    commitEventSerializer:   CommitEventSerializer[Interpretation],
-    logger:                  Logger[Interpretation]
-)(implicit executionContext: ExecutionContext)
-    extends RestClient[Interpretation, CommitEventSender[Interpretation]](Throttler.noThrottling, logger)
+private[categories] class CommitEventSenderImpl[Interpretation[_]: Async: Temporal: Logger](
+    eventLogUrl:           EventLogUrl,
+    commitEventSerializer: CommitEventSerializer[Interpretation]
+) extends RestClient[Interpretation, CommitEventSender[Interpretation]](Throttler.noThrottling)
     with CommitEventSender[Interpretation] {
 
   import commitEventSerializer._
@@ -55,10 +51,11 @@ private[categories] class CommitEventSenderImpl[Interpretation[_]: MonadThrow: C
     serialisedEvent <- serialiseToJsonString(commitEvent)
     eventBody       <- MonadThrow[Interpretation].fromEither(EventBody.from(serialisedEvent))
     uri             <- validateUri(s"$eventLogUrl/events")
-    sendingResult <-
-      send(request(POST, uri).withMultipartBuilder.addPart("event", (commitEvent -> eventBody).asJson).build())(
-        mapResponse
-      )
+    sendingResult <- send(
+                       request(POST, uri).withMultipartBuilder
+                         .addPart("event", (commitEvent -> eventBody).asJson)
+                         .build()
+                     )(mapResponse)
   } yield sendingResult
 
   private implicit lazy val entityEncoder: Encoder[(CommitEvent, EventBody)] =
@@ -99,13 +96,7 @@ private[categories] class CommitEventSenderImpl[Interpretation[_]: MonadThrow: C
 }
 
 private[categories] object CommitEventSender {
-
-  def apply(
-      logger: Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[CommitEventSender[IO]] =
-    EventLogUrl[IO]() map (new CommitEventSenderImpl(_, new CommitEventSerializer[IO], logger))
+  def apply[Interpretation[_]: Async: Temporal: Logger]: Interpretation[CommitEventSender[Interpretation]] = for {
+    eventLogUrl <- EventLogUrl[Interpretation]()
+  } yield new CommitEventSenderImpl(eventLogUrl, new CommitEventSerializer[Interpretation])
 }

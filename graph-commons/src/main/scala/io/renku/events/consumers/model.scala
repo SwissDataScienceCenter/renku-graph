@@ -63,6 +63,7 @@ class EventHandlingProcess[Interpretation[_]: Concurrent] private (
 }
 
 object EventHandlingProcess {
+
   def withWaitingForCompletion[Interpretation[_]: Concurrent](
       process:        Deferred[Interpretation, Unit] => EitherT[Interpretation, EventSchedulingResult, Accepted],
       releaseProcess: Interpretation[Unit]

@@ -18,9 +18,8 @@
 
 package io.renku.events.consumers.subscriptions
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.data.Kleisli
-import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -33,12 +32,11 @@ trait SubscriptionPayloadComposer[Interpretation[_]] {
   def prepareSubscriptionPayload(): Interpretation[Json]
 }
 
-private class SubscriptionPayloadComposerImpl[Interpretation[_]](
+private class SubscriptionPayloadComposerImpl[Interpretation[_]: MonadThrow](
     categoryName:           CategoryName,
     microserviceUrlFinder:  MicroserviceUrlFinder[Interpretation],
     microserviceIdentifier: MicroserviceIdentifier
-)(implicit ME:              MonadError[Interpretation, Throwable])
-    extends SubscriptionPayloadComposer[Interpretation] {
+) extends SubscriptionPayloadComposer[Interpretation] {
 
   import io.circe.syntax._
   import microserviceUrlFinder._
@@ -54,13 +52,16 @@ private class SubscriptionPayloadComposerImpl[Interpretation[_]](
 
 object SubscriptionPayloadComposer {
 
-  def categoryAndUrlPayloadsComposerFactory(
+  def categoryAndUrlPayloadsComposerFactory[Interpretation[_]: MonadThrow](
       microservicePort:       Int Refined Positive,
       microserviceIdentifier: MicroserviceIdentifier
-  ): Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO]] =
-    Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO]] { categoryName =>
+  ): Kleisli[Interpretation, CategoryName, SubscriptionPayloadComposer[Interpretation]] =
+    Kleisli[Interpretation, CategoryName, SubscriptionPayloadComposer[Interpretation]] { categoryName =>
       for {
         subscriptionUrlFinder <- MicroserviceUrlFinder(microservicePort)
-      } yield new SubscriptionPayloadComposerImpl[IO](categoryName, subscriptionUrlFinder, microserviceIdentifier)
+      } yield new SubscriptionPayloadComposerImpl[Interpretation](categoryName,
+                                                                  subscriptionUrlFinder,
+                                                                  microserviceIdentifier
+      )
     }
 }

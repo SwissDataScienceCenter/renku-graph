@@ -21,7 +21,7 @@ package io.renku.events.consumers
 import cats.data.EitherT
 import cats.data.EitherT.fromEither
 import cats.syntax.all._
-import cats.{Monad, MonadError, Show}
+import cats.{Monad, MonadError, MonadThrow, Show}
 import io.circe.{Decoder, DecodingFailure, Json}
 import io.renku.events.EventRequestContent
 import io.renku.events.consumers.EventSchedulingResult._
@@ -117,16 +117,16 @@ abstract class EventHandlerWithProcessLimiter[Interpretation[_]: Monad](
 
   protected implicit class EitherTOps[T](
       operation: Interpretation[T]
-  )(implicit ME: MonadError[Interpretation, Throwable]) {
+  )(implicit ME: MonadThrow[Interpretation]) {
 
     def toRightT(
         recoverTo: EventSchedulingResult
     ): EitherT[Interpretation, EventSchedulingResult, T] = EitherT {
-      operation map (_.asRight[EventSchedulingResult]) recover as(recoverTo)
+      operation.map(_.asRight[EventSchedulingResult]) recover as(recoverTo)
     }
 
     lazy val toRightT: EitherT[Interpretation, EventSchedulingResult, T] = EitherT {
-      operation map (_.asRight[EventSchedulingResult]) recover asSchedulingError
+      operation.map(_.asRight[EventSchedulingResult]) recover asSchedulingError
     }
 
     private def as(

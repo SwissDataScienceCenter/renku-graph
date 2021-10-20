@@ -78,7 +78,7 @@ class ExecutionTimeRecorderSpec
 
     "made the given histogram to collect process' execution time - case without a label" in new TestCase {
       val histogram                      = Histogram.build("metric", "help").create()
-      override val executionTimeRecorder = new ExecutionTimeRecorder(loggingThreshold, Some(histogram))
+      override val executionTimeRecorder = new ExecutionTimeRecorderImpl(loggingThreshold, Some(histogram))
 
       val blockOut = nonEmptyStrings().generateOne
       block.expects().returning(blockOut.pure[IO])
@@ -98,7 +98,7 @@ class ExecutionTimeRecorderSpec
     "made the given histogram to collect process' execution time - case with a label" in new TestCase {
       val label: String Refined NonEmpty = "label"
       val histogram                      = Histogram.build("metric", "help").labelNames(label.value).create()
-      override val executionTimeRecorder = new ExecutionTimeRecorder(loggingThreshold, Some(histogram))
+      override val executionTimeRecorder = new ExecutionTimeRecorderImpl(loggingThreshold, Some(histogram))
 
       val blockOut = nonEmptyStrings().generateOne
       block.expects().returning(blockOut.pure[IO])
@@ -120,7 +120,7 @@ class ExecutionTimeRecorderSpec
       val label: String Refined NonEmpty = "label"
       val histogramName                  = "metric"
       val histogram                      = Histogram.build(histogramName, "help").labelNames(label.value).create()
-      override val executionTimeRecorder = new ExecutionTimeRecorder(loggingThreshold, Some(histogram))
+      override val executionTimeRecorder = new ExecutionTimeRecorderImpl(loggingThreshold, Some(histogram))
 
       val blockOut = nonEmptyStrings().generateOne
       block.expects().returning(blockOut.pure[IO])
@@ -253,6 +253,6 @@ class ExecutionTimeRecorderSpec
 
     val loggingThreshold = ElapsedTime(1000 millis)
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val executionTimeRecorder = new ExecutionTimeRecorder[IO](loggingThreshold, maybeHistogram = None)
+    val executionTimeRecorder = new ExecutionTimeRecorderImpl[IO](loggingThreshold, maybeHistogram = None)
   }
 }

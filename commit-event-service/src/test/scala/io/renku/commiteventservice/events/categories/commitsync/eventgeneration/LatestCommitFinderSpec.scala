@@ -18,7 +18,7 @@
 
 package io.renku.commiteventservice.events.categories.commitsync.eventgeneration
 
-import cats.effect.{ConcurrentEffect, IO, Timer}
+import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Json
 import io.circe.literal._
@@ -32,14 +32,18 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
+import io.renku.testtools.IOSpec
 import org.http4s.Status
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
-class LatestCommitFinderSpec extends AnyWordSpec with MockFactory with ExternalServiceStubbing with should.Matchers {
+class LatestCommitFinderSpec
+    extends AnyWordSpec
+    with IOSpec
+    with MockFactory
+    with ExternalServiceStubbing
+    with should.Matchers {
 
   "findLatestCommit" should {
 
@@ -142,15 +146,12 @@ class LatestCommitFinderSpec extends AnyWordSpec with MockFactory with ExternalS
     }
   }
 
-  private implicit val ce:    ConcurrentEffect[IO] = IO.ioConcurrentEffect(IO.contextShift(global))
-  private implicit val timer: Timer[IO]            = IO.timer(global)
-
   private trait TestCase {
     val gitLabUrl  = GitLabUrl(externalServiceBaseUrl)
     val projectId  = projectIds.generateOne
     val commitInfo = commitInfos.generateOne
-
-    val latestCommitFinder = new LatestCommitFinderImpl[IO](gitLabUrl, Throttler.noThrottling, TestLogger())
+    private implicit val logger: TestLogger[IO] = TestLogger()
+    val latestCommitFinder = new LatestCommitFinderImpl[IO](gitLabUrl, Throttler.noThrottling)
   }
 
   private def commitsJson(from: CommitInfo) =

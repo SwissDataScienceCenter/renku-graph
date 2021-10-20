@@ -19,7 +19,8 @@
 package io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration
 
 import cats.MonadThrow
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.Async
+import cats.effect.kernel.Temporal
 import cats.syntax.all._
 import io.renku.commiteventservice.events.categories.common.SynchronizationSummary
 import io.renku.commiteventservice.events.categories.globalcommitsync._
@@ -34,20 +35,19 @@ import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 private[globalcommitsync] trait GlobalCommitEventSynchronizer[Interpretation[_]] {
   def synchronizeEvents(event: GlobalCommitSyncEvent): Interpretation[Unit]
 }
-private[globalcommitsync] class GlobalCommitEventSynchronizerImpl[Interpretation[_]: MonadThrow](
+
+private[globalcommitsync] class GlobalCommitEventSynchronizerImpl[Interpretation[_]: MonadThrow: Logger](
     accessTokenFinder:         AccessTokenFinder[Interpretation],
     gitLabCommitStatFetcher:   GitLabCommitStatFetcher[Interpretation],
     gitLabCommitFetcher:       GitLabCommitFetcher[Interpretation],
     commitEventDeleter:        CommitEventDeleter[Interpretation],
     missingCommitEventCreator: MissingCommitEventCreator[Interpretation],
-    executionTimeRecorder:     ExecutionTimeRecorder[Interpretation],
-    logger:                    Logger[Interpretation]
+    executionTimeRecorder:     ExecutionTimeRecorder[Interpretation]
 ) extends GlobalCommitEventSynchronizer[Interpretation] {
 
   import accessTokenFinder._
@@ -57,28 +57,29 @@ private[globalcommitsync] class GlobalCommitEventSynchronizerImpl[Interpretation
   import gitLabCommitStatFetcher._
   import missingCommitEventCreator._
 
-  override def synchronizeEvents(event: GlobalCommitSyncEvent): Interpretation[Unit] = (for {
-    maybeAccessToken <- findAccessToken(event.project.id)
-    maybeCommitStats <- fetchCommitStats(event.project.id)(maybeAccessToken)
-    _                <- syncOrDeleteCommits(event, maybeCommitStats)(maybeAccessToken)
-  } yield ()).recoverWith { case NonFatal(error) =>
-    logger.error(error)(s"$categoryName - Failed to sync commits for project ${event.project}") >>
+  override def synchronizeEvents(event: GlobalCommitSyncEvent): Interpretation[Unit] = {
+    for {
+      maybeAccessToken <- findAccessToken(event.project.id)
+      maybeCommitStats <- fetchCommitStats(event.project.id)(maybeAccessToken)
+      _                <- syncOrDeleteCommits(event, maybeCommitStats)(maybeAccessToken)
+    } yield ()
+  }.recoverWith { case NonFatal(error) =>
+    Logger[Interpretation].error(error)(s"$categoryName - Failed to sync commits for project ${event.project}") >>
       error.raiseError[Interpretation, Unit]
   }
 
   private def syncOrDeleteCommits(event: GlobalCommitSyncEvent, maybeCommitStats: Option[ProjectCommitStats])(implicit
       maybeAccessToken:                  Option[AccessToken]
-  ): Interpretation[Unit] =
-    maybeCommitStats match {
-      case Some(commitStats) =>
-        val commitsInSync = event.commits.length == commitStats.commitCount.value &&
-          event.commits.headOption == commitStats.maybeLatestCommit
+  ): Interpretation[Unit] = maybeCommitStats match {
+    case Some(commitStats) =>
+      val commitsInSync = event.commits.length == commitStats.commitCount.value &&
+        event.commits.headOption == commitStats.maybeLatestCommit
 
-        if (!commitsInSync) syncCommitsAndLogSummary(event)(maybeAccessToken)
-        else measureExecutionTime(SynchronizationSummary().pure[Interpretation]) >>= logSummary(event.project)
-      case None =>
-        measureExecutionTime(deleteExtraneousCommits(event.project, event.commits)) >>= logSummary(event.project)
-    }
+      if (!commitsInSync) syncCommitsAndLogSummary(event)(maybeAccessToken)
+      else measureExecutionTime(SynchronizationSummary().pure[Interpretation]) >>= logSummary(event.project)
+    case None =>
+      measureExecutionTime(deleteExtraneousCommits(event.project, event.commits)) >>= logSummary(event.project)
+  }
 
   private def syncCommitsAndLogSummary(
       event:                   GlobalCommitSyncEvent
@@ -96,29 +97,25 @@ private[globalcommitsync] class GlobalCommitEventSynchronizerImpl[Interpretation
   private def logSummary(
       project: Project
   ): ((ElapsedTime, SynchronizationSummary)) => Interpretation[Unit] = { case (elapsedTime, summary) =>
-    logger.info(show"$categoryName: $project -> events generation result: $summary in ${elapsedTime}ms")
+    Logger[Interpretation].info(show"$categoryName: $project -> events generation result: $summary in ${elapsedTime}ms")
   }
 }
 
 private[globalcommitsync] object GlobalCommitEventSynchronizer {
-  def apply(gitLabThrottler: Throttler[IO, GitLab], executionTimeRecorder: ExecutionTimeRecorder[IO])(implicit
-      executionContext:      ExecutionContext,
-      contextShift:          ContextShift[IO],
-      timer:                 Timer[IO],
-      logger:                Logger[IO]
-  ): IO[GlobalCommitEventSynchronizer[IO]] = for {
-    accessTokenFinder         <- AccessTokenFinder(logger)
-    gitLabCommitStatFetcher   <- GitLabCommitStatFetcher(gitLabThrottler, logger)
-    gitLabCommitFetcher       <- GitLabCommitFetcher(gitLabThrottler, logger)
-    commitEventDeleter        <- CommitEventDeleter()
-    missingCommitEventCreator <- MissingCommitEventCreator(gitLabThrottler, logger)
+  def apply[Interpretation[_]: Async: Temporal: Logger](gitLabThrottler: Throttler[Interpretation, GitLab],
+                                                        executionTimeRecorder: ExecutionTimeRecorder[Interpretation]
+  ): Interpretation[GlobalCommitEventSynchronizer[Interpretation]] = for {
+    accessTokenFinder         <- AccessTokenFinder[Interpretation]
+    gitLabCommitStatFetcher   <- GitLabCommitStatFetcher(gitLabThrottler)
+    gitLabCommitFetcher       <- GitLabCommitFetcher(gitLabThrottler)
+    commitEventDeleter        <- CommitEventDeleter[Interpretation]
+    missingCommitEventCreator <- MissingCommitEventCreator(gitLabThrottler)
   } yield new GlobalCommitEventSynchronizerImpl(
     accessTokenFinder,
     gitLabCommitStatFetcher,
     gitLabCommitFetcher,
     commitEventDeleter,
     missingCommitEventCreator,
-    executionTimeRecorder,
-    logger
+    executionTimeRecorder
   )
 }

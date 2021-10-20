@@ -18,8 +18,8 @@
 
 package io.renku.config.sentry
 
-import cats.MonadError
 import cats.syntax.all._
+import cats.{MonadError, MonadThrow}
 import io.renku.config.sentry.SentryConfig.SentryBaseUrl
 import io.sentry.SentryOptions
 
@@ -43,16 +43,12 @@ class SentryInitializer[Interpretation[_]](
 }
 
 object SentryInitializer {
-  import cats.MonadError
   import io.sentry.Sentry
 
-  def apply[Interpretation[_]]()(implicit
-      ME: MonadError[Interpretation, Throwable]
-  ): Interpretation[SentryInitializer[Interpretation]] =
-    for {
-      maybeSentryConfig <- SentryConfig[Interpretation]()
-    } yield new SentryInitializer(
-      maybeSentryConfig,
-      dsn => { Sentry.init((options: SentryOptions) => options.setDsn(dsn)); () }
-    )
+  def apply[Interpretation[_]: MonadThrow]: Interpretation[SentryInitializer[Interpretation]] = for {
+    maybeSentryConfig <- SentryConfig[Interpretation]()
+  } yield new SentryInitializer(
+    maybeSentryConfig,
+    dsn => { Sentry.init((options: SentryOptions) => options.setDsn(dsn)); () }
+  )
 }

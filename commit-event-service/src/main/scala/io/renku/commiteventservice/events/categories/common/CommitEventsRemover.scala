@@ -19,7 +19,7 @@
 package io.renku.commiteventservice.events.categories.common
 
 import cats.MonadThrow
-import cats.effect.{ConcurrentEffect, IO, Timer}
+import cats.effect.{Async, Temporal}
 import cats.syntax.all._
 import io.circe.literal._
 import io.renku.commiteventservice.events.categories.commitsync.categoryName
@@ -32,7 +32,6 @@ import io.renku.graph.model.events.EventStatus.AwaitingDeletion
 import io.renku.tinytypes.json.TinyTypeEncoders
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 private[categories] trait CommitEventsRemover[Interpretation[_]] {
@@ -67,11 +66,7 @@ private class CommitEventsRemoverImpl[Interpretation[_]: MonadThrow](
 }
 
 private[categories] object CommitEventsRemover {
-
-  def apply()(implicit
-      concurrentEffect: ConcurrentEffect[IO],
-      timer:            Timer[IO],
-      executionContext: ExecutionContext,
-      logger:           Logger[IO]
-  ): IO[CommitEventsRemover[IO]] = EventSender() map (new CommitEventsRemoverImpl[IO](_))
+  def apply[Interpretation[_]: Async: Temporal: Logger]: Interpretation[CommitEventsRemover[Interpretation]] = for {
+    sender <- EventSender[Interpretation]
+  } yield new CommitEventsRemoverImpl[Interpretation](sender)
 }

@@ -20,7 +20,7 @@ package io.renku.triplesgenerator.events.categories.awaitinggeneration
 
 import cats.data.EitherT
 import cats.effect.concurrent.Deferred
-import cats.effect.kernel.Temporal
+import cats.effect.kernel.{Deferred, Temporal}
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, IO, Timer}
 import cats.syntax.all._
 import cats.{MonadThrow, Show}
@@ -36,7 +36,7 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private[events] class EventHandler[Interpretation[_]: MonadThrow: ConcurrentEffect: ContextShift: Logger](
+private[events] class EventHandler[Interpretation[_]: MonadThrow: Concurrent: Logger](
     override val categoryName:  CategoryName,
     eventProcessor:             EventProcessor[Interpretation],
     eventBodyDeserializer:      EventBodyDeserializer[Interpretation],
@@ -80,7 +80,7 @@ object EventHandler {
       subscriptionMechanism: SubscriptionMechanism[IO],
       config:                Config = ConfigFactory.load()
   ): Interpretation[EventHandler[Interpretation]] = for {
-    eventProcessor           <- InterpretationCommitEventProcessor(metricsRegistry)
+    eventProcessor           <- CommitEventProcessor(metricsRegistry)
     generationProcesses      <- GenerationProcessesNumber[Interpretation](config)
     concurrentProcessLimiter <- ConcurrentProcessesLimiter(Refined.unsafeApply(generationProcesses.value))
   } yield new EventHandler[Interpretation](categoryName,

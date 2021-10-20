@@ -18,10 +18,9 @@
 
 package io.renku.commiteventservice.events.categories.globalcommitsync
 
-import cats.MonadThrow
 import cats.data.EitherT.fromEither
-import cats.effect.concurrent.Deferred
-import cats.effect.{Concurrent, ContextShift, IO, Timer}
+import cats.effect.kernel.Deferred
+import cats.effect._
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
@@ -37,16 +36,15 @@ import io.renku.graph.model.events.{CategoryName, CommitId}
 import io.renku.logging.ExecutionTimeRecorder
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-private[events] class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurrent](
+private[events] class EventHandler[Interpretation[_]: Spawn: Concurrent: Logger](
     override val categoryName:  CategoryName,
     commitEventSynchronizer:    GlobalCommitEventSynchronizer[Interpretation],
     subscriptionMechanism:      SubscriptionMechanism[Interpretation],
-    concurrentProcessesLimiter: ConcurrentProcessesLimiter[Interpretation],
-    logger:                     Logger[Interpretation]
+    concurrentProcessesLimiter: ConcurrentProcessesLimiter[Interpretation]
 ) extends consumers.EventHandlerWithProcessLimiter[Interpretation](concurrentProcessesLimiter) {
+
   import commitEventSynchronizer._
   import io.renku.graph.model.projects
   import io.renku.tinytypes.json.TinyTypeDecoders._
@@ -55,8 +53,8 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow: ContextShift: 
       request: EventRequestContent
   ): Interpretation[EventHandlingProcess[Interpretation]] =
     EventHandlingProcess.withWaitingForCompletion[Interpretation](
-      deferred => startEventProcessing(request, deferred),
-      subscriptionMechanism.renewSubscription()
+      process = startEventProcessing(request, _),
+      releaseProcess = subscriptionMechanism.renewSubscription()
     )
 
   private def startEventProcessing(request: EventRequestContent, deferred: Deferred[Interpretation, Unit]) =
@@ -66,23 +64,22 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow: ContextShift: 
           request.event.as[GlobalCommitSyncEvent].leftMap(_ => BadRequest)
         )
       result <-
-        (ContextShift[Interpretation].shift *> Concurrent[Interpretation]
-          .start(
-            synchronizeEvents(event)
-              .flatMap(_ => deferred.complete(()))
+        Spawn[Interpretation]
+          .start {
+            (synchronizeEvents(event) >> deferred.complete(())).void
               .recoverWith(finishProcessAndLogError(deferred, event))
-          )).toRightT
+          }
+          .toRightT
           .map(_ => Accepted)
-          .semiflatTap(logger log event)
-          .leftSemiflatTap(logger log event)
+          .semiflatTap(Logger[Interpretation] log event)
+          .leftSemiflatTap(Logger[Interpretation] log event)
     } yield result
 
-  private implicit val eventDecoder: Decoder[GlobalCommitSyncEvent] =
-    cursor =>
-      for {
-        project   <- cursor.downField("project").as[Project]
-        commitIds <- cursor.downField("commits").as[List[CommitId]]
-      } yield GlobalCommitSyncEvent(project, commitIds)
+  private implicit val eventDecoder: Decoder[GlobalCommitSyncEvent] = cursor =>
+    for {
+      project   <- cursor.downField("project").as[Project]
+      commitIds <- cursor.downField("commits").as[List[CommitId]]
+    } yield GlobalCommitSyncEvent(project, commitIds)
 
   private implicit lazy val projectDecoder: Decoder[Project] = cursor =>
     for {
@@ -95,7 +92,8 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow: ContextShift: 
   private def finishProcessAndLogError(deferred: Deferred[Interpretation, Unit],
                                        event:    GlobalCommitSyncEvent
   ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    deferred.complete(()) >> logger.logError(event, exception) >> exception.raiseError[Interpretation, Unit]
+    deferred.complete(()) >> Logger[Interpretation].logError(event, exception) >> exception
+      .raiseError[Interpretation, Unit]
   }
 }
 
@@ -104,22 +102,16 @@ private[events] object EventHandler {
   import eu.timepit.refined.auto._
   val processesLimit: Int Refined Positive = 1
 
-  def apply(
-      subscriptionMechanism: SubscriptionMechanism[IO],
-      gitLabThrottler:       Throttler[IO, GitLab],
-      executionTimeRecorder: ExecutionTimeRecorder[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO],
-      logger:           Logger[IO]
-  ): IO[EventHandler[IO]] = for {
+  def apply[Interpretation[_]: Async: Spawn: Concurrent: Temporal: Logger](
+      subscriptionMechanism: SubscriptionMechanism[Interpretation],
+      gitLabThrottler:       Throttler[Interpretation, GitLab],
+      executionTimeRecorder: ExecutionTimeRecorder[Interpretation]
+  ): Interpretation[EventHandler[Interpretation]] = for {
     concurrentProcessesLimiter    <- ConcurrentProcessesLimiter(processesLimit)
     globalCommitEventSynchronizer <- GlobalCommitEventSynchronizer(gitLabThrottler, executionTimeRecorder)
-  } yield new EventHandler[IO](categoryName,
-                               globalCommitEventSynchronizer,
-                               subscriptionMechanism,
-                               concurrentProcessesLimiter,
-                               logger
+  } yield new EventHandler[Interpretation](categoryName,
+                                           globalCommitEventSynchronizer,
+                                           subscriptionMechanism,
+                                           concurrentProcessesLimiter
   )
 }

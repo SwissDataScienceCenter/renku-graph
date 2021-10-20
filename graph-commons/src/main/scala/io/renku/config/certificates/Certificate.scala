@@ -18,7 +18,7 @@
 
 package io.renku.config.certificates
 
-import cats.MonadError
+import cats.{MonadError, MonadThrow}
 import cats.syntax.all._
 import io.renku.tinytypes.constraints.NonBlank
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
@@ -29,15 +29,15 @@ object Certificate extends TinyTypeFactory[Certificate](new Certificate(_)) with
   import com.typesafe.config.{Config, ConfigFactory}
   import io.renku.config.ConfigLoader.find
 
-  def fromConfig[Interpretation[_]](
-      config:    Config = ConfigFactory.load()
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[Option[Certificate]] =
+  def fromConfig[Interpretation[_]: MonadThrow](
+      config: Config = ConfigFactory.load()
+  ): Interpretation[Option[Certificate]] =
     find[Interpretation, Option[String]]("client-certificate", config)
       .flatMap(blankToNone(_))
       .flatMap {
-        case None => ME.pure(None)
+        case None => MonadThrow[Interpretation].pure(None)
         case Some(certContent) =>
-          ME.fromEither {
+          MonadThrow[Interpretation].fromEither {
             Certificate.from(certContent) map Option.apply
           }
       }

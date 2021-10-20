@@ -41,7 +41,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with IOSpec with MockFactory wi
   "routes" should {
 
     "define a POST /events endpoint" in new TestCase {
-      val request        = Request[IO](POST, uri"events")
+      val request        = Request[IO](POST, uri"/events")
       val expectedStatus = Gen.oneOf(Accepted, BadRequest, InternalServerError, TooManyRequests).generateOne
       (eventEndpoint.processEvent _).expects(request).returning(Response[IO](expectedStatus).pure[IO])
 
@@ -52,7 +52,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with IOSpec with MockFactory wi
 
     "define a GET /metrics endpoint returning OK with some prometheus metrics" in new TestCase {
       val response = routes.call(
-        Request(GET, uri"metrics")
+        Request(GET, uri"/metrics")
       )
 
       response.status     shouldBe Ok
@@ -60,7 +60,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with IOSpec with MockFactory wi
     }
 
     "define a GET /ping endpoint returning OK with 'pong' body" in new TestCase {
-      val response = routes.call(Request(GET, uri"ping"))
+      val response = routes.call(Request(GET, uri"/ping"))
 
       response.status       shouldBe Ok
       response.body[String] shouldBe "pong"

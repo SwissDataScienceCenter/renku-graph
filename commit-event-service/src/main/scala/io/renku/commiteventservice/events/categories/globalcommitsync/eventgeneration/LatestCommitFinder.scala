@@ -19,7 +19,7 @@
 package io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration
 
 import cats.data.OptionT
-import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
+import cats.effect.{Async, Temporal}
 import cats.syntax.all._
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
@@ -35,8 +35,6 @@ import org.http4s.circe.jsonOf
 import org.http4s.{EntityDecoder, Status}
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
 private trait LatestCommitFinder[Interpretation[_]] {
   def findLatestCommitId(
       projectId:        Id,
@@ -44,12 +42,10 @@ private trait LatestCommitFinder[Interpretation[_]] {
   ): OptionT[Interpretation, CommitId]
 }
 
-private class LatestCommitFinderImpl[Interpretation[_]: ConcurrentEffect: Timer](
-    gitLabUrl:               GitLabUrl,
-    gitLabThrottler:         Throttler[Interpretation, GitLab],
-    logger:                  Logger[Interpretation]
-)(implicit executionContext: ExecutionContext)
-    extends RestClient(gitLabThrottler, logger)
+private class LatestCommitFinderImpl[Interpretation[_]: Async: Temporal: Logger](
+    gitLabUrl:       GitLabUrl,
+    gitLabThrottler: Throttler[Interpretation, GitLab]
+) extends RestClient(gitLabThrottler)
     with LatestCommitFinder[Interpretation] {
 
   import io.renku.http.client.RestClientError.UnauthorizedException
@@ -83,14 +79,9 @@ private class LatestCommitFinderImpl[Interpretation[_]: ConcurrentEffect: Timer]
 }
 
 private object LatestCommitFinder {
-  def apply(
-      gitLabThrottler: Throttler[IO, GitLab],
-      logger:          Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[LatestCommitFinder[IO]] = for {
-    gitLabUrl <- GitLabUrlLoader[IO]()
-  } yield new LatestCommitFinderImpl(gitLabUrl, gitLabThrottler, logger)
+  def apply[Interpretation[_]: Async: Temporal: Logger](
+      gitLabThrottler: Throttler[Interpretation, GitLab]
+  ): Interpretation[LatestCommitFinder[Interpretation]] = for {
+    gitLabUrl <- GitLabUrlLoader[Interpretation]()
+  } yield new LatestCommitFinderImpl(gitLabUrl, gitLabThrottler)
 }

@@ -19,7 +19,7 @@
 package io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration
 
 import cats.MonadThrow
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{Async, Temporal}
 import cats.syntax.all._
 import io.renku.commiteventservice.events.categories.common.UpdateResult.Failed
 import io.renku.commiteventservice.events.categories.common.{CommitEventsRemover, SynchronizationSummary}
@@ -28,7 +28,6 @@ import io.renku.graph.model.events.CommitId
 import io.renku.http.client.AccessToken
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 private[eventgeneration] trait CommitEventDeleter[Interpretation[_]] {
@@ -53,12 +52,7 @@ private[eventgeneration] class CommitEventDeleterImpl[Interpretation[_]: MonadTh
   }
 }
 private[eventgeneration] object CommitEventDeleter {
-  def apply()(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO],
-      logger:           Logger[IO]
-  ): IO[CommitEventDeleter[IO]] = for {
-    commitEventsRemover <- CommitEventsRemover()
-  } yield new CommitEventDeleterImpl[IO](commitEventsRemover)
+  def apply[Interpretation[_]: Async: Temporal: Logger]: Interpretation[CommitEventDeleter[Interpretation]] = for {
+    commitEventsRemover <- CommitEventsRemover[Interpretation]
+  } yield new CommitEventDeleterImpl[Interpretation](commitEventsRemover)
 }

@@ -18,6 +18,8 @@
 
 package io.renku.config.certificates
 
+import cats.MonadThrow
+
 import javax.net.ssl.SSLContext
 
 private class SslContext private[certificates] (sslContext: SSLContext) {
@@ -25,13 +27,11 @@ private class SslContext private[certificates] (sslContext: SSLContext) {
 }
 
 private object SslContext {
-  import cats.MonadError
-
   import javax.net.ssl.TrustManagerFactory
 
-  def from[Interpretation[_]](
-      keystore:  Keystore[Interpretation]
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[SslContext] = ME.catchNonFatal {
+  def from[Interpretation[_]: MonadThrow](
+      keystore: Keystore[Interpretation]
+  ): Interpretation[SslContext] = MonadThrow[Interpretation].catchNonFatal {
     val trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm)
     trustManagerFactory.init(keystore.toJavaKeyStore)
 
@@ -41,9 +41,9 @@ private object SslContext {
     new SslContext(context)
   }
 
-  def makeDefault[Interpretation[_]](
+  def makeDefault[Interpretation[_]: MonadThrow](
       sslContext: SslContext
-  )(implicit ME:  MonadError[Interpretation, Throwable]): Interpretation[Unit] = ME.catchNonFatal {
+  ): Interpretation[Unit] = MonadThrow[Interpretation].catchNonFatal {
     SSLContext setDefault sslContext.toJavaSSLContext
   }
 }

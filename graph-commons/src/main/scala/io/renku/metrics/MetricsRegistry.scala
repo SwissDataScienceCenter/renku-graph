@@ -18,7 +18,7 @@
 
 package io.renku.metrics
 
-import cats.MonadError
+import cats.MonadThrow
 import io.prometheus.client.hotspot._
 import io.prometheus.client.{CollectorRegistry, SimpleCollector}
 
@@ -28,7 +28,7 @@ trait MetricsRegistry[Interpretation[_]] {
 
   def register[Collector <: SimpleCollector[_], Builder <: SimpleCollector.Builder[Builder, Collector]](
       collectorBuilder: Builder
-  )(implicit ME:        MonadError[Interpretation, Throwable]): Interpretation[Collector]
+  )(implicit ME:        MonadThrow[Interpretation]): Interpretation[Collector]
 
   def maybeCollectorRegistry: Option[CollectorRegistry]
 }
@@ -42,13 +42,12 @@ object MetricsRegistry {
 
   def apply(
       config: Config = ConfigFactory.load()
-  ): IO[MetricsRegistry[IO]] =
-    for {
-      maybeEnabled <- find[IO, Option[Boolean]]("metrics.enabled", config) recoverWith noneValue
-    } yield maybeEnabled match {
-      case Some(false) => DisabledMetricsRegistry
-      case _           => EnabledMetricsRegistry
-    }
+  ): IO[MetricsRegistry[IO]] = for {
+    maybeEnabled <- find[IO, Option[Boolean]]("metrics.enabled", config) recoverWith noneValue
+  } yield maybeEnabled match {
+    case Some(false) => DisabledMetricsRegistry
+    case _           => EnabledMetricsRegistry
+  }
 
   private val noneValue: PartialFunction[Throwable, IO[Option[Boolean]]] = { case NonFatal(_) =>
     IO.pure(Some(true))
@@ -58,7 +57,7 @@ object MetricsRegistry {
 
     override def register[Collector <: SimpleCollector[_], Builder <: SimpleCollector.Builder[Builder, Collector]](
         collectorBuilder: Builder
-    )(implicit ME:        MonadError[IO, Throwable]): IO[Collector] = IO {
+    )(implicit ME:        MonadThrow[IO]): IO[Collector] = IO {
       collectorBuilder.create()
     }
 
@@ -83,7 +82,7 @@ object MetricsRegistry {
 
     override def register[Collector <: SimpleCollector[_], Builder <: SimpleCollector.Builder[Builder, Collector]](
         collectorBuilder: Builder
-    )(implicit ME:        MonadError[IO, Throwable]): IO[Collector] = IO {
+    )(implicit ME:        MonadThrow[IO]): IO[Collector] = IO {
       collectorBuilder register registry
     }
 

@@ -60,10 +60,11 @@ class MicroserviceUrlFinderImpl[Interpretation[_]: MonadThrow](
 }
 
 object MicroserviceUrlFinder {
-  import cats.effect.IO
 
-  def apply(microservicePort: Int Refined Positive): IO[MicroserviceUrlFinder[IO]] = IO {
-    new MicroserviceUrlFinderImpl[IO](microservicePort)
+  def apply[Interpretation[_]: MonadThrow](
+      microservicePort: Int Refined Positive
+  ): Interpretation[MicroserviceUrlFinder[Interpretation]] = MonadThrow[Interpretation].catchNonFatal {
+    new MicroserviceUrlFinderImpl[Interpretation](microservicePort)
   }
 }
 

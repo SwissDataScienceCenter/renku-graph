@@ -18,6 +18,7 @@
 
 package io.renku.commiteventservice.events.categories.common
 
+import cats.MonadThrow
 import cats.effect._
 import cats.syntax.all._
 import io.renku.commiteventservice.events.categories.commitsync.categoryName
@@ -27,7 +28,6 @@ import io.renku.events.consumers.Project
 import io.renku.graph.model.events.BatchDate
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 private[categories] trait CommitToEventLog[Interpretation[_]] {
@@ -48,9 +48,10 @@ private[categories] class CommitToEventLogImpl[Interpretation[_]: MonadThrow](
                             batchDate:   BatchDate
   ): Interpretation[UpdateResult] = {
     val commitEvent = toCommitEvent(project, batchDate)(startCommit)
-    send(commitEvent).map(_ => Created).widen[UpdateResult] recover { case NonFatal(exception) =>
-      Failed(failureMessageFor(commitEvent), exception)
-    }
+    send(commitEvent)
+      .map(_ => Created)
+      .widen[UpdateResult]
+      .recover { case NonFatal(exception) => Failed(failureMessageFor(commitEvent), exception) }
   }
 
   private def toCommitEvent(project: Project, batchDate: BatchDate)(commitInfo: CommitInfo) =
@@ -79,23 +80,11 @@ private[categories] class CommitToEventLogImpl[Interpretation[_]: MonadThrow](
         )
     }
 
-  private def failureMessageFor(
-      startCommit: CommitEvent
-  ) =
+  private def failureMessageFor(startCommit: CommitEvent) =
     s"$categoryName: id = ${startCommit.id}, projectId = ${startCommit.project.id}, projectPath = ${startCommit.project.path} -> storing in the event log failed"
-
 }
-
 private[categories] object CommitToEventLog {
-  def apply(
-      logger: Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      clock:            Clock[IO],
-      timer:            Timer[IO]
-  ): IO[CommitToEventLog[IO]] =
-    for {
-      eventSender <- CommitEventSender(logger)
-    } yield new CommitToEventLogImpl[IO](eventSender)
+  def apply[Interpretation[_]: Async: Temporal: Logger]: Interpretation[CommitToEventLog[Interpretation]] = for {
+    eventSender <- CommitEventSender[Interpretation]
+  } yield new CommitToEventLogImpl[Interpretation](eventSender)
 }

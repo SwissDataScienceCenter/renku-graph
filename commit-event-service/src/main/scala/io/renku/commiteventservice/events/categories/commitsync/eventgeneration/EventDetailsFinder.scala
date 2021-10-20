@@ -18,7 +18,7 @@
 
 package io.renku.commiteventservice.events.categories.commitsync.eventgeneration
 
-import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
+import cats.effect.{Async, Temporal}
 import cats.syntax.all._
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
@@ -34,18 +34,14 @@ import org.http4s._
 import org.http4s.circe.jsonOf
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
 private trait EventDetailsFinder[Interpretation[_]] {
   def checkIfExists(projectId:   projects.Id, commitId: CommitId): Interpretation[Boolean]
   def getEventDetails(projectId: projects.Id, commitId: CommitId): Interpretation[Option[CommitWithParents]]
 }
 
-private class EventDetailsFinderImpl[Interpretation[_]: ContextShift: Timer: ConcurrentEffect](
-    eventLogUrl:             EventLogUrl,
-    logger:                  Logger[Interpretation]
-)(implicit executionContext: ExecutionContext)
-    extends RestClient[Interpretation, EventDetailsFinder[Interpretation]](Throttler.noThrottling, logger)
+private class EventDetailsFinderImpl[Interpretation[_]: Async: Temporal: Logger](
+    eventLogUrl: EventLogUrl
+) extends RestClient[Interpretation, EventDetailsFinder[Interpretation]](Throttler.noThrottling)
     with EventDetailsFinder[Interpretation] {
 
   import org.http4s.Method.GET
@@ -96,13 +92,7 @@ private class EventDetailsFinderImpl[Interpretation[_]: ContextShift: Timer: Con
 }
 
 private object EventDetailsFinder {
-  def apply(
-      logger: Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[EventDetailsFinderImpl[IO]] = for {
-    eventLogUrl <- EventLogUrl[IO]()
-  } yield new EventDetailsFinderImpl(eventLogUrl, logger)
+  def apply[Interpretation[_]: Async: Temporal: Logger]: Interpretation[EventDetailsFinderImpl[Interpretation]] = for {
+    eventLogUrl <- EventLogUrl[Interpretation]()
+  } yield new EventDetailsFinderImpl(eventLogUrl)
 }

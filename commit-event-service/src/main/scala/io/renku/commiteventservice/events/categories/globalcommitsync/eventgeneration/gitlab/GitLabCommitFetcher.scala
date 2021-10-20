@@ -18,7 +18,7 @@
 
 package io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.gitlab
 
-import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
+import cats.effect.{Async, Temporal}
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
@@ -34,10 +34,9 @@ import org.http4s.Method.GET
 import org.http4s.Status.{NotFound, Ok, Unauthorized}
 import org.http4s._
 import org.http4s.circe.jsonOf
-import org.http4s.util.CaseInsensitiveString
+import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
 private[globalcommitsync] trait GitLabCommitFetcher[Interpretation[_]] {
@@ -51,19 +50,16 @@ private[globalcommitsync] trait GitLabCommitFetcher[Interpretation[_]] {
   ): Interpretation[List[CommitId]]
 }
 
-private[globalcommitsync] class GitLabCommitFetcherImpl[Interpretation[_]: ConcurrentEffect: Timer](
-    gitLabApiUrl:            GitLabApiUrl,
-    gitLabThrottler:         Throttler[Interpretation, GitLab],
-    logger:                  Logger[Interpretation],
-    retryInterval:           FiniteDuration = RestClient.SleepAfterConnectionIssue,
-    maxRetries:              Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
-    requestTimeoutOverride:  Option[Duration] = None
-)(implicit executionContext: ExecutionContext)
-    extends RestClient(gitLabThrottler,
-                       logger,
-                       retryInterval = retryInterval,
-                       maxRetries = maxRetries,
-                       requestTimeoutOverride = requestTimeoutOverride
+private[globalcommitsync] class GitLabCommitFetcherImpl[Interpretation[_]: Async: Temporal: Logger](
+    gitLabApiUrl:           GitLabApiUrl,
+    gitLabThrottler:        Throttler[Interpretation, GitLab],
+    retryInterval:          FiniteDuration = RestClient.SleepAfterConnectionIssue,
+    maxRetries:             Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
+    requestTimeoutOverride: Option[Duration] = None
+) extends RestClient(gitLabThrottler,
+                     retryInterval = retryInterval,
+                     maxRetries = maxRetries,
+                     requestTimeoutOverride = requestTimeoutOverride
     )
     with GitLabCommitFetcher[Interpretation] {
 
@@ -138,18 +134,13 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[Interpretation[_]: Concu
     }
 
   private def maybeNextPage(response: Response[Interpretation]): Option[Int] =
-    response.headers.get(CaseInsensitiveString("X-Next-Page")).flatMap(_.value.toIntOption)
+    response.headers.get(ci"X-Next-Page").flatMap(_.head.value.toIntOption)
 }
 
 private[globalcommitsync] object GitLabCommitFetcher {
-  def apply(
-      gitLabThrottler: Throttler[IO, GitLab],
-      logger:          Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[GitLabCommitFetcher[IO]] = for {
-    gitLabUrl <- GitLabUrlLoader[IO]()
-  } yield new GitLabCommitFetcherImpl[IO](gitLabUrl.apiV4, gitLabThrottler, logger)
+  def apply[Interpretation[_]: Async: Temporal: Logger](
+      gitLabThrottler: Throttler[Interpretation, GitLab]
+  ): Interpretation[GitLabCommitFetcher[Interpretation]] = for {
+    gitLabUrl <- GitLabUrlLoader[Interpretation]()
+  } yield new GitLabCommitFetcherImpl[Interpretation](gitLabUrl.apiV4, gitLabThrottler)
 }

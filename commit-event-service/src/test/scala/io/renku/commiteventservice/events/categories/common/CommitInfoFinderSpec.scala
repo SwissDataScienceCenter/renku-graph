@@ -18,7 +18,7 @@
 
 package io.renku.commiteventservice.events.categories.common
 
-import cats.effect.{ConcurrentEffect, IO, Timer}
+import cats.effect.IO
 import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.literal._
@@ -34,15 +34,20 @@ import io.renku.graph.model.events.CommittedDate
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
+import io.renku.testtools.IOSpec
 import org.http4s.Status
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.{LocalDateTime, ZoneOffset}
-import scala.concurrent.ExecutionContext.Implicits.global
 
-class CommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalServiceStubbing with should.Matchers {
+class CommitInfoFinderSpec
+    extends AnyWordSpec
+    with IOSpec
+    with MockFactory
+    with ExternalServiceStubbing
+    with should.Matchers {
 
   "findCommitInfo" should {
 
@@ -262,9 +267,6 @@ class CommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSer
     }
   }
 
-  private implicit val ce:    ConcurrentEffect[IO] = IO.ioConcurrentEffect(IO.contextShift(global))
-  private implicit val timer: Timer[IO]            = IO.timer(global)
-
   private trait TestCase {
     val gitLabUrl     = GitLabUrl(externalServiceBaseUrl)
     val projectId     = projectIds.generateOne
@@ -274,6 +276,8 @@ class CommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSer
     val author        = authors.generateOne
     val committer     = committers.generateOne
     val parents       = parentsIdsLists().generateOne
+    private implicit val logger: TestLogger[IO] = TestLogger()
+    val finder = new CommitInfoFinderImpl[IO](gitLabUrl, Throttler.noThrottling)
 
     lazy val responseJson = json"""{
       "id":              ${commitId.value},
@@ -285,7 +289,5 @@ class CommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSer
       "committed_date":  "2012-09-20T09:06:12+03:00",
       "parent_ids":      ${parents.map(_.value)}
     }"""
-
-    val finder = new CommitInfoFinderImpl[IO](gitLabUrl, Throttler.noThrottling, TestLogger())
   }
 }

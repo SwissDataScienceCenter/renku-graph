@@ -114,7 +114,7 @@ object SubscriptionMechanism {
 
   private val RenewDelay = 5 minutes
 
-  def apply[Interpretation[_]: Async: MonadThrow: Concurrent: Temporal: Logger](
+  def apply[Interpretation[_]: Async: Concurrent: Temporal: Logger](
       categoryName: CategoryName,
       subscriptionPayloadComposerFactory: Kleisli[Interpretation, CategoryName, SubscriptionPayloadComposer[
         Interpretation

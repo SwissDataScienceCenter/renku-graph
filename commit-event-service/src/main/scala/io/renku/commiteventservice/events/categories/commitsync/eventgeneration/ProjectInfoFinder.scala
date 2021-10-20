@@ -18,7 +18,9 @@
 
 package io.renku.commiteventservice.events.categories.commitsync.eventgeneration
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.Async
+import cats.effect.kernel.Temporal
+import cats.syntax.all._
 import io.renku.commiteventservice.events.categories.common
 import io.renku.commiteventservice.events.categories.common.ProjectInfo
 import io.renku.config.GitLab
@@ -30,8 +32,6 @@ import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.http.client.{AccessToken, RestClient}
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
 private trait ProjectInfoFinder[Interpretation[_]] {
   def findProjectInfo(
       projectId:        projects.Id,
@@ -39,15 +39,12 @@ private trait ProjectInfoFinder[Interpretation[_]] {
   ): Interpretation[ProjectInfo]
 }
 
-private class ProjectInfoFinderImpl(
-    gitLabUrl:               GitLabUrl,
-    gitLabThrottler:         Throttler[IO, GitLab],
-    logger:                  Logger[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends RestClient(gitLabThrottler, logger)
-    with ProjectInfoFinder[IO] {
+private class ProjectInfoFinderImpl[Interpretation[_]: Async: Temporal: Logger](
+    gitLabUrl:       GitLabUrl,
+    gitLabThrottler: Throttler[Interpretation, GitLab]
+) extends RestClient(gitLabThrottler)
+    with ProjectInfoFinder[Interpretation] {
 
-  import cats.effect._
   import io.circe._
   import io.renku.http.client.RestClientError.UnauthorizedException
   import io.renku.tinytypes.json.TinyTypeDecoders._
@@ -57,18 +54,19 @@ private class ProjectInfoFinderImpl(
   import org.http4s.circe._
   import org.http4s.dsl.io._
 
-  def findProjectInfo(projectId: projects.Id, maybeAccessToken: Option[AccessToken]): IO[ProjectInfo] =
+  def findProjectInfo(projectId: projects.Id, maybeAccessToken: Option[AccessToken]): Interpretation[ProjectInfo] =
     for {
       uri         <- validateUri(s"$gitLabUrl/api/v4/projects/$projectId")
       projectInfo <- send(request(GET, uri, maybeAccessToken))(mapResponse)
     } yield projectInfo
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[ProjectInfo]] = {
+  private lazy val mapResponse
+      : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[ProjectInfo]] = {
     case (Ok, _, response)    => response.as[ProjectInfo]
-    case (Unauthorized, _, _) => IO.raiseError(UnauthorizedException)
+    case (Unauthorized, _, _) => UnauthorizedException.raiseError[Interpretation, ProjectInfo]
   }
 
-  private implicit lazy val projectInfoDecoder: EntityDecoder[IO, ProjectInfo] = {
+  private implicit lazy val projectInfoDecoder: EntityDecoder[Interpretation, ProjectInfo] = {
     implicit val hookNameDecoder: Decoder[ProjectInfo] = (cursor: HCursor) =>
       for {
         id         <- cursor.downField("id").as[projects.Id]
@@ -76,7 +74,7 @@ private class ProjectInfoFinderImpl(
         path       <- cursor.downField("path_with_namespace").as[projects.Path]
       } yield common.ProjectInfo(id, visibility, path)
 
-    jsonOf[IO, ProjectInfo]
+    jsonOf[Interpretation, ProjectInfo]
   }
 
   private def defaultToPublic(maybeVisibility: Option[Visibility]): Visibility =
@@ -84,14 +82,9 @@ private class ProjectInfoFinderImpl(
 }
 
 private object ProjectInfoFinder {
-  def apply(
-      gitLabThrottler: Throttler[IO, GitLab],
-      logger:          Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[ProjectInfoFinder[IO]] = for {
-    gitLabUrl <- GitLabUrlLoader[IO]()
-  } yield new ProjectInfoFinderImpl(gitLabUrl, gitLabThrottler, logger)
+  def apply[Interpretation[_]: Async: Temporal: Logger](
+      gitLabThrottler: Throttler[Interpretation, GitLab]
+  ): Interpretation[ProjectInfoFinder[Interpretation]] = for {
+    gitLabUrl <- GitLabUrlLoader[Interpretation]()
+  } yield new ProjectInfoFinderImpl(gitLabUrl, gitLabThrottler)
 }

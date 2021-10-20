@@ -129,14 +129,9 @@ class CertificateLoaderSpec extends AnyWordSpec with MockFactory with should.Mat
     val findCertificate       = mockFunction[Try[Option[Certificate]]]
     val createSslContext      = mockFunction[Keystore[Try], Try[SslContext]]
     val makeSslContextDefault = mockFunction[SslContext, MonadError[Try, Throwable], Try[Unit]]
-    val logger                = TestLogger[Try]()
-    val certificateLoader = new CertificateLoaderImpl[Try](
-      keystore,
-      findCertificate,
-      createSslContext,
-      makeSslContextDefault,
-      logger
-    )
+    implicit val logger: TestLogger[Try] = TestLogger[Try]()
+    val certificateLoader =
+      new CertificateLoaderImpl[Try](keystore, findCertificate, createSslContext, makeSslContextDefault)
   }
 
   private lazy val sslContexts: Gen[SslContext] = Gen.uuid.map(_ => new SslContext(SSLContext.getInstance("TLS")))
