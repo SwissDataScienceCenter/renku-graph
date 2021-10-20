@@ -38,24 +38,29 @@ services. Tagging has to be done manually.
 
 ### Event Flow
 
-Overview
+#### Project creation flow and new commit flow
+
+When a project is created on GitLab or when a new commit is pushed to the gitlab instance, this following flow is
+triggered
 
 ```mermaid
 graph TD;
-    A[GitLab] -- 1. new commit event --> B[KG] 
+    A[GitLab] -- 1. new commit event --> B[KG services] 
     B -- 2. generation of triples --> B
-    B -- 3. storing triples --> C[TriplesStore]
+    B -- 3. storing triples --> C[(TriplesStore)]
 
 ```
 
-New commit process
+The same process with more details on how the KG services interact with each other
 
 ```mermaid
-graph TD;
+graph TB;
     A[GitLab] -- 1. new commit event  --> B[WebhookService]
+    subgraph kg[KG Services]
     B -- 2. event for new commit  --> C[EventLog]
     C -- 3. fetch newest event --> C
     C -- 4. send event for triples generation  --> D[TriplesGenerator]
     D -- 5. triples generated --> C
-    C -- 6. storing triples --> E[TriplesStore]
+    end
+    C -- 6. storing triples --> E[(TriplesStore)]
 ```
