@@ -32,5 +32,30 @@ The standard release process is done manually.
 
 #### Hotfixes
 
-In a case of hotfixes, changes to a relevant commit/tag needs to be done and pushed to a special branch with name following the `hotfix-<major>.<minor>` pattern. Once the fix is pushed, CI will test the change with other Renku services. Tagging has to be done manually.
+In a case of hotfixes, changes to a relevant commit/tag needs to be done and pushed to a special branch with name
+following the `hotfix-<major>.<minor>` pattern. Once the fix is pushed, CI will test the change with other Renku
+services. Tagging has to be done manually.
 
+### Event Flow
+
+Overview
+
+```mermaid
+graph TD;
+    A[GitLab] -- 1. new commit event --> B[KG] 
+    B -- 2. generation of triples --> B
+    B -- 3. storing triples --> C[TriplesStore]
+
+```
+
+New commit process
+
+```mermaid
+graph TD;
+    A[GitLab] -- 1. new commit event  --> B[WebhookService]
+    B -- 2. event for new commit  --> C[EventLog]
+    C -- 3. fetch newest event --> C
+    C -- 4. send event for triples generation  --> D[TriplesGenerator]
+    D -- 5. triples generated --> C
+    C -- 6. storing triples --> E[TriplesStore]
+```
