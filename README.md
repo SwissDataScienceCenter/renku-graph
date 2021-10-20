@@ -40,8 +40,8 @@ services. Tagging has to be done manually.
 
 #### Project creation flow and new commit flow
 
-When a project is created on GitLab or when a new commit is pushed to the gitlab instance, this following flow is
-triggered
+When a project is created on GitLab or when a new commit is pushed to the gitlab instance, the following flow is
+triggered:
 
 ```mermaid
 graph TD;
