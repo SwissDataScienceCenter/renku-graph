@@ -58,7 +58,6 @@ graph TB;
     A[GitLab] -- 1. new commit event  --> B[WebhookService]
     subgraph kg[KG Services]
     B -- 2. event for new commit  --> C(Event Services)
-    C -- 3. fetch newest event --> C
     C -- 4. send event for triples generation  --> D[TriplesGenerator]
     D -- 5. triples generated --> C
     end
@@ -68,15 +67,17 @@ graph TB;
 Again the same process with more details on the Event services
 
 ```mermaid
-graph TB;
-    A[WebhookService] -- 1. event for new commit  --> B[EventLog]
-    subgraph kg[Event Services]
-    C[CommitSyncService] -- 2. fetch newest event --> B
-    B -- 3. send event --> C
-    C -- 4. create event for triples generation --> B
-    end
-    C -- 5. send event for triples generation  --> D[TriplesGenerator]
-    D -- 6. triples generated --> B
-    C -- 7. storing triples --> E[(TriplesStore)]
+sequenceDiagram
+    participant WebhookService
+    participant EventLog
+    participant CommmitEventService
+    participant TriplesGenerator
+    participant TriplesStore
+    WebhookService ->>EventLog: event for new commit 
+    EventLog ->>CommmitEventService: send event
+    CommmitEventService ->>EventLog: create event for triples generation
+    CommmitEventService ->>TriplesGenerator: send event for triples generation
+    TriplesGenerator ->>EventLog: triples generated
+    CommmitEventService ->>TriplesStore: storing triples
 ```
 
