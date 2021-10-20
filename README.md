@@ -76,8 +76,8 @@ sequenceDiagram
     WebhookService ->>EventLog: event for new commit 
     EventLog ->>CommmitEventService: send event
     CommmitEventService ->>EventLog: create event for triples generation
-    CommmitEventService ->>TriplesGenerator: send event for triples generation
+    EventLog ->>TriplesGenerator: send event for triples generation
     TriplesGenerator ->>EventLog: triples generated
-    CommmitEventService ->>TriplesStore: storing triples
+    EventLog ->>TriplesStore: storing triples
 ```
 
