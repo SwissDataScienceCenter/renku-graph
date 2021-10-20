@@ -20,7 +20,7 @@ package io.renku.tokenrepository.repository.fetching
 
 import cats.MonadThrow
 import cats.data.OptionT
-import cats.effect.IO
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.circe.syntax._
 import io.renku.db.{SessionResource, SqlStatement}
@@ -37,10 +37,20 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-class FetchTokenEndpoint[Interpretation[_]: MonadThrow: Logger](tokenFinder: TokenFinder[Interpretation])
-    extends Http4sDsl[Interpretation] {
-
+trait FetchTokenEndpoint[Interpretation[_]] {
   def fetchToken[ID](
+      projectIdentifier: ID
+  )(implicit findToken:  ID => OptionT[Interpretation, AccessToken]): Interpretation[Response[Interpretation]]
+
+  implicit val findById:   projects.Id => OptionT[Interpretation, AccessToken]
+  implicit val findByPath: projects.Path => OptionT[Interpretation, AccessToken]
+}
+
+class FetchTokenEndpointImpl[Interpretation[_]: MonadThrow: Logger](tokenFinder: TokenFinder[Interpretation])
+    extends Http4sDsl[Interpretation]
+    with FetchTokenEndpoint[Interpretation] {
+
+  override def fetchToken[ID](
       projectIdentifier: ID
   )(implicit findToken:  ID => OptionT[Interpretation, AccessToken]): Interpretation[Response[Interpretation]] =
     findToken(projectIdentifier).value
@@ -50,10 +60,8 @@ class FetchTokenEndpoint[Interpretation[_]: MonadThrow: Logger](tokenFinder: Tok
   private def toHttpResult[ID](
       projectIdentifier: ID
   ): Option[AccessToken] => Interpretation[Response[Interpretation]] = {
-    case Some(token) =>
-      Ok(token.asJson)
-    case None =>
-      NotFound(InfoMessage(s"Token for project: $projectIdentifier not found"))
+    case Some(token) => Ok(token.asJson)
+    case None        => NotFound(InfoMessage(s"Token for project: $projectIdentifier not found"))
   }
 
   private def httpResult[ID](
@@ -68,11 +76,11 @@ class FetchTokenEndpoint[Interpretation[_]: MonadThrow: Logger](tokenFinder: Tok
   implicit val findByPath: projects.Path => OptionT[Interpretation, AccessToken] = tokenFinder.findToken
 }
 
-object IOFetchTokenEndpoint {
-  def apply(
-      sessionResource:  SessionResource[IO, ProjectsTokensDB],
-      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
-  )(implicit logger:    Logger[IO]): IO[FetchTokenEndpoint[IO]] = for {
-    tokenFinder <- IOTokenFinder(sessionResource, queriesExecTimes)
-  } yield new FetchTokenEndpoint[IO](tokenFinder)
+object FetchTokenEndpoint {
+  def apply[F[_]: MonadCancelThrow: Logger](
+      sessionResource:  SessionResource[F, ProjectsTokensDB],
+      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[FetchTokenEndpoint[F]] = for {
+    tokenFinder <- TokenFinder(sessionResource, queriesExecTimes)
+  } yield new FetchTokenEndpointImpl[F](tokenFinder)
 }

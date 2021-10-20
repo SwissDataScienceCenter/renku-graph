@@ -20,6 +20,7 @@ package io.renku.tokenrepository.repository.init
 
 import cats.data.Kleisli
 import cats.effect._
+import cats.effect.kernel.Temporal
 import cats.syntax.all._
 import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.metrics.LabeledHistogram
@@ -28,22 +29,25 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-class DbInitializer[Interpretation[_]: BracketThrow](
+trait DbInitializer[Interpretation[_]] {
+  def run(): Interpretation[Unit]
+}
+
+class DbInitializerImpl[Interpretation[_]: MonadCancelThrow: Logger](
     projectPathAdder:         ProjectPathAdder[Interpretation],
     duplicateProjectsRemover: DuplicateProjectsRemover[Interpretation],
-    sessionResource:          SessionResource[Interpretation, ProjectsTokensDB],
-    logger:                   Logger[Interpretation]
-) {
+    sessionResource:          SessionResource[Interpretation, ProjectsTokensDB]
+) extends DbInitializer[Interpretation] {
 
   import skunk._
   import skunk.implicits._
 
-  def run(): Interpretation[Unit] = {
+  override def run(): Interpretation[Unit] = {
     for {
       _ <- createTable
       _ <- projectPathAdder.run()
       _ <- duplicateProjectsRemover.run()
-      _ <- logger.info("Projects Tokens database initialization success")
+      _ <- Logger[Interpretation].info("Projects Tokens database initialization success")
     } yield ()
   } recoverWith logging
 
@@ -51,34 +55,26 @@ class DbInitializer[Interpretation[_]: BracketThrow](
     sessionResource.useK {
       val query: Command[Void] =
         sql"""CREATE TABLE IF NOT EXISTS projects_tokens(
-                            project_id int4 PRIMARY KEY,
-                            token VARCHAR NOT NULL
-                            );""".command
+                project_id int4 PRIMARY KEY,
+                token VARCHAR NOT NULL
+              );""".command
       Kleisli[Interpretation, Session[Interpretation], Unit](session => session.execute(query).void)
     }
 
   private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    logger
+    Logger[Interpretation]
       .error(exception)("Projects Tokens database initialization failure")
-      .flatMap(_ => Bracket[Interpretation, Throwable].raiseError(exception))
+      .flatMap(_ => MonadCancelThrow[Interpretation].raiseError(exception))
   }
 }
 
-object IODbInitializer {
+object DbInitializer {
 
-  import scala.concurrent.ExecutionContext
-
-  def apply(
-      sessionResource:  SessionResource[IO, ProjectsTokensDB],
-      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name],
-      logger:           Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[DbInitializer[IO]] =
-    for {
-      pathAdder <- IOProjectPathAdder(sessionResource, queriesExecTimes, logger)
-      duplicateProjectsRemover = init.DuplicateProjectsRemover[IO](sessionResource, logger)
-    } yield new DbInitializer[IO](pathAdder, duplicateProjectsRemover, sessionResource, logger)
+  def apply[F[_]: Async: Temporal: Spawn: MonadCancelThrow: Logger](
+      sessionResource:  SessionResource[F, ProjectsTokensDB],
+      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[DbInitializer[F]] = for {
+    pathAdder <- ProjectPathAdder[F](sessionResource, queriesExecTimes)
+    duplicateProjectsRemover = init.DuplicateProjectsRemover[F](sessionResource)
+  } yield new DbInitializerImpl[F](pathAdder, duplicateProjectsRemover, sessionResource)
 }

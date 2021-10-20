@@ -18,8 +18,8 @@
 
 package io.renku.tokenrepository.repository.deletion
 
-import cats.MonadError
-import cats.effect.{ContextShift, Effect, IO}
+import cats.MonadThrow
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.graph.model.projects.Id
@@ -33,13 +33,16 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-class DeleteTokenEndpoint[Interpretation[_]: Effect](
-    tokenRemover: TokenRemover[Interpretation],
-    logger:       Logger[Interpretation]
-)(implicit ME:    MonadError[Interpretation, Throwable])
-    extends Http4sDsl[Interpretation] {
+trait DeleteTokenEndpoint[Interpretation[_]] {
+  def deleteToken(projectId: Id): Interpretation[Response[Interpretation]]
+}
 
-  def deleteToken(projectId: Id): Interpretation[Response[Interpretation]] =
+class DeleteTokenEndpointImpl[Interpretation[_]: MonadThrow: Logger](
+    tokenRemover: TokenRemover[Interpretation]
+) extends Http4sDsl[Interpretation]
+    with DeleteTokenEndpoint[Interpretation] {
+
+  override def deleteToken(projectId: Id): Interpretation[Response[Interpretation]] =
     tokenRemover
       .delete(projectId)
       .flatMap(_ => NoContent())
@@ -48,17 +51,16 @@ class DeleteTokenEndpoint[Interpretation[_]: Effect](
   private def httpResult(projectId: Id): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case NonFatal(exception) =>
       val errorMessage = ErrorMessage(s"Deleting token for projectId: $projectId failed")
-      logger.error(exception)(errorMessage.value)
+      Logger[Interpretation].error(exception)(errorMessage.value)
       InternalServerError(errorMessage)
   }
 }
 
-object IODeleteTokenEndpoint {
-  def apply(
-      sessionResource:     SessionResource[IO, ProjectsTokensDB],
-      queriesExecTimes:    LabeledHistogram[IO, SqlStatement.Name],
-      logger:              Logger[IO]
-  )(implicit contextShift: ContextShift[IO]): IO[DeleteTokenEndpoint[IO]] = IO {
-    new DeleteTokenEndpoint[IO](new TokenRemover[IO](sessionResource, queriesExecTimes), logger)
+object DeleteTokenEndpoint {
+  def apply[F[_]: MonadCancelThrow: Logger](
+      sessionResource:  SessionResource[F, ProjectsTokensDB],
+      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[DeleteTokenEndpoint[F]] = MonadThrow[F].catchNonFatal {
+    new DeleteTokenEndpointImpl[F](new TokenRemoverImpl[F](sessionResource, queriesExecTimes))
   }
 }

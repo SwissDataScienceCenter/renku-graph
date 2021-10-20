@@ -32,6 +32,7 @@ import io.renku.http.client.AccessToken
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
+import io.renku.testtools.IOSpec
 import org.http4s._
 import org.http4s.headers.`Content-Type`
 import org.http4s.implicits._
@@ -39,7 +40,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class AssociateTokenEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class AssociateTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "associateToken" should {
 
@@ -127,8 +128,8 @@ class AssociateTokenEndpointSpec extends AnyWordSpec with MockFactory with shoul
 
     val projectId = projectIds.generateOne
 
-    val tokensAssociator = mock[IOTokenAssociator]
-    val logger           = TestLogger[IO]()
-    val associateToken   = new AssociateTokenEndpoint[IO](tokensAssociator, logger).associateToken _
+    val tokensAssociator = mock[TokenAssociator[IO]]
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val associateToken = new AssociateTokenEndpointImpl[IO](tokensAssociator).associateToken _
   }
 }

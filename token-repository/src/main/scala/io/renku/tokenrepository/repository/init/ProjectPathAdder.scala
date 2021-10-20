@@ -20,14 +20,15 @@ package io.renku.tokenrepository.repository.init
 
 import cats.data.Kleisli
 import cats.effect._
+import cats.effect.kernel.Temporal
 import cats.syntax.all._
 import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.metrics.LabeledHistogram
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
-import io.renku.tokenrepository.repository.association.{IOProjectPathFinder, ProjectPathFinder}
-import io.renku.tokenrepository.repository.deletion.TokenRemover
+import io.renku.tokenrepository.repository.association.ProjectPathFinder
+import io.renku.tokenrepository.repository.deletion.{TokenRemover, TokenRemoverImpl}
 import io.renku.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB, TokenRepositoryTypeSerializers}
 import org.typelevel.log4cats.Logger
 import skunk._
@@ -39,12 +40,11 @@ private trait ProjectPathAdder[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
-private class ProjectPathAdderImpl[Interpretation[_]: Concurrent: Bracket[*[_], Throwable]: ContextShift](
+private class ProjectPathAdderImpl[Interpretation[_]: Spawn: MonadCancelThrow: Logger](
     sessionResource:   SessionResource[Interpretation, ProjectsTokensDB],
     accessTokenCrypto: AccessTokenCrypto[Interpretation],
     pathFinder:        ProjectPathFinder[Interpretation],
-    tokenRemover:      TokenRemover[Interpretation],
-    logger:            Logger[Interpretation]
+    tokenRemover:      TokenRemover[Interpretation]
 ) extends ProjectPathAdder[Interpretation]
     with TokenRepositoryTypeSerializers {
 
@@ -53,7 +53,7 @@ private class ProjectPathAdderImpl[Interpretation[_]: Concurrent: Bracket[*[_], 
 
   def run(): Interpretation[Unit] = sessionResource.useK {
     checkColumnExists >>= {
-      case true  => Kleisli.liftF(logger.info("'project_path' column exists"))
+      case true  => Kleisli.liftF(Logger[Interpretation].info("'project_path' column exists"))
       case false => addColumn()
     }
   }
@@ -67,9 +67,8 @@ private class ProjectPathAdderImpl[Interpretation[_]: Concurrent: Bracket[*[_], 
   private def addColumn(): Kleisli[Interpretation, Session[Interpretation], Unit] = Kleisli { implicit session =>
     {
       for {
-        _ <-
-          execute(sql"ALTER TABLE projects_tokens ADD COLUMN IF NOT EXISTS project_path VARCHAR".command)
-        _ <- Concurrent[Interpretation].start(addMissingPaths())
+        _ <- execute(sql"ALTER TABLE projects_tokens ADD COLUMN IF NOT EXISTS project_path VARCHAR".command)
+        _ <- Spawn[Interpretation] start addMissingPaths()
       } yield ()
     } recoverWith logging
   }
@@ -79,16 +78,14 @@ private class ProjectPathAdderImpl[Interpretation[_]: Concurrent: Bracket[*[_], 
       for {
         _ <- addPathIfMissing().run(session)
         _ <- execute(sql"ALTER TABLE projects_tokens ALTER COLUMN project_path SET NOT NULL".command)
-        _ <-
-          execute(sql"CREATE INDEX IF NOT EXISTS idx_project_path ON projects_tokens(project_path)".command)
-        _ <- logger.info("'project_path' column added")
+        _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_path ON projects_tokens(project_path)".command)
+        _ <- Logger[Interpretation].info("'project_path' column added")
       } yield ()
     }
-
   }
 
   private def addPathIfMissing(): Kleisli[Interpretation, Session[Interpretation], Unit] =
-    findEntryWithoutPath flatMap {
+    findEntryWithoutPath >>= {
       case None                              => Kleisli.pure(())
       case Some((projectId, encryptedToken)) => addPathOrRemoveRow(projectId, encryptedToken)
     }
@@ -110,7 +107,7 @@ private class ProjectPathAdderImpl[Interpretation[_]: Concurrent: Bracket[*[_], 
       _                <- addPathIfMissing()
     } yield ()
   } recoverWith { case NonFatal(exception) =>
-    logger.error(exception)(s"Error while adding Project Path for projectId = $id")
+    Logger[Interpretation].error(exception)(s"Error while adding Project Path for projectId = $id")
     addPathIfMissing()
   }
 
@@ -130,29 +127,19 @@ private class ProjectPathAdderImpl[Interpretation[_]: Concurrent: Bracket[*[_], 
     session.execute(sql).void
 
   private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    logger.error(exception)("'project_path' column adding failure")
+    Logger[Interpretation].error(exception)("'project_path' column adding failure")
     exception.raiseError[Interpretation, Unit]
   }
 }
 
-private object IOProjectPathAdder {
+private object ProjectPathAdder {
 
-  import cats.effect.{ContextShift, IO, Timer}
-
-  import scala.concurrent.ExecutionContext
-
-  def apply(
-      sessionResource:  SessionResource[IO, ProjectsTokensDB],
-      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name],
-      logger:           Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[ProjectPathAdder[IO]] =
-    for {
-      accessTokenCrypto <- AccessTokenCrypto[IO]()
-      pathFinder        <- IOProjectPathFinder(logger)
-      tokenRemover = new TokenRemover[IO](sessionResource, queriesExecTimes)
-    } yield new ProjectPathAdderImpl[IO](sessionResource, accessTokenCrypto, pathFinder, tokenRemover, logger)
+  def apply[Interpretation[_]: Async: Temporal: Spawn: MonadCancelThrow: Logger](
+      sessionResource:  SessionResource[Interpretation, ProjectsTokensDB],
+      queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
+  ): Interpretation[ProjectPathAdder[Interpretation]] = for {
+    accessTokenCrypto <- AccessTokenCrypto[Interpretation]()
+    pathFinder        <- ProjectPathFinder[Interpretation]
+    tokenRemover = new TokenRemoverImpl[Interpretation](sessionResource, queriesExecTimes)
+  } yield new ProjectPathAdderImpl[Interpretation](sessionResource, accessTokenCrypto, pathFinder, tokenRemover)
 }

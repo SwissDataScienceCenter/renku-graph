@@ -23,6 +23,7 @@ import cats.data.Kleisli
 import cats.effect.IO
 import io.renku.db.DbSpec
 import io.renku.graph.model.projects.{Id, Path}
+import io.renku.testtools.IOSpec
 import org.scalatest.TestSuite
 import skunk._
 import skunk.codec.all._
@@ -30,7 +31,7 @@ import skunk.data.Completion
 import skunk.implicits._
 
 trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb {
-  self: TestSuite =>
+  self: TestSuite with IOSpec =>
 
   protected def initDb(): Unit = createTable()
 

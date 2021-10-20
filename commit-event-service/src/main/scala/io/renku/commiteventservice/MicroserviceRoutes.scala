@@ -19,15 +19,15 @@
 package io.renku.commiteventservice
 
 import cats.MonadThrow
+import cats.effect.Resource
 import cats.effect.kernel.Concurrent
-import cats.effect.{Clock, Resource}
 import cats.syntax.all._
 import io.renku.commiteventservice.events.EventEndpoint
 import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.metrics.RoutesMetrics
 import org.http4s.dsl.Http4sDsl
 
-private class MicroserviceRoutes[Interpretation[_]: MonadThrow: Clock](
+private class MicroserviceRoutes[Interpretation[_]: MonadThrow](
     eventEndpoint: EventEndpoint[Interpretation],
     routesMetrics: RoutesMetrics[Interpretation]
 ) extends Http4sDsl[Interpretation] {
@@ -45,7 +45,7 @@ private class MicroserviceRoutes[Interpretation[_]: MonadThrow: Clock](
 }
 
 private object MicroserviceRoutes {
-  def apply[Interpretation[_]: MonadThrow: Concurrent: Clock](
+  def apply[Interpretation[_]: MonadThrow: Concurrent](
       consumersRegistry: EventConsumersRegistry[Interpretation],
       routesMetrics:     RoutesMetrics[Interpretation]
   ): Interpretation[MicroserviceRoutes[Interpretation]] = for {

@@ -107,7 +107,7 @@ class AccessTokenCryptoSpec extends AnyWordSpec with should.Matchers {
   private trait TestCase {
 
     private val secret = new String(Base64.getEncoder.encode("1234567890123456".getBytes(UTF_8)), UTF_8)
-    val hookTokenCrypto = new AccessTokenCrypto[Try](
+    val hookTokenCrypto = new AccessTokenCryptoImpl[Try](
       RefType
         .applyRef[Secret](secret)
         .getOrElse(throw new IllegalArgumentException("Wrong secret"))

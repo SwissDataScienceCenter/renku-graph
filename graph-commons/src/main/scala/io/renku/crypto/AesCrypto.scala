@@ -18,7 +18,7 @@
 
 package io.renku.crypto
 
-import cats.MonadError
+import cats.MonadThrow
 import eu.timepit.refined.W
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.MinSize
@@ -31,9 +31,9 @@ import javax.crypto.Cipher.{DECRYPT_MODE, ENCRYPT_MODE}
 import javax.crypto.spec.{IvParameterSpec, SecretKeySpec}
 import scala.util.Try
 
-abstract class AesCrypto[Interpretation[_], NONENCRYPTED, ENCRYPTED](
-    secret:    Secret
-)(implicit ME: MonadError[Interpretation, Throwable]) {
+abstract class AesCrypto[Interpretation[_]: MonadThrow, NONENCRYPTED, ENCRYPTED](
+    secret: Secret
+) {
 
   private val base64Decoder    = Base64.getDecoder
   private val base64Encoder    = Base64.getEncoder
@@ -66,7 +66,7 @@ abstract class AesCrypto[Interpretation[_], NONENCRYPTED, ENCRYPTED](
     )
   }
 
-  protected def pure[T](value: => T): Interpretation[T] = ME.fromTry {
+  protected def pure[T](value: => T): Interpretation[T] = MonadThrow[Interpretation].fromTry {
     Try(value)
   }
 }

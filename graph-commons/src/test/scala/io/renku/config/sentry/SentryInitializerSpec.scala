@@ -65,6 +65,6 @@ class SentryInitializerSpec extends AnyWordSpec with MockFactory with should.Mat
     val context = MonadError[Try, Throwable]
 
     val initSentry        = mockFunction[String, Unit]
-    val sentryInitializer = new SentryInitializer[Try](_, initSentry)
+    val sentryInitializer = new SentryInitializerImpl[Try](_, initSentry)
   }
 }

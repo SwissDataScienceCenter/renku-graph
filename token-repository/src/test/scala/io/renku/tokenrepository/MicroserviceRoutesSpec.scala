@@ -19,15 +19,17 @@
 package io.renku.tokenrepository
 
 import cats.data.OptionT
-import cats.effect.{Clock, IO}
+import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestRoutesMetrics
-import io.renku.tokenrepository.repository.association.IOAssociateTokenEndpoint
+import io.renku.testtools.IOSpec
+import io.renku.tokenrepository.repository.association.AssociateTokenEndpoint
 import io.renku.tokenrepository.repository.{deletion, fetching}
+import org.http4s.Method._
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.implicits._
@@ -36,78 +38,66 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import scala.concurrent.ExecutionContext
 import scala.language.reflectiveCalls
 
-class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyChecks with should.Matchers {
+class MicroserviceRoutesSpec
+    extends AnyWordSpec
+    with IOSpec
+    with MockFactory
+    with ScalaCheckPropertyChecks
+    with should.Matchers {
 
   "routes" should {
 
     "define a GET /ping endpoint returning OK with 'pong' body" in new TestCase {
-      val response = routes.call(
-        Request(Method.GET, uri"ping")
-      )
+      val response = routes.call(Request(GET, uri"/ping"))
 
       response.status       shouldBe Ok
       response.body[String] shouldBe "pong"
     }
 
     "define a GET /metrics endpoint returning OK with some prometheus metrics" in new TestCase {
-      val response = routes.call(
-        Request(Method.GET, uri"metrics")
-      )
+      val response = routes.call(Request(GET, uri"/metrics"))
 
       response.status     shouldBe Ok
       response.body[String] should include("server_response_duration_seconds")
     }
 
     s"define a GET /projects/:id/tokens endpoint returning $Ok when a valid projectId is given" in new TestCase {
-      import fetchEndpoint._
 
       val projectId = projectIds.generateOne
 
       (fetchEndpoint
         .fetchToken(_: projects.Id)(_: projects.Id => OptionT[IO, AccessToken]))
-        .expects(projectId, findById)
+        .expects(projectId, *)
         .returning(IO.pure(Response[IO](Ok)))
 
-      val response = routes.call(
-        Request(Method.GET, uri"projects" / projectId.toString / "tokens")
-      )
-
-      response.status shouldBe Ok
+      routes.call(Request(GET, uri"/projects" / projectId.toString / "tokens")).status shouldBe Ok
     }
 
     s"define a GET /projects/:id/tokens endpoint returning $Ok when a valid projectPath is given" in new TestCase {
-      import fetchEndpoint._
 
       val projectPath = projectPaths.generateOne
 
       (fetchEndpoint
         .fetchToken(_: projects.Path)(_: projects.Path => OptionT[IO, AccessToken]))
-        .expects(projectPath, findByPath)
+        .expects(projectPath, *)
         .returning(IO.pure(Response[IO](Ok)))
 
-      val response = routes.call(
-        Request(Method.GET, uri"projects" / projectPath.toString / "tokens")
-      )
-
-      response.status shouldBe Ok
+      routes.call(Request(GET, uri"/projects" / projectPath.toString / "tokens")).status shouldBe Ok
     }
 
     s"define a PUT /projects/:id/tokens endpoint returning $Ok when a valid projectId given" in new TestCase {
 
       val projectId = projectIds.generateOne
-      val request   = Request[IO](Method.PUT, uri"projects" / projectId.toString / "tokens")
+      val request   = Request[IO](PUT, uri"/projects" / projectId.toString / "tokens")
 
       (associateEndpoint
         .associateToken(_: projects.Id, _: Request[IO]))
         .expects(projectId, request)
         .returning(IO.pure(Response[IO](NoContent)))
 
-      val response = routes call request
-
-      response.status shouldBe NoContent
+      (routes call request).status shouldBe NoContent
     }
 
     s"define a DELETE /projects/:id/tokens endpoint returning $Ok when a valid projectId given" in new TestCase {
@@ -118,19 +108,17 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
         .expects(projectId)
         .returning(IO.pure(Response[IO](NoContent)))
 
-      val response = routes call Request[IO](Method.DELETE, uri"projects" / projectId.toString / "tokens")
+      val response = routes call Request[IO](DELETE, uri"/projects" / projectId.toString / "tokens")
 
       response.status shouldBe NoContent
     }
   }
 
-  private implicit val clock: Clock[IO] = IO.timer(ExecutionContext.global).clock
-
   private trait TestCase {
 
-    val fetchEndpoint     = mock[fetching.IOFetchTokenEndpoint]
-    val associateEndpoint = mock[IOAssociateTokenEndpoint]
-    val deleteEndpoint    = mock[deletion.IODeleteTokenEndpoint]
+    val fetchEndpoint     = mock[fetching.FetchTokenEndpoint[IO]]
+    val associateEndpoint = mock[AssociateTokenEndpoint[IO]]
+    val deleteEndpoint    = mock[deletion.DeleteTokenEndpoint[IO]]
     val routesMetrics     = TestRoutesMetrics()
     val routes = new MicroserviceRoutes[IO](
       fetchEndpoint,

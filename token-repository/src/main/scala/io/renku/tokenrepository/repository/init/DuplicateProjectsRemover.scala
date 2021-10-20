@@ -19,7 +19,7 @@
 package io.renku.tokenrepository.repository.init
 
 import cats.data.Kleisli
-import cats.effect.Bracket
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.renku.db.SessionResource
 import io.renku.tokenrepository.repository.ProjectsTokensDB
@@ -32,22 +32,19 @@ private trait DuplicateProjectsRemover[Interpretation[_]] {
 }
 
 private object DuplicateProjectsRemover {
-  def apply[Interpretation[_]: Bracket[*[_], Throwable]](
-      sessionResource: SessionResource[Interpretation, ProjectsTokensDB],
-      logger:          Logger[Interpretation]
-  ): DuplicateProjectsRemover[Interpretation] =
-    new DuplicateProjectsRemoverImpl(sessionResource, logger)
+  def apply[Interpretation[_]: MonadCancelThrow: Logger](
+      sessionResource: SessionResource[Interpretation, ProjectsTokensDB]
+  ): DuplicateProjectsRemover[Interpretation] = new DuplicateProjectsRemoverImpl(sessionResource)
 }
 
-private class DuplicateProjectsRemoverImpl[Interpretation[_]: Bracket[*[_], Throwable]](
-    sessionResource: SessionResource[Interpretation, ProjectsTokensDB],
-    logger:          Logger[Interpretation]
+private class DuplicateProjectsRemoverImpl[Interpretation[_]: MonadCancelThrow: Logger](
+    sessionResource: SessionResource[Interpretation, ProjectsTokensDB]
 ) extends DuplicateProjectsRemover[Interpretation] {
 
   override def run(): Interpretation[Unit] = sessionResource.useK {
     for {
       _ <- deduplicateProjects()
-      _ <- Kleisli.liftF(logger info "Projects de-duplicated")
+      _ <- Kleisli.liftF(Logger[Interpretation] info "Projects de-duplicated")
     } yield ()
   }
 
@@ -64,7 +61,6 @@ private class DuplicateProjectsRemoverImpl[Interpretation[_]: Bracket[*[_], Thro
                                          HAVING COUNT(distinct project_id) > 1
                                        ) pr_to_stay ON pr_to_stay.project_path = pt.project_path AND pr_to_stay.id_to_stay <> pt.project_id
                                      )""".command
-
     Kleisli(_.execute(query).void)
   }
 }

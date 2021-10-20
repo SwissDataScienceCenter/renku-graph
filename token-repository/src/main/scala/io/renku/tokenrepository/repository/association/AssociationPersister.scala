@@ -31,14 +31,21 @@ import skunk.data.Completion
 import skunk.data.Completion.{Insert, Update}
 import skunk.implicits._
 
-private class AssociationPersister[Interpretation[_]: BracketThrow](
+private trait AssociationPersister[Interpretation[_]] {
+  def persistAssociation(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken): Interpretation[Unit]
+}
+
+private class AssociationPersisterImpl[Interpretation[_]: MonadCancelThrow](
     sessionResource:  SessionResource[Interpretation, ProjectsTokensDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
 ) extends DbClient[Interpretation](Some(queriesExecTimes))
+    with AssociationPersister[Interpretation]
     with TokenRepositoryTypeSerializers {
 
-  def persistAssociation(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken): Interpretation[Unit] =
-    sessionResource.useK(upsert(projectId, projectPath, encryptedToken))
+  override def persistAssociation(projectId:      Id,
+                                  projectPath:    Path,
+                                  encryptedToken: EncryptedAccessToken
+  ): Interpretation[Unit] = sessionResource.useK(upsert(projectId, projectPath, encryptedToken))
 
   private def upsert(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken) =
     checkIfTokenExists(projectPath) flatMap {
@@ -49,9 +56,8 @@ private class AssociationPersister[Interpretation[_]: BracketThrow](
   private def checkIfTokenExists(projectPath: Path) = measureExecutionTime {
     SqlStatement(name = "associate token - check")
       .select[Path, EncryptedAccessToken](
-        sql"SELECT token FROM projects_tokens WHERE project_path = $projectPathEncoder".query(
-          encryptedAccessTokenDecoder
-        )
+        sql"SELECT token FROM projects_tokens WHERE project_path = $projectPathEncoder"
+          .query(encryptedAccessTokenDecoder)
       )
       .arguments(projectPath)
       .build(_.option)
@@ -89,9 +95,3 @@ private class AssociationPersister[Interpretation[_]: BracketThrow](
       new RuntimeException(s"Associating token for project $projectPath ($projectId)").raiseError[Interpretation, Unit]
   }
 }
-
-private class IOAssociationPersister(
-    sessionResource:     SessionResource[IO, ProjectsTokensDB],
-    queriesExecTimes:    LabeledHistogram[IO, SqlStatement.Name]
-)(implicit contextShift: ContextShift[IO])
-    extends AssociationPersister[IO](sessionResource, queriesExecTimes)

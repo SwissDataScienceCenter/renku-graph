@@ -18,7 +18,7 @@
 
 package io.renku.tokenrepository.repository.deletion
 
-import cats.effect.BracketThrow
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SessionResource, SqlStatement}
@@ -28,18 +28,22 @@ import io.renku.tokenrepository.repository.{ProjectsTokensDB, TokenRepositoryTyp
 import skunk.data.Completion
 import skunk.implicits._
 
-private[repository] class TokenRemover[Interpretation[_]: BracketThrow](
+private[repository] trait TokenRemover[Interpretation[_]] {
+  def delete(projectId: Id): Interpretation[Unit]
+}
+
+private[repository] class TokenRemoverImpl[Interpretation[_]: MonadCancelThrow](
     sessionResource:  SessionResource[Interpretation, ProjectsTokensDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
 ) extends DbClient[Interpretation](Some(queriesExecTimes))
+    with TokenRemover[Interpretation]
     with TokenRepositoryTypeSerializers {
 
-  def delete(projectId: Id): Interpretation[Unit] = sessionResource.useK {
+  override def delete(projectId: Id): Interpretation[Unit] = sessionResource.useK {
     measureExecutionTime {
       SqlStatement(name = "remove token")
         .command[Id](sql"""delete from projects_tokens
-              where project_id = $projectIdEncoder
-        """.command)
+                           where project_id = $projectIdEncoder""".command)
         .arguments(projectId)
         .build
         .flatMapResult(failIfMultiUpdate(projectId))

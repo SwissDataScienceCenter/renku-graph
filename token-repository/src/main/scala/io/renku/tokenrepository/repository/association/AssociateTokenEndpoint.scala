@@ -19,7 +19,8 @@
 package io.renku.tokenrepository.repository.association
 
 import cats.MonadError
-import cats.effect.Effect
+import cats.effect.Async
+import cats.effect.kernel.{Concurrent, Temporal}
 import cats.syntax.all._
 import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.graph.model.projects.Id
@@ -35,14 +36,20 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-class AssociateTokenEndpoint[Interpretation[_]: Effect: MonadError[*[_], Throwable]](
-    tokenAssociator: TokenAssociator[Interpretation],
-    logger:          Logger[Interpretation]
-) extends Http4sDsl[Interpretation] {
+trait AssociateTokenEndpoint[Interpretation[_]] {
+  def associateToken(projectId: Id, request: Request[Interpretation]): Interpretation[Response[Interpretation]]
+}
+
+class AssociateTokenEndpointImpl[Interpretation[_]: Concurrent: Logger](
+    tokenAssociator: TokenAssociator[Interpretation]
+) extends Http4sDsl[Interpretation]
+    with AssociateTokenEndpoint[Interpretation] {
 
   import tokenAssociator._
 
-  def associateToken(projectId: Id, request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
+  override def associateToken(projectId: Id,
+                              request:   Request[Interpretation]
+  ): Interpretation[Response[Interpretation]] = {
     for {
       accessToken <- request.as[AccessToken] recoverWith badRequest
       _           <- associate(projectId, accessToken)
@@ -64,27 +71,17 @@ class AssociateTokenEndpoint[Interpretation[_]: Effect: MonadError[*[_], Throwab
       BadRequest(ErrorMessage(exception))
     case NonFatal(exception) =>
       val errorMessage = ErrorMessage(s"Associating token with projectId: $projectId failed")
-      logger.error(exception)(errorMessage.value)
+      Logger[Interpretation].error(exception)(errorMessage.value)
       InternalServerError(errorMessage)
   }
 }
 
-object IOAssociateTokenEndpoint {
+object AssociateTokenEndpoint {
 
-  import cats.effect.{ContextShift, IO, Timer}
-
-  import scala.concurrent.ExecutionContext
-
-  def apply(
-      sessionResource:  SessionResource[IO, ProjectsTokensDB],
-      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name],
-      logger:           Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[AssociateTokenEndpoint[IO]] =
-    for {
-      tokenAssociator <- IOTokenAssociator(sessionResource, queriesExecTimes, logger)
-    } yield new AssociateTokenEndpoint[IO](tokenAssociator, logger)
+  def apply[F[_]: Async: Temporal: Logger](
+      sessionResource:  SessionResource[F, ProjectsTokensDB],
+      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[AssociateTokenEndpoint[F]] = for {
+    tokenAssociator <- TokenAssociator(sessionResource, queriesExecTimes)
+  } yield new AssociateTokenEndpointImpl[F](tokenAssociator)
 }

@@ -18,17 +18,19 @@
 
 package io.renku.tokenrepository.repository.association
 
+import cats.effect.IO
 import eu.timepit.refined.auto._
 import io.renku.db.SqlStatement
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.metrics.TestLabeledHistogram
+import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.InMemoryProjectsTokensDbSpec
 import io.renku.tokenrepository.repository.RepositoryGenerators._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class AssociationPersisterSpec extends AnyWordSpec with InMemoryProjectsTokensDbSpec with should.Matchers {
+class AssociationPersisterSpec extends AnyWordSpec with IOSpec with InMemoryProjectsTokensDbSpec with should.Matchers {
 
   "persistAssociation" should {
 
@@ -37,7 +39,7 @@ class AssociationPersisterSpec extends AnyWordSpec with InMemoryProjectsTokensDb
 
         val encryptedToken = encryptedAccessTokens.generateOne
 
-        associator.persistAssociation(projectId, projectPath, encryptedToken).unsafeRunSync() shouldBe ((): Unit)
+        associator.persistAssociation(projectId, projectPath, encryptedToken).unsafeRunSync() shouldBe ()
 
         findToken(projectId)   shouldBe Some(encryptedToken.value)
         findToken(projectPath) shouldBe Some(encryptedToken.value)
@@ -48,12 +50,12 @@ class AssociationPersisterSpec extends AnyWordSpec with InMemoryProjectsTokensDb
 
         val encryptedToken = encryptedAccessTokens.generateOne
 
-        associator.persistAssociation(projectId, projectPath, encryptedToken).unsafeRunSync() shouldBe ((): Unit)
+        associator.persistAssociation(projectId, projectPath, encryptedToken).unsafeRunSync() shouldBe ()
 
         findToken(projectId) shouldBe Some(encryptedToken.value)
 
         val newEncryptedToken = encryptedAccessTokens.generateOne
-        associator.persistAssociation(projectId, projectPath, newEncryptedToken).unsafeRunSync() shouldBe ((): Unit)
+        associator.persistAssociation(projectId, projectPath, newEncryptedToken).unsafeRunSync() shouldBe ()
 
         findToken(projectId)   shouldBe Some(newEncryptedToken.value)
         findToken(projectPath) shouldBe Some(newEncryptedToken.value)
@@ -64,13 +66,13 @@ class AssociationPersisterSpec extends AnyWordSpec with InMemoryProjectsTokensDb
 
         val encryptedToken = encryptedAccessTokens.generateOne
 
-        associator.persistAssociation(projectId, projectPath, encryptedToken).unsafeRunSync() shouldBe ((): Unit)
+        associator.persistAssociation(projectId, projectPath, encryptedToken).unsafeRunSync() shouldBe ()
 
         findToken(projectId) shouldBe Some(encryptedToken.value)
 
         val newProjectId      = projectIds.generateOne
         val newEncryptedToken = encryptedAccessTokens.generateOne
-        associator.persistAssociation(newProjectId, projectPath, newEncryptedToken).unsafeRunSync() shouldBe ((): Unit)
+        associator.persistAssociation(newProjectId, projectPath, newEncryptedToken).unsafeRunSync() shouldBe ()
 
         findToken(projectId)    shouldBe None
         findToken(newProjectId) shouldBe Some(newEncryptedToken.value)
@@ -83,6 +85,6 @@ class AssociationPersisterSpec extends AnyWordSpec with InMemoryProjectsTokensDb
     val projectPath = projectPaths.generateOne
 
     private val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val associator               = new AssociationPersister(sessionResource, queriesExecTimes)
+    val associator               = new AssociationPersisterImpl[IO](sessionResource, queriesExecTimes)
   }
 }

@@ -19,13 +19,14 @@
 package io.renku.tokenrepository
 
 import cats.effect._
+import cats.effect.unsafe.implicits.global
 import io.renku.config.certificates.CertificateLoader
+import io.renku.config.sentry.SentryInitializer
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.http.server.IOHttpServer
-import io.renku.interpreters.IOSentryInitializer
+import io.renku.http.server.HttpServer
 import io.renku.testtools.MockedRunnableCollaborators
-import io.renku.tokenrepository.repository.init.IODbInitializer
+import io.renku.tokenrepository.repository.init.DbInitializer
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -97,9 +98,9 @@ class MicroserviceRunnerSpec
 
   private trait TestCase {
     val certificateLoader = mock[CertificateLoader[IO]]
-    val sentryInitializer = mock[IOSentryInitializer]
-    val dbInitializer     = mock[IODbInitializer]
-    val httpServer        = mock[IOHttpServer]
+    val sentryInitializer = mock[SentryInitializer[IO]]
+    val dbInitializer     = mock[DbInitializer[IO]]
+    val httpServer        = mock[HttpServer[IO]]
     val runner            = new MicroserviceRunner(certificateLoader, sentryInitializer, dbInitializer, httpServer)
   }
 }
