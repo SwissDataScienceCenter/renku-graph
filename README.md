@@ -45,7 +45,7 @@ triggered:
 
 ```mermaid
 graph TD;
-    A[GitLab] -- 1. new commit event --> B[KG services] 
+    A[GitLab] -- 1. new commit event --> B(KG services) 
     B -- 2. generation of triples --> B
     B -- 3. storing triples --> C[(TriplesStore)]
 
@@ -57,10 +57,26 @@ The same process with more details on how the KG services interact with each oth
 graph TB;
     A[GitLab] -- 1. new commit event  --> B[WebhookService]
     subgraph kg[KG Services]
-    B -- 2. event for new commit  --> C[EventLog]
+    B -- 2. event for new commit  --> C(Event Services)
     C -- 3. fetch newest event --> C
     C -- 4. send event for triples generation  --> D[TriplesGenerator]
     D -- 5. triples generated --> C
     end
     C -- 6. storing triples --> E[(TriplesStore)]
 ```
+
+Again the same process with more details on the Event services
+
+```mermaid
+graph TB;
+    A[WebhookService] -- 1. event for new commit  --> B[EventLog]
+    subgraph kg[Event Services]
+    C[CommitSyncService] -- 2. fetch newest event --> B
+    B -- 3. send event --> C
+    C -- 4. create event for triples generation --> B
+    end
+    C -- 5. send event for triples generation  --> D[TriplesGenerator]
+    D -- 6. triples generated --> B
+    C -- 7. storing triples --> E[(TriplesStore)]
+```
+
