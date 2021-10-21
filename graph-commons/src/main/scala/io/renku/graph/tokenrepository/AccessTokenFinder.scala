@@ -19,7 +19,6 @@
 package io.renku.graph.tokenrepository
 
 import cats.effect.Async
-import cats.effect.kernel.Temporal
 import cats.syntax.all._
 import io.renku.control.Throttler
 import io.renku.graph.model.projects.{Id, Path}
@@ -30,7 +29,7 @@ trait AccessTokenFinder[F[_]] {
   def findAccessToken[ID](projectId: ID)(implicit toPathSegment: ID => String): F[Option[AccessToken]]
 }
 
-class AccessTokenFinderImpl[F[_]: Async: Temporal: Logger](
+class AccessTokenFinderImpl[F[_]: Async: Logger](
     tokenRepositoryUrl: TokenRepositoryUrl
 ) extends RestClient[F, AccessTokenFinder[F]](Throttler.noThrottling)
     with AccessTokenFinder[F] {
@@ -62,8 +61,7 @@ object AccessTokenFinder {
   implicit val projectPathToPath: Path => String = path => urlEncode(path.value)
   implicit val projectIdToPath:   Id => String   = _.toString
 
-  def apply[F[_]: Async: Temporal: Logger]: F[AccessTokenFinder[F]] =
-    for {
-      tokenRepositoryUrl <- TokenRepositoryUrl[F]()
-    } yield new AccessTokenFinderImpl[F](tokenRepositoryUrl)
+  def apply[F[_]: Async: Logger]: F[AccessTokenFinder[F]] = for {
+    tokenRepositoryUrl <- TokenRepositoryUrl[F]()
+  } yield new AccessTokenFinderImpl[F](tokenRepositoryUrl)
 }

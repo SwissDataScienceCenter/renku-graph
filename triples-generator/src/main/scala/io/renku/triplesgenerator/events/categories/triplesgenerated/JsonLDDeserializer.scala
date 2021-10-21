@@ -36,26 +36,26 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private trait JsonLDDeserializer[Interpretation[_]] {
+private trait JsonLDDeserializer[F[_]] {
   def deserializeToModel(event: TriplesGeneratedEvent)(implicit
       maybeAccessToken:         Option[AccessToken]
-  ): EitherT[Interpretation, ProcessingRecoverableError, Project]
+  ): EitherT[F, ProcessingRecoverableError, Project]
 }
 
-private class JsonLDDeserializerImpl[Interpretation[_]: MonadThrow](
-    projectInfoFinder: ProjectInfoFinder[Interpretation],
+private class JsonLDDeserializerImpl[F[_]: MonadThrow](
+    projectInfoFinder: ProjectInfoFinder[F],
     renkuBaseUrl:      RenkuBaseUrl
-) extends JsonLDDeserializer[Interpretation] {
+) extends JsonLDDeserializer[F] {
 
-  private implicit val renkuUrl: RenkuBaseUrl                = renkuBaseUrl
-  private val applicative:       Applicative[Interpretation] = Applicative[Interpretation]
+  private implicit val renkuUrl: RenkuBaseUrl   = renkuBaseUrl
+  private val applicative:       Applicative[F] = Applicative[F]
 
   import applicative._
   import projectInfoFinder._
 
   override def deserializeToModel(event: TriplesGeneratedEvent)(implicit
       maybeAccessToken:                  Option[AccessToken]
-  ): EitherT[Interpretation, ProcessingRecoverableError, Project] = for {
+  ): EitherT[F, ProcessingRecoverableError, Project] = for {
     projectInfo <- findValidProjectInfo(event)
     project     <- extractProject(projectInfo, event)
   } yield project
@@ -63,10 +63,10 @@ private class JsonLDDeserializerImpl[Interpretation[_]: MonadThrow](
   private def findValidProjectInfo(event: TriplesGeneratedEvent)(implicit
       maybeAccessToken:                   Option[AccessToken]
   ) = findProjectInfo(event.project.path) semiflatMap {
-    case Some(projectInfo) => projectInfo.pure[Interpretation]
+    case Some(projectInfo) => projectInfo.pure[F]
     case None =>
       new IllegalStateException(s"No project ${event.project.show} found in GitLab")
-        .raiseError[Interpretation, GitLabProjectInfo]
+        .raiseError[F, GitLabProjectInfo]
   }
 
   private def extractProject(projectInfo: GitLabProjectInfo, event: TriplesGeneratedEvent) =
@@ -74,26 +74,26 @@ private class JsonLDDeserializerImpl[Interpretation[_]: MonadThrow](
       for {
         projects <- event.payload.cursor
                       .as[List[Project]](decodeList(Project.decoder(projectInfo)))
-                      .fold(raiseError(event), _.pure[Interpretation])
+                      .fold(raiseError(event), _.pure[F])
         project <- projects match {
-                     case project :: Nil => project.pure[Interpretation]
+                     case project :: Nil => project.pure[F]
                      case other =>
                        new IllegalStateException(
                          s"${other.size} Project entities found in the JsonLD for ${event.project.show}"
-                       ).raiseError[Interpretation, Project]
+                       ).raiseError[F, Project]
                    }
         _ <- whenA(event.project.path != project.path)(
                new IllegalStateException(
                  s"Event for project ${event.project.show} contains payload for project ${project.path}"
-               ).raiseError[Interpretation, Unit]
+               ).raiseError[F, Unit]
              )
       } yield project
     }
 
-  private def raiseError[T](event: TriplesGeneratedEvent): DecodingFailure => Interpretation[T] =
+  private def raiseError[T](event: TriplesGeneratedEvent): DecodingFailure => F[T] =
     err =>
       new IllegalStateException(s"Finding Project entity in the JsonLD for ${event.project.show} failed", err)
-        .raiseError[Interpretation, T]
+        .raiseError[F, T]
 }
 
 private object JsonLDDeserializer {

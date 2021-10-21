@@ -34,23 +34,23 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private[triplescuration] trait DatasetTransformer[Interpretation[_]] {
-  def createTransformationStep: TransformationStep[Interpretation]
+private[triplescuration] trait DatasetTransformer[F[_]] {
+  def createTransformationStep: TransformationStep[F]
 }
 
-private[triplescuration] class DatasetTransformerImpl[Interpretation[_]: MonadThrow](
-    kgDatasetInfoFinder: KGDatasetInfoFinder[Interpretation],
+private[triplescuration] class DatasetTransformerImpl[F[_]: MonadThrow](
+    kgDatasetInfoFinder: KGDatasetInfoFinder[F],
     updatesCreator:      UpdatesCreator,
     projectFunctions:    ProjectFunctions
-) extends DatasetTransformer[Interpretation] {
+) extends DatasetTransformer[F] {
 
   import kgDatasetInfoFinder._
   import projectFunctions._
 
-  override def createTransformationStep: TransformationStep[Interpretation] =
+  override def createTransformationStep: TransformationStep[F] =
     TransformationStep("Dataset Details Updates", createTransformation)
 
-  private def createTransformation: Transformation[Interpretation] = projectMetadata =>
+  private def createTransformation: Transformation[F] = projectMetadata =>
     EitherT {
       (updateTopmostSameAs(ResultData(projectMetadata)) >>= updateTopmostDerivedFrom >>= updateHierarchyOnInvalidation)
         .map(_.asRight[ProcessingRecoverableError])
@@ -58,7 +58,7 @@ private[triplescuration] class DatasetTransformerImpl[Interpretation[_]: MonadTh
     }
 
   private def updateTopmostSameAs(resultData: ResultData) = findInternallyImportedDatasets(resultData.project)
-    .foldLeft(resultData.pure[Interpretation]) { (resultDataF, dataset) =>
+    .foldLeft(resultData.pure[F]) { (resultDataF, dataset) =>
       for {
         resultData               <- resultDataF
         maybeParentTopmostSameAs <- findParentTopmostSameAs(dataset.provenance.sameAs)
@@ -72,7 +72,7 @@ private[triplescuration] class DatasetTransformerImpl[Interpretation[_]: MonadTh
 
   private def updateTopmostDerivedFrom(resultData: ResultData) =
     findModifiedDatasets(resultData.project)
-      .foldLeft(resultData.pure[Interpretation]) { (resultDataF, dataset) =>
+      .foldLeft(resultData.pure[F]) { (resultDataF, dataset) =>
         for {
           resultData                    <- resultDataF
           maybeParentTopmostDerivedFrom <- findParentTopmostDerivedFrom(dataset.provenance.derivedFrom)
@@ -85,7 +85,7 @@ private[triplescuration] class DatasetTransformerImpl[Interpretation[_]: MonadTh
       }
 
   private def updateHierarchyOnInvalidation(resultData: ResultData) = findInvalidatedDatasets(resultData.project)
-    .foldLeft(resultData.pure[Interpretation]) { (resultDataF, dataset) =>
+    .foldLeft(resultData.pure[F]) { (resultDataF, dataset) =>
       for {
         resultData <- resultDataF
         queries = dataset.provenance match {
@@ -110,13 +110,13 @@ private[triplescuration] class DatasetTransformerImpl[Interpretation[_]: MonadTh
     }
 
   private lazy val maybeToRecoverableError
-      : PartialFunction[Throwable, Interpretation[Either[ProcessingRecoverableError, ResultData]]] = {
+      : PartialFunction[Throwable, F[Either[ProcessingRecoverableError, ResultData]]] = {
     case e @ (_: UnexpectedResponseException | _: ConnectivityException | _: ClientException |
         _: UnauthorizedException) =>
       TransformationRecoverableError("Problem finding dataset details in KG", e)
         .asLeft[ResultData]
         .leftWiden[ProcessingRecoverableError]
-        .pure[Interpretation]
+        .pure[F]
   }
 }
 

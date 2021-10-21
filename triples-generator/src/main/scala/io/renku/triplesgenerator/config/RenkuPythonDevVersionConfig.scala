@@ -34,8 +34,8 @@ object RenkuPythonDevVersionConfig {
     case None                                  => None
   }
 
-  def apply[Interpretation[_]](
+  def apply[F[_]](
       config:    Config = ConfigFactory.load
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[Option[RenkuPythonDevVersion]] =
-    find[Interpretation, Option[RenkuPythonDevVersion]]("renku-python-dev-version", config)
+  )(implicit ME: MonadError[F, Throwable]): F[Option[RenkuPythonDevVersion]] =
+    find[F, Option[RenkuPythonDevVersion]]("renku-python-dev-version", config)
 }

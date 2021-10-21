@@ -41,12 +41,12 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-trait ReProvisioningStatus[Interpretation[_]] {
-  def isReProvisioning(): Interpretation[Boolean]
+trait ReProvisioningStatus[F[_]] {
+  def isReProvisioning(): F[Boolean]
 
-  def setRunning(): Interpretation[Unit]
+  def setRunning(): F[Unit]
 
-  def clear(): Interpretation[Unit]
+  def clear(): F[Unit]
 }
 
 private class ReProvisioningStatusImpl(

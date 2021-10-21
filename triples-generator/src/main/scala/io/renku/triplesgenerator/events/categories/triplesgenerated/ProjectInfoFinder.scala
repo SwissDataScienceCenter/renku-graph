@@ -45,10 +45,10 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
-private trait ProjectInfoFinder[Interpretation[_]] {
+private trait ProjectInfoFinder[F[_]] {
   def findProjectInfo(path: projects.Path)(implicit
       maybeAccessToken:     Option[AccessToken]
-  ): EitherT[Interpretation, ProcessingRecoverableError, Option[GitLabProjectInfo]]
+  ): EitherT[F, ProcessingRecoverableError, Option[GitLabProjectInfo]]
 }
 
 private object ProjectInfoFinder {

@@ -33,8 +33,8 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private trait KGPersonFinder[Interpretation[_]] {
-  def find(person: Person): Interpretation[Option[Person]]
+private trait KGPersonFinder[F[_]] {
+  def find(person: Person): F[Option[Person]]
 }
 
 private object KGPersonFinder {

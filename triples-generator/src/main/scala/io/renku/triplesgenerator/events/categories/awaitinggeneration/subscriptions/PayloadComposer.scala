@@ -30,16 +30,16 @@ import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier, Micr
 import io.renku.triplesgenerator.Microservice
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.GenerationProcessesNumber
 
-private[awaitinggeneration] class PayloadComposer[Interpretation[_]: MonadError[*[_], Throwable]](
+private[awaitinggeneration] class PayloadComposer[F[_]: MonadError[*[_], Throwable]](
     categoryName:   CategoryName,
     capacity:       GenerationProcessesNumber,
-    urlFinder:      MicroserviceUrlFinder[Interpretation],
+    urlFinder:      MicroserviceUrlFinder[F],
     microserviceId: MicroserviceIdentifier
-) extends SubscriptionPayloadComposer[Interpretation] {
+) extends SubscriptionPayloadComposer[F] {
   import io.circe.syntax._
   import urlFinder._
 
-  override def prepareSubscriptionPayload(): Interpretation[Json] =
+  override def prepareSubscriptionPayload(): F[Json] =
     findBaseUrl()
       .map(newSubscriberUrl)
       .map(Subscriber(_, SubscriberId(microserviceId), capacity))

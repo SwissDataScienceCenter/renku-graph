@@ -36,36 +36,36 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private[events] class EventHandler[Interpretation[_]: MonadThrow: Concurrent: Logger](
+private[events] class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
     override val categoryName:  CategoryName,
-    eventProcessor:             EventProcessor[Interpretation],
-    eventBodyDeserializer:      EventBodyDeserializer[Interpretation],
-    subscriptionMechanism:      SubscriptionMechanism[Interpretation],
-    concurrentProcessesLimiter: ConcurrentProcessesLimiter[Interpretation]
-) extends consumers.EventHandlerWithProcessLimiter[Interpretation](concurrentProcessesLimiter) {
+    eventProcessor:             EventProcessor[F],
+    eventBodyDeserializer:      EventBodyDeserializer[F],
+    subscriptionMechanism:      SubscriptionMechanism[F],
+    concurrentProcessesLimiter: ConcurrentProcessesLimiter[F]
+) extends consumers.EventHandlerWithProcessLimiter[F](concurrentProcessesLimiter) {
 
   import eventBodyDeserializer.toCommitEvent
 
   override def createHandlingProcess(
       requestContent: EventRequestContent
-  ): Interpretation[EventHandlingProcess[Interpretation]] =
-    EventHandlingProcess.withWaitingForCompletion[Interpretation](
+  ): F[EventHandlingProcess[F]] =
+    EventHandlingProcess.withWaitingForCompletion[F](
       deferred => startProcessEvent(requestContent, deferred),
       subscriptionMechanism.renewSubscription()
     )
 
-  private def startProcessEvent(requestContent: EventRequestContent, deferred: Deferred[Interpretation, Unit]) = for {
+  private def startProcessEvent(requestContent: EventRequestContent, deferred: Deferred[F, Unit]) = for {
     eventBody <- requestContent match {
                    case EventRequestContent.WithPayload(_, payload: String) => EitherT.rightT(EventBody(payload))
                    case _                                                   => EitherT.leftT(BadRequest)
                  }
     commitEvent <- toCommitEvent(eventBody).toRightT(recoverTo = BadRequest)
-    result <- Concurrent[Interpretation]
+    result <- Concurrent[F]
                 .start(eventProcessor.process(commitEvent) >> deferred.complete(()))
                 .toRightT
                 .map(_ => Accepted)
-                .semiflatTap(Logger[Interpretation].log(commitEvent))
-                .leftSemiflatTap(Logger[Interpretation].log(commitEvent))
+                .semiflatTap(Logger[F].log(commitEvent))
+                .leftSemiflatTap(Logger[F].log(commitEvent))
   } yield result
 
   private implicit lazy val eventInfoToString: Show[CommitEvent] = Show.show { event =>
@@ -75,18 +75,18 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow: Concurrent: Lo
 
 object EventHandler {
 
-  def apply[Interpretation[_]: Temporal: Logger](
+  def apply[F[_]: Temporal: Logger](
       metricsRegistry:       MetricsRegistry[IO],
       subscriptionMechanism: SubscriptionMechanism[IO],
       config:                Config = ConfigFactory.load()
-  ): Interpretation[EventHandler[Interpretation]] = for {
+  ): F[EventHandler[F]] = for {
     eventProcessor           <- CommitEventProcessor(metricsRegistry)
-    generationProcesses      <- GenerationProcessesNumber[Interpretation](config)
+    generationProcesses      <- GenerationProcessesNumber[F](config)
     concurrentProcessLimiter <- ConcurrentProcessesLimiter(Refined.unsafeApply(generationProcesses.value))
-  } yield new EventHandler[Interpretation](categoryName,
-                                           eventProcessor,
-                                           EventBodyDeserializer(),
-                                           subscriptionMechanism,
-                                           concurrentProcessLimiter
+  } yield new EventHandler[F](categoryName,
+                              eventProcessor,
+                              EventBodyDeserializer(),
+                              subscriptionMechanism,
+                              concurrentProcessLimiter
   )
 }

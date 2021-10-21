@@ -34,29 +34,29 @@ import scala.concurrent.duration.FiniteDuration
 import scala.language.postfixOps
 import scala.util.control.NonFatal
 
-trait ReProvisioning[Interpretation[_]] {
-  def run(): Interpretation[Unit]
+trait ReProvisioning[F[_]] {
+  def run(): F[Unit]
 }
 
-class ReProvisioningImpl[Interpretation[_]: MonadThrow: Timer](
-    renkuVersionPairFinder:    RenkuVersionPairFinder[Interpretation],
+class ReProvisioningImpl[F[_]: MonadThrow: Timer](
+    renkuVersionPairFinder:    RenkuVersionPairFinder[F],
     versionCompatibilityPairs: NonEmptyList[RenkuVersionPair],
     reprovisionJudge:          ReProvisionJudge,
-    triplesRemover:            TriplesRemover[Interpretation],
-    eventsReScheduler:         EventsReScheduler[Interpretation],
-    renkuVersionPairUpdater:   RenkuVersionPairUpdater[Interpretation],
-    reProvisioningStatus:      ReProvisioningStatus[Interpretation],
-    executionTimeRecorder:     ExecutionTimeRecorder[Interpretation],
-    logger:                    Logger[Interpretation],
+    triplesRemover:            TriplesRemover[F],
+    eventsReScheduler:         EventsReScheduler[F],
+    renkuVersionPairUpdater:   RenkuVersionPairUpdater[F],
+    reProvisioningStatus:      ReProvisioningStatus[F],
+    executionTimeRecorder:     ExecutionTimeRecorder[F],
+    logger:                    Logger[F],
     sleepWhenBusy:             FiniteDuration
-) extends ReProvisioning[Interpretation] {
+) extends ReProvisioning[F] {
 
   import eventsReScheduler._
   import executionTimeRecorder._
   import reprovisionJudge.isReProvisioningNeeded
   import triplesRemover._
 
-  override def run(): Interpretation[Unit] = for {
+  override def run(): F[Unit] = for {
     maybeVersionPairInKG <- renkuVersionPairFinder.find() recoverWith tryAgain(renkuVersionPairFinder.find())
     _                    <- decideIfReProvisioningRequired(maybeVersionPairInKG)
   } yield ()
@@ -80,19 +80,18 @@ class ReProvisioningImpl[Interpretation[_]: MonadThrow: Timer](
     } yield ()
   } flatMap logSummary
 
-  private def logSummary: ((ElapsedTime, Unit)) => Interpretation[Unit] = { case (elapsedTime, _) =>
+  private def logSummary: ((ElapsedTime, Unit)) => F[Unit] = { case (elapsedTime, _) =>
     logger.info(s"Clearing DB finished in ${elapsedTime}ms - re-processing all the events")
   }
 
-  private def tryAgain[T](step: => Interpretation[T]): PartialFunction[Throwable, Interpretation[T]] = {
-    case NonFatal(exception) =>
-      {
-        for {
-          _      <- logger.error(exception)("Re-provisioning failure")
-          _      <- Timer[Interpretation] sleep sleepWhenBusy
-          result <- step
-        } yield result
-      } recoverWith tryAgain(step)
+  private def tryAgain[T](step: => F[T]): PartialFunction[Throwable, F[T]] = { case NonFatal(exception) =>
+    {
+      for {
+        _      <- logger.error(exception)("Re-provisioning failure")
+        _      <- Timer[F] sleep sleepWhenBusy
+        result <- step
+      } yield result
+    } recoverWith tryAgain(step)
   }
 }
 

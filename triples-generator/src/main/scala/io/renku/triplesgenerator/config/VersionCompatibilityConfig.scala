@@ -45,12 +45,12 @@ private object VersionCompatibilityConfig extends VersionCompatibilityConfig {
     RenkuVersionPair(CliVersion(cliVersion.trim), SchemaVersion(schemaVersion.trim))
   })
 
-  def apply[Interpretation[_]](
+  def apply[F[_]](
       maybeRenkuDevVersion: Option[RenkuPythonDevVersion],
-      logger:               Logger[Interpretation],
+      logger:               Logger[F],
       config:               Config
-  )(implicit ME:            MonadError[Interpretation, Throwable]): Interpretation[NonEmptyList[RenkuVersionPair]] =
-    find[Interpretation, List[RenkuVersionPair]]("compatibility-matrix", config)(reader, ME).flatMap {
+  )(implicit ME:            MonadError[F, Throwable]): F[NonEmptyList[RenkuVersionPair]] =
+    find[F, List[RenkuVersionPair]]("compatibility-matrix", config)(reader, ME).flatMap {
       case Nil =>
         ME.raiseError[NonEmptyList[RenkuVersionPair]](
           new Exception("No compatibility matrix provided for schema version")
@@ -63,7 +63,7 @@ private object VersionCompatibilityConfig extends VersionCompatibilityConfig {
                 s"RENKU_PYTHON_DEV_VERSION env variable is set. CLI config version is now set to ${devVersion.version}"
               )
               .map(_ => NonEmptyList(head.copy(cliVersion = CliVersion(devVersion.version)), tail))
-          case None => NonEmptyList(head, tail).pure[Interpretation]
+          case None => NonEmptyList(head, tail).pure[F]
         }
     }
 }

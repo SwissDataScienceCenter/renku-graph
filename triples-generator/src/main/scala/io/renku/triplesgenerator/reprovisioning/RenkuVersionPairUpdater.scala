@@ -30,8 +30,8 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-trait RenkuVersionPairUpdater[Interpretation[_]] {
-  def update(versionPair: RenkuVersionPair): Interpretation[Unit]
+trait RenkuVersionPairUpdater[F[_]] {
+  def update(versionPair: RenkuVersionPair): F[Unit]
 }
 
 private case object RenkuVersionPairJsonLD {

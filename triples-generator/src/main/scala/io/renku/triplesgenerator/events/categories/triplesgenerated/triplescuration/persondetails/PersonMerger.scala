@@ -24,7 +24,7 @@ import io.renku.graph.model.entities.Person
 
 private trait PersonMerger {
 
-  def merge[Interpretation[_]: MonadThrow](modelPerson: Person, kgPerson: Person): Interpretation[Person] =
+  def merge[F[_]: MonadThrow](modelPerson: Person, kgPerson: Person): F[Person] =
     validate(modelPerson, kgPerson) map { _ =>
       Person(
         kgPerson.resourceId,
@@ -36,16 +36,16 @@ private trait PersonMerger {
       )
     }
 
-  private def validate[Interpretation[_]: MonadThrow](modelPerson: Person, kgPerson: Person): Interpretation[Unit] =
+  private def validate[F[_]: MonadThrow](modelPerson: Person, kgPerson: Person): F[Unit] =
     if (
       (modelPerson.maybeGitLabId -> kgPerson.maybeGitLabId).mapN(_ == _).getOrElse(false) ||
       (modelPerson.maybeEmail    -> kgPerson.maybeEmail).mapN(_ == _).getOrElse(false) ||
       (modelPerson.resourceId == kgPerson.resourceId)
-    ) ().pure[Interpretation]
+    ) ().pure[F]
     else
       new IllegalArgumentException(
         s"Persons ${modelPerson.resourceId} and ${kgPerson.resourceId} do not have matching identifiers"
-      ).raiseError[Interpretation, Unit]
+      ).raiseError[F, Unit]
 
 }
 

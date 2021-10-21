@@ -30,21 +30,21 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-trait RenkuVersionPairFinder[Interpretation[_]] {
-  def find(): Interpretation[Option[RenkuVersionPair]]
+trait RenkuVersionPairFinder[F[_]] {
+  def find(): F[Option[RenkuVersionPair]]
 }
 
-private class RenkuVersionPairFinderImpl[Interpretation[_]: ConcurrentEffect: Timer](
+private class RenkuVersionPairFinderImpl[F[_]: ConcurrentEffect: Timer](
     rdfStoreConfig: RdfStoreConfig,
     renkuBaseUrl:   RenkuBaseUrl,
-    logger:         Logger[Interpretation],
-    timeRecorder:   SparqlQueryTimeRecorder[Interpretation]
+    logger:         Logger[F],
+    timeRecorder:   SparqlQueryTimeRecorder[F]
 )(implicit
     executionContext: ExecutionContext
-) extends RdfStoreClientImpl[Interpretation](rdfStoreConfig, logger, timeRecorder)
-    with RenkuVersionPairFinder[Interpretation] {
+) extends RdfStoreClientImpl[F](rdfStoreConfig, logger, timeRecorder)
+    with RenkuVersionPairFinder[F] {
 
-  override def find(): Interpretation[Option[RenkuVersionPair]] = queryExpecting[List[RenkuVersionPair]] {
+  override def find(): F[Option[RenkuVersionPair]] = queryExpecting[List[RenkuVersionPair]] {
     val entityId = (renkuBaseUrl / "version-pair").showAs[RdfResource]
     SparqlQuery.of(
       name = "version pair find",
@@ -58,11 +58,11 @@ private class RenkuVersionPairFinderImpl[Interpretation[_]: ConcurrentEffect: Ti
           |""".stripMargin
     )
   } >>= {
-    case Nil         => Option.empty[RenkuVersionPair].pure[Interpretation]
-    case head :: Nil => head.some.pure[Interpretation]
+    case Nil         => Option.empty[RenkuVersionPair].pure[F]
+    case head :: Nil => head.some.pure[F]
     case versionPairs =>
       new IllegalStateException(s"Too many Version pair found: $versionPairs")
-        .raiseError[Interpretation, Option[RenkuVersionPair]]
+        .raiseError[F, Option[RenkuVersionPair]]
   }
 }
 

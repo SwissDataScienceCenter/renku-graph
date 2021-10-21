@@ -29,29 +29,29 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
-private trait UpdatesUploader[Interpretation[_]] {
-  def send(updateQuery: SparqlQuery): Interpretation[TriplesUploadResult]
+private trait UpdatesUploader[F[_]] {
+  def send(updateQuery: SparqlQuery): F[TriplesUploadResult]
 }
 
-private class UpdatesUploaderImpl[Interpretation[_]: ConcurrentEffect: Timer](
+private class UpdatesUploaderImpl[F[_]: ConcurrentEffect: Timer](
     rdfStoreConfig: RdfStoreConfig,
-    timeRecorder:   SparqlQueryTimeRecorder[Interpretation],
+    timeRecorder:   SparqlQueryTimeRecorder[F],
     retryInterval:  FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:     Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     idleTimeout:    Duration = 5 minutes,
     requestTimeout: Duration = 4 minutes
 )(implicit
     executionContext: ExecutionContext,
-    logger:           Logger[Interpretation]
-) extends RdfStoreClientImpl[Interpretation](rdfStoreConfig,
-                                             logger,
-                                             timeRecorder,
-                                             retryInterval,
-                                             maxRetries,
-                                             idleTimeoutOverride = idleTimeout.some,
-                                             requestTimeoutOverride = requestTimeout.some
+    logger:           Logger[F]
+) extends RdfStoreClientImpl[F](rdfStoreConfig,
+                                logger,
+                                timeRecorder,
+                                retryInterval,
+                                maxRetries,
+                                idleTimeoutOverride = idleTimeout.some,
+                                requestTimeoutOverride = requestTimeout.some
     )
-    with UpdatesUploader[Interpretation] {
+    with UpdatesUploader[F] {
 
   import LogMessage._
   import TriplesUploadResult._
@@ -60,15 +60,13 @@ private class UpdatesUploaderImpl[Interpretation[_]: ConcurrentEffect: Timer](
 
   import scala.util.control.NonFatal
 
-  override def send(updateQuery: SparqlQuery): Interpretation[TriplesUploadResult] =
+  override def send(updateQuery: SparqlQuery): F[TriplesUploadResult] =
     updateWitMapping(updateQuery, responseMapper(updateQuery)) recoverWith deliveryFailure
 
   private def responseMapper(
       updateQuery: SparqlQuery
-  ): PartialFunction[(Status, Request[Interpretation], Response[Interpretation]),
-                     Interpretation[TriplesUploadResult]
-  ] = {
-    case (Ok, _, _) => DeliverySuccess.pure[Interpretation].widen[TriplesUploadResult]
+  ): PartialFunction[(Status, Request[F], Response[F]), F[TriplesUploadResult]] = {
+    case (Ok, _, _) => DeliverySuccess.pure[F].widen[TriplesUploadResult]
     case (BadRequest, _, response) =>
       response.as[String] map toSingleLine map toInvalidUpdatesFailure(updateQuery)
     case (other, _, response) =>
@@ -81,8 +79,7 @@ private class UpdatesUploaderImpl[Interpretation[_]: ConcurrentEffect: Timer](
   private def toDeliveryFailure(status: Status)(message: String): TriplesUploadResult =
     RecoverableFailure(s"Triples curation update failed: $status: $message")
 
-  private def deliveryFailure: PartialFunction[Throwable, Interpretation[TriplesUploadResult]] = {
-    case NonFatal(exception) =>
-      RecoverableFailure(exception.getMessage).pure[Interpretation].widen[TriplesUploadResult]
+  private def deliveryFailure: PartialFunction[Throwable, F[TriplesUploadResult]] = { case NonFatal(exception) =>
+    RecoverableFailure(exception.getMessage).pure[F].widen[TriplesUploadResult]
   }
 }

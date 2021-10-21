@@ -36,27 +36,27 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.control.NonFatal
 
-private trait TriplesUploader[Interpretation[_]] {
-  def upload(triples: JsonLD): Interpretation[TriplesUploadResult]
+private trait TriplesUploader[F[_]] {
+  def upload(triples: JsonLD): F[TriplesUploadResult]
 }
 
-private class TriplesUploaderImpl[Interpretation[_]: ConcurrentEffect: Timer](
+private class TriplesUploaderImpl[F[_]: ConcurrentEffect: Timer](
     rdfStoreConfig:          RdfStoreConfig,
-    timeRecorder:            SparqlQueryTimeRecorder[Interpretation],
+    timeRecorder:            SparqlQueryTimeRecorder[F],
     retryInterval:           FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     idleTimeout:             Duration = 6 minutes,
     requestTimeout:          Duration = 5 minutes
-)(implicit executionContext: ExecutionContext, logger: Logger[Interpretation])
-    extends RestClient[Interpretation, Any](Throttler.noThrottling,
-                                            logger,
-                                            maybeTimeRecorder = timeRecorder.instance.some,
-                                            retryInterval = retryInterval,
-                                            maxRetries = maxRetries,
-                                            idleTimeoutOverride = idleTimeout.some,
-                                            requestTimeoutOverride = requestTimeout.some
+)(implicit executionContext: ExecutionContext, logger: Logger[F])
+    extends RestClient[F, Any](Throttler.noThrottling,
+                               logger,
+                               maybeTimeRecorder = timeRecorder.instance.some,
+                               retryInterval = retryInterval,
+                               maxRetries = maxRetries,
+                               idleTimeoutOverride = idleTimeout.some,
+                               requestTimeoutOverride = requestTimeout.some
     )
-    with TriplesUploader[Interpretation] {
+    with TriplesUploader[F] {
 
   import TriplesUploadResult._
   import org.http4s.MediaType.application._
@@ -68,7 +68,7 @@ private class TriplesUploaderImpl[Interpretation[_]: ConcurrentEffect: Timer](
 
   private lazy val dataUploadUrl = rdfStoreConfig.fusekiBaseUrl / rdfStoreConfig.datasetName / "data"
 
-  override def upload(triples: JsonLD): Interpretation[TriplesUploadResult] = {
+  override def upload(triples: JsonLD): F[TriplesUploadResult] = {
     for {
       uri          <- validateUri(dataUploadUrl.value)
       uploadResult <- send(uploadRequest(uri, triples))(mapResponse)
@@ -82,17 +82,15 @@ private class TriplesUploaderImpl[Interpretation[_]: ConcurrentEffect: Timer](
     name = "json-ld upload"
   )
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[Interpretation], Response[Interpretation]),
-                                                Interpretation[TriplesUploadResult]
-  ] = {
-    case (Ok, _, _)                         => DeliverySuccess.pure[Interpretation].widen[TriplesUploadResult]
+  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[TriplesUploadResult]] = {
+    case (Ok, _, _)                         => DeliverySuccess.pure[F].widen[TriplesUploadResult]
     case (BadRequest, _, response)          => singleLineBody(response).map(InvalidTriplesFailure.apply)
     case (InternalServerError, _, response) => singleLineBody(response).map(InvalidTriplesFailure.apply)
     case (other, _, response) =>
       singleLineBody(response).map(message => s"$other: $message").map(RecoverableFailure.apply)
   }
 
-  private def singleLineBody(response: Response[Interpretation]): Interpretation[String] =
+  private def singleLineBody(response: Response[F]): F[String] =
     response.as[String].map(LogMessage.toSingleLine)
 
   private lazy val withUploadingError: PartialFunction[Throwable, TriplesUploadResult] = { case NonFatal(exception) =>

@@ -29,8 +29,8 @@ import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableE
 
 package object triplescuration {
 
-  private[triplesgenerated] type TransformationResults[Interpretation[_]] =
-    EitherT[Interpretation, ProcessingRecoverableError, Project]
+  private[triplesgenerated] type TransformationResults[F[_]] =
+    EitherT[F, ProcessingRecoverableError, Project]
 
   implicit class JsonOps(json: Json) {
 

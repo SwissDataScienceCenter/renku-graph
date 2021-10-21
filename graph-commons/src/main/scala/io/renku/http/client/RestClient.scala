@@ -19,8 +19,7 @@
 package io.renku.http.client
 
 import cats.MonadThrow
-import cats.effect.Async
-import cats.effect.kernel.Temporal
+import cats.effect.{Async, Temporal}
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty

@@ -28,19 +28,19 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private trait KGDatasetInfoFinder[Interpretation[_]] {
+private trait KGDatasetInfoFinder[F[_]] {
   def findParentTopmostSameAs(idSameAs: InternalSameAs)(implicit
       ev:                               InternalSameAs.type
-  ): Interpretation[Option[TopmostSameAs]]
+  ): F[Option[TopmostSameAs]]
   def findTopmostSameAs(resourceId: ResourceId)(implicit
       ev:                           ResourceId.type
-  ): Interpretation[Option[TopmostSameAs]]
+  ): F[Option[TopmostSameAs]]
   def findParentTopmostDerivedFrom(derivedFrom: DerivedFrom)(implicit
       ev:                                       DerivedFrom.type
-  ): Interpretation[Option[TopmostDerivedFrom]]
+  ): F[Option[TopmostDerivedFrom]]
   def findTopmostDerivedFrom(resourceId: ResourceId)(implicit
       ev:                                ResourceId.type
-  ): Interpretation[Option[TopmostDerivedFrom]]
+  ): F[Option[TopmostDerivedFrom]]
 }
 
 private class KGDatasetInfoFinderImpl(

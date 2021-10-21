@@ -19,7 +19,7 @@
 package io.renku.compression
 
 import cats.MonadThrow
-import cats.effect.{MonadCancelThrow, Resource, Sync}
+import cats.effect.{Resource, Sync}
 import cats.syntax.all._
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
@@ -29,13 +29,13 @@ import scala.io.{Codec, Source}
 import scala.util.control.NonFatal
 
 trait Zip {
-  def zip[F[_]:   MonadCancelThrow: Sync](content: String):      F[Array[Byte]]
-  def unzip[F[_]: MonadCancelThrow: Sync](bytes:   Array[Byte]): F[String]
+  def zip[F[_]:   Sync](content: String):      F[Array[Byte]]
+  def unzip[F[_]: Sync](bytes:   Array[Byte]): F[String]
 }
 
 object Zip extends Zip {
 
-  def zip[F[_]: MonadCancelThrow: Sync](content: String): F[Array[Byte]] = {
+  def zip[F[_]: Sync](content: String): F[Array[Byte]] = {
     val newStreams = MonadThrow[F].catchNonFatal {
       val arrOutputStream = new ByteArrayOutputStream(content.length)
       (arrOutputStream, new GZIPOutputStream(arrOutputStream))
@@ -63,7 +63,7 @@ object Zip extends Zip {
     }
   }
 
-  def unzip[F[_]: MonadCancelThrow: Sync](bytes: Array[Byte]): F[String] =
+  def unzip[F[_]: Sync](bytes: Array[Byte]): F[String] =
     Resource
       .make[F, GZIPInputStream] {
         MonadThrow[F].catchNonFatal(new GZIPInputStream(new ByteArrayInputStream(bytes)))

@@ -33,26 +33,26 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private[triplescuration] trait PersonTransformer[Interpretation[_]] {
-  def createTransformationStep: TransformationStep[Interpretation]
+private[triplescuration] trait PersonTransformer[F[_]] {
+  def createTransformationStep: TransformationStep[F]
 }
 
-private class PersonTransformerImpl[Interpretation[_]: MonadThrow](
-    kgPersonFinder:   KGPersonFinder[Interpretation],
+private class PersonTransformerImpl[F[_]: MonadThrow](
+    kgPersonFinder:   KGPersonFinder[F],
     personMerger:     PersonMerger,
     updatesCreator:   UpdatesCreator,
     projectFunctions: ProjectFunctions
-) extends PersonTransformer[Interpretation] {
+) extends PersonTransformer[F] {
 
   import projectFunctions._
 
-  override def createTransformationStep: TransformationStep[Interpretation] =
+  override def createTransformationStep: TransformationStep[F] =
     TransformationStep("Person Details Updates", createTransformation)
 
-  private def createTransformation: Transformation[Interpretation] = project =>
+  private def createTransformation: Transformation[F] = project =>
     EitherT {
       findAllPersons(project)
-        .foldLeft(ResultData(project, List.empty).pure[Interpretation]) { (previousResultsF, person) =>
+        .foldLeft(ResultData(project, List.empty).pure[F]) { (previousResultsF, person) =>
           for {
             previousResults   <- previousResultsF
             maybeKGPerson     <- kgPersonFinder find person
@@ -70,13 +70,13 @@ private class PersonTransformerImpl[Interpretation[_]: MonadThrow](
     }
 
   private lazy val maybeToRecoverableError
-      : PartialFunction[Throwable, Interpretation[Either[ProcessingRecoverableError, ResultData]]] = {
+      : PartialFunction[Throwable, F[Either[ProcessingRecoverableError, ResultData]]] = {
     case e @ (_: UnexpectedResponseException | _: ConnectivityException | _: ClientException |
         _: UnauthorizedException) =>
       TransformationRecoverableError("Problem finding person details in KG", e)
         .asLeft[ResultData]
         .leftWiden[ProcessingRecoverableError]
-        .pure[Interpretation]
+        .pure[F]
   }
 }
 

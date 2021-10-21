@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated
 import cats.data.EitherT
 import cats.data.EitherT.fromEither
 import cats.effect.concurrent.Deferred
-import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, IO, Timer}
+import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, Deferred, IO, Spawn, Timer}
 import cats.syntax.all._
 import cats.{MonadThrow, Show}
 import com.typesafe.config.{Config, ConfigFactory}
@@ -41,14 +41,13 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private[events] class EventHandler[Interpretation[_]: ConcurrentEffect: MonadThrow: ContextShift](
+private[events] class EventHandler[F[_]: Concurrent: Logger](
     override val categoryName:  CategoryName,
-    eventBodyDeserializer:      EventBodyDeserializer[Interpretation],
-    subscriptionMechanism:      SubscriptionMechanism[Interpretation],
-    concurrentProcessesLimiter: ConcurrentProcessesLimiter[Interpretation],
-    eventProcessor:             EventProcessor[Interpretation],
-    logger:                     Logger[Interpretation]
-) extends consumers.EventHandlerWithProcessLimiter[Interpretation](concurrentProcessesLimiter) {
+    eventBodyDeserializer:      EventBodyDeserializer[F],
+    subscriptionMechanism:      SubscriptionMechanism[F],
+    concurrentProcessesLimiter: ConcurrentProcessesLimiter[F],
+    eventProcessor:             EventProcessor[F]
+) extends consumers.EventHandlerWithProcessLimiter[F](concurrentProcessesLimiter) {
 
   import eventBodyDeserializer._
   import eventProcessor._
@@ -59,13 +58,13 @@ private[events] class EventHandler[Interpretation[_]: ConcurrentEffect: MonadThr
 
   override def createHandlingProcess(
       request: EventRequestContent
-  ): Interpretation[EventHandlingProcess[Interpretation]] =
-    EventHandlingProcess.withWaitingForCompletion[Interpretation](
+  ): F[EventHandlingProcess[F]] =
+    EventHandlingProcess.withWaitingForCompletion[F](
       processing => startProcessingEvent(request, processing),
       releaseProcess = subscriptionMechanism.renewSubscription()
     )
 
-  private def startProcessingEvent(request: EventRequestContent, processing: Deferred[Interpretation, Unit]) = for {
+  private def startProcessingEvent(request: EventRequestContent, processing: Deferred[F, Unit]) = for {
     eventId <- fromEither(request.event.getEventId)
     project <- fromEither(request.event.getProject)
     payload <- request match {
@@ -73,11 +72,12 @@ private[events] class EventHandler[Interpretation[_]: ConcurrentEffect: MonadThr
                  case _                                                               => EitherT.leftT(BadRequest)
                }
     event <- toEvent(eventId, project, payload).toRightT(recoverTo = BadRequest)
-    result <- (ContextShift[Interpretation].shift *> Concurrent[Interpretation]
-                .start(process(event) >> processing.complete(()))).toRightT
+    result <- Spawn[F]
+                .start(process(event) >> processing.complete(()))
+                .toRightT
                 .map(_ => Accepted)
-                .semiflatTap(logger.log(eventId -> event.project))
-                .leftSemiflatTap(logger.log(eventId -> event.project))
+                .semiflatTap(Logger[F].log(eventId -> event.project))
+                .leftSemiflatTap(Logger[F].log(eventId -> event.project))
   } yield result
 
   private implicit lazy val eventInfoShow: Show[(CompoundEventId, Project)] = Show.show { case (eventId, project) =>
@@ -96,19 +96,14 @@ private[events] object EventHandler {
   import ConfigLoader.find
   import eu.timepit.refined.pureconfig._
 
-  def apply(
-      metricsRegistry:       MetricsRegistry[IO],
-      gitLabThrottler:       Throttler[IO, GitLab],
-      timeRecorder:          SparqlQueryTimeRecorder[IO],
-      subscriptionMechanism: SubscriptionMechanism[IO],
+  def apply[F[_]: Concurrent: Logger](
+      metricsRegistry:       MetricsRegistry[F],
+      gitLabThrottler:       Throttler[F, GitLab],
+      timeRecorder:          SparqlQueryTimeRecorder[F],
+      subscriptionMechanism: SubscriptionMechanism[F],
       config:                Config = ConfigFactory.load()
-  )(implicit
-      contextShift:     ContextShift[IO],
-      executionContext: ExecutionContext,
-      timer:            Timer[IO],
-      logger:           Logger[IO]
-  ): IO[EventHandler[IO]] = for {
-    generationProcesses        <- find[IO, Int Refined Positive]("transformation-processes-number", config)
+  ): F[EventHandler[F]] = for {
+    generationProcesses        <- find[F, Int Refined Positive]("transformation-processes-number", config)
     eventProcessor             <- EventProcessor(metricsRegistry, gitLabThrottler, timeRecorder)
     concurrentProcessesLimiter <- ConcurrentProcessesLimiter(generationProcesses)
   } yield new EventHandler[IO](categoryName,

@@ -18,7 +18,7 @@
 
 package io.renku.logging
 
-import cats.effect.{Clock, IO, Temporal}
+import cats.effect.{IO, Temporal}
 import cats.syntax.all._
 import com.typesafe.config.ConfigFactory
 import eu.timepit.refined.api.Refined
@@ -219,8 +219,6 @@ class ExecutionTimeRecorderSpec
   "apply" should {
 
     "read the logging threshold from 'logging.elapsed-time-threshold' and instantiate the recorder with it" in {
-      implicit val clock: Clock[IO] = mock[Clock[IO]]
-
       forAll(finiteDuration retryUntil (_.toMillis > 0)) { threshold =>
         val config = ConfigFactory.parseMap(
           Map(

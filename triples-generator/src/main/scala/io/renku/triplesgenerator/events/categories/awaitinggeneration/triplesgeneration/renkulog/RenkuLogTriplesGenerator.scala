@@ -18,11 +18,11 @@
 
 package io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog
 
-import cats.Applicative
 import cats.data.EitherT
-import cats.effect.kernel.Async
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.Async
+import cats.effect.implicits._
 import cats.syntax.all._
+import cats.{Applicative, MonadThrow}
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken
@@ -33,18 +33,16 @@ import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgen
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.{CommitEvent, logMessageCommon}
 
 import java.security.SecureRandom
-import scala.concurrent.ExecutionContext
 
-private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
-    gitRepoUrlFinder:    GitLabRepoUrlFinder[IO],
-    renku:               Commands.Renku,
-    file:                Commands.File,
-    git:                 Commands.Git,
-    randomLong:          () => Long
-)(implicit contextShift: ContextShift[IO])
-    extends TriplesGenerator[IO] {
+private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[renkulog] (
+    gitRepoUrlFinder: GitLabRepoUrlFinder[F],
+    renku:            Commands.Renku[F],
+    file:             Commands.File[F],
+    git:              Commands.Git[F],
+    randomLong:       () => Long
+) extends TriplesGenerator[F] {
 
-  private val applicative = Applicative[IO]
+  private val applicative = Applicative[F]
 
   import ammonite.ops.{Path, root}
   import applicative._
@@ -57,17 +55,16 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
 
   override def generateTriples(
       commitEvent:             CommitEvent
-  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, JsonLD] =
-    EitherT {
-      createRepositoryDirectory(commitEvent.project.path)
-        .bracket(path => cloneCheckoutGenerate(commitEvent)(maybeAccessToken, RepositoryPath(path)))(deleteDirectory)
-        .recoverWith(meaningfulError(commitEvent, maybeAccessToken))
-    }
+  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[F, ProcessingRecoverableError, JsonLD] = EitherT {
+    createRepositoryDirectory(commitEvent.project.path)
+      .bracket(path => cloneCheckoutGenerate(commitEvent)(maybeAccessToken, RepositoryPath(path)))(deleteDirectory)
+      .recoverWith(meaningfulError(commitEvent, maybeAccessToken))
+  }
 
   private def cloneCheckoutGenerate(commitEvent: CommitEvent)(implicit
       maybeAccessToken:                          Option[AccessToken],
       repoDirectory:                             RepositoryPath
-  ): IO[Either[ProcessingRecoverableError, JsonLD]] = {
+  ): F[Either[ProcessingRecoverableError, JsonLD]] = {
     for {
       _      <- prepareRepository(commitEvent)
       _      <- EitherT.liftF(cleanUpRepository())
@@ -78,7 +75,7 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
   private def prepareRepository(commitEvent: CommitEvent)(implicit
       maybeAccessToken:                      Option[AccessToken],
       repoDirectory:                         RepositoryPath
-  ): EitherT[IO, ProcessingRecoverableError, Unit] = for {
+  ): EitherT[F, ProcessingRecoverableError, Unit] = for {
     repositoryUrl <- EitherT.liftF(findRepositoryUrl(commitEvent.project.path, maybeAccessToken))
     _             <- git.clone(repositoryUrl, workDirectory)
     _             <- EitherT.liftF(git.checkout(commitEvent.commitId))
@@ -87,7 +84,7 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
   private def cleanUpRepository()(implicit repoDirectory: RepositoryPath) = {
     val gitAttributeFilePath = repoDirectory.value / gitAttributeFileName
     file.exists(gitAttributeFilePath).flatMap {
-      case false => IO.unit
+      case false => MonadThrow[F].unit
       case true =>
         for {
           repoDirty <- git.status.map(status => !status.contains("nothing to commit"))
@@ -99,12 +96,12 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
 
   private def migrateAndLog(
       commitEvent:          CommitEvent
-  )(implicit repoDirectory: RepositoryPath): EitherT[IO, ProcessingRecoverableError, JsonLD] = for {
+  )(implicit repoDirectory: RepositoryPath): EitherT[F, ProcessingRecoverableError, JsonLD] = for {
     _       <- EitherT.liftF(renku migrate commitEvent)
     triples <- renku.`export`
   } yield triples
 
-  private def createRepositoryDirectory(projectPath: projects.Path): IO[Path] =
+  private def createRepositoryDirectory(projectPath: projects.Path): F[Path] =
     mkdir(tempDirectoryName(repositoryNameFrom(projectPath)))
 
   private def tempDirectoryName(repositoryName: String) =
@@ -117,19 +114,18 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
   private def meaningfulError(
       commitEvent:      CommitEvent,
       maybeAccessToken: Option[AccessToken]
-  ): PartialFunction[Throwable, IO[Either[ProcessingRecoverableError, JsonLD]]] = { case exception =>
-    IO.raiseError {
-      (Option(exception.getMessage) -> maybeAccessToken)
-        .mapN { (message, token) =>
-          if (message contains token.value)
-            new Exception(
-              s"${logMessageCommon(commitEvent)} triples generation failed: ${message.replaceAll(token.value, token.toString)}"
-            )
-          else
-            new Exception(s"${logMessageCommon(commitEvent)} triples generation failed", exception)
-        }
-        .getOrElse(new Exception(s"${logMessageCommon(commitEvent)} triples generation failed", exception))
-    }
+  ): PartialFunction[Throwable, F[Either[ProcessingRecoverableError, JsonLD]]] = { case exception =>
+    (Option(exception.getMessage) -> maybeAccessToken)
+      .mapN { (message, token) =>
+        if (message contains token.value)
+          new Exception(
+            s"${logMessageCommon(commitEvent)} triples generation failed: ${message.replaceAll(token.value, token.toString)}"
+          )
+        else
+          new Exception(s"${logMessageCommon(commitEvent)} triples generation failed", exception)
+      }
+      .getOrElse(new Exception(s"${logMessageCommon(commitEvent)} triples generation failed", exception))
+      .raiseError[F, Either[ProcessingRecoverableError, JsonLD]]
   }
 }
 
@@ -139,9 +135,9 @@ private[events] object RenkuLogTriplesGenerator {
     gitLabUrl <- GitLabUrlLoader[F]()
   } yield new RenkuLogTriplesGenerator(
     new GitLabRepoUrlFinderImpl[F](gitLabUrl),
-    new Commands.Renku,
-    new Commands.File,
-    new Commands.Git,
+    new Commands.Renku[F],
+    new Commands.File[F],
+    new Commands.Git[F],
     randomLong = new SecureRandom().nextLong _
   )
 }

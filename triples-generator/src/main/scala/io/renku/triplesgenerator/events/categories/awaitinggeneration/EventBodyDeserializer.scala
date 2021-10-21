@@ -28,14 +28,14 @@ import io.renku.graph.model.events._
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.tinytypes.json.TinyTypeDecoders._
 
-private trait EventBodyDeserializer[Interpretation[_]] {
-  def toCommitEvent(eventBody: EventBody): Interpretation[CommitEvent]
+private trait EventBodyDeserializer[F[_]] {
+  def toCommitEvent(eventBody: EventBody): F[CommitEvent]
 }
 
-private class EventBodyDeserializerImpl[Interpretation[_]: MonadThrow] extends EventBodyDeserializer[Interpretation] {
+private class EventBodyDeserializerImpl[F[_]: MonadThrow] extends EventBodyDeserializer[F] {
 
-  override def toCommitEvent(eventBody: EventBody): Interpretation[CommitEvent] =
-    MonadThrow[Interpretation].fromEither {
+  override def toCommitEvent(eventBody: EventBody): F[CommitEvent] =
+    MonadThrow[F].fromEither {
       parse(eventBody.value)
         .flatMap(_.as[CommitEvent])
         .leftMap(toMeaningfulError(eventBody))

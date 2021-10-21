@@ -27,22 +27,22 @@ import io.renku.graph.model.{CliVersion, RenkuVersionPair}
 import io.renku.triplesgenerator.config.TriplesGeneration
 import io.renku.triplesgenerator.config.TriplesGeneration.{RemoteTriplesGeneration, RenkuLog}
 
-trait CliVersionCompatibilityVerifier[Interpretation[_]] {
-  def run(): Interpretation[Unit]
+trait CliVersionCompatibilityVerifier[F[_]] {
+  def run(): F[Unit]
 }
 
-private class CliVersionCompatibilityVerifierImpl[Interpretation[_]](cliVersion:        CliVersion,
-                                                                     renkuVersionPairs: NonEmptyList[RenkuVersionPair]
-)(implicit ME: MonadError[Interpretation, Throwable])
-    extends CliVersionCompatibilityVerifier[Interpretation] {
-  override def run(): Interpretation[Unit] =
+private class CliVersionCompatibilityVerifierImpl[F[_]](cliVersion:        CliVersion,
+                                                        renkuVersionPairs: NonEmptyList[RenkuVersionPair]
+)(implicit ME:                                                             MonadError[F, Throwable])
+    extends CliVersionCompatibilityVerifier[F] {
+  override def run(): F[Unit] =
     if (cliVersion != renkuVersionPairs.head.cliVersion)
       ME.raiseError(
         new IllegalStateException(
           s"Incompatible versions. cliVersion: $cliVersion versionPairs: ${renkuVersionPairs.head.cliVersion}"
         )
       )
-    else ().pure[Interpretation]
+    else ().pure[F]
 }
 
 object IOCliVersionCompatibilityChecker {

@@ -32,8 +32,8 @@ private object GenerationProcessesNumber
 
   private implicit val configReader: ConfigReader[GenerationProcessesNumber] = intTinyTypeReader(this)
 
-  def apply[Interpretation[_]](
+  def apply[F[_]](
       config:    Config = ConfigFactory.load()
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[GenerationProcessesNumber] =
-    find[Interpretation, GenerationProcessesNumber]("generation-processes-number", config)
+  )(implicit ME: MonadError[F, Throwable]): F[GenerationProcessesNumber] =
+    find[F, GenerationProcessesNumber]("generation-processes-number", config)
 }

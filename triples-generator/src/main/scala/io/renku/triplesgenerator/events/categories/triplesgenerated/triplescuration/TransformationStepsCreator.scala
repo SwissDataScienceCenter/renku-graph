@@ -29,17 +29,17 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private[triplesgenerated] trait TransformationStepsCreator[Interpretation[_]] {
-  def createSteps: List[TransformationStep[Interpretation]]
+private[triplesgenerated] trait TransformationStepsCreator[F[_]] {
+  def createSteps: List[TransformationStep[F]]
 }
 
-private[triplesgenerated] class TransformationStepsCreatorImpl[Interpretation[_]: MonadThrow](
-    personTransformer:  PersonTransformer[Interpretation],
-    projectTransformer: ProjectTransformer[Interpretation],
-    datasetTransformer: DatasetTransformer[Interpretation]
-) extends TransformationStepsCreator[Interpretation] {
+private[triplesgenerated] class TransformationStepsCreatorImpl[F[_]: MonadThrow](
+    personTransformer:  PersonTransformer[F],
+    projectTransformer: ProjectTransformer[F],
+    datasetTransformer: DatasetTransformer[F]
+) extends TransformationStepsCreator[F] {
 
-  override def createSteps: List[TransformationStep[Interpretation]] = List(
+  override def createSteps: List[TransformationStep[F]] = List(
     personTransformer.createTransformationStep,
     projectTransformer.createTransformationStep,
     datasetTransformer.createTransformationStep

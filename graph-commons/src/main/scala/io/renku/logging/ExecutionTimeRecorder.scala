@@ -95,7 +95,7 @@ class ExecutionTimeRecorderImpl[F[_]: Sync: Clock: Logger](threshold: ElapsedTim
 
 object ExecutionTimeRecorder {
 
-  def apply[F[_]: Sync: Clock: Logger](
+  def apply[F[_]: Sync: Logger](
       config:         Config = ConfigFactory.load(),
       maybeHistogram: Option[Histogram] = None
   ): F[ExecutionTimeRecorder[F]] = for {

@@ -32,19 +32,19 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-trait ProjectTransformer[Interpretation[_]] {
-  def createTransformationStep: TransformationStep[Interpretation]
+trait ProjectTransformer[F[_]] {
+  def createTransformationStep: TransformationStep[F]
 }
 
-class ProjectTransformerImpl[Interpretation[_]: MonadThrow](
-    kGProjectFinder: KGProjectFinder[Interpretation],
+class ProjectTransformerImpl[F[_]: MonadThrow](
+    kGProjectFinder: KGProjectFinder[F],
     updatesCreator:  UpdatesCreator
-) extends ProjectTransformer[Interpretation] {
+) extends ProjectTransformer[F] {
 
-  override def createTransformationStep: TransformationStep[Interpretation] =
+  override def createTransformationStep: TransformationStep[F] =
     TransformationStep("Project Details Updates", createTransformation)
 
-  private def createTransformation: Transformation[Interpretation] = project =>
+  private def createTransformation: Transformation[F] = project =>
     EitherT {
       kGProjectFinder
         .find(project.resourceId)
@@ -59,13 +59,13 @@ class ProjectTransformerImpl[Interpretation[_]: MonadThrow](
     }
 
   private lazy val maybeToRecoverableError
-      : PartialFunction[Throwable, Interpretation[Either[ProcessingRecoverableError, ResultData]]] = {
+      : PartialFunction[Throwable, F[Either[ProcessingRecoverableError, ResultData]]] = {
     case e @ (_: UnexpectedResponseException | _: ConnectivityException | _: ClientException |
         _: UnauthorizedException) =>
       TransformationRecoverableError("Problem finding project details in KG", e)
         .asLeft[ResultData]
         .leftWiden[ProcessingRecoverableError]
-        .pure[Interpretation]
+        .pure[F]
   }
 }
 

@@ -42,39 +42,38 @@ import java.time.Duration
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-private trait EventProcessor[Interpretation[_]] {
-  def process(event: CommitEvent): Interpretation[Unit]
+private trait EventProcessor[F[_]] {
+  def process(event: CommitEvent): F[Unit]
 }
 
-private class CommitEventProcessor[Interpretation[_]: MonadThrow](
-    accessTokenFinder:       AccessTokenFinder[Interpretation],
-    triplesGenerator:        TriplesGenerator[Interpretation],
-    statusUpdater:           EventStatusUpdater[Interpretation],
-    logger:                  Logger[Interpretation],
-    allEventsTimeRecorder:   ExecutionTimeRecorder[Interpretation],
-    singleEventTimeRecorder: ExecutionTimeRecorder[Interpretation]
-) extends EventProcessor[Interpretation] {
+private class CommitEventProcessor[F[_]: MonadThrow](
+    accessTokenFinder:       AccessTokenFinder[F],
+    triplesGenerator:        TriplesGenerator[F],
+    statusUpdater:           EventStatusUpdater[F],
+    logger:                  Logger[F],
+    allEventsTimeRecorder:   ExecutionTimeRecorder[F],
+    singleEventTimeRecorder: ExecutionTimeRecorder[F]
+) extends EventProcessor[F] {
 
   import AccessTokenFinder._
   import TriplesGenerationResult._
   import accessTokenFinder._
   import triplesGenerator._
 
-  def process(event: CommitEvent): Interpretation[Unit] = allEventsTimeRecorder.measureExecutionTime {
+  def process(event: CommitEvent): F[Unit] = allEventsTimeRecorder.measureExecutionTime {
     for {
       maybeAccessToken <- findAccessToken(event.project.path) recoverWith rollbackEvent(event)
       uploadingResult  <- generateAndUpdateStatus(event)(maybeAccessToken)
     } yield uploadingResult
   } flatMap logSummary recoverWith logError(event)
 
-  private def logError(event: CommitEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
-    case NonFatal(exception) =>
-      logger.error(exception)(s"${logMessageCommon(event)}: commit Event processing failure")
+  private def logError(event: CommitEvent): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
+    logger.error(exception)(s"${logMessageCommon(event)}: commit Event processing failure")
   }
 
   private def generateAndUpdateStatus(
       commit:                  CommitEvent
-  )(implicit maybeAccessToken: Option[AccessToken]): Interpretation[TriplesGenerationResult] = EitherT {
+  )(implicit maybeAccessToken: Option[AccessToken]): F[TriplesGenerationResult] = EitherT {
     singleEventTimeRecorder
       .measureExecutionTime(generateTriples(commit).value)
       .map(toTriplesGenerated(commit))
@@ -95,7 +94,7 @@ private class CommitEventProcessor[Interpretation[_]: MonadThrow](
     }
   }
 
-  private def updateEventLog(uploadingResults: TriplesGenerationResult): Interpretation[Unit] = {
+  private def updateEventLog(uploadingResults: TriplesGenerationResult): F[Unit] = {
     uploadingResults match {
       case TriplesGenerated(commit, triples, processingTime) =>
         statusUpdater.toTriplesGenerated(CompoundEventId(commit.eventId, commit.project.id),
@@ -120,7 +119,7 @@ private class CommitEventProcessor[Interpretation[_]: MonadThrow](
 
   private def logEventLogUpdateError(
       triplesGenerationResult: TriplesGenerationResult
-  ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
+  ): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
     logger
       .error(exception)(
         s"${logMessageCommon(triplesGenerationResult.commit)} failed to mark as $triplesGenerationResult in the Event Log"
@@ -129,7 +128,7 @@ private class CommitEventProcessor[Interpretation[_]: MonadThrow](
 
   private def toRecoverableError(
       commit: CommitEvent
-  ): ProcessingRecoverableError => Interpretation[TriplesGenerationResult] = { error =>
+  ): ProcessingRecoverableError => F[TriplesGenerationResult] = { error =>
     logger
       .error(error)(s"${logMessageCommon(commit)} ${error.getMessage}")
       .map(_ => RecoverableError(commit, error): TriplesGenerationResult)
@@ -137,19 +136,19 @@ private class CommitEventProcessor[Interpretation[_]: MonadThrow](
 
   private def toNonRecoverableFailure(
       commit: CommitEvent
-  ): PartialFunction[Throwable, Interpretation[TriplesGenerationResult]] = { case NonFatal(exception) =>
+  ): PartialFunction[Throwable, F[TriplesGenerationResult]] = { case NonFatal(exception) =>
     logger
       .error(exception)(s"${logMessageCommon(commit)} failed")
       .map(_ => NonRecoverableError(commit, exception): TriplesGenerationResult)
   }
 
-  private def logSummary: ((ElapsedTime, TriplesGenerationResult)) => Interpretation[Unit] = {
+  private def logSummary: ((ElapsedTime, TriplesGenerationResult)) => F[Unit] = {
     case (elapsedTime, uploadingResult @ TriplesGenerated(_, _, _)) =>
       logger.info(s"${logMessageCommon(uploadingResult.commit)} processed in ${elapsedTime}ms")
-    case _ => ().pure[Interpretation]
+    case _ => ().pure[F]
   }
 
-  private def rollbackEvent(commit: CommitEvent): PartialFunction[Throwable, Interpretation[Option[AccessToken]]] = {
+  private def rollbackEvent(commit: CommitEvent): PartialFunction[Throwable, F[Option[AccessToken]]] = {
     case NonFatal(exception) =>
       statusUpdater
         .rollback[EventStatus.New](commit.compoundEventId, commit.project.path)

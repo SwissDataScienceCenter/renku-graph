@@ -19,7 +19,7 @@
 package io.renku.triplesgenerator.events.categories.triplesgenerated
 
 import cats.MonadThrow
-import cats.effect.{BracketThrow, IO, Sync}
+import cats.effect.Sync
 import cats.syntax.all._
 import io.renku.compression.Zip
 import io.renku.events.consumers.Project
@@ -29,28 +29,24 @@ import io.renku.jsonld.{JsonLD, parser}
 
 import scala.util.control.NonFatal
 
-private trait EventBodyDeserializer[Interpretation[_]] {
-  def toEvent(eventId:       CompoundEventId,
-              project:       Project,
-              zippedPayload: ZippedEventPayload
-  ): Interpretation[TriplesGeneratedEvent]
+private trait EventBodyDeserializer[F[_]] {
+  def toEvent(eventId: CompoundEventId, project: Project, zippedPayload: ZippedEventPayload): F[TriplesGeneratedEvent]
 }
 
-private class EventBodyDeserializerImpl[Interpretation[_]: BracketThrow: Sync](zip: Zip = Zip)
-    extends EventBodyDeserializer[Interpretation] {
+private class EventBodyDeserializerImpl[F[_]: Sync](zip: Zip = Zip) extends EventBodyDeserializer[F] {
 
   override def toEvent(eventId:       CompoundEventId,
                        project:       Project,
                        zippedPayload: ZippedEventPayload
-  ): Interpretation[TriplesGeneratedEvent] = for {
-    unzipped <- zip.unzip[Interpretation](zippedPayload.value)
-    payload <- MonadThrow[Interpretation].fromEither(parser.parse(unzipped)).recoverWith { case NonFatal(error) =>
+  ): F[TriplesGeneratedEvent] = for {
+    unzipped <- zip.unzip[F](zippedPayload.value)
+    payload <- MonadThrow[F].fromEither(parser.parse(unzipped)).recoverWith { case NonFatal(error) =>
                  ParsingFailure(s"TriplesGeneratedEvent cannot be deserialised: $eventId", error)
-                   .raiseError[Interpretation, JsonLD]
+                   .raiseError[F, JsonLD]
                }
   } yield TriplesGeneratedEvent(eventId.id, project, payload)
 }
 
 private object EventBodyDeserializer {
-  def apply(): EventBodyDeserializer[IO] = new EventBodyDeserializerImpl[IO]
+  def apply[F[_]: Sync]: EventBodyDeserializer[F] = new EventBodyDeserializerImpl[F]
 }

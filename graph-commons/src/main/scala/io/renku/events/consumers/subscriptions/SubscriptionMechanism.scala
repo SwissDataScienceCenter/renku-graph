@@ -114,11 +114,9 @@ object SubscriptionMechanism {
   private val RenewDelay = 5 minutes
 
   def apply[F[_]: Async: Logger](
-      categoryName: CategoryName,
-      subscriptionPayloadComposerFactory: Kleisli[F, CategoryName, SubscriptionPayloadComposer[
-        F
-      ]],
-      configuration: Config = ConfigFactory.load()
+      categoryName:                       CategoryName,
+      subscriptionPayloadComposerFactory: Kleisli[F, CategoryName, SubscriptionPayloadComposer[F]],
+      configuration:                      Config = ConfigFactory.load()
   ): F[SubscriptionMechanism[F]] = for {
     initialDelay                <- find[F, FiniteDuration]("event-subscription-initial-delay", configuration)
     subscriptionPayloadComposer <- subscriptionPayloadComposerFactory(categoryName)

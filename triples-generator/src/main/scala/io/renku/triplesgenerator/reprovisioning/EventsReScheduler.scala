@@ -28,22 +28,22 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private trait EventsReScheduler[Interpretation[_]] {
-  def triggerEventsReScheduling(): Interpretation[Unit]
+private trait EventsReScheduler[F[_]] {
+  def triggerEventsReScheduling(): F[Unit]
 }
 
-private class EventsReSchedulerImpl[Interpretation[_]: ConcurrentEffect: Timer](
+private class EventsReSchedulerImpl[F[_]: ConcurrentEffect: Timer](
     eventLogUrl:             EventLogUrl,
-    logger:                  Logger[Interpretation]
+    logger:                  Logger[F]
 )(implicit executionContext: ExecutionContext)
-    extends RestClient[Interpretation, EventsReScheduler[Interpretation]](Throttler.noThrottling, logger)
-    with EventsReScheduler[Interpretation] {
+    extends RestClient[F, EventsReScheduler[F]](Throttler.noThrottling, logger)
+    with EventsReScheduler[F] {
 
   import io.circe.literal._
   import org.http4s.Status.Accepted
   import org.http4s.{Request, Response, Status}
 
-  override def triggerEventsReScheduling(): Interpretation[Unit] =
+  override def triggerEventsReScheduling(): F[Unit] =
     for {
       uri <- validateUri(s"$eventLogUrl/events")
       sendingResult <-
@@ -54,9 +54,8 @@ private class EventsReSchedulerImpl[Interpretation[_]: ConcurrentEffect: Timer](
         )(mapResponse)
     } yield sendingResult
 
-  private lazy val mapResponse
-      : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[Unit]] = {
-    case (Accepted, _, _) => ().pure[Interpretation]
+  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Unit]] = { case (Accepted, _, _) =>
+    ().pure[F]
   }
 }
 

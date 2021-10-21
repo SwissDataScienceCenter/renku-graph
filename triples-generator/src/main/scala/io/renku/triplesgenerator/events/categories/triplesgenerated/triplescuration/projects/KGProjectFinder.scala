@@ -29,8 +29,8 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private trait KGProjectFinder[Interpretation[_]] {
-  def find(resourceId: projects.ResourceId): Interpretation[Option[KGProjectInfo]]
+private trait KGProjectFinder[F[_]] {
+  def find(resourceId: projects.ResourceId): F[Option[KGProjectInfo]]
 }
 
 private class KGProjectFinderImpl(

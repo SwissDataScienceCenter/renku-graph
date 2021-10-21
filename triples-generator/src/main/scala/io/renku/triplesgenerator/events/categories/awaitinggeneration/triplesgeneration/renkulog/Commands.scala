@@ -19,9 +19,9 @@
 package io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog
 
 import ammonite.ops.Path
-import cats.{MonadError, MonadThrow}
+import cats.MonadThrow
 import cats.data.EitherT
-import cats.effect.kernel.{Async, Temporal}
+import cats.effect.kernel.Async
 import io.renku.config.ServiceUrl
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.{GitLabUrl, projects}
@@ -46,18 +46,15 @@ private object Commands {
 
   object RepositoryPath extends TinyTypeFactory[RepositoryPath](new RepositoryPath(_))
 
-  trait GitLabRepoUrlFinder[Interpretation[_]] {
-    def findRepositoryUrl(projectPath: projects.Path, maybeAccessToken: Option[AccessToken]): Interpretation[ServiceUrl]
+  trait GitLabRepoUrlFinder[F[_]] {
+    def findRepositoryUrl(projectPath: projects.Path, maybeAccessToken: Option[AccessToken]): F[ServiceUrl]
   }
 
-  class GitLabRepoUrlFinderImpl[Interpretation[_]: MonadThrow](gitLabUrl: GitLabUrl)
-      extends GitLabRepoUrlFinder[Interpretation] {
+  class GitLabRepoUrlFinderImpl[F[_]: MonadThrow](gitLabUrl: GitLabUrl) extends GitLabRepoUrlFinder[F] {
 
     import java.net.URL
 
-    override def findRepositoryUrl(projectPath:      projects.Path,
-                                   maybeAccessToken: Option[AccessToken]
-    ): Interpretation[ServiceUrl] =
+    override def findRepositoryUrl(projectPath: projects.Path, maybeAccessToken: Option[AccessToken]): F[ServiceUrl] =
       merge(gitLabUrl, findUrlTokenPart(maybeAccessToken), projectPath)
 
     private lazy val findUrlTokenPart: Option[AccessToken] => String = {
@@ -66,17 +63,15 @@ private object Commands {
       case Some(OAuthAccessToken(token))    => s"oauth2:$token@"
     }
 
-    private def merge(gitLabUrl:    GitLabUrl,
-                      urlTokenPart: String,
-                      projectPath:  projects.Path
-    ): Interpretation[ServiceUrl] = MonadThrow[Interpretation].fromEither {
-      ServiceUrl.from {
-        val url              = gitLabUrl.value
-        val protocol         = new URL(url).getProtocol
-        val serviceWithToken = url.replace(s"$protocol://", s"$protocol://$urlTokenPart")
-        s"$serviceWithToken/$projectPath.git"
+    private def merge(gitLabUrl: GitLabUrl, urlTokenPart: String, projectPath: projects.Path): F[ServiceUrl] =
+      MonadThrow[F].fromEither {
+        ServiceUrl.from {
+          val url              = gitLabUrl.value
+          val protocol         = new URL(url).getProtocol
+          val serviceWithToken = url.replace(s"$protocol://", s"$protocol://$urlTokenPart")
+          s"$serviceWithToken/$projectPath.git"
+        }
       }
-    }
   }
 
   import ammonite.ops
@@ -166,12 +161,10 @@ private object Commands {
         .catchNonFatal(%%("renku", "migrate")(destinationDirectory.value))
         .void
         .recoverWith { case NonFatal(exception) =>
-          F.raiseError {
-            new Exception(
-              s"'renku migrate' failed for commit: ${commitEvent.commitId}, project: ${commitEvent.project.id}",
-              exception
-            )
-          }
+          new Exception(
+            s"'renku migrate' failed for commit: ${commitEvent.commitId}, project: ${commitEvent.project.id}",
+            exception
+          ).raiseError[F, Unit]
         }
 
     def export(implicit destinationDirectory: RepositoryPath): EitherT[F, ProcessingRecoverableError, JsonLD] =
@@ -179,11 +172,11 @@ private object Commands {
         {
           for {
             triplesAsString <- MonadThrow[F].catchNonFatal(renkuExport(destinationDirectory.value).out.string.trim)
-            wrappedTriples  <- F.fromEither(parse(triplesAsString))
+            wrappedTriples  <- MonadThrow[F].fromEither(parse(triplesAsString))
           } yield wrappedTriples.asRight[ProcessingRecoverableError]
         }.recoverWith {
           case ShelloutException(result) if result.exitCode == 137 =>
-            GenerationRecoverableError("Not enough memory").asLeft[JsonLD].pure[F]
+            GenerationRecoverableError("Not enough memory").asLeft[JsonLD].leftWiden[ProcessingRecoverableError].pure[F]
         }
       }
   }

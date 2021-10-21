@@ -31,12 +31,12 @@ import io.renku.triplesgenerator.events.categories.awaitinggeneration.CommitEven
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.RenkuLogTriplesGenerator
 import org.typelevel.log4cats.Logger
 
-private[awaitinggeneration] trait TriplesGenerator[Interpretation[_]] {
+private[awaitinggeneration] trait TriplesGenerator[F[_]] {
   def generateTriples(
       commit: CommitEvent
   )(implicit
       maybeAccessToken: Option[AccessToken]
-  ): EitherT[Interpretation, ProcessingRecoverableError, JsonLD]
+  ): EitherT[F, ProcessingRecoverableError, JsonLD]
 }
 
 private[awaitinggeneration] object TriplesGenerator {

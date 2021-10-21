@@ -27,8 +27,8 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private trait TriplesRemover[Interpretation[_]] {
-  def removeAllTriples(): Interpretation[Unit]
+private trait TriplesRemover[F[_]] {
+  def removeAllTriples(): F[Unit]
 }
 
 private class TriplesRemoverImpl(
