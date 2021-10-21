@@ -33,11 +33,11 @@ import io.renku.webhookservice.model.ProjectHookUrl
 import org.http4s.Status
 import org.typelevel.log4cats.Logger
 
-private trait ProjectHookCreator[Interpretation[_]] {
+private trait ProjectHookCreator[F[_]] {
   def create(
       projectHook: ProjectHook,
       accessToken: AccessToken
-  ): Interpretation[Unit]
+  ): F[Unit]
 }
 
 private class ProjectHookCreatorImpl[F[_]: Async: Logger](

@@ -18,7 +18,7 @@
 
 package io.renku.webhookservice.hookvalidation
 
-import cats.MonadError
+import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
@@ -47,7 +47,7 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
     "fail if finding stored access token fails when no access token given" in new TestCase {
 
       val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = context.raiseError(exception)
+      val error:     Try[Nothing] = exception.raiseError[Try, Nothing]
       (accessTokenFinder
         .findAccessToken(_: Id)(_: Id => String))
         .expects(projectId, projectIdToPath)
@@ -63,10 +63,11 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       (accessTokenFinder
         .findAccessToken(_: Id)(_: Id => String))
         .expects(projectId, projectIdToPath)
-        .returning(context.pure(None))
+        .returning(Option.empty[AccessToken].pure[Try])
 
       val noAccessTokenException = NoAccessTokenException(s"No access token found for projectId $projectId")
-      validator.validateHook(projectId, maybeAccessToken = None) shouldBe context.raiseError(noAccessTokenException)
+      validator.validateHook(projectId, maybeAccessToken = None) shouldBe noAccessTokenException
+        .raiseError[Try, Nothing]
 
       logger.loggedOnly(Info(s"Hook validation failed: ${noAccessTokenException.getMessage}"))
     }
@@ -76,7 +77,7 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       (accessTokenFinder
         .findAccessToken(_: Id)(_: Id => String))
         .expects(projectId, projectIdToPath)
-        .returning(context.raiseError(UnauthorizedException))
+        .returning(UnauthorizedException.raiseError[Try, Option[AccessToken]])
 
       val Failure(exception) = validator.validateHook(projectId, maybeAccessToken = None)
 
@@ -93,14 +94,14 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       (projectHookVerifier
         .checkHookPresence(_: HookIdentifier, _: AccessToken))
         .expects(HookIdentifier(projectId, projectHookUrl), givenAccessToken)
-        .returning(context.pure(true))
+        .returning(true.pure[Try])
 
       (accessTokenAssociator
         .associate(_: Id, _: AccessToken))
         .expects(projectId, givenAccessToken)
-        .returning(context.unit)
+        .returning(().pure[Try])
 
-      validator.validateHook(projectId, Some(givenAccessToken)) shouldBe context.pure(HookExists)
+      validator.validateHook(projectId, Some(givenAccessToken)) shouldBe HookExists.pure[Try]
 
       logger.expectNoLogs()
     }
@@ -110,14 +111,14 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       (projectHookVerifier
         .checkHookPresence(_: HookIdentifier, _: AccessToken))
         .expects(HookIdentifier(projectId, projectHookUrl), givenAccessToken)
-        .returning(context.pure(false))
+        .returning(false.pure[Try])
 
       (accessTokenRemover
         .removeAccessToken(_: Id))
         .expects(projectId)
-        .returning(context.unit)
+        .returning(().pure[Try])
 
-      validator.validateHook(projectId, Some(givenAccessToken)) shouldBe context.pure(HookMissing)
+      validator.validateHook(projectId, Some(givenAccessToken)) shouldBe HookMissing.pure[Try]
 
       logger.expectNoLogs()
     }
@@ -125,7 +126,7 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
     "fail if finding hook verification fails" in new TestCase {
 
       val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = context.raiseError(exception)
+      val error:     Try[Nothing] = exception.raiseError[Try, Nothing]
       (projectHookVerifier
         .checkHookPresence(_: HookIdentifier, _: AccessToken))
         .expects(HookIdentifier(projectId, projectHookUrl), givenAccessToken)
@@ -140,10 +141,10 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       (projectHookVerifier
         .checkHookPresence(_: HookIdentifier, _: AccessToken))
         .expects(HookIdentifier(projectId, projectHookUrl), givenAccessToken)
-        .returning(context.pure(true))
+        .returning(true.pure[Try])
 
       val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = context.raiseError(exception)
+      val error:     Try[Nothing] = exception.raiseError[Try, Nothing]
       (accessTokenAssociator
         .associate(_: Id, _: AccessToken))
         .expects(projectId, givenAccessToken)
@@ -158,10 +159,10 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       (projectHookVerifier
         .checkHookPresence(_: HookIdentifier, _: AccessToken))
         .expects(HookIdentifier(projectId, projectHookUrl), givenAccessToken)
-        .returning(context.pure(false))
+        .returning(false.pure[Try])
 
       val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = context.raiseError(exception)
+      val error:     Try[Nothing] = exception.raiseError[Try, Nothing]
       (accessTokenRemover
         .removeAccessToken(_: Id))
         .expects(projectId)
@@ -182,9 +183,9 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       (projectHookVerifier
         .checkHookPresence(_: HookIdentifier, _: AccessToken))
         .expects(HookIdentifier(projectId, projectHookUrl), storedAccessToken)
-        .returning(context.pure(true))
+        .returning(true.pure[Try])
 
-      validator.validateHook(projectId, None) shouldBe context.pure(HookExists)
+      validator.validateHook(projectId, None) shouldBe HookExists.pure[Try]
 
       logger.expectNoLogs()
     }
@@ -195,14 +196,14 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       (projectHookVerifier
         .checkHookPresence(_: HookIdentifier, _: AccessToken))
         .expects(HookIdentifier(projectId, projectHookUrl), storedAccessToken)
-        .returning(context.pure(false))
+        .returning(false.pure[Try])
 
       (accessTokenRemover
         .removeAccessToken(_: Id))
         .expects(projectId)
-        .returning(context.unit)
+        .returning(().pure[Try])
 
-      validator.validateHook(projectId, maybeAccessToken = None) shouldBe context.pure(HookMissing)
+      validator.validateHook(projectId, maybeAccessToken = None) shouldBe HookMissing.pure[Try]
 
       logger.expectNoLogs()
     }
@@ -212,7 +213,7 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       val storedAccessToken = assumeGivenAccessTokenInvalid()
 
       val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = context.raiseError(exception)
+      val error:     Try[Nothing] = exception.raiseError[Try, Nothing]
       (projectHookVerifier
         .checkHookPresence(_: HookIdentifier, _: AccessToken))
         .expects(HookIdentifier(projectId, projectHookUrl), storedAccessToken)
@@ -230,10 +231,10 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       (projectHookVerifier
         .checkHookPresence(_: HookIdentifier, _: AccessToken))
         .expects(HookIdentifier(projectId, projectHookUrl), storedAccessToken)
-        .returning(context.pure(false))
+        .returning(false.pure[Try])
 
       val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = context.raiseError(exception)
+      val error:     Try[Nothing] = exception.raiseError[Try, Nothing]
       (accessTokenRemover
         .removeAccessToken(_: Id))
         .expects(projectId)
@@ -246,8 +247,6 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
   }
 
   private trait TestCase {
-    val context = MonadError[Try, Throwable]
-
     val givenAccessToken = accessTokens.generateOne
     val projectHookUrl   = projectHookUrls.generateOne
 
@@ -272,7 +271,7 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       (accessTokenFinder
         .findAccessToken(_: Id)(_: Id => String))
         .expects(projectId, projectIdToPath)
-        .returning(context.pure(Some(storedAccessToken)))
+        .returning(Some(storedAccessToken).pure[Try])
       storedAccessToken
     }
   }

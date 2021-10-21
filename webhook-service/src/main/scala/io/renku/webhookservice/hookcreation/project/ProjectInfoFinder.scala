@@ -30,10 +30,7 @@ import io.renku.http.client.{AccessToken, RestClient}
 import org.typelevel.log4cats.Logger
 
 private[hookcreation] trait ProjectInfoFinder[F[_]] {
-  def findProjectInfo(
-      projectId:        projects.Id,
-      maybeAccessToken: Option[AccessToken]
-  ): F[ProjectInfo]
+  def findProjectInfo(projectId: projects.Id, maybeAccessToken: Option[AccessToken]): F[ProjectInfo]
 }
 
 private[hookcreation] class ProjectInfoFinderImpl[F[_]: Async: Logger](

@@ -31,11 +31,11 @@ import io.renku.webhookservice.hookvalidation.ProjectHookVerifier.HookIdentifier
 import io.renku.webhookservice.model.ProjectHookUrl
 import org.typelevel.log4cats.Logger
 
-private trait ProjectHookVerifier[Interpretation[_]] {
+private trait ProjectHookVerifier[F[_]] {
   def checkHookPresence(
       projectHookId: HookIdentifier,
       accessToken:   AccessToken
-  ): Interpretation[Boolean]
+  ): F[Boolean]
 }
 
 private object ProjectHookVerifier {
