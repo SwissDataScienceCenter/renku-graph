@@ -18,9 +18,9 @@
 
 package io.renku.eventlog.subscriptions
 
+import cats.MonadThrow
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import cats.{MonadError, MonadThrow}
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SessionResource, SqlStatement}
 import io.renku.eventlog.{EventLogDB, Microservice, TypeSerializers}
@@ -33,20 +33,20 @@ import skunk._
 import skunk.data.Completion
 import skunk.implicits._
 
-private[subscriptions] trait EventDelivery[Interpretation[_], CategoryEvent] {
-  def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): Interpretation[Unit]
+private[subscriptions] trait EventDelivery[F[_], CategoryEvent] {
+  def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): F[Unit]
 }
 
-private class EventDeliveryImpl[Interpretation[_]: MonadCancelThrow, CategoryEvent](
-    sessionResource:          SessionResource[Interpretation, EventLogDB],
+private class EventDeliveryImpl[F[_]: MonadCancelThrow, CategoryEvent](
+    sessionResource:          SessionResource[F, EventLogDB],
     compoundEventIdExtractor: CategoryEvent => CompoundEventId,
-    queriesExecTimes:         LabeledHistogram[Interpretation, SqlStatement.Name],
+    queriesExecTimes:         LabeledHistogram[F, SqlStatement.Name],
     sourceUrl:                MicroserviceBaseUrl
 ) extends DbClient(Some(queriesExecTimes))
-    with EventDelivery[Interpretation, CategoryEvent]
+    with EventDelivery[F, CategoryEvent]
     with TypeSerializers {
 
-  def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): Interpretation[Unit] = sessionResource.useK {
+  def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): F[Unit] = sessionResource.useK {
     val CompoundEventId(id, projectId) = compoundEventIdExtractor(event)
     for {
       _      <- deleteDelivery(id, projectId)
@@ -82,9 +82,9 @@ private class EventDeliveryImpl[Interpretation[_]: MonadCancelThrow, CategoryEve
       .void
   }
 
-  private lazy val toResult: Completion => Interpretation[Unit] = {
-    case Completion.Insert(0 | 1) => ().pure[Interpretation]
-    case _ => new Exception("Inserted more than one record to the event_delivery").raiseError[Interpretation, Unit]
+  private lazy val toResult: Completion => F[Unit] = {
+    case Completion.Insert(0 | 1) => ().pure[F]
+    case _ => new Exception("Inserted more than one record to the event_delivery").raiseError[F, Unit]
   }
 }
 
@@ -103,15 +103,12 @@ private[subscriptions] object EventDelivery {
                                                   microserviceUrl
   )
 
-  def noOp[Interpretation[_]: MonadThrow, CategoryEvent]: Interpretation[EventDelivery[Interpretation, CategoryEvent]] =
-    new NoOpEventDelivery[Interpretation, CategoryEvent]()
-      .pure[Interpretation]
-      .widen[EventDelivery[Interpretation, CategoryEvent]]
+  def noOp[F[_]: MonadThrow, CategoryEvent]: F[EventDelivery[F, CategoryEvent]] =
+    new NoOpEventDelivery[F, CategoryEvent]()
+      .pure[F]
+      .widen[EventDelivery[F, CategoryEvent]]
 }
 
-private class NoOpEventDelivery[Interpretation[_]: MonadError[*[_], Throwable], CategoryEvent]
-    extends EventDelivery[Interpretation, CategoryEvent] {
-
-  override def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): Interpretation[Unit] =
-    ().pure[Interpretation]
+private class NoOpEventDelivery[F[_]: MonadThrow, CategoryEvent] extends EventDelivery[F, CategoryEvent] {
+  override def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): F[Unit] = ().pure[F]
 }

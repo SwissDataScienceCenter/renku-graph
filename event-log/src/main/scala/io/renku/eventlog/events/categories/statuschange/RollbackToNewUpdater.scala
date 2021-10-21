@@ -36,14 +36,14 @@ import skunk.~
 
 import java.time.Instant
 
-private class RollbackToNewUpdater[Interpretation[_]: MonadCancelThrow](
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
+private class RollbackToNewUpdater[F[_]: MonadCancelThrow](
+    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
-    with DBUpdater[Interpretation, RollbackToNew] {
+    with DBUpdater[F, RollbackToNew] {
 
-  override def updateDB(event: RollbackToNew): UpdateResult[Interpretation] = measureExecutionTime {
-    SqlStatement[Interpretation](name = "to_new rollback - status update")
+  override def updateDB(event: RollbackToNew): UpdateResult[F] = measureExecutionTime {
+    SqlStatement[F](name = "to_new rollback - status update")
       .command[ExecutionDate ~ EventId ~ projects.Id](
         sql"""UPDATE event
               SET status = '#${New.value}', execution_date = $executionDateEncoder
@@ -58,11 +58,11 @@ private class RollbackToNewUpdater[Interpretation[_]: MonadCancelThrow](
         case Completion.Update(1) =>
           DBUpdateResults
             .ForProjects(event.projectPath, Map(GeneratingTriples -> -1, New -> 1))
-            .pure[Interpretation]
+            .pure[F]
             .widen[DBUpdateResults]
         case _ =>
           new Exception(s"Could not rollback event ${event.eventId} to status $New")
-            .raiseError[Interpretation, DBUpdateResults]
+            .raiseError[F, DBUpdateResults]
       }
   }
 

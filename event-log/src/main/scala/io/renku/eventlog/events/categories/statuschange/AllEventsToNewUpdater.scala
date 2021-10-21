@@ -31,13 +31,13 @@ import skunk.implicits._
 
 import java.time.Instant
 
-private class AllEventsToNewUpdater[Interpretation[_]: MonadCancelThrow](
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
+private class AllEventsToNewUpdater[F[_]: MonadCancelThrow](
+    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
-    with DBUpdater[Interpretation, AllEventsToNew] {
+    with DBUpdater[F, AllEventsToNew] {
 
-  override def updateDB(event: AllEventsToNew): UpdateResult[Interpretation] = for {
+  override def updateDB(event: AllEventsToNew): UpdateResult[F] = for {
     _ <- updateStatuses()
     _ <- removeAllProcessingTimes()
     _ <- removeAllPayloads()

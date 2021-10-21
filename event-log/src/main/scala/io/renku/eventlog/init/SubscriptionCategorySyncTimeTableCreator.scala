@@ -27,31 +27,31 @@ import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-private trait SubscriptionCategorySyncTimeTableCreator[Interpretation[_]] {
-  def run(): Interpretation[Unit]
+private trait SubscriptionCategorySyncTimeTableCreator[F[_]] {
+  def run(): F[Unit]
 }
 
 private object SubscriptionCategorySyncTimeTableCreator {
-  def apply[Interpretation[_]: MonadCancelThrow: Logger](
-      sessionResource: SessionResource[Interpretation, EventLogDB]
-  ): SubscriptionCategorySyncTimeTableCreator[Interpretation] =
-    new SubscriptionCategorySyncTimeTableCreatorImpl[Interpretation](sessionResource)
+  def apply[F[_]: MonadCancelThrow: Logger](
+      sessionResource: SessionResource[F, EventLogDB]
+  ): SubscriptionCategorySyncTimeTableCreator[F] =
+    new SubscriptionCategorySyncTimeTableCreatorImpl[F](sessionResource)
 }
 
-private class SubscriptionCategorySyncTimeTableCreatorImpl[Interpretation[_]: MonadCancelThrow: Logger](
-    sessionResource: SessionResource[Interpretation, EventLogDB]
-) extends SubscriptionCategorySyncTimeTableCreator[Interpretation] {
+private class SubscriptionCategorySyncTimeTableCreatorImpl[F[_]: MonadCancelThrow: Logger](
+    sessionResource: SessionResource[F, EventLogDB]
+) extends SubscriptionCategorySyncTimeTableCreator[F] {
 
   import cats.syntax.all._
 
-  override def run(): Interpretation[Unit] = sessionResource.useK {
+  override def run(): F[Unit] = sessionResource.useK {
     checkTableExists >>= {
-      case true  => Kleisli.liftF(Logger[Interpretation] info "'subscription_category_sync_time' table exists")
+      case true  => Kleisli.liftF(Logger[F] info "'subscription_category_sync_time' table exists")
       case false => createTable()
     }
   }
 
-  private lazy val checkTableExists: Kleisli[Interpretation, Session[Interpretation], Boolean] = {
+  private lazy val checkTableExists: Kleisli[F, Session[F], Boolean] = {
     val query: Query[Void, Boolean] =
       sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'subscription_category_sync_time')".query(bool)
     Kleisli(
@@ -60,7 +60,7 @@ private class SubscriptionCategorySyncTimeTableCreatorImpl[Interpretation[_]: Mo
     )
   }
 
-  private def createTable(): Kleisli[Interpretation, Session[Interpretation], Unit] = for {
+  private def createTable(): Kleisli[F, Session[F], Unit] = for {
     _ <- execute(createTableSql)
     _ <- execute(
            sql"CREATE INDEX IF NOT EXISTS idx_project_id ON subscription_category_sync_time(project_id)".command
@@ -73,7 +73,7 @@ private class SubscriptionCategorySyncTimeTableCreatorImpl[Interpretation[_]: Mo
       execute(
         sql"CREATE INDEX IF NOT EXISTS idx_last_synced ON subscription_category_sync_time(last_synced)".command
       )
-    _ <- Kleisli.liftF(Logger[Interpretation] info "'subscription_category_sync_time' table created")
+    _ <- Kleisli.liftF(Logger[F] info "'subscription_category_sync_time' table created")
     _ <- execute(foreignKeySql)
   } yield ()
 

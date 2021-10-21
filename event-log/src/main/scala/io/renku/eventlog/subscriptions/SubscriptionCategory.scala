@@ -24,13 +24,13 @@ import io.circe.Json
 import io.renku.eventlog.subscriptions.SubscriptionCategory._
 import io.renku.graph.model.events.CategoryName
 
-private trait SubscriptionCategory[Interpretation[_]] {
+private trait SubscriptionCategory[F[_]] {
 
   def name: CategoryName
 
-  def run(): Interpretation[Unit]
+  def run(): F[Unit]
 
-  def register(payload: Json): Interpretation[RegistrationResult]
+  def register(payload: Json): F[RegistrationResult]
 }
 
 private[subscriptions] object SubscriptionCategory {
@@ -45,16 +45,16 @@ private[subscriptions] object SubscriptionCategory {
   }
 }
 
-private class SubscriptionCategoryImpl[Interpretation[_]: MonadThrow, SubscriptionInfoType <: SubscriptionInfo](
+private class SubscriptionCategoryImpl[F[_]: MonadThrow, SubscriptionInfoType <: SubscriptionInfo](
     val name:          CategoryName,
-    subscribers:       Subscribers[Interpretation],
-    eventsDistributor: EventsDistributor[Interpretation],
-    deserializer:      SubscriptionRequestDeserializer[Interpretation, SubscriptionInfoType]
-) extends SubscriptionCategory[Interpretation] {
+    subscribers:       Subscribers[F],
+    eventsDistributor: EventsDistributor[F],
+    deserializer:      SubscriptionRequestDeserializer[F, SubscriptionInfoType]
+) extends SubscriptionCategory[F] {
 
-  override def run(): Interpretation[Unit] = eventsDistributor.run()
+  override def run(): F[Unit] = eventsDistributor.run()
 
-  override def register(payload: Json): Interpretation[RegistrationResult] = {
+  override def register(payload: Json): F[RegistrationResult] = {
     for {
       subscriptionInfo <- OptionT(deserializer deserialize payload)
       _                <- OptionT.liftF(subscribers add subscriptionInfo)

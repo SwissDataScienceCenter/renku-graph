@@ -37,43 +37,43 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-private class EventHandler[Interpretation[_]: MonadThrow: Spawn: Concurrent: Logger](
+private class EventHandler[F[_]: MonadThrow: Spawn: Concurrent: Logger](
     override val categoryName:          CategoryName,
-    zombieStatusCleaner:                ZombieStatusCleaner[Interpretation],
-    awaitingTriplesGenerationGauge:     LabeledGauge[Interpretation, projects.Path],
-    underTriplesGenerationGauge:        LabeledGauge[Interpretation, projects.Path],
-    awaitingTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
-    underTriplesTransformationGauge:    LabeledGauge[Interpretation, projects.Path]
-) extends consumers.EventHandlerWithProcessLimiter[Interpretation](ConcurrentProcessesLimiter.withoutLimit) {
+    zombieStatusCleaner:                ZombieStatusCleaner[F],
+    awaitingTriplesGenerationGauge:     LabeledGauge[F, projects.Path],
+    underTriplesGenerationGauge:        LabeledGauge[F, projects.Path],
+    awaitingTriplesTransformationGauge: LabeledGauge[F, projects.Path],
+    underTriplesTransformationGauge:    LabeledGauge[F, projects.Path]
+) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
 
   import io.renku.graph.model.projects
 
   override def createHandlingProcess(
       request: EventRequestContent
-  ): Interpretation[EventHandlingProcess[Interpretation]] =
-    EventHandlingProcess[Interpretation](startCleanZombieEvents(request))
+  ): F[EventHandlingProcess[F]] =
+    EventHandlingProcess[F](startCleanZombieEvents(request))
 
   private def startCleanZombieEvents(request: EventRequestContent) = for {
-    event <- fromEither[Interpretation](
+    event <- fromEither[F](
                request.event.as[ZombieEvent].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult]
              )
-    result <- Spawn[Interpretation]
+    result <- Spawn[F]
                 .start(cleanZombieStatus(event))
                 .toRightT
                 .map(_ => Accepted)
-                .semiflatTap(Logger[Interpretation].log(event))
-                .leftSemiflatTap(Logger[Interpretation].log(event))
+                .semiflatTap(Logger[F].log(event))
+                .leftSemiflatTap(Logger[F].log(event))
   } yield result
 
-  private def cleanZombieStatus(event: ZombieEvent): Interpretation[Unit] = {
+  private def cleanZombieStatus(event: ZombieEvent): F[Unit] = {
     for {
       result <- zombieStatusCleaner.cleanZombieStatus(event)
-      _      <- Applicative[Interpretation].whenA(result == Updated)(updateGauges(event))
-      _      <- Logger[Interpretation].logInfo(event, result.toString)
+      _      <- Applicative[F].whenA(result == Updated)(updateGauges(event))
+      _      <- Logger[F].logInfo(event, result.toString)
     } yield ()
-  } recoverWith { case NonFatal(exception) => Logger[Interpretation].logError(event, exception) }
+  } recoverWith { case NonFatal(exception) => Logger[F].logError(event, exception) }
 
-  private lazy val updateGauges: ZombieEvent => Interpretation[Unit] = {
+  private lazy val updateGauges: ZombieEvent => F[Unit] = {
     case GeneratingTriplesZombieEvent(_, projectPath) =>
       for {
         _ <- awaitingTriplesGenerationGauge.increment(projectPath)

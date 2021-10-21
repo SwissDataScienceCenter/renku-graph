@@ -27,22 +27,22 @@ import skunk.Transaction
 
 import scala.util.control.NonFatal
 
-private trait StatusChanger[Interpretation[_]] {
+private trait StatusChanger[F[_]] {
   def updateStatuses[E <: StatusChangeEvent](event: E)(implicit
-      dbUpdater:                                    DBUpdater[Interpretation, E]
-  ): Interpretation[Unit]
+      dbUpdater:                                    DBUpdater[F, E]
+  ): F[Unit]
 }
 
-private class StatusChangerImpl[Interpretation[_]: MonadCancelThrow](
-    sessionResource: SessionResource[Interpretation, EventLogDB],
-    gaugesUpdater:   GaugesUpdater[Interpretation]
-) extends StatusChanger[Interpretation] {
+private class StatusChangerImpl[F[_]: MonadCancelThrow](
+    sessionResource: SessionResource[F, EventLogDB],
+    gaugesUpdater:   GaugesUpdater[F]
+) extends StatusChanger[F] {
 
   import gaugesUpdater._
 
   override def updateStatuses[E <: StatusChangeEvent](
       event:            E
-  )(implicit dbUpdater: DBUpdater[Interpretation, E]): Interpretation[Unit] = sessionResource.useWithTransactionK {
+  )(implicit dbUpdater: DBUpdater[F, E]): F[Unit] = sessionResource.useWithTransactionK {
     Kleisli { case (transaction, session) =>
       {
         for {
@@ -54,16 +54,16 @@ private class StatusChangerImpl[Interpretation[_]: MonadCancelThrow](
     }
   }
 
-  private def rollback[E <: StatusChangeEvent](transaction: Transaction[Interpretation])(
+  private def rollback[E <: StatusChangeEvent](transaction: Transaction[F])(
       savepoint:                                            transaction.Savepoint
   )(event:                                                  E)(implicit
-      dbUpdater:                                            DBUpdater[Interpretation, E]
-  ): PartialFunction[Throwable, UpdateResult[Interpretation]] = { case NonFatal(err) =>
+      dbUpdater:                                            DBUpdater[F, E]
+  ): PartialFunction[Throwable, UpdateResult[F]] = { case NonFatal(err) =>
     Kleisli.liftF {
       for {
         _ <- transaction.rollback(savepoint)
         _ <- sessionResource.useK(dbUpdater onRollback event)
-        _ <- err.raiseError[Interpretation, DBUpdateResults]
+        _ <- err.raiseError[F, DBUpdateResults]
       } yield DBUpdateResults.ForProjects.empty
     }
   }

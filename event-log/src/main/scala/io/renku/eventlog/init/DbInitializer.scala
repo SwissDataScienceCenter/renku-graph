@@ -28,20 +28,19 @@ import org.typelevel.log4cats.Logger
 import scala.language.reflectiveCalls
 import scala.util.control.NonFatal
 
-trait DbInitializer[Interpretation[_]] {
-  def run(): Interpretation[Unit]
+trait DbInitializer[F[_]] {
+  def run(): F[Unit]
 }
 
-class DbInitializerImpl[Interpretation[_]: MonadCancelThrow: Logger](migrators: List[Runnable[Interpretation, Unit]])
-    extends DbInitializer[Interpretation] {
+class DbInitializerImpl[F[_]: MonadCancelThrow: Logger](migrators: List[Runnable[F, Unit]]) extends DbInitializer[F] {
 
-  override def run(): Interpretation[Unit] = {
-    migrators.map(_.run()).sequence >> Logger[Interpretation].info("Event Log database initialization success")
+  override def run(): F[Unit] = {
+    migrators.map(_.run()).sequence >> Logger[F].info("Event Log database initialization success")
   } recoverWith logging
 
-  private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    Logger[Interpretation].error(exception)("Event Log database initialization failure")
-    exception.raiseError[Interpretation, Unit]
+  private lazy val logging: PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
+    Logger[F].error(exception)("Event Log database initialization failure")
+    exception.raiseError[F, Unit]
   }
 }
 

@@ -32,14 +32,14 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-trait ProcessingStatusEndpoint[Interpretation[_]] {
-  def findProcessingStatus(projectId: projects.Id): Interpretation[Response[Interpretation]]
+trait ProcessingStatusEndpoint[F[_]] {
+  def findProcessingStatus(projectId: projects.Id): F[Response[F]]
 }
 
-class ProcessingStatusEndpointImpl[Interpretation[_]: MonadThrow: Logger](
-    processingStatusFinder: ProcessingStatusFinder[Interpretation]
-) extends Http4sDsl[Interpretation]
-    with ProcessingStatusEndpoint[Interpretation] {
+class ProcessingStatusEndpointImpl[F[_]: MonadThrow: Logger](
+    processingStatusFinder: ProcessingStatusFinder[F]
+) extends Http4sDsl[F]
+    with ProcessingStatusEndpoint[F] {
 
   import cats.syntax.all._
   import io.circe.Encoder
@@ -52,7 +52,7 @@ class ProcessingStatusEndpointImpl[Interpretation[_]: MonadThrow: Logger](
   import org.http4s.circe._
   import processingStatusFinder._
 
-  override def findProcessingStatus(projectId: projects.Id): Interpretation[Response[Interpretation]] = {
+  override def findProcessingStatus(projectId: projects.Id): F[Response[F]] = {
     for {
       maybeProcessingStatus <- fetchStatus(projectId).value
       response              <- maybeProcessingStatus.toResponse
@@ -68,7 +68,7 @@ class ProcessingStatusEndpointImpl[Interpretation[_]: MonadThrow: Logger](
   }
 
   private implicit class StatusOps(maybeProcessingStatus: Option[ProcessingStatus]) {
-    lazy val toResponse: Interpretation[Response[Interpretation]] =
+    lazy val toResponse: F[Response[F]] =
       maybeProcessingStatus.fold {
         NotFound(InfoMessage("No processing status found").asJson)
       } { status =>
@@ -78,9 +78,9 @@ class ProcessingStatusEndpointImpl[Interpretation[_]: MonadThrow: Logger](
 
   private def internalServerError(
       projectId: projects.Id
-  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = { case NonFatal(exception) =>
+  ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
     val errorMessage = ErrorMessage(s"Finding processing status for project $projectId failed")
-    Logger[Interpretation].error(exception)(errorMessage.value)
+    Logger[F].error(exception)(errorMessage.value)
     InternalServerError(errorMessage)
   }
 }

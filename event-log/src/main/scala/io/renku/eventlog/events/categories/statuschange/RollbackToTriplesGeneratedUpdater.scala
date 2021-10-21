@@ -36,14 +36,14 @@ import skunk.~
 
 import java.time.Instant
 
-private class RollbackToTriplesGeneratedUpdater[Interpretation[_]: MonadCancelThrow](
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
+private class RollbackToTriplesGeneratedUpdater[F[_]: MonadCancelThrow](
+    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
-    with DBUpdater[Interpretation, RollbackToTriplesGenerated] {
+    with DBUpdater[F, RollbackToTriplesGenerated] {
 
-  override def updateDB(event: RollbackToTriplesGenerated): UpdateResult[Interpretation] = measureExecutionTime {
-    SqlStatement[Interpretation](name = "to_triples_generated rollback - status update")
+  override def updateDB(event: RollbackToTriplesGenerated): UpdateResult[F] = measureExecutionTime {
+    SqlStatement[F](name = "to_triples_generated rollback - status update")
       .command[ExecutionDate ~ EventId ~ projects.Id](
         sql"""UPDATE event
               SET status = '#${TriplesGenerated.value}', execution_date = $executionDateEncoder
@@ -58,11 +58,11 @@ private class RollbackToTriplesGeneratedUpdater[Interpretation[_]: MonadCancelTh
         case Completion.Update(1) =>
           DBUpdateResults
             .ForProjects(event.projectPath, Map(TransformingTriples -> -1, TriplesGenerated -> 1))
-            .pure[Interpretation]
+            .pure[F]
             .widen[DBUpdateResults]
         case _ =>
           new Exception(s"Could not rollback event ${event.eventId} to status $TriplesGenerated")
-            .raiseError[Interpretation, DBUpdateResults]
+            .raiseError[F, DBUpdateResults]
       }
   }
 

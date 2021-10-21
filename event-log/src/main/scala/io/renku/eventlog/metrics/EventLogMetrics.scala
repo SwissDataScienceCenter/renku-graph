@@ -28,8 +28,8 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.control.NonFatal
 
-trait EventLogMetrics[Interpretation[_]] {
-  def run(): Interpretation[Unit]
+trait EventLogMetrics[F[_]] {
+  def run(): F[Unit]
 }
 
 class EventLogMetricsImpl[F[_]: Temporal: Logger](

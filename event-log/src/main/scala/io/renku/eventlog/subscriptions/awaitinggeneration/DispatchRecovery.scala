@@ -33,12 +33,12 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-private class DispatchRecoveryImpl[Interpretation[_]: MonadThrow: Logger](
-    eventSender: EventSender[Interpretation]
-) extends subscriptions.DispatchRecovery[Interpretation, AwaitingGenerationEvent]
+private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
+    eventSender: EventSender[F]
+) extends subscriptions.DispatchRecovery[F, AwaitingGenerationEvent]
     with TinyTypeEncoders {
 
-  override def returnToQueue(event: AwaitingGenerationEvent): Interpretation[Unit] =
+  override def returnToQueue(event: AwaitingGenerationEvent): F[Unit] =
     eventSender.sendEvent(
       EventRequestContent.NoPayload(
         json"""{
@@ -57,7 +57,7 @@ private class DispatchRecoveryImpl[Interpretation[_]: MonadThrow: Logger](
   override def recover(
       url:   SubscriberUrl,
       event: AwaitingGenerationEvent
-  ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
+  ): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
     val requestContent = EventRequestContent.NoPayload(
       json"""{
         "categoryName": "EVENTS_STATUS_CHANGE",
@@ -71,7 +71,7 @@ private class DispatchRecoveryImpl[Interpretation[_]: MonadThrow: Logger](
       }"""
     )
     val errorMessage = s"${SubscriptionCategory.name}: $event, url = $url -> $GenerationNonRecoverableFailure"
-    eventSender.sendEvent(requestContent, errorMessage) >> Logger[Interpretation].error(exception)(errorMessage)
+    eventSender.sendEvent(requestContent, errorMessage) >> Logger[F].error(exception)(errorMessage)
   }
 }
 

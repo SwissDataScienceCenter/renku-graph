@@ -30,20 +30,20 @@ import skunk._
 import skunk.data.Completion
 import skunk.implicits._
 
-private trait SubscriberTracker[Interpretation[_]] {
-  def add(subscriptionInfo: SubscriptionInfo): Interpretation[Boolean]
-  def remove(subscriberUrl: SubscriberUrl):    Interpretation[Boolean]
+private trait SubscriberTracker[F[_]] {
+  def add(subscriptionInfo: SubscriptionInfo): F[Boolean]
+  def remove(subscriberUrl: SubscriberUrl):    F[Boolean]
 }
 
-private class SubscriberTrackerImpl[Interpretation[_]: MonadCancelThrow](
-    sessionResource:  SessionResource[Interpretation, EventLogDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
+private class SubscriberTrackerImpl[F[_]: MonadCancelThrow](
+    sessionResource:  SessionResource[F, EventLogDB],
+    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name],
     sourceUrl:        MicroserviceBaseUrl
 ) extends DbClient(Some(queriesExecTimes))
-    with SubscriberTracker[Interpretation]
+    with SubscriberTracker[F]
     with TypeSerializers {
 
-  override def add(subscriptionInfo: SubscriptionInfo): Interpretation[Boolean] = sessionResource.useK {
+  override def add(subscriptionInfo: SubscriptionInfo): F[Boolean] = sessionResource.useK {
     measureExecutionTime(
       SqlStatement(name = "subscriber - add")
         .command[SubscriberId ~ SubscriberUrl ~ MicroserviceBaseUrl ~ SubscriberId](
@@ -60,7 +60,7 @@ private class SubscriberTrackerImpl[Interpretation[_]: MonadCancelThrow](
     ) map insertToTableResult
   }
 
-  override def remove(subscriberUrl: SubscriberUrl): Interpretation[Boolean] = sessionResource.useK {
+  override def remove(subscriberUrl: SubscriberUrl): F[Boolean] = sessionResource.useK {
     measureExecutionTime(
       SqlStatement(name = "subscriber - delete")
         .command[SubscriberUrl ~ MicroserviceBaseUrl](

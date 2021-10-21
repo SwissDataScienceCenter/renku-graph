@@ -25,14 +25,14 @@ import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.graph.model.events.CategoryName
 import org.typelevel.log4cats.Logger
 
-private trait Subscribers[Interpretation[_]] {
-  def add(subscriptionInfo: SubscriptionInfo): Interpretation[Unit]
+private trait Subscribers[F[_]] {
+  def add(subscriptionInfo: SubscriptionInfo): F[Unit]
 
-  def delete(subscriberUrl: SubscriberUrl): Interpretation[Unit]
+  def delete(subscriberUrl: SubscriberUrl): F[Unit]
 
-  def markBusy(subscriberUrl: SubscriberUrl): Interpretation[Unit]
+  def markBusy(subscriberUrl: SubscriberUrl): F[Unit]
 
-  def runOnSubscriber(f: SubscriberUrl => Interpretation[Unit]): Interpretation[Unit]
+  def runOnSubscriber(f: SubscriberUrl => F[Unit]): F[Unit]
 
   def getTotalCapacity: Option[Capacity]
 }

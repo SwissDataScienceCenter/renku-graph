@@ -39,18 +39,18 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-private class EventHandler[Interpretation[_]: MonadThrow: Async: Spawn: Concurrent: Logger](
+private class EventHandler[F[_]: MonadThrow: Async: Spawn: Concurrent: Logger](
     override val categoryName: CategoryName,
-    statusChanger:             StatusChanger[Interpretation],
-    deliveryInfoRemover:       DeliveryInfoRemover[Interpretation],
-    queriesExecTimes:          LabeledHistogram[Interpretation, SqlStatement.Name]
-) extends consumers.EventHandlerWithProcessLimiter[Interpretation](ConcurrentProcessesLimiter.withoutLimit) {
+    statusChanger:             StatusChanger[F],
+    deliveryInfoRemover:       DeliveryInfoRemover[F],
+    queriesExecTimes:          LabeledHistogram[F, SqlStatement.Name]
+) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
 
   import EventHandler._
 
   override def createHandlingProcess(
       request: EventRequestContent
-  ): Interpretation[EventHandlingProcess[Interpretation]] = EventHandlingProcess[Interpretation] {
+  ): F[EventHandlingProcess[F]] = EventHandlingProcess[F] {
     tryHandle(
       requestAs[ToTriplesGenerated],
       requestAs[ToTriplesStore],
@@ -63,17 +63,17 @@ private class EventHandler[Interpretation[_]: MonadThrow: Async: Spawn: Concurre
   }
 
   private def tryHandle(
-      options: EventRequestContent => EitherT[Interpretation, EventSchedulingResult, Accepted]*
-  ): EventRequestContent => EitherT[Interpretation, EventSchedulingResult, Accepted] = request =>
+      options: EventRequestContent => EitherT[F, EventSchedulingResult, Accepted]*
+  ): EventRequestContent => EitherT[F, EventSchedulingResult, Accepted] = request =>
     options.foldLeft(
-      EitherT.left[Accepted](UnsupportedEventType.pure[Interpretation].widen[EventSchedulingResult])
+      EitherT.left[Accepted](UnsupportedEventType.pure[F].widen[EventSchedulingResult])
     ) { case (previousOptionResult, option) => previousOptionResult orElse option(request) }
 
   private def requestAs[E <: StatusChangeEvent](request: EventRequestContent)(implicit
-      updaterFactory:                                    EventUpdaterFactory[Interpretation, E],
+      updaterFactory:                                    EventUpdaterFactory[F, E],
       show:                                              Show[E],
       decoder:                                           EventRequestContent => Either[DecodingFailure, E]
-  ): EitherT[Interpretation, EventSchedulingResult, Accepted] = EitherT(
+  ): EitherT[F, EventSchedulingResult, Accepted] = EitherT(
     decode[E](request)
       .map(startUpdate)
       .leftMap(_ => BadRequest)
@@ -82,20 +82,20 @@ private class EventHandler[Interpretation[_]: MonadThrow: Async: Spawn: Concurre
   )
 
   private def startUpdate[E <: StatusChangeEvent](implicit
-      updaterFactory: EventUpdaterFactory[Interpretation, E],
+      updaterFactory: EventUpdaterFactory[F, E],
       show:           Show[E]
-  ): E => Interpretation[Accepted] = event =>
-    Spawn[Interpretation]
+  ): E => F[Accepted] = event =>
+    Spawn[F]
       .start(executeUpdate(event))
       .map(_ => Accepted)
-      .flatTap(Logger[Interpretation].log(event.show))
+      .flatTap(Logger[F].log(event.show))
 
   private def executeUpdate[E <: StatusChangeEvent](
       event:                 E
-  )(implicit updaterFactory: EventUpdaterFactory[Interpretation, E], show: Show[E]) = statusChanger
+  )(implicit updaterFactory: EventUpdaterFactory[F, E], show: Show[E]) = statusChanger
     .updateStatuses(event)(updaterFactory(deliveryInfoRemover, queriesExecTimes))
-    .recoverWith { case NonFatal(e) => Logger[Interpretation].logError(event, e) >> e.raiseError[Interpretation, Unit] }
-    .flatTap(_ => Logger[Interpretation].logInfo(event, "Processed"))
+    .recoverWith { case NonFatal(e) => Logger[F].logError(event, e) >> e.raiseError[F, Unit] }
+    .flatTap(_ => Logger[F].logInfo(event, "Processed"))
 }
 
 private object EventHandler {
