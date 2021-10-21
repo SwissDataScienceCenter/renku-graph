@@ -47,12 +47,17 @@ private object Commands {
 
   object RepositoryPath extends TinyTypeFactory[RepositoryPath](new RepositoryPath(_))
 
-  class GitLabRepoUrlFinder[Interpretation[_]: MonadThrow](gitLabUrl: GitLabUrl) {
+  trait GitLabRepoUrlFinder[Interpretation[_]] {
+    def findRepositoryUrl(projectPath: projects.Path, maybeAccessToken: Option[AccessToken]): Interpretation[ServiceUrl]
+  }
+
+  class GitLabRepoUrlFinderImpl[Interpretation[_]: MonadThrow](gitLabUrl: GitLabUrl)
+      extends GitLabRepoUrlFinder[Interpretation] {
 
     import java.net.URL
 
-    def findRepositoryUrl(projectPath:      projects.Path,
-                          maybeAccessToken: Option[AccessToken]
+    override def findRepositoryUrl(projectPath:      projects.Path,
+                                   maybeAccessToken: Option[AccessToken]
     ): Interpretation[ServiceUrl] =
       merge(gitLabUrl, findUrlTokenPart(maybeAccessToken), projectPath)
 

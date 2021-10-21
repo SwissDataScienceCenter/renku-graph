@@ -57,7 +57,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
     "define a GET /events - case with project-path only" in new TestCase {
       val projectPath = projectPaths.generateOne
 
-      val request = Request[IO](method = GET, uri"events".withQueryParam("project-path", projectPath.value))
+      val request = Request[IO](method = GET, uri"/events".withQueryParam("project-path", projectPath.value))
 
       (eventsEndpoint.findEvents _)
         .expects(EventsEndpoint.Request.ProjectEvents(projectPath, None, PagingRequest.default))
@@ -69,7 +69,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
     "define a GET /events - case with status only" in new TestCase {
       val eventStatus = eventStatuses.generateOne
 
-      val request = Request[IO](method = GET, uri"events".withQueryParam("status", eventStatus.value))
+      val request = Request[IO](method = GET, uri"/events".withQueryParam("status", eventStatus.value))
 
       (eventsEndpoint.findEvents _)
         .expects(EventsEndpoint.Request.EventsWithStatus(eventStatus, PagingRequest.default))
@@ -85,7 +85,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
 
       val request = Request[IO](
         method = GET,
-        uri"events"
+        uri"/events"
           .withQueryParam("project-path", projectPath.value)
           .withQueryParam("status", eventStatus.value)
           .withQueryParam("page", pagingRequest.page.value)
@@ -100,12 +100,12 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
     }
 
     Set(
-      uri"events".withQueryParam("project-path", nonEmptyStrings().generateOne),
-      uri"events".withQueryParam("status", nonEmptyStrings().generateOne),
-      uri"events"
+      uri"/events".withQueryParam("project-path", nonEmptyStrings().generateOne),
+      uri"/events".withQueryParam("status", nonEmptyStrings().generateOne),
+      uri"/events"
         .withQueryParam("status", eventStatuses.generateOne.show)
         .withQueryParam("page", nonEmptyStrings().generateOne),
-      uri"events"
+      uri"/events"
         .withQueryParam("status", eventStatuses.generateOne.show)
         .withQueryParam("per_page", nonEmptyStrings().generateOne)
     ) foreach { uri =>
@@ -115,7 +115,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
     }
 
     "define a GET /events not finding the endpoint when no project-path or status parameter is present" in new TestCase {
-      routes.call(Request[IO](method = GET, uri"events")).status shouldBe NotFound
+      routes.call(Request[IO](method = GET, uri"/events")).status shouldBe NotFound
     }
 
     "define a GET /events/:event-id/:project-id endpoint" in new TestCase {
@@ -123,7 +123,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
 
       val request = Request[IO](
         method = GET,
-        uri"events" / eventId.id.toString / eventId.projectId.toString
+        uri"/events" / eventId.id.toString / eventId.projectId.toString
       )
 
       (eventDetailsEndpoint.getDetails _).expects(eventId).returning(Response[IO](Ok).pure[IO])
@@ -134,7 +134,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
     }
 
     "define a POST /events endpoint" in new TestCase {
-      val request        = Request[IO](POST, uri"events")
+      val request        = Request[IO](POST, uri"/events")
       val expectedStatus = Gen.oneOf(Accepted, BadRequest, InternalServerError, TooManyRequests).generateOne
       (eventEndpoint.processEvent _).expects(request).returning(Response[IO](expectedStatus).pure[IO])
 
@@ -145,7 +145,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
 
     "define a GET /metrics endpoint returning OK with some prometheus metrics" in new TestCase {
       val response = routes.call(
-        Request(GET, uri"metrics")
+        Request(GET, uri"/metrics")
       )
 
       response.status     shouldBe Ok
@@ -153,7 +153,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
     }
 
     "define a GET /ping endpoint returning OK with 'pong' body" in new TestCase {
-      val response = routes.call(Request(GET, uri"ping"))
+      val response = routes.call(Request(GET, uri"/ping"))
 
       response.status       shouldBe Ok
       response.body[String] shouldBe "pong"
@@ -162,7 +162,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
     "define a GET /processing-status?project-id=:id endpoint" in new TestCase {
       val projectId = projectIds.generateOne
 
-      val request = Request[IO](GET, uri"processing-status".withQueryParam("project-id", projectId.toString))
+      val request = Request[IO](GET, uri"/processing-status".withQueryParam("project-id", projectId.toString))
       (processingStatusEndpoint.findProcessingStatus _).expects(projectId).returning(Response[IO](Ok).pure[IO])
 
       val response = routes.call(request)
@@ -173,7 +173,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
     "define a GET /processing-status?project-id=:id endpoint " +
       s"returning $NotFound if no project-id parameter is given" in new TestCase {
 
-        val request = Request[IO](GET, uri"processing-status")
+        val request = Request[IO](GET, uri"/processing-status")
 
         val response = routes.call(request)
 
@@ -184,7 +184,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
 
     "define a GET /processing-status?project-id=:id endpoint " +
       s"returning $BadRequest if illegal project-id parameter value is given" in new TestCase {
-        val request = Request[IO](GET, uri"processing-status".withQueryParam("project-id", "non int value"))
+        val request = Request[IO](GET, uri"/processing-status".withQueryParam("project-id", "non int value"))
 
         val response = routes.call(request)
 
@@ -194,7 +194,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
       }
 
     "define a POST /subscriptions endpoint" in new TestCase {
-      val request = Request[IO](POST, uri"subscriptions")
+      val request = Request[IO](POST, uri"/subscriptions")
 
       (subscriptionsEndpoint.addSubscription _).expects(request).returning(Response[IO](Accepted).pure[IO])
 
@@ -203,8 +203,6 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
       response.status shouldBe Accepted
     }
   }
-
-  private implicit val clock: Clock[IO] = IO.timer(ExecutionContext.global).clock
 
   private trait TestCase {
     val eventEndpoint            = mock[EventEndpoint[IO]]
