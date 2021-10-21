@@ -33,26 +33,25 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-trait DeleteTokenEndpoint[Interpretation[_]] {
-  def deleteToken(projectId: Id): Interpretation[Response[Interpretation]]
+trait DeleteTokenEndpoint[F[_]] {
+  def deleteToken(projectId: Id): F[Response[F]]
 }
 
-class DeleteTokenEndpointImpl[Interpretation[_]: MonadThrow: Logger](
-    tokenRemover: TokenRemover[Interpretation]
-) extends Http4sDsl[Interpretation]
-    with DeleteTokenEndpoint[Interpretation] {
+class DeleteTokenEndpointImpl[F[_]: MonadThrow: Logger](
+    tokenRemover: TokenRemover[F]
+) extends Http4sDsl[F]
+    with DeleteTokenEndpoint[F] {
 
-  override def deleteToken(projectId: Id): Interpretation[Response[Interpretation]] =
+  override def deleteToken(projectId: Id): F[Response[F]] =
     tokenRemover
       .delete(projectId)
       .flatMap(_ => NoContent())
       .recoverWith(httpResult(projectId))
 
-  private def httpResult(projectId: Id): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
-    case NonFatal(exception) =>
-      val errorMessage = ErrorMessage(s"Deleting token for projectId: $projectId failed")
-      Logger[Interpretation].error(exception)(errorMessage.value)
-      InternalServerError(errorMessage)
+  private def httpResult(projectId: Id): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
+    val errorMessage = ErrorMessage(s"Deleting token for projectId: $projectId failed")
+    Logger[F].error(exception)(errorMessage.value)
+    InternalServerError(errorMessage)
   }
 }
 

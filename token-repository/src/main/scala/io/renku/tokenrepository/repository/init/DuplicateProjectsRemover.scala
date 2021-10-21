@@ -27,28 +27,28 @@ import org.typelevel.log4cats.Logger
 import skunk.implicits._
 import skunk.{Command, Session}
 
-private trait DuplicateProjectsRemover[Interpretation[_]] {
-  def run(): Interpretation[Unit]
+private trait DuplicateProjectsRemover[F[_]] {
+  def run(): F[Unit]
 }
 
 private object DuplicateProjectsRemover {
-  def apply[Interpretation[_]: MonadCancelThrow: Logger](
-      sessionResource: SessionResource[Interpretation, ProjectsTokensDB]
-  ): DuplicateProjectsRemover[Interpretation] = new DuplicateProjectsRemoverImpl(sessionResource)
+  def apply[F[_]: MonadCancelThrow: Logger](
+      sessionResource: SessionResource[F, ProjectsTokensDB]
+  ): DuplicateProjectsRemover[F] = new DuplicateProjectsRemoverImpl(sessionResource)
 }
 
-private class DuplicateProjectsRemoverImpl[Interpretation[_]: MonadCancelThrow: Logger](
-    sessionResource: SessionResource[Interpretation, ProjectsTokensDB]
-) extends DuplicateProjectsRemover[Interpretation] {
+private class DuplicateProjectsRemoverImpl[F[_]: MonadCancelThrow: Logger](
+    sessionResource: SessionResource[F, ProjectsTokensDB]
+) extends DuplicateProjectsRemover[F] {
 
-  override def run(): Interpretation[Unit] = sessionResource.useK {
+  override def run(): F[Unit] = sessionResource.useK {
     for {
       _ <- deduplicateProjects()
-      _ <- Kleisli.liftF(Logger[Interpretation] info "Projects de-duplicated")
+      _ <- Kleisli.liftF(Logger[F] info "Projects de-duplicated")
     } yield ()
   }
 
-  private def deduplicateProjects(): Kleisli[Interpretation, Session[Interpretation], Unit] = {
+  private def deduplicateProjects(): Kleisli[F, Session[F], Unit] = {
 
     val query: Command[skunk.Void] =
       sql"""DELETE FROM projects_tokens WHERE project_id IN (

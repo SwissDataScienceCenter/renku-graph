@@ -37,43 +37,43 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-trait FetchTokenEndpoint[Interpretation[_]] {
+trait FetchTokenEndpoint[F[_]] {
   def fetchToken[ID](
       projectIdentifier: ID
-  )(implicit findToken:  ID => OptionT[Interpretation, AccessToken]): Interpretation[Response[Interpretation]]
+  )(implicit findToken:  ID => OptionT[F, AccessToken]): F[Response[F]]
 
-  implicit val findById:   projects.Id => OptionT[Interpretation, AccessToken]
-  implicit val findByPath: projects.Path => OptionT[Interpretation, AccessToken]
+  implicit val findById:   projects.Id => OptionT[F, AccessToken]
+  implicit val findByPath: projects.Path => OptionT[F, AccessToken]
 }
 
-class FetchTokenEndpointImpl[Interpretation[_]: MonadThrow: Logger](tokenFinder: TokenFinder[Interpretation])
-    extends Http4sDsl[Interpretation]
-    with FetchTokenEndpoint[Interpretation] {
+class FetchTokenEndpointImpl[F[_]: MonadThrow: Logger](tokenFinder: TokenFinder[F])
+    extends Http4sDsl[F]
+    with FetchTokenEndpoint[F] {
 
   override def fetchToken[ID](
       projectIdentifier: ID
-  )(implicit findToken:  ID => OptionT[Interpretation, AccessToken]): Interpretation[Response[Interpretation]] =
+  )(implicit findToken:  ID => OptionT[F, AccessToken]): F[Response[F]] =
     findToken(projectIdentifier).value
       .flatMap(toHttpResult(projectIdentifier))
       .recoverWith(httpResult(projectIdentifier))
 
   private def toHttpResult[ID](
       projectIdentifier: ID
-  ): Option[AccessToken] => Interpretation[Response[Interpretation]] = {
+  ): Option[AccessToken] => F[Response[F]] = {
     case Some(token) => Ok(token.asJson)
     case None        => NotFound(InfoMessage(s"Token for project: $projectIdentifier not found"))
   }
 
   private def httpResult[ID](
       projectIdentifier: ID
-  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = { case NonFatal(exception) =>
+  ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
     val errorMessage = ErrorMessage(s"Finding token for project: $projectIdentifier failed")
-    Logger[Interpretation].error(exception)(errorMessage.value)
+    Logger[F].error(exception)(errorMessage.value)
     InternalServerError(errorMessage)
   }
 
-  implicit val findById:   projects.Id => OptionT[Interpretation, AccessToken]   = tokenFinder.findToken
-  implicit val findByPath: projects.Path => OptionT[Interpretation, AccessToken] = tokenFinder.findToken
+  implicit val findById:   projects.Id => OptionT[F, AccessToken]   = tokenFinder.findToken
+  implicit val findByPath: projects.Path => OptionT[F, AccessToken] = tokenFinder.findToken
 }
 
 object FetchTokenEndpoint {

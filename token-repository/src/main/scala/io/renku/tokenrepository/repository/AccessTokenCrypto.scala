@@ -35,23 +35,23 @@ import io.renku.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 
 import scala.util.control.NonFatal
 
-private trait AccessTokenCrypto[Interpretation[_]] {
-  def encrypt(accessToken:    AccessToken):          Interpretation[EncryptedAccessToken]
-  def decrypt(encryptedToken: EncryptedAccessToken): Interpretation[AccessToken]
+private trait AccessTokenCrypto[F[_]] {
+  def encrypt(accessToken:    AccessToken):          F[EncryptedAccessToken]
+  def decrypt(encryptedToken: EncryptedAccessToken): F[AccessToken]
 }
 
-private class AccessTokenCryptoImpl[Interpretation[_]: MonadThrow](
+private class AccessTokenCryptoImpl[F[_]: MonadThrow](
     secret: Secret
-) extends AesCrypto[Interpretation, AccessToken, EncryptedAccessToken](secret)
-    with AccessTokenCrypto[Interpretation] {
+) extends AesCrypto[F, AccessToken, EncryptedAccessToken](secret)
+    with AccessTokenCrypto[F] {
 
-  override def encrypt(accessToken: AccessToken): Interpretation[EncryptedAccessToken] = for {
+  override def encrypt(accessToken: AccessToken): F[EncryptedAccessToken] = for {
     serializedToken  <- pure(serialize(accessToken))
     encoded          <- encryptAndEncode(serializedToken)
     validatedDecoded <- validate(encoded)
   } yield validatedDecoded
 
-  override def decrypt(encryptedToken: EncryptedAccessToken): Interpretation[AccessToken] = {
+  override def decrypt(encryptedToken: EncryptedAccessToken): F[AccessToken] = {
     for {
       decoded      <- decodeAndDecrypt(encryptedToken.value)
       deserialized <- deserialize(decoded)
@@ -63,8 +63,8 @@ private class AccessTokenCryptoImpl[Interpretation[_]: MonadThrow](
     case PersonalAccessToken(token) => Json.obj("personal" -> Json.fromString(token)).noSpaces
   }
 
-  private def validate(value: String): Interpretation[EncryptedAccessToken] =
-    MonadThrow[Interpretation].fromEither[EncryptedAccessToken] {
+  private def validate(value: String): F[EncryptedAccessToken] =
+    MonadThrow[F].fromEither[EncryptedAccessToken] {
       EncryptedAccessToken.from(value)
     }
 
@@ -87,13 +87,13 @@ private class AccessTokenCryptoImpl[Interpretation[_]: MonadThrow](
         .map(Option.apply)
   }
 
-  private def deserialize(serializedToken: String): Interpretation[AccessToken] =
-    MonadThrow[Interpretation].fromEither {
+  private def deserialize(serializedToken: String): F[AccessToken] =
+    MonadThrow[F].fromEither {
       parse(serializedToken).flatMap(_.as[AccessToken])
     }
 
-  private lazy val meaningfulError: PartialFunction[Throwable, Interpretation[AccessToken]] = { case NonFatal(cause) =>
-    MonadThrow[Interpretation].raiseError(new RuntimeException("AccessToken decryption failed", cause))
+  private lazy val meaningfulError: PartialFunction[Throwable, F[AccessToken]] = { case NonFatal(cause) =>
+    MonadThrow[F].raiseError(new RuntimeException("AccessToken decryption failed", cause))
   }
 }
 
@@ -101,11 +101,11 @@ private object AccessTokenCrypto {
 
   import io.renku.config.ConfigLoader._
 
-  def apply[Interpretation[_]: MonadThrow](
+  def apply[F[_]: MonadThrow](
       config: Config = ConfigFactory.load()
-  ): Interpretation[AccessTokenCrypto[Interpretation]] = for {
-    secret <- find[Interpretation, Secret]("projects-tokens.secret", config)
-  } yield new AccessTokenCryptoImpl[Interpretation](secret)
+  ): F[AccessTokenCrypto[F]] = for {
+    secret <- find[F, Secret]("projects-tokens.secret", config)
+  } yield new AccessTokenCryptoImpl[F](secret)
 
   type EncryptedAccessToken = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
 

@@ -28,24 +28,24 @@ import io.renku.http.client.AccessToken
 import io.renku.metrics.LabeledHistogram
 import io.renku.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB}
 
-private trait TokenFinder[Interpretation[_]] {
-  def findToken(projectPath: Path): OptionT[Interpretation, AccessToken]
-  def findToken(projectId:   Id):   OptionT[Interpretation, AccessToken]
+private trait TokenFinder[F[_]] {
+  def findToken(projectPath: Path): OptionT[F, AccessToken]
+  def findToken(projectId:   Id):   OptionT[F, AccessToken]
 }
 
-private class TokenFinderImpl[Interpretation[_]: MonadThrow](
-    tokenInRepoFinder: PersistedTokensFinder[Interpretation],
-    accessTokenCrypto: AccessTokenCrypto[Interpretation]
-) extends TokenFinder[Interpretation] {
+private class TokenFinderImpl[F[_]: MonadThrow](
+    tokenInRepoFinder: PersistedTokensFinder[F],
+    accessTokenCrypto: AccessTokenCrypto[F]
+) extends TokenFinder[F] {
 
   import accessTokenCrypto._
 
-  override def findToken(projectPath: Path): OptionT[Interpretation, AccessToken] = for {
+  override def findToken(projectPath: Path): OptionT[F, AccessToken] = for {
     encryptedToken <- tokenInRepoFinder.findToken(projectPath)
     accessToken    <- OptionT.liftF(decrypt(encryptedToken))
   } yield accessToken
 
-  override def findToken(projectId: Id): OptionT[Interpretation, AccessToken] = for {
+  override def findToken(projectId: Id): OptionT[F, AccessToken] = for {
     encryptedToken <- tokenInRepoFinder.findToken(projectId)
     accessToken    <- OptionT.liftF(decrypt(encryptedToken))
   } yield accessToken

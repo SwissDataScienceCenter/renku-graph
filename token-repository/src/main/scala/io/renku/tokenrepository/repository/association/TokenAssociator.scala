@@ -30,22 +30,22 @@ import io.renku.tokenrepository.repository.deletion.{TokenRemover, TokenRemoverI
 import io.renku.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB}
 import org.typelevel.log4cats.Logger
 
-private trait TokenAssociator[Interpretation[_]] {
-  def associate(projectId: Id, token: AccessToken): Interpretation[Unit]
+private trait TokenAssociator[F[_]] {
+  def associate(projectId: Id, token: AccessToken): F[Unit]
 }
 
-private class TokenAssociatorImpl[Interpretation[_]: MonadThrow](
-    projectPathFinder:    ProjectPathFinder[Interpretation],
-    accessTokenCrypto:    AccessTokenCrypto[Interpretation],
-    associationPersister: AssociationPersister[Interpretation],
-    tokenRemover:         TokenRemover[Interpretation]
-) extends TokenAssociator[Interpretation] {
+private class TokenAssociatorImpl[F[_]: MonadThrow](
+    projectPathFinder:    ProjectPathFinder[F],
+    accessTokenCrypto:    AccessTokenCrypto[F],
+    associationPersister: AssociationPersister[F],
+    tokenRemover:         TokenRemover[F]
+) extends TokenAssociator[F] {
 
   import accessTokenCrypto._
   import associationPersister._
   import projectPathFinder._
 
-  override def associate(projectId: Id, token: AccessToken): Interpretation[Unit] =
+  override def associate(projectId: Id, token: AccessToken): F[Unit] =
     findProjectPath(projectId, Some(token)) flatMap {
       case Some(projectPath) => encryptAndPersist(projectId, projectPath, token)
       case None              => tokenRemover delete projectId

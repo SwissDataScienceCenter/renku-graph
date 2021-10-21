@@ -31,21 +31,19 @@ import skunk.data.Completion
 import skunk.data.Completion.{Insert, Update}
 import skunk.implicits._
 
-private trait AssociationPersister[Interpretation[_]] {
-  def persistAssociation(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken): Interpretation[Unit]
+private trait AssociationPersister[F[_]] {
+  def persistAssociation(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken): F[Unit]
 }
 
-private class AssociationPersisterImpl[Interpretation[_]: MonadCancelThrow](
-    sessionResource:  SessionResource[Interpretation, ProjectsTokensDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
-) extends DbClient[Interpretation](Some(queriesExecTimes))
-    with AssociationPersister[Interpretation]
+private class AssociationPersisterImpl[F[_]: MonadCancelThrow](
+    sessionResource:  SessionResource[F, ProjectsTokensDB],
+    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+) extends DbClient[F](Some(queriesExecTimes))
+    with AssociationPersister[F]
     with TokenRepositoryTypeSerializers {
 
-  override def persistAssociation(projectId:      Id,
-                                  projectPath:    Path,
-                                  encryptedToken: EncryptedAccessToken
-  ): Interpretation[Unit] = sessionResource.useK(upsert(projectId, projectPath, encryptedToken))
+  override def persistAssociation(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken): F[Unit] =
+    sessionResource.useK(upsert(projectId, projectPath, encryptedToken))
 
   private def upsert(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken) =
     checkIfTokenExists(projectPath) flatMap {
@@ -89,9 +87,9 @@ private class AssociationPersisterImpl[Interpretation[_]: MonadCancelThrow](
       .flatMapResult(failIfMultiUpdate(projectId, projectPath))
   }
 
-  private def failIfMultiUpdate(projectId: Id, projectPath: Path): Completion => Interpretation[Unit] = {
-    case Insert(1) | Update(1) => ().pure[Interpretation]
+  private def failIfMultiUpdate(projectId: Id, projectPath: Path): Completion => F[Unit] = {
+    case Insert(1) | Update(1) => ().pure[F]
     case _ =>
-      new RuntimeException(s"Associating token for project $projectPath ($projectId)").raiseError[Interpretation, Unit]
+      new RuntimeException(s"Associating token for project $projectPath ($projectId)").raiseError[F, Unit]
   }
 }

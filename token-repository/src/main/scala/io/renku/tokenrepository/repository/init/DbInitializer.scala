@@ -29,42 +29,42 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-trait DbInitializer[Interpretation[_]] {
-  def run(): Interpretation[Unit]
+trait DbInitializer[F[_]] {
+  def run(): F[Unit]
 }
 
-class DbInitializerImpl[Interpretation[_]: MonadCancelThrow: Logger](
-    projectPathAdder:         ProjectPathAdder[Interpretation],
-    duplicateProjectsRemover: DuplicateProjectsRemover[Interpretation],
-    sessionResource:          SessionResource[Interpretation, ProjectsTokensDB]
-) extends DbInitializer[Interpretation] {
+class DbInitializerImpl[F[_]: MonadCancelThrow: Logger](
+    projectPathAdder:         ProjectPathAdder[F],
+    duplicateProjectsRemover: DuplicateProjectsRemover[F],
+    sessionResource:          SessionResource[F, ProjectsTokensDB]
+) extends DbInitializer[F] {
 
   import skunk._
   import skunk.implicits._
 
-  override def run(): Interpretation[Unit] = {
+  override def run(): F[Unit] = {
     for {
       _ <- createTable
       _ <- projectPathAdder.run()
       _ <- duplicateProjectsRemover.run()
-      _ <- Logger[Interpretation].info("Projects Tokens database initialization success")
+      _ <- Logger[F].info("Projects Tokens database initialization success")
     } yield ()
   } recoverWith logging
 
-  private def createTable: Interpretation[Unit] =
+  private def createTable: F[Unit] =
     sessionResource.useK {
       val query: Command[Void] =
         sql"""CREATE TABLE IF NOT EXISTS projects_tokens(
                 project_id int4 PRIMARY KEY,
                 token VARCHAR NOT NULL
               );""".command
-      Kleisli[Interpretation, Session[Interpretation], Unit](session => session.execute(query).void)
+      Kleisli[F, Session[F], Unit](session => session.execute(query).void)
     }
 
-  private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    Logger[Interpretation]
+  private lazy val logging: PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
+    Logger[F]
       .error(exception)("Projects Tokens database initialization failure")
-      .flatMap(_ => MonadCancelThrow[Interpretation].raiseError(exception))
+      .flatMap(_ => MonadCancelThrow[F].raiseError(exception))
   }
 }
 

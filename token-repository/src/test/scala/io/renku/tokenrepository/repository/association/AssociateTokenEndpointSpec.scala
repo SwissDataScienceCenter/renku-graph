@@ -18,8 +18,8 @@
 
 package io.renku.tokenrepository.repository.association
 
-import cats.MonadError
 import cats.effect.IO
+import cats.syntax.all._
 import io.circe.Json
 import io.circe.literal._
 import io.circe.syntax.EncoderOps
@@ -50,7 +50,7 @@ class AssociateTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactor
       (tokensAssociator
         .associate(_: Id, _: AccessToken))
         .expects(projectId, accessToken)
-        .returning(context.pure(()))
+        .returning(IO.unit)
 
       val request = Request(Method.PUT, uri"projects" / projectId.toString / "tokens")
         .withEntity(accessToken.asJson)
@@ -70,7 +70,7 @@ class AssociateTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactor
       (tokensAssociator
         .associate(_: Id, _: AccessToken))
         .expects(projectId, accessToken)
-        .returning(context.pure(()))
+        .returning(IO.unit)
 
       val request = Request(Method.PUT, uri"projects" / projectId.toString / "tokens")
         .withEntity(accessToken.asJson)
@@ -106,7 +106,7 @@ class AssociateTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactor
       (tokensAssociator
         .associate(_: Id, _: AccessToken))
         .expects(projectId, accessToken)
-        .returning(context.raiseError(exception))
+        .returning(exception.raiseError[IO, Unit])
 
       val request = Request(Method.PUT, uri"projects" / projectId.toString / "tokens")
         .withEntity(accessToken.asJson)
@@ -123,8 +123,6 @@ class AssociateTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactor
   }
 
   private trait TestCase {
-
-    val context = MonadError[IO, Throwable]
 
     val projectId = projectIds.generateOne
 

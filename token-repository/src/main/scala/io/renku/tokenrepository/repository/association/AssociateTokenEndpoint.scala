@@ -18,7 +18,7 @@
 
 package io.renku.tokenrepository.repository.association
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.effect.Async
 import cats.effect.kernel.{Concurrent, Temporal}
 import cats.syntax.all._
@@ -36,20 +36,18 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-trait AssociateTokenEndpoint[Interpretation[_]] {
-  def associateToken(projectId: Id, request: Request[Interpretation]): Interpretation[Response[Interpretation]]
+trait AssociateTokenEndpoint[F[_]] {
+  def associateToken(projectId: Id, request: Request[F]): F[Response[F]]
 }
 
-class AssociateTokenEndpointImpl[Interpretation[_]: Concurrent: Logger](
-    tokenAssociator: TokenAssociator[Interpretation]
-) extends Http4sDsl[Interpretation]
-    with AssociateTokenEndpoint[Interpretation] {
+class AssociateTokenEndpointImpl[F[_]: Concurrent: Logger](
+    tokenAssociator: TokenAssociator[F]
+) extends Http4sDsl[F]
+    with AssociateTokenEndpoint[F] {
 
   import tokenAssociator._
 
-  override def associateToken(projectId: Id,
-                              request:   Request[Interpretation]
-  ): Interpretation[Response[Interpretation]] = {
+  override def associateToken(projectId: Id, request: Request[F]): F[Response[F]] = {
     for {
       accessToken <- request.as[AccessToken] recoverWith badRequest
       _           <- associate(projectId, accessToken)
@@ -57,21 +55,21 @@ class AssociateTokenEndpointImpl[Interpretation[_]: Concurrent: Logger](
     } yield response
   } recoverWith httpResponse(projectId)
 
-  private implicit lazy val accessTokenEntityDecoder: EntityDecoder[Interpretation, AccessToken] =
-    jsonOf[Interpretation, AccessToken]
+  private implicit lazy val accessTokenEntityDecoder: EntityDecoder[F, AccessToken] =
+    jsonOf[F, AccessToken]
 
   private case class BadRequestError(cause: Throwable) extends Exception(cause)
 
-  private lazy val badRequest: PartialFunction[Throwable, Interpretation[AccessToken]] = { case NonFatal(exception) =>
-    MonadError[Interpretation, Throwable].raiseError(BadRequestError(exception))
+  private lazy val badRequest: PartialFunction[Throwable, F[AccessToken]] = { case NonFatal(exception) =>
+    MonadThrow[F].raiseError(BadRequestError(exception))
   }
 
-  private def httpResponse(projectId: Id): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
+  private def httpResponse(projectId: Id): PartialFunction[Throwable, F[Response[F]]] = {
     case BadRequestError(exception) =>
       BadRequest(ErrorMessage(exception))
     case NonFatal(exception) =>
       val errorMessage = ErrorMessage(s"Associating token with projectId: $projectId failed")
-      Logger[Interpretation].error(exception)(errorMessage.value)
+      Logger[F].error(exception)(errorMessage.value)
       InternalServerError(errorMessage)
   }
 }
