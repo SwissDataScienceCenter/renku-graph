@@ -40,44 +40,27 @@ services. Tagging has to be done manually.
 
 #### Project creation flow and new commit flow
 
-When a project is created on GitLab or when a new commit is pushed to the gitlab instance, the following flow is
-triggered:
-
-```mermaid
-graph TD;
-    A[GitLab] -- 1. new commit event --> B(KG services) 
-    B -- 2. generation of triples --> B
-    B -- 3. storing triples --> C[(TriplesStore)]
-
-```
-
-The same process with more details on how the KG services interact with each other
-
-```mermaid
-graph TB;
-    A[GitLab] -- 1. new commit event  --> B[WebhookService]
-    subgraph kg[KG Services]
-    B -- 2. event for new commit  --> C(Event Services)
-    C -- 4. send event for triples generation  --> D[TriplesGenerator]
-    D -- 5. triples generated --> C
-    end
-    C -- 6. storing triples --> E[(TriplesStore)]
-```
-
-Again the same process with more details on the Event services
+When a project is created on GitLab the following flow is triggered:
 
 ```mermaid
 sequenceDiagram
+    participant GitLab
     participant WebhookService
     participant EventLog
     participant CommmitEventService
     participant TriplesGenerator
     participant TriplesStore
-    WebhookService ->>EventLog: event for new commit 
-    EventLog ->>CommmitEventService: send event
-    CommmitEventService ->>EventLog: create event for triples generation
-    EventLog ->>TriplesGenerator: send event for triples generation
-    TriplesGenerator ->>EventLog: triples generated
-    EventLog ->>TriplesStore: storing triples
+    GitLab ->>WebhookService: CommitSyncRequest
+    WebhookService ->>EventLog: CommitSyncRequest 
+    EventLog ->>EventLog: find latest event 
+    EventLog ->>CommmitEventService: MinimalCommitSyncEvent
+    CommmitEventService ->>EventLog: NewCommitEvent
+    EventLog ->>EventLog: find AwaitingGenerationEvent
+    EventLog ->>TriplesGenerator: AwaitingGenerationEvent
+    TriplesGenerator ->>EventLog: TriplesGeneratedEvent
+    EventLog ->>EventLog: find TriplesGeneratedEvent
+    EventLog ->>TriplesGenerator: TriplesGeneratedEvent
+    TriplesGenerator ->>TriplesStore: JsonLD
+    TriplesGenerator ->>EventLog: TriplesStoreEvent
 ```
 
