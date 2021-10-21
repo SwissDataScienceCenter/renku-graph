@@ -20,6 +20,7 @@ package io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesge
 
 import cats.Applicative
 import cats.data.EitherT
+import cats.effect.kernel.Async
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import io.renku.graph.config.GitLabUrlLoader
@@ -28,7 +29,7 @@ import io.renku.http.client.AccessToken
 import io.renku.jsonld.JsonLD
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator
-import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.{GitLabRepoUrlFinder, RepositoryPath}
+import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.{GitLabRepoUrlFinder, GitLabRepoUrlFinderImpl, RepositoryPath}
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.{CommitEvent, logMessageCommon}
 
 import java.security.SecureRandom
@@ -134,14 +135,10 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
 
 private[events] object RenkuLogTriplesGenerator {
 
-  def apply()(implicit
-      contextShift:     ContextShift[IO],
-      executionContext: ExecutionContext,
-      timer:            Timer[IO]
-  ): IO[TriplesGenerator[IO]] = for {
-    gitLabUrl <- GitLabUrlLoader[IO]()
+  def apply[F[_]: Async](): F[TriplesGenerator[F]] = for {
+    gitLabUrl <- GitLabUrlLoader[F]()
   } yield new RenkuLogTriplesGenerator(
-    new GitLabRepoUrlFinder[IO](gitLabUrl),
+    new GitLabRepoUrlFinderImpl[F](gitLabUrl),
     new Commands.Renku,
     new Commands.File,
     new Commands.Git,

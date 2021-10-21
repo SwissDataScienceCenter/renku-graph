@@ -18,19 +18,16 @@
 
 package io.renku.triplesgenerator.events.categories.awaitinggeneration
 
-import cats.effect.kernel.Temporal
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.Async
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.subscriptions.PayloadComposer.payloadsComposerFactory
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
 object SubscriptionFactory {
-  def apply[Interpretation[_]: Temporal: Logger](
-      metricsRegistry: MetricsRegistry[Interpretation]
-  ): Interpretation[(EventHandler[Interpretation], SubscriptionMechanism[Interpretation])] = for {
+  def apply[F[_]: Async: Logger](
+      metricsRegistry: MetricsRegistry[F]
+  ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
     subscriptionMechanism <- SubscriptionMechanism(categoryName, payloadsComposerFactory)
     handler               <- EventHandler(metricsRegistry, subscriptionMechanism)
   } yield handler -> subscriptionMechanism

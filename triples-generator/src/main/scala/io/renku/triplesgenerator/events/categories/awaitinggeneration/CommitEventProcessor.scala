@@ -20,7 +20,8 @@ package io.renku.triplesgenerator.events.categories.awaitinggeneration
 
 import cats.MonadThrow
 import cats.data.EitherT
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.Async
+import cats.effect.kernel.Temporal
 import cats.syntax.all._
 import io.prometheus.client.Histogram
 import io.renku.graph.model.events.EventStatus.{GenerationNonRecoverableFailure, GenerationRecoverableFailure}
@@ -187,20 +188,15 @@ private object IOCommitEventProcessor {
       .buckets(.1, .5, 1, 5, 10, 50, 100, 500, 1000, 5000, 10000, 50000, 100000, 500000, 1000000, 5000000, 10000000,
                50000000, 100000000, 500000000)
 
-  def apply(
-      metricsRegistry: MetricsRegistry[IO]
-  )(implicit
-      contextShift:     ContextShift[IO],
-      executionContext: ExecutionContext,
-      timer:            Timer[IO],
-      logger:           Logger[IO]
-  ): IO[CommitEventProcessor[IO]] = for {
+  def apply[F[_]: Async](
+      metricsRegistry: MetricsRegistry[F]
+  ): F[CommitEventProcessor[F]] = for {
     triplesGenerator        <- TriplesGenerator()
     accessTokenFinder       <- AccessTokenFinder(logger)
     eventStatusUpdater      <- EventStatusUpdater(categoryName)
     eventsProcessingTimes   <- metricsRegistry.register[Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
-    allEventsTimeRecorder   <- ExecutionTimeRecorder[IO](logger, maybeHistogram = Some(eventsProcessingTimes))
-    singleEventTimeRecorder <- ExecutionTimeRecorder[IO](logger, maybeHistogram = None)
+    allEventsTimeRecorder   <- ExecutionTimeRecorder[F](logger, maybeHistogram = Some(eventsProcessingTimes))
+    singleEventTimeRecorder <- ExecutionTimeRecorder[F](logger, maybeHistogram = None)
   } yield new CommitEventProcessor(
     accessTokenFinder,
     triplesGenerator,

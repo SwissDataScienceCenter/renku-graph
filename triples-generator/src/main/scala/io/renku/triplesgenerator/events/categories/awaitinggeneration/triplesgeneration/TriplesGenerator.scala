@@ -19,7 +19,8 @@
 package io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration
 
 import cats.data.EitherT
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.Async
+import cats.implicits.toFlatMapOps
 import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.JsonLD
@@ -28,8 +29,7 @@ import io.renku.triplesgenerator.config.TriplesGeneration.{RemoteTriplesGenerati
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.CommitEvent
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.RenkuLogTriplesGenerator
-
-import scala.concurrent.ExecutionContext
+import org.typelevel.log4cats.Logger
 
 private[awaitinggeneration] trait TriplesGenerator[Interpretation[_]] {
   def generateTriples(
@@ -45,12 +45,8 @@ private[awaitinggeneration] object TriplesGenerator {
       extends Exception(message)
       with ProcessingRecoverableError
 
-  def apply(config:     Config = ConfigFactory.load)(implicit
-      contextShift:     ContextShift[IO],
-      executionContext: ExecutionContext,
-      timer:            Timer[IO]
-  ): IO[TriplesGenerator[IO]] =
-    TriplesGeneration[IO](config) flatMap {
+  def apply[F[_]: Async: Logger](config: Config = ConfigFactory.load): F[TriplesGenerator[F]] =
+    TriplesGeneration[F](config) flatMap {
       case RenkuLog                => RenkuLogTriplesGenerator()
       case RemoteTriplesGeneration => RemoteTriplesGenerator(config)
     }
