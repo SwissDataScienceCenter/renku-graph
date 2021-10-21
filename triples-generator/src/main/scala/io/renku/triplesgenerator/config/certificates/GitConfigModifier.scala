@@ -18,7 +18,8 @@
 
 package io.renku.triplesgenerator.config.certificates
 
-import cats.MonadError
+import cats.{MonadError, MonadThrow}
+import org.typelevel.log4cats.Logger
 
 import java.nio.file.Path
 
@@ -27,10 +28,7 @@ private trait GitConfigModifier[Interpretation[_]] {
 }
 
 private object GitConfigModifier {
-  def apply[Interpretation[_]]()(implicit
-      ME: MonadError[Interpretation, Throwable]
-  ): GitConfigModifier[Interpretation] =
-    new GitConfigModifierImpl[Interpretation]()
+  def apply[F[_]: MonadThrow: Logger](): GitConfigModifier[F] = new GitConfigModifierImpl[F]()
 }
 
 private class GitConfigModifierImpl[Interpretation[_]]()(implicit

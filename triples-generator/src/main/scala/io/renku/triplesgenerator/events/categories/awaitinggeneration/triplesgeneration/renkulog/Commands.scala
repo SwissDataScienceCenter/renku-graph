@@ -19,9 +19,9 @@
 package io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog
 
 import ammonite.ops.Path
-import cats.data.EitherT
-import cats.effect.{ContextShift, IO, Timer}
 import cats.{MonadError, MonadThrow}
+import cats.data.EitherT
+import cats.effect.kernel.{Async, Temporal}
 import io.renku.config.ServiceUrl
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.{GitLabUrl, projects}
@@ -34,7 +34,6 @@ import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableE
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.CommitEvent
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 
-import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 private object Commands {
@@ -83,23 +82,23 @@ private object Commands {
   import ammonite.ops
   import ammonite.ops._
 
-  class File {
+  class File[F[_]: MonadThrow] {
 
-    def mkdir(newDir: Path): IO[Path] = IO {
+    def mkdir(newDir: Path): F[Path] = MonadThrow[F].catchNonFatal {
       ops.mkdir ! newDir
       newDir
     }
 
-    def deleteDirectory(repositoryDirectory: Path): IO[Unit] = IO {
+    def deleteDirectory(repositoryDirectory: Path): F[Unit] = MonadThrow[F].catchNonFatal {
       ops.rm ! repositoryDirectory
     }
 
-    def exists(fileName: Path): IO[Boolean] = IO {
+    def exists(fileName: Path): F[Boolean] = MonadThrow[F].catchNonFatal {
       ops.exists(fileName)
     }
   }
 
-  class Git(
+  class Git[F[_]: MonadThrow](
       doClone: (ServiceUrl, RepositoryPath, Path) => CommandResult = (url, destinationDir, workDir) =>
         %%("git", "clone", url.toString, destinationDir.toString)(workDir)
   ) {
@@ -107,30 +106,33 @@ private object Commands {
     import cats.syntax.all._
     import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 
-    def checkout(commitId: CommitId)(implicit repositoryDirectory: RepositoryPath): IO[Unit] = IO {
-      %%("git", "checkout", commitId.value)(repositoryDirectory.value)
-    }.void
+    def checkout(commitId: CommitId)(implicit repositoryDirectory: RepositoryPath): F[Unit] =
+      MonadThrow[F].catchNonFatal {
+        %%("git", "checkout", commitId.value)(repositoryDirectory.value)
+      }.void
 
-    def `reset --hard`(implicit repositoryDirectory: RepositoryPath): IO[Unit] = IO {
+    def `reset --hard`(implicit repositoryDirectory: RepositoryPath): F[Unit] = MonadThrow[F].catchNonFatal {
       %%("git", "reset", "--hard")(repositoryDirectory.value)
     }.void
 
     def clone(
         repositoryUrl:               ServiceUrl,
         workDirectory:               Path
-    )(implicit destinationDirectory: RepositoryPath): EitherT[IO, GenerationRecoverableError, Unit] =
-      EitherT[IO, GenerationRecoverableError, Unit] {
-        IO {
-          doClone(repositoryUrl, destinationDirectory, workDirectory)
-        }.map(_ => ().asRight[GenerationRecoverableError])
+    )(implicit destinationDirectory: RepositoryPath): EitherT[F, GenerationRecoverableError, Unit] =
+      EitherT[F, GenerationRecoverableError, Unit] {
+        MonadThrow[F]
+          .catchNonFatal {
+            doClone(repositoryUrl, destinationDirectory, workDirectory)
+          }
+          .map(_ => ().asRight[GenerationRecoverableError])
           .recoverWith(relevantError)
       }
 
-    def rm(fileName: Path)(implicit repositoryDirectory: RepositoryPath): IO[Unit] = IO {
+    def rm(fileName: Path)(implicit repositoryDirectory: RepositoryPath): F[Unit] = MonadThrow[F].catchNonFatal {
       %%("git", "rm", fileName)(repositoryDirectory.value)
     }.void
 
-    def status(implicit repositoryDirectory: RepositoryPath): IO[String] = IO {
+    def status(implicit repositoryDirectory: RepositoryPath): F[String] = MonadThrow[F].catchNonFatal {
       %%("git", "status")(repositoryDirectory.value).out.string
     }
 
@@ -140,32 +142,31 @@ private object Commands {
                                         "Could not resolve host:",
                                         "Host is unreachable"
     )
-    private lazy val relevantError: PartialFunction[Throwable, IO[Either[GenerationRecoverableError, Unit]]] = {
+    private lazy val relevantError: PartialFunction[Throwable, F[Either[GenerationRecoverableError, Unit]]] = {
       case ShelloutException(result) =>
         def errorMessage(message: String) = s"git clone failed with: $message"
 
-        IO(result.out.string) flatMap {
+        MonadThrow[F].catchNonFatal(result.out.string) flatMap {
           case out if recoverableErrors exists out.contains =>
-            GenerationRecoverableError(errorMessage(result.toString())).asLeft[Unit].pure[IO]
+            GenerationRecoverableError(errorMessage(result.toString())).asLeft[Unit].pure[F]
           case _ =>
-            new Exception(errorMessage(result.toString())).raiseError[IO, Either[GenerationRecoverableError, Unit]]
+            new Exception(errorMessage(result.toString())).raiseError[F, Either[GenerationRecoverableError, Unit]]
         }
     }
   }
 
-  class Renku(renkuExport: Path => CommandResult = %%("renku", "graph", "export", "--full", "--strict")(_))(implicit
-      contextShift:        ContextShift[IO],
-      timer:               Timer[IO],
-      ME:                  MonadError[IO, Throwable],
-      executionContext:    ExecutionContext
+  class Renku[F[_]: Async](
+      renkuExport: Path => CommandResult = %%("renku", "graph", "export", "--full", "--strict")(_)
   ) {
 
     import cats.syntax.all._
 
-    def migrate(commitEvent: CommitEvent)(implicit destinationDirectory: RepositoryPath): IO[Unit] =
-      IO(%%("renku", "migrate")(destinationDirectory.value)).void
+    def migrate(commitEvent: CommitEvent)(implicit destinationDirectory: RepositoryPath): F[Unit] =
+      MonadThrow[F]
+        .catchNonFatal(%%("renku", "migrate")(destinationDirectory.value))
+        .void
         .recoverWith { case NonFatal(exception) =>
-          IO.raiseError {
+          F.raiseError {
             new Exception(
               s"'renku migrate' failed for commit: ${commitEvent.commitId}, project: ${commitEvent.project.id}",
               exception
@@ -173,16 +174,16 @@ private object Commands {
           }
         }
 
-    def export(implicit destinationDirectory: RepositoryPath): EitherT[IO, ProcessingRecoverableError, JsonLD] =
+    def export(implicit destinationDirectory: RepositoryPath): EitherT[F, ProcessingRecoverableError, JsonLD] =
       EitherT {
         {
           for {
-            triplesAsString <- IO(renkuExport(destinationDirectory.value).out.string.trim)
-            wrappedTriples  <- IO.fromEither(parse(triplesAsString))
+            triplesAsString <- MonadThrow[F].catchNonFatal(renkuExport(destinationDirectory.value).out.string.trim)
+            wrappedTriples  <- F.fromEither(parse(triplesAsString))
           } yield wrappedTriples.asRight[ProcessingRecoverableError]
         }.recoverWith {
           case ShelloutException(result) if result.exitCode == 137 =>
-            GenerationRecoverableError("Not enough memory").asLeft[JsonLD].pure[IO]
+            GenerationRecoverableError("Not enough memory").asLeft[JsonLD].pure[F]
         }
       }
   }

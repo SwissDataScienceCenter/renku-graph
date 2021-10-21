@@ -18,42 +18,40 @@
 
 package io.renku.triplesgenerator.config.certificates
 
-import cats.MonadError
+import cats.effect.kernel.Async
+import cats.{MonadError, MonadThrow}
 import io.renku.config.certificates.Certificate
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-trait GitCertificateInstaller[Interpretation[_]] {
-  def run(): Interpretation[Unit]
+trait GitCertificateInstaller[F[_]] {
+  def run(): F[Unit]
 }
 
 object GitCertificateInstaller {
-  def apply[Interpretation[_]](
-      logger:    Logger[Interpretation]
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[GitCertificateInstaller[Interpretation]] =
-    ME.catchNonFatal {
-      new GitCertificateInstallerImpl[Interpretation](
-        () => Certificate.fromConfig[Interpretation](),
+  def apply[F[_]: MonadThrow: Logger]: F[GitCertificateInstaller[F]] =
+    MonadThrow.catchNonFatal {
+      new GitCertificateInstallerImpl[F](
+        () => Certificate.fromConfig[F](),
         CertificateSaver(),
-        GitConfigModifier(),
-        logger
+        GitConfigModifier()
       )
     }
 }
 
-class GitCertificateInstallerImpl[Interpretation[_]](
-    findCertificate:   () => Interpretation[Option[Certificate]],
-    certificateSaver:  CertificateSaver[Interpretation],
-    gitConfigModifier: GitConfigModifier[Interpretation],
-    logger:            Logger[Interpretation]
-)(implicit ME:         MonadError[Interpretation, Throwable])
-    extends GitCertificateInstaller[Interpretation] {
+class GitCertificateInstallerImpl[F[_]: Async: Logger](
+    findCertificate:   () => F[Option[Certificate]],
+    certificateSaver:  CertificateSaver[F],
+    gitConfigModifier: GitConfigModifier[F],
+    logger:            Logger[F]
+)(implicit ME:         MonadError[F, Throwable])
+    extends GitCertificateInstaller[F] {
 
   import cats.syntax.all._
 
-  def run(): Interpretation[Unit] = findCertificate() flatMap {
-    case None => ().pure[Interpretation]
+  def run(): F[Unit] = findCertificate() flatMap {
+    case None => ().pure[F]
     case Some(certificate) =>
       for {
         certPath <- certificateSaver.save(certificate)
@@ -62,9 +60,9 @@ class GitCertificateInstallerImpl[Interpretation[_]](
       } yield ()
   } recoverWith logMessage
 
-  private lazy val logMessage: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
+  private lazy val logMessage: PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
     logger
       .error(exception)("Certificate installation for Git failed")
-      .flatMap(_ => exception.raiseError[Interpretation, Unit])
+      .flatMap(_ => exception.raiseError[F, Unit])
   }
 }

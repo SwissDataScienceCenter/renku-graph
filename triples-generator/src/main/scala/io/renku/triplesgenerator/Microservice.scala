@@ -62,10 +62,10 @@ object Microservice extends IOMicroservice {
 
   override def run(args: List[String]): IO[ExitCode] = for {
     config                         <- parseConfigArgs(args)
-    certificateLoader              <- CertificateLoader[IO](ApplicationLogger)
-    gitCertificateInstaller        <- GitCertificateInstaller[IO](ApplicationLogger)
-    triplesGeneration              <- TriplesGeneration[IO]()
-    sentryInitializer              <- SentryInitializer[IO]()
+    certificateLoader              <- CertificateLoader[IO]
+    gitCertificateInstaller        <- GitCertificateInstaller[IO]
+    triplesGeneration              <- TriplesGeneration[IO]
+    sentryInitializer              <- SentryInitializer[IO]
     metricsRegistry                <- MetricsRegistry()
     renkuVersionPairs              <- IOVersionCompatibilityConfig(ApplicationLogger, config)
     cliVersionCompatChecker        <- IOCliVersionCompatibilityChecker(triplesGeneration, renkuVersionPairs)

@@ -21,6 +21,7 @@ package io.renku.triplesgenerator.init
 import cats.MonadError
 import cats.data.NonEmptyList
 import cats.effect.IO
+import cats.effect.kernel.Async
 import cats.syntax.all._
 import io.renku.graph.model.{CliVersion, RenkuVersionPair}
 import io.renku.triplesgenerator.config.TriplesGeneration
@@ -46,14 +47,14 @@ private class CliVersionCompatibilityVerifierImpl[Interpretation[_]](cliVersion:
 
 object IOCliVersionCompatibilityChecker {
 
-  def apply(triplesGeneration: TriplesGeneration,
-            renkuVersionPairs: NonEmptyList[RenkuVersionPair]
-  ): IO[CliVersionCompatibilityVerifier[IO]] = {
+  def apply[F[_]: Async](triplesGeneration: TriplesGeneration,
+                         renkuVersionPairs: NonEmptyList[RenkuVersionPair]
+  ): F[CliVersionCompatibilityVerifier[F]] = {
     // the concept of TriplesGeneration flag is a temporary solution
     // to provide acceptance-tests with the expected CLI version
     triplesGeneration match {
-      case RenkuLog                => CliVersionLoader[IO]()
-      case RemoteTriplesGeneration => renkuVersionPairs.head.cliVersion.pure[IO]
+      case RenkuLog                => CliVersionLoader[F]()
+      case RemoteTriplesGeneration => renkuVersionPairs.head.cliVersion.pure[F]
     }
-  }.map(cliVersion => new CliVersionCompatibilityVerifierImpl[IO](cliVersion, renkuVersionPairs))
+  }.map(cliVersion => new CliVersionCompatibilityVerifierImpl[F](cliVersion, renkuVersionPairs))
 }
