@@ -18,12 +18,12 @@
 
 package io.renku.config.certificates
 
-import cats.MonadError
+import cats.MonadThrow
 
 import java.security.KeyStore
 
-private trait Keystore[Interpretation[_]] {
-  def load(certificate: Certificate): Interpretation[Unit]
+private trait Keystore[F[_]] {
+  def load(certificate: Certificate): F[Unit]
   def toJavaKeyStore: KeyStore
 }
 
@@ -31,14 +31,11 @@ private object Keystore {
 
   val CertificateAlias: String = "RenkuClientCertificate"
 
-  def apply[Interpretation[_]]()(implicit
-      ME: MonadError[Interpretation, Throwable]
-  ): Interpretation[Keystore[Interpretation]] =
-    ME.catchNonFatal(new KeystoreImpl[Interpretation]())
+  def apply[F[_]: MonadThrow](): F[Keystore[F]] =
+    MonadThrow[F].catchNonFatal(new KeystoreImpl[F]())
 }
 
-private class KeystoreImpl[Interpretation[_]](implicit ME: MonadError[Interpretation, Throwable])
-    extends Keystore[Interpretation] {
+private class KeystoreImpl[F[_]: MonadThrow] extends Keystore[F] {
 
   import Keystore.CertificateAlias
 
@@ -48,7 +45,7 @@ private class KeystoreImpl[Interpretation[_]](implicit ME: MonadError[Interpreta
 
   private val keystore = KeyStore.getInstance("JKS")
 
-  override def load(certificate: Certificate): Interpretation[Unit] = ME.catchNonFatal {
+  override def load(certificate: Certificate): F[Unit] = MonadThrow[F].catchNonFatal {
     val certificateFactory = CertificateFactory.getInstance("X.509");
     val certAsInputStream  = new ByteArrayInputStream(certificate.value.getBytes())
     val x509Certificate    = certificateFactory.generateCertificate(certAsInputStream);

@@ -26,29 +26,29 @@ trait Paging[Result] {
 
   import Paging.PagedResultsFinder
 
-  def findPage[Interpretation[_]: MonadThrow](paging: PagingRequest)(implicit
-      resultsFinder: PagedResultsFinder[Interpretation, Result]
-  ): Interpretation[PagingResponse[Result]] = for {
+  def findPage[F[_]: MonadThrow](paging: PagingRequest)(implicit
+      resultsFinder: PagedResultsFinder[F, Result]
+  ): F[PagingResponse[Result]] = for {
     results  <- resultsFinder.findResults(paging)
     response <- prepareResponse(results, paging)
   } yield response
 
-  private def prepareResponse[Interpretation[_]: MonadThrow](
+  private def prepareResponse[F[_]: MonadThrow](
       results:              List[Result],
       pagingRequest:        PagingRequest
-  )(implicit resultsFinder: PagedResultsFinder[Interpretation, Result]) = for {
+  )(implicit resultsFinder: PagedResultsFinder[F, Result]) = for {
     total <- if (results.nonEmpty && results.size < pagingRequest.perPage.value)
-               Total((pagingRequest.page.value - 1) * pagingRequest.perPage.value + results.size).pure[Interpretation]
+               Total((pagingRequest.page.value - 1) * pagingRequest.perPage.value + results.size).pure[F]
              else
                resultsFinder.findTotal()
-    response <- PagingResponse.from[Interpretation, Result](results, pagingRequest, total)
+    response <- PagingResponse.from[F, Result](results, pagingRequest, total)
   } yield response
 }
 
 object Paging {
 
-  trait PagedResultsFinder[Interpretation[_], Result] {
-    def findResults(paging: PagingRequest): Interpretation[List[Result]]
-    def findTotal(): Interpretation[Total]
+  trait PagedResultsFinder[F[_], Result] {
+    def findResults(paging: PagingRequest): F[List[Result]]
+    def findTotal(): F[Total]
   }
 }

@@ -26,45 +26,45 @@ import io.renku.events.consumers.EventSchedulingResult.UnsupportedEventType
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.graph.model.events.CategoryName
 
-trait EventConsumersRegistry[Interpretation[_]] {
-  def handle(requestContent: EventRequestContent): Interpretation[EventSchedulingResult]
-  def renewAllSubscriptions(): Interpretation[Unit]
-  def run():                   Interpretation[Unit]
+trait EventConsumersRegistry[F[_]] {
+  def handle(requestContent: EventRequestContent): F[EventSchedulingResult]
+  def renewAllSubscriptions(): F[Unit]
+  def run():                   F[Unit]
 }
 
-class EventConsumersRegistryImpl[Interpretation[_]: MonadThrow: Parallel](
-    eventHandlers:           List[EventHandler[Interpretation]],
-    subscriptionsMechanisms: List[SubscriptionMechanism[Interpretation]]
-) extends EventConsumersRegistry[Interpretation] {
+class EventConsumersRegistryImpl[F[_]: MonadThrow: Parallel](
+    eventHandlers:           List[EventHandler[F]],
+    subscriptionsMechanisms: List[SubscriptionMechanism[F]]
+) extends EventConsumersRegistry[F] {
 
-  override def handle(requestContent: EventRequestContent): Interpretation[EventSchedulingResult] =
+  override def handle(requestContent: EventRequestContent): F[EventSchedulingResult] =
     tryNextHandler(requestContent, eventHandlers)
 
   private def tryNextHandler(requestContent: EventRequestContent,
-                             handlers:       List[EventHandler[Interpretation]]
-  ): Interpretation[EventSchedulingResult] =
+                             handlers:       List[EventHandler[F]]
+  ): F[EventSchedulingResult] =
     handlers.headOption match {
       case Some(handler) =>
         handler.tryHandling(requestContent) >>= {
           case UnsupportedEventType => tryNextHandler(requestContent, handlers.tail)
-          case otherResult          => otherResult.pure[Interpretation]
+          case otherResult          => otherResult.pure[F]
         }
       case None =>
-        (UnsupportedEventType: EventSchedulingResult).pure[Interpretation]
+        (UnsupportedEventType: EventSchedulingResult).pure[F]
     }
 
-  def subscriptionMechanism(categoryName: CategoryName): Interpretation[SubscriptionMechanism[Interpretation]] =
+  def subscriptionMechanism(categoryName: CategoryName): F[SubscriptionMechanism[F]] =
     subscriptionsMechanisms
       .find(_.categoryName == categoryName)
-      .map(_.pure[Interpretation])
+      .map(_.pure[F])
       .getOrElse(
         new IllegalStateException(s"No SubscriptionMechanism for $categoryName")
-          .raiseError[Interpretation, SubscriptionMechanism[Interpretation]]
+          .raiseError[F, SubscriptionMechanism[F]]
       )
 
-  def run(): Interpretation[Unit] = subscriptionsMechanisms.map(_.run()).parSequence.void
+  def run(): F[Unit] = subscriptionsMechanisms.map(_.run()).parSequence.void
 
-  def renewAllSubscriptions(): Interpretation[Unit] =
+  def renewAllSubscriptions(): F[Unit] =
     subscriptionsMechanisms.map(_.renewSubscription()).parSequence.void
 }
 

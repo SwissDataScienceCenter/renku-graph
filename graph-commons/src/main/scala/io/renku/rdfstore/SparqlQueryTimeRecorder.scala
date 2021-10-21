@@ -28,7 +28,7 @@ import io.prometheus.client.Histogram
 import io.renku.logging.ExecutionTimeRecorder
 import org.typelevel.log4cats.Logger
 
-class SparqlQueryTimeRecorder[Interpretation[_]](val instance: ExecutionTimeRecorder[Interpretation])
+class SparqlQueryTimeRecorder[F[_]](val instance: ExecutionTimeRecorder[F])
 
 object SparqlQueryTimeRecorder {
 
@@ -43,10 +43,10 @@ object SparqlQueryTimeRecorder {
 
   import io.renku.metrics.MetricsRegistry
 
-  def apply[Interpretation[_]: Sync: Clock: Logger: MonadThrow](
-      metricsRegistry: MetricsRegistry[Interpretation]
-  ): Interpretation[SparqlQueryTimeRecorder[Interpretation]] = for {
+  def apply[F[_]: Sync: Clock: Logger: MonadThrow](
+      metricsRegistry: MetricsRegistry[F]
+  ): F[SparqlQueryTimeRecorder[F]] = for {
     histogram             <- metricsRegistry.register[Histogram, Histogram.Builder](queriesExecutionTimesHistogram)
-    executionTimeRecorder <- ExecutionTimeRecorder[Interpretation](maybeHistogram = Some(histogram))
+    executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = Some(histogram))
   } yield new SparqlQueryTimeRecorder(executionTimeRecorder)
 }

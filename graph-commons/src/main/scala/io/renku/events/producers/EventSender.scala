@@ -37,28 +37,28 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-trait EventSender[Interpretation[_]] {
-  def sendEvent(eventContent: EventRequestContent.NoPayload, errorMessage: String): Interpretation[Unit]
+trait EventSender[F[_]] {
+  def sendEvent(eventContent: EventRequestContent.NoPayload, errorMessage: String): F[Unit]
 
   def sendEvent[PayloadType](eventContent: EventRequestContent.WithPayload[PayloadType], errorMessage: String)(implicit
       partEncoder:                         RestClient.PartEncoder[PayloadType]
-  ): Interpretation[Unit]
+  ): F[Unit]
 }
 
-class EventSenderImpl[Interpretation[_]: Async: Logger](
+class EventSenderImpl[F[_]: Async: Logger](
     eventLogUrl:            EventLogUrl,
     onErrorSleep:           FiniteDuration,
     retryInterval:          FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:             Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     requestTimeoutOverride: Option[Duration] = None
-) extends RestClient[Interpretation, Any](Throttler.noThrottling,
-                                          retryInterval = retryInterval,
-                                          maxRetries = maxRetries,
-                                          requestTimeoutOverride = requestTimeoutOverride
+) extends RestClient[F, Any](Throttler.noThrottling,
+                             retryInterval = retryInterval,
+                             maxRetries = maxRetries,
+                             requestTimeoutOverride = requestTimeoutOverride
     )
-    with EventSender[Interpretation] {
+    with EventSender[F] {
 
-  override def sendEvent(eventContent: EventRequestContent.NoPayload, errorMessage: String): Interpretation[Unit] =
+  override def sendEvent(eventContent: EventRequestContent.NoPayload, errorMessage: String): F[Unit] =
     for {
       uri <- validateUri(s"$eventLogUrl/events")
       request = createRequest(uri, eventContent)
@@ -69,7 +69,7 @@ class EventSenderImpl[Interpretation[_]: Async: Logger](
 
   override def sendEvent[PayloadType](eventContent: EventRequestContent.WithPayload[PayloadType], errorMessage: String)(
       implicit partEncoder:                         RestClient.PartEncoder[PayloadType]
-  ): Interpretation[Unit] = for {
+  ): F[Unit] = for {
     uri <- validateUri(s"$eventLogUrl/events")
     request = createRequest(uri, eventContent)
     _ <- send(request)(responseMapping)
@@ -89,29 +89,28 @@ class EventSenderImpl[Interpretation[_]: Async: Logger](
     .build()
 
   private def retryOnServerError(
-      retry:        Eval[Interpretation[Unit]],
+      retry:        Eval[F[Unit]],
       errorMessage: String
-  ): PartialFunction[Throwable, Interpretation[Unit]] = {
+  ): PartialFunction[Throwable, F[Unit]] = {
     case exception @ UnexpectedResponseException(ServiceUnavailable | GatewayTimeout | BadGateway, _) =>
       waitAndRetry(retry, exception, errorMessage)
     case exception @ (_: ConnectivityException | _: ClientException) =>
       waitAndRetry(retry, exception, errorMessage)
   }
 
-  private def waitAndRetry(retry: Eval[Interpretation[Unit]], exception: Throwable, errorMessage: String) = for {
-    _      <- Logger[Interpretation].error(exception)(errorMessage)
-    _      <- Temporal[Interpretation] sleep onErrorSleep
+  private def waitAndRetry(retry: Eval[F[Unit]], exception: Throwable, errorMessage: String) = for {
+    _      <- Logger[F].error(exception)(errorMessage)
+    _      <- Temporal[F] sleep onErrorSleep
     result <- retry.value
   } yield result
 
-  private lazy val responseMapping
-      : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[Unit]] = {
-    case (Accepted | NotFound, _, _) => ().pure[Interpretation]
+  private lazy val responseMapping: PartialFunction[(Status, Request[F], Response[F]), F[Unit]] = {
+    case (Accepted | NotFound, _, _) => ().pure[F]
   }
 }
 
 object EventSender {
-  def apply[Interpretation[_]: Async: Logger]: Interpretation[EventSender[Interpretation]] = for {
-    eventLogUrl <- EventLogUrl[Interpretation]()
+  def apply[F[_]: Async: Logger]: F[EventSender[F]] = for {
+    eventLogUrl <- EventLogUrl[F]()
   } yield new EventSenderImpl(eventLogUrl, onErrorSleep = 15 seconds)
 }

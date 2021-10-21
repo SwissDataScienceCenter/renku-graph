@@ -26,35 +26,33 @@ import io.renku.graph.model.projects.{Id, Path}
 import io.renku.http.client.{AccessToken, RestClient}
 import org.typelevel.log4cats.Logger
 
-trait AccessTokenFinder[Interpretation[_]] {
-  def findAccessToken[ID](projectId: ID)(implicit toPathSegment: ID => String): Interpretation[Option[AccessToken]]
+trait AccessTokenFinder[F[_]] {
+  def findAccessToken[ID](projectId: ID)(implicit toPathSegment: ID => String): F[Option[AccessToken]]
 }
 
-class AccessTokenFinderImpl[Interpretation[_]: Async: Temporal: Logger](
+class AccessTokenFinderImpl[F[_]: Async: Temporal: Logger](
     tokenRepositoryUrl: TokenRepositoryUrl
-) extends RestClient[Interpretation, AccessTokenFinder[Interpretation]](Throttler.noThrottling)
-    with AccessTokenFinder[Interpretation] {
+) extends RestClient[F, AccessTokenFinder[F]](Throttler.noThrottling)
+    with AccessTokenFinder[F] {
 
   import org.http4s.Method.GET
   import org.http4s._
   import org.http4s.circe._
   import org.http4s.dsl.io._
 
-  def findAccessToken[ID](projectId: ID)(implicit toPathSegment: ID => String): Interpretation[Option[AccessToken]] =
+  def findAccessToken[ID](projectId: ID)(implicit toPathSegment: ID => String): F[Option[AccessToken]] =
     for {
       uri         <- validateUri(s"$tokenRepositoryUrl/projects/${toPathSegment(projectId)}/tokens")
       accessToken <- send(request(GET, uri))(mapResponse)
     } yield accessToken
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[Interpretation], Response[Interpretation]),
-                                                Interpretation[Option[AccessToken]]
-  ] = {
+  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[AccessToken]]] = {
     case (Ok, _, response) => response.as[Option[AccessToken]]
-    case (NotFound, _, _)  => Option.empty[AccessToken].pure[Interpretation]
+    case (NotFound, _, _)  => Option.empty[AccessToken].pure[F]
   }
 
-  private implicit lazy val accessTokenEntityDecoder: EntityDecoder[Interpretation, Option[AccessToken]] =
-    jsonOf[Interpretation, AccessToken].map(Option.apply)
+  private implicit lazy val accessTokenEntityDecoder: EntityDecoder[F, Option[AccessToken]] =
+    jsonOf[F, AccessToken].map(Option.apply)
 }
 
 object AccessTokenFinder {
@@ -64,8 +62,8 @@ object AccessTokenFinder {
   implicit val projectPathToPath: Path => String = path => urlEncode(path.value)
   implicit val projectIdToPath:   Id => String   = _.toString
 
-  def apply[Interpretation[_]: Async: Temporal: Logger]: Interpretation[AccessTokenFinder[Interpretation]] =
+  def apply[F[_]: Async: Temporal: Logger]: F[AccessTokenFinder[F]] =
     for {
-      tokenRepositoryUrl <- TokenRepositoryUrl[Interpretation]()
-    } yield new AccessTokenFinderImpl[Interpretation](tokenRepositoryUrl)
+      tokenRepositoryUrl <- TokenRepositoryUrl[F]()
+    } yield new AccessTokenFinderImpl[F](tokenRepositoryUrl)
 }

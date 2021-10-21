@@ -18,7 +18,7 @@
 
 package io.renku.rdfstore
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.effect._
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
@@ -86,11 +86,10 @@ abstract class RdfStoreClientImpl[F[_]: Async: Logger](
         ResultType
       ]],
       queryType: RdfQueryType
-  ): F[ResultType] =
-    for {
-      uri    <- validateUri((fusekiBaseUrl / datasetName / path(queryType)).toString)
-      result <- send(sparqlQueryRequest(uri, queryType, query))(mapResponse)
-    } yield result
+  ): F[ResultType] = for {
+    uri    <- validateUri((fusekiBaseUrl / datasetName / path(queryType)).toString)
+    result <- send(sparqlQueryRequest(uri, queryType, query))(mapResponse)
+  } yield result
 
   private def sparqlQueryRequest(uri: Uri, queryType: RdfQueryType, query: SparqlQuery) = HttpRequest(
     request(POST, uri, rdfStoreConfig.authCredentials)
@@ -109,8 +108,7 @@ abstract class RdfStoreClientImpl[F[_]: Async: Logger](
 
   private def responseMapperFor[ResultType](implicit
       decoder: Decoder[ResultType]
-  ): Response[F] => F[ResultType] =
-    _.as[ResultType](implicitly[MonadError[F, Throwable]], jsonOf[F, ResultType])
+  ): Response[F] => F[ResultType] = _.as[ResultType](MonadThrow[F], jsonOf[F, ResultType])
 
   private def toEntity(queryType: RdfQueryType, query: SparqlQuery): String = queryType match {
     case _: RdfQuery => s"query=${urlEncode(query.toString)}"

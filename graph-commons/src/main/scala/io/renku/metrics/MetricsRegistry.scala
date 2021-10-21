@@ -24,11 +24,11 @@ import io.prometheus.client.{CollectorRegistry, SimpleCollector}
 
 import scala.util.control.NonFatal
 
-trait MetricsRegistry[Interpretation[_]] {
+trait MetricsRegistry[F[_]] {
 
   def register[Collector <: SimpleCollector[_], Builder <: SimpleCollector.Builder[Builder, Collector]](
       collectorBuilder: Builder
-  )(implicit ME:        MonadThrow[Interpretation]): Interpretation[Collector]
+  )(implicit ME:        MonadThrow[F]): F[Collector]
 
   def maybeCollectorRegistry: Option[CollectorRegistry]
 }

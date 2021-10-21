@@ -28,59 +28,59 @@ import io.renku.db.SqlStatement.Name
 import skunk._
 import skunk.data.Completion
 
-final case class SqlStatement[Interpretation[_], ResultType](
-    queryExecution: Kleisli[Interpretation, Session[Interpretation], ResultType],
+final case class SqlStatement[F[_], ResultType](
+    queryExecution: Kleisli[F, Session[F], ResultType],
     name:           Name
 ) {
-  def flatMapResult[O](f: ResultType => Interpretation[O])(implicit
-      monad:              Monad[Interpretation]
-  ): SqlStatement[Interpretation, O] =
+  def flatMapResult[O](f: ResultType => F[O])(implicit
+      monad:              Monad[F]
+  ): SqlStatement[F, O] =
     copy(queryExecution = queryExecution.flatMapF(f))
 
-  def mapResult[O](f: ResultType => O)(implicit functor: Functor[Interpretation]): SqlStatement[Interpretation, O] =
+  def mapResult[O](f: ResultType => O)(implicit functor: Functor[F]): SqlStatement[F, O] =
     copy(queryExecution = queryExecution.map(f))
 
-  def void(implicit functor: Functor[Interpretation]): SqlStatement[Interpretation, Unit] =
+  def void(implicit functor: Functor[F]): SqlStatement[F, Unit] =
     copy(queryExecution = queryExecution.void)
 }
 
 object SqlStatement {
   type Name = String Refined NonEmpty
 
-  def apply[Interpretation[_]: MonadCancelThrow](name: Name): QueryBuilder[Interpretation] =
-    new QueryBuilder[Interpretation](name)
+  def apply[F[_]: MonadCancelThrow](name: Name): QueryBuilder[F] =
+    new QueryBuilder[F](name)
 
-  class QueryBuilder[Interpretation[_]: MonadCancelThrow](val name: Name) {
+  class QueryBuilder[F[_]: MonadCancelThrow](val name: Name) {
 
-    def select[In, Out](query: Query[In, Out]): SelectBuilder[Interpretation, In, Out] =
-      SelectBuilder[Interpretation, In, Out](query, name)
+    def select[In, Out](query: Query[In, Out]): SelectBuilder[F, In, Out] =
+      SelectBuilder[F, In, Out](query, name)
 
-    def command[In](command: skunk.Command[In]): CommandBuilder[Interpretation, In] = CommandBuilder(command, name)
+    def command[In](command: skunk.Command[In]): CommandBuilder[F, In] = CommandBuilder(command, name)
   }
 
-  case class SelectBuilder[Interpretation[_]: MonadCancelThrow, In, Out](query: Query[In, Out], name: Name) {
-    def arguments(args: In): Select[Interpretation, In, Out] = Select(query, name, args = args)
+  case class SelectBuilder[F[_]: MonadCancelThrow, In, Out](query: Query[In, Out], name: Name) {
+    def arguments(args: In): Select[F, In, Out] = Select(query, name, args = args)
   }
 
-  case class CommandBuilder[Interpretation[_]: MonadCancelThrow, In](command: skunk.Command[In], name: Name) {
-    def arguments(args: In): Command[Interpretation, In] = Command(command, name, args = args)
+  case class CommandBuilder[F[_]: MonadCancelThrow, In](command: skunk.Command[In], name: Name) {
+    def arguments(args: In): Command[F, In] = Command(command, name, args = args)
   }
 
-  case class Select[Interpretation[_]: MonadCancelThrow, In, Out](query: Query[In, Out], name: Name, args: In) {
-    def build[F[_]](
-        queryExecution: PreparedQuery[Interpretation, In, Out] => In => Interpretation[F[Out]]
-    ): SqlStatement[Interpretation, F[Out]] = SqlStatement[Interpretation, F[Out]](
+  case class Select[F[_]: MonadCancelThrow, In, Out](query: Query[In, Out], name: Name, args: In) {
+    def build[FF[_]](
+        queryExecution: PreparedQuery[F, In, Out] => In => F[F[Out]]
+    ): SqlStatement[F, F[Out]] = SqlStatement[F, F[Out]](
       Kleisli(session => session.prepare(query).use(queryExecution(_)(args))),
       name
     )
   }
 
-  case class Command[Interpretation[_]: MonadCancelThrow, In](
+  case class Command[F[_]: MonadCancelThrow, In](
       command: skunk.Command[In],
       name:    Name,
       args:    In
   ) {
-    def build: SqlStatement[Interpretation, Completion] =
-      SqlStatement[Interpretation, Completion](Kleisli(session => session.prepare(command).use(_.execute(args))), name)
+    def build: SqlStatement[F, Completion] =
+      SqlStatement[F, Completion](Kleisli(session => session.prepare(command).use(_.execute(args))), name)
   }
 }

@@ -54,8 +54,6 @@ class HistogramSpec extends AnyWordSpec with MockFactory with should.Matchers {
   }
 
   private trait TestCase {
-    val ME = MonadError[Try, Throwable]
-
     val name = nonBlankStrings().generateOne
     val help = sentences().generateOne
 
@@ -91,8 +89,6 @@ class LabeledHistogramSpec extends AnyWordSpec with MockFactory with should.Matc
   }
 
   private trait TestCase {
-    val ME = MonadError[Try, Throwable]
-
     val label        = nonBlankStrings().generateOne.value
     private val name = nonBlankStrings().generateOne
     private val help = sentences().generateOne

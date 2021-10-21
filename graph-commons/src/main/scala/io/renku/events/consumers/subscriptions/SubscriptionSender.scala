@@ -27,33 +27,32 @@ import io.renku.graph.config.EventLogUrl
 import io.renku.http.client.RestClient
 import org.typelevel.log4cats.Logger
 
-private trait SubscriptionSender[Interpretation[_]] {
-  def postToEventLog(subscriptionPayload: Json): Interpretation[Unit]
+private trait SubscriptionSender[F[_]] {
+  def postToEventLog(subscriptionPayload: Json): F[Unit]
 }
 
-private class SubscriptionSenderImpl[Interpretation[_]: Async: Temporal: Logger](
+private class SubscriptionSenderImpl[F[_]: Async: Temporal: Logger](
     eventLogUrl: EventLogUrl
-) extends RestClient[Interpretation, SubscriptionSender[Interpretation]](Throttler.noThrottling)
-    with SubscriptionSender[Interpretation] {
+) extends RestClient[F, SubscriptionSender[F]](Throttler.noThrottling)
+    with SubscriptionSender[F] {
 
   import org.http4s.Method.POST
   import org.http4s.Status.Accepted
   import org.http4s.circe._
   import org.http4s.{Request, Response, Status}
 
-  override def postToEventLog(subscriptionPayload: Json): Interpretation[Unit] = for {
+  override def postToEventLog(subscriptionPayload: Json): F[Unit] = for {
     uri           <- validateUri(s"$eventLogUrl/subscriptions")
     sendingResult <- send(request(POST, uri).withEntity(subscriptionPayload))(mapResponse)
   } yield sendingResult
 
-  private lazy val mapResponse
-      : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[Unit]] = {
-    case (Accepted, _, _) => MonadThrow[Interpretation].unit
+  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Unit]] = { case (Accepted, _, _) =>
+    MonadThrow[F].unit
   }
 }
 
 private object SubscriptionSender {
-  def apply[Interpretation[_]: Async: Temporal: Logger]: Interpretation[SubscriptionSender[Interpretation]] = for {
-    eventLogUrl <- EventLogUrl[Interpretation]()
+  def apply[F[_]: Async: Temporal: Logger]: F[SubscriptionSender[F]] = for {
+    eventLogUrl <- EventLogUrl[F]()
   } yield new SubscriptionSenderImpl(eventLogUrl)
 }

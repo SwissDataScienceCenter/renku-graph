@@ -28,20 +28,20 @@ import io.circe.Json
 import io.renku.graph.model.events.CategoryName
 import io.renku.microservices._
 
-trait SubscriptionPayloadComposer[Interpretation[_]] {
-  def prepareSubscriptionPayload(): Interpretation[Json]
+trait SubscriptionPayloadComposer[F[_]] {
+  def prepareSubscriptionPayload(): F[Json]
 }
 
-private class SubscriptionPayloadComposerImpl[Interpretation[_]: MonadThrow](
+private class SubscriptionPayloadComposerImpl[F[_]: MonadThrow](
     categoryName:           CategoryName,
-    microserviceUrlFinder:  MicroserviceUrlFinder[Interpretation],
+    microserviceUrlFinder:  MicroserviceUrlFinder[F],
     microserviceIdentifier: MicroserviceIdentifier
-) extends SubscriptionPayloadComposer[Interpretation] {
+) extends SubscriptionPayloadComposer[F] {
 
   import io.circe.syntax._
   import microserviceUrlFinder._
 
-  override def prepareSubscriptionPayload(): Interpretation[Json] =
+  override def prepareSubscriptionPayload(): F[Json] =
     findBaseUrl()
       .map(newSubscriberUrl)
       .map(SubscriberBasicInfo(_, SubscriberId(microserviceIdentifier)))
@@ -52,16 +52,13 @@ private class SubscriptionPayloadComposerImpl[Interpretation[_]: MonadThrow](
 
 object SubscriptionPayloadComposer {
 
-  def categoryAndUrlPayloadsComposerFactory[Interpretation[_]: MonadThrow](
+  def categoryAndUrlPayloadsComposerFactory[F[_]: MonadThrow](
       microservicePort:       Int Refined Positive,
       microserviceIdentifier: MicroserviceIdentifier
-  ): Kleisli[Interpretation, CategoryName, SubscriptionPayloadComposer[Interpretation]] =
-    Kleisli[Interpretation, CategoryName, SubscriptionPayloadComposer[Interpretation]] { categoryName =>
+  ): Kleisli[F, CategoryName, SubscriptionPayloadComposer[F]] =
+    Kleisli[F, CategoryName, SubscriptionPayloadComposer[F]] { categoryName =>
       for {
         subscriptionUrlFinder <- MicroserviceUrlFinder(microservicePort)
-      } yield new SubscriptionPayloadComposerImpl[Interpretation](categoryName,
-                                                                  subscriptionUrlFinder,
-                                                                  microserviceIdentifier
-      )
+      } yield new SubscriptionPayloadComposerImpl[F](categoryName, subscriptionUrlFinder, microserviceIdentifier)
     }
 }

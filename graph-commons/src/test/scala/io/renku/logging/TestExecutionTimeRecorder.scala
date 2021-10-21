@@ -32,25 +32,25 @@ import scala.util.Try
 
 object TestExecutionTimeRecorder {
 
-  def apply[Interpretation[_]: MonadThrow: Logger](
+  def apply[F[_]: MonadThrow: Logger](
       maybeHistogram: Option[Histogram] = None
-  ): TestExecutionTimeRecorder[Interpretation] =
-    new TestExecutionTimeRecorder[Interpretation](threshold = elapsedTimes.generateOne, maybeHistogram)
+  ): TestExecutionTimeRecorder[F] =
+    new TestExecutionTimeRecorder[F](threshold = elapsedTimes.generateOne, maybeHistogram)
 }
 
-class TestExecutionTimeRecorder[Interpretation[_]: MonadThrow: Logger](
+class TestExecutionTimeRecorder[F[_]: MonadThrow: Logger](
     threshold:      ElapsedTime,
     maybeHistogram: Option[Histogram]
-) extends ExecutionTimeRecorder[Interpretation](threshold) {
+) extends ExecutionTimeRecorder[F](threshold) {
 
   val elapsedTime:            ElapsedTime = threshold
   lazy val executionTimeInfo: String      = s" in ${threshold}ms"
 
   override def measureExecutionTime[BlockOut](
-      block:               => Interpretation[BlockOut],
+      block:               => F[BlockOut],
       maybeHistogramLabel: Option[String Refined NonEmpty] = None
-  ): Interpretation[(ElapsedTime, BlockOut)] = for {
-    _ <- MonadThrow[Interpretation].unit
+  ): F[(ElapsedTime, BlockOut)] = for {
+    _ <- MonadThrow[F].unit
     maybeHistogramTimer = startTimer(maybeHistogramLabel)
     result <- block
     _ = maybeHistogramTimer map (_.observeDuration())

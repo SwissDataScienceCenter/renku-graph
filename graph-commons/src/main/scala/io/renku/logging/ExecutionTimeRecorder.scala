@@ -33,11 +33,11 @@ import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 import scala.util.Try
 
-abstract class ExecutionTimeRecorder[Interpretation[_]: Logger](threshold: ElapsedTime) {
+abstract class ExecutionTimeRecorder[F[_]: Logger](threshold: ElapsedTime) {
 
-  def measureExecutionTime[BlockOut](block:               => Interpretation[BlockOut],
+  def measureExecutionTime[BlockOut](block:               => F[BlockOut],
                                      maybeHistogramLabel: Option[String Refined NonEmpty] = None
-  ): Interpretation[(ElapsedTime, BlockOut)]
+  ): F[(ElapsedTime, BlockOut)]
 
   def logExecutionTimeWhen[BlockOut](
       condition: PartialFunction[BlockOut, String]
@@ -61,22 +61,21 @@ abstract class ExecutionTimeRecorder[Interpretation[_]: Logger](threshold: Elaps
       blockOut:    BlockOut,
       condition:   PartialFunction[BlockOut, String]
   ): Unit = if (elapsedTime.value >= threshold.value)
-    (condition lift blockOut) foreach (message => Logger[Interpretation].warn(s"$message in ${elapsedTime}ms"))
+    (condition lift blockOut) foreach (message => Logger[F].warn(s"$message in ${elapsedTime}ms"))
 }
 
-class ExecutionTimeRecorderImpl[Interpretation[_]: Sync: Clock: Logger](threshold: ElapsedTime,
-                                                                        maybeHistogram: Option[Histogram]
-) extends ExecutionTimeRecorder[Interpretation](threshold) {
+class ExecutionTimeRecorderImpl[F[_]: Sync: Clock: Logger](threshold: ElapsedTime, maybeHistogram: Option[Histogram])
+    extends ExecutionTimeRecorder[F](threshold) {
 
-  override def measureExecutionTime[BlockOut](block:               => Interpretation[BlockOut],
+  override def measureExecutionTime[BlockOut](block:               => F[BlockOut],
                                               maybeHistogramLabel: Option[String Refined NonEmpty] = None
-  ): Interpretation[(ElapsedTime, BlockOut)] =
-    Clock[Interpretation]
+  ): F[(ElapsedTime, BlockOut)] =
+    Clock[F]
       .timed {
         for {
-          maybeHistogramTimer <- Sync[Interpretation].blocking(startTimer(maybeHistogramLabel))
+          maybeHistogramTimer <- Sync[F].blocking(startTimer(maybeHistogramLabel))
           result              <- block
-          _                   <- Sync[Interpretation].blocking(maybeHistogramTimer.map(_.observeDuration()))
+          _                   <- Sync[F].blocking(maybeHistogramTimer.map(_.observeDuration()))
         } yield result
       }
       .map { case (elapsedTime, result) => ElapsedTime(elapsedTime) -> result }
@@ -88,7 +87,7 @@ class ExecutionTimeRecorderImpl[Interpretation[_]: Sync: Clock: Logger](threshol
         .getOrElse(histogram.startTimer())
     }.toOption.orElse {
       val histogramName = histogram.describe().asScala.headOption.map(_.name).getOrElse("Execution Time Recorder")
-      Logger[Interpretation].error(s"$histogramName histogram labels not configured correctly")
+      Logger[F].error(s"$histogramName histogram labels not configured correctly")
       None
     }
   }
@@ -96,11 +95,11 @@ class ExecutionTimeRecorderImpl[Interpretation[_]: Sync: Clock: Logger](threshol
 
 object ExecutionTimeRecorder {
 
-  def apply[Interpretation[_]: Sync: Clock: Logger](
+  def apply[F[_]: Sync: Clock: Logger](
       config:         Config = ConfigFactory.load(),
       maybeHistogram: Option[Histogram] = None
-  ): Interpretation[ExecutionTimeRecorder[Interpretation]] = for {
-    duration <- find[Interpretation, FiniteDuration]("logging.elapsed-time-threshold", config)
+  ): F[ExecutionTimeRecorder[F]] = for {
+    duration <- find[F, FiniteDuration]("logging.elapsed-time-threshold", config)
   } yield new ExecutionTimeRecorderImpl(ElapsedTime(duration), maybeHistogram)
 
   class ElapsedTime private (val value: Long) extends AnyVal with LongTinyType

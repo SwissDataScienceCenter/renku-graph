@@ -18,7 +18,7 @@
 
 package io.renku.config.certificates
 
-import cats.{MonadError, MonadThrow}
+import cats.MonadThrow
 import cats.syntax.all._
 import io.renku.tinytypes.constraints.NonBlank
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
@@ -29,27 +29,25 @@ object Certificate extends TinyTypeFactory[Certificate](new Certificate(_)) with
   import com.typesafe.config.{Config, ConfigFactory}
   import io.renku.config.ConfigLoader.find
 
-  def fromConfig[Interpretation[_]: MonadThrow](
+  def fromConfig[F[_]: MonadThrow](
       config: Config = ConfigFactory.load()
-  ): Interpretation[Option[Certificate]] =
-    find[Interpretation, Option[String]]("client-certificate", config)
+  ): F[Option[Certificate]] =
+    find[F, Option[String]]("client-certificate", config)
       .flatMap(blankToNone(_))
       .flatMap {
-        case None => MonadThrow[Interpretation].pure(None)
+        case None => MonadThrow[F].pure(None)
         case Some(certContent) =>
-          MonadThrow[Interpretation].fromEither {
+          MonadThrow[F].fromEither {
             Certificate.from(certContent) map Option.apply
           }
       }
 
-  private def blankToNone[Interpretation[_]](
-      maybeBody: Option[String]
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[Option[String]] =
+  private def blankToNone[F[_]: MonadThrow](maybeBody: Option[String]): F[Option[String]] =
     maybeBody
       .map(_.trim)
       .flatMap {
         case ""       => None
         case nonBlank => Some(nonBlank)
       }
-      .pure[Interpretation]
+      .pure[F]
 }

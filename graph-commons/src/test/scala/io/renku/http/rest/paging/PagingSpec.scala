@@ -18,7 +18,6 @@
 
 package io.renku.http.rest.paging
 
-import cats.MonadError
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
@@ -39,7 +38,7 @@ class PagingSpec extends AnyWordSpec with should.Matchers {
 
         val results = nonEmptyList(positiveInts(), minElements = 6, maxElements = 6).generateOne.map(_.value).toList
 
-        val resultsFinder = new ResultsFinder(returning = context.pure(results))()
+        val resultsFinder = new ResultsFinder(returning = results.pure[Try])()
 
         val pagingRequest = PagingRequest(Page.first, PerPage(7))
 
@@ -55,7 +54,7 @@ class PagingSpec extends AnyWordSpec with should.Matchers {
 
         val results = nonEmptyList(positiveInts(), minElements = 6, maxElements = 6).generateOne.map(_.value).toList
 
-        val resultsFinder = new ResultsFinder(returning = context.pure(results))()
+        val resultsFinder = new ResultsFinder(returning = results.pure[Try])()
 
         val pagingRequest = PagingRequest(Page.first, PerPage(6))
 
@@ -70,7 +69,7 @@ class PagingSpec extends AnyWordSpec with should.Matchers {
       "if not the first page is requested and there are no results" in {
 
         val total         = Total(5)
-        val resultsFinder = new ResultsFinder(returning = context.pure(Nil))(total)
+        val resultsFinder = new ResultsFinder(returning = Nil.pure[Try])(total)
 
         val pagingRequest = PagingRequest(Page(2), PerPage(6))
 
@@ -86,7 +85,7 @@ class PagingSpec extends AnyWordSpec with should.Matchers {
 
         val results = nonEmptyList(positiveInts(), minElements = 6, maxElements = 6).generateOne.map(_.value).toList
 
-        val resultsFinder = new ResultsFinder(returning = context.pure(results))()
+        val resultsFinder = new ResultsFinder(returning = results.pure[Try])()
 
         val pagingRequest = PagingRequest(Page.first, PerPage(5))
 
@@ -97,8 +96,6 @@ class PagingSpec extends AnyWordSpec with should.Matchers {
         response.pagingInfo.total         shouldBe Total(results.size)
       }
   }
-
-  private val context = MonadError[Try, Throwable]
 
   private class ResultsFinder(
       returning: Try[List[Int]]

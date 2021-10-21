@@ -27,7 +27,7 @@ object model {
 }
 
 sealed trait EndpointSecurityException extends Exception with Product with Serializable {
-  def toHttpResponse[Interpretation[_]]: Response[Interpretation]
+  def toHttpResponse[F[_]]: Response[F]
 }
 
 object EndpointSecurityException {
@@ -40,8 +40,8 @@ object EndpointSecurityException {
 
     override lazy val getMessage: String = "User authentication failure"
 
-    override def toHttpResponse[Interpretation[_]]: Response[Interpretation] =
-      Response[Interpretation](Status.Unauthorized).withEntity(ErrorMessage(getMessage))
+    override def toHttpResponse[F[_]]: Response[F] =
+      Response[F](Status.Unauthorized).withEntity(ErrorMessage(getMessage))
   }
   type AuthenticationFailure = AuthenticationFailure.type
 
@@ -49,8 +49,8 @@ object EndpointSecurityException {
 
     override lazy val getMessage: String = "User not authorized failure"
 
-    override def toHttpResponse[Interpretation[_]]: Response[Interpretation] =
-      Response[Interpretation](Status.NotFound).withEntity(ErrorMessage(getMessage))
+    override def toHttpResponse[F[_]]: Response[F] =
+      Response[F](Status.NotFound).withEntity(ErrorMessage(getMessage))
   }
   type AuthorizationFailure = AuthorizationFailure.type
 }

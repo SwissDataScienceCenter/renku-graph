@@ -37,10 +37,8 @@ import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
-trait ProjectAuthorizer[Interpretation[_]] {
-  def authorize(path:          projects.Path,
-                maybeAuthUser: Option[AuthUser]
-  ): EitherT[Interpretation, EndpointSecurityException, Unit]
+trait ProjectAuthorizer[F[_]] {
+  def authorize(path: projects.Path, maybeAuthUser: Option[AuthUser]): EitherT[F, EndpointSecurityException, Unit]
 }
 
 object ProjectAuthorizer {
@@ -54,16 +52,16 @@ object ProjectAuthorizer {
   } yield new ProjectAuthorizerImpl(config, renkuUrl, timeRecorder)
 }
 
-class ProjectAuthorizerImpl[Interpretation[_]: Async: Temporal: Logger](
+class ProjectAuthorizerImpl[F[_]: Async: Temporal: Logger](
     rdfStoreConfig: RdfStoreConfig,
     renkuBaseUrl:   RenkuBaseUrl,
-    timeRecorder:   SparqlQueryTimeRecorder[Interpretation]
+    timeRecorder:   SparqlQueryTimeRecorder[F]
 ) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
-    with ProjectAuthorizer[Interpretation] {
+    with ProjectAuthorizer[F] {
 
   override def authorize(path:          projects.Path,
                          maybeAuthUser: Option[AuthUser]
-  ): EitherT[Interpretation, EndpointSecurityException, Unit] = for {
+  ): EitherT[F, EndpointSecurityException, Unit] = for {
     records <- EitherT.right(queryExpecting[List[Record]](using = query(path))(recordsDecoder))
     _       <- validate(maybeAuthUser, records)
   } yield ()
@@ -121,7 +119,7 @@ class ProjectAuthorizerImpl[Interpretation[_]: Async: Temporal: Logger](
   private def validate(
       maybeAuthUser: Option[AuthUser],
       records:       List[Record]
-  ): EitherT[Interpretation, EndpointSecurityException, Unit] = records -> maybeAuthUser match {
+  ): EitherT[F, EndpointSecurityException, Unit] = records -> maybeAuthUser match {
     case (Nil, _)                                                                            => rightT(())
     case ((Public, _) :: Nil, _)                                                             => rightT(())
     case ((_, projectMembers) :: Nil, Some(authUser)) if projectMembers contains authUser.id => rightT(())

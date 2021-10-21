@@ -18,7 +18,7 @@
 
 package io.renku.config.sentry
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.config.sentry.SentryConfig._
@@ -37,24 +37,20 @@ object SentryConfig {
 
   import io.renku.config.ConfigLoader._
 
-  def apply[Interpretation[_]](
-      config:    Config = ConfigFactory.load()
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[Option[SentryConfig]] = {
-    lazy val emptyString: PartialFunction[Throwable, Interpretation[SentryStackTracePackage]] = { case NonFatal(_) =>
-      SentryStackTracePackage.empty.pure[Interpretation]
+  def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[Option[SentryConfig]] = {
+    lazy val emptyString: PartialFunction[Throwable, F[SentryStackTracePackage]] = { case NonFatal(_) =>
+      SentryStackTracePackage.empty.pure[F]
     }
 
-    find[Interpretation, Boolean]("services.sentry.enabled", config) flatMap {
-      case false => ME.pure(None)
+    find[F, Boolean]("services.sentry.enabled", config) flatMap {
+      case false => MonadThrow[F].pure(None)
       case true =>
         for {
-          url         <- find[Interpretation, SentryBaseUrl]("services.sentry.url", config)
-          environment <- find[Interpretation, EnvironmentName]("services.sentry.environment-name", config)
-          serviceName <- find[Interpretation, ServiceName]("services.sentry.service-name", config)
+          url         <- find[F, SentryBaseUrl]("services.sentry.url", config)
+          environment <- find[F, EnvironmentName]("services.sentry.environment-name", config)
+          serviceName <- find[F, ServiceName]("services.sentry.service-name", config)
           stackTracePackage <-
-            find[Interpretation, SentryStackTracePackage]("services.sentry.stacktrace-package",
-                                                          config
-            ) recoverWith emptyString
+            find[F, SentryStackTracePackage]("services.sentry.stacktrace-package", config) recoverWith emptyString
         } yield Some(
           SentryConfig(url, environment, serviceName, stackTracePackage)
         )
@@ -73,7 +69,7 @@ object SentryConfig {
   class SentryStackTracePackage private (val value: String) extends AnyVal with StringTinyType
   implicit object SentryStackTracePackage
       extends TinyTypeFactory[SentryStackTracePackage](new SentryStackTracePackage(_)) {
-    lazy val empty = SentryStackTracePackage("")
+    lazy val empty: SentryStackTracePackage = SentryStackTracePackage("")
   }
 
   class EnvironmentName private (val value: String) extends AnyVal with StringTinyType

@@ -18,7 +18,7 @@
 
 package io.renku.config.certificates
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.certificates
 import io.renku.generators.Generators.Implicits._
@@ -128,7 +128,7 @@ class CertificateLoaderSpec extends AnyWordSpec with MockFactory with should.Mat
     val keystore              = mock[Keystore[Try]]
     val findCertificate       = mockFunction[Try[Option[Certificate]]]
     val createSslContext      = mockFunction[Keystore[Try], Try[SslContext]]
-    val makeSslContextDefault = mockFunction[SslContext, MonadError[Try, Throwable], Try[Unit]]
+    val makeSslContextDefault = mockFunction[SslContext, MonadThrow[Try], Try[Unit]]
     implicit val logger: TestLogger[Try] = TestLogger[Try]()
     val certificateLoader =
       new CertificateLoaderImpl[Try](keystore, findCertificate, createSslContext, makeSslContextDefault)

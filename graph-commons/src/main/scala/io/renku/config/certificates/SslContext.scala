@@ -29,9 +29,9 @@ private class SslContext private[certificates] (sslContext: SSLContext) {
 private object SslContext {
   import javax.net.ssl.TrustManagerFactory
 
-  def from[Interpretation[_]: MonadThrow](
-      keystore: Keystore[Interpretation]
-  ): Interpretation[SslContext] = MonadThrow[Interpretation].catchNonFatal {
+  def from[F[_]: MonadThrow](
+      keystore: Keystore[F]
+  ): F[SslContext] = MonadThrow[F].catchNonFatal {
     val trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm)
     trustManagerFactory.init(keystore.toJavaKeyStore)
 
@@ -41,9 +41,9 @@ private object SslContext {
     new SslContext(context)
   }
 
-  def makeDefault[Interpretation[_]: MonadThrow](
+  def makeDefault[F[_]: MonadThrow](
       sslContext: SslContext
-  ): Interpretation[Unit] = MonadThrow[Interpretation].catchNonFatal {
+  ): F[Unit] = MonadThrow[F].catchNonFatal {
     SSLContext setDefault sslContext.toJavaSSLContext
   }
 }

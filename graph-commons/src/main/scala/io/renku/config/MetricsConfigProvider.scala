@@ -20,6 +20,6 @@ package io.renku.config
 
 import scala.concurrent.duration.FiniteDuration
 
-trait MetricsConfigProvider[Interpretation[_]] extends ConfigLoader[Interpretation] {
-  def getInterval(): Interpretation[FiniteDuration]
+trait MetricsConfigProvider[F[_]] extends ConfigLoader[F] {
+  def getInterval(): F[FiniteDuration]
 }

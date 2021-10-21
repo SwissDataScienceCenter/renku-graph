@@ -29,21 +29,20 @@ import scala.io.{Codec, Source}
 import scala.util.control.NonFatal
 
 trait Zip {
-  def zip[Interpretation[_]:   MonadCancelThrow: Sync](content: String):      Interpretation[Array[Byte]]
-  def unzip[Interpretation[_]: MonadCancelThrow: Sync](bytes:   Array[Byte]): Interpretation[String]
+  def zip[F[_]:   MonadCancelThrow: Sync](content: String):      F[Array[Byte]]
+  def unzip[F[_]: MonadCancelThrow: Sync](bytes:   Array[Byte]): F[String]
 }
 
 object Zip extends Zip {
 
-  def zip[Interpretation[_]: MonadCancelThrow: Sync](content: String): Interpretation[Array[Byte]] = {
-    val newStreams = MonadThrow[Interpretation].catchNonFatal {
+  def zip[F[_]: MonadCancelThrow: Sync](content: String): F[Array[Byte]] = {
+    val newStreams = MonadThrow[F].catchNonFatal {
       val arrOutputStream = new ByteArrayOutputStream(content.length)
       (arrOutputStream, new GZIPOutputStream(arrOutputStream))
     }
 
-    val closeStreams: ((ByteArrayOutputStream, GZIPOutputStream)) => Interpretation[Unit] = {
-      case (arrayOutputStream, _) =>
-        Sync[Interpretation].delay(arrayOutputStream.close())
+    val closeStreams: ((ByteArrayOutputStream, GZIPOutputStream)) => F[Unit] = { case (arrayOutputStream, _) =>
+      Sync[F].delay(arrayOutputStream.close())
     }
 
     def zipContent(arrayOutputStream: ByteArrayOutputStream,
@@ -56,22 +55,22 @@ object Zip extends Zip {
     }
 
     Resource
-      .make[Interpretation, (ByteArrayOutputStream, GZIPOutputStream)](newStreams)(closeStreams)
+      .make[F, (ByteArrayOutputStream, GZIPOutputStream)](newStreams)(closeStreams)
       .use { case (arrayOutputStream, zipOutputStream) =>
-        MonadThrow[Interpretation].catchNonFatal(zipContent(arrayOutputStream, zipOutputStream, content))
+        MonadThrow[F].catchNonFatal(zipContent(arrayOutputStream, zipOutputStream, content))
       } recoverWith { case NonFatal(error) =>
-      new Exception("Zipping content failed", error).raiseError[Interpretation, Array[Byte]]
+      new Exception("Zipping content failed", error).raiseError[F, Array[Byte]]
     }
   }
 
-  def unzip[Interpretation[_]: MonadCancelThrow: Sync](bytes: Array[Byte]): Interpretation[String] =
+  def unzip[F[_]: MonadCancelThrow: Sync](bytes: Array[Byte]): F[String] =
     Resource
-      .make[Interpretation, GZIPInputStream] {
-        MonadThrow[Interpretation].catchNonFatal(new GZIPInputStream(new ByteArrayInputStream(bytes)))
-      }(stream => Sync[Interpretation].delay(stream.close()))
+      .make[F, GZIPInputStream] {
+        MonadThrow[F].catchNonFatal(new GZIPInputStream(new ByteArrayInputStream(bytes)))
+      }(stream => Sync[F].delay(stream.close()))
       .use { inputStream =>
-        MonadThrow[Interpretation].catchNonFatal(Source.fromInputStream(inputStream)(Codec.UTF8).mkString)
+        MonadThrow[F].catchNonFatal(Source.fromInputStream(inputStream)(Codec.UTF8).mkString)
       } recoverWith { case NonFatal(error) =>
-      new Exception("Unzipping content failed", error).raiseError[Interpretation, String]
+      new Exception("Unzipping content failed", error).raiseError[F, String]
     }
 }

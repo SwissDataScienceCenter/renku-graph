@@ -18,7 +18,7 @@
 
 package io.renku.interpreters
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.effect.IO
 import io.prometheus.client.{CollectorRegistry, SimpleCollector}
 import io.renku.metrics.MetricsRegistry
@@ -29,7 +29,7 @@ object TestMetricsRegistry extends MetricsRegistry[IO] {
 
   override def register[Collector <: SimpleCollector[_], Builder <: SimpleCollector.Builder[Builder, Collector]](
       collectorBuilder: Builder
-  )(implicit ME:        MonadError[IO, Throwable]): IO[Collector] = IO {
+  )(implicit ME:        MonadThrow[IO]): IO[Collector] = IO {
     collectorBuilder register collectorRegistry
   }
 

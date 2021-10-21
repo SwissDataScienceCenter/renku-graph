@@ -18,7 +18,7 @@
 
 package io.renku.control
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.{RefType, Refined}
@@ -48,14 +48,12 @@ object RateLimitUnit extends TypeName {
   case object Hour   extends RateLimitUnit
   case object Day    extends RateLimitUnit
 
-  def from[Interpretation[_]](
-      value:     String
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[RateLimitUnit] = value match {
-    case "sec"  => ME.pure(Second)
-    case "min"  => ME.pure(Minute)
-    case "hour" => ME.pure(Hour)
-    case "day"  => ME.pure(Day)
-    case other  => ME.raiseError(new IllegalArgumentException(s"Unknown '$other' for $typeName"))
+  def from[F[_]: MonadThrow](value: String): F[RateLimitUnit] = value match {
+    case "sec"  => Second.pure[F].widen[RateLimitUnit]
+    case "min"  => Minute.pure[F].widen[RateLimitUnit]
+    case "hour" => Hour.pure[F].widen[RateLimitUnit]
+    case "day"  => Day.pure[F].widen[RateLimitUnit]
+    case other  => new IllegalArgumentException(s"Unknown '$other' for $typeName").raiseError[F, RateLimitUnit]
   }
 
   implicit class RateLimitUnitOps(unit: RateLimitUnit) {
@@ -76,18 +74,16 @@ object RateLimit extends TypeName {
 
   private val RateExtractor = """(\d+)[ ]*/(\w+)""".r
 
-  def from[Interpretation[_], Target](
-      value:     String
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[RateLimit[Target]] = value match {
+  def from[F[_]: MonadThrow, Target](value: String): F[RateLimit[Target]] = value match {
     case RateExtractor(rate, unit) =>
-      (toPositiveLong[Interpretation](rate), RateLimitUnit.from[Interpretation](unit)) mapN RateLimit[Target]
-    case other => ME.raiseError(new IllegalArgumentException(s"Invalid value for $typeName: '$other'"))
+      (toPositiveLong[F](rate), RateLimitUnit.from[F](unit)) mapN RateLimit[Target]
+    case other => MonadThrow[F].raiseError(new IllegalArgumentException(s"Invalid value for $typeName: '$other'"))
   }
 
-  def fromConfig[Interpretation[_], Target](
-      key:       String,
-      config:    Config = ConfigFactory.load()
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[RateLimit[Target]] = {
+  def fromConfig[F[_]: MonadThrow, Target](
+      key:    String,
+      config: Config = ConfigFactory.load()
+  ): F[RateLimit[Target]] = {
     import ConfigLoader._
     import pureconfig.ConfigReader
     import pureconfig.error.CannotConvert
@@ -100,18 +96,16 @@ object RateLimit extends TypeName {
           .leftMap(exception => CannotConvert(value, RateLimit.getClass.toString, exception.getMessage))
       }
 
-    find[Interpretation, RateLimit[Target]](key, config)
+    find[F, RateLimit[Target]](key, config)
   }
 
-  private def toPositiveLong[Interpretation[_]](
-      rate:      String
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[Long Refined Positive] =
-    for {
-      long <- ME
-                .fromTry(Try(rate.toLong))
-                .adaptError { case _ => new IllegalArgumentException(s"$typeName has to be positive") }
-      positiveLong <- ME.fromEither(long.toPositiveLong(errorWhenNotPositive = s"$typeName has to be positive"))
-    } yield positiveLong
+  private def toPositiveLong[F[_]: MonadThrow](rate: String): F[Long Refined Positive] = for {
+    long <- MonadThrow[F]
+              .fromTry(Try(rate.toLong))
+              .adaptError { case _ => new IllegalArgumentException(s"$typeName has to be positive") }
+    positiveLong <-
+      MonadThrow[F].fromEither(long.toPositiveLong(errorWhenNotPositive = s"$typeName has to be positive"))
+  } yield positiveLong
 
   implicit class RateLimitOps[OldTarget](rateLimit: RateLimit[OldTarget]) {
     import RateLimitUnit._
