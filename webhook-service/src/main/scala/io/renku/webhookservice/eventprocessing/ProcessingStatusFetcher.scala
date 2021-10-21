@@ -18,9 +18,8 @@
 
 package io.renku.webhookservice.eventprocessing
 
-import ProcessingStatusFetcher.ProcessingStatus
 import cats.data.OptionT
-import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
+import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
@@ -29,16 +28,31 @@ import io.renku.control.Throttler
 import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.projects
 import io.renku.http.client.RestClient
+import io.renku.webhookservice.eventprocessing.ProcessingStatusFetcher.ProcessingStatus
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.math.BigDecimal.RoundingMode
 
-private trait ProcessingStatusFetcher[Interpretation[_]] {
-  def fetchProcessingStatus(projectId: projects.Id): OptionT[Interpretation, ProcessingStatus]
+private trait ProcessingStatusFetcher[F[_]] {
+  def fetchProcessingStatus(projectId: projects.Id): OptionT[F, ProcessingStatus]
 }
 
 private object ProcessingStatusFetcher {
+
+  import io.circe.DecodingFailure
+
+  def apply[F[_]: Async: Logger]: F[ProcessingStatusFetcher[F]] =
+    for {
+      eventLogUrl <- EventLogUrl[F]()
+    } yield new ProcessingStatusFetcherImpl(eventLogUrl)
+
+  implicit lazy val processingStatusDecoder: Decoder[ProcessingStatus] = cursor =>
+    for {
+      done           <- cursor.downField("done").as[Int]
+      total          <- cursor.downField("total").as[Int]
+      progress       <- cursor.downField("progress").as[Double]
+      progressStatus <- ProcessingStatus.from(done, total, progress).leftMap(DecodingFailure(_, Nil))
+    } yield progressStatus
 
   import ProcessingStatus._
 
@@ -73,22 +87,18 @@ private object ProcessingStatusFetcher {
   }
 }
 
-private class ProcessingStatusFetcherImpl[Interpretation[_]: ConcurrentEffect: Timer](
-    eventLogUrl: EventLogUrl,
-    logger:      Logger[Interpretation]
-)(implicit
-    executionContext: ExecutionContext
-) extends RestClient[Interpretation, ProcessingStatusFetcher[Interpretation]](Throttler.noThrottling, logger)
-    with ProcessingStatusFetcher[Interpretation] {
+private class ProcessingStatusFetcherImpl[F[_]: Async: Logger](
+    eventLogUrl: EventLogUrl
+) extends RestClient[F, ProcessingStatusFetcher[F]](Throttler.noThrottling)
+    with ProcessingStatusFetcher[F] {
 
-  import IOProcessingStatusFetcher._
   import ProcessingStatusFetcher._
   import org.http4s.Method.GET
   import org.http4s._
   import org.http4s.circe.jsonOf
   import org.http4s.dsl.io._
 
-  override def fetchProcessingStatus(projectId: projects.Id): OptionT[Interpretation, ProcessingStatus] =
+  override def fetchProcessingStatus(projectId: projects.Id): OptionT[F, ProcessingStatus] =
     OptionT {
       for {
         uri <- validateUri(s"$eventLogUrl/processing-status") map (_.withQueryParam("project-id", projectId.toString))
@@ -96,37 +106,11 @@ private class ProcessingStatusFetcherImpl[Interpretation[_]: ConcurrentEffect: T
       } yield latestEvents
     }
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[Interpretation], Response[Interpretation]),
-                                                Interpretation[Option[ProcessingStatus]]
-  ] = {
-    case (NotFound, _, _)  => Option.empty[ProcessingStatus].pure[Interpretation]
+  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[ProcessingStatus]]] = {
+    case (NotFound, _, _)  => Option.empty[ProcessingStatus].pure[F]
     case (Ok, _, response) => response.as[ProcessingStatus].map(Option.apply)
   }
 
-  private implicit lazy val entityDecoder: EntityDecoder[Interpretation, ProcessingStatus] =
-    jsonOf[Interpretation, ProcessingStatus]
-}
-
-private object IOProcessingStatusFetcher {
-
-  import io.circe.DecodingFailure
-
-  def apply(
-      logger: Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[ProcessingStatusFetcher[IO]] =
-    for {
-      eventLogUrl <- EventLogUrl[IO]()
-    } yield new ProcessingStatusFetcherImpl(eventLogUrl, logger)
-
-  implicit lazy val processingStatusDecoder: Decoder[ProcessingStatus] = cursor =>
-    for {
-      done           <- cursor.downField("done").as[Int]
-      total          <- cursor.downField("total").as[Int]
-      progress       <- cursor.downField("progress").as[Double]
-      progressStatus <- ProcessingStatus.from(done, total, progress).leftMap(DecodingFailure(_, Nil))
-    } yield progressStatus
+  private implicit lazy val entityDecoder: EntityDecoder[F, ProcessingStatus] =
+    jsonOf[F, ProcessingStatus]
 }

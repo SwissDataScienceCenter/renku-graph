@@ -19,7 +19,7 @@
 package io.renku.webhookservice.hookcreation
 
 import cats._
-import cats.effect.{ConcurrentEffect, ContextShift, IO}
+import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
@@ -28,9 +28,10 @@ import io.renku.graph.model.projects.Id
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
+import io.renku.testtools.IOSpec
 import io.renku.webhookservice.CommitSyncRequestSender
 import io.renku.webhookservice.WebhookServiceGenerators._
-import io.renku.webhookservice.crypto.IOHookTokenCrypto
+import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.hookcreation.HookCreator.CreationResult.{HookCreated, HookExisted}
 import io.renku.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import io.renku.webhookservice.hookcreation.project.ProjectInfoFinder
@@ -42,9 +43,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext
-
-class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers with IOSpec {
 
   "createHook" should {
 
@@ -258,9 +257,6 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
     }
   }
 
-  private implicit val contextShift: ContextShift[IO]     = IO.contextShift(ExecutionContext.global)
-  private implicit val concurrent:   ConcurrentEffect[IO] = IO.ioConcurrentEffect
-
   private trait TestCase {
     val projectInfo         = projectInfos.generateOne
     val projectId           = projectInfo.id
@@ -270,11 +266,11 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
 
     val context: MonadError[IO, Throwable] = MonadError[IO, Throwable]
 
-    val logger                  = TestLogger[IO]()
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val projectInfoFinder       = mock[ProjectInfoFinder[IO]]
     val projectHookValidator    = mock[HookValidator[IO]]
     val projectHookCreator      = mock[ProjectHookCreator[IO]]
-    val hookTokenCrypto         = mock[IOHookTokenCrypto]
+    val hookTokenCrypto         = mock[HookTokenCrypto[IO]]
     val accessTokenAssociator   = mock[AccessTokenAssociator[IO]]
     val commitSyncRequestSender = mock[CommitSyncRequestSender[IO]]
 
@@ -285,8 +281,7 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
       hookTokenCrypto,
       projectHookCreator,
       accessTokenAssociator,
-      commitSyncRequestSender,
-      logger
+      commitSyncRequestSender
     )
   }
 }

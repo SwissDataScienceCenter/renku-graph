@@ -34,27 +34,22 @@ import scala.concurrent.ExecutionContext
 
 object Microservice extends IOMicroservice {
 
-  protected implicit override val executionContext: ExecutionContext =
+  protected implicit val executionContext: ExecutionContext =
     ExecutionContext fromExecutorService newFixedThreadPool(ConfigSource.default.at("threads-number").loadOrThrow[Int])
 
-  protected implicit override def contextShift: ContextShift[IO] =
-    IO.contextShift(executionContext)
-
-  protected implicit override def timer: Timer[IO] =
-    IO.timer(executionContext)
+  private implicit val logger: ApplicationLogger.type = ApplicationLogger
 
   override def run(args: List[String]): IO[ExitCode] = for {
-    certificateLoader     <- CertificateLoader[IO](ApplicationLogger)
-    sentryInitializer     <- SentryInitializer[IO]()
+    certificateLoader     <- CertificateLoader[IO]
+    sentryInitializer     <- SentryInitializer[IO]
     gitLabRateLimit       <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
     gitLabThrottler       <- Throttler[IO, GitLab](gitLabRateLimit)
-    executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
+    executionTimeRecorder <- ExecutionTimeRecorder[IO]()
     metricsRegistry       <- MetricsRegistry()
     microserviceRoutes <-
-      MicroserviceRoutes(metricsRegistry, gitLabThrottler, executionTimeRecorder, ApplicationLogger)
+      MicroserviceRoutes(metricsRegistry, gitLabThrottler, executionTimeRecorder)
     exitcode <- microserviceRoutes.routes.use { routes =>
-                  val httpServer = new HttpServer[IO](serverPort = 9001, routes)
-
+                  val httpServer = HttpServer[IO](serverPort = 9001, routes)
                   new MicroserviceRunner(
                     certificateLoader,
                     sentryInitializer,
@@ -67,7 +62,7 @@ object Microservice extends IOMicroservice {
 class MicroserviceRunner(certificateLoader: CertificateLoader[IO],
                          sentryInitializer: SentryInitializer[IO],
                          httpServer:        HttpServer[IO]
-)(implicit contextShift:                    ContextShift[IO]) {
+) {
 
   def run(): IO[ExitCode] = for {
     _      <- certificateLoader.run()

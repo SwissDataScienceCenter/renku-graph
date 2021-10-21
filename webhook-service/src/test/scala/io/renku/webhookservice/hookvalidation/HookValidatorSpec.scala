@@ -18,7 +18,6 @@
 
 package io.renku.webhookservice.hookvalidation
 
-import HookValidator.NoAccessTokenException
 import cats.MonadError
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
@@ -31,6 +30,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.webhookservice.WebhookServiceGenerators._
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
+import io.renku.webhookservice.hookvalidation.HookValidator.NoAccessTokenException
 import io.renku.webhookservice.hookvalidation.ProjectHookVerifier.HookIdentifier
 import io.renku.webhookservice.tokenrepository.{AccessTokenAssociator, AccessTokenRemover}
 import org.scalamock.scalatest.MockFactory
@@ -258,14 +258,13 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
     val accessTokenFinder     = mock[AccessTokenFinder[Try]]
     val accessTokenAssociator = mock[AccessTokenAssociator[Try]]
     val accessTokenRemover    = mock[AccessTokenRemover[Try]]
-    val logger                = TestLogger[Try]()
+    implicit val logger: TestLogger[Try] = TestLogger[Try]()
     val validator = new HookValidatorImpl[Try](
       projectHookUrl,
       projectHookVerifier,
       accessTokenFinder,
       accessTokenAssociator,
-      accessTokenRemover,
-      logger
+      accessTokenRemover
     )
 
     def assumeGivenAccessTokenInvalid(): AccessToken = {

@@ -18,8 +18,9 @@
 
 package io.renku.webhookservice.hookcreation
 
-import ProjectHookCreator.ProjectHook
-import cats.effect.{ContextShift, IO, Timer}
+import cats.Applicative
+import cats.effect.Async
+import cats.syntax.all._
 import io.renku.config.GitLab
 import io.renku.control.Throttler
 import io.renku.graph.config.GitLabUrlLoader
@@ -27,11 +28,10 @@ import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.projects.Id
 import io.renku.http.client.{AccessToken, RestClient}
 import io.renku.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
+import io.renku.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import io.renku.webhookservice.model.ProjectHookUrl
 import org.http4s.Status
 import org.typelevel.log4cats.Logger
-
-import scala.concurrent.ExecutionContext
 
 private trait ProjectHookCreator[Interpretation[_]] {
   def create(
@@ -40,22 +40,11 @@ private trait ProjectHookCreator[Interpretation[_]] {
   ): Interpretation[Unit]
 }
 
-private object ProjectHookCreator {
-
-  final case class ProjectHook(
-      projectId:           Id,
-      projectHookUrl:      ProjectHookUrl,
-      serializedHookToken: SerializedHookToken
-  )
-}
-
-private class IOProjectHookCreator(
-    gitLabUrl:               GitLabUrl,
-    gitLabThrottler:         Throttler[IO, GitLab],
-    logger:                  Logger[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends RestClient(gitLabThrottler, logger)
-    with ProjectHookCreator[IO] {
+private class ProjectHookCreatorImpl[F[_]: Async: Logger](
+    gitLabUrl:       GitLabUrl,
+    gitLabThrottler: Throttler[F, GitLab]
+) extends RestClient(gitLabThrottler)
+    with ProjectHookCreator[F] {
 
   import cats.effect._
   import io.circe.Json
@@ -65,7 +54,7 @@ private class IOProjectHookCreator(
   import org.http4s.circe._
   import org.http4s.{Request, Response}
 
-  def create(projectHook: ProjectHook, accessToken: AccessToken): IO[Unit] =
+  def create(projectHook: ProjectHook, accessToken: AccessToken): F[Unit] =
     for {
       uri <- validateUri(s"$gitLabUrl/api/v4/projects/${projectHook.projectId}/hooks")
       requestWithPayload = request(POST, uri, accessToken).withEntity(payload(projectHook))
@@ -80,22 +69,21 @@ private class IOProjectHookCreator(
       "token"       -> Json.fromString(projectHook.serializedHookToken.value)
     )
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
-    case (Created, _, _)      => IO.unit
-    case (Unauthorized, _, _) => IO.raiseError(UnauthorizedException)
+  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Unit]] = {
+    case (Created, _, _)      => Applicative[F].unit
+    case (Unauthorized, _, _) => MonadCancelThrow[F].raiseError(UnauthorizedException)
   }
 }
 
-private object IOProjectHookCreator {
-  def apply(
-      gitLabThrottler: Throttler[IO, GitLab],
-      logger:          Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[ProjectHookCreator[IO]] =
+private object ProjectHookCreator {
+  final case class ProjectHook(
+      projectId:           Id,
+      projectHookUrl:      ProjectHookUrl,
+      serializedHookToken: SerializedHookToken
+  )
+
+  def apply[F[_]: Async: Logger](gitLabThrottler: Throttler[F, GitLab]): F[ProjectHookCreator[F]] =
     for {
-      gitLabUrl <- GitLabUrlLoader[IO]()
-    } yield new IOProjectHookCreator(gitLabUrl, gitLabThrottler, logger)
+      gitLabUrl <- GitLabUrlLoader[F]()
+    } yield new ProjectHookCreatorImpl(gitLabUrl, gitLabThrottler)
 }

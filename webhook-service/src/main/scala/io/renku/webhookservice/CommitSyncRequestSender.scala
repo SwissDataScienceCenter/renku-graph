@@ -105,7 +105,7 @@ private class CommitSyncRequestSenderImpl[F[_]: Async: Temporal: Logger](
 
 private object CommitSyncRequestSender {
 
-  def apply[F[_]: Async: Temporal: Logger]: F[CommitSyncRequestSender[F]] = for {
+  def apply[F[_]: Async: Logger]: F[CommitSyncRequestSender[F]] = for {
     eventLogUrl <- EventLogUrl[F]()
   } yield new CommitSyncRequestSenderImpl(eventLogUrl, retryDelay = 30 seconds)
 }
