@@ -41,6 +41,7 @@ import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
+import io.renku.testtools.IOSpec
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.EntityDecoder
 import org.http4s.MediaType._
@@ -53,13 +54,13 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.Try
 
-class EventsEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class EventsEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "findEvents" should {
 
     s"$Ok with an empty array if there are no events found" in new TestCase {
-      val request           = requests.generateOne
-      implicit val resource = resourceUrl(request)
+      val request = requests.generateOne
+      implicit val resource: EventLogUrl = resourceUrl(request)
 
       val pagingResponse =
         PagingResponse.from[Try, EventInfo](Nil, request.pagingRequest, Total(0)).fold(throw _, identity)
@@ -72,12 +73,12 @@ class EventsEndpointSpec extends AnyWordSpec with MockFactory with should.Matche
       response.status                              shouldBe Ok
       response.contentType                         shouldBe Some(`Content-Type`(application.json))
       response.as[List[EventInfo]].unsafeRunSync() shouldBe Nil
-      response.headers.toList should contain allElementsOf PagingHeaders.from[IO, EventLogUrl](pagingResponse)
+      response.headers.headers should contain allElementsOf PagingHeaders.from[IO, EventLogUrl](pagingResponse)
     }
 
     s"$Ok with array of events if there are events found" in new TestCase {
-      val request           = requests.generateOne
-      implicit val resource = resourceUrl(request)
+      val request = requests.generateOne
+      implicit val resource: EventLogUrl = resourceUrl(request)
 
       val pagingResponse = pagingResponses(eventInfos()).generateOne
 
@@ -90,12 +91,12 @@ class EventsEndpointSpec extends AnyWordSpec with MockFactory with should.Matche
       response.status                              shouldBe Ok
       response.contentType                         shouldBe Some(`Content-Type`(application.json))
       response.as[List[EventInfo]].unsafeRunSync() shouldBe pagingResponse.results
-      response.headers.toList should contain allElementsOf PagingHeaders.from[IO, EventLogUrl](pagingResponse)
+      response.headers.headers should contain allElementsOf PagingHeaders.from[IO, EventLogUrl](pagingResponse)
     }
 
     s"$InternalServerError when an error happens while fetching the events" in new TestCase {
-      val request           = requests.generateOne
-      implicit val resource = resourceUrl(request)
+      val request = requests.generateOne
+      implicit val resource: EventLogUrl = resourceUrl(request)
 
       val exception = exceptions.generateOne
       (eventsFinder.findEvents _)

@@ -27,6 +27,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.metrics.TestLabeledHistogram
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -35,6 +36,7 @@ import java.time.Instant
 
 class CommitSyncForcerSpec
     extends AnyWordSpec
+    with IOSpec
     with InMemoryEventLogDbSpec
     with SubscriptionDataProvisioning
     with MockFactory

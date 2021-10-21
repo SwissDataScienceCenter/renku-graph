@@ -33,6 +33,7 @@ import io.renku.http.InfoMessage._
 import io.renku.http.client.RestClient._
 import io.renku.http.server.EndpointTester._
 import io.renku.http.{ErrorMessage, InfoMessage}
+import io.renku.testtools.IOSpec
 import io.renku.tinytypes.ByteArrayTinyType
 import io.renku.tinytypes.contenttypes.ZippedContent
 import org.http4s.MediaType._
@@ -46,7 +47,12 @@ import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 
-class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers with TableDrivenPropertyChecks {
+class EventEndpointSpec
+    extends AnyWordSpec
+    with IOSpec
+    with MockFactory
+    with should.Matchers
+    with TableDrivenPropertyChecks {
 
   "processEvent" should {
 

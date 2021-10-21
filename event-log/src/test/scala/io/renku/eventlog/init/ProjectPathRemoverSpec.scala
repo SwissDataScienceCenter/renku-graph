@@ -24,6 +24,7 @@ import cats.syntax.all._
 import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.testtools.IOSpec
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -32,17 +33,16 @@ import skunk.implicits._
 
 class ProjectPathRemoverSpec
     extends AnyWordSpec
+    with IOSpec
     with DbInitSpec
     with should.Matchers
     with Eventually
     with IntegrationPatience {
 
-  protected override lazy val migrationsToRun: List[Migration] = List(
-    eventLogTableCreator,
-    projectPathAdder,
-    batchDateAdder,
-    projectTableCreator
-  )
+  protected override lazy val migrationsToRun: List[Migration] = allMigrations.takeWhile {
+    case _: ProjectPathRemoverImpl[_] => false
+    case _ => true
+  }
 
   "run" should {
 
@@ -74,15 +74,15 @@ class ProjectPathRemoverSpec
   }
 
   private trait TestCase {
-    implicit val logger    = TestLogger[IO]()
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val projectPathRemover = new ProjectPathRemoverImpl[IO](sessionResource)
   }
 
   private def checkColumnExists: Boolean = sessionResource
     .useK {
       Kleisli { session =>
-        val query: Query[Void, projects.Path] = sql"select project_path from event_log limit 1"
-          .query(projectPathDecoder)
+        val query: Query[Void, projects.Path] =
+          sql"select project_path from event_log limit 1".query(projectPathDecoder)
         session
           .option(query)
           .map(_ => true)

@@ -33,13 +33,22 @@ import scala.jdk.CollectionConverters._
 import scala.language.postfixOps
 import scala.util.Random
 
-private class SubscribersRegistry[F[_]: MonadThrow: Concurrent: Temporal: Logger](
+private trait SubscribersRegistry[F[_]] {
+  def add(subscriptionInfo: SubscriptionInfo): F[Boolean]
+  def findAvailableSubscriber(): F[Deferred[F, SubscriberUrl]]
+  def delete(subscriberUrl:   SubscriberUrl): F[Boolean]
+  def markBusy(subscriberUrl: SubscriberUrl): F[Unit]
+  def subscriberCount(): Int
+  def getTotalCapacity:  Option[Capacity]
+}
+
+private class SubscribersRegistryImpl[F[_]: MonadThrow: Temporal: Logger](
     categoryName:                CategoryName,
     subscriberUrlReferenceQueue: Ref[F, List[Deferred[F, SubscriberUrl]]],
     now:                         () => Instant,
     busySleep:                   FiniteDuration,
     checkupInterval:             FiniteDuration
-) {
+) extends SubscribersRegistry[F] {
 
   val monadThrow = MonadThrow[F]
 
@@ -49,7 +58,7 @@ private class SubscribersRegistry[F[_]: MonadThrow: Concurrent: Temporal: Logger
   private val availablePool = new ConcurrentHashMap[SubscriptionInfo, Unit]()
   private val busyPool      = new ConcurrentHashMap[SubscriptionInfo, CheckupTime]()
 
-  def add(subscriptionInfo: SubscriptionInfo): F[Boolean] = for {
+  override def add(subscriptionInfo: SubscriptionInfo): F[Boolean] = for {
     _        <- MonadThrow[F].catchNonFatal(busyPool remove subscriptionInfo)
     exists   <- MonadThrow[F].catchNonFatal(Option(availablePool.get(subscriptionInfo)).nonEmpty)
     _        <- whenA(exists)(MonadThrow[F].catchNonFatal(availablePool.remove(subscriptionInfo)))
@@ -73,7 +82,7 @@ private class SubscribersRegistry[F[_]: MonadThrow: Concurrent: Temporal: Logger
       _ <- notifyCallerAboutAvailability(subscriberUrl)
     } yield ()
 
-  def findAvailableSubscriber(): F[Deferred[F, SubscriberUrl]] = for {
+  override def findAvailableSubscriber(): F[Deferred[F, SubscriberUrl]] = for {
     subscriberUrlReference <- Deferred[F, SubscriberUrl]
     _ <- maybeSubscriberUrl map subscriberUrlReference.complete getOrElse makeCallerToWait(subscriberUrlReference)
   } yield subscriberUrlReference
@@ -92,12 +101,12 @@ private class SubscribersRegistry[F[_]: MonadThrow: Concurrent: Temporal: Logger
     show"$categoryName: all ${subscriberCount()} subscriber(s) are busy; waiting for one to become available"
   )
 
-  def delete(subscriberUrl: SubscriberUrl): F[Boolean] = catchNonFatal {
+  override def delete(subscriberUrl: SubscriberUrl): F[Boolean] = catchNonFatal {
     find(subscriberUrl, in = busyPool).flatMap(info => Option(busyPool remove info)).isDefined |
       find(subscriberUrl, in = availablePool).flatMap(info => Option(availablePool remove info)).isDefined
   }
 
-  def markBusy(subscriberUrl: SubscriberUrl): F[Unit] = catchNonFatal {
+  override def markBusy(subscriberUrl: SubscriberUrl): F[Unit] = catchNonFatal {
     (find(subscriberUrl, in = availablePool) orElse find(subscriberUrl, in = busyPool))
       .foreach { info =>
         availablePool.remove(info)
@@ -107,9 +116,9 @@ private class SubscribersRegistry[F[_]: MonadThrow: Concurrent: Temporal: Logger
       }
   }
 
-  def subscriberCount(): Int = busyPool.size() + availablePool.size()
+  override def subscriberCount(): Int = busyPool.size() + availablePool.size()
 
-  private def busySubscriberCheckup(): F[Unit] = for {
+  def busySubscriberCheckup(): F[Unit] = for {
     _                        <- Temporal[F] sleep checkupInterval
     subscribersDueForCheckup <- findSubscribersDueForCheckup
     _                        <- bringToAvailable(subscribersDueForCheckup)
@@ -137,7 +146,7 @@ private class SubscribersRegistry[F[_]: MonadThrow: Concurrent: Temporal: Logger
       .find { case (info, _) => info.subscriberUrl == subscriberUrl }
       .map { case (info, _) => info }
 
-  def getTotalCapacity: Option[Capacity] =
+  override def getTotalCapacity: Option[Capacity] =
     (availablePool.asScala.keySet ++ busyPool.asScala.keySet).toList
       .flatMap(_.maybeCapacity) match {
       case Nil        => None
@@ -147,21 +156,21 @@ private class SubscribersRegistry[F[_]: MonadThrow: Concurrent: Temporal: Logger
 
 private object SubscribersRegistry {
 
-  private final class CheckupTime private (val value: Instant) extends InstantTinyType
-  private object CheckupTime                                   extends TinyTypeFactory[CheckupTime](new CheckupTime(_))
+  final class CheckupTime private (val value: Instant) extends InstantTinyType
+  object CheckupTime                                   extends TinyTypeFactory[CheckupTime](new CheckupTime(_))
 
-  def apply[F[_]: MonadThrow: Spawn: Concurrent: Temporal: Logger](
+  def apply[F[_]: Async: Logger](
       categoryName:    CategoryName,
       busySleep:       FiniteDuration = 5 minutes,
       checkupInterval: FiniteDuration = 500 millis
   ): F[SubscribersRegistry[F]] = for {
     subscriberUrlReferenceQueue <- Ref.of[F, List[Deferred[F, SubscriberUrl]]](List.empty)
     registry <- MonadThrow[F].catchNonFatal {
-                  new SubscribersRegistry(categoryName,
-                                          subscriberUrlReferenceQueue,
-                                          Instant.now _,
-                                          busySleep,
-                                          checkupInterval
+                  new SubscribersRegistryImpl(categoryName,
+                                              subscriberUrlReferenceQueue,
+                                              Instant.now _,
+                                              busySleep,
+                                              checkupInterval
                   )
                 }
     _ <- Spawn[F].start(registry.busySubscriberCheckup().foreverM[Unit])

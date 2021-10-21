@@ -33,6 +33,7 @@ import io.renku.graph.model.events.{BatchDate, CompoundEventId, EventId, EventSt
 import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk._
@@ -41,19 +42,16 @@ import skunk.implicits._
 
 class EventStatusRenamerImplSpec
     extends AnyWordSpec
+    with IOSpec
     with DbInitSpec
     with should.Matchers
     with EventLogDataProvisioning
     with EventDataFetching {
 
-  protected override lazy val migrationsToRun: List[Migration] = List(
-    eventLogTableCreator,
-    projectPathAdder,
-    batchDateAdder,
-    projectTableCreator,
-    projectPathRemover,
-    eventLogTableRenamer
-  )
+  protected override lazy val migrationsToRun: List[Migration] = allMigrations.takeWhile {
+    case _: EventStatusRenamerImpl[_] => false
+    case _ => true
+  }
 
   "run" should {
     "rename all the events from PROCESSING to GENERATING_TRIPLES, " +
@@ -111,7 +109,7 @@ class EventStatusRenamerImplSpec
   }
 
   private trait TestCase {
-    implicit val logger    = TestLogger[IO]()
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val eventStatusRenamer = new EventStatusRenamerImpl[IO](sessionResource)
   }
 
@@ -142,7 +140,7 @@ class EventStatusRenamerImplSpec
               ) ~ event.batchDate
             )
           )
-          .map(_ => ())
+          .void
       }
     }
   }

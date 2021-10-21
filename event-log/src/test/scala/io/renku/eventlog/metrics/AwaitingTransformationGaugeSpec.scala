@@ -32,6 +32,7 @@ import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Path
 import io.renku.metrics.MetricsTools._
 import io.renku.metrics.{LabeledGauge, MetricsRegistry}
+import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -39,7 +40,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.jdk.CollectionConverters._
 
-class AwaitingTransformationGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class AwaitingTransformationGaugeSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "apply" should {
 

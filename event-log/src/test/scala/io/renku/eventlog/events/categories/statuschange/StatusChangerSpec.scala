@@ -36,6 +36,7 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{EventId, EventStatus}
 import io.renku.graph.model.projects
+import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -45,6 +46,7 @@ import skunk.{Session, ~}
 
 class StatusChangerSpec
     extends AnyWordSpec
+    with IOSpec
     with InMemoryEventLogDbSpec
     with TypeSerializers
     with should.Matchers

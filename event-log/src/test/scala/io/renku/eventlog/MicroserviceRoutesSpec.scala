@@ -18,7 +18,7 @@
 
 package io.renku.eventlog
 
-import cats.effect.{Clock, IO}
+import cats.effect.IO
 import cats.syntax.all._
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
@@ -35,6 +35,7 @@ import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.server.EndpointTester._
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestRoutesMetrics
+import io.renku.testtools.IOSpec
 import org.http4s.MediaType.application
 import org.http4s.Method.{GET, POST}
 import org.http4s.Status._
@@ -47,10 +48,14 @@ import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext
 import scala.language.reflectiveCalls
 
-class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Matchers with TableDrivenPropertyChecks {
+class MicroserviceRoutesSpec
+    extends AnyWordSpec
+    with IOSpec
+    with MockFactory
+    with should.Matchers
+    with TableDrivenPropertyChecks {
 
   "routes" should {
 

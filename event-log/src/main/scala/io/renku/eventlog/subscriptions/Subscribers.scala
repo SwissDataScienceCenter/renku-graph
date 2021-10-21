@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions
 
 import cats.MonadThrow
-import cats.effect.{Concurrent, Temporal}
+import cats.effect.Async
 import cats.syntax.all._
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.graph.model.events.CategoryName
@@ -72,7 +72,7 @@ private class SubscribersImpl[F[_]: MonadThrow: Logger] private[subscriptions] (
 
 private object Subscribers {
 
-  def apply[F[_]: Concurrent: Temporal: Logger](
+  def apply[F[_]: Async: Logger](
       categoryName:      CategoryName,
       subscriberTracker: SubscriberTracker[F]
   ): F[Subscribers[F]] = for {

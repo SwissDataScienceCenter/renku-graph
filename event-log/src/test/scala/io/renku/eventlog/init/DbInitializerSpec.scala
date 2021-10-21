@@ -23,12 +23,17 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.testtools.MockedRunnableCollaborators
+import io.renku.testtools.{IOSpec, MockedRunnableCollaborators}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators with MockFactory with should.Matchers {
+class DbInitializerSpec
+    extends AnyWordSpec
+    with IOSpec
+    with MockedRunnableCollaborators
+    with MockFactory
+    with should.Matchers {
 
   "run" should {
 
@@ -58,12 +63,10 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
 
     import DbInitializer.Runnable
 
-    val migrator1       = mock[EventLogTableCreator[IO]]
-    val migrator2       = mock[EventPayloadTableCreator[IO]]
-    implicit val logger = TestLogger[IO]()
+    val migrator1 = mock[EventLogTableCreator[IO]]
+    val migrator2 = mock[EventPayloadTableCreator[IO]]
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
 
-    val dbInitializer = new DbInitializerImpl[IO](
-      List[Runnable[IO, Unit]](migrator1, migrator2)
-    )
+    val dbInitializer = new DbInitializerImpl[IO](List[Runnable[IO, Unit]](migrator1, migrator2))
   }
 }

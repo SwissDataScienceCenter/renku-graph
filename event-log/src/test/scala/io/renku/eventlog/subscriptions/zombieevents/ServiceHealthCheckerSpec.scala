@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.subscriptions.zombieevents
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
@@ -26,14 +26,14 @@ import io.renku.generators.Generators.httpUrls
 import io.renku.interpreters.TestLogger
 import io.renku.microservices.MicroserviceBaseUrl
 import io.renku.stubbing.ExternalServiceStubbing
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class ServiceHealthCheckerSpec extends AnyWordSpec with ExternalServiceStubbing with should.Matchers {
+class ServiceHealthCheckerSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing with should.Matchers {
 
   "ping" should {
 
@@ -58,11 +58,9 @@ class ServiceHealthCheckerSpec extends AnyWordSpec with ExternalServiceStubbing 
     }
   }
 
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO]        = IO.timer(global)
-
   private trait TestCase {
+    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val microserviceUrl = MicroserviceBaseUrl(externalServiceBaseUrl)
-    val healthChecker   = new ServiceHealthCheckerImpl[IO](TestLogger(), retryInterval = 50 millis, maxRetries = 1)
+    val healthChecker   = new ServiceHealthCheckerImpl[IO](retryInterval = 50 millis, maxRetries = 1)
   }
 }

@@ -30,6 +30,7 @@ import eu.timepit.refined.auto._
 import io.renku.eventlog._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.RollbackToNew
 import io.renku.metrics.TestLabeledHistogram
+import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -39,6 +40,7 @@ import java.time.Instant
 
 class RollbackToNewUpdaterSpec
     extends AnyWordSpec
+    with IOSpec
     with InMemoryEventLogDbSpec
     with TypeSerializers
     with should.Matchers
