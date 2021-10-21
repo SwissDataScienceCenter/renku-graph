@@ -18,9 +18,8 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.Semigroup
+import cats.{MonadThrow, Semigroup}
 import cats.data.OptionT
-import cats.effect.Effect
 import io.circe.Json
 import io.renku.eventlog.subscriptions.SubscriptionCategory._
 import io.renku.graph.model.events.CategoryName
@@ -46,7 +45,7 @@ private[subscriptions] object SubscriptionCategory {
   }
 }
 
-private class SubscriptionCategoryImpl[Interpretation[_]: Effect, SubscriptionInfoType <: SubscriptionInfo](
+private class SubscriptionCategoryImpl[Interpretation[_]: MonadThrow, SubscriptionInfoType <: SubscriptionInfo](
     val name:          CategoryName,
     subscribers:       Subscribers[Interpretation],
     eventsDistributor: EventsDistributor[Interpretation],

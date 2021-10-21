@@ -19,7 +19,7 @@
 package io.renku.eventlog.events.categories.statuschange
 
 import cats.data.Kleisli
-import cats.effect.{BracketThrow, Sync}
+import cats.effect.MonadCancelThrow
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.ExecutionDate
@@ -31,7 +31,7 @@ import skunk.implicits._
 
 import java.time.Instant
 
-private class AllEventsToNewUpdater[Interpretation[_]: BracketThrow: Sync](
+private class AllEventsToNewUpdater[Interpretation[_]: MonadCancelThrow](
     queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))

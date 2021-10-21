@@ -19,7 +19,7 @@
 package io.renku.eventlog.events.categories.statuschange
 
 import cats.data.Kleisli
-import cats.effect.BracketThrow
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
@@ -33,7 +33,7 @@ private trait StatusChanger[Interpretation[_]] {
   ): Interpretation[Unit]
 }
 
-private class StatusChangerImpl[Interpretation[_]: BracketThrow](
+private class StatusChangerImpl[Interpretation[_]: MonadCancelThrow](
     sessionResource: SessionResource[Interpretation, EventLogDB],
     gaugesUpdater:   GaugesUpdater[Interpretation]
 ) extends StatusChanger[Interpretation] {

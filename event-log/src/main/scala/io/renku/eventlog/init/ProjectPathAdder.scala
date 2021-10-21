@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.{Bracket, BracketThrow, MonadCancel, MonadCancelThrow}
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.circe.parser._
 import io.circe.{Decoder, HCursor}

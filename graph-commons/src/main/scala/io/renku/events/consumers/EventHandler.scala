@@ -42,6 +42,7 @@ trait EventHandler[Interpretation[_]] {
 abstract class EventHandlerWithProcessLimiter[Interpretation[_]: Monad](
     processesLimiter: ConcurrentProcessesLimiter[Interpretation]
 ) extends EventHandler[Interpretation] {
+
   val categoryName: CategoryName
 
   final override def tryHandling(request: EventRequestContent): Interpretation[EventSchedulingResult] = (for {

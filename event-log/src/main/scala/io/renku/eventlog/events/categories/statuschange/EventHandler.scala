@@ -19,7 +19,8 @@
 package io.renku.eventlog.events.categories.statuschange
 
 import cats.data.EitherT
-import cats.effect.{Concurrent, ContextShift, IO}
+import cats.effect.Concurrent
+import cats.effect.kernel.{Async, Spawn}
 import cats.syntax.all._
 import cats.{MonadThrow, Show}
 import io.circe.DecodingFailure
@@ -38,7 +39,7 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurrent: Logger](
+private class EventHandler[Interpretation[_]: MonadThrow: Async: Spawn: Concurrent: Logger](
     override val categoryName: CategoryName,
     statusChanger:             StatusChanger[Interpretation],
     deliveryInfoRemover:       DeliveryInfoRemover[Interpretation],
@@ -84,8 +85,8 @@ private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurre
       updaterFactory: EventUpdaterFactory[Interpretation, E],
       show:           Show[E]
   ): E => Interpretation[Accepted] = event =>
-    (ContextShift[Interpretation].shift *> Concurrent[Interpretation]
-      .start(executeUpdate(event)))
+    Spawn[Interpretation]
+      .start(executeUpdate(event))
       .map(_ => Accepted)
       .flatTap(Logger[Interpretation].log(event.show))
 
@@ -99,29 +100,30 @@ private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurre
 
 private object EventHandler {
 
-  def apply(sessionResource:                    SessionResource[IO, EventLogDB],
-            queriesExecTimes:                   LabeledHistogram[IO, SqlStatement.Name],
-            awaitingTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],
-            underTriplesGenerationGauge:        LabeledGauge[IO, projects.Path],
-            awaitingTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
-            underTriplesTransformationGauge:    LabeledGauge[IO, projects.Path]
-  )(implicit cs:                                ContextShift[IO], logger: Logger[IO]): IO[EventHandler[IO]] = for {
+  def apply[F[_]: MonadThrow: Async: Spawn: Concurrent: Logger](
+      sessionResource:                    SessionResource[F, EventLogDB],
+      queriesExecTimes:                   LabeledHistogram[F, SqlStatement.Name],
+      awaitingTriplesGenerationGauge:     LabeledGauge[F, projects.Path],
+      underTriplesGenerationGauge:        LabeledGauge[F, projects.Path],
+      awaitingTriplesTransformationGauge: LabeledGauge[F, projects.Path],
+      underTriplesTransformationGauge:    LabeledGauge[F, projects.Path]
+  ): F[EventHandler[F]] = for {
     deliveryInfoRemover <- DeliveryInfoRemover(queriesExecTimes)
-    gaugesUpdater <- IO(
-                       new GaugesUpdaterImpl[IO](awaitingTriplesGenerationGauge,
-                                                 awaitingTriplesTransformationGauge,
-                                                 underTriplesTransformationGauge,
-                                                 underTriplesGenerationGauge
+    gaugesUpdater <- MonadThrow[F].catchNonFatal(
+                       new GaugesUpdaterImpl[F](awaitingTriplesGenerationGauge,
+                                                awaitingTriplesTransformationGauge,
+                                                underTriplesTransformationGauge,
+                                                underTriplesGenerationGauge
                        )
                      )
-    statusChanger <- IO(new StatusChangerImpl[IO](sessionResource, gaugesUpdater))
-  } yield new EventHandler[IO](categoryName, statusChanger, deliveryInfoRemover, queriesExecTimes)
+    statusChanger <- MonadThrow[F].catchNonFatal(new StatusChangerImpl[F](sessionResource, gaugesUpdater))
+  } yield new EventHandler[F](categoryName, statusChanger, deliveryInfoRemover, queriesExecTimes)
 
   import io.renku.tinytypes.json.TinyTypeDecoders._
 
-  private def decode[E <: StatusChangeEvent](request: EventRequestContent)(implicit
-      decoder:                                        EventRequestContent => Either[DecodingFailure, E]
-  ) = decoder(request)
+  private def decode[E <: StatusChangeEvent](
+      request:        EventRequestContent
+  )(implicit decoder: EventRequestContent => Either[DecodingFailure, E]) = decoder(request)
 
   private implicit lazy val eventTriplesGeneratedDecoder
       : EventRequestContent => Either[DecodingFailure, ToTriplesGenerated] = {
@@ -178,7 +180,7 @@ private object EventHandler {
   }
 
   private implicit lazy val eventRollbackToNewDecoder: EventRequestContent => Either[DecodingFailure, RollbackToNew] = {
-    case request =>
+    request =>
       for {
         id          <- request.event.hcursor.downField("id").as[EventId]
         projectId   <- request.event.hcursor.downField("project").downField("id").as[projects.Id]
@@ -191,7 +193,7 @@ private object EventHandler {
   }
 
   private implicit lazy val eventRollbackToTriplesGeneratedDecoder
-      : EventRequestContent => Either[DecodingFailure, RollbackToTriplesGenerated] = { case request =>
+      : EventRequestContent => Either[DecodingFailure, RollbackToTriplesGenerated] = { request =>
     for {
       id          <- request.event.hcursor.downField("id").as[EventId]
       projectId   <- request.event.hcursor.downField("project").downField("id").as[projects.Id]

@@ -18,8 +18,9 @@
 
 package io.renku.eventlog.events.categories.zombieevents
 
+import cats.MonadThrow
 import cats.data.Kleisli
-import cats.effect.BracketThrow
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SessionResource, SqlStatement}
@@ -38,7 +39,7 @@ private trait ZombieStatusCleaner[Interpretation[_]] {
   def cleanZombieStatus(event: ZombieEvent): Interpretation[UpdateResult]
 }
 
-private class ZombieStatusCleanerImpl[Interpretation[_]: BracketThrow](
+private class ZombieStatusCleanerImpl[Interpretation[_]: MonadCancelThrow](
     sessionResource:  SessionResource[Interpretation, EventLogDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
     now:              () => Instant = () => Instant.now
@@ -59,7 +60,7 @@ private class ZombieStatusCleanerImpl[Interpretation[_]: BracketThrow](
     SqlStatement(name = "zombie_chasing - clean deliveries")
       .command[EventId ~ projects.Id](
         sql"""DELETE FROM event_delivery
-                WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
+              WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
             """.command
       )
       .arguments(eventId.id ~ eventId.projectId)
@@ -92,9 +93,9 @@ private class ZombieStatusCleanerImpl[Interpretation[_]: BracketThrow](
 
 private object ZombieStatusCleaner {
 
-  import cats.effect.IO
-
-  def apply(sessionResource:  SessionResource[IO, EventLogDB],
-            queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
-  ): IO[ZombieStatusCleaner[IO]] = IO(new ZombieStatusCleanerImpl(sessionResource, queriesExecTimes))
+  def apply[F[_]: MonadCancelThrow](sessionResource: SessionResource[F, EventLogDB],
+                                    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[ZombieStatusCleaner[F]] = MonadThrow[F].catchNonFatal(
+    new ZombieStatusCleanerImpl(sessionResource, queriesExecTimes)
+  )
 }

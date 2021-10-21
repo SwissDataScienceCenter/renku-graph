@@ -45,7 +45,7 @@ trait EventSender[Interpretation[_]] {
   ): Interpretation[Unit]
 }
 
-class EventSenderImpl[Interpretation[_]: Async: Temporal: Logger](
+class EventSenderImpl[Interpretation[_]: Async: Logger](
     eventLogUrl:            EventLogUrl,
     onErrorSleep:           FiniteDuration,
     retryInterval:          FiniteDuration = SleepAfterConnectionIssue,
@@ -111,7 +111,7 @@ class EventSenderImpl[Interpretation[_]: Async: Temporal: Logger](
 }
 
 object EventSender {
-  def apply[Interpretation[_]: Async: Temporal: Logger]: Interpretation[EventSender[Interpretation]] = for {
+  def apply[Interpretation[_]: Async: Logger]: Interpretation[EventSender[Interpretation]] = for {
     eventLogUrl <- EventLogUrl[Interpretation]()
   } yield new EventSenderImpl(eventLogUrl, onErrorSleep = 15 seconds)
 }

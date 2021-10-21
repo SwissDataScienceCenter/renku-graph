@@ -50,7 +50,7 @@ import java.net.{ConnectException, SocketException}
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.control.NonFatal
 
-abstract class RestClient[F[_]: Async: Temporal: Logger, ThrottlingTarget](
+abstract class RestClient[F[_]: Async: Logger, ThrottlingTarget](
     throttler:              Throttler[F, ThrottlingTarget],
     maybeTimeRecorder:      Option[ExecutionTimeRecorder[F]] = None,
     retryInterval:          FiniteDuration = SleepAfterConnectionIssue,

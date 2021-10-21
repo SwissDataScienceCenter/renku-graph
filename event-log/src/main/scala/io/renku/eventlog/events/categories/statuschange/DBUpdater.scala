@@ -19,7 +19,8 @@
 package io.renku.eventlog.events.categories.statuschange
 
 import cats.data.Kleisli
-import cats.effect.{BracketThrow, Sync}
+import cats.effect.MonadCancelThrow
+import cats.effect.kernel.Async
 import io.renku.db.SqlStatement
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.{AllEventsToNew, _}
 import io.renku.graph.model.events.EventStatus.{FailureStatus, ProcessingStatus}
@@ -38,27 +39,27 @@ private object DBUpdater {
      LabeledHistogram[Interpretation, SqlStatement.Name]
     ) => DBUpdater[Interpretation, E]
 
-  implicit def factoryToTriplesGeneratorUpdater[Interpretation[_]: BracketThrow: Sync]
+  implicit def factoryToTriplesGeneratorUpdater[Interpretation[_]: MonadCancelThrow: Async]
       : EventUpdaterFactory[Interpretation, ToTriplesGenerated] = new ToTriplesGeneratedUpdater(_, _)
 
-  implicit def factoryToTriplesStoreUpdater[Interpretation[_]: BracketThrow: Sync]
+  implicit def factoryToTriplesStoreUpdater[Interpretation[_]: MonadCancelThrow: Async]
       : EventUpdaterFactory[Interpretation, ToTriplesStore] = new ToTriplesStoreUpdater(_, _)
 
-  implicit def factoryToFailureUpdater[Interpretation[_]: BracketThrow: Sync]
+  implicit def factoryToFailureUpdater[Interpretation[_]: MonadCancelThrow: Async]
       : EventUpdaterFactory[Interpretation, ToFailure[ProcessingStatus, FailureStatus]] = new ToFailureUpdater(_, _)
 
-  implicit def factoryRollbackToNewUpdater[Interpretation[_]: BracketThrow: Sync]
+  implicit def factoryRollbackToNewUpdater[Interpretation[_]: MonadCancelThrow]
       : EventUpdaterFactory[Interpretation, RollbackToNew] = (_, execTimes) => new RollbackToNewUpdater(execTimes)
 
-  implicit def factoryRollbackToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow: Sync]
+  implicit def factoryRollbackToTriplesGeneratedUpdater[Interpretation[_]: MonadCancelThrow]
       : EventUpdaterFactory[Interpretation, RollbackToTriplesGenerated] = (_, execTimes) =>
     new RollbackToTriplesGeneratedUpdater(execTimes)
 
-  implicit def factoryToAwaitingDeletionUpdater[Interpretation[_]: BracketThrow: Sync]
+  implicit def factoryToAwaitingDeletionUpdater[Interpretation[_]: MonadCancelThrow]
       : EventUpdaterFactory[Interpretation, ToAwaitingDeletion] = (_, execTimes) =>
     new ToAwaitingDeletionUpdater(execTimes)
 
-  implicit def factoryToAllEventsNewUpdater[Interpretation[_]: BracketThrow: Sync]
+  implicit def factoryToAllEventsNewUpdater[Interpretation[_]: MonadCancelThrow]
       : EventUpdaterFactory[Interpretation, AllEventsToNew] = (_, execTimes) =>
     new AllEventsToNewUpdater[Interpretation](execTimes)
 }

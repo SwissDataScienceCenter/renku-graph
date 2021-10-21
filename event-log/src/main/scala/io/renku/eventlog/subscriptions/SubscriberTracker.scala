@@ -18,7 +18,8 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.effect.{BracketThrow, IO}
+import cats.effect.MonadCancelThrow
+import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SessionResource, SqlStatement}
 import io.renku.eventlog.{EventLogDB, Microservice, TypeSerializers}
@@ -31,11 +32,10 @@ import skunk.implicits._
 
 private trait SubscriberTracker[Interpretation[_]] {
   def add(subscriptionInfo: SubscriptionInfo): Interpretation[Boolean]
-
-  def remove(subscriberUrl: SubscriberUrl): Interpretation[Boolean]
+  def remove(subscriberUrl: SubscriberUrl):    Interpretation[Boolean]
 }
 
-private class SubscriberTrackerImpl[Interpretation[_]: BracketThrow](
+private class SubscriberTrackerImpl[Interpretation[_]: MonadCancelThrow](
     sessionResource:  SessionResource[Interpretation, EventLogDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
     sourceUrl:        MicroserviceBaseUrl
@@ -85,10 +85,10 @@ private class SubscriberTrackerImpl[Interpretation[_]: BracketThrow](
 }
 
 private object SubscriberTracker {
-  def apply(sessionResource:  SessionResource[IO, EventLogDB],
-            queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
-  ): IO[SubscriberTracker[IO]] = for {
+  def apply[F[_]: MonadCancelThrow](sessionResource: SessionResource[F, EventLogDB],
+                                    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[SubscriberTracker[F]] = for {
     microserviceUrlFinder <- MicroserviceUrlFinder(Microservice.ServicePort)
     sourceUrl             <- microserviceUrlFinder.findBaseUrl()
-  } yield new SubscriberTrackerImpl(sessionResource, queriesExecTimes, sourceUrl)
+  } yield new SubscriberTrackerImpl[F](sessionResource, queriesExecTimes, sourceUrl)
 }

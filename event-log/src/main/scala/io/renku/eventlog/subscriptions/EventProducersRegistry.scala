@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions
 
 import cats._
-import cats.effect.{ContextShift, Effect, IO, Timer}
+import cats.effect.{Async, Concurrent, MonadCancelThrow, Spawn, Temporal}
 import cats.syntax.all._
 import io.circe.Json
 import io.renku.db.{SessionResource, SqlStatement}
@@ -37,10 +37,9 @@ trait EventProducersRegistry[Interpretation[_]] {
   def register(subscriptionRequest: Json): Interpretation[SubscriptionResult]
 }
 
-private[subscriptions] class EventProducersRegistryImpl[Interpretation[_]: Effect: Applicative](
-    categories:      Set[SubscriptionCategory[Interpretation]]
-)(implicit parallel: Parallel[Interpretation])
-    extends EventProducersRegistry[Interpretation] {
+private[subscriptions] class EventProducersRegistryImpl[Interpretation[_]: Parallel: Applicative](
+    categories: Set[SubscriptionCategory[Interpretation]]
+) extends EventProducersRegistry[Interpretation] {
 
   override def run(): Interpretation[Unit] = categories.toList.map(_.run()).parSequence.void
 
@@ -64,19 +63,14 @@ object EventProducersRegistry {
   final case object SuccessfulSubscription             extends SubscriptionResult
   final case class UnsupportedPayload(message: String) extends SubscriptionResult
 
-  def apply(
-      sessionResource:                SessionResource[IO, EventLogDB],
-      awaitingTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
-      underTriplesGenerationGauge:    LabeledGauge[IO, projects.Path],
-      awaitingTransformationGauge:    LabeledGauge[IO, projects.Path],
-      underTransformationGauge:       LabeledGauge[IO, projects.Path],
-      queriesExecTimes:               LabeledHistogram[IO, SqlStatement.Name]
-  )(implicit
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO],
-      executionContext: ExecutionContext,
-      logger:           Logger[IO]
-  ): IO[EventProducersRegistry[IO]] = for {
+  def apply[F[_]: Async: Parallel: Logger](
+      sessionResource:                SessionResource[F, EventLogDB],
+      awaitingTriplesGenerationGauge: LabeledGauge[F, projects.Path],
+      underTriplesGenerationGauge:    LabeledGauge[F, projects.Path],
+      awaitingTransformationGauge:    LabeledGauge[F, projects.Path],
+      underTransformationGauge:       LabeledGauge[F, projects.Path],
+      queriesExecTimes:               LabeledHistogram[F, SqlStatement.Name]
+  ): F[EventProducersRegistry[F]] = for {
     subscriberTracker <- SubscriberTracker(sessionResource, queriesExecTimes)
     awaitingGenerationCategory <- awaitinggeneration.SubscriptionCategory(sessionResource,
                                                                           awaitingTriplesGenerationGauge,
@@ -97,7 +91,7 @@ object EventProducersRegistry {
     zombieEventsCategory <-
       zombieevents.SubscriptionCategory(sessionResource, queriesExecTimes, subscriberTracker, logger)
   } yield new EventProducersRegistryImpl(
-    Set[SubscriptionCategory[IO]](
+    Set[SubscriptionCategory[F]](
       awaitingGenerationCategory,
       memberSyncCategory,
       commitSyncCategory,

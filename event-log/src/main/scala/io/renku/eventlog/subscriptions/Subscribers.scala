@@ -18,13 +18,12 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.Applicative
-import cats.effect.{ContextShift, IO, Timer}
+import cats.MonadThrow
+import cats.effect.{Concurrent, Temporal}
+import cats.syntax.all._
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.graph.model.events.CategoryName
 import org.typelevel.log4cats.Logger
-
-import scala.concurrent.ExecutionContext
 
 private trait Subscribers[Interpretation[_]] {
   def add(subscriptionInfo: SubscriptionInfo): Interpretation[Unit]
@@ -38,34 +37,31 @@ private trait Subscribers[Interpretation[_]] {
   def getTotalCapacity: Option[Capacity]
 }
 
-private class SubscribersImpl private[subscriptions] (
+private class SubscribersImpl[F[_]: MonadThrow: Logger] private[subscriptions] (
     categoryName:        CategoryName,
-    subscribersRegistry: SubscribersRegistry,
-    subscriberTracker:   SubscriberTracker[IO],
-    logger:              Logger[IO]
-)(implicit contextShift: ContextShift[IO])
-    extends Subscribers[IO] {
+    subscribersRegistry: SubscribersRegistry[F],
+    subscriberTracker:   SubscriberTracker[F]
+) extends Subscribers[F] {
 
-  private val applicative = Applicative[IO]
+  private val moandThrow = MonadThrow[F]
+  import moandThrow._
 
-  import applicative._
-
-  override def add(subscriptionInfo: SubscriptionInfo): IO[Unit] = for {
+  override def add(subscriptionInfo: SubscriptionInfo): F[Unit] = for {
     wasAdded <- subscribersRegistry add subscriptionInfo
     _        <- subscriberTracker add subscriptionInfo
-    _        <- whenA(wasAdded)(logger.info(s"$categoryName: $subscriptionInfo added"))
+    _        <- whenA(wasAdded)(Logger[F].info(s"$categoryName: $subscriptionInfo added"))
   } yield ()
 
-  override def delete(subscriberUrl: SubscriberUrl): IO[Unit] = for {
+  override def delete(subscriberUrl: SubscriberUrl): F[Unit] = for {
     removed <- subscribersRegistry delete subscriberUrl
     _       <- subscriberTracker remove subscriberUrl
-    _       <- whenA(removed)(logger.info(s"$categoryName: $subscriberUrl gone - deleting"))
+    _       <- whenA(removed)(Logger[F].info(s"$categoryName: $subscriberUrl gone - deleting"))
   } yield ()
 
-  override def markBusy(subscriberUrl: SubscriberUrl): IO[Unit] =
+  override def markBusy(subscriberUrl: SubscriberUrl): F[Unit] =
     subscribersRegistry markBusy subscriberUrl
 
-  override def runOnSubscriber(f: SubscriberUrl => IO[Unit]): IO[Unit] = for {
+  override def runOnSubscriber(f: SubscriberUrl => F[Unit]): F[Unit] = for {
     subscriberUrlReference <- subscribersRegistry.findAvailableSubscriber()
     subscriberUrl          <- subscriberUrlReference.get
     _                      <- f(subscriberUrl)
@@ -76,18 +72,12 @@ private class SubscribersImpl private[subscriptions] (
 
 private object Subscribers {
 
-  import cats.effect.IO
-
-  def apply(
+  def apply[F[_]: Concurrent: Temporal: Logger](
       categoryName:      CategoryName,
-      subscriberTracker: SubscriberTracker[IO],
-      logger:            Logger[IO]
-  )(implicit
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO],
-      executionContext: ExecutionContext
-  ): IO[Subscribers[IO]] = for {
-    subscribersRegistry <- SubscribersRegistry(categoryName, logger)
-    subscribers         <- IO(new SubscribersImpl(categoryName, subscribersRegistry, subscriberTracker, logger))
+      subscriberTracker: SubscriberTracker[F]
+  ): F[Subscribers[F]] = for {
+    subscribersRegistry <- SubscribersRegistry(categoryName)
+    subscribers <-
+      MonadThrow[F].catchNonFatal(new SubscribersImpl(categoryName, subscribersRegistry, subscriberTracker))
   } yield subscribers
 }

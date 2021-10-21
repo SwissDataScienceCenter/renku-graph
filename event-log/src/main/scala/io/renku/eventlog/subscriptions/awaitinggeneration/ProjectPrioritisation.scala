@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.data.NonEmptyList
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
@@ -145,10 +145,10 @@ private class ProjectPrioritisationImpl[Interpretation[_]](subscribers: Subscrib
 
 private object ProjectPrioritisation {
 
-  def apply[Interpretation[_]](subscribers: Subscribers[Interpretation])(implicit
-      ME:                                   MonadError[Interpretation, Throwable]
+  def apply[Interpretation[_]: MonadThrow](
+      subscribers: Subscribers[Interpretation]
   ): Interpretation[ProjectPrioritisation[Interpretation]] =
-    ME.catchNonFatal(new ProjectPrioritisationImpl[Interpretation](subscribers))
+    MonadThrow[Interpretation].catchNonFatal(new ProjectPrioritisationImpl[Interpretation](subscribers))
 
   final case class ProjectInfo(id:               projects.Id,
                                path:             projects.Path,

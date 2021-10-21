@@ -18,8 +18,9 @@
 
 package io.renku.eventlog.events.categories.statuschange
 
+import cats.MonadThrow
 import cats.data.Kleisli
-import cats.effect.{BracketThrow, IO}
+import cats.effect.MonadCancelThrow
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers
 import io.renku.graph.model.events.{CompoundEventId, EventId}
@@ -33,12 +34,14 @@ private trait DeliveryInfoRemover[Interpretation[_]] {
 }
 
 private object DeliveryInfoRemover {
-  def apply(queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]): IO[DeliveryInfoRemover[IO]] = IO {
-    new DeliveryInfoRemoverImpl(queriesExecTimes)
+  def apply[Interpretation[_]: MonadCancelThrow](
+      queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
+  ): Interpretation[DeliveryInfoRemover[Interpretation]] = MonadThrow[Interpretation].catchNonFatal {
+    new DeliveryInfoRemoverImpl[Interpretation](queriesExecTimes)
   }
 }
 
-private class DeliveryInfoRemoverImpl[Interpretation[_]: BracketThrow](
+private class DeliveryInfoRemoverImpl[Interpretation[_]: MonadCancelThrow](
     queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
 ) extends DbClient(Some(queriesExecTimes))
     with DeliveryInfoRemover[Interpretation]

@@ -19,6 +19,9 @@
 package io.renku.eventlog.processingstatus
 
 import cats.MonadThrow
+import cats.effect.MonadCancelThrow
+import cats.effect.kernel.Async
+import cats.syntax.all._
 import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.graph.model.projects
 import io.renku.http.ErrorMessage
@@ -33,9 +36,8 @@ trait ProcessingStatusEndpoint[Interpretation[_]] {
   def findProcessingStatus(projectId: projects.Id): Interpretation[Response[Interpretation]]
 }
 
-class ProcessingStatusEndpointImpl[Interpretation[_]: MonadThrow](
-    processingStatusFinder: ProcessingStatusFinder[Interpretation],
-    logger:                 Logger[Interpretation]
+class ProcessingStatusEndpointImpl[Interpretation[_]: MonadThrow: Logger](
+    processingStatusFinder: ProcessingStatusFinder[Interpretation]
 ) extends Http4sDsl[Interpretation]
     with ProcessingStatusEndpoint[Interpretation] {
 
@@ -78,21 +80,19 @@ class ProcessingStatusEndpointImpl[Interpretation[_]: MonadThrow](
       projectId: projects.Id
   ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = { case NonFatal(exception) =>
     val errorMessage = ErrorMessage(s"Finding processing status for project $projectId failed")
-    logger.error(exception)(errorMessage.value)
+    Logger[Interpretation].error(exception)(errorMessage.value)
     InternalServerError(errorMessage)
   }
 }
 
 object ProcessingStatusEndpoint {
 
-  import cats.effect.{ContextShift, IO}
   import io.renku.eventlog.EventLogDB
 
-  def apply(
-      sessionResource:     SessionResource[IO, EventLogDB],
-      queriesExecTimes:    LabeledHistogram[IO, SqlStatement.Name],
-      logger:              Logger[IO]
-  )(implicit contextShift: ContextShift[IO]): IO[ProcessingStatusEndpoint[IO]] = for {
-    statusFinder <- IOProcessingStatusFinder(sessionResource, queriesExecTimes)
-  } yield new ProcessingStatusEndpointImpl[IO](statusFinder, logger)
+  def apply[F[_]: MonadCancelThrow: Async: Logger](
+      sessionResource:  SessionResource[F, EventLogDB],
+      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[ProcessingStatusEndpoint[F]] = for {
+    statusFinder <- ProcessingStatusFinder(sessionResource, queriesExecTimes)
+  } yield new ProcessingStatusEndpointImpl[F](statusFinder)
 }

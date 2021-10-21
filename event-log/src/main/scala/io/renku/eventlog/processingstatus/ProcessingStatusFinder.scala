@@ -18,9 +18,10 @@
 
 package io.renku.eventlog.processingstatus
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.data.OptionT
-import cats.effect.{BracketThrow, IO, Sync}
+import cats.effect.MonadCancelThrow
+import cats.effect.kernel.Async
 import cats.syntax.all._
 import eu.timepit.refined.api.RefType.applyRef
 import eu.timepit.refined.api.Refined
@@ -41,7 +42,7 @@ trait ProcessingStatusFinder[Interpretation[_]] {
   def fetchStatus(projectId: Id): OptionT[Interpretation, ProcessingStatus]
 }
 
-class ProcessingStatusFinderImpl[Interpretation[_]: Sync: BracketThrow](
+class ProcessingStatusFinderImpl[Interpretation[_]: MonadCancelThrow: Async](
     sessionResource:  SessionResource[Interpretation, EventLogDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
 ) extends DbClient(Some(queriesExecTimes))
@@ -57,15 +58,15 @@ class ProcessingStatusFinderImpl[Interpretation[_]: Sync: BracketThrow](
   private def latestBatchStatues(projectId: Id) = SqlStatement[Interpretation](name = "processing status")
     .select[Id ~ Id, EventStatus](
       sql"""SELECT evt.status
-              FROM event evt
-              INNER JOIN (
-                SELECT batch_date
-                FROM event
-                WHERE project_id = $projectIdEncoder
-                ORDER BY batch_date DESC
-                LIMIT 1
-              ) max_batch_date ON evt.batch_date = max_batch_date.batch_date
-              WHERE evt.project_id = $projectIdEncoder
+            FROM event evt
+            INNER JOIN (
+              SELECT batch_date
+              FROM event
+              WHERE project_id = $projectIdEncoder
+              ORDER BY batch_date DESC
+              LIMIT 1
+            ) max_batch_date ON evt.batch_date = max_batch_date.batch_date
+            WHERE evt.project_id = $projectIdEncoder
            """.query(eventStatusDecoder)
     )
     .arguments(projectId ~ projectId)
@@ -82,11 +83,11 @@ class ProcessingStatusFinderImpl[Interpretation[_]: Sync: BracketThrow](
     }
 }
 
-object IOProcessingStatusFinder {
-  def apply(
-      sessionResource:  SessionResource[IO, EventLogDB],
-      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
-  ): IO[ProcessingStatusFinder[IO]] = IO {
+object ProcessingStatusFinder {
+  def apply[F[_]: MonadCancelThrow: Async](
+      sessionResource:  SessionResource[F, EventLogDB],
+      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[ProcessingStatusFinder[F]] = MonadThrow[F].catchNonFatal {
     new ProcessingStatusFinderImpl(sessionResource, queriesExecTimes)
   }
 }
@@ -105,41 +106,33 @@ object ProcessingStatus {
   type Total    = Int Refined NonNegative
   type Progress = Double Refined NonNegative
 
-  def from[Interpretation[_]: MonadError[*[_], Throwable]](
-      done:  Int,
-      total: Int
-  ): Interpretation[ProcessingStatus] =
-    for {
-      validDone  <- applyRef[Done](done) getOrError [Interpretation] "ProcessingStatus's 'done' cannot be negative"
-      validTotal <- applyRef[Total](total) getOrError [Interpretation] "ProcessingStatus's 'total' cannot be negative"
-      _          <- checkDoneLessThanTotal[Interpretation](validDone, validTotal)
-      progress   <- progressFrom[Interpretation](validDone, validTotal)
-    } yield new ProcessingStatus(validDone, validTotal, progress)
+  def from[Interpretation[_]: MonadThrow](done: Int, total: Int): Interpretation[ProcessingStatus] = for {
+    validDone  <- applyRef[Done](done) getOrError [Interpretation] "ProcessingStatus's 'done' cannot be negative"
+    validTotal <- applyRef[Total](total) getOrError [Interpretation] "ProcessingStatus's 'total' cannot be negative"
+    _          <- checkDoneLessThanTotal[Interpretation](validDone, validTotal)
+    progress   <- progressFrom[Interpretation](validDone, validTotal)
+  } yield new ProcessingStatus(validDone, validTotal, progress)
 
   private implicit class RefTypeOps[V](maybeValue: Either[String, V]) {
-    def getOrError[Interpretation[_]: MonadError[*[_], Throwable]](
+    def getOrError[Interpretation[_]: MonadThrow](
         message: String
-    ): Interpretation[V] =
-      maybeValue.fold(
-        _ => MonadError[Interpretation, Throwable].raiseError[V](new IllegalArgumentException(message)),
-        MonadError[Interpretation, Throwable].pure
-      )
+    ): Interpretation[V] = maybeValue.fold(
+      _ => MonadThrow[Interpretation].raiseError[V](new IllegalArgumentException(message)),
+      MonadThrow[Interpretation].pure
+    )
   }
 
-  private def checkDoneLessThanTotal[Interpretation[_]: MonadError[*[_], Throwable]](
+  private def checkDoneLessThanTotal[Interpretation[_]: MonadThrow](
       done:  Done,
       total: Total
   ): Interpretation[Unit] =
-    if (done.value <= total.value) MonadError[Interpretation, Throwable].unit
+    if (done.value <= total.value) MonadThrow[Interpretation].unit
     else
-      MonadError[Interpretation, Throwable].raiseError(
+      MonadThrow[Interpretation].raiseError(
         new IllegalArgumentException("ProcessingStatus with 'done' > 'total' makes no sense")
       )
 
-  private def progressFrom[Interpretation[_]: MonadError[*[_], Throwable]](
-      done:  Done,
-      total: Total
-  ): Interpretation[Progress] = {
+  private def progressFrom[Interpretation[_]: MonadThrow](done: Done, total: Total): Interpretation[Progress] = {
     val progress =
       if (total.value == 0) 100d
       else BigDecimal((done.value.toDouble / total.value) * 100).setScale(2, RoundingMode.HALF_DOWN).toDouble

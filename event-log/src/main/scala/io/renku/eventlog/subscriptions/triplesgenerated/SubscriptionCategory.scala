@@ -18,7 +18,8 @@
 
 package io.renku.eventlog.subscriptions.triplesgenerated
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.Async
+import cats.syntax.all._
 import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog.subscriptions._
 import io.renku.eventlog.subscriptions.triplesgenerated.TriplesGeneratedEventEncoder.{encodeEvent, encodePayload}
@@ -28,47 +29,39 @@ import io.renku.graph.model.projects
 import io.renku.metrics.{LabeledGauge, LabeledHistogram}
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
 private[subscriptions] object SubscriptionCategory {
   val name: CategoryName = CategoryName("TRIPLES_GENERATED")
 
-  def apply(
-      sessionResource:             SessionResource[IO, EventLogDB],
-      awaitingTransformationGauge: LabeledGauge[IO, projects.Path],
-      underTransformationGauge:    LabeledGauge[IO, projects.Path],
-      queriesExecTimes:            LabeledHistogram[IO, SqlStatement.Name],
-      subscriberTracker:           SubscriberTracker[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO],
-      logger:           Logger[IO]
-  ): IO[subscriptions.SubscriptionCategory[IO]] = for {
-    subscribers <- Subscribers(name, subscriberTracker, logger)
-    eventFetcher <- IOTriplesGeneratedEventFinder(sessionResource,
-                                                  awaitingTransformationGauge,
-                                                  underTransformationGauge,
-                                                  queriesExecTimes
+  def apply[F[_]: Async: Logger](
+      sessionResource:             SessionResource[F, EventLogDB],
+      awaitingTransformationGauge: LabeledGauge[F, projects.Path],
+      underTransformationGauge:    LabeledGauge[F, projects.Path],
+      queriesExecTimes:            LabeledHistogram[F, SqlStatement.Name],
+      subscriberTracker:           SubscriberTracker[F]
+  ): F[subscriptions.SubscriptionCategory[F]] = for {
+    subscribers <- Subscribers(name, subscriberTracker)
+    eventFetcher <- TriplesGeneratedEventFinder(sessionResource,
+                                                awaitingTransformationGauge,
+                                                underTransformationGauge,
+                                                queriesExecTimes
                     )
-    dispatchRecovery <- DispatchRecovery()
-    eventDelivery <- EventDelivery[TriplesGeneratedEvent](sessionResource,
-                                                          compoundEventIdExtractor = (_: TriplesGeneratedEvent).id,
-                                                          queriesExecTimes
+    dispatchRecovery <- DispatchRecovery[F]
+    eventDelivery <- EventDelivery[F, TriplesGeneratedEvent](sessionResource,
+                                                             compoundEventIdExtractor = (_: TriplesGeneratedEvent).id,
+                                                             queriesExecTimes
                      )
-    eventsDistributor <- IOEventsDistributor(name,
-                                             subscribers,
-                                             eventFetcher,
-                                             eventDelivery,
-                                             EventEncoder(encodeEvent, encodePayload),
-                                             dispatchRecovery,
-                                             logger
+    eventsDistributor <- EventsDistributor(name,
+                                           subscribers,
+                                           eventFetcher,
+                                           eventDelivery,
+                                           EventEncoder(encodeEvent, encodePayload),
+                                           dispatchRecovery
                          )
     deserializer <-
-      SubscriptionRequestDeserializer[IO, SubscriptionCategoryPayload](name, SubscriptionCategoryPayload.apply)
-  } yield new SubscriptionCategoryImpl[IO, SubscriptionCategoryPayload](name,
-                                                                        subscribers,
-                                                                        eventsDistributor,
-                                                                        deserializer
+      SubscriptionRequestDeserializer[F, SubscriptionCategoryPayload](name, SubscriptionCategoryPayload.apply)
+  } yield new SubscriptionCategoryImpl[F, SubscriptionCategoryPayload](name,
+                                                                       subscribers,
+                                                                       eventsDistributor,
+                                                                       deserializer
   )
 }

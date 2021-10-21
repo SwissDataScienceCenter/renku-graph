@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
 import cats.MonadThrow
-import cats.effect.{ConcurrentEffect, IO, Timer}
+import cats.effect.{Async, Temporal}
 import cats.syntax.all._
 import io.circe.literal._
 import io.renku.eventlog.subscriptions.DispatchRecovery
@@ -31,7 +31,6 @@ import io.renku.graph.model.events.EventStatus.{GenerationNonRecoverableFailure,
 import io.renku.tinytypes.json.TinyTypeEncoders
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 private class DispatchRecoveryImpl[Interpretation[_]: MonadThrow: Logger](
@@ -77,12 +76,7 @@ private class DispatchRecoveryImpl[Interpretation[_]: MonadThrow: Logger](
 }
 
 private object DispatchRecovery {
-
-  def apply()(implicit
-      executionContext: ExecutionContext,
-      concurrentEffect: ConcurrentEffect[IO],
-      timer:            Timer[IO],
-      logger:           Logger[IO]
-  ): IO[DispatchRecovery[IO, AwaitingGenerationEvent]] =
-    EventSender() map (new DispatchRecoveryImpl[IO](_))
+  def apply[F[_]: Async: Temporal: Logger]: F[DispatchRecovery[F, AwaitingGenerationEvent]] = for {
+    eventSender <- EventSender[F]
+  } yield new DispatchRecoveryImpl[F](eventSender)
 }
