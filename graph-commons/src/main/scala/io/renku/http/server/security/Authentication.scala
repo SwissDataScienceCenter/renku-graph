@@ -18,51 +18,48 @@
 
 package io.renku.http.server.security
 
-import cats.MonadError
 import cats.data.{Kleisli, OptionT}
 import cats.syntax.all._
+import cats.{Applicative, MonadThrow}
 import io.renku.http.client.AccessToken
 import io.renku.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import io.renku.http.server.security.EndpointSecurityException.AuthenticationFailure
-import model._
+import io.renku.http.server.security.model._
 import org.http4s.AuthScheme.Bearer
 import org.http4s.Credentials.Token
 import org.http4s.headers.Authorization
 import org.http4s.{AuthedRoutes, Request}
 import org.typelevel.ci._
 
-private trait Authentication[Interpretation[_]] {
-  def authenticateIfNeeded
-      : Kleisli[Interpretation, Request[Interpretation], Either[EndpointSecurityException, Option[AuthUser]]]
-  def authenticate: Kleisli[Interpretation, Request[Interpretation], Either[EndpointSecurityException, AuthUser]]
+private trait Authentication[F[_]] {
+  def authenticateIfNeeded: Kleisli[F, Request[F], Either[EndpointSecurityException, Option[AuthUser]]]
+
+  def authenticate: Kleisli[F, Request[F], Either[EndpointSecurityException, AuthUser]]
 }
 
-private class AuthenticationImpl[Interpretation[_]](
-    authenticator: Authenticator[Interpretation]
-)(implicit ME:     MonadError[Interpretation, Throwable])
-    extends Authentication[Interpretation] {
+private class AuthenticationImpl[F[_]: MonadThrow](
+    authenticator: Authenticator[F]
+) extends Authentication[F] {
 
   import org.http4s.{Header, Request}
 
-  override val authenticateIfNeeded
-      : Kleisli[Interpretation, Request[Interpretation], Either[EndpointSecurityException, Option[AuthUser]]] =
+  override val authenticateIfNeeded: Kleisli[F, Request[F], Either[EndpointSecurityException, Option[AuthUser]]] =
     Kleisli { request =>
       request.getBearerToken orElse request.getPrivateAccessToken match {
         case Some(token) => authenticator.authenticate(token).map(_.map(Option.apply))
-        case None        => Option.empty[AuthUser].asRight[EndpointSecurityException].pure[Interpretation]
+        case None        => Option.empty[AuthUser].asRight[EndpointSecurityException].pure[F]
       }
     }
 
-  override val authenticate
-      : Kleisli[Interpretation, Request[Interpretation], Either[EndpointSecurityException, AuthUser]] =
+  override val authenticate: Kleisli[F, Request[F], Either[EndpointSecurityException, AuthUser]] =
     Kleisli { request =>
       request.getBearerToken orElse request.getPrivateAccessToken match {
         case Some(token) => authenticator.authenticate(token)
-        case None        => (AuthenticationFailure: EndpointSecurityException).asLeft[AuthUser].pure[Interpretation]
+        case None        => (AuthenticationFailure: EndpointSecurityException).asLeft[AuthUser].pure[F]
       }
     }
 
-  private implicit class RequestOps(request: Request[Interpretation]) {
+  private implicit class RequestOps(request: Request[F]) {
 
     import Header.Select._
 
@@ -82,30 +79,31 @@ private class AuthenticationImpl[Interpretation[_]](
 
 object Authentication {
 
-  import cats.effect.IO
   import org.http4s.server.AuthMiddleware
 
-  def middlewareAuthenticatingIfNeeded(
-      authenticator: Authenticator[IO]
-  ): IO[AuthMiddleware[IO, Option[AuthUser]]] = IO {
-    middlewareAuthenticatingIfNeeded(new AuthenticationImpl(authenticator))
+  def middlewareAuthenticatingIfNeeded[F[_]: MonadThrow](
+      authenticator: Authenticator[F]
+  ): F[AuthMiddleware[F, Option[AuthUser]]] = MonadThrow[F].catchNonFatal {
+    middlewareAuthenticatingIfNeeded[F](new AuthenticationImpl[F](authenticator))
   }
 
-  private[security] def middlewareAuthenticatingIfNeeded(
-      authentication: Authentication[IO]
-  ): AuthMiddleware[IO, Option[AuthUser]] = AuthMiddleware(authentication.authenticateIfNeeded, onFailure)
+  private[security] def middlewareAuthenticatingIfNeeded[F[_]: MonadThrow](
+      authentication: Authentication[F]
+  ): AuthMiddleware[F, Option[AuthUser]] =
+    AuthMiddleware[F, EndpointSecurityException, Option[AuthUser]](authentication.authenticateIfNeeded, onFailure)
 
-  def middleware(
-      authenticator: Authenticator[IO]
-  ): IO[AuthMiddleware[IO, AuthUser]] = IO {
+  def middleware[F[_]: MonadThrow](
+      authenticator: Authenticator[F]
+  ): F[AuthMiddleware[F, AuthUser]] = MonadThrow[F].catchNonFatal {
     middleware(new AuthenticationImpl(authenticator))
   }
 
-  private[security] def middleware(
-      authentication: Authentication[IO]
-  ): AuthMiddleware[IO, AuthUser] = AuthMiddleware(authentication.authenticate, onFailure)
+  private[security] def middleware[F[_]: MonadThrow](
+      authentication: Authentication[F]
+  ): AuthMiddleware[F, AuthUser] =
+    AuthMiddleware[F, EndpointSecurityException, AuthUser](authentication.authenticate, onFailure)
 
-  private lazy val onFailure: AuthedRoutes[EndpointSecurityException, IO] = Kleisli { req =>
-    OptionT.some(req.context.toHttpResponse)
+  private def onFailure[F[_]: Applicative]: AuthedRoutes[EndpointSecurityException, F] = Kleisli { req =>
+    OptionT.some[F](req.context.toHttpResponse)
   }
 }

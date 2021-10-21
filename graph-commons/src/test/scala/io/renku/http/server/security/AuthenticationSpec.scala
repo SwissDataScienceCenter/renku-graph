@@ -146,7 +146,8 @@ class AuthenticationSpec
 
       val request = Request[IO]()
 
-      val maybeResponse = Authentication.middlewareAuthenticatingIfNeeded(authentication) {
+      val middleware = Authentication.middlewareAuthenticatingIfNeeded[IO](authentication)
+      val maybeResponse = middleware {
         AuthedRoutes.of { case GET -> Root as _ => Response.notFound[IO].pure[IO] }
       }(request)
 
@@ -174,7 +175,9 @@ class AuthenticationSpec
 
       val request = Request[IO]()
 
-      val maybeResponse = Authentication.middleware(authentication) {
+      val middleware = Authentication.middleware[IO](authentication)
+
+      val maybeResponse = middleware {
         AuthedRoutes.of { case GET -> Root as _ => Response.notFound[IO].pure[IO] }
       }(request)
 
