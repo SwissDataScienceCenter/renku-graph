@@ -78,7 +78,7 @@ class ThrottlerSpec extends AnyWordSpec with IOSpec with should.Matchers {
       val startTime = {
         for {
           startTime <- Clock[IO].monotonic
-          _         <- processConcurrently(tasksNumber, use = Throttler.noThrottling[IO, Any])
+          _         <- processConcurrently(tasksNumber, use = Throttler.noThrottling[IO])
         } yield startTime
       }.unsafeRunSync()
 

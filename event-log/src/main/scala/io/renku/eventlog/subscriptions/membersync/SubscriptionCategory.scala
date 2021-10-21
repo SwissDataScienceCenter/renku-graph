@@ -18,15 +18,14 @@
 
 package io.renku.eventlog.subscriptions.membersync
 
-import cats.effect.{Async, ContextShift, IO, Timer}
+import cats.effect.Async
+import cats.syntax.all._
 import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog.subscriptions._
 import io.renku.eventlog.subscriptions.membersync.MemberSyncEventEncoder.encodeEvent
 import io.renku.eventlog.{EventLogDB, subscriptions}
 import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
-import cats.syntax.all._
-import scala.concurrent.ExecutionContext
 
 private[subscriptions] object SubscriptionCategory {
 

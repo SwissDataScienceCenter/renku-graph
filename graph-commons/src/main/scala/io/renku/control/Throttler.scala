@@ -18,18 +18,17 @@
 
 package io.renku.control
 
+import cats.MonadThrow
 import cats.effect.kernel.Clock
 import cats.effect.std.Semaphore
 import cats.effect.{Concurrent, Ref, Temporal}
 import cats.syntax.all._
-import cats.{Applicative, MonadThrow}
 
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration._
 
-trait Throttler[Interpretation[_], ThrottlingTarget] {
+trait Throttler[Interpretation[_], +ThrottlingTarget] {
   def acquire(): Interpretation[Unit]
-
   def release(): Interpretation[Unit]
 }
 
@@ -86,10 +85,9 @@ object Throttler {
     workersStartTimes <- Clock[Interpretation].monotonic flatMap (now => Ref.of(List(now.toNanos)))
   } yield new StandardThrottler[Interpretation, ThrottlingTarget](rateLimit, semaphore, workersStartTimes)
 
-  def noThrottling[Interpretation[_]: Applicative, ThrottlingTarget]: Throttler[Interpretation, ThrottlingTarget] =
-    new Throttler[Interpretation, ThrottlingTarget] {
+  def noThrottling[Interpretation[_]: MonadThrow]: Throttler[Interpretation, Nothing] =
+    new Throttler[Interpretation, Nothing] {
       override def acquire(): Interpretation[Unit] = ().pure[Interpretation]
-
       override def release(): Interpretation[Unit] = ().pure[Interpretation]
     }
 }

@@ -27,17 +27,17 @@ import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.metrics.RoutesMetrics
 import org.http4s.dsl.Http4sDsl
 
-private class MicroserviceRoutes[Interpretation[_]: MonadThrow](
-    eventEndpoint: EventEndpoint[Interpretation],
-    routesMetrics: RoutesMetrics[Interpretation]
-) extends Http4sDsl[Interpretation] {
+private class MicroserviceRoutes[F[_]: MonadThrow](
+    eventEndpoint: EventEndpoint[F],
+    routesMetrics: RoutesMetrics[F]
+) extends Http4sDsl[F] {
 
   import eventEndpoint._
   import org.http4s.HttpRoutes
   import routesMetrics._
 
   // format: off
-  lazy val routes: Resource[Interpretation, HttpRoutes[Interpretation]] = HttpRoutes.of[Interpretation] {
+  lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
     case           GET  -> Root / "ping"   => Ok("pong")
     case request @ POST -> Root / "events" => processEvent(request)
   }.withMetrics
@@ -45,10 +45,10 @@ private class MicroserviceRoutes[Interpretation[_]: MonadThrow](
 }
 
 private object MicroserviceRoutes {
-  def apply[Interpretation[_]: MonadThrow: Concurrent](
-      consumersRegistry: EventConsumersRegistry[Interpretation],
-      routesMetrics:     RoutesMetrics[Interpretation]
-  ): Interpretation[MicroserviceRoutes[Interpretation]] = for {
-    eventEndpoint <- EventEndpoint[Interpretation](consumersRegistry)
+  def apply[F[_]: MonadThrow: Concurrent](
+      consumersRegistry: EventConsumersRegistry[F],
+      routesMetrics:     RoutesMetrics[F]
+  ): F[MicroserviceRoutes[F]] = for {
+    eventEndpoint <- EventEndpoint[F](consumersRegistry)
   } yield new MicroserviceRoutes(eventEndpoint, routesMetrics)
 }

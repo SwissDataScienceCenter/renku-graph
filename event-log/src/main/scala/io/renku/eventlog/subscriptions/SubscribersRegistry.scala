@@ -164,6 +164,6 @@ private object SubscribersRegistry {
                                           checkupInterval
                   )
                 }
-    _ <- Spawn[F].start(registry.busySubscriberCheckup().foreverM)
+    _ <- Spawn[F].start(registry.busySubscriberCheckup().foreverM[Unit])
   } yield registry
 }

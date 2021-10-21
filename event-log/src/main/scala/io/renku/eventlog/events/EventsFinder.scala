@@ -18,8 +18,9 @@
 
 package io.renku.eventlog.events
 
+import cats.MonadThrow
 import cats.data.Kleisli
-import cats.effect.{BracketThrow, Concurrent, ConcurrentEffect, IO}
+import cats.effect.Async
 import cats.syntax.all._
 import io.renku.db.{DbClient, SessionResource, SqlStatement}
 import io.renku.eventlog._
@@ -31,15 +32,15 @@ import io.renku.http.rest.paging.model.{PerPage, Total}
 import io.renku.http.rest.paging.{Paging, PagingRequest, PagingResponse}
 import io.renku.metrics.LabeledHistogram
 
-private trait EventsFinder[Interpretation[_]] {
-  def findEvents(request: EventsEndpoint.Request): Interpretation[PagingResponse[EventInfo]]
+private trait EventsFinder[F[_]] {
+  def findEvents(request: EventsEndpoint.Request): F[PagingResponse[EventInfo]]
 }
 
-private class EventsFinderImpl[Interpretation[_]: BracketThrow: Concurrent](
-    sessionResource:  SessionResource[Interpretation, EventLogDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
-) extends DbClient[Interpretation](Some(queriesExecTimes))
-    with EventsFinder[Interpretation]
+private class EventsFinderImpl[F[_]: Async](
+    sessionResource:  SessionResource[F, EventLogDB],
+    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+) extends DbClient[F](Some(queriesExecTimes))
+    with EventsFinder[F]
     with Paging[EventInfo] {
 
   import eu.timepit.refined.auto._
@@ -48,16 +49,15 @@ private class EventsFinderImpl[Interpretation[_]: BracketThrow: Concurrent](
   import skunk.codec.numeric._
   import skunk.implicits._
 
-  override def findEvents(request: EventsEndpoint.Request): Interpretation[PagingResponse[EventInfo]] = {
-    implicit val finder: PagedResultsFinder[Interpretation, EventInfo] =
-      createFinder(request)
+  override def findEvents(request: EventsEndpoint.Request): F[PagingResponse[EventInfo]] = {
+    implicit val finder: PagedResultsFinder[F, EventInfo] = createFinder(request)
     findPage(request.pagingRequest)
   }
 
   private def createFinder(request: EventsEndpoint.Request) =
-    new PagedResultsFinder[Interpretation, EventInfo] with TypeSerializers {
+    new PagedResultsFinder[F, EventInfo] with TypeSerializers {
 
-      override def findResults(paging: PagingRequest): Interpretation[List[EventInfo]] =
+      override def findResults(paging: PagingRequest): F[List[EventInfo]] =
         sessionResource.useK {
           for {
             infos               <- find()
@@ -124,7 +124,7 @@ private class EventsFinderImpl[Interpretation[_]: BracketThrow: Concurrent](
 
       private def find() = measureExecutionTime {
         val query: AppliedFragment = selectEventInfoQuery(request)
-        SqlStatement[Interpretation](name = "find event infos")
+        SqlStatement[F](name = "find event infos")
           .select[query.A, (EventInfo, Long)](
             query.fragment
               .query(
@@ -153,8 +153,7 @@ private class EventsFinderImpl[Interpretation[_]: BracketThrow: Concurrent](
           .build(_.toList)
       }
 
-      private def addProcessingTimes()
-          : ((EventInfo, Long)) => Kleisli[Interpretation, Session[Interpretation], EventInfo] = {
+      private def addProcessingTimes(): ((EventInfo, Long)) => Kleisli[F, Session[F], EventInfo] = {
         case (info, 0L) => Kleisli.pure(info)
         case (info, _) =>
           findStatusProcessingTimes(info)
@@ -162,7 +161,7 @@ private class EventsFinderImpl[Interpretation[_]: BracketThrow: Concurrent](
       }
 
       private def findStatusProcessingTimes(eventInfo: EventInfo) = measureExecutionTime {
-        SqlStatement[Interpretation](name = "find event processing times")
+        SqlStatement[F](name = "find event processing times")
           .select[EventId ~ projects.Path, StatusProcessingTime](
             sql"""SELECT times.status, times.processing_time
               FROM status_processing_time times
@@ -171,8 +170,7 @@ private class EventsFinderImpl[Interpretation[_]: BracketThrow: Concurrent](
                 ORDER BY project_id DESC
                 LIMIT 1
               )
-          """
-              .query(statusProcessingTimesDecoder)
+          """.query(statusProcessingTimesDecoder)
           )
           .arguments(eventInfo.eventId, eventInfo.projectPath)
           .build(_.toList)
@@ -209,10 +207,10 @@ private class EventsFinderImpl[Interpretation[_]: BracketThrow: Concurrent](
           query(status)
       }
 
-      override def findTotal(): Interpretation[Total] = sessionResource.useK {
+      override def findTotal(): F[Total] = sessionResource.useK {
         val query = countEventQuery(request)
         measureExecutionTime {
-          SqlStatement[Interpretation](name = "find event infos total")
+          SqlStatement[F](name = "find event infos total")
             .select[query.A, Total](query.fragment.query(int8).map((total: Long) => Total(total.toInt)))
             .arguments(query.argument)
             .build(_.option)
@@ -226,9 +224,9 @@ private class EventsFinderImpl[Interpretation[_]: BracketThrow: Concurrent](
 }
 
 private object EventsFinder {
-  def apply(sessionResource:   SessionResource[IO, EventLogDB],
-            queriesExecTimes:  LabeledHistogram[IO, SqlStatement.Name]
-  )(implicit concurrentEffect: ConcurrentEffect[IO]): IO[EventsFinder[IO]] = IO(
+  def apply[F[_]: Async](sessionResource: SessionResource[F, EventLogDB],
+                         queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[EventsFinder[F]] = MonadThrow[F].catchNonFatal(
     new EventsFinderImpl(sessionResource, queriesExecTimes)
   )
 }

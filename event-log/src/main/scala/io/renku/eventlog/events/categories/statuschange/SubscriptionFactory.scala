@@ -19,8 +19,7 @@
 package io.renku.eventlog.events.categories.statuschange
 
 import cats.MonadThrow
-import cats.effect.Concurrent
-import cats.effect.kernel.{Async, Spawn}
+import cats.effect.kernel.Async
 import cats.syntax.all._
 import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog.EventLogDB
@@ -31,7 +30,7 @@ import io.renku.metrics.{LabeledGauge, LabeledHistogram}
 import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
-  def apply[F[_]: MonadThrow: Async: Spawn: Concurrent: Logger](
+  def apply[F[_]: MonadThrow: Async: Logger](
       sessionResource:                    SessionResource[F, EventLogDB],
       awaitingTriplesGenerationGauge:     LabeledGauge[F, projects.Path],
       underTriplesGenerationGauge:        LabeledGauge[F, projects.Path],

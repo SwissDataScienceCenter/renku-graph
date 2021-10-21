@@ -19,7 +19,6 @@
 package io.renku.eventlog.subscriptions
 
 import cats.effect.Async
-import cats.effect.kernel.Temporal
 import cats.{MonadThrow, Show}
 import io.renku.control.Throttler
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
@@ -40,9 +39,9 @@ private class EventsSenderImpl[F[_]: Async: Logger, CategoryEvent](
     categoryEventEncoder:   EventEncoder[CategoryEvent],
     retryInterval:          FiniteDuration = 1 second,
     requestTimeoutOverride: Option[Duration] = None
-) extends RestClient(Throttler.noThrottling,
-                     retryInterval = retryInterval,
-                     requestTimeoutOverride = requestTimeoutOverride
+) extends RestClient[F, EventsSender[F, CategoryEvent]](Throttler.noThrottling,
+                                                        retryInterval = retryInterval,
+                                                        requestTimeoutOverride = requestTimeoutOverride
     )
     with EventsSender[F, CategoryEvent] {
 

@@ -56,7 +56,7 @@ class HttpServerSpec extends AnyWordSpec with IOSpec with Http4sDsl[IO] with sho
 
   private def execute(request: Request[IO]): Response[IO] =
     BlazeClientBuilder[IO].resource
-      .use(_.run(request).use(response => IO.pure(response)))
+      .use(_.run(request).use(IO.pure))
       .unsafeRunSync()
 
   private lazy val port    = httpPorts.generateOne

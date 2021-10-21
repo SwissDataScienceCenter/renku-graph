@@ -25,18 +25,18 @@ import io.sentry.SentryOptions
 
 import scala.util.Try
 
-trait SentryInitializer[Interpretation[_]] {
-  def run(): Interpretation[Unit]
+trait SentryInitializer[F[_]] {
+  def run(): F[Unit]
 }
 
-class SentryInitializerImpl[Interpretation[_]: MonadThrow](
+class SentryInitializerImpl[F[_]: MonadThrow](
     maybeSentryConfig: Option[SentryConfig],
     initSentry:        String => Unit
-) extends SentryInitializer[Interpretation] {
+) extends SentryInitializer[F] {
 
-  override def run(): Interpretation[Unit] = maybeSentryConfig.map(toDsn) match {
-    case Some(dsn) => MonadThrow[Interpretation].fromTry(Try(initSentry(dsn.toString)))
-    case _         => MonadThrow[Interpretation].unit
+  override def run(): F[Unit] = maybeSentryConfig.map(toDsn) match {
+    case Some(dsn) => MonadThrow[F].fromTry(Try(initSentry(dsn.toString)))
+    case _         => MonadThrow[F].unit
   }
 
   private lazy val toDsn: SentryConfig => SentryBaseUrl = {
@@ -48,8 +48,8 @@ class SentryInitializerImpl[Interpretation[_]: MonadThrow](
 object SentryInitializer {
   import io.sentry.Sentry
 
-  def apply[Interpretation[_]: MonadThrow]: Interpretation[SentryInitializer[Interpretation]] = for {
-    maybeSentryConfig <- SentryConfig[Interpretation]()
+  def apply[F[_]: MonadThrow]: F[SentryInitializer[F]] = for {
+    maybeSentryConfig <- SentryConfig[F]()
   } yield new SentryInitializerImpl(
     maybeSentryConfig,
     dsn => { Sentry.init((options: SentryOptions) => options.setDsn(dsn)); () }

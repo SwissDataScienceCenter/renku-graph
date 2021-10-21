@@ -18,8 +18,9 @@
 
 package io.renku.eventlog.events.categories.commitsyncrequest
 
+import cats.MonadThrow
 import cats.data.Kleisli
-import cats.effect.BracketThrow
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import io.renku.db.{DbClient, SessionResource, SqlStatement}
@@ -34,19 +35,19 @@ import skunk.implicits._
 
 import java.time.Instant
 
-private trait CommitSyncForcer[Interpretation[_]] {
-  def forceCommitSync(projectId: projects.Id, projectPath: projects.Path): Interpretation[Unit]
+private trait CommitSyncForcer[F[_]] {
+  def forceCommitSync(projectId: projects.Id, projectPath: projects.Path): F[Unit]
 }
 
-private class CommitSyncForcerImpl[Interpretation[_]: BracketThrow](
-    sessionResource:  SessionResource[Interpretation, EventLogDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
+private class CommitSyncForcerImpl[F[_]: MonadCancelThrow](
+    sessionResource:  SessionResource[F, EventLogDB],
+    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
 ) extends DbClient(Some(queriesExecTimes))
-    with CommitSyncForcer[Interpretation]
+    with CommitSyncForcer[F]
     with TypeSerializers
     with SubscriptionTypeSerializers {
 
-  override def forceCommitSync(projectId: projects.Id, projectPath: projects.Path): Interpretation[Unit] =
+  override def forceCommitSync(projectId: projects.Id, projectPath: projects.Path): F[Unit] =
     sessionResource.useK {
       deleteLastSyncedDate(projectId) flatMap {
         case true  => upsertProject(projectId, projectPath).void
@@ -84,11 +85,9 @@ private class CommitSyncForcerImpl[Interpretation[_]: BracketThrow](
 
 private object CommitSyncForcer {
 
-  import cats.effect.IO
-
-  def apply(sessionResource:  SessionResource[IO, EventLogDB],
-            queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
-  ): IO[CommitSyncForcer[IO]] = IO {
+  def apply[F[_]: MonadCancelThrow](sessionResource: SessionResource[F, EventLogDB],
+                                    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[CommitSyncForcer[F]] = MonadThrow[F].catchNonFatal {
     new CommitSyncForcerImpl(sessionResource, queriesExecTimes)
   }
 }
