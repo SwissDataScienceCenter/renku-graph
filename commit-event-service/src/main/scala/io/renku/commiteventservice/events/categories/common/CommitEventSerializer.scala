@@ -18,16 +18,16 @@
 
 package io.renku.commiteventservice.events.categories.common
 
-import cats.{MonadError, MonadThrow}
+import cats.MonadThrow
 import io.circe.literal._
 import io.circe.{Encoder, Json}
 
 import scala.util.Try
 
-private class CommitEventSerializer[Interpretation[_]: MonadThrow] {
+private class CommitEventSerializer[F[_]: MonadThrow] {
 
-  def serialiseToJsonString(commitEvent: CommitEvent): Interpretation[String] =
-    MonadError[Interpretation, Throwable].fromTry(Try(toJson(commitEvent).noSpaces))
+  def serialiseToJsonString(commitEvent: CommitEvent): F[String] =
+    MonadThrow[F].fromTry(Try(toJson(commitEvent).noSpaces))
 
   private def toJson(commitEvent: CommitEvent): Json = json"""{
     "id":            ${commitEvent.id.value},

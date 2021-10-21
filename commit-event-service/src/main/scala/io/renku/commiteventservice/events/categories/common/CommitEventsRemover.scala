@@ -34,16 +34,16 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-private[categories] trait CommitEventsRemover[Interpretation[_]] {
-  def removeDeletedEvent(project: Project, commitId: CommitId): Interpretation[UpdateResult]
+private[categories] trait CommitEventsRemover[F[_]] {
+  def removeDeletedEvent(project: Project, commitId: CommitId): F[UpdateResult]
 }
 
-private class CommitEventsRemoverImpl[Interpretation[_]: MonadThrow](
-    eventSender: EventSender[Interpretation]
-) extends CommitEventsRemover[Interpretation]
+private class CommitEventsRemoverImpl[F[_]: MonadThrow](
+    eventSender: EventSender[F]
+) extends CommitEventsRemover[F]
     with TinyTypeEncoders {
 
-  override def removeDeletedEvent(project: Project, commitId: CommitId): Interpretation[UpdateResult] =
+  override def removeDeletedEvent(project: Project, commitId: CommitId): F[UpdateResult] =
     eventSender
       .sendEvent(
         EventRequestContent.NoPayload(json"""{
@@ -60,13 +60,13 @@ private class CommitEventsRemoverImpl[Interpretation[_]: MonadThrow](
       .map(_ => Deleted: UpdateResult)
       .recoverWith { case NonFatal(e) =>
         Failed(s"$categoryName - Commit Remover failed to send commit deletion status", e)
-          .pure[Interpretation]
+          .pure[F]
           .widen[UpdateResult]
       }
 }
 
 private[categories] object CommitEventsRemover {
-  def apply[Interpretation[_]: Async: Temporal: Logger]: Interpretation[CommitEventsRemover[Interpretation]] = for {
-    sender <- EventSender[Interpretation]
-  } yield new CommitEventsRemoverImpl[Interpretation](sender)
+  def apply[F[_]: Async: Temporal: Logger]: F[CommitEventsRemover[F]] = for {
+    sender <- EventSender[F]
+  } yield new CommitEventsRemoverImpl[F](sender)
 }

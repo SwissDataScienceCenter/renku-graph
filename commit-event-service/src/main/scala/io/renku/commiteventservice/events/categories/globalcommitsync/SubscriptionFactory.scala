@@ -30,10 +30,10 @@ import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
 
-  def apply[Interpretation[_]: Async: Spawn: Concurrent: Temporal: Logger](
-      gitLabThrottler:       Throttler[Interpretation, GitLab],
-      executionTimeRecorder: ExecutionTimeRecorder[Interpretation]
-  ): Interpretation[(EventHandler[Interpretation], SubscriptionMechanism[Interpretation])] = for {
+  def apply[F[_]: Async: Spawn: Concurrent: Temporal: Logger](
+      gitLabThrottler:       Throttler[F, GitLab],
+      executionTimeRecorder: ExecutionTimeRecorder[F]
+  ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
     subscriptionMechanism <- SubscriptionMechanism(
                                categoryName,
                                categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort, Microservice.Identifier)

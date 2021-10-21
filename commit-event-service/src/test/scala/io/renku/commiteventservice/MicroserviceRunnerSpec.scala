@@ -20,11 +20,11 @@ package io.renku.commiteventservice
 
 import cats.effect._
 import io.renku.config.certificates.CertificateLoader
+import io.renku.config.sentry.SentryInitializer
 import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.http.server.HttpServer
-import io.renku.interpreters.IOSentryInitializer
 import io.renku.testtools.{IOSpec, MockedRunnableCollaborators}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -100,7 +100,7 @@ class MicroserviceRunnerSpec
 
   private trait TestCase {
     val certificateLoader      = mock[CertificateLoader[IO]]
-    val sentryInitializer      = mock[IOSentryInitializer]
+    val sentryInitializer      = mock[SentryInitializer[IO]]
     val eventConsumersRegistry = mock[EventConsumersRegistry[IO]]
     val httpServer             = mock[HttpServer[IO]]
     val runner = new MicroserviceRunner(

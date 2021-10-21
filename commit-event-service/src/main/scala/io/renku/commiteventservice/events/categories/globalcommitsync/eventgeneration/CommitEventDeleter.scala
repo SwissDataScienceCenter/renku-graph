@@ -30,29 +30,29 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-private[eventgeneration] trait CommitEventDeleter[Interpretation[_]] {
+private[eventgeneration] trait CommitEventDeleter[F[_]] {
   def deleteExtraneousCommits(project: Project, commitsToDelete: List[CommitId])(implicit
       maybeAccessToken:                Option[AccessToken]
-  ): Interpretation[SynchronizationSummary]
+  ): F[SynchronizationSummary]
 }
-private[eventgeneration] class CommitEventDeleterImpl[Interpretation[_]: MonadThrow](
-    commitEventsRemover: CommitEventsRemover[Interpretation]
-) extends CommitEventDeleter[Interpretation] {
+private[eventgeneration] class CommitEventDeleterImpl[F[_]: MonadThrow](
+    commitEventsRemover: CommitEventsRemover[F]
+) extends CommitEventDeleter[F] {
 
   import commitEventsRemover._
 
   override def deleteExtraneousCommits(project: Project, commitsToDelete: List[CommitId])(implicit
       maybeAccessToken:                         Option[AccessToken]
-  ): Interpretation[SynchronizationSummary] = commitsToDelete.foldLeftM(SynchronizationSummary()) { (summary, commit) =>
+  ): F[SynchronizationSummary] = commitsToDelete.foldLeftM(SynchronizationSummary()) { (summary, commit) =>
     removeDeletedEvent(project, commit)
       .map(summary.incrementCount)
       .recoverWith { case NonFatal(error) =>
-        summary.incrementCount(Failed(s"Failed to delete commit $commit", error)).pure[Interpretation]
+        summary.incrementCount(Failed(s"Failed to delete commit $commit", error)).pure[F]
       }
   }
 }
 private[eventgeneration] object CommitEventDeleter {
-  def apply[Interpretation[_]: Async: Temporal: Logger]: Interpretation[CommitEventDeleter[Interpretation]] = for {
-    commitEventsRemover <- CommitEventsRemover[Interpretation]
-  } yield new CommitEventDeleterImpl[Interpretation](commitEventsRemover)
+  def apply[F[_]: Async: Temporal: Logger]: F[CommitEventDeleter[F]] = for {
+    commitEventsRemover <- CommitEventsRemover[F]
+  } yield new CommitEventDeleterImpl[F](commitEventsRemover)
 }

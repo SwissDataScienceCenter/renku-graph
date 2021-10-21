@@ -30,23 +30,17 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-private[categories] trait CommitToEventLog[Interpretation[_]] {
-  def storeCommitInEventLog(project:     Project,
-                            startCommit: CommitInfo,
-                            batchDate:   BatchDate
-  ): Interpretation[UpdateResult]
+private[categories] trait CommitToEventLog[F[_]] {
+  def storeCommitInEventLog(project: Project, startCommit: CommitInfo, batchDate: BatchDate): F[UpdateResult]
 }
 
-private[categories] class CommitToEventLogImpl[Interpretation[_]: MonadThrow](
-    commitEventSender: CommitEventSender[Interpretation]
-) extends CommitToEventLog[Interpretation] {
+private[categories] class CommitToEventLogImpl[F[_]: MonadThrow](
+    commitEventSender: CommitEventSender[F]
+) extends CommitToEventLog[F] {
 
   import commitEventSender._
 
-  def storeCommitInEventLog(project:     Project,
-                            startCommit: CommitInfo,
-                            batchDate:   BatchDate
-  ): Interpretation[UpdateResult] = {
+  def storeCommitInEventLog(project: Project, startCommit: CommitInfo, batchDate: BatchDate): F[UpdateResult] = {
     val commitEvent = toCommitEvent(project, batchDate)(startCommit)
     send(commitEvent)
       .map(_ => Created)
@@ -84,7 +78,7 @@ private[categories] class CommitToEventLogImpl[Interpretation[_]: MonadThrow](
     s"$categoryName: id = ${startCommit.id}, projectId = ${startCommit.project.id}, projectPath = ${startCommit.project.path} -> storing in the event log failed"
 }
 private[categories] object CommitToEventLog {
-  def apply[Interpretation[_]: Async: Temporal: Logger]: Interpretation[CommitToEventLog[Interpretation]] = for {
-    eventSender <- CommitEventSender[Interpretation]
-  } yield new CommitToEventLogImpl[Interpretation](eventSender)
+  def apply[F[_]: Async: Temporal: Logger]: F[CommitToEventLog[F]] = for {
+    eventSender <- CommitEventSender[F]
+  } yield new CommitToEventLogImpl[F](eventSender)
 }

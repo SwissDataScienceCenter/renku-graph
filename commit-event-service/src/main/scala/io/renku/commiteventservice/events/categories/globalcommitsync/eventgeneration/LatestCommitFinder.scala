@@ -35,18 +35,18 @@ import org.http4s.circe.jsonOf
 import org.http4s.{EntityDecoder, Status}
 import org.typelevel.log4cats.Logger
 
-private trait LatestCommitFinder[Interpretation[_]] {
+private trait LatestCommitFinder[F[_]] {
   def findLatestCommitId(
       projectId:        Id,
       maybeAccessToken: Option[AccessToken]
-  ): OptionT[Interpretation, CommitId]
+  ): OptionT[F, CommitId]
 }
 
-private class LatestCommitFinderImpl[Interpretation[_]: Async: Temporal: Logger](
+private class LatestCommitFinderImpl[F[_]: Async: Temporal: Logger](
     gitLabUrl:       GitLabUrl,
-    gitLabThrottler: Throttler[Interpretation, GitLab]
+    gitLabThrottler: Throttler[F, GitLab]
 ) extends RestClient(gitLabThrottler)
-    with LatestCommitFinder[Interpretation] {
+    with LatestCommitFinder[F] {
 
   import io.renku.http.client.RestClientError.UnauthorizedException
   import org.http4s.Method.GET
@@ -56,32 +56,30 @@ private class LatestCommitFinderImpl[Interpretation[_]: Async: Temporal: Logger]
   override def findLatestCommitId(
       projectId:        Id,
       maybeAccessToken: Option[AccessToken]
-  ): OptionT[Interpretation, CommitId] = OptionT {
+  ): OptionT[F, CommitId] = OptionT {
     for {
-      stringUri     <- s"$gitLabUrl/api/v4/projects/$projectId/repository/commits".pure[Interpretation]
+      stringUri     <- s"$gitLabUrl/api/v4/projects/$projectId/repository/commits".pure[F]
       uri           <- validateUri(stringUri) map (_.withQueryParam("per_page", "1"))
       maybeCommitId <- send(request(GET, uri, maybeAccessToken))(mapResponse)
     } yield maybeCommitId
   }
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[Interpretation], Response[Interpretation]),
-                                                Interpretation[Option[CommitId]]
-  ] = {
+  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[CommitId]]] = {
     case (Ok, _, response)    => response.as[List[CommitInfo]] map (_.headOption.map(_.id))
-    case (NotFound, _, _)     => Option.empty[CommitId].pure[Interpretation]
+    case (NotFound, _, _)     => Option.empty[CommitId].pure[F]
     case (Unauthorized, _, _) => UnauthorizedException.raiseError
   }
 
-  private implicit val commitInfosEntityDecoder: EntityDecoder[Interpretation, List[CommitInfo]] = {
+  private implicit val commitInfosEntityDecoder: EntityDecoder[F, List[CommitInfo]] = {
     implicit val infosDecoder: Decoder[List[CommitInfo]] = decodeList[CommitInfo]
-    jsonOf[Interpretation, List[CommitInfo]]
+    jsonOf[F, List[CommitInfo]]
   }
 }
 
 private object LatestCommitFinder {
-  def apply[Interpretation[_]: Async: Temporal: Logger](
-      gitLabThrottler: Throttler[Interpretation, GitLab]
-  ): Interpretation[LatestCommitFinder[Interpretation]] = for {
-    gitLabUrl <- GitLabUrlLoader[Interpretation]()
+  def apply[F[_]: Async: Temporal: Logger](
+      gitLabThrottler: Throttler[F, GitLab]
+  ): F[LatestCommitFinder[F]] = for {
+    gitLabUrl <- GitLabUrlLoader[F]()
   } yield new LatestCommitFinderImpl(gitLabUrl, gitLabThrottler)
 }

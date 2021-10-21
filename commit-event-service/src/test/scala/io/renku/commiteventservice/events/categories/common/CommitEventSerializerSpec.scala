@@ -18,7 +18,7 @@
 
 package io.renku.commiteventservice.events.categories.common
 
-import cats.MonadError
+import cats.syntax.all._
 import io.circe.Json
 import io.circe.parser._
 import io.renku.commiteventservice.events.categories.common.Generators._
@@ -52,13 +52,9 @@ class CommitEventSerializerSpec extends AnyWordSpec with ScalaCheckPropertyCheck
   }
 
   private trait TestCase {
-    val context = MonadError[Try, Throwable]
-
     val serializer = new CommitEventSerializer[Try]()
 
-    def json(fields: (String, Json)*) = context.pure {
-      Right(Json.obj(fields: _*))
-    }
+    def json(fields: (String, Json)*) = Right(Json.obj(fields: _*)).pure[Try]
   }
 
   private implicit class PersonOps(person: Person) {

@@ -29,36 +29,36 @@ import io.renku.graph.model.events.{BatchDate, CommitId}
 import io.renku.http.client.AccessToken
 import org.typelevel.log4cats.Logger
 
-private[eventgeneration] trait MissingCommitEventCreator[Interpretation[_]] {
+private[eventgeneration] trait MissingCommitEventCreator[F[_]] {
   def createMissingCommits(project: Project, commitsToCreate: List[CommitId])(implicit
       maybeAccessToken:             Option[AccessToken]
-  ): Interpretation[SynchronizationSummary]
+  ): F[SynchronizationSummary]
 }
 
-private[eventgeneration] class MissingCommitEventCreatorImpl[Interpretation[_]: MonadThrow](
-    commitInfoFinder: CommitInfoFinder[Interpretation],
-    commitToEventLog: CommitToEventLog[Interpretation],
+private[eventgeneration] class MissingCommitEventCreatorImpl[F[_]: MonadThrow](
+    commitInfoFinder: CommitInfoFinder[F],
+    commitToEventLog: CommitToEventLog[F],
     clock:            java.time.Clock = java.time.Clock.systemUTC()
-) extends MissingCommitEventCreator[Interpretation] {
+) extends MissingCommitEventCreator[F] {
 
   import commitInfoFinder._
 
   override def createMissingCommits(project: Project, commitsToCreate: List[CommitId])(implicit
       maybeAccessToken:                      Option[AccessToken]
-  ): Interpretation[SynchronizationSummary] = for {
+  ): F[SynchronizationSummary] = for {
     commitInfos <- commitsToCreate.map(findCommitInfo(project.id, _)).sequence
     results     <- commitInfos.map(commitToEventLog.storeCommitInEventLog(project, _, BatchDate(clock))).sequence
     summary <- results
                  .foldLeft(SynchronizationSummary())(_.incrementCount(_))
-                 .pure[Interpretation]
+                 .pure[F]
   } yield summary
 }
 
 private[eventgeneration] object MissingCommitEventCreator {
-  def apply[Interpretation[_]: Async: Temporal: Logger](
-      gitLabThrottler: Throttler[Interpretation, GitLab]
-  ): Interpretation[MissingCommitEventCreator[Interpretation]] = for {
+  def apply[F[_]: Async: Temporal: Logger](
+      gitLabThrottler: Throttler[F, GitLab]
+  ): F[MissingCommitEventCreator[F]] = for {
     commitInfoFinder <- CommitInfoFinder(gitLabThrottler)
-    commitToEventLog <- CommitToEventLog[Interpretation]
-  } yield new MissingCommitEventCreatorImpl[Interpretation](commitInfoFinder, commitToEventLog)
+    commitToEventLog <- CommitToEventLog[F]
+  } yield new MissingCommitEventCreatorImpl[F](commitInfoFinder, commitToEventLog)
 }

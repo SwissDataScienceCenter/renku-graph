@@ -32,18 +32,18 @@ import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.http.client.{AccessToken, RestClient}
 import org.typelevel.log4cats.Logger
 
-private trait ProjectInfoFinder[Interpretation[_]] {
+private trait ProjectInfoFinder[F[_]] {
   def findProjectInfo(
       projectId:        projects.Id,
       maybeAccessToken: Option[AccessToken]
-  ): Interpretation[ProjectInfo]
+  ): F[ProjectInfo]
 }
 
-private class ProjectInfoFinderImpl[Interpretation[_]: Async: Temporal: Logger](
+private class ProjectInfoFinderImpl[F[_]: Async: Temporal: Logger](
     gitLabUrl:       GitLabUrl,
-    gitLabThrottler: Throttler[Interpretation, GitLab]
+    gitLabThrottler: Throttler[F, GitLab]
 ) extends RestClient(gitLabThrottler)
-    with ProjectInfoFinder[Interpretation] {
+    with ProjectInfoFinder[F] {
 
   import io.circe._
   import io.renku.http.client.RestClientError.UnauthorizedException
@@ -54,19 +54,18 @@ private class ProjectInfoFinderImpl[Interpretation[_]: Async: Temporal: Logger](
   import org.http4s.circe._
   import org.http4s.dsl.io._
 
-  def findProjectInfo(projectId: projects.Id, maybeAccessToken: Option[AccessToken]): Interpretation[ProjectInfo] =
+  def findProjectInfo(projectId: projects.Id, maybeAccessToken: Option[AccessToken]): F[ProjectInfo] =
     for {
       uri         <- validateUri(s"$gitLabUrl/api/v4/projects/$projectId")
       projectInfo <- send(request(GET, uri, maybeAccessToken))(mapResponse)
     } yield projectInfo
 
-  private lazy val mapResponse
-      : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[ProjectInfo]] = {
+  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[ProjectInfo]] = {
     case (Ok, _, response)    => response.as[ProjectInfo]
-    case (Unauthorized, _, _) => UnauthorizedException.raiseError[Interpretation, ProjectInfo]
+    case (Unauthorized, _, _) => UnauthorizedException.raiseError[F, ProjectInfo]
   }
 
-  private implicit lazy val projectInfoDecoder: EntityDecoder[Interpretation, ProjectInfo] = {
+  private implicit lazy val projectInfoDecoder: EntityDecoder[F, ProjectInfo] = {
     implicit val hookNameDecoder: Decoder[ProjectInfo] = (cursor: HCursor) =>
       for {
         id         <- cursor.downField("id").as[projects.Id]
@@ -74,7 +73,7 @@ private class ProjectInfoFinderImpl[Interpretation[_]: Async: Temporal: Logger](
         path       <- cursor.downField("path_with_namespace").as[projects.Path]
       } yield common.ProjectInfo(id, visibility, path)
 
-    jsonOf[Interpretation, ProjectInfo]
+    jsonOf[F, ProjectInfo]
   }
 
   private def defaultToPublic(maybeVisibility: Option[Visibility]): Visibility =
@@ -82,9 +81,9 @@ private class ProjectInfoFinderImpl[Interpretation[_]: Async: Temporal: Logger](
 }
 
 private object ProjectInfoFinder {
-  def apply[Interpretation[_]: Async: Temporal: Logger](
-      gitLabThrottler: Throttler[Interpretation, GitLab]
-  ): Interpretation[ProjectInfoFinder[Interpretation]] = for {
-    gitLabUrl <- GitLabUrlLoader[Interpretation]()
+  def apply[F[_]: Async: Temporal: Logger](
+      gitLabThrottler: Throttler[F, GitLab]
+  ): F[ProjectInfoFinder[F]] = for {
+    gitLabUrl <- GitLabUrlLoader[F]()
   } yield new ProjectInfoFinderImpl(gitLabUrl, gitLabThrottler)
 }

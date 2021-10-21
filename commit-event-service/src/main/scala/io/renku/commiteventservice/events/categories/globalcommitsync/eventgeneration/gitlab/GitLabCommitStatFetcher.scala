@@ -40,16 +40,16 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
-private[globalcommitsync] trait GitLabCommitStatFetcher[Interpretation[_]] {
+private[globalcommitsync] trait GitLabCommitStatFetcher[F[_]] {
   def fetchCommitStats(projectId: projects.Id)(implicit
       maybeAccessToken:           Option[AccessToken]
-  ): Interpretation[Option[ProjectCommitStats]]
+  ): F[Option[ProjectCommitStats]]
 }
 
-private[globalcommitsync] class GitLabCommitStatFetcherImpl[Interpretation[_]: Async: Temporal: Logger](
-    gitLabCommitFetcher:    GitLabCommitFetcher[Interpretation],
+private[globalcommitsync] class GitLabCommitStatFetcherImpl[F[_]: Async: Temporal: Logger](
+    gitLabCommitFetcher:    GitLabCommitFetcher[F],
     gitLabApiUrl:           GitLabApiUrl,
-    gitLabThrottler:        Throttler[Interpretation, GitLab],
+    gitLabThrottler:        Throttler[F, GitLab],
     retryInterval:          FiniteDuration = RestClient.SleepAfterConnectionIssue,
     maxRetries:             Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
     requestTimeoutOverride: Option[Duration] = None
@@ -58,13 +58,13 @@ private[globalcommitsync] class GitLabCommitStatFetcherImpl[Interpretation[_]: A
                      maxRetries = maxRetries,
                      requestTimeoutOverride = requestTimeoutOverride
     )
-    with GitLabCommitStatFetcher[Interpretation] {
+    with GitLabCommitStatFetcher[F] {
 
   import gitLabCommitFetcher._
 
   override def fetchCommitStats(projectId: projects.Id)(implicit
       maybeAccessToken:                    Option[AccessToken]
-  ): Interpretation[Option[ProjectCommitStats]] = (for {
+  ): F[Option[ProjectCommitStats]] = (for {
     maybeLatestCommitId <- OptionT.liftF(fetchLatestGitLabCommit(projectId))
     commitCount         <- OptionT(fetchCommitCount(projectId))
   } yield ProjectCommitStats(maybeLatestCommitId, commitCount)).value
@@ -74,27 +74,26 @@ private[globalcommitsync] class GitLabCommitStatFetcherImpl[Interpretation[_]: A
     commitCount <- send(request(GET, uri, maybeAccessToken))(mapCountResponse)
   } yield commitCount
 
-  private implicit lazy val mapCountResponse
-      : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[
-        Option[CommitCount]
-      ]] = {
+  private implicit lazy val mapCountResponse: PartialFunction[(Status, Request[F], Response[F]), F[
+    Option[CommitCount]
+  ]] = {
     case (Ok, _, response)    => response.as[CommitCount].map(_.some)
-    case (NotFound, _, _)     => Option.empty[CommitCount].pure[Interpretation]
+    case (NotFound, _, _)     => Option.empty[CommitCount].pure[F]
     case (Unauthorized, _, _) => UnauthorizedException.raiseError
   }
 
-  private implicit val commitCountDecoder: EntityDecoder[Interpretation, CommitCount] = {
+  private implicit val commitCountDecoder: EntityDecoder[F, CommitCount] = {
     implicit val commitDecoder: Decoder[CommitCount] =
       _.downField("statistics").downField("commit_count").as[Int].map(CommitCount(_))
-    jsonOf[Interpretation, CommitCount]
+    jsonOf[F, CommitCount]
   }
 }
 
 private[globalcommitsync] object GitLabCommitStatFetcher {
-  def apply[Interpretation[_]: Async: Temporal: Logger](
-      gitLabThrottler: Throttler[Interpretation, GitLab]
-  ): Interpretation[GitLabCommitStatFetcher[Interpretation]] = for {
+  def apply[F[_]: Async: Temporal: Logger](
+      gitLabThrottler: Throttler[F, GitLab]
+  ): F[GitLabCommitStatFetcher[F]] = for {
     gitLabCommitFetcher <- GitLabCommitFetcher(gitLabThrottler)
-    gitLabUrl           <- GitLabUrlLoader[Interpretation]()
-  } yield new GitLabCommitStatFetcherImpl[Interpretation](gitLabCommitFetcher, gitLabUrl.apiV4, gitLabThrottler)
+    gitLabUrl           <- GitLabUrlLoader[F]()
+  } yield new GitLabCommitStatFetcherImpl[F](gitLabCommitFetcher, gitLabUrl.apiV4, gitLabThrottler)
 }

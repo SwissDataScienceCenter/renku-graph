@@ -30,15 +30,15 @@ import org.http4s.Status
 import org.http4s.Status.Accepted
 import org.typelevel.log4cats.Logger
 
-private[categories] trait CommitEventSender[Interpretation[_]] {
-  def send(commitEvent: CommitEvent): Interpretation[Unit]
+private[categories] trait CommitEventSender[F[_]] {
+  def send(commitEvent: CommitEvent): F[Unit]
 }
 
-private[categories] class CommitEventSenderImpl[Interpretation[_]: Async: Temporal: Logger](
+private[categories] class CommitEventSenderImpl[F[_]: Async: Temporal: Logger](
     eventLogUrl:           EventLogUrl,
-    commitEventSerializer: CommitEventSerializer[Interpretation]
-) extends RestClient[Interpretation, CommitEventSender[Interpretation]](Throttler.noThrottling)
-    with CommitEventSender[Interpretation] {
+    commitEventSerializer: CommitEventSerializer[F]
+) extends RestClient[F, CommitEventSender[F]](Throttler.noThrottling)
+    with CommitEventSender[F] {
 
   import commitEventSerializer._
   import io.circe.Encoder
@@ -47,9 +47,9 @@ private[categories] class CommitEventSenderImpl[Interpretation[_]: Async: Tempor
   import org.http4s.Method.POST
   import org.http4s.{Request, Response}
 
-  def send(commitEvent: CommitEvent): Interpretation[Unit] = for {
+  def send(commitEvent: CommitEvent): F[Unit] = for {
     serialisedEvent <- serialiseToJsonString(commitEvent)
-    eventBody       <- MonadThrow[Interpretation].fromEither(EventBody.from(serialisedEvent))
+    eventBody       <- MonadThrow[F].fromEither(EventBody.from(serialisedEvent))
     uri             <- validateUri(s"$eventLogUrl/events")
     sendingResult <- send(
                        request(POST, uri).withMultipartBuilder
@@ -89,14 +89,13 @@ private[categories] class CommitEventSenderImpl[Interpretation[_]: Async: Tempor
       }"""
     }
 
-  private lazy val mapResponse
-      : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[Unit]] = {
-    case (Accepted, _, _) => ().pure[Interpretation]
+  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Unit]] = { case (Accepted, _, _) =>
+    ().pure[F]
   }
 }
 
 private[categories] object CommitEventSender {
-  def apply[Interpretation[_]: Async: Temporal: Logger]: Interpretation[CommitEventSender[Interpretation]] = for {
-    eventLogUrl <- EventLogUrl[Interpretation]()
-  } yield new CommitEventSenderImpl(eventLogUrl, new CommitEventSerializer[Interpretation])
+  def apply[F[_]: Async: Temporal: Logger]: F[CommitEventSender[F]] = for {
+    eventLogUrl <- EventLogUrl[F]()
+  } yield new CommitEventSenderImpl(eventLogUrl, new CommitEventSerializer[F])
 }

@@ -34,18 +34,18 @@ import org.http4s.{Request, Response}
 
 import scala.util.control.NonFatal
 
-trait EventEndpoint[Interpretation[_]] {
-  def processEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]]
+trait EventEndpoint[F[_]] {
+  def processEvent(request: Request[F]): F[Response[F]]
 }
 
-class EventEndpointImpl[Interpretation[_]: Concurrent](
-    eventConsumersRegistry: EventConsumersRegistry[Interpretation]
-) extends Http4sDsl[Interpretation]
-    with EventEndpoint[Interpretation] {
+class EventEndpointImpl[F[_]: Concurrent](
+    eventConsumersRegistry: EventConsumersRegistry[F]
+) extends Http4sDsl[F]
+    with EventEndpoint[F] {
 
   import org.http4s.circe._
 
-  def processEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
+  def processEvent(request: Request[F]): F[Response[F]] = {
     for {
       multipart    <- toMultipart(request)
       eventJson    <- toEvent(multipart)
@@ -54,7 +54,7 @@ class EventEndpointImpl[Interpretation[_]: Concurrent](
                        case Some(payload) => EventRequestContent.WithPayload(eventJson, payload)
                        case None          => EventRequestContent.NoPayload(eventJson)
                      }
-      result <- right[Response[Interpretation]](
+      result <- right[Response[F]](
                   eventConsumersRegistry.handle(eventRequest) >>= toHttpResult
                 )
     } yield result
@@ -62,7 +62,7 @@ class EventEndpointImpl[Interpretation[_]: Concurrent](
     toHttpResult(EventSchedulingResult.SchedulingError(error))
   }
 
-  private lazy val toHttpResult: EventSchedulingResult => Interpretation[Response[Interpretation]] = {
+  private lazy val toHttpResult: EventSchedulingResult => F[Response[F]] = {
     case EventSchedulingResult.Accepted             => Accepted(InfoMessage("Event accepted"))
     case EventSchedulingResult.Busy                 => TooManyRequests(InfoMessage("Too many events to handle"))
     case EventSchedulingResult.UnsupportedEventType => BadRequest(ErrorMessage("Unsupported Event Type"))
@@ -71,44 +71,44 @@ class EventEndpointImpl[Interpretation[_]: Concurrent](
   }
 
   private def toMultipart(
-      request: Request[Interpretation]
-  ): EitherT[Interpretation, Response[Interpretation], Multipart[Interpretation]] = EitherT {
+      request: Request[F]
+  ): EitherT[F, Response[F], Multipart[F]] = EitherT {
     request
-      .as[Multipart[Interpretation]]
-      .map(_.asRight[Response[Interpretation]])
+      .as[Multipart[F]]
+      .map(_.asRight[Response[F]])
       .recoverWith { case NonFatal(_) =>
-        BadRequest(ErrorMessage("Not multipart request")).map(_.asLeft[Multipart[Interpretation]])
+        BadRequest(ErrorMessage("Not multipart request")).map(_.asLeft[Multipart[F]])
       }
   }
 
-  private def toEvent(multipart: Multipart[Interpretation]): EitherT[Interpretation, Response[Interpretation], Json] =
+  private def toEvent(multipart: Multipart[F]): EitherT[F, Response[F], Json] =
     EitherT {
       multipart.parts
         .find(_.name.contains("event"))
-        .map(_.as[Json].map(_.asRight[Response[Interpretation]]).recoverWith { case NonFatal(_) =>
+        .map(_.as[Json].map(_.asRight[Response[F]]).recoverWith { case NonFatal(_) =>
           BadRequest(ErrorMessage("Malformed event body")).map(_.asLeft[Json])
         })
         .getOrElse(BadRequest(ErrorMessage("Missing event part")).map(_.asLeft[Json]))
     }
 
   private def getPayload(
-      multipart: Multipart[Interpretation]
-  ): EitherT[Interpretation, Response[Interpretation], Option[String]] = EitherT {
+      multipart: Multipart[F]
+  ): EitherT[F, Response[F], Option[String]] = EitherT {
     multipart.parts
       .find(_.name.contains("payload"))
       .map {
-        _.as[String].map(_.some.asRight[Response[Interpretation]]).recoverWith { case NonFatal(_) =>
+        _.as[String].map(_.some.asRight[Response[F]]).recoverWith { case NonFatal(_) =>
           BadRequest(ErrorMessage("Malformed event payload")).map(_.asLeft[Option[String]])
         }
       }
-      .getOrElse(Option.empty[String].asRight[Response[Interpretation]].pure[Interpretation])
+      .getOrElse(Option.empty[String].asRight[Response[F]].pure[F])
   }
 }
 
 object EventEndpoint {
-  def apply[Interpretation[_]: MonadThrow: Concurrent](
-      subscriptionsRegistry: EventConsumersRegistry[Interpretation]
-  ): Interpretation[EventEndpoint[Interpretation]] = MonadThrow[Interpretation].catchNonFatal {
-    new EventEndpointImpl[Interpretation](subscriptionsRegistry)
+  def apply[F[_]: MonadThrow: Concurrent](
+      subscriptionsRegistry: EventConsumersRegistry[F]
+  ): F[EventEndpoint[F]] = MonadThrow[F].catchNonFatal {
+    new EventEndpointImpl[F](subscriptionsRegistry)
   }
 }

@@ -37,10 +37,10 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-private[events] class EventHandler[Interpretation[_]: MonadThrow: Spawn: Concurrent: Logger](
+private[events] class EventHandler[F[_]: MonadThrow: Spawn: Concurrent: Logger](
     override val categoryName: CategoryName,
-    commitEventSynchronizer:   CommitEventSynchronizer[Interpretation]
-) extends consumers.EventHandlerWithProcessLimiter[Interpretation](ConcurrentProcessesLimiter.withoutLimit) {
+    commitEventSynchronizer:   CommitEventSynchronizer[F]
+) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
 
   import commitEventSynchronizer._
   import io.renku.graph.model.projects
@@ -48,29 +48,28 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow: Spawn: Concurr
 
   override def createHandlingProcess(
       request: EventRequestContent
-  ): Interpretation[EventHandlingProcess[Interpretation]] =
-    EventHandlingProcess[Interpretation](startSynchronizingEvents(request))
+  ): F[EventHandlingProcess[F]] =
+    EventHandlingProcess[F](startSynchronizingEvents(request))
 
   private def startSynchronizingEvents(
       request: EventRequestContent
-  ): EitherT[Interpretation, EventSchedulingResult, Accepted] =
+  ): EitherT[F, EventSchedulingResult, Accepted] =
     for {
       event <-
-        fromEither[Interpretation](
+        fromEither[F](
           request.event.as[CommitSyncEvent].leftMap(_ => BadRequest)
         )
-      result <- Spawn[Interpretation]
+      result <- Spawn[F]
                   .start(synchronizeEvents(event) recoverWith logError(event))
                   .toRightT
                   .map(_ => Accepted)
-                  .semiflatTap(Logger[Interpretation] log event)
-                  .leftSemiflatTap(Logger[Interpretation] log event)
+                  .semiflatTap(Logger[F] log event)
+                  .leftSemiflatTap(Logger[F] log event)
     } yield result
 
-  private def logError(event: CommitSyncEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
-    case NonFatal(exception) =>
-      Logger[Interpretation].logError(event, exception)
-      exception.raiseError[Interpretation, Unit]
+  private def logError(event: CommitSyncEvent): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
+    Logger[F].logError(event, exception)
+    exception.raiseError[F, Unit]
   }
 
   private implicit val eventDecoder: Decoder[CommitSyncEvent] = cursor =>
@@ -94,10 +93,10 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow: Spawn: Concurr
 }
 
 private[events] object EventHandler {
-  def apply[Interpretation[_]: Async: Spawn: Concurrent: Temporal: Logger](
-      gitLabThrottler:       Throttler[Interpretation, GitLab],
-      executionTimeRecorder: ExecutionTimeRecorder[Interpretation]
-  ): Interpretation[EventHandler[Interpretation]] = for {
+  def apply[F[_]: Async: Spawn: Concurrent: Temporal: Logger](
+      gitLabThrottler:       Throttler[F, GitLab],
+      executionTimeRecorder: ExecutionTimeRecorder[F]
+  ): F[EventHandler[F]] = for {
     commitEventSynchronizer <- CommitEventSynchronizer(gitLabThrottler, executionTimeRecorder)
-  } yield new EventHandler[Interpretation](categoryName, commitEventSynchronizer)
+  } yield new EventHandler[F](categoryName, commitEventSynchronizer)
 }
