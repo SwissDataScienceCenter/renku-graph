@@ -68,8 +68,8 @@ object SqlStatement {
 
   case class Select[F[_]: MonadCancelThrow, In, Out](query: Query[In, Out], name: Name, args: In) {
     def build[FF[_]](
-        queryExecution: PreparedQuery[F, In, Out] => In => F[F[Out]]
-    ): SqlStatement[F, F[Out]] = SqlStatement[F, F[Out]](
+        queryExecution: PreparedQuery[F, In, Out] => In => F[FF[Out]]
+    ): SqlStatement[F, FF[Out]] = SqlStatement[F, FF[Out]](
       Kleisli(session => session.prepare(query).use(queryExecution(_)(args))),
       name
     )
