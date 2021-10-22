@@ -64,7 +64,7 @@ object Microservice extends IOMicroservice {
     config                         <- parseConfigArgs(args)
     certificateLoader              <- CertificateLoader[IO]
     gitCertificateInstaller        <- GitCertificateInstaller[IO]
-    triplesGeneration              <- TriplesGeneration[IO]
+    triplesGeneration              <- TriplesGeneration[IO](config)
     sentryInitializer              <- SentryInitializer[IO]
     metricsRegistry                <- MetricsRegistry()
     renkuVersionPairs              <- IOVersionCompatibilityConfig(ApplicationLogger, config)
