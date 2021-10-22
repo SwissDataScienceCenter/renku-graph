@@ -40,12 +40,18 @@ import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort.{DateProperty, DatePublishedProperty, ProjectsCountProperty, TitleProperty}
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks with should.Matchers {
+class DatasetsFinderSpec
+    extends AnyWordSpec
+    with InMemoryRdfStore
+    with ScalaCheckPropertyChecks
+    with should.Matchers
+    with IOSpec {
 
   "findDatasets - no phrase" should {
 
@@ -834,12 +840,11 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
   }
 
   private trait TestCase {
-    private val logger       = TestLogger[IO]()
-    private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
-    val datasetsFinder = new DatasetsFinderImpl(
+    private implicit val logger = TestLogger[IO]()
+    private val timeRecorder    = new SparqlQueryTimeRecorder[IO](TestExecutionTimeRecorder[IO]())
+    val datasetsFinder = new DatasetsFinderImpl[IO](
       rdfStoreConfig,
-      new CreatorsFinder(rdfStoreConfig, logger, timeRecorder),
-      logger,
+      new CreatorsFinderImpl[IO](rdfStoreConfig, timeRecorder),
       timeRecorder
     )
   }

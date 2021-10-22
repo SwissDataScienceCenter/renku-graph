@@ -18,38 +18,34 @@
 
 package io.renku.knowledgegraph.projects.rest
 
-import KGProjectFinder._
-import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
+import cats.effect.Async
+import cats.syntax.all._
 import io.renku.graph.config.RenkuBaseUrlLoader
 import io.renku.graph.model.projects._
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.{RenkuBaseUrl, SchemaVersion, users}
-import io.renku.logging.ApplicationLogger
+import io.renku.knowledgegraph.projects.rest.KGProjectFinder._
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
-private trait KGProjectFinder[Interpretation[_]] {
-  def findProject(path: Path): Interpretation[Option[KGProject]]
+private trait KGProjectFinder[F[_]] {
+  def findProject(path: Path): F[Option[KGProject]]
 }
 
-private class KGProjectFinderImpl[Interpretation[_]: ConcurrentEffect: Timer](
-    rdfStoreConfig:          RdfStoreConfig,
-    renkuBaseUrl:            RenkuBaseUrl,
-    logger:                  Logger[Interpretation],
-    timeRecorder:            SparqlQueryTimeRecorder[Interpretation]
-)(implicit executionContext: ExecutionContext)
-    extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
-    with KGProjectFinder[Interpretation] {
+private class KGProjectFinderImpl[F[_]: Async: Logger](
+    rdfStoreConfig: RdfStoreConfig,
+    renkuBaseUrl:   RenkuBaseUrl,
+    timeRecorder:   SparqlQueryTimeRecorder[F]
+) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
+    with KGProjectFinder[F] {
 
   import cats.syntax.all._
   import eu.timepit.refined.auto._
   import io.circe.Decoder
   import io.renku.graph.model.Schemas._
 
-  override def findProject(path: Path): Interpretation[Option[KGProject]] = {
+  override def findProject(path: Path): F[Option[KGProject]] = {
     implicit val decoder: Decoder[List[KGProject]] = recordsDecoder(path)
     queryExpecting[List[KGProject]](using = query(path)) flatMap toSingleProject
   }
@@ -130,12 +126,12 @@ private class KGProjectFinderImpl[Interpretation[_]: ConcurrentEffect: Timer](
     _.downField("results").downField("bindings").as(decodeList(project))
   }
 
-  private lazy val toSingleProject: List[KGProject] => Interpretation[Option[KGProject]] = {
-    case Nil            => Option.empty[KGProject].pure[Interpretation]
-    case project +: Nil => project.some.pure[Interpretation]
+  private lazy val toSingleProject: List[KGProject] => F[Option[KGProject]] = {
+    case Nil            => Option.empty[KGProject].pure[F]
+    case project +: Nil => project.some.pure[F]
     case projects =>
       new RuntimeException(s"More than one project with ${projects.head.path} path")
-        .raiseError[Interpretation, Option[KGProject]]
+        .raiseError[F, Option[KGProject]]
   }
 }
 
@@ -155,17 +151,10 @@ private object KGProjectFinder {
 
   final case class ProjectCreator(maybeEmail: Option[users.Email], name: users.Name)
 
-  def apply(
-      timeRecorder:   SparqlQueryTimeRecorder[IO],
-      rdfStoreConfig: IO[RdfStoreConfig] = RdfStoreConfig[IO](),
-      renkuBaseUrl:   IO[RenkuBaseUrl] = RenkuBaseUrlLoader[IO](),
-      logger:         Logger[IO] = ApplicationLogger
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[KGProjectFinder[IO]] = for {
-    config       <- rdfStoreConfig
-    renkuBaseUrl <- renkuBaseUrl
-  } yield new KGProjectFinderImpl(config, renkuBaseUrl, logger, timeRecorder)
+  def apply[F[_]: Async: Logger](
+      timeRecorder: SparqlQueryTimeRecorder[F]
+  ): F[KGProjectFinder[F]] = for {
+    config       <- RdfStoreConfig[F]()
+    renkuBaseUrl <- RenkuBaseUrlLoader[F]()
+  } yield new KGProjectFinderImpl(config, renkuBaseUrl, timeRecorder)
 }

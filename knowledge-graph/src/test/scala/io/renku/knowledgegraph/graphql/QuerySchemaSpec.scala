@@ -30,6 +30,7 @@ import io.renku.knowledgegraph.lineage.LineageFinder
 import io.renku.knowledgegraph.lineage.LineageGenerators._
 import io.renku.knowledgegraph.lineage.model.Node.Location
 import io.renku.knowledgegraph.lineage.model._
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatest.matchers.should
@@ -40,7 +41,6 @@ import sangria.execution.Executor
 import sangria.macros._
 import sangria.marshalling.circe._
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.reflectiveCalls
 
 class QuerySchemaSpec
@@ -49,12 +49,14 @@ class QuerySchemaSpec
     with MockFactory
     with ScalaFutures
     with IntegrationPatience
-    with should.Matchers {
+    with should.Matchers
+    with IOSpec {
 
   "query" should {
 
     "allow to search for lineage of a given projectPath, commitId and file" in new LineageTestCase {
-      val query = graphql"""
+      val query =
+        graphql"""
         {
           lineage(projectPath: "namespace/project", filePath: "directory/file") {
             nodes {
@@ -80,6 +82,7 @@ class QuerySchemaSpec
   private trait TestCase {
     val lineageFinder = mock[LineageFinder[IO]]
 
+    import scala.concurrent.ExecutionContext.Implicits.global
     val maybeAuthUser = authUsers.generateOption
     def execute(query: Document): Json =
       Executor

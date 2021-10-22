@@ -20,6 +20,7 @@ package io.renku.knowledgegraph.datasets.rest
 
 import cats.effect._
 import cats.syntax.all._
+import cats.{MonadThrow, Parallel}
 import io.renku.config._
 import io.renku.config.renku.ResourceUrl
 import io.renku.graph.config.GitLabUrlLoader
@@ -31,7 +32,9 @@ import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.datasets.model.DatasetCreator
-import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder}
+import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.{Phrase, _}
+import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
+import io.renku.logging.ExecutionTimeRecorder
 import io.renku.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import io.renku.tinytypes.constraints.NonBlank
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
@@ -40,20 +43,25 @@ import org.http4s.dsl.Http4sDsl
 import org.http4s.dsl.impl.OptionalValidatingQueryParamDecoderMatcher
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-class DatasetsSearchEndpoint[Interpretation[_]: Effect: MonadThrow](
-    datasetsFinder:        DatasetsFinder[Interpretation],
+trait DatasetsSearchEndpoint[F[_]] {
+  def searchForDatasets(maybePhrase: Option[Phrase],
+                        sort:        Sort.By,
+                        paging:      PagingRequest,
+                        maybeUser:   Option[AuthUser]
+  ): F[Response[F]]
+}
+
+class DatasetsSearchEndpointImpl[F[_]: Parallel: MonadThrow: Logger](
+    datasetsFinder:        DatasetsFinder[F],
     renkuResourcesUrl:     renku.ResourcesUrl,
     gitLabUrl:             GitLabUrl,
-    executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
-    logger:                Logger[Interpretation]
-) extends Http4sDsl[Interpretation] {
+    executionTimeRecorder: ExecutionTimeRecorder[F]
+) extends Http4sDsl[F]
+    with DatasetsSearchEndpoint[F] {
 
   import DatasetsFinder.DatasetSearchResult
-  import DatasetsSearchEndpoint.Query._
-  import DatasetsSearchEndpoint.Sort
   import PagingRequest.Decoders._
   import executionTimeRecorder._
   import io.circe.literal._
@@ -65,11 +73,11 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect: MonadThrow](
                         sort:        Sort.By,
                         paging:      PagingRequest,
                         maybeUser:   Option[AuthUser]
-  ): Interpretation[Response[Interpretation]] = measureExecutionTime {
+  ): F[Response[F]] = measureExecutionTime {
     implicit val datasetsUrl: renku.ResourceUrl = requestedUrl(maybePhrase, sort, paging)
     datasetsFinder
       .findDatasets(maybePhrase, sort, paging, maybeUser)
-      .map(_.toHttpResponse)
+      .map(_.toHttpResponse[F, renku.ResourceUrl])
       .recoverWith(httpResult(maybePhrase))
   } map logExecutionTimeWhen(finishedSuccessfully(maybePhrase))
 
@@ -78,17 +86,17 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect: MonadThrow](
 
   private def httpResult(
       maybePhrase: Option[Phrase]
-  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = { case NonFatal(exception) =>
+  ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
     val errorMessage = ErrorMessage(
       maybePhrase
         .map(phrase => s"Finding datasets matching '$phrase' failed")
         .getOrElse("Finding all datasets failed")
     )
-    logger.error(exception)(errorMessage.value)
-    InternalServerError(errorMessage)
+    Logger[F].error(exception)(errorMessage.value) >>
+      InternalServerError(errorMessage)
   }
 
-  private def finishedSuccessfully(maybePhrase: Option[Phrase]): PartialFunction[Response[Interpretation], String] = {
+  private def finishedSuccessfully(maybePhrase: Option[Phrase]): PartialFunction[Response[F], String] = {
     case response if response.status == Ok =>
       maybePhrase
         .map(phrase => s"Finding datasets containing '$phrase' phrase finished")
@@ -159,6 +167,23 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect: MonadThrow](
 
 object DatasetsSearchEndpoint {
 
+  def apply[F[_]: Parallel: Async: Logger](
+      timeRecorder: SparqlQueryTimeRecorder[F]
+  ): F[DatasetsSearchEndpoint[F]] =
+    for {
+      rdfStoreConfig        <- RdfStoreConfig[F]()
+      renkuResourceUrl      <- renku.ResourcesUrl[F]()
+      gitLabUrl             <- GitLabUrlLoader[F]()
+      executionTimeRecorder <- ExecutionTimeRecorder[F]()
+      creatorsFinder        <- CreatorsFinder(rdfStoreConfig, timeRecorder)
+      datasetsFinder        <- DatasetsFinder(rdfStoreConfig, creatorsFinder, timeRecorder)
+    } yield new DatasetsSearchEndpointImpl[F](
+      datasetsFinder,
+      renkuResourceUrl,
+      gitLabUrl,
+      executionTimeRecorder
+    )
+
   object Query {
     final class Phrase private (val value: String) extends AnyVal with StringTinyType
 
@@ -197,31 +222,4 @@ object DatasetsSearchEndpoint {
       ProjectsCountProperty
     )
   }
-}
-
-object IODatasetsSearchEndpoint {
-
-  def apply(
-      timeRecorder: SparqlQueryTimeRecorder[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[DatasetsSearchEndpoint[IO]] =
-    for {
-      rdfStoreConfig        <- RdfStoreConfig[IO]()
-      renkuResourceUrl      <- renku.ResourcesUrl[IO]()
-      gitLabUrl             <- GitLabUrlLoader[IO]()
-      executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
-    } yield new DatasetsSearchEndpoint[IO](
-      new DatasetsFinderImpl(rdfStoreConfig,
-                             new CreatorsFinder(rdfStoreConfig, ApplicationLogger, timeRecorder),
-                             ApplicationLogger,
-                             timeRecorder
-      ),
-      renkuResourceUrl,
-      gitLabUrl,
-      executionTimeRecorder,
-      ApplicationLogger
-    )
 }

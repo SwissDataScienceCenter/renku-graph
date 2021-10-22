@@ -20,6 +20,7 @@ package io.renku.knowledgegraph.projects.rest
 
 import cats.effect._
 import cats.syntax.all._
+import cats.{MonadThrow, Parallel}
 import io.renku.config.{GitLab, renku}
 import io.renku.control.Throttler
 import io.renku.graph.model.projects
@@ -29,26 +30,24 @@ import io.renku.http.server.security.model.AuthUser
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.knowledgegraph.projects.model.Permissions._
 import io.renku.knowledgegraph.projects.model._
-import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder}
+import io.renku.logging.ExecutionTimeRecorder
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-trait ProjectEndpoint[Interpretation[_]] {
-  def getProject(path: projects.Path, maybeAuthUser: Option[AuthUser]): Interpretation[Response[Interpretation]]
+trait ProjectEndpoint[F[_]] {
+  def getProject(path: projects.Path, maybeAuthUser: Option[AuthUser]): F[Response[F]]
 }
 
-class ProjectEndpointImpl[Interpretation[_]: Effect](
-    projectFinder:         ProjectFinder[Interpretation],
+class ProjectEndpointImpl[F[_]: MonadThrow: Logger](
+    projectFinder:         ProjectFinder[F],
     renkuResourcesUrl:     renku.ResourcesUrl,
-    executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
-    logger:                Logger[Interpretation]
-) extends Http4sDsl[Interpretation]
-    with ProjectEndpoint[Interpretation] {
+    executionTimeRecorder: ExecutionTimeRecorder[F]
+) extends Http4sDsl[F]
+    with ProjectEndpoint[F] {
 
   import executionTimeRecorder._
   import io.circe.literal._
@@ -56,7 +55,7 @@ class ProjectEndpointImpl[Interpretation[_]: Effect](
   import io.circe.{Encoder, Json}
   import org.http4s.circe._
 
-  def getProject(path: projects.Path, maybeAuthUser: Option[AuthUser]): Interpretation[Response[Interpretation]] =
+  def getProject(path: projects.Path, maybeAuthUser: Option[AuthUser]): F[Response[F]] =
     measureExecutionTime {
       projectFinder
         .findProject(path, maybeAuthUser)
@@ -66,20 +65,20 @@ class ProjectEndpointImpl[Interpretation[_]: Effect](
 
   private def toHttpResult(
       path: projects.Path
-  ): Option[Project] => Interpretation[Response[Interpretation]] = {
+  ): Option[Project] => F[Response[F]] = {
     case None          => NotFound(InfoMessage(s"No '$path' project found"))
     case Some(project) => Ok(project.asJson)
   }
 
   private def httpResult(
       path: projects.Path
-  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = { case NonFatal(exception) =>
+  ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
     val errorMessage = ErrorMessage(s"Finding '$path' project failed")
-    logger.error(exception)(errorMessage.value)
+    Logger[F].error(exception)(errorMessage.value)
     InternalServerError(errorMessage)
   }
 
-  private def finishedSuccessfully(projectPath: projects.Path): PartialFunction[Response[Interpretation], String] = {
+  private def finishedSuccessfully(projectPath: projects.Path): PartialFunction[Response[F], String] = {
     case response if response.status == Ok || response.status == NotFound =>
       s"Finding '$projectPath' details finished"
   }
@@ -174,21 +173,16 @@ class ProjectEndpointImpl[Interpretation[_]: Effect](
 
 object ProjectEndpoint {
 
-  def apply(
-      gitLabThrottler: Throttler[IO, GitLab],
-      timeRecorder:    SparqlQueryTimeRecorder[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[ProjectEndpoint[IO]] = for {
-    projectFinder         <- ProjectFinder(gitLabThrottler, ApplicationLogger, timeRecorder)
-    renkuResourceUrl      <- renku.ResourcesUrl[IO]()
-    executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
-  } yield new ProjectEndpointImpl[IO](
+  def apply[F[_]: Parallel: Async: Logger](
+      gitLabThrottler: Throttler[F, GitLab],
+      timeRecorder:    SparqlQueryTimeRecorder[F]
+  ): F[ProjectEndpoint[F]] = for {
+    projectFinder         <- ProjectFinder[F](gitLabThrottler, timeRecorder)
+    renkuResourceUrl      <- renku.ResourcesUrl[F]()
+    executionTimeRecorder <- ExecutionTimeRecorder[F]()
+  } yield new ProjectEndpointImpl[F](
     projectFinder,
     renkuResourceUrl,
-    executionTimeRecorder,
-    ApplicationLogger
+    executionTimeRecorder
   )
 }

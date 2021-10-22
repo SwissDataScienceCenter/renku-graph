@@ -18,7 +18,8 @@
 
 package io.renku.knowledgegraph.lineage
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.Parallel
+import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
@@ -27,35 +28,30 @@ import io.renku.graph.model.Schemas._
 import io.renku.graph.model.projects.ResourceId
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.{RenkuBaseUrl, projects}
+import io.renku.knowledgegraph.lineage.model.{ExecutionInfo, Node}
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import io.renku.tinytypes.json.TinyTypeDecoders
-import model.{ExecutionInfo, Node}
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
-private trait NodeDetailsFinder[Interpretation[_]] {
+private trait NodeDetailsFinder[F[_]] {
 
   def findDetails[T](
       location:     Set[T],
       projectPath:  projects.Path
-  )(implicit query: (T, ResourceId) => SparqlQuery): Interpretation[Set[Node]]
+  )(implicit query: (T, ResourceId) => SparqlQuery): F[Set[Node]]
 }
 
-private class NodeDetailsFinderImpl(
-    rdfStoreConfig:          RdfStoreConfig,
-    renkuBaseUrl:            RenkuBaseUrl,
-    logger:                  Logger[IO],
-    timeRecorder:            SparqlQueryTimeRecorder[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
-    with NodeDetailsFinder[IO] {
+private class NodeDetailsFinderImpl[F[_]: Async: Parallel: Logger](rdfStoreConfig: RdfStoreConfig,
+                                                                   renkuBaseUrl: RenkuBaseUrl,
+                                                                   timeRecorder: SparqlQueryTimeRecorder[F]
+) extends RdfStoreClientImpl[F](rdfStoreConfig, timeRecorder)
+    with NodeDetailsFinder[F] {
 
   override def findDetails[T](
       ids:          Set[T],
       projectPath:  projects.Path
-  )(implicit query: (T, ResourceId) => SparqlQuery): IO[Set[Node]] =
+  )(implicit query: (T, ResourceId) => SparqlQuery): F[Set[Node]] =
     ids.toList
       .map { id =>
         queryExpecting[Option[Node]](using = query(id, ResourceId(projectPath)(renkuBaseUrl))).flatMap(failIf(no = id))
@@ -96,30 +92,26 @@ private class NodeDetailsFinderImpl(
       .map(maybeToNode)
   }
 
-  private def failIf[T](no: T): Option[Node] => IO[Node] = {
-    case Some(details) => details.pure[IO]
+  private def failIf[T](no: T): Option[Node] => F[Node] = {
+    case Some(details) => details.pure[F]
     case _ =>
       no match {
         case location: Node.Location =>
-          new IllegalArgumentException(s"No entity with $location").raiseError[IO, Node]
+          new IllegalArgumentException(s"No entity with $location").raiseError[F, Node]
         case runInfo: ExecutionInfo =>
-          new IllegalArgumentException(s"No plan with ${runInfo.entityId}").raiseError[IO, Node]
+          new IllegalArgumentException(s"No plan with ${runInfo.entityId}").raiseError[F, Node]
         case other =>
-          new IllegalArgumentException(s"Entity $other not recognisable").raiseError[IO, Node]
+          new IllegalArgumentException(s"Entity $other not recognisable").raiseError[F, Node]
       }
   }
 }
 
 private object NodeDetailsFinder {
 
-  def apply(timeRecorder: SparqlQueryTimeRecorder[IO], logger: Logger[IO])(implicit
-      executionContext:   ExecutionContext,
-      contextShift:       ContextShift[IO],
-      timer:              Timer[IO]
-  ): IO[NodeDetailsFinder[IO]] = for {
-    config       <- RdfStoreConfig[IO]()
-    renkuBaseUrl <- RenkuBaseUrlLoader[IO]()
-  } yield new NodeDetailsFinderImpl(config, renkuBaseUrl, logger, timeRecorder)
+  def apply[F[_]: Async: Parallel: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[NodeDetailsFinder[F]] = for {
+    config       <- RdfStoreConfig[F]()
+    renkuBaseUrl <- RenkuBaseUrlLoader[F]()
+  } yield new NodeDetailsFinderImpl[F](config, renkuBaseUrl, timeRecorder)
 
   implicit val locationQuery: (Node.Location, ResourceId) => SparqlQuery = (location, path) =>
     SparqlQuery.of(

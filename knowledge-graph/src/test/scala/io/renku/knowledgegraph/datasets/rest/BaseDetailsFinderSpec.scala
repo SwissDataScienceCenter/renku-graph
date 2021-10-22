@@ -38,7 +38,7 @@ class BaseDetailsFinderSpec
     with should.Matchers
     with TinyTypeEncoders {
 
-  import BaseDetailsFinder._
+  import BaseDetailsFinderImpl._
 
   "non-modified dataset decoder" should {
 

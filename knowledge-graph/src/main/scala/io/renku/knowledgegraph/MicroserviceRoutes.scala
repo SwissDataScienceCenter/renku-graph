@@ -18,8 +18,10 @@
 
 package io.renku.knowledgegraph
 
+import cats.MonadThrow
 import cats.data.{EitherT, Validated, ValidatedNel}
-import cats.effect.{Clock, ConcurrentEffect, ContextShift, IO, Resource, Timer}
+import cats.effect.unsafe.IORuntime
+import cats.effect.{IO, Resource}
 import cats.syntax.all._
 import io.renku.config.GitLab
 import io.renku.control.{RateLimit, Throttler}
@@ -45,7 +47,7 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private class MicroserviceRoutes[F[_]: ConcurrentEffect](
+private class MicroserviceRoutes[F[_]: MonadThrow](
     queryEndpoint:           QueryEndpoint[F],
     projectEndpoint:         ProjectEndpoint[F],
     projectDatasetsEndpoint: ProjectDatasetsEndpoint[F],
@@ -53,8 +55,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     datasetsSearchEndpoint:  DatasetsSearchEndpoint[F],
     authMiddleware:          AuthMiddleware[F, Option[AuthUser]],
     routesMetrics:           RoutesMetrics[F]
-)(implicit clock:            Clock[F])
-    extends Http4sDsl[F] {
+) extends Http4sDsl[F] {
 
   import datasetEndpoint._
   import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.query
@@ -103,7 +104,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   private def routeToProjectsEndpoints(
       path:          Path,
       maybeAuthUser: Option[AuthUser]
-  ): F[Response[F]] = path.toList match {
+  ): F[Response[F]] = path.segments.toList.map(_.toString) match {
     case projectPathParts :+ "datasets" => projectPathParts.toProjectPath.fold(identity, getProjectDatasets)
     case projectPathParts =>
       projectPathParts.toProjectPath.map { projectPath =>
@@ -112,12 +113,9 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   }
 
   private implicit class PathPartsOps(parts: List[String]) {
-    import cats.MonadError
     import io.renku.http.InfoMessage
     import io.renku.http.InfoMessage._
     import org.http4s.{Response, Status}
-
-    private implicit val ME: MonadError[F, Throwable] = implicitly[MonadError[F, Throwable]]
 
     lazy val toProjectPath: Either[F[Response[F]], model.projects.Path] =
       model.projects.Path
@@ -129,23 +127,18 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
 private object MicroserviceRoutes {
 
   def apply(
-      metricsRegistry:    MetricsRegistry[IO],
-      sparqlTimeRecorder: SparqlQueryTimeRecorder[IO],
-      logger:             Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[MicroserviceRoutes[IO]] =
+      metricsRegistry:         MetricsRegistry[IO],
+      sparqlTimeRecorder:      SparqlQueryTimeRecorder[IO]
+  )(implicit executionContext: ExecutionContext, runtime: IORuntime, logger: Logger[IO]): IO[MicroserviceRoutes[IO]] =
     for {
       gitLabRateLimit         <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
       gitLabThrottler         <- Throttler[IO, GitLab](gitLabRateLimit)
-      queryEndpoint           <- IOQueryEndpoint(sparqlTimeRecorder, logger)
-      projectEndpoint         <- ProjectEndpoint(gitLabThrottler, sparqlTimeRecorder)
-      projectDatasetsEndpoint <- IOProjectDatasetsEndpoint(sparqlTimeRecorder)
-      datasetEndpoint         <- IODatasetEndpoint(sparqlTimeRecorder)
-      datasetsSearchEndpoint  <- IODatasetsSearchEndpoint(sparqlTimeRecorder)
-      authenticator           <- GitLabAuthenticator(gitLabThrottler, logger)
+      queryEndpoint           <- IOQueryEndpoint(sparqlTimeRecorder)
+      projectEndpoint         <- ProjectEndpoint[IO](gitLabThrottler, sparqlTimeRecorder)
+      projectDatasetsEndpoint <- ProjectDatasetsEndpoint[IO](sparqlTimeRecorder)
+      datasetEndpoint         <- DatasetEndpoint[IO](sparqlTimeRecorder)
+      datasetsSearchEndpoint  <- DatasetsSearchEndpoint[IO](sparqlTimeRecorder)
+      authenticator           <- GitLabAuthenticator(gitLabThrottler)
       authMiddleware          <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
       routesMetrics = new RoutesMetrics[IO](metricsRegistry)
     } yield new MicroserviceRoutes(queryEndpoint,

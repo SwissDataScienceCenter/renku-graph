@@ -18,7 +18,6 @@
 
 package io.renku.knowledgegraph.datasets.rest
 
-import ProjectDatasetsFinder.ProjectDataset
 import cats.effect._
 import cats.syntax.all._
 import io.circe.literal._
@@ -31,30 +30,34 @@ import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.http.ErrorMessage
 import io.renku.http.InfoMessage._
 import io.renku.http.rest.Links._
-import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder}
+import io.renku.knowledgegraph.datasets.rest.ProjectDatasetsFinder.ProjectDataset
+import io.renku.logging.ExecutionTimeRecorder
 import io.renku.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import io.renku.tinytypes.json.TinyTypeEncoders
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-class ProjectDatasetsEndpoint[Interpretation[_]: Effect](
-    projectDatasetsFinder: ProjectDatasetsFinder[Interpretation],
+trait ProjectDatasetsEndpoint[F[_]] {
+  def getProjectDatasets(projectPath: projects.Path): F[Response[F]]
+}
+
+class ProjectDatasetsEndpointImpl[F[_]: MonadCancelThrow: Logger](
+    projectDatasetsFinder: ProjectDatasetsFinder[F],
     renkuResourcesUrl:     renku.ResourcesUrl,
     gitLabUrl:             GitLabUrl,
-    executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
-    logger:                Logger[Interpretation]
-) extends Http4sDsl[Interpretation]
-    with TinyTypeEncoders {
+    executionTimeRecorder: ExecutionTimeRecorder[F]
+) extends Http4sDsl[F]
+    with TinyTypeEncoders
+    with ProjectDatasetsEndpoint[F] {
 
   import ProjectDatasetsFinder.SameAsOrDerived
   import executionTimeRecorder._
   import org.http4s.circe._
 
-  def getProjectDatasets(projectPath: projects.Path): Interpretation[Response[Interpretation]] = measureExecutionTime {
+  def getProjectDatasets(projectPath: projects.Path): F[Response[F]] = measureExecutionTime {
     implicit val encoder: Encoder[ProjectDataset] = datasetEncoder(projectPath)
 
     projectDatasetsFinder
@@ -65,13 +68,13 @@ class ProjectDatasetsEndpoint[Interpretation[_]: Effect](
 
   private def httpResult(
       projectPath: projects.Path
-  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = { case NonFatal(exception) =>
+  ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
     val errorMessage = ErrorMessage(s"Finding $projectPath's datasets failed")
-    logger.error(exception)(errorMessage.value)
-    InternalServerError(errorMessage)
+    Logger[F].error(exception)(errorMessage.value) >>
+      InternalServerError(errorMessage)
   }
 
-  private def finishedSuccessfully(projectPath: projects.Path): PartialFunction[Response[Interpretation], String] = {
+  private def finishedSuccessfully(projectPath: projects.Path): PartialFunction[Response[F], String] = {
     case response if response.status == Ok => s"Finding '$projectPath' datasets finished"
   }
 
@@ -119,27 +122,22 @@ class ProjectDatasetsEndpoint[Interpretation[_]: Effect](
     }
 }
 
-object IOProjectDatasetsEndpoint {
+object ProjectDatasetsEndpoint {
 
-  def apply(
-      timeRecorder: SparqlQueryTimeRecorder[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[ProjectDatasetsEndpoint[IO]] =
+  def apply[F[_]: Async: Logger](
+      timeRecorder: SparqlQueryTimeRecorder[F]
+  ): F[ProjectDatasetsEndpoint[F]] =
     for {
-      rdfStoreConfig        <- RdfStoreConfig[IO]()
-      renkuBaseUrl          <- RenkuBaseUrlLoader[IO]()
-      gitLabUrl             <- GitLabUrlLoader[IO]()
-      renkuResourceUrl      <- renku.ResourcesUrl[IO]()
-      executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
-      projectDatasetFinder  <- ProjectDatasetsFinder(rdfStoreConfig, renkuBaseUrl, ApplicationLogger, timeRecorder)
-    } yield new ProjectDatasetsEndpoint[IO](
+      rdfStoreConfig        <- RdfStoreConfig[F]()
+      renkuBaseUrl          <- RenkuBaseUrlLoader[F]()
+      gitLabUrl             <- GitLabUrlLoader[F]()
+      renkuResourceUrl      <- renku.ResourcesUrl[F]()
+      executionTimeRecorder <- ExecutionTimeRecorder[F]()
+      projectDatasetFinder  <- ProjectDatasetsFinder(rdfStoreConfig, renkuBaseUrl, timeRecorder)
+    } yield new ProjectDatasetsEndpointImpl[F](
       projectDatasetFinder,
       renkuResourceUrl,
       gitLabUrl,
-      executionTimeRecorder,
-      ApplicationLogger
+      executionTimeRecorder
     )
 }

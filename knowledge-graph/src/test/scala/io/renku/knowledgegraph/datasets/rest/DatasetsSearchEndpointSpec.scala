@@ -46,6 +46,7 @@ import io.renku.knowledgegraph.datasets.rest.DatasetsFinder.{DatasetSearchResult
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.{Phrase, query}
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.testtools.IOSpec
 import org.http4s.MediaType.application
 import org.http4s.Status._
 import org.http4s.headers.`Content-Type`
@@ -59,7 +60,8 @@ class DatasetsSearchEndpointSpec
     extends AnyWordSpec
     with MockFactory
     with ScalaCheckPropertyChecks
-    with should.Matchers {
+    with should.Matchers
+    with IOSpec {
 
   "searchForDatasets" should {
 
@@ -71,9 +73,9 @@ class DatasetsSearchEndpointSpec
 
         val response = endpoint.searchForDatasets(maybePhrase, sort, pagingRequest, maybeAuthUser).unsafeRunSync()
 
-        response.status       shouldBe Ok
-        response.contentType  shouldBe Some(`Content-Type`(application.json))
-        response.headers.toList should contain allElementsOf PagingHeaders.from[IO, ResourceUrl](pagingResponse)
+        response.status        shouldBe Ok
+        response.contentType   shouldBe Some(`Content-Type`(application.json))
+        response.headers.headers should contain allElementsOf PagingHeaders.from[IO, ResourceUrl](pagingResponse)
         response
           .as[List[Json]]
           .unsafeRunSync() should contain theSameElementsAs (pagingResponse.results map toJson)
@@ -96,7 +98,7 @@ class DatasetsSearchEndpointSpec
       response.status                         shouldBe Ok
       response.contentType                    shouldBe Some(`Content-Type`(application.json))
       response.as[List[Json]].unsafeRunSync() shouldBe empty
-      response.headers.toList should contain allElementsOf PagingHeaders.from[IO, ResourceUrl](pagingResponse)
+      response.headers.headers should contain allElementsOf PagingHeaders.from[IO, ResourceUrl](pagingResponse)
 
       logger.loggedOnly(warn(maybePhrase))
     }
@@ -152,11 +154,11 @@ class DatasetsSearchEndpointSpec
     implicit val renkuResourceUrl: renku.ResourceUrl =
       (renkuResourcesUrl / "datasets") ? (page.parameterName -> pagingRequest.page) & (perPage.parameterName -> pagingRequest.perPage) & (Sort.sort.parameterName -> sort) && (query.parameterName -> maybePhrase)
 
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val datasetsFinder        = mock[DatasetsFinder[IO]]
-    val logger                = TestLogger[IO]()
-    val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
+    val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
     val endpoint =
-      new DatasetsSearchEndpoint[IO](datasetsFinder, renkuResourcesUrl, gitLabUrl, executionTimeRecorder, logger)
+      new DatasetsSearchEndpointImpl[IO](datasetsFinder, renkuResourcesUrl, gitLabUrl, executionTimeRecorder)
 
     lazy val toJson: DatasetSearchResult => Json = {
       case DatasetSearchResult(id,

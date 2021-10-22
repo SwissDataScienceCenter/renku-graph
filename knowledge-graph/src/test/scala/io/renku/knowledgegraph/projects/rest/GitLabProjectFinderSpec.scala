@@ -18,8 +18,7 @@
 
 package io.renku.knowledgegraph.projects.rest
 
-import ProjectsGenerators._
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Json
 import io.circe.literal._
@@ -36,19 +35,20 @@ import io.renku.interpreters.TestLogger
 import io.renku.knowledgegraph.projects.model.Permissions
 import io.renku.knowledgegraph.projects.model.Permissions._
 import io.renku.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
+import io.renku.knowledgegraph.projects.rest.ProjectsGenerators._
 import io.renku.stubbing.ExternalServiceStubbing
+import io.renku.testtools.IOSpec
 import org.http4s.Status
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
 class GitLabProjectFinderSpec
     extends AnyWordSpec
     with ExternalServiceStubbing
     with ScalaCheckPropertyChecks
-    with should.Matchers {
+    with should.Matchers
+    with IOSpec {
 
   "findProject" should {
 
@@ -150,12 +150,10 @@ class GitLabProjectFinderSpec
     }
   }
 
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO]        = IO.timer(global)
-
   private trait TestCase {
-    val gitLabUrl     = GitLabUrl(externalServiceBaseUrl)
-    val projectFinder = new GitLabProjectFinderImpl[IO](gitLabUrl, Throttler.noThrottling, TestLogger())
+    implicit val logger = TestLogger[IO]()
+    val gitLabUrl       = GitLabUrl(externalServiceBaseUrl)
+    val projectFinder   = new GitLabProjectFinderImpl[IO](gitLabUrl, Throttler.noThrottling)
   }
 
   private def projectJson(project: GitLabProject): Json = json"""{

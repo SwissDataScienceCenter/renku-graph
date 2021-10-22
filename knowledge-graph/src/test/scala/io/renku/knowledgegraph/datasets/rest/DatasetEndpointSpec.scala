@@ -43,6 +43,7 @@ import io.renku.interpreters.TestLogger.Level.{Error, Warn}
 import io.renku.knowledgegraph.datasets.model
 import io.renku.knowledgegraph.datasets.model._
 import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.testtools.IOSpec
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.Status._
 import org.http4s._
@@ -54,7 +55,12 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyChecks with should.Matchers {
+class DatasetEndpointSpec
+    extends AnyWordSpec
+    with MockFactory
+    with ScalaCheckPropertyChecks
+    with should.Matchers
+    with IOSpec {
 
   "getDataset" should {
 
@@ -169,11 +175,11 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
     implicit val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
     val gitLabUrl = gitLabUrls.generateOne
 
-    val datasetsFinder        = mock[DatasetFinder[IO]]
-    val renkuResourcesUrl     = renkuResourcesUrls.generateOne
-    val logger                = TestLogger[IO]()
-    val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
-    val endpoint = new DatasetEndpoint[IO](datasetsFinder, renkuResourcesUrl, gitLabUrl, executionTimeRecorder, logger)
+    val datasetsFinder    = mock[DatasetFinder[IO]]
+    val renkuResourcesUrl = renkuResourcesUrls.generateOne
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
+    val endpoint = new DatasetEndpointImpl[IO](datasetsFinder, renkuResourcesUrl, gitLabUrl, executionTimeRecorder)
   }
 
   private implicit val datasetEntityDecoder: EntityDecoder[IO, model.Dataset] = jsonOf[IO, model.Dataset]

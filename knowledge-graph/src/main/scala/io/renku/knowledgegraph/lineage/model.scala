@@ -21,8 +21,8 @@ package io.renku.knowledgegraph.lineage
 import cats.MonadThrow
 import cats.syntax.all._
 import io.renku.jsonld.{EntityId, EntityType}
+import io.renku.knowledgegraph.lineage.model.Node.Location
 import io.renku.tinytypes.{InstantTinyType, TinyTypeFactory}
-import model.Node.Location
 
 import java.time.Instant
 
@@ -39,14 +39,14 @@ object model {
 
   object Lineage {
 
-    def from[Interpretation[_]: MonadThrow](edges: Set[Edge], nodes: Set[Node]): Interpretation[Lineage] = {
+    def from[F[_]: MonadThrow](edges: Set[Edge], nodes: Set[Node]): F[Lineage] = {
       val allEdgesLocations = collectLocations(edges)
       val allNodesLocations = nodes.map(_.location)
-      if (allEdgesLocations == allNodesLocations) Lineage(edges, nodes).pure[Interpretation]
+      if (allEdgesLocations == allNodesLocations) Lineage(edges, nodes).pure[F]
       else if ((allNodesLocations diff allEdgesLocations).nonEmpty)
-        new IllegalArgumentException("There are orphan nodes").raiseError[Interpretation, Lineage]
+        new IllegalArgumentException("There are orphan nodes").raiseError[F, Lineage]
       else
-        new IllegalArgumentException("There are edges with no nodes definitions").raiseError[Interpretation, Lineage]
+        new IllegalArgumentException("There are edges with no nodes definitions").raiseError[F, Lineage]
     }
 
     private def collectLocations(edges: Set[Edge]): Set[Node.Location] =

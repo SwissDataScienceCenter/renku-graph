@@ -18,9 +18,9 @@
 
 package io.renku.knowledgegraph.projects.rest
 
-import GitLabProjectFinder.GitLabProject
 import cats.data.OptionT
-import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
+import cats.effect.kernel.Async
+import cats.syntax.all._
 import io.renku.config.GitLab
 import io.renku.control.Throttler
 import io.renku.graph.config.GitLabUrlLoader
@@ -30,24 +30,21 @@ import io.renku.http.client.{AccessToken, RestClient}
 import io.renku.knowledgegraph.projects.model.Forking.ForksCount
 import io.renku.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount, Tag}
 import io.renku.knowledgegraph.projects.model._
+import io.renku.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
-private trait GitLabProjectFinder[Interpretation[_]] {
+private trait GitLabProjectFinder[F[_]] {
   def findProject(
       projectPath:      projects.Path,
       maybeAccessToken: Option[AccessToken]
-  ): OptionT[Interpretation, GitLabProject]
+  ): OptionT[F, GitLabProject]
 }
 
-private class GitLabProjectFinderImpl[Interpretation[_]: ConcurrentEffect: Timer](
-    gitLabUrl:               GitLabUrl,
-    gitLabThrottler:         Throttler[Interpretation, GitLab],
-    logger:                  Logger[Interpretation]
-)(implicit executionContext: ExecutionContext)
-    extends RestClient(gitLabThrottler, logger)
-    with GitLabProjectFinder[Interpretation] {
+private class GitLabProjectFinderImpl[F[_]: Async: Logger](
+    gitLabUrl:       GitLabUrl,
+    gitLabThrottler: Throttler[F, GitLab]
+) extends RestClient(gitLabThrottler)
+    with GitLabProjectFinder[F] {
 
   import cats.syntax.all._
   import io.circe._
@@ -58,9 +55,7 @@ private class GitLabProjectFinderImpl[Interpretation[_]: ConcurrentEffect: Timer
   import org.http4s.circe.jsonOf
   import org.http4s.dsl.io._
 
-  def findProject(projectPath:      projects.Path,
-                  maybeAccessToken: Option[AccessToken]
-  ): OptionT[Interpretation, GitLabProject] =
+  def findProject(projectPath: projects.Path, maybeAccessToken: Option[AccessToken]): OptionT[F, GitLabProject] =
     OptionT {
       for {
         uri     <- validateUri(s"$gitLabUrl/api/v4/projects/${urlEncode(projectPath.value)}?statistics=true")
@@ -68,14 +63,12 @@ private class GitLabProjectFinderImpl[Interpretation[_]: ConcurrentEffect: Timer
       } yield project
     }
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[Interpretation], Response[Interpretation]),
-                                                Interpretation[Option[GitLabProject]]
-  ] = {
+  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[GitLabProject]]] = {
     case (Ok, _, response) => response.as[GitLabProject].map(Option.apply)
-    case (NotFound, _, _)  => Option.empty[GitLabProject].pure[Interpretation]
+    case (NotFound, _, _)  => Option.empty[GitLabProject].pure[F]
   }
 
-  private implicit lazy val projectDecoder: EntityDecoder[Interpretation, GitLabProject] = {
+  private implicit lazy val projectDecoder: EntityDecoder[F, GitLabProject] = {
     import io.renku.knowledgegraph.projects.model.Forking.ForksCount
     import io.renku.knowledgegraph.projects.model.Permissions._
     import io.renku.knowledgegraph.projects.model.Project.StarsCount
@@ -150,7 +143,7 @@ private class GitLabProjectFinderImpl[Interpretation[_]: ConcurrentEffect: Timer
         statistics
       )
 
-    jsonOf[Interpretation, GitLabProject]
+    jsonOf[F, GitLabProject]
   }
 }
 
@@ -168,14 +161,9 @@ private object GitLabProjectFinder {
                                  statistics:       Statistics
   )
 
-  def apply(
-      gitLabThrottler: Throttler[IO, GitLab],
-      logger:          Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[GitLabProjectFinder[IO]] = for {
-    gitLabUrl <- GitLabUrlLoader[IO]()
-  } yield new GitLabProjectFinderImpl(gitLabUrl, gitLabThrottler, logger)
+  def apply[F[_]: Async: Logger](
+      gitLabThrottler: Throttler[F, GitLab]
+  ): F[GitLabProjectFinder[F]] = for {
+    gitLabUrl <- GitLabUrlLoader[F]()
+  } yield new GitLabProjectFinderImpl(gitLabUrl, gitLabThrottler)
 }
