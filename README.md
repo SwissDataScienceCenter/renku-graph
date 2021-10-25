@@ -40,7 +40,9 @@ services. Tagging has to be done manually.
 
 #### Project creation flow and new commit flow
 
-When a project is created on GitLab the following flow is triggered:
+When a project is created on GitLab or a new commit is pushed to GitLab the following flow is triggered:
+A MinimalCommitSyncEvent is created if a new project is created and a FullCommitSyncEvent is created when a new commit
+is pushed.
 
 ```mermaid
 sequenceDiagram
@@ -52,15 +54,57 @@ sequenceDiagram
     participant TriplesStore
     GitLab ->>WebhookService: CommitSyncRequest
     WebhookService ->>EventLog: CommitSyncRequest 
-    EventLog ->>EventLog: find latest event 
-    EventLog ->>CommmitEventService: MinimalCommitSyncEvent
+    loop Continuously pulling
+    EventLog -->>EventLog: find latest event 
+    end
+    EventLog ->>CommmitEventService: MinimalCommitSyncEvent or FullCommitSyncEvent
+    CommmitEventService -->>GitLab: get the latest commit
+    GitLab ->>CommmitEventService: CommitInfo
     CommmitEventService ->>EventLog: NewCommitEvent
-    EventLog ->>EventLog: find AwaitingGenerationEvent
+    loop Continuously pulling
+    EventLog -->>EventLog: find AwaitingGenerationEvent
+    end
     EventLog ->>TriplesGenerator: AwaitingGenerationEvent
     TriplesGenerator ->>EventLog: TriplesGeneratedEvent
-    EventLog ->>EventLog: find TriplesGeneratedEvent
+    loop Continuously pulling
+    EventLog -->>EventLog: find TriplesGeneratedEvent
+    end
     EventLog ->>TriplesGenerator: TriplesGeneratedEvent
     TriplesGenerator ->>TriplesStore: JsonLD
     TriplesGenerator ->>EventLog: TriplesStoreEvent
 ```
+
+#### Global Commit Sync flow:
+
+This flow is scheduled to be triggered at max once a week per project. It allows removal or creation of commit anywhere
+in the history
+
+```mermaid
+sequenceDiagram
+    participant GitLab
+    participant WebhookService
+    participant EventLog
+    participant CommmitEventService
+    participant TriplesGenerator
+    participant TriplesStore
+    Note over CommmitEventService, EventLog: The scheduling time depends on the usage of the project
+    loop Every hour or week
+    CommmitEventService -->>EventLog: get all commits
+    CommmitEventService -->>GitLab: get all commits
+    CommmitEventService ->>EventLog: AwaitingDeletionEvent or NewCommitEvent
+    end
+    
+    loop Continuously pulling
+    EventLog -->>EventLog: find AwaitingGenerationEvent
+    end
+    EventLog ->>TriplesGenerator: AwaitingGenerationEvent
+    TriplesGenerator ->>EventLog: TriplesGeneratedEvent
+    loop Continuously pulling
+    EventLog -->>EventLog: find TriplesGeneratedEvent
+    end
+    EventLog ->>TriplesGenerator: TriplesGeneratedEvent
+    TriplesGenerator ->>TriplesStore: JsonLD
+    TriplesGenerator ->>EventLog: TriplesStoreEvent
+```
+
 
