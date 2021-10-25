@@ -20,7 +20,7 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescura
 
 import cats.MonadThrow
 import cats.data.EitherT
-import cats.effect.{ContextShift, Timer}
+import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.http.client.RestClientError._
@@ -30,8 +30,6 @@ import io.renku.triplesgenerator.events.categories.triplesgenerated.Transformati
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.{ProjectFunctions, TransformationStep}
 import org.typelevel.log4cats.Logger
-
-import scala.concurrent.ExecutionContext
 
 private[triplescuration] trait PersonTransformer[F[_]] {
   def createTransformationStep: TransformationStep[F]
@@ -82,16 +80,7 @@ private class PersonTransformerImpl[F[_]: MonadThrow](
 
 private[triplescuration] object PersonTransformer {
 
-  import cats.effect.IO
-
-  def apply(
-      timeRecorder: SparqlQueryTimeRecorder[IO],
-      logger:       Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[PersonTransformer[IO]] = for {
-    kgPersonFinder <- KGPersonFinder(logger, timeRecorder)
-  } yield new PersonTransformerImpl[IO](kgPersonFinder, PersonMerger, UpdatesCreator, ProjectFunctions)
+  def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[PersonTransformer[F]] = for {
+    kgPersonFinder <- KGPersonFinder(timeRecorder)
+  } yield new PersonTransformerImpl[F](kgPersonFinder, PersonMerger, UpdatesCreator, ProjectFunctions)
 }

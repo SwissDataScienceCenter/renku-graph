@@ -24,7 +24,7 @@ import org.http4s.HttpRoutes
 import org.http4s.metrics.prometheus.{Prometheus, PrometheusExportService}
 import org.http4s.server.middleware.{Metrics => ServerMetrics}
 
-class RoutesMetrics[F[_]: Sync](metricsRegistry: MetricsRegistry[F]) {
+class RoutesMetrics[F[_]: Sync](metricsRegistry: MetricsRegistry) {
 
   implicit class RoutesOps(routes: HttpRoutes[F]) {
 

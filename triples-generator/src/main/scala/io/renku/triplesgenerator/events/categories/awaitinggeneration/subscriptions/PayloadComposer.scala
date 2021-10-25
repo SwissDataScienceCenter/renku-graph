@@ -18,9 +18,8 @@
 
 package io.renku.triplesgenerator.events.categories.awaitinggeneration.subscriptions
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.data.Kleisli
-import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Json
@@ -30,7 +29,7 @@ import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier, Micr
 import io.renku.triplesgenerator.Microservice
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.GenerationProcessesNumber
 
-private[awaitinggeneration] class PayloadComposer[F[_]: MonadError[*[_], Throwable]](
+private[awaitinggeneration] class PayloadComposer[F[_]: MonadThrow](
     categoryName:   CategoryName,
     capacity:       GenerationProcessesNumber,
     urlFinder:      MicroserviceUrlFinder[F],
@@ -50,11 +49,11 @@ private[awaitinggeneration] class PayloadComposer[F[_]: MonadError[*[_], Throwab
 
 private[awaitinggeneration] object PayloadComposer {
 
-  lazy val payloadsComposerFactory: Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO]] =
-    Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO]] { categoryName =>
+  def payloadsComposerFactory[F[_]: MonadThrow]: Kleisli[F, CategoryName, SubscriptionPayloadComposer[F]] =
+    Kleisli[F, CategoryName, SubscriptionPayloadComposer[F]] { categoryName =>
       for {
-        subscriptionUrlFinder <- MicroserviceUrlFinder(Microservice.ServicePort)
-        capacity              <- GenerationProcessesNumber[IO]()
-      } yield new PayloadComposer[IO](categoryName, capacity, subscriptionUrlFinder, Microservice.Identifier)
+        subscriptionUrlFinder <- MicroserviceUrlFinder[F](Microservice.ServicePort)
+        capacity              <- GenerationProcessesNumber[F]()
+      } yield new PayloadComposer[F](categoryName, capacity, subscriptionUrlFinder, Microservice.Identifier)
     }
 }

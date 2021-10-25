@@ -44,7 +44,7 @@ private class CliVersionCompatibilityVerifierImpl[F[_]](cliVersion:        CliVe
     else ().pure[F]
 }
 
-object IOCliVersionCompatibilityChecker {
+object CliVersionCompatibilityChecker {
 
   def apply[F[_]: Async](triplesGeneration: TriplesGeneration,
                          renkuVersionPairs: NonEmptyList[RenkuVersionPair]

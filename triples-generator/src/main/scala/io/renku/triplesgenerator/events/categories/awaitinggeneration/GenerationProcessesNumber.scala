@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories.awaitinggeneration
 
-import cats.MonadError
+import cats.MonadThrow
 import io.renku.config.ConfigLoader
 import io.renku.tinytypes.{IntTinyType, TinyTypeFactory}
 
@@ -32,8 +32,6 @@ private object GenerationProcessesNumber
 
   private implicit val configReader: ConfigReader[GenerationProcessesNumber] = intTinyTypeReader(this)
 
-  def apply[F[_]](
-      config:    Config = ConfigFactory.load()
-  )(implicit ME: MonadError[F, Throwable]): F[GenerationProcessesNumber] =
+  def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[GenerationProcessesNumber] =
     find[F, GenerationProcessesNumber]("generation-processes-number", config)
 }

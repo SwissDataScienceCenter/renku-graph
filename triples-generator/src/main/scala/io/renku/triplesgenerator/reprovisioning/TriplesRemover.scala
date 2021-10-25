@@ -18,34 +18,34 @@
 
 package io.renku.triplesgenerator.reprovisioning
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.MonadThrow
+import cats.effect.Async
+import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
+import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
-
-import scala.concurrent.ExecutionContext
 
 private trait TriplesRemover[F[_]] {
   def removeAllTriples(): F[Unit]
 }
 
-private class TriplesRemoverImpl(
-    removalBatchSize:        Long Refined Positive,
-    rdfStoreConfig:          RdfStoreConfig,
-    logger:                  Logger[IO],
-    timeRecorder:            SparqlQueryTimeRecorder[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
-    with TriplesRemover[IO] {
+private class TriplesRemoverImpl[F[_]: Async: Logger](
+    removalBatchSize: Long Refined Positive,
+    rdfStoreConfig:   RdfStoreConfig,
+    timeRecorder:     SparqlQueryTimeRecorder[F]
+) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
+    with TriplesRemover[F] {
 
   import eu.timepit.refined.auto._
   import io.circe.Decoder
+  import io.renku.graph.model.Schemas._
 
-  override def removeAllTriples(): IO[Unit] =
+  override def removeAllTriples(): F[Unit] =
     queryExpecting(checkIfEmpty)(storeEmptyFlagDecoder) flatMap { isEmpty =>
-      if (isEmpty) IO.unit
+      if (isEmpty) MonadThrow[F].unit
       else
         for {
           _ <- updateWithNoResult(removeTriplesBatch)
@@ -53,16 +53,13 @@ private class TriplesRemoverImpl(
         } yield ()
     }
 
-  private val checkIfEmpty = SparqlQuery(
+  private val checkIfEmpty = SparqlQuery.of(
     name = "triples remove - count",
-    prefixes = Set(
-      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-      "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>"
-    ),
+    Prefixes.of(renku -> "renku"),
     s"""|SELECT ?subject
         |WHERE { ?subject ?p ?o 
         |  MINUS {
-        |    ?subject rdf:type ?type
+        |    ?subject a ?type
         |    FILTER (?type IN (<${RenkuVersionPairJsonLD.objectType}>, <${ReProvisioningJsonLD.objectType}>)) 
         |  }
         |}
@@ -70,18 +67,15 @@ private class TriplesRemoverImpl(
         |""".stripMargin
   )
 
-  private val removeTriplesBatch = SparqlQuery(
+  private val removeTriplesBatch = SparqlQuery.of(
     name = "triples remove - delete",
-    prefixes = Set(
-      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-      "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>"
-    ),
+    Prefixes.of(renku -> "renku"),
     s"""|DELETE { ?s ?p ?o }
         |WHERE { 
         |  SELECT ?s ?p ?o
         |  WHERE { ?s ?p ?o 
         |    MINUS {
-        |      ?s rdf:type ?type
+        |      ?s a ?type
         |      FILTER (?type IN (<${RenkuVersionPairJsonLD.objectType}>, <${ReProvisioningJsonLD.objectType}>)) 
         |    }
         |  }
@@ -109,17 +103,11 @@ private object TriplesRemoverImpl {
   import eu.timepit.refined.pureconfig._
   import io.renku.config.ConfigLoader._
 
-  def apply(
+  def apply[F[_]: Async: Logger](
       rdfStoreConfig: RdfStoreConfig,
-      logger:         Logger[IO],
-      timeRecorder:   SparqlQueryTimeRecorder[IO],
+      timeRecorder:   SparqlQueryTimeRecorder[F],
       config:         Config = ConfigFactory.load()
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[TriplesRemover[IO]] =
-    find[IO, Long Refined Positive]("re-provisioning-removal-batch-size", config) map { removalBatchSize =>
-      new TriplesRemoverImpl(removalBatchSize, rdfStoreConfig, logger, timeRecorder)
-    }
+  ): F[TriplesRemover[F]] = for {
+    removalBatchSize <- find[F, Long Refined Positive]("re-provisioning-removal-batch-size", config)
+  } yield new TriplesRemoverImpl(removalBatchSize, rdfStoreConfig, timeRecorder)
 }

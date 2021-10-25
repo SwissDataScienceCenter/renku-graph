@@ -18,10 +18,9 @@
 
 package io.renku.events.consumers
 
-import cats.MonadThrow
 import cats.data.EitherT
-import cats.effect.Concurrent
 import cats.effect.std.Semaphore
+import cats.effect.{Concurrent, Spawn}
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
@@ -41,7 +40,7 @@ object ConcurrentProcessesLimiter {
     semaphore <- Semaphore(processesCount.value)
   } yield new ConcurrentProcessesLimiterImpl[F](processesCount, semaphore)
 
-  def withoutLimit[F[_]: MonadThrow: Concurrent]: ConcurrentProcessesLimiter[F] =
+  def withoutLimit[F[_]: Concurrent]: ConcurrentProcessesLimiter[F] =
     new ConcurrentProcessesLimiter[F] {
       override def tryExecuting(
           scheduledProcess: EventHandlingProcess[F]
@@ -64,7 +63,7 @@ object ConcurrentProcessesLimiter {
     }
 }
 
-class ConcurrentProcessesLimiterImpl[F[_]: MonadThrow: Concurrent](
+class ConcurrentProcessesLimiterImpl[F[_]: Concurrent](
     processesCount: Int Refined Positive,
     semaphore:      Semaphore[F]
 ) extends ConcurrentProcessesLimiter[F] {
@@ -106,7 +105,7 @@ class ConcurrentProcessesLimiterImpl[F[_]: MonadThrow: Concurrent](
     for {
       _ <- semaphore.release
       _ <- scheduledProcess.maybeReleaseProcess
-             .map(Concurrent[F].start(_).void)
+             .map(Spawn[F].start(_).void)
              .getOrElse(().pure[F])
              .recover { case NonFatal(_) =>
                ()

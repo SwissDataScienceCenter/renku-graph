@@ -92,7 +92,7 @@ object Gauge {
   def apply[F[_]: MonadThrow](
       name:          String Refined NonEmpty,
       help:          String Refined NonEmpty
-  )(metricsRegistry: MetricsRegistry[F]): F[SingleValueGauge[F]] = {
+  )(metricsRegistry: MetricsRegistry): F[SingleValueGauge[F]] = {
 
     val gaugeBuilder = LibGauge
       .build()
@@ -100,7 +100,7 @@ object Gauge {
       .help(help.value)
 
     for {
-      gauge <- metricsRegistry register [LibGauge, LibGauge.Builder] gaugeBuilder
+      gauge <- metricsRegistry register [F, LibGauge, LibGauge.Builder] gaugeBuilder
     } yield new SingleValueGaugeImpl[F](gauge)
   }
 
@@ -108,7 +108,7 @@ object Gauge {
       name:          String Refined NonEmpty,
       help:          String Refined NonEmpty,
       labelName:     String Refined NonEmpty
-  )(metricsRegistry: MetricsRegistry[F]): F[LabeledGauge[F, LabelValue]] =
+  )(metricsRegistry: MetricsRegistry): F[LabeledGauge[F, LabelValue]] =
     this(name, help, labelName, () => Map.empty[LabelValue, Double].pure[F])(metricsRegistry)
 
   def apply[F[_]: MonadThrow, LabelValue](
@@ -116,7 +116,7 @@ object Gauge {
       help:           String Refined NonEmpty,
       labelName:      String Refined NonEmpty,
       resetDataFetch: () => F[Map[LabelValue, Double]]
-  )(metricsRegistry:  MetricsRegistry[F]): F[LabeledGauge[F, LabelValue]] = {
+  )(metricsRegistry:  MetricsRegistry): F[LabeledGauge[F, LabelValue]] = {
 
     val gaugeBuilder = LibGauge
       .build()
@@ -125,7 +125,7 @@ object Gauge {
       .labelNames(labelName.value)
 
     for {
-      gauge <- metricsRegistry register [LibGauge, LibGauge.Builder] gaugeBuilder
+      gauge <- metricsRegistry register [F, LibGauge, LibGauge.Builder] gaugeBuilder
     } yield new LabeledGaugeImpl[F, LabelValue](gauge, resetDataFetch)
   }
 }

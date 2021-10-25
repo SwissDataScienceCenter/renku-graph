@@ -18,8 +18,7 @@
 
 package io.renku.rdfstore
 
-import cats.MonadThrow
-import cats.effect.{Clock, Sync}
+import cats.effect.Sync
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -43,10 +42,8 @@ object SparqlQueryTimeRecorder {
 
   import io.renku.metrics.MetricsRegistry
 
-  def apply[F[_]: Sync: Clock: Logger: MonadThrow](
-      metricsRegistry: MetricsRegistry[F]
-  ): F[SparqlQueryTimeRecorder[F]] = for {
-    histogram             <- metricsRegistry.register[Histogram, Histogram.Builder](queriesExecutionTimesHistogram)
+  def apply[F[_]: Sync: Logger](metricsRegistry: MetricsRegistry): F[SparqlQueryTimeRecorder[F]] = for {
+    histogram             <- metricsRegistry.register[F, Histogram, Histogram.Builder](queriesExecutionTimesHistogram)
     executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = Some(histogram))
   } yield new SparqlQueryTimeRecorder(executionTimeRecorder)
 }

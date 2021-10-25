@@ -18,9 +18,8 @@
 
 package io.renku.triplesgenerator.config
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.data.NonEmptyList
-import cats.effect.IO
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.graph.model.{CliVersion, RenkuVersionPair, SchemaVersion}
@@ -28,16 +27,15 @@ import org.typelevel.log4cats.Logger
 import pureconfig.ConfigReader
 
 import scala.util.control.NonFatal
-trait VersionCompatibilityConfig
 
-private object VersionCompatibilityConfig extends VersionCompatibilityConfig {
+private object RenkuVersionPairsReader {
 
   import cats.syntax.all._
   import io.renku.config.ConfigLoader._
 
   private val separator = "->"
 
-  implicit val reader = ConfigReader[List[String]].map(_.map { pair =>
+  private implicit val reader: ConfigReader[List[RenkuVersionPair]] = ConfigReader[List[String]].map(_.map { pair =>
     val (cliVersion, schemaVersion): (String, String) = pair.split(separator).toList match {
       case List(cliVersion, schemaVersion) => (cliVersion, schemaVersion)
       case _                               => throw new Exception(s"Did not find exactly two elements: ${pair}")
@@ -45,20 +43,18 @@ private object VersionCompatibilityConfig extends VersionCompatibilityConfig {
     RenkuVersionPair(CliVersion(cliVersion.trim), SchemaVersion(schemaVersion.trim))
   })
 
-  def apply[F[_]](
+  def readRenkuVersionPairs[F[_]: MonadThrow: Logger](
       maybeRenkuDevVersion: Option[RenkuPythonDevVersion],
-      logger:               Logger[F],
       config:               Config
-  )(implicit ME:            MonadError[F, Throwable]): F[NonEmptyList[RenkuVersionPair]] =
-    find[F, List[RenkuVersionPair]]("compatibility-matrix", config)(reader, ME).flatMap {
+  ): F[NonEmptyList[RenkuVersionPair]] =
+    find[F, List[RenkuVersionPair]]("compatibility-matrix", config).flatMap {
       case Nil =>
-        ME.raiseError[NonEmptyList[RenkuVersionPair]](
-          new Exception("No compatibility matrix provided for schema version")
-        )
+        new Exception("No compatibility matrix provided for schema version")
+          .raiseError[F, NonEmptyList[RenkuVersionPair]]
       case head :: tail =>
         maybeRenkuDevVersion match {
           case Some(devVersion) =>
-            logger
+            Logger[F]
               .warn(
                 s"RENKU_PYTHON_DEV_VERSION env variable is set. CLI config version is now set to ${devVersion.version}"
               )
@@ -68,13 +64,13 @@ private object VersionCompatibilityConfig extends VersionCompatibilityConfig {
     }
 }
 
-object IOVersionCompatibilityConfig {
-  def apply(logger: Logger[IO], config: Config = ConfigFactory.load): IO[NonEmptyList[RenkuVersionPair]] = for {
-    maybeRenkuDevVersion       <- RenkuPythonDevVersionConfig[IO]() recoverWith errorToNone
-    versionCompatibilityConfig <- VersionCompatibilityConfig(maybeRenkuDevVersion, logger, config)
+object VersionCompatibilityConfig {
+  def apply[F[_]: MonadThrow: Logger](config: Config = ConfigFactory.load): F[NonEmptyList[RenkuVersionPair]] = for {
+    maybeRenkuDevVersion       <- RenkuPythonDevVersionConfig[F]() recoverWith errorToNone
+    versionCompatibilityConfig <- RenkuVersionPairsReader.readRenkuVersionPairs[F](maybeRenkuDevVersion, config)
   } yield versionCompatibilityConfig
 
-  private lazy val errorToNone: PartialFunction[Throwable, IO[Option[RenkuPythonDevVersion]]] = { case NonFatal(_) =>
-    None.pure[IO]
+  private def errorToNone[F[_]: MonadThrow]: PartialFunction[Throwable, F[Option[RenkuPythonDevVersion]]] = {
+    case NonFatal(_) => Option.empty[RenkuPythonDevVersion].pure[F]
   }
 }

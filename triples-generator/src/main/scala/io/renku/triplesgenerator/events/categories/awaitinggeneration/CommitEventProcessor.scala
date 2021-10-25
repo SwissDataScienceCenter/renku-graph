@@ -21,7 +21,6 @@ package io.renku.triplesgenerator.events.categories.awaitinggeneration
 import cats.MonadThrow
 import cats.data.EitherT
 import cats.effect.Async
-import cats.effect.kernel.Temporal
 import cats.syntax.all._
 import io.prometheus.client.Histogram
 import io.renku.graph.model.events.EventStatus.{GenerationNonRecoverableFailure, GenerationRecoverableFailure}
@@ -39,7 +38,6 @@ import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgen
 import org.typelevel.log4cats.Logger
 
 import java.time.Duration
-import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 private trait EventProcessor[F[_]] {
@@ -176,7 +174,7 @@ private class CommitEventProcessor[F[_]: MonadThrow: Logger](
   }
 }
 
-private object IOCommitEventProcessor {
+private object CommitEventProcessor {
 
   private[events] lazy val eventsProcessingTimesBuilder =
     Histogram
@@ -186,13 +184,11 @@ private object IOCommitEventProcessor {
       .buckets(.1, .5, 1, 5, 10, 50, 100, 500, 1000, 5000, 10000, 50000, 100000, 500000, 1000000, 5000000, 10000000,
                50000000, 100000000, 500000000)
 
-  def apply[F[_]: Async: Logger](
-      metricsRegistry: MetricsRegistry[F]
-  ): F[CommitEventProcessor[F]] = for {
+  def apply[F[_]: Async: Logger](metricsRegistry: MetricsRegistry): F[CommitEventProcessor[F]] = for {
     triplesGenerator        <- TriplesGenerator()
-    accessTokenFinder       <- AccessTokenFinder()
+    accessTokenFinder       <- AccessTokenFinder[F]
     eventStatusUpdater      <- EventStatusUpdater(categoryName)
-    eventsProcessingTimes   <- metricsRegistry.register[Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
+    eventsProcessingTimes   <- metricsRegistry.register[F, Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
     allEventsTimeRecorder   <- ExecutionTimeRecorder[F](maybeHistogram = Some(eventsProcessingTimes))
     singleEventTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = None)
   } yield new CommitEventProcessor(

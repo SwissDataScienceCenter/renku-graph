@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories
 
-import cats.effect.{Async, IO, MonadCancelThrow, Sync}
+import cats.effect.{Async, Sync}
 import cats.syntax.all._
 import io.renku.compression.Zip
 import io.renku.data.ErrorMessage
@@ -31,8 +31,6 @@ import io.renku.graph.model.projects
 import io.renku.jsonld.JsonLD
 import io.renku.tinytypes.json.TinyTypeEncoders
 import org.typelevel.log4cats.Logger
-
-import scala.concurrent.ExecutionContext
 
 private trait EventStatusUpdater[F[_]] {
   def toTriplesGenerated(eventId:        CompoundEventId,
@@ -54,7 +52,7 @@ private trait EventStatusUpdater[F[_]] {
   ): F[Unit]
 }
 
-private class EventStatusUpdaterImpl[F[_]: MonadCancelThrow: Sync](
+private class EventStatusUpdaterImpl[F[_]: Sync](
     eventSender:  EventSender[F],
     categoryName: CategoryName,
     zipper:       Zip
@@ -145,9 +143,7 @@ private object EventStatusUpdater {
   implicit val rollbackToNew:              () => EventStatus.New              = () => EventStatus.New
   implicit val rollbackToTriplesGenerated: () => EventStatus.TriplesGenerated = () => EventStatus.TriplesGenerated
 
-  def apply[F[_]: Async: Logger](
-      categoryName: CategoryName
-  ): IO[EventStatusUpdater[IO]] = for {
-    eventSender <- EventSender()
+  def apply[F[_]: Async: Logger](categoryName: CategoryName): F[EventStatusUpdater[F]] = for {
+    eventSender <- EventSender[F]
   } yield new EventStatusUpdaterImpl(eventSender, categoryName, Zip)
 }

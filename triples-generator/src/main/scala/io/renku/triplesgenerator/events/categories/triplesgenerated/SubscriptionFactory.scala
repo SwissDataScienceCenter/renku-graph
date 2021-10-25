@@ -19,6 +19,7 @@
 package io.renku.triplesgenerator.events.categories.triplesgenerated
 
 import cats.effect.Async
+import cats.syntax.all._
 import io.renku.config.GitLab
 import io.renku.control.Throttler
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
@@ -30,7 +31,7 @@ import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
   def apply[F[_]: Async: Logger](
-      metricsRegistry: MetricsRegistry[F],
+      metricsRegistry: MetricsRegistry,
       gitLabThrottler: Throttler[F, GitLab],
       timeRecorder:    SparqlQueryTimeRecorder[F]
   ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {

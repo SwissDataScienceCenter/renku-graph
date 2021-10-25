@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading
 
-import cats.effect.{ConcurrentEffect, Timer}
+import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
@@ -26,25 +26,20 @@ import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepA
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
 private trait UpdatesUploader[F[_]] {
   def send(updateQuery: SparqlQuery): F[TriplesUploadResult]
 }
 
-private class UpdatesUploaderImpl[F[_]: ConcurrentEffect: Timer](
+private class UpdatesUploaderImpl[F[_]: Async: Logger](
     rdfStoreConfig: RdfStoreConfig,
     timeRecorder:   SparqlQueryTimeRecorder[F],
     retryInterval:  FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:     Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     idleTimeout:    Duration = 5 minutes,
     requestTimeout: Duration = 4 minutes
-)(implicit
-    executionContext: ExecutionContext,
-    logger:           Logger[F]
 ) extends RdfStoreClientImpl[F](rdfStoreConfig,
-                                logger,
                                 timeRecorder,
                                 retryInterval,
                                 maxRetries,

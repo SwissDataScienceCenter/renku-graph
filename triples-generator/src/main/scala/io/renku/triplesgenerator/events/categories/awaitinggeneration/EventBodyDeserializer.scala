@@ -19,7 +19,6 @@
 package io.renku.triplesgenerator.events.categories.awaitinggeneration
 
 import cats.MonadThrow
-import cats.effect.IO
 import cats.syntax.all._
 import io.circe.parser._
 import io.circe.{Decoder, DecodingFailure, Error, ParsingFailure}
@@ -55,5 +54,5 @@ private class EventBodyDeserializerImpl[F[_]: MonadThrow] extends EventBodyDeser
 }
 
 private object EventBodyDeserializer {
-  def apply(): EventBodyDeserializer[IO] = new EventBodyDeserializerImpl[IO]
+  def apply[F[_]: MonadThrow]: EventBodyDeserializer[F] = new EventBodyDeserializerImpl[F]
 }

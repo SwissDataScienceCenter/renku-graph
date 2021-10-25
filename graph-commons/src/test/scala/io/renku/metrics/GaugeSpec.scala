@@ -228,7 +228,7 @@ class GaugeSpec extends AnyWordSpec with MockFactory with should.Matchers {
       "and return an instance of the SingleValueGauge" in new TestCase {
 
         (metricsRegistry
-          .register[LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[Try, Throwable]))
+          .register[Try, LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[Try, Throwable]))
           .expects(*, *)
           .onCall { (builder: LibGauge.Builder, _: MonadError[Try, Throwable]) =>
             builder.create().pure[Try]
@@ -248,7 +248,7 @@ class GaugeSpec extends AnyWordSpec with MockFactory with should.Matchers {
       "and return an instance of the LabeledGauge" in new TestCase {
 
         (metricsRegistry
-          .register[LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[Try, Throwable]))
+          .register[Try, LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[Try, Throwable]))
           .expects(*, *)
           .onCall { (builder: LibGauge.Builder, _: MonadError[Try, Throwable]) =>
             builder.create().pure[Try]
@@ -268,6 +268,6 @@ class GaugeSpec extends AnyWordSpec with MockFactory with should.Matchers {
     val name = nonBlankStrings().generateOne
     val help = sentences().generateOne
 
-    val metricsRegistry = mock[MetricsRegistry[Try]]
+    val metricsRegistry = mock[MetricsRegistry]
   }
 }

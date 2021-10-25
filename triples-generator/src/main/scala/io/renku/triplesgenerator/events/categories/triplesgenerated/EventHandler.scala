@@ -18,12 +18,11 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated
 
+import cats.Show
 import cats.data.EitherT
 import cats.data.EitherT.fromEither
-import cats.effect.concurrent.Deferred
-import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, Deferred, IO, Spawn, Timer}
+import cats.effect._
 import cats.syntax.all._
-import cats.{MonadThrow, Show}
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
@@ -38,8 +37,6 @@ import io.renku.graph.model.events.{CategoryName, CompoundEventId, EventBody, Zi
 import io.renku.metrics.MetricsRegistry
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
-
-import scala.concurrent.ExecutionContext
 
 private[events] class EventHandler[F[_]: Concurrent: Logger](
     override val categoryName:  CategoryName,
@@ -96,8 +93,8 @@ private[events] object EventHandler {
   import ConfigLoader.find
   import eu.timepit.refined.pureconfig._
 
-  def apply[F[_]: Concurrent: Logger](
-      metricsRegistry:       MetricsRegistry[F],
+  def apply[F[_]: Async: Logger](
+      metricsRegistry:       MetricsRegistry,
       gitLabThrottler:       Throttler[F, GitLab],
       timeRecorder:          SparqlQueryTimeRecorder[F],
       subscriptionMechanism: SubscriptionMechanism[F],
@@ -106,11 +103,10 @@ private[events] object EventHandler {
     generationProcesses        <- find[F, Int Refined Positive]("transformation-processes-number", config)
     eventProcessor             <- EventProcessor(metricsRegistry, gitLabThrottler, timeRecorder)
     concurrentProcessesLimiter <- ConcurrentProcessesLimiter(generationProcesses)
-  } yield new EventHandler[IO](categoryName,
-                               EventBodyDeserializer(),
-                               subscriptionMechanism,
-                               concurrentProcessesLimiter,
-                               eventProcessor,
-                               logger
+  } yield new EventHandler[F](categoryName,
+                              EventBodyDeserializer[F],
+                              subscriptionMechanism,
+                              concurrentProcessesLimiter,
+                              eventProcessor
   )
 }

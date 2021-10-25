@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration
 
-import cats.effect.IO
+import cats.MonadThrow
 import cats.effect.kernel.Async
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
@@ -28,7 +28,6 @@ import io.renku.control.Throttler
 import io.renku.http.client.{AccessToken, RestClient}
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.parser._
-import io.renku.logging.ApplicationLogger
 import io.renku.tinytypes.constraints.Url
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
@@ -36,29 +35,24 @@ import io.renku.triplesgenerator.events.categories.awaitinggeneration.CommitEven
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
 // This TriplesGenerator supposed to be used by the acceptance-tests only
 
-private[events] object RemoteTriplesGenerator extends ConfigLoader[IO] {
+private[events] object RemoteTriplesGenerator {
+  import ConfigLoader._
 
-  def apply[F[_]: Async: Logger](
-      configuration: Config = ConfigFactory.load()
-  ): IO[TriplesGenerator[IO]] =
-    for {
-      serviceUrl <- find[String]("services.triples-generator.url", configuration) flatMap (url =>
-                      IO.fromEither(TriplesGenerationServiceUrl from url)
-                    )
-    } yield new RemoteTriplesGenerator(serviceUrl)
+  def apply[F[_]: Async: Logger](configuration: Config = ConfigFactory.load()): F[TriplesGenerator[F]] = for {
+    serviceUrl <- find[F, String]("services.triples-generator.url", configuration) flatMap (url =>
+                    MonadThrow[F].fromEither(TriplesGenerationServiceUrl from url)
+                  )
+  } yield new RemoteTriplesGenerator(serviceUrl)
 }
 
 private[awaitinggeneration] class RemoteTriplesGenerator[F[_]: Async: Logger](
     serviceUrl: TriplesGenerationServiceUrl
-) extends RestClient[F, RemoteTriplesGenerator](Throttler.noThrottling)
+) extends RestClient(Throttler.noThrottling)
     with TriplesGenerator[F] {
 
   import cats.data.EitherT
-  import cats.effect._
   import io.renku.http.client.RestClientError.UnauthorizedException
   import org.http4s.Method.GET
   import org.http4s.Status.Unauthorized
@@ -73,16 +67,16 @@ private[awaitinggeneration] class RemoteTriplesGenerator[F[_]: Async: Logger](
       for {
         uri           <- validateUri(s"$serviceUrl/projects/${commitEvent.project.id}/commits/${commitEvent.commitId}")
         triplesInJson <- send(request(GET, uri))(mapResponse)
-        triples       <- IO.fromEither(parse(triplesInJson))
+        triples       <- MonadThrow[F].fromEither(parse(triplesInJson))
       } yield triples.asRight[ProcessingRecoverableError]
     } recoverWith { case UnauthorizedException =>
-      GenerationRecoverableError("Unauthorized exception").asLeft[JsonLD].pure[F]
+      GenerationRecoverableError("Unauthorized exception").asLeft[JsonLD].leftWiden[ProcessingRecoverableError].pure[F]
     }
   }
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Json]] = {
+  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Json]] = {
     case (Ok, _, response)    => response.as[Json]
-    case (Unauthorized, _, _) => IO.raiseError(UnauthorizedException)
+    case (Unauthorized, _, _) => UnauthorizedException.raiseError[F, Json]
   }
 }
 

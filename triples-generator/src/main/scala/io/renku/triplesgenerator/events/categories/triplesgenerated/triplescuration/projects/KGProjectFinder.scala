@@ -19,7 +19,7 @@
 package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects
 
 import cats.MonadThrow
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.model.projects
 import io.renku.rdfstore.SparqlQuery.Prefixes
@@ -27,22 +27,14 @@ import io.renku.rdfstore._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects.KGProjectFinder.KGProjectInfo
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
 private trait KGProjectFinder[F[_]] {
   def find(resourceId: projects.ResourceId): F[Option[KGProjectInfo]]
 }
 
-private class KGProjectFinderImpl(
-    rdfStoreConfig: RdfStoreConfig,
-    timeRecorder:   SparqlQueryTimeRecorder[IO]
-)(implicit
-    executionContext: ExecutionContext,
-    contextShift:     ContextShift[IO],
-    timer:            Timer[IO],
-    logger:           Logger[IO]
-) extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
-    with KGProjectFinder[IO] {
+private class KGProjectFinderImpl[F[_]: Async: Logger](rdfStoreConfig: RdfStoreConfig,
+                                                       timeRecorder: SparqlQueryTimeRecorder[F]
+) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
+    with KGProjectFinder[F] {
 
   import eu.timepit.refined.auto._
   import io.circe.Decoder
@@ -50,7 +42,7 @@ private class KGProjectFinderImpl(
   import io.renku.graph.model.Schemas._
   import io.renku.tinytypes.json.TinyTypeDecoders._
 
-  override def find(resourceId: projects.ResourceId): IO[Option[KGProjectInfo]] =
+  override def find(resourceId: projects.ResourceId): F[Option[KGProjectInfo]] =
     queryExpecting[List[KGProjectInfo]](using = query(resourceId)) >>= toSingleResult(resourceId)
 
   private def query(resourceId: projects.ResourceId) = SparqlQuery.of(
@@ -77,22 +69,17 @@ private class KGProjectFinderImpl(
     _.downField("results").downField("bindings").as(decodeList(rowDecoder))
   }
 
-  private def toSingleResult(resourceId: projects.ResourceId): List[KGProjectInfo] => IO[Option[KGProjectInfo]] = {
-    case Nil           => MonadThrow[IO].pure(Option.empty[KGProjectInfo])
-    case record +: Nil => MonadThrow[IO].pure(Some(record))
+  private def toSingleResult(resourceId: projects.ResourceId): List[KGProjectInfo] => F[Option[KGProjectInfo]] = {
+    case Nil           => MonadThrow[F].pure(Option.empty[KGProjectInfo])
+    case record +: Nil => MonadThrow[F].pure(Some(record))
     case _ =>
-      MonadThrow[IO].raiseError(new RuntimeException(s"More than one project found for resourceId: '$resourceId'"))
+      MonadThrow[F].raiseError(new RuntimeException(s"More than one project found for resourceId: '$resourceId'"))
   }
 }
 
 private object KGProjectFinder {
-  def apply(timeRecorder: SparqlQueryTimeRecorder[IO])(implicit
-      executionContext:   ExecutionContext,
-      contextShift:       ContextShift[IO],
-      timer:              Timer[IO],
-      logger:             Logger[IO]
-  ): IO[KGProjectFinder[IO]] = for {
-    config <- RdfStoreConfig[IO]()
+  def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[KGProjectFinder[F]] = for {
+    config <- RdfStoreConfig[F]()
   } yield new KGProjectFinderImpl(config, timeRecorder)
 
   type KGProjectInfo = (projects.Name, Option[projects.ResourceId], projects.Visibility)

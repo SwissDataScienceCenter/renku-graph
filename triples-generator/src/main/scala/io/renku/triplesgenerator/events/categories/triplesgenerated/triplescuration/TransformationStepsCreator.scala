@@ -19,6 +19,8 @@
 package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration
 
 import cats.MonadThrow
+import cats.effect.Async
+import cats.syntax.all._
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep
@@ -26,8 +28,6 @@ import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescurat
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails.PersonTransformer
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects.ProjectTransformer
 import org.typelevel.log4cats.Logger
-
-import scala.concurrent.ExecutionContext
 
 private[triplesgenerated] trait TransformationStepsCreator[F[_]] {
   def createSteps: List[TransformationStep[F]]
@@ -48,8 +48,6 @@ private[triplesgenerated] class TransformationStepsCreatorImpl[F[_]: MonadThrow]
 
 private[triplesgenerated] object TriplesCurator {
 
-  import cats.effect.{ContextShift, IO, Timer}
-
   final case class TransformationRecoverableError(message: String, cause: Throwable)
       extends Exception(message, cause)
       with ProcessingRecoverableError
@@ -58,18 +56,9 @@ private[triplesgenerated] object TriplesCurator {
     def apply(message: String): TransformationRecoverableError = TransformationRecoverableError(message, null)
   }
 
-  def apply(timeRecorder: SparqlQueryTimeRecorder[IO])(implicit
-      executionContext:   ExecutionContext,
-      cs:                 ContextShift[IO],
-      timer:              Timer[IO],
-      logger:             Logger[IO]
-  ): IO[TransformationStepsCreator[IO]] = for {
-    personTransformer  <- PersonTransformer(timeRecorder, logger)
+  def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[TransformationStepsCreator[F]] = for {
+    personTransformer  <- PersonTransformer(timeRecorder)
     projectTransformer <- ProjectTransformer(timeRecorder)
-    datasetTransformer <- DatasetTransformer(timeRecorder, logger)
-  } yield new TransformationStepsCreatorImpl[IO](
-    personTransformer,
-    projectTransformer,
-    datasetTransformer
-  )
+    datasetTransformer <- DatasetTransformer(timeRecorder)
+  } yield new TransformationStepsCreatorImpl[F](personTransformer, projectTransformer, datasetTransformer)
 }

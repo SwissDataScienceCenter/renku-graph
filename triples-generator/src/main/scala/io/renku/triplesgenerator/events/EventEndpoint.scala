@@ -32,11 +32,9 @@ import io.renku.triplesgenerator.reprovisioning.ReProvisioningStatus
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.`Content-Type`
-import org.http4s.implicits.http4sHeaderSyntax
 import org.http4s.multipart.{Multipart, Part}
 import org.http4s.{Request, Response}
 
-import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 trait EventEndpoint[F[_]] {
@@ -99,7 +97,7 @@ class EventEndpointImpl[F[_]: Async](
       .find(_.name.contains("payload"))
       .map { part =>
         part.headers
-          .find(_.name == `Content-Type`.name)
+          .get[`Content-Type`]
           .map(toEventRequestContent(part, eventJson))
           .getOrElse(
             BadRequest(ErrorMessage("Content-type not provided for payload")).map(_.asLeft[EventRequestContent])
@@ -110,8 +108,8 @@ class EventEndpointImpl[F[_]: Async](
 
   private def toEventRequestContent(part:      Part[F],
                                     eventJson: Json
-  ): Header.Raw => F[Either[Response[F], EventRequestContent]] = {
-    case header if header.value == `Content-Type`(MediaType.application.zip).value =>
+  ): `Content-Type` => F[Either[Response[F], EventRequestContent]] = {
+    case header if header == `Content-Type`(MediaType.application.zip) =>
       part
         .as[Array[Byte]]
         .map(ZippedEventPayload)
@@ -120,7 +118,7 @@ class EventEndpointImpl[F[_]: Async](
             .asRight[Response[F]]
             .widen[EventRequestContent]
         )
-    case header if header.value == `Content-Type`(MediaType.text.plain).value =>
+    case header if header == `Content-Type`(MediaType.text.plain) =>
       part
         .as[String]
         .map(WithPayload[String](eventJson, _).asRight[Response[F]].widen[EventRequestContent])

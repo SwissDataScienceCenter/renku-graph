@@ -20,7 +20,7 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuplo
 
 import cats.MonadThrow
 import cats.data.EitherT
-import cats.effect.{ConcurrentEffect, Timer}
+import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.config.{GitLabUrlLoader, RenkuBaseUrlLoader}
 import io.renku.graph.model.entities.Project
@@ -30,7 +30,6 @@ import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableE
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 private[triplesgenerated] trait TransformationStepsRunner[F[_]] {
@@ -107,21 +106,14 @@ private[triplesgenerated] class TransformationStepsRunnerImpl[F[_]: MonadThrow](
 
 private[triplesgenerated] object TransformationStepsRunner {
 
-  import cats.effect.IO
-
-  def apply(timeRecorder: SparqlQueryTimeRecorder[IO])(implicit
-      executionContext:   ExecutionContext,
-      concurrentEffect:   ConcurrentEffect[IO],
-      timer:              Timer[IO],
-      logger:             Logger[IO]
-  ): IO[TransformationStepsRunnerImpl[IO]] = for {
-    rdfStoreConfig <- RdfStoreConfig[IO]()
-    renkuBaseUrl   <- RenkuBaseUrlLoader[IO]()
-    gitlabUrl      <- GitLabUrlLoader[IO]()
-  } yield new TransformationStepsRunnerImpl[IO](new TriplesUploaderImpl[IO](rdfStoreConfig, timeRecorder),
-                                                new UpdatesUploaderImpl(rdfStoreConfig, timeRecorder),
-                                                renkuBaseUrl,
-                                                gitlabUrl
+  def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[TransformationStepsRunnerImpl[F]] = for {
+    rdfStoreConfig <- RdfStoreConfig[F]()
+    renkuBaseUrl   <- RenkuBaseUrlLoader[F]()
+    gitlabUrl      <- GitLabUrlLoader[F]()
+  } yield new TransformationStepsRunnerImpl[F](new TriplesUploaderImpl[F](rdfStoreConfig, timeRecorder),
+                                               new UpdatesUploaderImpl(rdfStoreConfig, timeRecorder),
+                                               renkuBaseUrl,
+                                               gitlabUrl
   )
 }
 

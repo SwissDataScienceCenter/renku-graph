@@ -36,14 +36,13 @@ import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.microservices.IOMicroservice
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.config.certificates.GitCertificateInstaller
-import io.renku.triplesgenerator.config.{IOVersionCompatibilityConfig, TriplesGeneration}
+import io.renku.triplesgenerator.config.{TriplesGeneration, VersionCompatibilityConfig}
 import io.renku.triplesgenerator.events.EventEndpoint
-import io.renku.triplesgenerator.init.{CliVersionCompatibilityVerifier, IOCliVersionCompatibilityChecker}
-import io.renku.triplesgenerator.reprovisioning.{IOReProvisioning, ReProvisioning, ReProvisioningStatus}
+import io.renku.triplesgenerator.init.{CliVersionCompatibilityChecker, CliVersionCompatibilityVerifier}
+import io.renku.triplesgenerator.reprovisioning.{ReProvisioning, ReProvisioningStatus}
 import org.typelevel.log4cats.Logger
 
 import java.util.concurrent.ConcurrentHashMap
-import scala.util.control.NonFatal
 
 object Microservice extends IOMicroservice {
 
@@ -63,13 +62,13 @@ object Microservice extends IOMicroservice {
     gitCertificateInstaller        <- GitCertificateInstaller[IO]
     triplesGeneration              <- TriplesGeneration[IO](config)
     sentryInitializer              <- SentryInitializer[IO]
-    metricsRegistry                <- MetricsRegistry()
-    renkuVersionPairs              <- IOVersionCompatibilityConfig(ApplicationLogger, config)
-    cliVersionCompatChecker        <- IOCliVersionCompatibilityChecker(triplesGeneration, renkuVersionPairs)
+    metricsRegistry                <- MetricsRegistry[IO]()
+    renkuVersionPairs              <- VersionCompatibilityConfig[IO](config)
+    cliVersionCompatChecker        <- CliVersionCompatibilityChecker[IO](triplesGeneration, renkuVersionPairs)
     gitLabRateLimit                <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
     gitLabThrottler                <- Throttler[IO, GitLab](gitLabRateLimit)
-    sparqlTimeRecorder             <- SparqlQueryTimeRecorder(metricsRegistry)
-    awaitingGenerationSubscription <- events.categories.awaitinggeneration.SubscriptionFactory(metricsRegistry)
+    sparqlTimeRecorder             <- SparqlQueryTimeRecorder[IO](metricsRegistry)
+    awaitingGenerationSubscription <- events.categories.awaitinggeneration.SubscriptionFactory[IO](metricsRegistry)
     membersSyncSubscription <- events.categories.membersync.SubscriptionFactory(gitLabThrottler, sparqlTimeRecorder)
     triplesGeneratedSubscription <-
       events.categories.triplesgenerated.SubscriptionFactory(metricsRegistry, gitLabThrottler, sparqlTimeRecorder)
@@ -78,8 +77,8 @@ object Microservice extends IOMicroservice {
                                 membersSyncSubscription,
                                 triplesGeneratedSubscription
                               )
-    reProvisioningStatus <- ReProvisioningStatus(eventConsumersRegistry, ApplicationLogger, sparqlTimeRecorder)
-    reProvisioning <- IOReProvisioning(reProvisioningStatus, renkuVersionPairs, sparqlTimeRecorder, ApplicationLogger)
+    reProvisioningStatus    <- ReProvisioningStatus(eventConsumersRegistry, sparqlTimeRecorder)
+    reProvisioning          <- ReProvisioning(reProvisioningStatus, renkuVersionPairs, sparqlTimeRecorder)
     eventProcessingEndpoint <- EventEndpoint(eventConsumersRegistry, reProvisioningStatus)
     microserviceRoutes =
       new MicroserviceRoutes[IO](eventProcessingEndpoint, new RoutesMetrics[IO](metricsRegistry), config.some).routes
@@ -109,23 +108,18 @@ private class MicroserviceRunner(
     subProcessesCancelTokens:        ConcurrentHashMap[IO[Unit], Unit]
 ) {
 
-  def run(): IO[ExitCode] =
-    for {
-      _        <- certificateLoader.run()
-      _        <- gitCertificateInstaller.run()
-      _        <- sentryInitializer.run()
-      _        <- cliVersionCompatibilityVerifier.run()
-      _        <- eventConsumersRegistry.run().start.map(gatherCancelToken)
-      _        <- reProvisioning.run().start.map(gatherCancelToken)
-      exitCode <- httpServer.run()
-    } yield exitCode
+  def run(): IO[ExitCode] = for {
+    _        <- certificateLoader.run()
+    _        <- gitCertificateInstaller.run()
+    _        <- sentryInitializer.run()
+    _        <- cliVersionCompatibilityVerifier.run()
+    _        <- eventConsumersRegistry.run().start.map(gatherCancelToken)
+    _        <- reProvisioning.run().start.map(gatherCancelToken)
+    exitCode <- httpServer.run()
+  } yield exitCode
 
   private def gatherCancelToken(fiber: FiberIO[Unit]): FiberIO[Unit] = {
     subProcessesCancelTokens.put(fiber.cancel, ())
     fiber
-  }
-
-  private def logAndThrow(logger: Logger[IO]): PartialFunction[Throwable, IO[ExitCode]] = { case NonFatal(exception) =>
-    logger.error(exception)(exception.getMessage).flatMap(_ => exception.raiseError[IO, ExitCode])
   }
 }

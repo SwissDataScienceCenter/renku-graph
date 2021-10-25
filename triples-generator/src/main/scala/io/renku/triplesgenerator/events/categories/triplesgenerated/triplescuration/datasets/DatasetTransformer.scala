@@ -20,7 +20,7 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescura
 
 import cats.MonadThrow
 import cats.data.EitherT
-import cats.effect.{ContextShift, IO}
+import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.entities.Dataset
@@ -31,8 +31,6 @@ import io.renku.triplesgenerator.events.categories.triplesgenerated.Transformati
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.{ProjectFunctions, TransformationStep}
 import org.typelevel.log4cats.Logger
-
-import scala.concurrent.ExecutionContext
 
 private[triplescuration] trait DatasetTransformer[F[_]] {
   def createTransformationStep: TransformationStep[F]
@@ -122,13 +120,7 @@ private[triplescuration] class DatasetTransformerImpl[F[_]: MonadThrow](
 
 private[triplescuration] object DatasetTransformer {
 
-  import cats.effect.Timer
-
-  def apply(
-      timeRecorder:            SparqlQueryTimeRecorder[IO],
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[DatasetTransformer[IO]] =
-    for {
-      kgDatasetInfoFinder <- IOKGDatasetInfoFinder(logger, timeRecorder)
-    } yield new DatasetTransformerImpl[IO](kgDatasetInfoFinder, UpdatesCreator, ProjectFunctions)
+  def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[DatasetTransformer[F]] = for {
+    kgDatasetInfoFinder <- KGDatasetInfoFinder(timeRecorder)
+  } yield new DatasetTransformerImpl[F](kgDatasetInfoFinder, UpdatesCreator, ProjectFunctions)
 }

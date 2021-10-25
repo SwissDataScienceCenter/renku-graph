@@ -18,7 +18,8 @@
 
 package io.renku.triplesgenerator.reprovisioning
 
-import cats.effect.{ConcurrentEffect, IO, Timer}
+import cats.MonadThrow
+import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas._
@@ -28,20 +29,15 @@ import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
 trait RenkuVersionPairFinder[F[_]] {
   def find(): F[Option[RenkuVersionPair]]
 }
 
-private class RenkuVersionPairFinderImpl[F[_]: ConcurrentEffect: Timer](
+private class RenkuVersionPairFinderImpl[F[_]: Async: Logger](
     rdfStoreConfig: RdfStoreConfig,
     renkuBaseUrl:   RenkuBaseUrl,
-    logger:         Logger[F],
     timeRecorder:   SparqlQueryTimeRecorder[F]
-)(implicit
-    executionContext: ExecutionContext
-) extends RdfStoreClientImpl[F](rdfStoreConfig, logger, timeRecorder)
+) extends RdfStoreClientImpl[F](rdfStoreConfig, timeRecorder)
     with RenkuVersionPairFinder[F] {
 
   override def find(): F[Option[RenkuVersionPair]] = queryExpecting[List[RenkuVersionPair]] {
@@ -67,15 +63,10 @@ private class RenkuVersionPairFinderImpl[F[_]: ConcurrentEffect: Timer](
 }
 
 private object RenkuVersionPairFinder {
-  def apply(rdfStoreConfig: RdfStoreConfig,
-            renkuBaseUrl:   RenkuBaseUrl,
-            logger:         Logger[IO],
-            timeRecorder:   SparqlQueryTimeRecorder[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      concurrentEffect: ConcurrentEffect[IO],
-      timer:            Timer[IO]
-  ): IO[RenkuVersionPairFinderImpl[IO]] = IO(
-    new RenkuVersionPairFinderImpl[IO](rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
+  def apply[F[_]: Async: Logger](rdfStoreConfig: RdfStoreConfig,
+                                 renkuBaseUrl: RenkuBaseUrl,
+                                 timeRecorder: SparqlQueryTimeRecorder[F]
+  ): F[RenkuVersionPairFinderImpl[F]] = MonadThrow[F].catchNonFatal(
+    new RenkuVersionPairFinderImpl[F](rdfStoreConfig, renkuBaseUrl, timeRecorder)
   )
 }

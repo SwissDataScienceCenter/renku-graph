@@ -19,7 +19,7 @@
 package io.renku.triplesgenerator.events.categories.triplesgenerated
 
 import cats.data.EitherT
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.Async
 import cats.syntax.all._
 import cats.{Applicative, MonadThrow}
 import io.circe.DecodingFailure
@@ -33,8 +33,6 @@ import io.renku.http.client.AccessToken
 import io.renku.jsonld.JsonLDDecoder.decodeList
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import org.typelevel.log4cats.Logger
-
-import scala.concurrent.ExecutionContext
 
 private trait JsonLDDeserializer[F[_]] {
   def deserializeToModel(event: TriplesGeneratedEvent)(implicit
@@ -97,15 +95,8 @@ private class JsonLDDeserializerImpl[F[_]: MonadThrow](
 }
 
 private object JsonLDDeserializer {
-  def apply(
-      gitLabThrottler: Throttler[IO, GitLab],
-      logger:          Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[JsonLDDeserializer[IO]] = for {
-    renkuBaseUrl      <- RenkuBaseUrlLoader[IO]()
-    projectInfoFinder <- ProjectInfoFinder(gitLabThrottler, logger)
-  } yield new JsonLDDeserializerImpl[IO](projectInfoFinder, renkuBaseUrl)
+  def apply[F[_]: Async: Logger](gitLabThrottler: Throttler[F, GitLab]): F[JsonLDDeserializer[F]] = for {
+    renkuBaseUrl      <- RenkuBaseUrlLoader[F]()
+    projectInfoFinder <- ProjectInfoFinder(gitLabThrottler)
+  } yield new JsonLDDeserializerImpl[F](projectInfoFinder, renkuBaseUrl)
 }

@@ -24,47 +24,44 @@ import io.prometheus.client.{CollectorRegistry, SimpleCollector}
 
 import scala.util.control.NonFatal
 
-trait MetricsRegistry[F[_]] {
+trait MetricsRegistry {
 
-  def register[Collector <: SimpleCollector[_], Builder <: SimpleCollector.Builder[Builder, Collector]](
-      collectorBuilder: Builder
-  )(implicit ME:        MonadThrow[F]): F[Collector]
+  def register[F[_]: MonadThrow,
+               Collector <: SimpleCollector[_],
+               Builder <: SimpleCollector.Builder[Builder, Collector]
+  ](collectorBuilder: Builder): F[Collector]
 
   def maybeCollectorRegistry: Option[CollectorRegistry]
 }
 
 object MetricsRegistry {
 
-  import cats.effect.IO
   import cats.syntax.all._
   import com.typesafe.config.{Config, ConfigFactory}
   import io.renku.config.ConfigLoader.find
 
-  def apply(
-      config: Config = ConfigFactory.load()
-  ): IO[MetricsRegistry[IO]] = for {
-    maybeEnabled <- find[IO, Option[Boolean]]("metrics.enabled", config) recoverWith noneValue
+  def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[MetricsRegistry] = for {
+    maybeEnabled <- find[F, Option[Boolean]]("metrics.enabled", config) recoverWith noneValue
   } yield maybeEnabled match {
     case Some(false) => DisabledMetricsRegistry
     case _           => EnabledMetricsRegistry
   }
 
-  private val noneValue: PartialFunction[Throwable, IO[Option[Boolean]]] = { case NonFatal(_) =>
-    IO.pure(Some(true))
+  private def noneValue[F[_]: MonadThrow]: PartialFunction[Throwable, F[Option[Boolean]]] = { case NonFatal(_) =>
+    Option(true).pure[F]
   }
 
-  object DisabledMetricsRegistry extends MetricsRegistry[IO] {
+  object DisabledMetricsRegistry extends MetricsRegistry {
 
-    override def register[Collector <: SimpleCollector[_], Builder <: SimpleCollector.Builder[Builder, Collector]](
-        collectorBuilder: Builder
-    )(implicit ME:        MonadThrow[IO]): IO[Collector] = IO {
-      collectorBuilder.create()
-    }
+    override def register[F[_]: MonadThrow,
+                          Collector <: SimpleCollector[_],
+                          Builder <: SimpleCollector.Builder[Builder, Collector]
+    ](collectorBuilder: Builder): F[Collector] = MonadThrow[F].catchNonFatal(collectorBuilder.create())
 
     override lazy val maybeCollectorRegistry: Option[CollectorRegistry] = None
   }
 
-  object EnabledMetricsRegistry extends MetricsRegistry[IO] {
+  object EnabledMetricsRegistry extends MetricsRegistry {
 
     private lazy val registry: CollectorRegistry = addJvmMetrics(new CollectorRegistry())
 
@@ -80,9 +77,10 @@ object MetricsRegistry {
       registry
     }
 
-    override def register[Collector <: SimpleCollector[_], Builder <: SimpleCollector.Builder[Builder, Collector]](
-        collectorBuilder: Builder
-    )(implicit ME:        MonadThrow[IO]): IO[Collector] = IO {
+    override def register[F[_]: MonadThrow,
+                          Collector <: SimpleCollector[_],
+                          Builder <: SimpleCollector.Builder[Builder, Collector]
+    ](collectorBuilder: Builder): F[Collector] = MonadThrow[F].catchNonFatal {
       collectorBuilder register registry
     }
 

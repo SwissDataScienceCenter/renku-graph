@@ -18,6 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects
 
+import cats.MonadThrow
 import cats.data.EitherT
 import cats.effect._
 import cats.syntax.all._
@@ -29,8 +30,6 @@ import io.renku.triplesgenerator.events.categories.triplesgenerated.Transformati
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{ResultData, Transformation}
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
 import org.typelevel.log4cats.Logger
-
-import scala.concurrent.ExecutionContext
 
 trait ProjectTransformer[F[_]] {
   def createTransformationStep: TransformationStep[F]
@@ -70,12 +69,7 @@ class ProjectTransformerImpl[F[_]: MonadThrow](
 }
 
 object ProjectTransformer {
-  def apply(timeRecorder: SparqlQueryTimeRecorder[IO])(implicit
-      executionContext:   ExecutionContext,
-      cs:                 ContextShift[IO],
-      timer:              Timer[IO],
-      logger:             Logger[IO]
-  ): IO[ProjectTransformer[IO]] = for {
+  def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[ProjectTransformer[F]] = for {
     kgProjectFinder <- KGProjectFinder(timeRecorder)
-  } yield new ProjectTransformerImpl[IO](kgProjectFinder, UpdatesCreator)
+  } yield new ProjectTransformerImpl[F](kgProjectFinder, UpdatesCreator)
 }

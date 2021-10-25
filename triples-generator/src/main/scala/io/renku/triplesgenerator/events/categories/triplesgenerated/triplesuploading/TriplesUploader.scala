@@ -32,7 +32,6 @@ import io.renku.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import org.http4s.Uri
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.control.NonFatal
@@ -48,12 +47,12 @@ private class TriplesUploaderImpl[F[_]: Async: Logger](
     maxRetries:     Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     idleTimeout:    Duration = 6 minutes,
     requestTimeout: Duration = 5 minutes
-) extends RestClient[F, Any](Throttler.noThrottling,
-                             maybeTimeRecorder = timeRecorder.instance.some,
-                             retryInterval = retryInterval,
-                             maxRetries = maxRetries,
-                             idleTimeoutOverride = idleTimeout.some,
-                             requestTimeoutOverride = requestTimeout.some
+) extends RestClient(Throttler.noThrottling,
+                     maybeTimeRecorder = timeRecorder.instance.some,
+                     retryInterval = retryInterval,
+                     maxRetries = maxRetries,
+                     idleTimeoutOverride = idleTimeout.some,
+                     requestTimeoutOverride = requestTimeout.some
     )
     with TriplesUploader[F] {
 
@@ -104,7 +103,7 @@ private object TriplesUploader {
                                  maxRetries:     Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
                                  idleTimeout:    Duration = 6 minutes,
                                  requestTimeout: Duration = 5 minutes
-  ) = MonadThrow.catchNonFatal(
+  ) = MonadThrow[F].catchNonFatal(
     new TriplesUploaderImpl[F](rdfStoreConfig, timeRecorder, retryInterval, maxRetries, idleTimeout, requestTimeout)
   )
 }

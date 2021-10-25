@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.reprovisioning
 
-import cats.effect.{ConcurrentEffect, IO, Timer}
+import cats.effect.Async
 import cats.syntax.all._
 import io.renku.control.Throttler
 import io.renku.graph.config.EventLogUrl
@@ -26,17 +26,13 @@ import io.renku.http.client.RestClient
 import org.http4s.Method.POST
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
 private trait EventsReScheduler[F[_]] {
   def triggerEventsReScheduling(): F[Unit]
 }
 
-private class EventsReSchedulerImpl[F[_]: ConcurrentEffect: Timer](
-    eventLogUrl:             EventLogUrl,
-    logger:                  Logger[F]
-)(implicit executionContext: ExecutionContext)
-    extends RestClient[F, EventsReScheduler[F]](Throttler.noThrottling, logger)
+private class EventsReSchedulerImpl[F[_]: Async: Logger](
+    eventLogUrl: EventLogUrl
+) extends RestClient[F, EventsReScheduler[F]](Throttler.noThrottling)
     with EventsReScheduler[F] {
 
   import io.circe.literal._
@@ -59,15 +55,8 @@ private class EventsReSchedulerImpl[F[_]: ConcurrentEffect: Timer](
   }
 }
 
-private object IOEventsReScheduler {
-  def apply(
-      logger: Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      concurrentEffect: ConcurrentEffect[IO],
-      timer:            Timer[IO]
-  ): IO[EventsReScheduler[IO]] =
-    for {
-      eventLogUrl <- EventLogUrl[IO]()
-    } yield new EventsReSchedulerImpl(eventLogUrl, logger)
+private object EventsReScheduler {
+  def apply[F[_]: Async: Logger]: F[EventsReScheduler[F]] = for {
+    eventLogUrl <- EventLogUrl[F]()
+  } yield new EventsReSchedulerImpl(eventLogUrl)
 }

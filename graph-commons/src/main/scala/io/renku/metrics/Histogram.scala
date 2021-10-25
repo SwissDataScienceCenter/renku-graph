@@ -49,7 +49,7 @@ object Histogram {
       help:          String Refined NonEmpty,
       labelName:     String Refined NonEmpty,
       buckets:       Seq[Double]
-  )(metricsRegistry: MetricsRegistry[F]): F[LabeledHistogram[F, LabelValue]] = {
+  )(metricsRegistry: MetricsRegistry): F[LabeledHistogram[F, LabelValue]] = {
 
     val builder = LibHistogram
       .build()
@@ -59,7 +59,7 @@ object Histogram {
       .buckets(buckets: _*)
 
     for {
-      histogram <- metricsRegistry register [LibHistogram, LibHistogram.Builder] builder
+      histogram <- metricsRegistry register [F, LibHistogram, LibHistogram.Builder] builder
     } yield new LabeledHistogramImpl[F, LabelValue](histogram)
   }
 }
