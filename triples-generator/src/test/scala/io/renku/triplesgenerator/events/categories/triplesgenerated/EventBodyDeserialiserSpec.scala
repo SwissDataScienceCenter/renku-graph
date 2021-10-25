@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated
 
-import cats.effect.{BracketThrow, IO, Sync}
+import cats.effect.{IO, Sync}
 import cats.syntax.all._
 import io.renku.compression.Zip
 import io.renku.events.consumers.Project
@@ -29,20 +29,21 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.ZippedEventPayload
 import io.renku.jsonld.generators.JsonLDGenerators._
 import io.renku.jsonld.parser.ParsingFailure
+import io.renku.testtools.IOSpec
 import org.scalacheck.Arbitrary
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EventBodyDeserialiserSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class EventBodyDeserialiserSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "toEvent" should {
 
     "produce TriplesGeneratedEvent if the byte array payload can be successfully deserialized to JsonLD" in new TestCase {
 
       (zip
-        .unzip[IO](_: Array[Byte])(_: BracketThrow[IO], _: Sync[IO]))
-        .expects(originalPayload.value, *, *)
+        .unzip[IO](_: Array[Byte])(_: Sync[IO]))
+        .expects(originalPayload.value, *)
         .returns(jsonld.toJson.noSpaces.pure[IO])
 
       deserializer.toEvent(compoundEventId, project, originalPayload).unsafeRunSync() shouldBe TriplesGeneratedEvent(
@@ -55,8 +56,8 @@ class EventBodyDeserialiserSpec extends AnyWordSpec with MockFactory with should
     "fail if unzipping fails" in new TestCase {
       val exception = exceptions.generateOne
       (zip
-        .unzip[IO](_: Array[Byte])(_: BracketThrow[IO], _: Sync[IO]))
-        .expects(where((arr: Array[Byte], _, _) => arr.sameElements(originalPayload.value)))
+        .unzip[IO](_: Array[Byte])(_: Sync[IO]))
+        .expects(where((arr: Array[Byte], _) => arr.sameElements(originalPayload.value)))
         .returns(exception.raiseError[IO, String])
 
       intercept[Exception] {
@@ -66,8 +67,8 @@ class EventBodyDeserialiserSpec extends AnyWordSpec with MockFactory with should
 
     "fail if parsing fails" in new TestCase {
       (zip
-        .unzip[IO](_: Array[Byte])(_: BracketThrow[IO], _: Sync[IO]))
-        .expects(originalPayload.value, *, *)
+        .unzip[IO](_: Array[Byte])(_: Sync[IO]))
+        .expects(originalPayload.value, *)
         .returns("{".pure[IO])
 
       intercept[ParsingFailure] {
@@ -88,9 +89,7 @@ class EventBodyDeserialiserSpec extends AnyWordSpec with MockFactory with should
 
     val jsonld = jsonLDValues.generateOne
 
-    val zip = mock[Zip]
-
+    val zip          = mock[Zip]
     val deserializer = new EventBodyDeserializerImpl[IO](zip)
-
   }
 }

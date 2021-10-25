@@ -28,6 +28,7 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.{CliVersion, RenkuVersionPair, SchemaVersion}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Warn
+import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -89,7 +90,7 @@ class VersionCompatibilityConfigSpec extends AnyWordSpec with should.Matchers {
 
       val expected = renkuPythonDevVersion.toRenkuVersionPair(configVersions.head.schemaVersion) +: configVersions.tail
 
-      val Success(result) = VersionCompatibilityConfig[Try](renkuPythonDevVersion.some, logger, config)
+      val Success(result) = RenkuVersionPairsReader.readRenkuVersionPairs[Try](renkuPythonDevVersion.some, config)
       result shouldBe NonEmptyList.fromListUnsafe(expected)
 
       logger.loggedOnly(
@@ -111,18 +112,17 @@ class VersionCompatibilityConfigSpec extends AnyWordSpec with should.Matchers {
 
   private trait TestCase {
 
-    val logger = TestLogger[Try]()
+    implicit val logger: TestLogger[Try] = TestLogger[Try]()
 
-    def versionCompatibilityWith(config: Config) = VersionCompatibilityConfig[Try](None, logger, config)
+    def versionCompatibilityWith(config: Config) = RenkuVersionPairsReader.readRenkuVersionPairs[Try](None, config)
 
-    implicit lazy val renkuPythonDevVersions = for {
+    implicit lazy val renkuPythonDevVersions: Gen[RenkuPythonDevVersion] = for {
       version <- nonEmptyStrings()
     } yield RenkuPythonDevVersion(version)
 
     implicit class RenkuPythonDevVersionOps(devVersion: RenkuPythonDevVersion) {
-      def toRenkuVersionPair(schemaVersion: SchemaVersion) =
+      def toRenkuVersionPair(schemaVersion: SchemaVersion): RenkuVersionPair =
         RenkuVersionPair(CliVersion(devVersion.version), schemaVersion)
     }
   }
-
 }

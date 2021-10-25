@@ -25,7 +25,7 @@ import io.renku.generators.Generators._
 import io.renku.jsonld.generators.JsonLDGenerators.jsonLDEntities
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
-import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.{Renku, RepositoryPath}
+import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.{RenkuImpl, RepositoryPath}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -73,6 +73,6 @@ class RenkuSpec extends AnyWordSpec with IOSpec with should.Matchers with MockFa
     val path        = RepositoryPath(paths.generateOne)
     val renkuExport = mockFunction[Path, CommandResult]
 
-    val renku = new Renku[IO](renkuExport)
+    val renku = new RenkuImpl[IO](renkuExport)
   }
 }

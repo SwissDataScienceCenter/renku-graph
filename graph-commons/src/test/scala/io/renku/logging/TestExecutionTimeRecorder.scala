@@ -32,9 +32,7 @@ import scala.util.Try
 
 object TestExecutionTimeRecorder {
 
-  def apply[F[_]: MonadThrow: Logger](
-      maybeHistogram: Option[Histogram] = None
-  ): TestExecutionTimeRecorder[F] =
+  def apply[F[_]: MonadThrow: Logger](maybeHistogram: Option[Histogram] = None): TestExecutionTimeRecorder[F] =
     new TestExecutionTimeRecorder[F](threshold = elapsedTimes.generateOne, maybeHistogram)
 }
 

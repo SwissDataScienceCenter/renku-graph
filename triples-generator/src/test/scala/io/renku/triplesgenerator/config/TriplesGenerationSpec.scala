@@ -19,6 +19,7 @@
 package io.renku.triplesgenerator.config
 
 import com.typesafe.config.ConfigFactory
+import io.renku.interpreters.TestLogger
 import io.renku.triplesgenerator.config.TriplesGeneration._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -51,4 +52,6 @@ class TriplesGenerationSpec extends AnyWordSpec with should.Matchers {
       TriplesGeneration[Try](config) shouldBe Success(RemoteTriplesGeneration)
     }
   }
+
+  private implicit val logger: TestLogger[Try] = TestLogger[Try]()
 }

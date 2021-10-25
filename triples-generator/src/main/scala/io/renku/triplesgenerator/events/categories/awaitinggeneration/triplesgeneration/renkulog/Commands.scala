@@ -77,40 +77,65 @@ private object Commands {
   import ammonite.ops
   import ammonite.ops._
 
-  class File[F[_]: MonadThrow] {
+  trait File[F[_]] {
+    def mkdir(newDir:                        Path): F[Path]
+    def deleteDirectory(repositoryDirectory: Path): F[Unit]
+    def exists(fileName:                     Path): F[Boolean]
+  }
 
-    def mkdir(newDir: Path): F[Path] = MonadThrow[F].catchNonFatal {
+  object File {
+    def apply[F[_]: MonadThrow]: File[F] = new FileImpl[F]
+  }
+
+  class FileImpl[F[_]: MonadThrow] extends File[F] {
+
+    override def mkdir(newDir: Path): F[Path] = MonadThrow[F].catchNonFatal {
       ops.mkdir ! newDir
       newDir
     }
 
-    def deleteDirectory(repositoryDirectory: Path): F[Unit] = MonadThrow[F].catchNonFatal {
+    override def deleteDirectory(repositoryDirectory: Path): F[Unit] = MonadThrow[F].catchNonFatal {
       ops.rm ! repositoryDirectory
     }
 
-    def exists(fileName: Path): F[Boolean] = MonadThrow[F].catchNonFatal {
+    override def exists(fileName: Path): F[Boolean] = MonadThrow[F].catchNonFatal {
       ops.exists(fileName)
     }
   }
 
-  class Git[F[_]: MonadThrow](
+  trait Git[F[_]] {
+    def checkout(commitId:                           CommitId)(implicit repositoryDirectory: RepositoryPath): F[Unit]
+    def `reset --hard`(implicit repositoryDirectory: RepositoryPath): F[Unit]
+    def clone(
+        repositoryUrl:                       ServiceUrl,
+        workDirectory:                       Path
+    )(implicit destinationDirectory:         RepositoryPath): EitherT[F, GenerationRecoverableError, Unit]
+    def rm(fileName:                         Path)(implicit repositoryDirectory: RepositoryPath): F[Unit]
+    def status(implicit repositoryDirectory: RepositoryPath): F[String]
+  }
+
+  object Git {
+    def apply[F[_]: MonadThrow]: Git[F] = new GitImpl[F]()
+  }
+
+  class GitImpl[F[_]: MonadThrow](
       doClone: (ServiceUrl, RepositoryPath, Path) => CommandResult = (url, destinationDir, workDir) =>
         %%("git", "clone", url.toString, destinationDir.toString)(workDir)
-  ) {
+  ) extends Git[F] {
     import cats.data.EitherT
     import cats.syntax.all._
     import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 
-    def checkout(commitId: CommitId)(implicit repositoryDirectory: RepositoryPath): F[Unit] =
+    override def checkout(commitId: CommitId)(implicit repositoryDirectory: RepositoryPath): F[Unit] =
       MonadThrow[F].catchNonFatal {
         %%("git", "checkout", commitId.value)(repositoryDirectory.value)
       }.void
 
-    def `reset --hard`(implicit repositoryDirectory: RepositoryPath): F[Unit] = MonadThrow[F].catchNonFatal {
+    override def `reset --hard`(implicit repositoryDirectory: RepositoryPath): F[Unit] = MonadThrow[F].catchNonFatal {
       %%("git", "reset", "--hard")(repositoryDirectory.value)
     }.void
 
-    def clone(
+    override def clone(
         repositoryUrl:               ServiceUrl,
         workDirectory:               Path
     )(implicit destinationDirectory: RepositoryPath): EitherT[F, GenerationRecoverableError, Unit] =
@@ -123,11 +148,12 @@ private object Commands {
           .recoverWith(relevantError)
       }
 
-    def rm(fileName: Path)(implicit repositoryDirectory: RepositoryPath): F[Unit] = MonadThrow[F].catchNonFatal {
-      %%("git", "rm", fileName)(repositoryDirectory.value)
-    }.void
+    override def rm(fileName: Path)(implicit repositoryDirectory: RepositoryPath): F[Unit] =
+      MonadThrow[F].catchNonFatal {
+        %%("git", "rm", fileName)(repositoryDirectory.value)
+      }.void
 
-    def status(implicit repositoryDirectory: RepositoryPath): F[String] = MonadThrow[F].catchNonFatal {
+    override def status(implicit repositoryDirectory: RepositoryPath): F[String] = MonadThrow[F].catchNonFatal {
       %%("git", "status")(repositoryDirectory.value).out.string
     }
 
@@ -150,13 +176,22 @@ private object Commands {
     }
   }
 
-  class Renku[F[_]: Async](
+  trait Renku[F[_]] {
+    def migrate(commitEvent:                  CommitEvent)(implicit destinationDirectory: RepositoryPath): F[Unit]
+    def export(implicit destinationDirectory: RepositoryPath): EitherT[F, ProcessingRecoverableError, JsonLD]
+  }
+
+  object Renku {
+    def apply[F[_]: Async]: Renku[F] = new RenkuImpl[F]()
+  }
+
+  class RenkuImpl[F[_]: Async](
       renkuExport: Path => CommandResult = %%("renku", "graph", "export", "--full", "--strict")(_)
-  ) {
+  ) extends Renku[F] {
 
     import cats.syntax.all._
 
-    def migrate(commitEvent: CommitEvent)(implicit destinationDirectory: RepositoryPath): F[Unit] =
+    override def migrate(commitEvent: CommitEvent)(implicit destinationDirectory: RepositoryPath): F[Unit] =
       MonadThrow[F]
         .catchNonFatal(%%("renku", "migrate")(destinationDirectory.value))
         .void
@@ -167,7 +202,7 @@ private object Commands {
           ).raiseError[F, Unit]
         }
 
-    def export(implicit destinationDirectory: RepositoryPath): EitherT[F, ProcessingRecoverableError, JsonLD] =
+    override def export(implicit destinationDirectory: RepositoryPath): EitherT[F, ProcessingRecoverableError, JsonLD] =
       EitherT {
         {
           for {

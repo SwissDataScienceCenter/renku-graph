@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER
@@ -31,17 +31,22 @@ import io.renku.jsonld.generators.JsonLDGenerators._
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.rdfstore.{FusekiBaseUrl, SparqlQueryTimeRecorder}
 import io.renku.stubbing.ExternalServiceStubbing
+import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult.{DeliverySuccess, InvalidTriplesFailure, RecoverableFailure}
 import org.http4s.Status._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class TriplesUploaderSpec extends AnyWordSpec with MockFactory with ExternalServiceStubbing with should.Matchers {
+class TriplesUploaderSpec
+    extends AnyWordSpec
+    with IOSpec
+    with MockFactory
+    with ExternalServiceStubbing
+    with should.Matchers {
 
   "upload" should {
 
@@ -82,15 +87,12 @@ class TriplesUploaderSpec extends AnyWordSpec with MockFactory with ExternalServ
     }
   }
 
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO]        = IO.timer(global)
-
   private trait TestCase {
 
     val triples = jsonLDEntities.generateOne
 
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
+    private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO]())
     lazy val rdfStoreConfig  = rdfStoreConfigs.generateOne.copy(fusekiBaseUrl = FusekiBaseUrl(externalServiceBaseUrl))
     lazy val triplesUploader =
       new TriplesUploaderImpl[IO](rdfStoreConfig, timeRecorder, retryInterval = 100 millis, maxRetries = 1)

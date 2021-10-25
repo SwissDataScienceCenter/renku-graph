@@ -27,11 +27,12 @@ import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityTypes, JsonLD}
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.generators.VersionGenerators.renkuVersionPairs
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class TriplesRemoverSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers {
+class TriplesRemoverSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore with should.Matchers {
 
   "removeAllTriples" should {
 
@@ -71,10 +72,10 @@ class TriplesRemoverSpec extends AnyWordSpec with InMemoryRdfStore with should.M
   }
 
   private trait TestCase {
-    private val removalBatchSize      = positiveLongs(max = 100000).generateOne
-    private val logger                = TestLogger[IO]()
-    private val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
+    private val removalBatchSize = positiveLongs(max = 100000).generateOne
+    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    private val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
     private val sparqlTimeRecorder    = new SparqlQueryTimeRecorder(executionTimeRecorder)
-    val triplesRemover = new TriplesRemoverImpl(removalBatchSize, rdfStoreConfig, logger, sparqlTimeRecorder)
+    val triplesRemover                = new TriplesRemoverImpl(removalBatchSize, rdfStoreConfig, sparqlTimeRecorder)
   }
 }

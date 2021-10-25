@@ -25,11 +25,13 @@ import io.renku.graph.model.{CliVersion, RenkuVersionPair, SchemaVersion}
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.generators.VersionGenerators._
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-class RenkuVersionPairUpdaterSpec extends AnyWordSpec with InMemoryRdfStore with Matchers {
+class RenkuVersionPairUpdaterSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore with Matchers {
+
   "update" should {
     "create a renku:VersionPair with the given version pair" in new TestCase {
       findPairInDb shouldBe Set.empty
@@ -41,18 +43,18 @@ class RenkuVersionPairUpdaterSpec extends AnyWordSpec with InMemoryRdfStore with
       renkuVersionPairUpdater.update(newVersionCompatibilityPairs).unsafeRunSync()
 
       findPairInDb shouldBe Set(newVersionCompatibilityPairs)
-
     }
   }
 
   private trait TestCase {
-    val currentRenkuVersionPair      = renkuVersionPairs.generateOne
-    private val renkuBaseUrl         = renkuBaseUrls.generateOne
-    private val logger               = TestLogger[IO]()
-    private val timeRecorder         = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
+    val currentRenkuVersionPair = renkuVersionPairs.generateOne
+    private val renkuBaseUrl    = renkuBaseUrls.generateOne
+
+    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    private val timeRecorder         = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO]())
     val newVersionCompatibilityPairs = renkuVersionPairs.generateOne
 
-    val renkuVersionPairUpdater = new RenkuVersionPairUpdaterImpl(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
+    val renkuVersionPairUpdater = new RenkuVersionPairUpdaterImpl(rdfStoreConfig, renkuBaseUrl, timeRecorder)
 
     def findPairInDb: Set[RenkuVersionPair] =
       runQuery(s"""|SELECT DISTINCT ?schemaVersion ?cliVersion

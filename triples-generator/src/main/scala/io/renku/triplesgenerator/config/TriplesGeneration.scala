@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.config
 
-import cats.effect.Async
+import cats.MonadThrow
 import com.typesafe.config.{Config, ConfigFactory}
 import org.typelevel.log4cats.Logger
 
@@ -31,7 +31,7 @@ object TriplesGeneration {
   import cats.syntax.all._
   import io.renku.config.ConfigLoader._
 
-  def apply[F[_]: Async: Logger](config: Config = ConfigFactory.load): F[TriplesGeneration] =
+  def apply[F[_]: MonadThrow: Logger](config: Config = ConfigFactory.load): F[TriplesGeneration] =
     find[F, String]("triples-generation", config) map {
       case "renku-log"        => RenkuLog
       case "remote-generator" => RemoteTriplesGeneration

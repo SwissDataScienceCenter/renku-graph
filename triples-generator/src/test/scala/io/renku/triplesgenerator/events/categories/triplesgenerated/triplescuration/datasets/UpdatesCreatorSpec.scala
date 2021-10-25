@@ -26,11 +26,17 @@ import io.renku.graph.model.datasets.{SameAs, TopmostDerivedFrom, TopmostSameAs}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{entities, projects}
 import io.renku.rdfstore.InMemoryRdfStore
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 
-class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers with TableDrivenPropertyChecks {
+class UpdatesCreatorSpec
+    extends AnyWordSpec
+    with IOSpec
+    with InMemoryRdfStore
+    with should.Matchers
+    with TableDrivenPropertyChecks {
 
   "prepareUpdates" should {
 

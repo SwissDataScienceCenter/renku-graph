@@ -19,7 +19,6 @@
 package io.renku.triplesgenerator.config.certificates
 
 import cats.MonadThrow
-import cats.effect.kernel.Async
 import io.renku.config.certificates.Certificate
 import org.typelevel.log4cats.Logger
 
@@ -30,7 +29,7 @@ trait GitCertificateInstaller[F[_]] {
 }
 
 object GitCertificateInstaller {
-  def apply[F[_]: Async: Logger]: F[GitCertificateInstaller[F]] =
+  def apply[F[_]: MonadThrow: Logger]: F[GitCertificateInstaller[F]] =
     MonadThrow[F].catchNonFatal {
       new GitCertificateInstallerImpl[F](
         () => Certificate.fromConfig[F](),
@@ -40,7 +39,7 @@ object GitCertificateInstaller {
     }
 }
 
-class GitCertificateInstallerImpl[F[_]: Async: Logger](
+class GitCertificateInstallerImpl[F[_]: MonadThrow: Logger](
     findCertificate:   () => F[Option[Certificate]],
     certificateSaver:  CertificateSaver[F],
     gitConfigModifier: GitConfigModifier[F]

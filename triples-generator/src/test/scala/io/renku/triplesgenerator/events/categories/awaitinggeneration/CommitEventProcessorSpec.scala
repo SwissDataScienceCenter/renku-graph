@@ -19,10 +19,9 @@
 package io.renku.triplesgenerator.events.categories.awaitinggeneration
 
 import EventProcessingGenerators._
-import cats.MonadError
 import cats.data.EitherT
 import cats.data.EitherT.{leftT, rightT}
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import cats.syntax.all._
 import io.prometheus.client.Histogram
 import io.renku.generators.CommonGraphGenerators._
@@ -39,9 +38,10 @@ import io.renku.jsonld.JsonLD
 import io.renku.jsonld.generators.JsonLDGenerators.jsonLDEntities
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.metrics.MetricsRegistry
+import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater
-import io.renku.triplesgenerator.events.categories.awaitinggeneration.IOCommitEventProcessor.eventsProcessingTimesBuilder
+import io.renku.triplesgenerator.events.categories.awaitinggeneration.CommitEventProcessor.eventsProcessingTimesBuilder
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import org.scalacheck.Gen
@@ -52,13 +52,12 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Duration
-import scala.concurrent.ExecutionContext
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.jdk.CollectionConverters._
 import scala.util.Try
 
 class CommitEventProcessorSpec
     extends AnyWordSpec
+    with IOSpec
     with MockFactory
     with Eventually
     with IntegrationPatience
@@ -154,37 +153,34 @@ class CommitEventProcessorSpec
 
     "be registered in the Metrics Registry" in {
 
-      val metricsRegistry = mock[MetricsRegistry[IO]]
+      val metricsRegistry = mock[MetricsRegistry]
 
       (metricsRegistry
-        .register[Histogram, Histogram.Builder](_: Histogram.Builder)(_: MonadError[IO, Throwable]))
-        .expects(eventsProcessingTimesBuilder, *)
+        .register[IO, Histogram, Histogram.Builder](_: Histogram.Builder))
+        .expects(eventsProcessingTimesBuilder)
         .returning(IO.pure(eventsProcessingTimes))
 
       implicit val logger: TestLogger[IO] = TestLogger[IO]()
-      IOCommitEventProcessor(metricsRegistry).unsafeRunSync()
+      CommitEventProcessor[IO](metricsRegistry).unsafeRunSync()
     }
   }
 
-  private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
-  private implicit val timer:        Timer[IO]        = IO.timer(ExecutionContext.global)
   private lazy val eventsProcessingTimes = eventsProcessingTimesBuilder.create()
 
   private trait TestCase {
 
     val maybeAccessToken = Gen.option(accessTokens).generateOne
 
+    implicit val logger: TestLogger[Try] = TestLogger[Try]()
     val accessTokenFinder       = mock[AccessTokenFinder[Try]]
     val triplesFinder           = mock[TriplesGenerator[Try]]
     val eventStatusUpdater      = mock[EventStatusUpdater[Try]]
-    val logger                  = TestLogger[Try]()
-    val allEventsTimeRecorder   = TestExecutionTimeRecorder[Try](logger, Option(eventsProcessingTimes))
-    val singleEventTimeRecorder = TestExecutionTimeRecorder[Try](logger, maybeHistogram = None)
+    val allEventsTimeRecorder   = TestExecutionTimeRecorder[Try](Option(eventsProcessingTimes))
+    val singleEventTimeRecorder = TestExecutionTimeRecorder[Try](maybeHistogram = None)
     val eventProcessor = new CommitEventProcessor(
       accessTokenFinder,
       triplesFinder,
       eventStatusUpdater,
-      logger,
       allEventsTimeRecorder,
       singleEventTimeRecorder
     )

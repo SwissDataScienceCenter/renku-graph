@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories
 
-import cats.effect.{BracketThrow, IO, Sync}
+import cats.effect.{IO, Sync}
 import cats.syntax.all._
 import io.circe.literal._
 import io.renku.compression.Zip
@@ -33,6 +33,7 @@ import io.renku.graph.model.events
 import io.renku.graph.model.events.EventStatus._
 import io.renku.http.client.RestClient._
 import io.renku.jsonld.generators.JsonLDGenerators.jsonLDEntities
+import io.renku.testtools.IOSpec
 import io.renku.tinytypes.ByteArrayTinyType
 import io.renku.tinytypes.contenttypes.ZippedContent
 import io.renku.tinytypes.json.TinyTypeEncoders
@@ -41,7 +42,12 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EventStatusUpdaterSpec extends AnyWordSpec with MockFactory with should.Matchers with TinyTypeEncoders {
+class EventStatusUpdaterSpec
+    extends AnyWordSpec
+    with IOSpec
+    with MockFactory
+    with should.Matchers
+    with TinyTypeEncoders {
 
   "toTriplesGenerated" should {
 
@@ -51,8 +57,8 @@ class EventStatusUpdaterSpec extends AnyWordSpec with MockFactory with should.Ma
       val jsonLDPayload = jsonLDEntities.generateOne
       val zippedPayload = zippedEventPayloads.generateOne
       (zip
-        .zip[IO](_: String)(_: BracketThrow[IO], _: Sync[IO]))
-        .expects(jsonLDPayload.toJson.noSpaces, *, *)
+        .zip[IO](_: String)(_: Sync[IO]))
+        .expects(jsonLDPayload.toJson.noSpaces, *)
         .returning(zippedPayload.value.pure[IO])
 
       (eventSender

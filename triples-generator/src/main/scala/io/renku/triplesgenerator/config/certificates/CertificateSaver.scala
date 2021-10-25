@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.config.certificates
 
-import cats.MonadError
+import cats.{MonadError, MonadThrow}
 import io.renku.config.certificates.Certificate
 
 import java.io.{File, PrintWriter}
@@ -29,7 +29,7 @@ private trait CertificateSaver[F[_]] {
 }
 
 private object CertificateSaver {
-  def apply[F[_]]()(implicit ME: MonadError[F, Throwable]): CertificateSaver[F] =
+  def apply[F[_]: MonadThrow](): CertificateSaver[F] =
     new CertificateSaverImpl[F]()
 }
 

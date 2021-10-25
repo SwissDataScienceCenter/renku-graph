@@ -135,9 +135,9 @@ private[events] object RenkuLogTriplesGenerator {
     gitLabUrl <- GitLabUrlLoader[F]()
   } yield new RenkuLogTriplesGenerator(
     new GitLabRepoUrlFinderImpl[F](gitLabUrl),
-    new Commands.Renku[F],
-    new Commands.File[F],
-    new Commands.Git[F],
+    Commands.Renku[F],
+    Commands.File[F],
+    Commands.Git[F],
     randomLong = new SecureRandom().nextLong _
   )
 }

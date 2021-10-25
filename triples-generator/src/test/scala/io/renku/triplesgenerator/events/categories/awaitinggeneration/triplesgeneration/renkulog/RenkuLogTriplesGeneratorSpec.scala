@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesge
 import ammonite.ops.root
 import cats.data.EitherT
 import cats.data.EitherT._
-import cats.effect.{ContextShift, IO}
+import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.config.ServiceUrl
@@ -36,9 +36,10 @@ import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.generators.JsonLDGenerators.jsonLDEntities
+import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
-import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.RepositoryPath
+import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.{GitLabRepoUrlFinder, RepositoryPath}
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.{CommitEvent, categoryName}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -46,9 +47,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import os.Path
 
-import scala.concurrent.ExecutionContext
-
-class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "generateTriples" should {
 
@@ -684,8 +683,6 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
     }
   }
 
-  private implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
-
   private trait TestCase {
     implicit lazy val maybeAccessToken: Option[AccessToken] = Gen.option(accessTokens).generateOne
     lazy val repositoryName = nonEmptyStrings().generateOne
@@ -708,10 +705,10 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
     val payload:           JsonLD = jsonLDEntities.generateOne
     val dirtyRepoFilePath: Path   = repositoryDirectory.value / ".gitattributes"
 
-    val gitLabRepoUrlFinder = mock[IOGitLabRepoUrlFinder]
-    val file                = mock[Commands.File]
-    val git                 = mock[Commands.Git]
-    val renku               = mock[Commands.Renku]
+    val gitLabRepoUrlFinder = mock[GitLabRepoUrlFinder[IO]]
+    val file                = mock[Commands.File[IO]]
+    val git                 = mock[Commands.Git[IO]]
+    val renku               = mock[Commands.Renku[IO]]
     val randomLong          = mockFunction[Long]
     randomLong.expects().returning(pathDifferentiator)
 
