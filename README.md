@@ -38,6 +38,10 @@ services. Tagging has to be done manually.
 
 ### Event Flow
 
+This section describes the flow of events starting from a commit on GitLab until the data is stored in the triples
+store. The solid lines represent an event being sent and the dotted lines represent non-event-like data (request or
+response).
+
 #### Project creation flow and new commit flow
 
 When a project is created on GitLab or a new commit is pushed to GitLab the following flow is triggered:
@@ -70,30 +74,32 @@ sequenceDiagram
     EventLog -->>EventLog: find TriplesGeneratedEvent
     end
     EventLog ->>TriplesGenerator: TriplesGeneratedEvent
-    TriplesGenerator ->>TriplesStore: JsonLD
+    TriplesGenerator -->>TriplesStore: JsonLD
     TriplesGenerator ->>EventLog: TriplesStoreEvent
 ```
 
 #### Global Commit Sync flow:
 
-This flow is scheduled to be triggered at max once a week per project. It allows removal or creation of commit anywhere
-in the history
+This flow allows removal or creation of commits anywhere in the commit history. It is scheduled to be triggered at a
+minimum rate of once per week per project and at a maximum rate of once per hour per project. This process will only
+begin if a change in the history is detected.
 
 ```mermaid
 sequenceDiagram
     participant GitLab
-    participant WebhookService
     participant EventLog
     participant CommmitEventService
     participant TriplesGenerator
     participant TriplesStore
     Note over CommmitEventService, EventLog: The scheduling time depends on the usage of the project
     loop Every hour or week
+    EventLog ->>CommmitEventService: GlobalCommitSyncEvent
     CommmitEventService -->>EventLog: get all commits
+    EventLog -->>CommmitEventService: return all commits
     CommmitEventService -->>GitLab: get all commits
+    GitLab -->>CommmitEventService: return all commits
     CommmitEventService ->>EventLog: AwaitingDeletionEvent or NewCommitEvent
     end
-    
     loop Continuously pulling
     EventLog -->>EventLog: find AwaitingGenerationEvent
     end
@@ -103,7 +109,7 @@ sequenceDiagram
     EventLog -->>EventLog: find TriplesGeneratedEvent
     end
     EventLog ->>TriplesGenerator: TriplesGeneratedEvent
-    TriplesGenerator ->>TriplesStore: JsonLD
+    TriplesGenerator -->>TriplesStore: JsonLD
     TriplesGenerator ->>EventLog: TriplesStoreEvent
 ```
 
