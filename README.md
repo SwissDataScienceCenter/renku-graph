@@ -62,9 +62,12 @@ sequenceDiagram
     EventLog -->>EventLog: find latest event 
     end
     EventLog ->>CommmitEventService: MinimalCommitSyncEvent or FullCommitSyncEvent
-    CommmitEventService -->>GitLab: get the latest commit
+    Note over CommmitEventService, GitLab: this process will be repeated for each commit that is not yet in EventLog or if a commit in EventLog should be removed
+    loop Until the commit from gitlab is already in the EventLog
+    CommmitEventService -->>GitLab: get commit
     GitLab ->>CommmitEventService: CommitInfo
-    CommmitEventService ->>EventLog: NewCommitEvent
+    CommmitEventService ->>EventLog: NewCommitEvent or AwaitingDeletion
+    end
     loop Continuously pulling
     EventLog -->>EventLog: find AwaitingGenerationEvent
     end
