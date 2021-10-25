@@ -50,7 +50,7 @@ object Microservice extends IOMicroservice {
     for {
       certificateLoader      <- CertificateLoader[IO]
       sentryInitializer      <- SentryInitializer[IO]
-      metricsRegistry        <- MetricsRegistry()
+      metricsRegistry        <- MetricsRegistry[IO]()
       queriesExecTimes       <- QueriesExecutionTimes(metricsRegistry)
       fetchTokenEndpoint     <- FetchTokenEndpoint(sessionResource, queriesExecTimes)
       associateTokenEndpoint <- AssociateTokenEndpoint(sessionResource, queriesExecTimes)

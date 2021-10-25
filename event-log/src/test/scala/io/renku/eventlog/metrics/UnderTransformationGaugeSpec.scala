@@ -46,7 +46,7 @@ class UnderTransformationGaugeSpec extends AnyWordSpec with IOSpec with MockFact
     "create and register an events_awaiting_transformation_count named gauge" in new TestCase {
 
       (metricsRegistry
-        .register[LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[IO, Throwable]))
+        .register[IO, LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[IO, Throwable]))
         .expects(*, *)
         .onCall { (builder: LibGauge.Builder, _: MonadError[IO, Throwable]) =>
           val actual = builder.create()
@@ -63,7 +63,7 @@ class UnderTransformationGaugeSpec extends AnyWordSpec with IOSpec with MockFact
     "return a gauge with reset method provisioning it with values from the Event Log" in new TestCase {
 
       (metricsRegistry
-        .register[LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[IO, Throwable]))
+        .register[IO, LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[IO, Throwable]))
         .expects(*, *)
         .onCall((_: LibGauge.Builder, _: MonadError[IO, Throwable]) => underlying.pure[IO])
 
@@ -88,7 +88,7 @@ class UnderTransformationGaugeSpec extends AnyWordSpec with IOSpec with MockFact
       .labelNames("project")
       .create()
 
-    val metricsRegistry = mock[MetricsRegistry[IO]]
+    val metricsRegistry = mock[MetricsRegistry]
     val statsFinder     = mock[StatsFinder[IO]]
   }
 

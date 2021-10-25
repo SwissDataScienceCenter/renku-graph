@@ -31,6 +31,7 @@ import io.renku.graph.acceptancetests.tooling._
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.EventStatus._
 import io.renku.http.client.AccessToken
+import io.renku.testtools.IOSpec
 import io.renku.webhookservice.model.HookToken
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
@@ -44,6 +45,7 @@ class EventFlowsSpec
     with GivenWhenThen
     with GraphServices
     with Eventually
+    with IOSpec
     with AcceptanceTestPatience
     with should.Matchers {
 

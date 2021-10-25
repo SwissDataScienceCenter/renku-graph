@@ -18,6 +18,7 @@
 
 package io.renku.graph.acceptancetests.flows
 
+import cats.effect.unsafe.IORuntime
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data
 import io.renku.graph.acceptancetests.flows.AccessTokenPresence._
@@ -48,7 +49,7 @@ object RdfStoreProvisioning extends ModelImplicits with Eventually with Acceptan
       project:            data.Project,
       triples:            JsonLD,
       commitId:           CommitId = commitIds.generateOne
-  )(implicit accessToken: AccessToken): Assertion = {
+  )(implicit accessToken: AccessToken, ioRuntime: IORuntime): Assertion = {
     `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(project.id, commitId)
 
     `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project.id, commitId)
@@ -68,7 +69,7 @@ object RdfStoreProvisioning extends ModelImplicits with Eventually with Acceptan
     `wait for events to be processed`(project.id)
   }
 
-  def `wait for events to be processed`(projectId: projects.Id): Assertion = eventually {
+  def `wait for events to be processed`(projectId: projects.Id)(implicit ioRuntime: IORuntime): Assertion = eventually {
     val response = eventLogClient.fetchProcessingStatus(projectId)
     response.status                                              shouldBe Ok
     response.bodyAsJson.hcursor.downField("progress").as[Double] shouldBe Right(100d)

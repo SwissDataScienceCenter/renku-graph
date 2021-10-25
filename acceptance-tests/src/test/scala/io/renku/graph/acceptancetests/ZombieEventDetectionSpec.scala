@@ -38,6 +38,7 @@ import io.renku.graph.model.events.{BatchDate, CommitId, EventBody, EventId, Eve
 import io.renku.graph.model.projects._
 import io.renku.http.client.AccessToken
 import io.renku.microservices.MicroserviceIdentifier
+import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.Eventually
@@ -55,6 +56,7 @@ import scala.language.postfixOps
 class ZombieEventDetectionSpec
     extends AnyFeatureSpec
     with GraphServices
+    with IOSpec
     with Eventually
     with ModelImplicits
     with GivenWhenThen

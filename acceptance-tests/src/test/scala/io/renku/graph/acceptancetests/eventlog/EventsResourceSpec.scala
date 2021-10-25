@@ -36,6 +36,7 @@ import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.http.client.AccessToken
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.jsonld.syntax._
+import io.renku.testtools.IOSpec
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.Eventually
@@ -46,6 +47,7 @@ class EventsResourceSpec
     extends AnyFeatureSpec
     with GivenWhenThen
     with GraphServices
+    with IOSpec
     with RdfStoreData
     with should.Matchers
     with Eventually

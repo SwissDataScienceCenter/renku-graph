@@ -18,10 +18,11 @@
 
 package io.renku.knowledgegraph.graphql
 
-import cats.MonadThrow
 import cats.effect._
+import cats.effect.kernel.Concurrent
 import cats.effect.unsafe.IORuntime
 import cats.syntax.all._
+import cats.MonadThrow
 import io.circe.Json
 import io.renku.http.ErrorMessage
 import io.renku.http.server.security.model.AuthUser
@@ -112,7 +113,7 @@ object QueryEndpointImpl {
     }
 }
 
-object IOQueryEndpoint {
+object QueryEndpoint {
 
   import io.renku.rdfstore.SparqlQueryTimeRecorder
 

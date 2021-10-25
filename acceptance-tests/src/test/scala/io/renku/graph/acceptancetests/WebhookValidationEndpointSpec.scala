@@ -27,12 +27,18 @@ import io.renku.graph.acceptancetests.stubs.GitLab._
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.acceptancetests.tooling.ResponseTools._
 import io.renku.http.client.AccessToken
+import io.renku.testtools.IOSpec
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 
-class WebhookValidationEndpointSpec extends AnyFeatureSpec with GivenWhenThen with GraphServices with should.Matchers {
+class WebhookValidationEndpointSpec
+    extends AnyFeatureSpec
+    with GivenWhenThen
+    with GraphServices
+    with IOSpec
+    with should.Matchers {
 
   Feature("Existence of a Graph Services hook can be validated") {
 

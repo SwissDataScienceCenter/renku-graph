@@ -18,6 +18,7 @@
 
 package io.renku.graph.acceptancetests.flows
 
+import cats.effect.unsafe.IORuntime
 import io.circe.syntax._
 import io.renku.graph.acceptancetests.data.Project
 import io.renku.graph.acceptancetests.tooling.GraphServices.tokenRepositoryClient
@@ -28,7 +29,7 @@ import org.scalatest.matchers.should
 
 object AccessTokenPresence extends should.Matchers {
 
-  def givenAccessTokenPresentFor(project: Project)(implicit accessToken: AccessToken): Assertion =
+  def givenAccessTokenPresentFor(project: Project)(implicit accessToken: AccessToken, ioRuntime: IORuntime): Assertion =
     tokenRepositoryClient
       .PUT(s"projects/${project.id}/tokens", accessToken.asJson, None)
       .status shouldBe NoContent

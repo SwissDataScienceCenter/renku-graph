@@ -42,6 +42,7 @@ import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 import io.renku.http.server.EndpointTester._
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
+import io.renku.testtools.IOSpec
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
@@ -51,6 +52,7 @@ class ProjectsResourcesSpec
     extends AnyFeatureSpec
     with GivenWhenThen
     with GraphServices
+    with IOSpec
     with AcceptanceTestPatience
     with RdfStoreData
     with should.Matchers {
@@ -102,7 +104,7 @@ class ProjectsResourcesSpec
       projectDetails shouldBe fullJson(project)
 
       When("user then fetches project's datasets using the link from the response")
-      val datasetsLink     = projectDetails._links.get(Rel("datasets")) getOrFail (message = "No link with rel 'datasets'")
+      val datasetsLink = projectDetails._links.get(Rel("datasets")) getOrFail (message = "No link with rel 'datasets'")
       val datasetsResponse = restClient GET datasetsLink.toString
 
       Then("he should get OK response with the projects datasets")
@@ -189,7 +191,7 @@ object ProjectsResources {
       "dateCreated": ${dateCreated.value},
       "creator": $creator
     }"""
-    case (dateCreated, _)             => json"""{
+    case (dateCreated, _) => json"""{
       "dateCreated": ${dateCreated.value}
     }"""
   }
@@ -199,7 +201,7 @@ object ProjectsResources {
       "name": ${name.value},
       "email": ${email.value}
     }"""
-    case Person(name, _, _, _)           => json"""{
+    case Person(name, _, _, _) => json"""{
       "name": ${name.value}
     }"""
   }
@@ -213,12 +215,12 @@ object ProjectsResources {
         "level": {"name": ${groupAccessLevel.name.value}, "value": ${groupAccessLevel.value.value}}
       }
     }"""
-    case ProjectPermissions(projectAccessLevel)                           => json"""{
+    case ProjectPermissions(projectAccessLevel) => json"""{
       "projectAccess": {
         "level": {"name": ${projectAccessLevel.name.value}, "value": ${projectAccessLevel.value.value}}
       }
     }"""
-    case GroupPermissions(groupAccessLevel)                               => json"""{
+    case GroupPermissions(groupAccessLevel) => json"""{
       "groupAccess": {
         "level": {"name": ${groupAccessLevel.name.value}, "value": ${groupAccessLevel.value.value}}
       }

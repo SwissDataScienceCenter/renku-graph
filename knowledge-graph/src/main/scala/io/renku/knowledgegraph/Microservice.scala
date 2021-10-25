@@ -45,8 +45,8 @@ object Microservice extends IOMicroservice {
   override def run(args: List[String]): IO[ExitCode] = for {
     certificateLoader  <- CertificateLoader[IO]
     sentryInitializer  <- SentryInitializer[IO]
-    metricsRegistry    <- MetricsRegistry()
-    sparqlTimeRecorder <- SparqlQueryTimeRecorder(metricsRegistry)
+    metricsRegistry    <- MetricsRegistry[IO]()
+    sparqlTimeRecorder <- SparqlQueryTimeRecorder[IO](metricsRegistry)
     kgMetrics          <- KGMetrics(metricsRegistry, sparqlTimeRecorder)
     microserviceRoutes <- MicroserviceRoutes(metricsRegistry, sparqlTimeRecorder)
     exicode <- microserviceRoutes.routes.use { routes =>

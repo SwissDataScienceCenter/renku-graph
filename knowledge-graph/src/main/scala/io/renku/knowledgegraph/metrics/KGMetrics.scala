@@ -70,7 +70,7 @@ object KGMetrics {
   private[metrics] val countsInterval: FiniteDuration = 1 minute
 
   def apply[F[_]: Async: Logger](
-      metricsRegistry: MetricsRegistry[F],
+      metricsRegistry: MetricsRegistry,
       timeRecorder:    SparqlQueryTimeRecorder[F]
   ): F[KGMetrics[F]] =
     for {

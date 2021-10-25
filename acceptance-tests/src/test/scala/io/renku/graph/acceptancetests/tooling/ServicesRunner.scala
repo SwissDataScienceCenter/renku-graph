@@ -19,12 +19,13 @@
 package io.renku.graph.acceptancetests.tooling
 
 import cats.effect._
-import cats.effect.concurrent.Semaphore
+import cats.effect.std.Semaphore
+import cats.effect.unsafe.IORuntime
 import io.renku.microservices.IOMicroservice
 
 import java.util.concurrent.ConcurrentHashMap
-import scala.concurrent.ExecutionContext
 import scala.jdk.CollectionConverters._
+import scala.language.postfixOps
 
 final case class ServiceRun(name:             String,
                             service:          IOMicroservice,
@@ -34,9 +35,7 @@ final case class ServiceRun(name:             String,
                             serviceArgsList:  List[() => String] = List.empty
 )
 
-class ServicesRunner(
-    semaphore:               Semaphore[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO]) {
+class ServicesRunner(semaphore: Semaphore[IO]) {
 
   import ServiceClient.ServiceReadiness._
   import cats.syntax.all._
@@ -45,18 +44,16 @@ class ServicesRunner(
 
   private val logger = TestLogger()
 
-  def run(services: ServiceRun*): IO[Unit] =
+  def run(services: ServiceRun*)(implicit ioRuntime: IORuntime): IO[Unit] =
     for {
       _ <- semaphore.acquire
       _ <- services.toList.map(start).parSequence
       _ <- semaphore.release
     } yield ()
 
-  private val cancelTokens = new ConcurrentHashMap[ServiceRun, CancelToken[IO]]()
+  private val cancelTokens = new ConcurrentHashMap[ServiceRun, IO[Unit]]()
 
-  private def start(
-      serviceRun:              ServiceRun
-  )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO]): IO[Unit] = {
+  private def start(serviceRun: ServiceRun)(implicit ioRuntime: IORuntime): IO[Unit] = {
     import serviceRun._
     serviceClient.ping.flatMap {
       case ServiceUp => IO.unit
@@ -68,27 +65,27 @@ class ServicesRunner(
                 .run(serviceRun.serviceArgsList.map(_()))
                 .start
                 .map(fiber => cancelTokens.put(serviceRun, fiber.cancel))
-                .unsafeRunAsyncAndForget()
+                .unsafeRunAndForget()
           _ <- verifyServiceReady(serviceRun)
         } yield ()
     }
   }
 
-  private def verifyServiceReady(serviceRun: ServiceRun)(implicit timer: Timer[IO]): IO[Unit] =
+  private def verifyServiceReady(serviceRun: ServiceRun): IO[Unit] =
     serviceRun.serviceClient.ping flatMap {
       case ServiceUp =>
         serviceRun.postServiceStart.sequence flatMap (_ => logger.info(s"Service ${serviceRun.name} started"))
       case _ =>
-        (timer sleep (500 millis)) flatMap (_ => verifyServiceReady(serviceRun))
+        Temporal[IO].delayBy(verifyServiceReady(serviceRun), 500 millis)
     }
 
-  private def verifyServiceDown(serviceRun: ServiceRun)(implicit timer: Timer[IO]): IO[Unit] =
+  private def verifyServiceDown(serviceRun: ServiceRun): IO[Unit] =
     serviceRun.serviceClient.ping flatMap {
-      case ServiceUp => (timer sleep (500 millis)) flatMap (_ => verifyServiceDown(serviceRun))
+      case ServiceUp => Temporal[IO].delayBy(verifyServiceReady(serviceRun), 500 millis)
       case _         => logger.info(s"Service ${serviceRun.name} stopped")
     }
 
-  def restart(service: ServiceRun): Unit = cancelTokens.asScala.get(service) match {
+  def restart(service: ServiceRun)(implicit ioRuntime: IORuntime): Unit = cancelTokens.asScala.get(service) match {
     case None => throw new IllegalStateException(s"'${service.name}' service not found so cannot be restarted")
     case Some(cancelToken) =>
       {
@@ -103,7 +100,7 @@ class ServicesRunner(
       }.unsafeRunSync()
   }
 
-  def stop(serviceName: String): Unit =
+  def stop(serviceName: String)(implicit ioRuntime: IORuntime): Unit =
     cancelTokens.asScala.find { case (key, _) => key.name == serviceName } match {
       case None => throw new IllegalStateException(s"'$serviceName' service not found so cannot be restarted")
       case Some((_, cancelToken)) =>
@@ -111,8 +108,9 @@ class ServicesRunner(
         cancelToken.unsafeRunSync()
     }
 
-  def stopAllServices(): Unit = cancelTokens.asScala.foreach { case (service, cancelToken) =>
-    logger.info(s"Service ${service.name} stopping")
-    cancelToken.unsafeRunSync()
+  def stopAllServices()(implicit ioRuntime: IORuntime): Unit = cancelTokens.asScala.foreach {
+    case (service, cancelToken) =>
+      logger.info(s"Service ${service.name} stopping")
+      cancelToken.unsafeRunSync()
   }
 }

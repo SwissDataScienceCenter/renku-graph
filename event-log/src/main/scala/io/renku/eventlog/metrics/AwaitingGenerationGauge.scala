@@ -31,7 +31,7 @@ object AwaitingGenerationGauge {
   val NumberOfProjects: Int Refined Positive = 20
 
   def apply(
-      metricsRegistry: MetricsRegistry[IO],
+      metricsRegistry: MetricsRegistry,
       statsFinder:     StatsFinder[IO]
   ): IO[LabeledGauge[IO, projects.Path]] =
     Gauge[IO, projects.Path](

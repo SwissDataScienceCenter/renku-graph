@@ -19,6 +19,7 @@
 package io.renku.graph.acceptancetests.db
 
 import cats.effect.IO
+import cats.effect.unsafe.IORuntime
 import com.dimafeng.testcontainers.FixedHostPortGenericContainer
 import io.renku.db.DBConfigProvider
 import io.renku.graph.acceptancetests.tooling.TestLogger
@@ -28,10 +29,10 @@ object TokenRepository {
 
   private val logger = TestLogger()
 
-  private val dbConfig: DBConfigProvider.DBConfig[ProjectsTokensDB] =
+  private def dbConfig(implicit ioRuntime: IORuntime): DBConfigProvider.DBConfig[ProjectsTokensDB] =
     new ProjectsTokensDbConfigProvider[IO].get().unsafeRunSync()
 
-  private val postgresContainer = FixedHostPortGenericContainer(
+  private def postgresContainer(implicit ioRuntime: IORuntime) = FixedHostPortGenericContainer(
     imageName = "postgres:11.11-alpine",
     env = Map("POSTGRES_USER"     -> dbConfig.user.value,
               "POSTGRES_PASSWORD" -> dbConfig.pass.value,
@@ -43,7 +44,7 @@ object TokenRepository {
     command = Seq(s"-p ${dbConfig.port.value}")
   )
 
-  def startDB(): IO[Unit] = for {
+  def startDB()(implicit ioRuntime: IORuntime): IO[Unit] = for {
     _ <- IO(postgresContainer.start())
     _ <- logger.info("projects_tokens DB started")
   } yield ()

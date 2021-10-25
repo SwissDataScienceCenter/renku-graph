@@ -36,6 +36,7 @@ import io.renku.graph.model.testentities.LineageExemplarData.ExemplarData
 import io.renku.graph.model.testentities.{LineageExemplarData, NodeDef}
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.syntax._
+import io.renku.testtools.IOSpec
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
@@ -47,6 +48,7 @@ class LineageQuerySpec
     extends AnyFeatureSpec
     with GivenWhenThen
     with GraphServices
+    with IOSpec
     with AcceptanceTestPatience
     with should.Matchers
     with ModelImplicits {
@@ -71,15 +73,7 @@ class LineageQuerySpec
 
     /** Expected data structure when looking for the grid_plot file
       *
-      * zhbikes folder   clean_data
-      *           \      /
-      *          run plan 1
-      *               \
-      *              bikesParquet   plot_data
-      *                       \     /
-      *                      run plan 2
-      *                       /
-      *                grid_plot
+      * zhbikes folder clean_data \ / run plan 1 \ bikesParquet plot_data \ / run plan 2 / grid_plot
       */
 
     Scenario("As a user I would like to find project's lineage with a GraphQL query") {

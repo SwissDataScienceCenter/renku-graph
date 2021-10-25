@@ -34,6 +34,7 @@ import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.{SchemaVersion, testentities}
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.syntax._
+import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator
 import org.http4s.Response
 import org.http4s.Status.Ok
@@ -51,6 +52,7 @@ class ReProvisioningSpec
     with ModelImplicits
     with GivenWhenThen
     with GraphServices
+    with IOSpec
     with should.Matchers
     with RdfStoreData {
 

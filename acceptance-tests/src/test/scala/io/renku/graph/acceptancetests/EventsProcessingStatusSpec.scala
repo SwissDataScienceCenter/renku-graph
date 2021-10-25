@@ -34,6 +34,7 @@ import io.renku.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.CommitId
 import io.renku.http.client.AccessToken
+import io.renku.testtools.IOSpec
 import io.renku.webhookservice.model.HookToken
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
@@ -48,6 +49,7 @@ class EventsProcessingStatusSpec
     with ModelImplicits
     with GivenWhenThen
     with GraphServices
+    with IOSpec
     with Eventually
     with AcceptanceTestPatience
     with should.Matchers {

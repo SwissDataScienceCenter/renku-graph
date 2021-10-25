@@ -52,7 +52,7 @@ object Microservice extends IOMicroservice {
     globalCommitSyncCategory <-
       events.categories.globalcommitsync.SubscriptionFactory(gitLabThrottler, executionTimeRecorder)
     eventConsumersRegistry <- consumers.EventConsumersRegistry(commitSyncCategory, globalCommitSyncCategory)
-    metricsRegistry        <- MetricsRegistry()
+    metricsRegistry        <- MetricsRegistry[IO]()
     microserviceRoutes     <- MicroserviceRoutes(eventConsumersRegistry, new RoutesMetrics[IO](metricsRegistry))
     exitcode <- microserviceRoutes.routes.use { routes =>
                   new MicroserviceRunner(

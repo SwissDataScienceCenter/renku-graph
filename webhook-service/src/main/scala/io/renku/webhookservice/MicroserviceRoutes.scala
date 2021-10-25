@@ -76,7 +76,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
 
 private object MicroserviceRoutes {
   def apply[F[_]: Async: Logger](
-      metricsRegistry:       MetricsRegistry[F],
+      metricsRegistry:       MetricsRegistry,
       gitLabThrottler:       Throttler[F, GitLab],
       executionTimeRecorder: ExecutionTimeRecorder[F]
   ): F[MicroserviceRoutes[F]] = for {

@@ -35,6 +35,7 @@ import io.renku.graph.model.events.EventId
 import io.renku.graph.model.events.EventStatus.TriplesStore
 import io.renku.graph.model.projects.Id
 import io.renku.http.client.AccessToken
+import io.renku.testtools.IOSpec
 import io.renku.webhookservice.model.HookToken
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
@@ -50,6 +51,7 @@ class CommitSyncFlowsSpec
     with GivenWhenThen
     with GraphServices
     with Eventually
+    with IOSpec
     with AcceptanceTestPatience
     with should.Matchers
     with TypeSerializers {

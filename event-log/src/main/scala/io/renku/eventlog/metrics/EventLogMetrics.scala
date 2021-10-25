@@ -79,7 +79,7 @@ object EventLogMetrics {
   import eu.timepit.refined.auto._
 
   def apply[F[_]: Temporal: Logger](
-      metricsRegistry: MetricsRegistry[F],
+      metricsRegistry: MetricsRegistry,
       statsFinder:     StatsFinder[F]
   ): F[EventLogMetrics[F]] = for {
     categoryNameEventsGauge <- Gauge[F, CategoryName](

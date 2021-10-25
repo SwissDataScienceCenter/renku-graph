@@ -45,7 +45,7 @@ object Microservice extends IOMicroservice {
     gitLabRateLimit       <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
     gitLabThrottler       <- Throttler[IO, GitLab](gitLabRateLimit)
     executionTimeRecorder <- ExecutionTimeRecorder[IO]()
-    metricsRegistry       <- MetricsRegistry()
+    metricsRegistry       <- MetricsRegistry[IO]()
     microserviceRoutes <-
       MicroserviceRoutes(metricsRegistry, gitLabThrottler, executionTimeRecorder)
     exitcode <- microserviceRoutes.routes.use { routes =>

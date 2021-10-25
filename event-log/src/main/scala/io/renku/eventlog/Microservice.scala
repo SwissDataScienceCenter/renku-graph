@@ -59,7 +59,7 @@ object Microservice extends IOMicroservice {
         certificateLoader           <- CertificateLoader[IO]
         sentryInitializer           <- SentryInitializer[IO]
         dbInitializer               <- DbInitializer(sessionResource)
-        metricsRegistry             <- MetricsRegistry()
+        metricsRegistry             <- MetricsRegistry[IO]()
         queriesExecTimes            <- QueriesExecutionTimes(metricsRegistry)
         statsFinder                 <- StatsFinder(sessionResource, queriesExecTimes)
         eventLogMetrics             <- EventLogMetrics(metricsRegistry, statsFinder)

@@ -41,6 +41,7 @@ import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.http.rest.Links.{Href, Rel, _links}
 import io.renku.http.server.EndpointTester._
 import io.renku.jsonld.syntax._
+import io.renku.testtools.IOSpec
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
@@ -55,6 +56,7 @@ class DatasetsResourcesSpec
     with GraphServices
     with AcceptanceTestPatience
     with RdfStoreData
+    with IOSpec
     with should.Matchers
     with EntitiesGenerators {
 
@@ -378,7 +380,7 @@ object DatasetsResources {
           "creator": ${creators.toList},
           "datePublished": $date
         }"""
-      case (creators, _)                   => json"""{
+      case (creators, _) => json"""{
           "creator": ${creators.toList}
         }"""
     }

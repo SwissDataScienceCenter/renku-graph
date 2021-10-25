@@ -25,7 +25,7 @@ import io.renku.metrics.{Histogram, LabeledHistogram, MetricsRegistry}
 
 object QueriesExecutionTimes {
 
-  def apply(metricsRegistry: MetricsRegistry[IO]): IO[LabeledHistogram[IO, SqlStatement.Name]] =
+  def apply(metricsRegistry: MetricsRegistry): IO[LabeledHistogram[IO, SqlStatement.Name]] =
     Histogram[IO, SqlStatement.Name](
       name = "token_repository_queries_execution_times",
       help = "Token Repository queries execution times",

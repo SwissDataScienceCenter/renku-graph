@@ -36,7 +36,7 @@ import io.renku.http.server.security.Authentication
 import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import io.renku.knowledgegraph.datasets.rest._
-import io.renku.knowledgegraph.graphql.{IOQueryEndpoint, QueryEndpoint}
+import io.renku.knowledgegraph.graphql.QueryEndpoint
 import io.renku.knowledgegraph.projects.rest.ProjectEndpoint
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.rdfstore.SparqlQueryTimeRecorder
@@ -127,13 +127,13 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
 private object MicroserviceRoutes {
 
   def apply(
-      metricsRegistry:         MetricsRegistry[IO],
+      metricsRegistry:         MetricsRegistry,
       sparqlTimeRecorder:      SparqlQueryTimeRecorder[IO]
   )(implicit executionContext: ExecutionContext, runtime: IORuntime, logger: Logger[IO]): IO[MicroserviceRoutes[IO]] =
     for {
       gitLabRateLimit         <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
       gitLabThrottler         <- Throttler[IO, GitLab](gitLabRateLimit)
-      queryEndpoint           <- IOQueryEndpoint(sparqlTimeRecorder)
+      queryEndpoint           <- QueryEndpoint(sparqlTimeRecorder)
       projectEndpoint         <- ProjectEndpoint[IO](gitLabThrottler, sparqlTimeRecorder)
       projectDatasetsEndpoint <- ProjectDatasetsEndpoint[IO](sparqlTimeRecorder)
       datasetEndpoint         <- DatasetEndpoint[IO](sparqlTimeRecorder)
