@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events
 import cats.MonadThrow
 import cats.data.EitherT
 import cats.data.EitherT.right
-import cats.effect.{Effect, Timer}
+import cats.effect.Async
 import io.circe.Json
 import io.renku.events.EventRequestContent
 import io.renku.events.EventRequestContent.WithPayload
@@ -32,6 +32,7 @@ import io.renku.triplesgenerator.reprovisioning.ReProvisioningStatus
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.`Content-Type`
+import org.http4s.implicits.http4sHeaderSyntax
 import org.http4s.multipart.{Multipart, Part}
 import org.http4s.{Request, Response}
 
@@ -42,7 +43,7 @@ trait EventEndpoint[F[_]] {
   def processEvent(request: Request[F]): F[Response[F]]
 }
 
-class EventEndpointImpl[F[_]: Effect: MonadThrow](
+class EventEndpointImpl[F[_]: Async](
     eventConsumersRegistry: EventConsumersRegistry[F],
     reProvisioningStatus:   ReProvisioningStatus[F]
 ) extends Http4sDsl[F]
@@ -109,7 +110,7 @@ class EventEndpointImpl[F[_]: Effect: MonadThrow](
 
   private def toEventRequestContent(part:      Part[F],
                                     eventJson: Json
-  ): Header => F[Either[Response[F], EventRequestContent]] = {
+  ): Header.Raw => F[Either[Response[F], EventRequestContent]] = {
     case header if header.value == `Content-Type`(MediaType.application.zip).value =>
       part
         .as[Array[Byte]]
@@ -136,15 +137,11 @@ class EventEndpointImpl[F[_]: Effect: MonadThrow](
   }
 }
 
-object IOEventEndpoint {
-  import cats.effect.{ContextShift, IO}
+object EventEndpoint {
 
-  def apply(
-      eventConsumersRegistry: EventConsumersRegistry[IO],
-      reProvisioningStatus:   ReProvisioningStatus[IO]
-  )(implicit
-      contextShift:     ContextShift[IO],
-      executionContext: ExecutionContext,
-      timer:            Timer[IO]
-  ): IO[EventEndpoint[IO]] = IO(new EventEndpointImpl[IO](eventConsumersRegistry, reProvisioningStatus))
+  def apply[F[_]: Async](
+      eventConsumersRegistry: EventConsumersRegistry[F],
+      reProvisioningStatus:   ReProvisioningStatus[F]
+  ): F[EventEndpoint[F]] =
+    MonadThrow[F].catchNonFatal(new EventEndpointImpl[F](eventConsumersRegistry, reProvisioningStatus))
 }

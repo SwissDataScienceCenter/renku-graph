@@ -37,15 +37,12 @@ import io.renku.microservices.IOMicroservice
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.config.certificates.GitCertificateInstaller
 import io.renku.triplesgenerator.config.{IOVersionCompatibilityConfig, TriplesGeneration}
-import io.renku.triplesgenerator.events.IOEventEndpoint
+import io.renku.triplesgenerator.events.EventEndpoint
 import io.renku.triplesgenerator.init.{CliVersionCompatibilityVerifier, IOCliVersionCompatibilityChecker}
 import io.renku.triplesgenerator.reprovisioning.{IOReProvisioning, ReProvisioning, ReProvisioningStatus}
 import org.typelevel.log4cats.Logger
-import pureconfig._
 
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors.newFixedThreadPool
-import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 object Microservice extends IOMicroservice {
@@ -83,7 +80,7 @@ object Microservice extends IOMicroservice {
                               )
     reProvisioningStatus <- ReProvisioningStatus(eventConsumersRegistry, ApplicationLogger, sparqlTimeRecorder)
     reProvisioning <- IOReProvisioning(reProvisioningStatus, renkuVersionPairs, sparqlTimeRecorder, ApplicationLogger)
-    eventProcessingEndpoint <- IOEventEndpoint(eventConsumersRegistry, reProvisioningStatus)
+    eventProcessingEndpoint <- EventEndpoint(eventConsumersRegistry, reProvisioningStatus)
     microserviceRoutes =
       new MicroserviceRoutes[IO](eventProcessingEndpoint, new RoutesMetrics[IO](metricsRegistry), config.some).routes
     exitCode <- microserviceRoutes.use { routes =>
@@ -94,9 +91,8 @@ object Microservice extends IOMicroservice {
                     cliVersionCompatChecker,
                     eventConsumersRegistry,
                     reProvisioning,
-                    new HttpServer[IO](serverPort = ServicePort.value, routes),
-                    subProcessesCancelTokens,
-                    ApplicationLogger
+                    HttpServer[IO](serverPort = ServicePort.value, routes),
+                    subProcessesCancelTokens
                   ).run()
                 }
   } yield exitCode
@@ -110,11 +106,10 @@ private class MicroserviceRunner(
     eventConsumersRegistry:          EventConsumersRegistry[IO],
     reProvisioning:                  ReProvisioning[IO],
     httpServer:                      HttpServer[IO],
-    subProcessesCancelTokens:        ConcurrentHashMap[CancelToken[IO], Unit],
-    logger:                          Logger[IO]
-)(implicit contextShift:             ContextShift[IO]) {
+    subProcessesCancelTokens:        ConcurrentHashMap[IO[Unit], Unit]
+) {
 
-  def run(): IO[ExitCode] = {
+  def run(): IO[ExitCode] =
     for {
       _        <- certificateLoader.run()
       _        <- gitCertificateInstaller.run()
@@ -124,9 +119,8 @@ private class MicroserviceRunner(
       _        <- reProvisioning.run().start.map(gatherCancelToken)
       exitCode <- httpServer.run()
     } yield exitCode
-  } recoverWith logAndThrow(logger)
 
-  private def gatherCancelToken(fiber: Fiber[IO, Unit]): Fiber[IO, Unit] = {
+  private def gatherCancelToken(fiber: FiberIO[Unit]): FiberIO[Unit] = {
     subProcessesCancelTokens.put(fiber.cancel, ())
     fiber
   }

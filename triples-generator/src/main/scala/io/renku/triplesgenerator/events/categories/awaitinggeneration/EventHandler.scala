@@ -19,9 +19,8 @@
 package io.renku.triplesgenerator.events.categories.awaitinggeneration
 
 import cats.data.EitherT
-import cats.effect.concurrent.Deferred
 import cats.effect.kernel.{Deferred, Temporal}
-import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, IO, Timer}
+import cats.effect.{Concurrent, IO}
 import cats.syntax.all._
 import cats.{MonadThrow, Show}
 import com.typesafe.config.{Config, ConfigFactory}
@@ -33,8 +32,6 @@ import io.renku.events.{EventRequestContent, consumers}
 import io.renku.graph.model.events.{CategoryName, EventBody}
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
-
-import scala.concurrent.ExecutionContext
 
 private[events] class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
     override val categoryName:  CategoryName,

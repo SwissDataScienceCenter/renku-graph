@@ -18,7 +18,6 @@
 
 package io.renku.triplesgenerator.config
 
-import cats.MonadError
 import cats.effect.Async
 import com.typesafe.config.{Config, ConfigFactory}
 import org.typelevel.log4cats.Logger

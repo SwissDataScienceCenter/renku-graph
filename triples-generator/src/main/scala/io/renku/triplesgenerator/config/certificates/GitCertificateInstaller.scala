@@ -18,8 +18,8 @@
 
 package io.renku.triplesgenerator.config.certificates
 
+import cats.MonadThrow
 import cats.effect.kernel.Async
-import cats.{MonadError, MonadThrow}
 import io.renku.config.certificates.Certificate
 import org.typelevel.log4cats.Logger
 
@@ -30,8 +30,8 @@ trait GitCertificateInstaller[F[_]] {
 }
 
 object GitCertificateInstaller {
-  def apply[F[_]: MonadThrow: Logger]: F[GitCertificateInstaller[F]] =
-    MonadThrow.catchNonFatal {
+  def apply[F[_]: Async: Logger]: F[GitCertificateInstaller[F]] =
+    MonadThrow[F].catchNonFatal {
       new GitCertificateInstallerImpl[F](
         () => Certificate.fromConfig[F](),
         CertificateSaver(),
@@ -43,10 +43,8 @@ object GitCertificateInstaller {
 class GitCertificateInstallerImpl[F[_]: Async: Logger](
     findCertificate:   () => F[Option[Certificate]],
     certificateSaver:  CertificateSaver[F],
-    gitConfigModifier: GitConfigModifier[F],
-    logger:            Logger[F]
-)(implicit ME:         MonadError[F, Throwable])
-    extends GitCertificateInstaller[F] {
+    gitConfigModifier: GitConfigModifier[F]
+) extends GitCertificateInstaller[F] {
 
   import cats.syntax.all._
 
@@ -56,12 +54,12 @@ class GitCertificateInstallerImpl[F[_]: Async: Logger](
       for {
         certPath <- certificateSaver.save(certificate)
         _        <- gitConfigModifier.makeGitTrust(certPath)
-        _        <- logger info "Certificate installed for Git"
+        _        <- Logger[F] info "Certificate installed for Git"
       } yield ()
   } recoverWith logMessage
 
   private lazy val logMessage: PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
-    logger
+    Logger[F]
       .error(exception)("Certificate installation for Git failed")
       .flatMap(_ => exception.raiseError[F, Unit])
   }

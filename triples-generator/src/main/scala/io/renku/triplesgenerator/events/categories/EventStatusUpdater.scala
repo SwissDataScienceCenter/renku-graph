@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories
 
-import cats.effect.{BracketThrow, ContextShift, IO, Sync, Timer}
+import cats.effect.{Async, IO, MonadCancelThrow, Sync}
 import cats.syntax.all._
 import io.renku.compression.Zip
 import io.renku.data.ErrorMessage
@@ -54,7 +54,7 @@ private trait EventStatusUpdater[F[_]] {
   ): F[Unit]
 }
 
-private class EventStatusUpdaterImpl[F[_]: BracketThrow: Sync](
+private class EventStatusUpdaterImpl[F[_]: MonadCancelThrow: Sync](
     eventSender:  EventSender[F],
     categoryName: CategoryName,
     zipper:       Zip
@@ -145,13 +145,8 @@ private object EventStatusUpdater {
   implicit val rollbackToNew:              () => EventStatus.New              = () => EventStatus.New
   implicit val rollbackToTriplesGenerated: () => EventStatus.TriplesGenerated = () => EventStatus.TriplesGenerated
 
-  def apply(
+  def apply[F[_]: Async: Logger](
       categoryName: CategoryName
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO],
-      logger:           Logger[IO]
   ): IO[EventStatusUpdater[IO]] = for {
     eventSender <- EventSender()
   } yield new EventStatusUpdaterImpl(eventSender, categoryName, Zip)

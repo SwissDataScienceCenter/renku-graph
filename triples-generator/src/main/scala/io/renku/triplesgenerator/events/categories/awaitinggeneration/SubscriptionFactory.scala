@@ -28,7 +28,7 @@ object SubscriptionFactory {
   def apply[F[_]: Async: Logger](
       metricsRegistry: MetricsRegistry[F]
   ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
-    subscriptionMechanism <- SubscriptionMechanism(categoryName, payloadsComposerFactory)
+    subscriptionMechanism <- SubscriptionMechanism[F](categoryName, payloadsComposerFactory)
     handler               <- EventHandler(metricsRegistry, subscriptionMechanism)
   } yield handler -> subscriptionMechanism
 }

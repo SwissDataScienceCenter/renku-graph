@@ -18,7 +18,8 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading
 
-import cats.effect.{ConcurrentEffect, IO, Timer}
+import cats.MonadThrow
+import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -40,21 +41,19 @@ private trait TriplesUploader[F[_]] {
   def upload(triples: JsonLD): F[TriplesUploadResult]
 }
 
-private class TriplesUploaderImpl[F[_]: ConcurrentEffect: Timer](
-    rdfStoreConfig:          RdfStoreConfig,
-    timeRecorder:            SparqlQueryTimeRecorder[F],
-    retryInterval:           FiniteDuration = SleepAfterConnectionIssue,
-    maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-    idleTimeout:             Duration = 6 minutes,
-    requestTimeout:          Duration = 5 minutes
-)(implicit executionContext: ExecutionContext, logger: Logger[F])
-    extends RestClient[F, Any](Throttler.noThrottling,
-                               logger,
-                               maybeTimeRecorder = timeRecorder.instance.some,
-                               retryInterval = retryInterval,
-                               maxRetries = maxRetries,
-                               idleTimeoutOverride = idleTimeout.some,
-                               requestTimeoutOverride = requestTimeout.some
+private class TriplesUploaderImpl[F[_]: Async: Logger](
+    rdfStoreConfig: RdfStoreConfig,
+    timeRecorder:   SparqlQueryTimeRecorder[F],
+    retryInterval:  FiniteDuration = SleepAfterConnectionIssue,
+    maxRetries:     Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
+    idleTimeout:    Duration = 6 minutes,
+    requestTimeout: Duration = 5 minutes
+) extends RestClient[F, Any](Throttler.noThrottling,
+                             maybeTimeRecorder = timeRecorder.instance.some,
+                             retryInterval = retryInterval,
+                             maxRetries = maxRetries,
+                             idleTimeoutOverride = idleTimeout.some,
+                             requestTimeoutOverride = requestTimeout.some
     )
     with TriplesUploader[F] {
 
@@ -99,18 +98,13 @@ private class TriplesUploaderImpl[F[_]: ConcurrentEffect: Timer](
 }
 
 private object TriplesUploader {
-  def apply(rdfStoreConfig: RdfStoreConfig,
-            timeRecorder:   SparqlQueryTimeRecorder[IO],
-            retryInterval:  FiniteDuration = SleepAfterConnectionIssue,
-            maxRetries:     Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-            idleTimeout:    Duration = 6 minutes,
-            requestTimeout: Duration = 5 minutes
-  )(implicit
-      executionContext: ExecutionContext,
-      concurrentEffect: ConcurrentEffect[IO],
-      timer:            Timer[IO],
-      logger:           Logger[IO]
-  ) = IO(
-    new TriplesUploaderImpl[IO](rdfStoreConfig, timeRecorder, retryInterval, maxRetries, idleTimeout, requestTimeout)
+  def apply[F[_]: Async: Logger](rdfStoreConfig: RdfStoreConfig,
+                                 timeRecorder:   SparqlQueryTimeRecorder[F],
+                                 retryInterval:  FiniteDuration = SleepAfterConnectionIssue,
+                                 maxRetries:     Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
+                                 idleTimeout:    Duration = 6 minutes,
+                                 requestTimeout: Duration = 5 minutes
+  ) = MonadThrow.catchNonFatal(
+    new TriplesUploaderImpl[F](rdfStoreConfig, timeRecorder, retryInterval, maxRetries, idleTimeout, requestTimeout)
   )
 }

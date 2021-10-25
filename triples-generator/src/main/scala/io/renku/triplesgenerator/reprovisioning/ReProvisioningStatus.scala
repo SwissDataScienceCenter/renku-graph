@@ -19,8 +19,8 @@
 package io.renku.triplesgenerator.reprovisioning
 
 import cats.Applicative
-import cats.effect.concurrent.Ref
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.Ref
+import cats.effect.kernel.Async
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.auto._
@@ -49,20 +49,19 @@ trait ReProvisioningStatus[F[_]] {
   def clear(): F[Unit]
 }
 
-private class ReProvisioningStatusImpl(
-    eventConsumersRegistry:  EventConsumersRegistry[IO],
-    rdfStoreConfig:          RdfStoreConfig,
-    renkuBaseUrl:            RenkuBaseUrl,
-    logger:                  Logger[IO],
-    timeRecorder:            SparqlQueryTimeRecorder[IO],
-    statusRefreshInterval:   FiniteDuration,
-    cacheRefreshInterval:    FiniteDuration,
-    lastCacheCheckTimeRef:   Ref[IO, Long]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
-    with ReProvisioningStatus[IO] {
+private class ReProvisioningStatusImpl[F[_]: Async](
+    eventConsumersRegistry: EventConsumersRegistry[F],
+    rdfStoreConfig:         RdfStoreConfig,
+    renkuBaseUrl:           RenkuBaseUrl,
+    logger:                 Logger[F],
+    timeRecorder:           SparqlQueryTimeRecorder[F],
+    statusRefreshInterval:  FiniteDuration,
+    cacheRefreshInterval:   FiniteDuration,
+    lastCacheCheckTimeRef:  Ref[F, Long]
+) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
+    with ReProvisioningStatus[F] {
 
-  private val applicative = Applicative[IO]
+  private val applicative = Applicative[F]
 
   import ReProvisioningJsonLD._
   import applicative._
@@ -70,7 +69,7 @@ private class ReProvisioningStatusImpl(
 
   private val runningStatusCheckStarted = new AtomicBoolean(false)
 
-  override def setRunning(): IO[Unit] = updateWithNoResult {
+  override def setRunning(): F[Unit] = updateWithNoResult {
     SparqlQuery.of(
       name = "re-provisioning - status insert",
       Prefixes.of(rdf -> "rdf"),
@@ -82,7 +81,7 @@ private class ReProvisioningStatusImpl(
     )
   }
 
-  override def clear(): IO[Unit] = for {
+  override def clear(): F[Unit] = for {
     _ <- deleteFromDb()
     _ <- renewAllSubscriptions()
   } yield ()
@@ -100,16 +99,16 @@ private class ReProvisioningStatusImpl(
     )
   }
 
-  override def isReProvisioning(): IO[Boolean] = for {
+  override def isReProvisioning(): F[Boolean] = for {
     isCacheExpired <- isCacheExpired
     flag <- if (isCacheExpired) fetchStatus flatMap {
               case Some(Running) => triggerPeriodicStatusCheck() map (_ => true)
               case _             => updateCacheCheckTime() map (_ => false)
             }
-            else false.pure[IO]
+            else false.pure[F]
   } yield flag
 
-  private def isCacheExpired: IO[Boolean] = for {
+  private def isCacheExpired: F[Boolean] = for {
     lastCheckTime <- lastCacheCheckTimeRef.get
     currentTime   <- timer.clock.monotonic(TimeUnit.MILLISECONDS)
   } yield currentTime - lastCheckTime > cacheRefreshInterval.toMillis
@@ -119,13 +118,13 @@ private class ReProvisioningStatusImpl(
     _           <- lastCacheCheckTimeRef set currentTime
   } yield ()
 
-  private def triggerPeriodicStatusCheck(): IO[Unit] =
+  private def triggerPeriodicStatusCheck(): F[Unit] =
     whenA(!runningStatusCheckStarted.get()) {
       runningStatusCheckStarted set true
       periodicStatusCheck.start.void
     }
 
-  private def periodicStatusCheck: IO[Unit] = for {
+  private def periodicStatusCheck: F[Unit] = for {
     _ <- timer sleep statusRefreshInterval
     _ <- fetchStatus flatMap {
            case Some(Running) => periodicStatusCheck
@@ -135,7 +134,7 @@ private class ReProvisioningStatusImpl(
          }
   } yield ()
 
-  private def fetchStatus: IO[Option[Status]] = queryExpecting[Option[Status]] {
+  private def fetchStatus: F[Option[Status]] = queryExpecting[Option[Status]] {
     SparqlQuery.of(
       name = "re-provisioning - get status",
       Prefixes of rdf -> "rdf",

@@ -18,7 +18,8 @@
 
 package io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
+import cats.effect.kernel.Async
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
 import io.circe.Json
@@ -41,26 +42,20 @@ import scala.concurrent.ExecutionContext
 
 private[events] object RemoteTriplesGenerator extends ConfigLoader[IO] {
 
-  def apply(
+  def apply[F[_]: Async: Logger](
       configuration: Config = ConfigFactory.load()
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
   ): IO[TriplesGenerator[IO]] =
     for {
       serviceUrl <- find[String]("services.triples-generator.url", configuration) flatMap (url =>
                       IO.fromEither(TriplesGenerationServiceUrl from url)
                     )
-    } yield new RemoteTriplesGenerator(serviceUrl, ApplicationLogger)
+    } yield new RemoteTriplesGenerator(serviceUrl)
 }
 
-private[awaitinggeneration] class RemoteTriplesGenerator(
-    serviceUrl:              TriplesGenerationServiceUrl,
-    logger:                  Logger[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends RestClient[IO, RemoteTriplesGenerator](Throttler.noThrottling, logger)
-    with TriplesGenerator[IO] {
+private[awaitinggeneration] class RemoteTriplesGenerator[F[_]: Async: Logger](
+    serviceUrl: TriplesGenerationServiceUrl
+) extends RestClient[F, RemoteTriplesGenerator](Throttler.noThrottling)
+    with TriplesGenerator[F] {
 
   import cats.data.EitherT
   import cats.effect._
@@ -73,7 +68,7 @@ private[awaitinggeneration] class RemoteTriplesGenerator(
 
   override def generateTriples(
       commitEvent:             CommitEvent
-  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, JsonLD] = EitherT {
+  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[F, ProcessingRecoverableError, JsonLD] = EitherT {
     {
       for {
         uri           <- validateUri(s"$serviceUrl/projects/${commitEvent.project.id}/commits/${commitEvent.commitId}")
@@ -81,7 +76,7 @@ private[awaitinggeneration] class RemoteTriplesGenerator(
         triples       <- IO.fromEither(parse(triplesInJson))
       } yield triples.asRight[ProcessingRecoverableError]
     } recoverWith { case UnauthorizedException =>
-      GenerationRecoverableError("Unauthorized exception").asLeft[JsonLD].pure[IO]
+      GenerationRecoverableError("Unauthorized exception").asLeft[JsonLD].pure[F]
     }
   }
 

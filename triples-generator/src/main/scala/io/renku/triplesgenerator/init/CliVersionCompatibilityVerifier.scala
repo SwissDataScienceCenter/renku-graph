@@ -20,7 +20,6 @@ package io.renku.triplesgenerator.init
 
 import cats.MonadError
 import cats.data.NonEmptyList
-import cats.effect.IO
 import cats.effect.kernel.Async
 import cats.syntax.all._
 import io.renku.graph.model.{CliVersion, RenkuVersionPair}
