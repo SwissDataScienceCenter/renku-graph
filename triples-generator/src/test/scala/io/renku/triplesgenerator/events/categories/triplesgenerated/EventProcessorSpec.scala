@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.data.EitherT
 import cats.effect.IO
 import cats.syntax.all._
@@ -298,8 +298,8 @@ class EventProcessorSpec
       val metricsRegistry = mock[MetricsRegistry]
 
       (metricsRegistry
-        .register[IO, Histogram, Histogram.Builder](_: Histogram.Builder)(_: MonadError[IO, Throwable]))
-        .expects(eventsProcessingTimesBuilder, *)
+        .register[IO, Histogram, Histogram.Builder](_: Histogram.Builder)(_: MonadThrow[IO]))
+        .expects(eventsProcessingTimesBuilder, MonadThrow[IO])
         .returning(eventsProcessingTimes.pure[IO])
 
       implicit val logger: TestLogger[IO] = TestLogger[IO]()

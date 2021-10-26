@@ -118,7 +118,6 @@ class EventEndpointSpec
 
         val response = endpoint.processEvent(request).unsafeRunSync()
 
-        println(response.as[String].unsafeRunSync())
         response.status                          shouldBe Accepted
         response.contentType                     shouldBe Some(`Content-Type`(application.json))
         response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event accepted")
