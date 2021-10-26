@@ -18,6 +18,7 @@
 
 package io.renku.graph.acceptancetests.db
 
+import cats.Applicative
 import cats.data.{Kleisli, NonEmptyList}
 import cats.effect.IO._
 import cats.effect.unsafe.IORuntime
@@ -25,19 +26,18 @@ import cats.effect.{IO, Resource}
 import com.dimafeng.testcontainers.FixedHostPortGenericContainer
 import io.renku.db.{DBConfigProvider, SessionResource}
 import io.renku.eventlog._
-import io.renku.graph.acceptancetests.tooling.TestLogger
 import io.renku.graph.model.events.{CommitId, EventId, EventStatus}
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Id
 import natchez.Trace.Implicits.noop
+import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.implicits._
 
 import scala.collection.immutable
+import scala.util.Try
 
 object EventLog extends TypeSerializers {
-
-  private val logger = TestLogger()
 
   def findEvents(projectId: Id)(implicit ioRuntime: IORuntime): List[(EventId, EventStatus)] = execute { session =>
     val query: Query[projects.Id, (EventId, EventStatus)] =
@@ -68,10 +68,10 @@ object EventLog extends TypeSerializers {
       .use(_.useK(Kleisli[IO, Session[IO], O](session => query(session))))
       .unsafeRunSync()
 
-  private def dbConfig(implicit ioRuntime: IORuntime): DBConfigProvider.DBConfig[EventLogDB] =
-    new EventLogDbConfigProvider[IO].get().unsafeRunSync()
+  private lazy val dbConfig: DBConfigProvider.DBConfig[EventLogDB] =
+    new EventLogDbConfigProvider[Try].get().fold(throw _, identity)
 
-  private def postgresContainer(implicit ioRuntime: IORuntime) = FixedHostPortGenericContainer(
+  private lazy val postgresContainer = FixedHostPortGenericContainer(
     imageName = "postgres:11.11-alpine",
     env = immutable.Map("POSTGRES_USER"     -> dbConfig.user.value,
                         "POSTGRES_PASSWORD" -> dbConfig.pass.value,
@@ -83,21 +83,16 @@ object EventLog extends TypeSerializers {
     command = Seq(s"-p ${dbConfig.port.value}")
   )
 
-  def startDB()(implicit ioRuntime: IORuntime): IO[Unit] = for {
-    _ <- IO(postgresContainer.start())
+  def startDB()(implicit ioRuntime: IORuntime, logger: Logger[IO]): IO[Unit] = for {
+    _ <- Applicative[IO].unlessA(postgresContainer.container.isRunning)(IO(postgresContainer.start()))
     _ <- logger.info("event_log DB started")
   } yield ()
 
-  def stopDB()(implicit ioRuntime: IORuntime): IO[Unit] = for {
-    _ <- IO(postgresContainer.stop())
-    _ <- logger.info("event_log DB stopped")
-  } yield ()
-
-  private def sessionResource(implicit ioRuntime: IORuntime): Resource[IO, SessionResource[IO, EventLogDB]] =
+  private lazy val sessionResource: Resource[IO, SessionResource[IO, EventLogDB]] =
     Session
       .pooled(
         host = postgresContainer.host,
-        port = postgresContainer.container.getMappedPort(dbConfig.port.value),
+        port = dbConfig.port.value,
         database = dbConfig.name.value,
         user = dbConfig.user.value,
         password = Some(dbConfig.pass.value),

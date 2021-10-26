@@ -27,7 +27,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.graph.acceptancetests.data
-import io.renku.graph.acceptancetests.tooling.GraphServices
+import io.renku.graph.acceptancetests.tooling.{GraphServices, TestLogger}
 import io.renku.graph.model._
 import io.renku.graph.model.events.CommitId
 import io.renku.jsonld.JsonLD
@@ -36,7 +36,7 @@ import io.renku.jsonld.syntax._
 trait RemoteTriplesGenerator {
   self: GraphServices =>
 
-  private val port: Int Refined Positive = 8080
+  import RemoteTriplesGeneratorWiremockInstance._
 
   def `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(
       project:             data.Project,
@@ -84,11 +84,19 @@ trait RemoteTriplesGenerator {
     ()
   }
 
-  private val instance = WireMock.create().http().host("localhost").port(port.value).build()
-
   private def stubFor(mappingBuilder: MappingBuilder): StubMapping = instance.register(mappingBuilder)
 
-  private val server = {
+  def reset(): Unit = server.resetAll()
+}
+
+private object RemoteTriplesGeneratorWiremockInstance {
+  private val logger = TestLogger()
+
+  val port: Int Refined Positive = 8080
+
+  val instance = WireMock.create().http().host("localhost").port(port.value).build()
+
+  val server = {
     val newServer = new WireMockServer(WireMockConfiguration.wireMockConfig().port(port.value))
     newServer.start()
     WireMock.configureFor(newServer.port())
@@ -96,9 +104,7 @@ trait RemoteTriplesGenerator {
     newServer
   }
 
-  def reset(): Unit = server.resetAll()
-
-  def shutdownRemoteTriplesGenerator(): Unit = {
+  def shutdownGitLab(): Unit = {
     server.stop()
     server.shutdownServer()
     logger.info(s"Remote Triples Generator stub stopped")

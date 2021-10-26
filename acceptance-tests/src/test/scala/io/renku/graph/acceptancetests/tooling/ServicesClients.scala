@@ -33,6 +33,7 @@ import io.renku.webhookservice.model.HookToken
 import org.http4s.Status.Ok
 import org.http4s.{Header, Method, Response}
 import org.scalatest.matchers.should
+import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
@@ -52,7 +53,7 @@ object WebhookServiceClient {
       for {
         hookTokenCrypto    <- HookTokenCrypto[IO]()
         encryptedHookToken <- hookTokenCrypto.encrypt(hookToken)
-        tokenHeader        <- IO.pure(Header("X-Gitlab-Token", encryptedHookToken.value))
+        tokenHeader        <- IO.pure(Header.Raw(ci"X-Gitlab-Token", encryptedHookToken.value))
         uri                <- validateUri(s"$baseUrl/$url")
         response           <- send(request(Method.POST, uri) withHeaders tokenHeader withEntity payload)(mapResponse)
       } yield response

@@ -34,6 +34,7 @@ import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{BatchDate, CommitId, EventBody, EventId, EventStatus}
 import io.renku.graph.model.projects._
+import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.http.client.AccessToken
 import io.renku.microservices.MicroserviceIdentifier
 import org.scalacheck.Gen

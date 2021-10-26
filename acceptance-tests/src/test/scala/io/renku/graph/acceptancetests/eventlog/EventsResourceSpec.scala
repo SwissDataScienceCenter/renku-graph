@@ -31,6 +31,7 @@ import io.renku.graph.acceptancetests.tooling.ResponseTools._
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events
 import io.renku.graph.model.events.{EventId, EventProcessingTime, EventStatus}
+import io.renku.graph.model.testentities.generators.EntitiesGenerators.{anyVisibility, projectEntities}
 import io.renku.http.client.AccessToken
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.jsonld.syntax._

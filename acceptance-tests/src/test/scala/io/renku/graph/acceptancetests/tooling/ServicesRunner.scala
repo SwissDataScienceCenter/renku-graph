@@ -26,7 +26,6 @@ import org.typelevel.log4cats.Logger
 
 import java.util.concurrent.ConcurrentHashMap
 import scala.jdk.CollectionConverters._
-import scala.language.postfixOps
 
 final case class ServiceRun(name:             String,
                             service:          IOMicroservice,
@@ -60,11 +59,10 @@ class ServicesRunner(semaphore: Semaphore[IO])(implicit logger: Logger[IO]) {
         for {
           _ <- logger.info(s"Service ${serviceRun.name} starting")
           _ <- preServiceStart.sequence
-          _ = service
-                .run(serviceRun.serviceArgsList.map(_()))
-                .start
-                .map(fiber => cancelTokens.put(serviceRun, fiber.cancel))
-                .unsafeRunAndForget()
+          _ <- service
+                 .run(serviceRun.serviceArgsList.map(_()))
+                 .start
+                 .map(fiber => cancelTokens.put(serviceRun, fiber.cancel))
           _ <- verifyServiceReady(serviceRun)
         } yield ()
     }

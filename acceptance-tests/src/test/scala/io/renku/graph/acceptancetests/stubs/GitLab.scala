@@ -36,7 +36,7 @@ import io.renku.generators.Generators._
 import io.renku.graph.acceptancetests.data
 import io.renku.graph.acceptancetests.data.Project.Permissions
 import io.renku.graph.acceptancetests.data.Project.Permissions._
-import io.renku.graph.acceptancetests.tooling.GraphServices
+import io.renku.graph.acceptancetests.tooling.{GraphServices, TestLogger}
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects.Id
@@ -52,7 +52,9 @@ import java.time.Instant
 trait GitLab {
   self: GraphServices =>
 
-  private val port:               Int Refined Positive = 2048
+  import GitLabWiremockInstance._
+
+  private val port:               Int Refined Positive = GitLabWiremockInstance.port
   implicit lazy val gitLabUrl:    GitLabUrl            = GitLabUrl(s"http://localhost:$port")
   implicit lazy val gitLabApiUrl: GitLabApiUrl         = gitLabUrl.apiV4
 
@@ -285,9 +287,15 @@ trait GitLab {
     }
   }
 
-  private val instance = WireMock.create().http().host("localhost").port(port.value).build()
-
   private def stubFor(mappingBuilder: MappingBuilder): StubMapping = instance.register(mappingBuilder)
+}
+
+private object GitLabWiremockInstance {
+  private val logger = TestLogger()
+
+  val port: Int Refined Positive = 2048
+
+  val instance = WireMock.create().http().host("localhost").port(port.value).build()
 
   private val server = {
     val newServer = new WireMockServer(WireMockConfiguration.wireMockConfig().port(port.value))

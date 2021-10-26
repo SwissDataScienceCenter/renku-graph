@@ -31,6 +31,7 @@ import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.acceptancetests.tooling.ResponseTools._
 import io.renku.graph.acceptancetests.tooling.TestReadabilityTools._
 import io.renku.graph.model.datasets.{DatePublished, Identifier, ImageUri, Title}
+import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.graph.model.testentities.{::~, Dataset, Person}
 import io.renku.graph.model.{projects, testentities}
 import io.renku.http.client.AccessToken

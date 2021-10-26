@@ -31,6 +31,7 @@ import io.renku.graph.model
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.projects
 import io.renku.graph.model.testentities.LineageExemplarData.ExemplarData
+import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.graph.model.testentities.{LineageExemplarData, NodeDef}
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.syntax._

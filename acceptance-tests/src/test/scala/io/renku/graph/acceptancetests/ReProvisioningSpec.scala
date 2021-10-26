@@ -28,6 +28,7 @@ import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
 import io.renku.graph.acceptancetests.tooling.ResponseTools.ResponseOps
 import io.renku.graph.acceptancetests.tooling.{GraphServices, ServiceRun}
 import io.renku.graph.model.EventsGenerators.commitIds
+import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.graph.model.{SchemaVersion, testentities}
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.syntax._

@@ -30,6 +30,7 @@ import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.EventId
 import io.renku.graph.model.events.EventStatus.TriplesStore
 import io.renku.graph.model.projects.Id
+import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.http.client.AccessToken
 import io.renku.webhookservice.model.HookToken
 import org.http4s.Status._
