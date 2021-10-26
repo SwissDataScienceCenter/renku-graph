@@ -18,20 +18,11 @@
 
 package io.renku.testtools
 
-import cats.effect.unsafe
 import cats.effect.unsafe.IORuntime
 import org.scalatest.Suite
-
-import scala.concurrent.ExecutionContext.global
 
 trait IOSpec {
   self: Suite =>
 
-  private def createIORuntime: unsafe.IORuntime = {
-    val (blocking, blockingSD)   = unsafe.IORuntime.createDefaultBlockingExecutionContext()
-    val (scheduler, schedulerSD) = unsafe.IORuntime.createDefaultScheduler()
-    unsafe.IORuntime(global, blocking, scheduler, { () => blockingSD(); schedulerSD(); }, unsafe.IORuntimeConfig())
-  }
-
-  implicit val ioRuntime: IORuntime = createIORuntime
+  implicit val ioRuntime: IORuntime = cats.effect.unsafe.implicits.global
 }
