@@ -40,7 +40,9 @@ class TriplesGeneratorSpec extends AnyWordSpec with IOSpec with should.Matchers 
         ).asJava
       )
 
-      TriplesGenerator[IO](config).unsafeRunSync().getClass shouldBe RenkuLogTriplesGenerator.getClass
+      TriplesGenerator[IO](config)
+        .unsafeRunSync()
+        .getClass shouldBe RenkuLogTriplesGenerator[IO]().unsafeRunSync().getClass
     }
 
     s"return an instance of RemoteTriplesGenerator if TriplesGeneration is $RemoteTriplesGeneration" in {
@@ -52,7 +54,10 @@ class TriplesGeneratorSpec extends AnyWordSpec with IOSpec with should.Matchers 
         ).asJava
       )
 
-      TriplesGenerator[IO](config).unsafeRunSync().getClass shouldBe RemoteTriplesGenerator.getClass
+      TriplesGenerator[IO](config)
+        .unsafeRunSync()
+        .getClass
+        .getSimpleName shouldBe RemoteTriplesGenerator[IO](config).unsafeRunSync().getClass.getSimpleName
     }
   }
 
