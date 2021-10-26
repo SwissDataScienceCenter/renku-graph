@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories.awaitinggeneration
 
-import EventProcessingGenerators._
+import cats.MonadThrow
 import cats.data.EitherT
 import cats.data.EitherT.{leftT, rightT}
 import cats.effect.IO
@@ -42,6 +42,7 @@ import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.CommitEventProcessor.eventsProcessingTimesBuilder
+import io.renku.triplesgenerator.events.categories.awaitinggeneration.EventProcessingGenerators._
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import org.scalacheck.Gen
@@ -156,8 +157,8 @@ class CommitEventProcessorSpec
       val metricsRegistry = mock[MetricsRegistry]
 
       (metricsRegistry
-        .register[IO, Histogram, Histogram.Builder](_: Histogram.Builder))
-        .expects(eventsProcessingTimesBuilder)
+        .register[IO, Histogram, Histogram.Builder](_: Histogram.Builder)(_: MonadThrow[IO]))
+        .expects(eventsProcessingTimesBuilder, MonadThrow[IO])
         .returning(IO.pure(eventsProcessingTimes))
 
       implicit val logger: TestLogger[IO] = TestLogger[IO]()
