@@ -88,6 +88,11 @@ object EventLog extends TypeSerializers {
     _ <- logger.info("event_log DB started")
   } yield ()
 
+  def stopDB()(implicit ioRuntime: IORuntime): IO[Unit] = for {
+    _ <- IO(postgresContainer.stop())
+    _ <- logger.info("event_log DB stopped")
+  } yield ()
+
   private def sessionResource(implicit ioRuntime: IORuntime): Resource[IO, SessionResource[IO, EventLogDB]] =
     Session
       .pooled(

@@ -21,13 +21,9 @@ package io.renku.graph.acceptancetests.flows
 import cats.effect.unsafe.IORuntime
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data
-import io.renku.graph.acceptancetests.flows.AccessTokenPresence._
-import io.renku.graph.acceptancetests.stubs.GitLab._
-import io.renku.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
-import io.renku.graph.acceptancetests.tooling.GraphServices._
-import io.renku.graph.acceptancetests.tooling.ModelImplicits
 import io.renku.graph.acceptancetests.tooling.ResponseTools._
+import io.renku.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects
@@ -43,7 +39,13 @@ import java.lang.Thread.sleep
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-object RdfStoreProvisioning extends ModelImplicits with Eventually with AcceptanceTestPatience with should.Matchers {
+trait RdfStoreProvisioning
+    extends ModelImplicits
+    with AccessTokenPresence
+    with Eventually
+    with AcceptanceTestPatience
+    with should.Matchers {
+  self: GraphServices =>
 
   def `data in the RDF store`(
       project:            data.Project,

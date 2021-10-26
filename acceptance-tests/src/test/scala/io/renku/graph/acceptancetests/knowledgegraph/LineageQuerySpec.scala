@@ -24,11 +24,9 @@ import io.circe.literal._
 import io.renku.generators.CommonGraphGenerators.{accessTokens, authUsers}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data._
-import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning.`data in the RDF store`
-import io.renku.graph.acceptancetests.stubs.GitLab.`GET <gitlabApi>/user returning OK`
-import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
+import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
+import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.acceptancetests.tooling.ResponseTools._
-import io.renku.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import io.renku.graph.model
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.projects
@@ -36,22 +34,13 @@ import io.renku.graph.model.testentities.LineageExemplarData.ExemplarData
 import io.renku.graph.model.testentities.{LineageExemplarData, NodeDef}
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.syntax._
-import io.renku.testtools.IOSpec
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers.should
 import sangria.ast.Document
 import sangria.macros._
 
-class LineageQuerySpec
-    extends AnyFeatureSpec
-    with GivenWhenThen
-    with GraphServices
-    with IOSpec
-    with AcceptanceTestPatience
-    with should.Matchers
-    with ModelImplicits {
+class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServices with RdfStoreProvisioning {
 
   Feature("GraphQL query to find lineage") {
 

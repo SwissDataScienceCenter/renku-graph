@@ -41,8 +41,7 @@ import scala.util.control.NonFatal
 
 object WebhookServiceClient {
 
-  def apply()(implicit logger: Logger[IO]) =
-    new WebhookServiceClient
+  def apply()(implicit logger: Logger[IO]) = new WebhookServiceClient
 
   class WebhookServiceClient(implicit logger: Logger[IO]) extends ServiceClient with should.Matchers {
     import io.circe.Json

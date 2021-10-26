@@ -27,9 +27,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.db.EventLog
-import io.renku.graph.acceptancetests.flows.AccessTokenPresence.givenAccessTokenPresentFor
-import io.renku.graph.acceptancetests.stubs.GitLab._
-import io.renku.graph.acceptancetests.stubs.RemoteTriplesGenerator._
+import io.renku.graph.acceptancetests.flows.AccessTokenPresence
 import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
 import io.renku.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
@@ -38,7 +36,6 @@ import io.renku.graph.model.events.{BatchDate, CommitId, EventBody, EventId, Eve
 import io.renku.graph.model.projects._
 import io.renku.http.client.AccessToken
 import io.renku.microservices.MicroserviceIdentifier
-import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.Eventually
@@ -56,9 +53,9 @@ import scala.language.postfixOps
 class ZombieEventDetectionSpec
     extends AnyFeatureSpec
     with GraphServices
-    with IOSpec
     with Eventually
     with ModelImplicits
+    with AccessTokenPresence
     with GivenWhenThen
     with TypeSerializers
     with AcceptanceTestPatience

@@ -27,16 +27,15 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.graph.acceptancetests.data
-import io.renku.graph.acceptancetests.data._
-import io.renku.graph.acceptancetests.tooling.TestLogger
+import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.model._
 import io.renku.graph.model.events.CommitId
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
 
-object RemoteTriplesGenerator extends RdfStoreData {
+trait RemoteTriplesGenerator {
+  self: GraphServices =>
 
-  private val logger = TestLogger()
   private val port: Int Refined Positive = 8080
 
   def `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(
@@ -99,7 +98,7 @@ object RemoteTriplesGenerator extends RdfStoreData {
 
   def reset(): Unit = server.resetAll()
 
-  def shutdown(): Unit = {
+  def shutdownRemoteTriplesGenerator(): Unit = {
     server.stop()
     server.shutdownServer()
     logger.info(s"Remote Triples Generator stub stopped")

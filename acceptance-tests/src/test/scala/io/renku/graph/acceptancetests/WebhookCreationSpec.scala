@@ -23,14 +23,11 @@ import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
 import io.renku.graph.acceptancetests.data.dataProjects
-import io.renku.graph.acceptancetests.flows.AccessTokenPresence.givenAccessTokenPresentFor
-import io.renku.graph.acceptancetests.stubs.GitLab._
-import io.renku.graph.acceptancetests.stubs.RemoteTriplesGenerator._
+import io.renku.graph.acceptancetests.flows.AccessTokenPresence
 import io.renku.graph.acceptancetests.tooling.ResponseTools._
 import io.renku.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.http.client.AccessToken
-import io.renku.testtools.IOSpec
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
@@ -41,7 +38,7 @@ class WebhookCreationSpec
     with ModelImplicits
     with GivenWhenThen
     with GraphServices
-    with IOSpec
+    with AccessTokenPresence
     with should.Matchers {
 
   Feature("A Graph Services hook can be created for a project") {

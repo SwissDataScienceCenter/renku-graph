@@ -26,10 +26,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project.Permissions._
 import io.renku.graph.acceptancetests.data.Project.{Urls, _}
 import io.renku.graph.acceptancetests.data.{Project, _}
-import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning._
-import io.renku.graph.acceptancetests.knowledgegraph.DatasetsResources._
-import io.renku.graph.acceptancetests.stubs.GitLab._
-import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
+import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.acceptancetests.tooling.ResponseTools._
 import io.renku.graph.acceptancetests.tooling.TestReadabilityTools._
@@ -42,20 +39,17 @@ import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 import io.renku.http.server.EndpointTester._
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
-import io.renku.testtools.IOSpec
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers.should
 
 class ProjectsResourcesSpec
     extends AnyFeatureSpec
     with GivenWhenThen
     with GraphServices
-    with IOSpec
-    with AcceptanceTestPatience
-    with RdfStoreData
-    with should.Matchers {
+    with RdfStoreProvisioning
+    with DatasetsResources
+    with RdfStoreData {
 
   import ProjectsResources._
 

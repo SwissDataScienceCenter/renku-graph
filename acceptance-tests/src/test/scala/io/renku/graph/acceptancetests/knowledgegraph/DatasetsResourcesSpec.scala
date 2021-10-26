@@ -26,14 +26,11 @@ import io.renku.generators.CommonGraphGenerators.{accessTokens, authUsers}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.acceptancetests.data._
-import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning._
-import io.renku.graph.acceptancetests.stubs.GitLab._
-import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
+import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.acceptancetests.tooling.ResponseTools._
 import io.renku.graph.acceptancetests.tooling.TestReadabilityTools._
 import io.renku.graph.model.datasets.{DatePublished, Identifier, ImageUri, Title}
-import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.testentities.{::~, Dataset, Person}
 import io.renku.graph.model.{projects, testentities}
 import io.renku.http.client.AccessToken
@@ -41,7 +38,6 @@ import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.http.rest.Links.{Href, Rel, _links}
 import io.renku.http.server.EndpointTester._
 import io.renku.jsonld.syntax._
-import io.renku.testtools.IOSpec
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
@@ -54,13 +50,9 @@ class DatasetsResourcesSpec
     extends AnyFeatureSpec
     with GivenWhenThen
     with GraphServices
-    with AcceptanceTestPatience
+    with RdfStoreProvisioning
     with RdfStoreData
-    with IOSpec
-    with should.Matchers
-    with EntitiesGenerators {
-
-  import DatasetsResources._
+    with DatasetsResources {
 
   Feature("GET knowledge-graph/projects/<namespace>/<name>/datasets to find project's datasets") {
 
@@ -306,7 +298,8 @@ class DatasetsResourcesSpec
   }
 }
 
-object DatasetsResources {
+trait DatasetsResources {
+  self: GraphServices with should.Matchers =>
 
   import io.renku.json.JsonOps._
   import io.renku.tinytypes.json.TinyTypeEncoders._

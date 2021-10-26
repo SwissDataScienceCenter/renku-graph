@@ -18,24 +18,25 @@
 
 package io.renku.graph.acceptancetests.tooling
 
+import cats.data.OptionT
+import cats.effect._
 import cats.effect.unsafe.IORuntime
-import cats.effect.{FiberIO, IO, Outcome, Spawn}
 import cats.syntax.all._
 import io.renku.graph.acceptancetests.data.RdfStoreData
+import RdfStoreData.currentVersionPair
 import io.renku.graph.model.RenkuVersionPair
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.testentities.renkuBaseUrl
 import io.renku.jsonld.EntityId
 import io.renku.rdfstore.FusekiBaseUrl
 import org.apache.jena.fuseki.main.FusekiServer
-import org.apache.jena.rdfconnection.RDFConnectionFactory
+import org.apache.jena.rdfconnection.{RDFConnection, RDFConnectionFactory}
 import org.apache.lucene.store.MMapDirectory
 
 import java.nio.file.Files
-import java.util.concurrent.ConcurrentHashMap
 import scala.jdk.CollectionConverters._
 
-object RDFStore extends RdfStoreData {
+object RDFStore {
 
   private val logger = TestLogger()
 
@@ -66,101 +67,76 @@ object RDFStore extends RdfStoreData {
       )
     }
 
-    lazy val connection = RDFConnectionFactory.connect(dataset)
+    lazy val connection: RDFConnection = RDFConnectionFactory.connect(dataset)
+    private val maybeJenaReference = Ref.unsafe[IO, Option[FusekiServer]](None)
 
-    private val jenaFiber = new ConcurrentHashMap[FiberIO[FusekiServer], Unit]()
-
-    def start()(implicit ioRuntime: IORuntime): IO[Unit] =
-      for {
-        server <- IO {
-                    FusekiServer
-                      .create()
-                      .loopback(true)
-                      .port(jenaPort)
-                      .add("/renku", dataset)
-                      .build
-                  }
-        fiber <- Spawn[IO].start(IO(server.start()))
-        _     <- IO(jenaFiber.put(fiber, ()))
-        _     <- logger.info("RDF store started")
-      } yield ()
+    def start(): IO[Unit] = for {
+      server <- IO {
+                  FusekiServer
+                    .create()
+                    .loopback(true)
+                    .port(jenaPort)
+                    .add("/renku", dataset)
+                    .build
+                }
+      _ <- Spawn[IO].start(IO(server.start()))
+      _ <- maybeJenaReference.getAndSet(server.some)
+      _ <- logger.info("RDF store started")
+    } yield ()
 
     def stop(): IO[Unit] = {
       connection.close()
       dataset.close()
-      jenaFiber
-        .keys()
-        .asScala
-        .toList
-        .headOption
-        .getOrElse(throw new Exception("No JENA instance running"))
-        .join
-        .flatMap {
-          case Outcome.Succeeded(fuseki) => fuseki.map(_.stop()).flatTap(_ => logger.info("RDF store stopped"))
-          case other                     => logger.error(s"Fuseki not started : $other")
-        }
+      OptionT(maybeJenaReference getAndSet None)
+        .map { jena => jena.stop(); logger.info("RDF store stopped") }
+        .value
+        .void
     }
   }
 
-  private val jenaReference = new ConcurrentHashMap[JenaInstance, Unit]()
+  private val maybeJenaReference = Ref.unsafe[IO, Option[JenaInstance]](None)
 
-  def start(
-      maybeVersionPair: Option[RenkuVersionPair] = Some(currentVersionPair)
-  )(implicit ioRuntime: IORuntime): IO[Unit] =
-    for {
-      _ <- stop()
-      newJena = new JenaInstance()
-      _       = jenaReference.put(newJena, ())
-      _ <- newJena.start()
-      _ = maybeVersionPair
-            .map { currentVersionPair =>
-              jenaReference
-                .keys()
-                .asScala
-                .toList
-                .headOption
-                .map {
-                  _.connection.update(s"""
-            INSERT DATA{
-              <${EntityId
-                    .of((renkuBaseUrl / "version-pair").toString)}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <${renku / "VersionPair"}> ;
-                                <${renku / "cliVersion"}> '${currentVersionPair.cliVersion}' ;
-                                <${renku / "schemaVersion"}> '${currentVersionPair.schemaVersion}'}""")
-                }
-                .getOrElse(throw new Exception("No JENA instance running"))
-            }
-    } yield ()
+  def start(maybeVersionPair: Option[RenkuVersionPair] = Some(currentVersionPair)): IO[Unit] = for {
+    _ <- stop()
+    newJena = new JenaInstance()
+    _ <- maybeJenaReference getAndSet newJena.some
+    _ <- newJena.start()
+    _ = maybeVersionPair.map { currentVersionPair =>
+          newJena.connection.update(s"""
+          INSERT DATA{
+            <${EntityId.of((renkuBaseUrl / "version-pair").toString)}> a <${renku / "VersionPair"}> ;
+                            <${renku / "cliVersion"}> '${currentVersionPair.cliVersion}' ;
+                            <${renku / "schemaVersion"}> '${currentVersionPair.schemaVersion}'}""")
+        }
+  } yield ()
 
-  def stop(): IO[Unit] = jenaReference.keys().asScala.toList.map(_.stop()).sequence.void
+  def stop(): IO[Unit] = OptionT(maybeJenaReference getAndSet None).semiflatMap(_.stop()).value.void
 
-  def allTriplesCount: Int =
-    jenaReference.keys.asScala.toList.headOption
-      .map { jena =>
-        jena.connection
-          .query("""|SELECT (COUNT(*) as ?count)
-                    |WHERE { ?s ?p ?o
-                    |  FILTER NOT EXISTS {
-                    |    ?s <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://swissdatasciencecenter.github.io/renku-ontology#VersionPair>
-                    |  }
-                    |  FILTER NOT EXISTS {
-                    |    ?s <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://swissdatasciencecenter.github.io/renku-ontology#ReProvisioning>
-                    |  }
-                    |}
-                    |""".stripMargin)
-          .execSelect()
-          .next()
-          .get("count")
-          .asLiteral()
-          .getInt
-      }
-      .getOrElse(throw new Exception("No JENA instance running"))
+  def allTriplesCount(implicit ioRuntime: IORuntime): Int = maybeJenaReference.get
+    .map(_.getOrElse(throw new Exception("No JENA instance running")))
+    .map {
+      _.connection
+        .query("""|SELECT (COUNT(*) as ?count)
+                  |WHERE { ?s ?p ?o
+                  |  FILTER NOT EXISTS {
+                  |    ?s a <https://swissdatasciencecenter.github.io/renku-ontology#VersionPair>
+                  |  }
+                  |  FILTER NOT EXISTS {
+                  |    ?s a <https://swissdatasciencecenter.github.io/renku-ontology#ReProvisioning>
+                  |  }
+                  |}
+                  |""".stripMargin)
+        .execSelect()
+        .next()
+        .get("count")
+        .asLiteral()
+        .getInt
+    }
+    .unsafeRunSync()
 
-  def run(query: String): Seq[Map[String, String]] =
-    jenaReference
-      .keys()
-      .asScala
-      .toList
-      .headOption
+  def run(query: String)(implicit ioRuntime: IORuntime): Seq[Map[String, String]] =
+    maybeJenaReference.get
+      .map(_.getOrElse(throw new Exception("No JENA instance running")))
       .map {
         _.connection
           .query(query)
@@ -169,5 +145,5 @@ object RDFStore extends RdfStoreData {
           .map(row => row.varNames().asScala.map(name => name -> row.get(name).toString).toMap)
           .toList
       }
-      .getOrElse(throw new Exception("No JENA instance running"))
+      .unsafeRunSync()
 }

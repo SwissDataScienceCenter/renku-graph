@@ -22,6 +22,7 @@ import cats.effect._
 import cats.effect.std.Semaphore
 import cats.effect.unsafe.IORuntime
 import io.renku.microservices.IOMicroservice
+import org.typelevel.log4cats.Logger
 
 import java.util.concurrent.ConcurrentHashMap
 import scala.jdk.CollectionConverters._
@@ -32,24 +33,22 @@ final case class ServiceRun(name:             String,
                             serviceClient:    ServiceClient,
                             preServiceStart:  List[IO[Unit]] = List.empty,
                             postServiceStart: List[IO[Unit]] = List.empty,
+                            onServiceStop:    List[IO[Unit]] = List.empty,
                             serviceArgsList:  List[() => String] = List.empty
 )
 
-class ServicesRunner(semaphore: Semaphore[IO]) {
+class ServicesRunner(semaphore: Semaphore[IO])(implicit logger: Logger[IO]) {
 
   import ServiceClient.ServiceReadiness._
   import cats.syntax.all._
 
   import scala.concurrent.duration._
 
-  private val logger = TestLogger()
-
-  def run(services: ServiceRun*)(implicit ioRuntime: IORuntime): IO[Unit] =
-    for {
-      _ <- semaphore.acquire
-      _ <- services.toList.map(start).parSequence
-      _ <- semaphore.release
-    } yield ()
+  def run(services: ServiceRun*)(implicit ioRuntime: IORuntime): IO[Unit] = for {
+    _ <- semaphore.acquire
+    _ <- services.toList.map(start).parSequence
+    _ <- semaphore.release
+  } yield ()
 
   private val cancelTokens = new ConcurrentHashMap[ServiceRun, IO[Unit]]()
 
@@ -100,17 +99,14 @@ class ServicesRunner(semaphore: Semaphore[IO]) {
       }.unsafeRunSync()
   }
 
-  def stop(serviceName: String)(implicit ioRuntime: IORuntime): Unit =
-    cancelTokens.asScala.find { case (key, _) => key.name == serviceName } match {
-      case None => throw new IllegalStateException(s"'$serviceName' service not found so cannot be restarted")
-      case Some((_, cancelToken)) =>
-        logger.info(s"$serviceName service stopping")
-        cancelToken.unsafeRunSync()
+  def stop(service: ServiceRun)(implicit ioRuntime: IORuntime): Unit =
+    cancelTokens.asScala.find { case (key, _) => key.name == service.name } match {
+      case None => throw new IllegalStateException(s"'${service.name}' service not found so cannot be restarted")
+      case Some((service, cancelToken)) =>
+        logger.info(s"${service.name} service stopping")
+        (service.onServiceStop.sequence >> cancelToken).unsafeRunSync()
     }
 
-  def stopAllServices()(implicit ioRuntime: IORuntime): Unit = cancelTokens.asScala.foreach {
-    case (service, cancelToken) =>
-      logger.info(s"Service ${service.name} stopping")
-      cancelToken.unsafeRunSync()
-  }
+  def stopAllServices()(implicit ioRuntime: IORuntime): Unit =
+    cancelTokens.asScala.foreach { case (service, _) => stop(service) }
 }

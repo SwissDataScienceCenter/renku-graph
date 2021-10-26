@@ -41,6 +41,5 @@ object ResponseTools {
           value.substring(value.lastIndexOf("<") + 1, value.lastIndexOf(">"))
         }
         .getOrElse(fail(s"""No link with the rel="$rel""""))
-
   }
 }

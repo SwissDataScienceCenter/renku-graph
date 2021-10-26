@@ -48,4 +48,9 @@ object TokenRepository {
     _ <- IO(postgresContainer.start())
     _ <- logger.info("projects_tokens DB started")
   } yield ()
+
+  def stopDB()(implicit ioRuntime: IORuntime): IO[Unit] = for {
+    _ <- IO(postgresContainer.stop())
+    _ <- logger.info("projects_tokens DB stopped")
+  } yield ()
 }

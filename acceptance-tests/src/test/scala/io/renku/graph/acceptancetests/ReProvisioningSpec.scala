@@ -24,36 +24,27 @@ import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.acceptancetests.data._
-import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning.`data in the RDF store`
-import io.renku.graph.acceptancetests.stubs.GitLab.`GET <gitlabApi>/projects/:path AND :id returning OK with`
-import io.renku.graph.acceptancetests.stubs.RemoteTriplesGenerator.`GET <triples-generator>/projects/:id/commits/:id returning OK`
-import io.renku.graph.acceptancetests.tooling.GraphServices._
+import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
 import io.renku.graph.acceptancetests.tooling.ResponseTools.ResponseOps
-import io.renku.graph.acceptancetests.tooling.{GraphServices, ModelImplicits, ServiceRun}
+import io.renku.graph.acceptancetests.tooling.{GraphServices, ServiceRun}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.{SchemaVersion, testentities}
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.syntax._
-import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator
 import org.http4s.Response
 import org.http4s.Status.Ok
 import org.scalactic.source.Position
 import org.scalatest.GivenWhenThen
-import org.scalatest.concurrent.Eventually
-import org.scalatest.concurrent.Eventually.eventually
 import org.scalatest.enablers.Retrying
 import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers.should
 import org.scalatest.time.{Minutes, Seconds, Span}
 
 class ReProvisioningSpec
     extends AnyFeatureSpec
-    with ModelImplicits
     with GivenWhenThen
     with GraphServices
-    with IOSpec
-    with should.Matchers
+    with RdfStoreProvisioning
     with RdfStoreData {
 
   Feature("ReProvisioning") {
@@ -99,7 +90,10 @@ class ReProvisioningSpec
           knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)
         projectDetailsResponseIsValid(updatedProjectDetailsResponse, newSchemaVersion)
 
-      }(patience, Retrying.retryingNatureOfT, Position.here)
+      }(PatienceConfig(timeout = Span(20, Minutes), interval = Span(10, Seconds)),
+        Retrying.retryingNatureOfT,
+        Position.here
+      )
     }
   }
 
@@ -112,9 +106,6 @@ class ReProvisioningSpec
       .map(_.copy(version = initialProjectSchemaVersion))
       .withActivities(activityEntities(planEntities()))
       .generateOne
-
-    val patience: org.scalatest.concurrent.Eventually.PatienceConfig =
-      Eventually.PatienceConfig(timeout = Span(20, Minutes), interval = Span(10, Seconds))
   }
 
   private def projectDetailsResponseIsValid(projectDetailsResponse:       Response[IO],
@@ -133,7 +124,7 @@ class ReProvisioningSpec
       serviceClient = triplesGeneratorClient,
       serviceArgsList = List(() => "application-re-provisioning.conf")
     )
-    stop(newTriplesGenerator.name)
-    GraphServices.run(newTriplesGenerator)
+    stop(newTriplesGenerator)
+    run(newTriplesGenerator)
   }
 }

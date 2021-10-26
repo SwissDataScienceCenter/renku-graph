@@ -20,15 +20,14 @@ package io.renku.graph.acceptancetests.tooling
 
 import cats.effect._
 import cats.effect.std.Semaphore
-import cats.effect.unsafe.IORuntime
 import io.renku._
 import io.renku.graph.acceptancetests.db.{EventLog, TokenRepository}
 import io.renku.graph.acceptancetests.stubs.{GitLab, RemoteTriplesGenerator}
 import io.renku.graph.acceptancetests.tooling.KnowledgeGraphClient.KnowledgeGraphClient
 import io.renku.graph.acceptancetests.tooling.WebhookServiceClient.WebhookServiceClient
 import io.renku.graph.config.RenkuBaseUrlLoader
+import io.renku.graph.model.RenkuBaseUrl
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
-import io.renku.graph.model.{GitLabApiUrl, GitLabUrl, RenkuBaseUrl}
 import io.renku.rdfstore.FusekiBaseUrl
 import io.renku.testtools.IOSpec
 import org.scalatest.{BeforeAndAfterAll, Suite}
@@ -36,55 +35,52 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.Try
 
-trait GraphServices extends BeforeAndAfterAll with EntitiesGenerators {
-  this: Suite with IOSpec =>
+trait GraphServices
+    extends EntitiesGenerators
+    with GitLab
+    with RemoteTriplesGenerator
+    with IOSpec
+    with BeforeAndAfterAll {
+  self: Suite =>
 
   protected implicit val fusekiBaseUrl: FusekiBaseUrl = RDFStore.fusekiBaseUrl
   implicit override val renkuBaseUrl:   RenkuBaseUrl  = RenkuBaseUrlLoader[Try]().fold(throw _, identity)
-  implicit override val gitLabUrl:      GitLabUrl     = GitLab.gitLabUrl
-  implicit override val gitLabApiUrl:   GitLabApiUrl  = GitLab.gitLabApiUrl
+  implicit lazy val logger:             Logger[IO]    = TestLogger()
 
-  protected implicit lazy val logger: Logger[IO] = TestLogger()
-
-  protected val restClient:             RestClientImpl       = new RestClientImpl()
-  protected val webhookServiceClient:   WebhookServiceClient = GraphServices.webhookServiceClient
-  protected val tokenRepositoryClient:  ServiceClient        = GraphServices.tokenRepositoryClient
-  protected val triplesGeneratorClient: ServiceClient        = GraphServices.triplesGeneratorClient
-  protected val knowledgeGraphClient:   KnowledgeGraphClient = GraphServices.knowledgeGraphClient
-  protected val eventLogClient:         ServiceClient        = GraphServices.eventLogClient
-  protected val webhookService:         ServiceRun           = GraphServices.webhookService
-  protected val commitEventService:     ServiceRun           = GraphServices.commitEventService
-  protected val tokenRepository:        ServiceRun           = GraphServices.tokenRepository
-  protected val triplesGenerator:       ServiceRun           = GraphServices.triplesGenerator
-  protected val knowledgeGraph:         ServiceRun           = GraphServices.knowledgeGraph
-  protected val eventLog:               ServiceRun           = GraphServices.eventLog
-
-  protected override def beforeAll(): Unit = {
-    super.beforeAll()
-
-    GraphServices.servicesRunner
-      .run(
-        tokenRepository,
-        eventLog,
-        webhookService,
-        commitEventService,
-        triplesGenerator,
-        knowledgeGraph
-      )
-      .unsafeRunSync()
-  }
-}
-
-object GraphServices {
-
-  private implicit lazy val logger: Logger[IO] = TestLogger()
-
+  val restClient:               RestClientImpl                = new RestClientImpl()
   val webhookServiceClient:     WebhookServiceClient          = WebhookServiceClient()
   val commitEventServiceClient: ServiceClient                 = CommitEventServiceClient()
   val triplesGeneratorClient:   ServiceClient                 = TriplesGeneratorClient()
   val tokenRepositoryClient:    ServiceClient                 = TokenRepositoryClient()
   val knowledgeGraphClient:     KnowledgeGraphClient          = KnowledgeGraphClient()
   val eventLogClient:           EventLogClient.EventLogClient = EventLogClient()
+
+  def run(service: ServiceRun):     Unit = servicesRunner.run(service).unsafeRunSync()
+  def restart(service: ServiceRun): Unit = servicesRunner.restart(service)
+  def stop(service: ServiceRun):    Unit = servicesRunner.stop(service)
+
+//  protected override def beforeAll(): Unit = {
+//    super.beforeAll()
+//
+//    servicesRunner
+//      .run(
+//        tokenRepository,
+//        eventLog,
+//        webhookService,
+//        commitEventService,
+//        triplesGenerator,
+//        knowledgeGraph
+//      )
+//      .unsafeRunSync()
+//  }
+//
+//  protected override def afterAll(): Unit = {
+//    servicesRunner.stopAllServices()
+//    shutdownGitLab()
+//    shutdownRemoteTriplesGenerator()
+//
+//    super.afterAll()
+//  }
 
   private val webhookService = ServiceRun("webhook-service", webhookservice.Microservice, webhookServiceClient)
   private val commitEventService = ServiceRun(
@@ -97,33 +93,24 @@ object GraphServices {
     "token-repository",
     tokenrepository.Microservice,
     tokenRepositoryClient,
-    preServiceStart = List(TokenRepository.startDB()(cats.effect.unsafe.implicits.global)),
+    preServiceStart = List(TokenRepository.startDB()),
+    onServiceStop = List(TokenRepository.stopDB()),
     serviceArgsList = List()
   )
   private val eventLog = ServiceRun(
     "event-log",
     eventlog.Microservice,
     eventLogClient,
-    preServiceStart = List(EventLog.startDB()(cats.effect.unsafe.implicits.global)),
+    preServiceStart = List(EventLog.startDB()),
+    onServiceStop = List(EventLog.stopDB()),
     serviceArgsList = List()
   )
   private val triplesGenerator = ServiceRun(
     "triples-generator",
     service = triplesgenerator.Microservice,
     serviceClient = triplesGeneratorClient,
-    preServiceStart = List(RDFStore.stop(), RDFStore.start()(cats.effect.unsafe.implicits.global))
+    preServiceStart = List(RDFStore.stop(), RDFStore.start())
   )
 
-  private val servicesRunner =
-    (Semaphore[IO](1) map (new ServicesRunner(_))).unsafeRunSync()(cats.effect.unsafe.implicits.global)
-
-  def run(service: ServiceRun)(implicit ioRuntime: IORuntime):     Unit = servicesRunner.run(service).unsafeRunSync()
-  def restart(service: ServiceRun)(implicit ioRuntime: IORuntime): Unit = servicesRunner.restart(service)
-  def stop(serviceName: String)(implicit ioRuntime: IORuntime):    Unit = servicesRunner.stop(serviceName)
-
-  sys.addShutdownHook {
-    servicesRunner.stopAllServices()(cats.effect.unsafe.implicits.global)
-    GitLab.shutdown()
-    RemoteTriplesGenerator.shutdown()
-  }
+  private val servicesRunner = (Semaphore[IO](1) map (new ServicesRunner(_))).unsafeRunSync()
 }

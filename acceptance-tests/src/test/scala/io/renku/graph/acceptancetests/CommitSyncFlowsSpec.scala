@@ -24,36 +24,25 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
 import io.renku.graph.acceptancetests.data.dataProjects
 import io.renku.graph.acceptancetests.db.EventLog
-import io.renku.graph.acceptancetests.flows.AccessTokenPresence.givenAccessTokenPresentFor
-import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning.`wait for events to be processed`
-import io.renku.graph.acceptancetests.stubs.GitLab._
-import io.renku.graph.acceptancetests.stubs.RemoteTriplesGenerator._
-import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
-import io.renku.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
+import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
+import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.EventId
 import io.renku.graph.model.events.EventStatus.TriplesStore
 import io.renku.graph.model.projects.Id
 import io.renku.http.client.AccessToken
-import io.renku.testtools.IOSpec
 import io.renku.webhookservice.model.HookToken
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
-import org.scalatest.concurrent.Eventually
 import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers.should
 import skunk.Command
 import skunk.implicits._
 
 class CommitSyncFlowsSpec
     extends AnyFeatureSpec
-    with ModelImplicits
     with GivenWhenThen
     with GraphServices
-    with Eventually
-    with IOSpec
-    with AcceptanceTestPatience
-    with should.Matchers
+    with RdfStoreProvisioning
     with TypeSerializers {
 
   Feature("Missed GitLab events should be synchronised") {
