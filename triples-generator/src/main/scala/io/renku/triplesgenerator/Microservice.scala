@@ -43,6 +43,7 @@ import io.renku.triplesgenerator.reprovisioning.{ReProvisioning, ReProvisioningS
 import org.typelevel.log4cats.Logger
 
 import java.util.concurrent.ConcurrentHashMap
+import scala.util.control.NonFatal
 
 object Microservice extends IOMicroservice {
 
@@ -83,7 +84,7 @@ object Microservice extends IOMicroservice {
     microserviceRoutes =
       new MicroserviceRoutes[IO](eventProcessingEndpoint, new RoutesMetrics[IO](metricsRegistry), config.some).routes
     exitCode <- microserviceRoutes.use { routes =>
-                  new MicroserviceRunner(
+                  new MicroserviceRunner[IO](
                     certificateLoader,
                     gitCertificateInstaller,
                     sentryInitializer,
@@ -97,29 +98,35 @@ object Microservice extends IOMicroservice {
   } yield exitCode
 }
 
-private class MicroserviceRunner(
-    certificateLoader:               CertificateLoader[IO],
-    gitCertificateInstaller:         GitCertificateInstaller[IO],
-    sentryInitializer:               SentryInitializer[IO],
-    cliVersionCompatibilityVerifier: CliVersionCompatibilityVerifier[IO],
-    eventConsumersRegistry:          EventConsumersRegistry[IO],
-    reProvisioning:                  ReProvisioning[IO],
-    httpServer:                      HttpServer[IO],
-    subProcessesCancelTokens:        ConcurrentHashMap[IO[Unit], Unit]
+private class MicroserviceRunner[F[_]: Spawn: Logger](
+    certificateLoader:               CertificateLoader[F],
+    gitCertificateInstaller:         GitCertificateInstaller[F],
+    sentryInitializer:               SentryInitializer[F],
+    cliVersionCompatibilityVerifier: CliVersionCompatibilityVerifier[F],
+    eventConsumersRegistry:          EventConsumersRegistry[F],
+    reProvisioning:                  ReProvisioning[F],
+    httpServer:                      HttpServer[F],
+    subProcessesCancelTokens:        ConcurrentHashMap[F[Unit], Unit]
 ) {
 
-  def run(): IO[ExitCode] = for {
-    _        <- certificateLoader.run()
-    _        <- gitCertificateInstaller.run()
-    _        <- sentryInitializer.run()
-    _        <- cliVersionCompatibilityVerifier.run()
-    _        <- eventConsumersRegistry.run().start.map(gatherCancelToken)
-    _        <- reProvisioning.run().start.map(gatherCancelToken)
-    exitCode <- httpServer.run()
-  } yield exitCode
+  def run(): F[ExitCode] = {
+    for {
+      _        <- certificateLoader.run()
+      _        <- gitCertificateInstaller.run()
+      _        <- sentryInitializer.run()
+      _        <- cliVersionCompatibilityVerifier.run()
+      _        <- Spawn[F].start(eventConsumersRegistry.run()).map(gatherCancelToken)
+      _        <- Spawn[F].start(reProvisioning.run()).map(gatherCancelToken)
+      exitCode <- httpServer.run()
+    } yield exitCode
+  } recoverWith logAndThrow
 
-  private def gatherCancelToken(fiber: FiberIO[Unit]): FiberIO[Unit] = {
+  private def gatherCancelToken(fiber: Fiber[F, Throwable, Unit]): Fiber[F, Throwable, Unit] = {
     subProcessesCancelTokens.put(fiber.cancel, ())
     fiber
+  }
+
+  private lazy val logAndThrow: PartialFunction[Throwable, F[ExitCode]] = { case NonFatal(exception) =>
+    Logger[F].error(exception)(exception.getMessage).flatMap(_ => exception.raiseError[F, ExitCode])
   }
 }
