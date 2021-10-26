@@ -29,10 +29,12 @@ import org.http4s._
 import org.http4s.blaze.client.BlazeClientBuilder
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.`Content-Type`
+import org.scalactic.source.Position
+import org.scalatest.BeforeAndAfter
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class HttpServerSpec extends AnyWordSpec with IOSpec with Http4sDsl[IO] with should.Matchers {
+class HttpServerSpec extends AnyWordSpec with IOSpec with Http4sDsl[IO] with should.Matchers with BeforeAndAfter {
 
   "run" should {
 
@@ -62,5 +64,9 @@ class HttpServerSpec extends AnyWordSpec with IOSpec with Http4sDsl[IO] with sho
   private lazy val port    = httpPorts.generateOne
   private lazy val baseUri = Uri.unsafeFromString(s"http://localhost:$port")
   private lazy val routes  = HttpRoutes.of[IO] { case GET -> Root / "resource" => Ok("response") }
-  HttpServer[IO](port.value, routes).run().unsafeRunAndForget()
+  private val serverFiber =
+    HttpServer[IO](port.value, routes).serverBuilder.resource.use(_ => IO.never).start.unsafeRunSync()
+
+  override def after(fun: => Any)(implicit pos: Position): Unit =
+    serverFiber.cancel.unsafeRunSync()
 }
