@@ -22,11 +22,10 @@ import cats.data.Kleisli
 import cats.effect._
 import cats.syntax.all._
 import org.http4s.blaze.server._
-import org.http4s.server.ServerBuilder
-import org.http4s.{HttpRoutes, Request, Response}
+import org.http4s.{HttpApp, HttpRoutes, Request, Response}
 
 trait HttpServer[F[_]] {
-  val serverBuilder: ServerBuilder[F]
+  val httpApp: HttpApp[F]
   def run(): F[ExitCode]
 }
 
@@ -39,11 +38,15 @@ class HttpServerImpl[F[_]: Async](serverPort: Int, serviceRoutes: HttpRoutes[F])
 
   import QueryParameterTools.resourceNotFound
 
-  lazy val serverBuilder: ServerBuilder[F] = BlazeServerBuilder[F]
-    .bindLocal(serverPort)
-    .withHttpApp(serviceRoutes.orNotFound)
+  lazy val httpApp: HttpApp[F] = serviceRoutes.orNotFound
 
-  def run(): F[ExitCode] = serverBuilder.serve.compile.drain.as(ExitCode.Success)
+  def run(): F[ExitCode] = BlazeServerBuilder[F]
+    .bindHttp(serverPort, "0.0.0.0")
+    .withHttpApp(httpApp)
+    .serve
+    .compile
+    .drain
+    .as(ExitCode.Success)
 
   private implicit class RoutesOps(routes: HttpRoutes[F]) {
     def orNotFound: Kleisli[F, Request[F], Response[F]] = Kleisli {
