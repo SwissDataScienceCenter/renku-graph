@@ -56,7 +56,8 @@ lazy val renkuModel = Project(
   base = file("renku-model")
 ).settings(
   commonSettings,
-  libraryDependencies += jsonLD
+  libraryDependencies += jsonLD,
+  libraryDependencies += jsonLD % Test
 ).dependsOn(
   tinyTypes % "compile->compile",
   tinyTypes % "test->test"
