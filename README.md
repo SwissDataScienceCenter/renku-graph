@@ -1,4 +1,4 @@
-[![pullreminders](https://pullreminders.com/badge.svg)](https://pullreminders.com?ref=badge)
+\[![pullreminders](https://pullreminders.com/badge.svg)](https://pullreminders.com?ref=badge)
 
 # renku-graph
 
@@ -45,8 +45,8 @@ response).
 #### Project creation flow and new commit flow
 
 When a project is created on GitLab or a new commit is pushed to GitLab the following flow is triggered:
-A MinimalCommitSyncEvent is created if a new project is created and a FullCommitSyncEvent is created when a new commit
-is pushed.
+A `MinimalCommitSyncEvent` is created if a new project is created and a `FullCommitSyncEvent` is created when a new
+commit is pushed.
 
 ```mermaid
 sequenceDiagram
@@ -56,7 +56,7 @@ sequenceDiagram
     participant CommmitEventService
     participant TriplesGenerator
     participant TriplesStore
-    GitLab ->>WebhookService: CommitSyncRequest
+    GitLab ->>WebhookService: WebhookEvent
     WebhookService ->>EventLog: CommitSyncRequest 
     loop Continuously pulling
     EventLog -->>EventLog: find latest event 
@@ -83,9 +83,15 @@ sequenceDiagram
 
 #### Global Commit Sync flow:
 
-This flow allows removal or creation of commits anywhere in the commit history. It is scheduled to be triggered at a
-minimum rate of once per week per project and at a maximum rate of once per hour per project. This process will only
-begin if a change in the history is detected.
+This flow traverses the whole commit history of a project and find out:
+
+1. if there are commits on GitLab that need to be created on the `Eventlog`
+2. if there are commits that are not on GitLab that should be removed from the `EventLog`
+
+This process is scheduled to be triggered at a minimum rate of once per week per project and at a maximum rate of once
+per hour per project. The commit history traversal only begins when the number of commits on GitLab and on
+the `EventLog` does not match and the most recent commit on GitLab is different from the most recent commit on
+the `EventLog`.
 
 ```mermaid
 sequenceDiagram
