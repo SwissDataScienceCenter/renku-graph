@@ -36,7 +36,13 @@ final case class ServiceRun(name:             String,
                             serviceArgsList:  List[() => String] = List.empty
 )
 
-class ServicesRunner(semaphore: Semaphore[IO])(implicit logger: Logger[IO]) {
+object ServicesState {
+  val cancelTokens = new ConcurrentHashMap[ServiceRun, IO[Unit]]()
+}
+
+class ServicesRunner(semaphore: Semaphore[IO])(implicit
+    logger:                     Logger[IO]
+) {
 
   import ServiceClient.ServiceReadiness._
   import cats.syntax.all._
@@ -49,8 +55,6 @@ class ServicesRunner(semaphore: Semaphore[IO])(implicit logger: Logger[IO]) {
     _ <- semaphore.release
   } yield ()
 
-  private val cancelTokens = new ConcurrentHashMap[ServiceRun, IO[Unit]]()
-
   private def start(serviceRun: ServiceRun)(implicit ioRuntime: IORuntime): IO[Unit] = {
     import serviceRun._
     serviceClient.ping.flatMap {
@@ -62,7 +66,7 @@ class ServicesRunner(semaphore: Semaphore[IO])(implicit logger: Logger[IO]) {
           _ <- service
                  .run(serviceRun.serviceArgsList.map(_()))
                  .start
-                 .map(fiber => cancelTokens.put(serviceRun, fiber.cancel))
+                 .map(fiber => ServicesState.cancelTokens.put(serviceRun, fiber.cancel))
           _ <- verifyServiceReady(serviceRun)
         } yield ()
     }
@@ -75,13 +79,11 @@ class ServicesRunner(semaphore: Semaphore[IO])(implicit logger: Logger[IO]) {
     }
 
   def stop(service: ServiceRun)(implicit ioRuntime: IORuntime): Unit =
-    cancelTokens.asScala.find { case (key, _) => key.name == service.name } match {
+    ServicesState.cancelTokens.asScala.find { case (key, _) => key.name == service.name } match {
       case None => throw new IllegalStateException(s"'${service.name}' service not found, it is already stopped")
       case Some((service, cancelToken)) =>
         (service.onServiceStop.sequence >> cancelToken >> logger.info(s"${service.name} service stopping"))
           .unsafeRunSync()
     }
 
-  def stopAllServices()(implicit ioRuntime: IORuntime): Unit =
-    cancelTokens.asScala.foreach { case (service, _) => stop(service) }
 }
