@@ -34,5 +34,5 @@ object model {
   }
 
   final class Total private (val value: Int) extends AnyVal with IntTinyType
-  implicit object Total extends TinyTypeFactory[Total](new Total(_)) with NonNegativeInt
+  implicit object Total                      extends TinyTypeFactory[Total](new Total(_)) with NonNegativeInt
 }

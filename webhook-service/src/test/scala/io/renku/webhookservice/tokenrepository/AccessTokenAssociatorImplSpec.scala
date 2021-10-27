@@ -18,7 +18,7 @@
 
 package io.renku.webhookservice.tokenrepository
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.syntax._
 import io.renku.generators.CommonGraphGenerators._
@@ -30,18 +30,18 @@ import io.renku.http.ErrorMessage._
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
+import io.renku.testtools.IOSpec
 import org.http4s.Status
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
 class AccessTokenAssociatorImplSpec
     extends AnyWordSpec
     with MockFactory
     with ExternalServiceStubbing
-    with should.Matchers {
+    with should.Matchers
+    with IOSpec {
 
   "associate" should {
 
@@ -75,14 +75,13 @@ class AccessTokenAssociatorImplSpec
     }
   }
 
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO]        = IO.timer(global)
-
   private trait TestCase {
+
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
 
     val tokenRepositoryUrl = TokenRepositoryUrl(externalServiceBaseUrl)
     val projectId          = projectIds.generateOne
 
-    val associator = new AccessTokenAssociatorImpl[IO](tokenRepositoryUrl, TestLogger())
+    val associator = new AccessTokenAssociatorImpl[IO](tokenRepositoryUrl)
   }
 }

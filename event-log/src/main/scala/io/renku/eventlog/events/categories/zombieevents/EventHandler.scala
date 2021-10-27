@@ -19,7 +19,8 @@
 package io.renku.eventlog.events.categories.zombieevents
 
 import cats.data.EitherT.fromEither
-import cats.effect.{Concurrent, ContextShift, IO, Timer}
+import cats.effect.Concurrent
+import cats.effect.kernel.Spawn
 import cats.syntax.all._
 import cats.{Applicative, MonadThrow, Show}
 import io.circe.{Decoder, DecodingFailure}
@@ -34,47 +35,45 @@ import io.renku.graph.model.projects
 import io.renku.metrics.{LabeledGauge, LabeledHistogram}
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurrent](
+private class EventHandler[F[_]: MonadThrow: Spawn: Concurrent: Logger](
     override val categoryName:          CategoryName,
-    zombieStatusCleaner:                ZombieStatusCleaner[Interpretation],
-    awaitingTriplesGenerationGauge:     LabeledGauge[Interpretation, projects.Path],
-    underTriplesGenerationGauge:        LabeledGauge[Interpretation, projects.Path],
-    awaitingTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
-    underTriplesTransformationGauge:    LabeledGauge[Interpretation, projects.Path],
-    logger:                             Logger[Interpretation]
-) extends consumers.EventHandlerWithProcessLimiter[Interpretation](ConcurrentProcessesLimiter.withoutLimit) {
+    zombieStatusCleaner:                ZombieStatusCleaner[F],
+    awaitingTriplesGenerationGauge:     LabeledGauge[F, projects.Path],
+    underTriplesGenerationGauge:        LabeledGauge[F, projects.Path],
+    awaitingTriplesTransformationGauge: LabeledGauge[F, projects.Path],
+    underTriplesTransformationGauge:    LabeledGauge[F, projects.Path]
+) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
 
   import io.renku.graph.model.projects
-  import io.renku.tinytypes.json.TinyTypeDecoders._
 
   override def createHandlingProcess(
       request: EventRequestContent
-  ): Interpretation[EventHandlingProcess[Interpretation]] =
-    EventHandlingProcess[Interpretation](startCleanZombieEvents(request))
+  ): F[EventHandlingProcess[F]] =
+    EventHandlingProcess[F](startCleanZombieEvents(request))
 
   private def startCleanZombieEvents(request: EventRequestContent) = for {
-    event <- fromEither[Interpretation](
+    event <- fromEither[F](
                request.event.as[ZombieEvent].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult]
              )
-    result <- (ContextShift[Interpretation].shift *> Concurrent[Interpretation]
-                .start(cleanZombieStatus(event))).toRightT
+    result <- Spawn[F]
+                .start(cleanZombieStatus(event))
+                .toRightT
                 .map(_ => Accepted)
-                .semiflatTap(logger.log(event))
-                .leftSemiflatTap(logger.log(event))
+                .semiflatTap(Logger[F].log(event))
+                .leftSemiflatTap(Logger[F].log(event))
   } yield result
 
-  private def cleanZombieStatus(event: ZombieEvent): Interpretation[Unit] = {
+  private def cleanZombieStatus(event: ZombieEvent): F[Unit] = {
     for {
       result <- zombieStatusCleaner.cleanZombieStatus(event)
-      _      <- Applicative[Interpretation].whenA(result == Updated)(updateGauges(event))
-      _      <- logger.logInfo(event, result.toString)
+      _      <- Applicative[F].whenA(result == Updated)(updateGauges(event))
+      _      <- Logger[F].logInfo(event, result.toString)
     } yield ()
-  } recoverWith { case NonFatal(exception) => logger.logError(event, exception) }
+  } recoverWith { case NonFatal(exception) => Logger[F].logError(event, exception) }
 
-  private lazy val updateGauges: ZombieEvent => Interpretation[Unit] = {
+  private lazy val updateGauges: ZombieEvent => F[Unit] = {
     case GeneratingTriplesZombieEvent(_, projectPath) =>
       for {
         _ <- awaitingTriplesGenerationGauge.increment(projectPath)
@@ -91,7 +90,9 @@ private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurre
     show"${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status}"
   }
 
-  private implicit val eventDecoder: Decoder[ZombieEvent] = { cursor =>
+  private implicit lazy val eventDecoder: Decoder[ZombieEvent] = { cursor =>
+    import io.renku.tinytypes.json.TinyTypeDecoders._
+
     for {
       id          <- cursor.downField("id").as[EventId]
       projectId   <- cursor.downField("project").downField("id").as[projects.Id]
@@ -112,25 +113,20 @@ private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurre
 }
 
 private object EventHandler {
-  def apply(sessionResource:                    SessionResource[IO, EventLogDB],
-            queriesExecTimes:                   LabeledHistogram[IO, SqlStatement.Name],
-            awaitingTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],
-            underTriplesGenerationGauge:        LabeledGauge[IO, projects.Path],
-            awaitingTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
-            underTriplesTransformationGauge:    LabeledGauge[IO, projects.Path],
-            logger:                             Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[EventHandler[IO]] = for {
+  def apply[F[_]: Spawn: Concurrent: Logger](
+      sessionResource:                    SessionResource[F, EventLogDB],
+      queriesExecTimes:                   LabeledHistogram[F, SqlStatement.Name],
+      awaitingTriplesGenerationGauge:     LabeledGauge[F, projects.Path],
+      underTriplesGenerationGauge:        LabeledGauge[F, projects.Path],
+      awaitingTriplesTransformationGauge: LabeledGauge[F, projects.Path],
+      underTriplesTransformationGauge:    LabeledGauge[F, projects.Path]
+  ): F[EventHandler[F]] = for {
     zombieStatusCleaner <- ZombieStatusCleaner(sessionResource, queriesExecTimes)
-  } yield new EventHandler[IO](categoryName,
-                               zombieStatusCleaner,
-                               awaitingTriplesGenerationGauge,
-                               underTriplesGenerationGauge,
-                               awaitingTriplesTransformationGauge,
-                               underTriplesTransformationGauge,
-                               logger
+  } yield new EventHandler[F](categoryName,
+                              zombieStatusCleaner,
+                              awaitingTriplesGenerationGauge,
+                              underTriplesGenerationGauge,
+                              awaitingTriplesTransformationGauge,
+                              underTriplesTransformationGauge
   )
 }

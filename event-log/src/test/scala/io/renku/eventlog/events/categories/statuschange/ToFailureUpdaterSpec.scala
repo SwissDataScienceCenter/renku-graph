@@ -32,6 +32,7 @@ import EventContentGenerators.{eventDates, eventMessages}
 import cats.data.Kleisli
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.{AllowedCombination, ToFailure}
 import io.renku.metrics.TestLabeledHistogram
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -40,6 +41,7 @@ import java.time.Instant
 
 class ToFailureUpdaterSpec
     extends AnyWordSpec
+    with IOSpec
     with InMemoryEventLogDbSpec
     with TypeSerializers
     with should.Matchers

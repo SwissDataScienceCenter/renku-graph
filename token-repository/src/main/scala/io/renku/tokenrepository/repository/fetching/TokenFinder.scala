@@ -18,44 +18,47 @@
 
 package io.renku.tokenrepository.repository.fetching
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.data.OptionT
-import cats.effect.{Async, ContextShift, IO}
+import cats.effect.MonadCancelThrow
+import cats.syntax.all._
 import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.http.client.AccessToken
 import io.renku.metrics.LabeledHistogram
 import io.renku.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB}
 
-private class TokenFinder[Interpretation[_]: Async: MonadError[*[_], Throwable]](
-    tokenInRepoFinder: PersistedTokensFinder[Interpretation],
-    accessTokenCrypto: AccessTokenCrypto[Interpretation]
-) {
+private trait TokenFinder[F[_]] {
+  def findToken(projectPath: Path): OptionT[F, AccessToken]
+  def findToken(projectId:   Id):   OptionT[F, AccessToken]
+}
+
+private class TokenFinderImpl[F[_]: MonadThrow](
+    tokenInRepoFinder: PersistedTokensFinder[F],
+    accessTokenCrypto: AccessTokenCrypto[F]
+) extends TokenFinder[F] {
 
   import accessTokenCrypto._
 
-  def findToken(projectPath: Path): OptionT[Interpretation, AccessToken] =
-    for {
-      encryptedToken <- tokenInRepoFinder.findToken(projectPath)
-      accessToken    <- OptionT.liftF(decrypt(encryptedToken))
-    } yield accessToken
+  override def findToken(projectPath: Path): OptionT[F, AccessToken] = for {
+    encryptedToken <- tokenInRepoFinder.findToken(projectPath)
+    accessToken    <- OptionT.liftF(decrypt(encryptedToken))
+  } yield accessToken
 
-  def findToken(projectId: Id): OptionT[Interpretation, AccessToken] =
-    for {
-      encryptedToken <- tokenInRepoFinder.findToken(projectId)
-      accessToken    <- OptionT.liftF(decrypt(encryptedToken))
-    } yield accessToken
+  override def findToken(projectId: Id): OptionT[F, AccessToken] = for {
+    encryptedToken <- tokenInRepoFinder.findToken(projectId)
+    accessToken    <- OptionT.liftF(decrypt(encryptedToken))
+  } yield accessToken
 }
 
-private object IOTokenFinder {
-  def apply(
-      sessionResource:     SessionResource[IO, ProjectsTokensDB],
-      queriesExecTimes:    LabeledHistogram[IO, SqlStatement.Name]
-  )(implicit contextShift: ContextShift[IO]): IO[TokenFinder[IO]] =
-    for {
-      accessTokenCrypto <- AccessTokenCrypto[IO]()
-    } yield new TokenFinder[IO](
-      new IOPersistedTokensFinder(sessionResource, queriesExecTimes),
-      accessTokenCrypto
-    )
+private object TokenFinder {
+  def apply[F[_]: MonadCancelThrow](
+      sessionResource:  SessionResource[F, ProjectsTokensDB],
+      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[TokenFinder[F]] = for {
+    accessTokenCrypto <- AccessTokenCrypto[F]()
+  } yield new TokenFinderImpl[F](
+    new PersistedTokensFinderImpl[F](sessionResource, queriesExecTimes),
+    accessTokenCrypto
+  )
 }

@@ -18,12 +18,9 @@
 
 package io.renku.knowledgegraph.datasets.rest
 
-import DatasetsFinder.DatasetSearchResult
-import DatasetsSearchEndpoint.Query.Phrase
-import DatasetsSearchEndpoint.Sort
-import cats.Parallel
-import cats.effect.{ConcurrentEffect, Timer}
+import cats.effect.Async
 import cats.syntax.all._
+import cats.{MonadThrow, Parallel}
 import eu.timepit.refined.auto._
 import io.circe.DecodingFailure
 import io.renku.graph.model.Schemas._
@@ -34,23 +31,30 @@ import io.renku.http.rest.paging.Paging.PagedResultsFinder
 import io.renku.http.rest.paging.{Paging, PagingRequest, PagingResponse}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.datasets.model.DatasetCreator
+import io.renku.knowledgegraph.datasets.rest.DatasetsFinder.DatasetSearchResult
+import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
+import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import io.renku.tinytypes.constraints.NonNegativeInt
 import io.renku.tinytypes.{IntTinyType, TinyTypeFactory}
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
-private trait DatasetsFinder[Interpretation[_]] {
+private trait DatasetsFinder[F[_]] {
   def findDatasets(maybePhrase: Option[Phrase],
                    sort:        Sort.By,
                    paging:      PagingRequest,
                    maybeUser:   Option[AuthUser]
-  ): Interpretation[PagingResponse[DatasetSearchResult]]
+  ): F[PagingResponse[DatasetSearchResult]]
 }
 
 private object DatasetsFinder {
+
+  def apply[F[_]: Parallel: Async: Logger](rdfStoreConfig: RdfStoreConfig,
+                                           creatorsFinder: CreatorsFinder[F],
+                                           timeRecorder:   SparqlQueryTimeRecorder[F]
+  ): F[DatasetsFinder[F]] =
+    MonadThrow[F].catchNonFatal(new DatasetsFinderImpl[F](rdfStoreConfig, creatorsFinder, timeRecorder))
 
   final case class DatasetSearchResult(
       id:                  Identifier,
@@ -70,18 +74,32 @@ private object DatasetsFinder {
   implicit object ProjectsCount extends TinyTypeFactory[ProjectsCount](new ProjectsCount(_)) with NonNegativeInt
 }
 
-private class DatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer: Parallel](
-    rdfStoreConfig:          RdfStoreConfig,
-    creatorsFinder:          CreatorsFinder[Interpretation],
-    logger:                  Logger[Interpretation],
-    timeRecorder:            SparqlQueryTimeRecorder[Interpretation]
-)(implicit executionContext: ExecutionContext)
-    extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
-    with DatasetsFinder[Interpretation]
+private class DatasetsFinderImpl[F[_]: Parallel: Async: Logger](
+    rdfStoreConfig: RdfStoreConfig,
+    creatorsFinder: CreatorsFinder[F],
+    timeRecorder:   SparqlQueryTimeRecorder[F]
+) extends RdfStoreClientImpl[F](rdfStoreConfig, timeRecorder)
+    with DatasetsFinder[F]
     with Paging[DatasetSearchResult] {
 
   import DatasetsFinderImpl._
-  import cats.syntax.all._
+
+  override def findDatasets(maybePhrase:   Option[Phrase],
+                            sort:          Sort.By,
+                            pagingRequest: PagingRequest,
+                            maybeUser:     Option[AuthUser]
+  ): F[PagingResponse[DatasetSearchResult]] = {
+    val phrase = maybePhrase getOrElse Phrase("*")
+    implicit val resultsFinder: PagedResultsFinder[F, DatasetSearchResult] = pagedResultsFinder(
+      sparqlQuery(phrase, sort, maybeUser)
+    )
+    for {
+      page                 <- findPage[F](pagingRequest)
+      datasetsWithCreators <- (page.results map addCreators).parSequence
+      updatedPage          <- page.updateResults[F](datasetsWithCreators)
+    } yield updatedPage
+  }
+
   import creatorsFinder._
 
   private lazy val projectMemberFilterQuery: Option[AuthUser] => String = {
@@ -101,26 +119,10 @@ private class DatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer: Par
           |FILTER(?visibility = '${Visibility.Public.value}')
           |""".stripMargin
   }
-  private lazy val addCreators: DatasetSearchResult => Interpretation[DatasetSearchResult] =
+  private lazy val addCreators: DatasetSearchResult => F[DatasetSearchResult] =
     dataset =>
       findCreators(dataset.id)
         .map(creators => dataset.copy(creators = creators))
-
-  override def findDatasets(maybePhrase:   Option[Phrase],
-                            sort:          Sort.By,
-                            pagingRequest: PagingRequest,
-                            maybeUser:     Option[AuthUser]
-  ): Interpretation[PagingResponse[DatasetSearchResult]] = {
-    val phrase = maybePhrase getOrElse Phrase("*")
-    implicit val resultsFinder: PagedResultsFinder[Interpretation, DatasetSearchResult] = pagedResultsFinder(
-      sparqlQuery(phrase, sort, maybeUser)
-    )
-    for {
-      page                 <- findPage[Interpretation](pagingRequest)
-      datasetsWithCreators <- (page.results map addCreators).parSequence
-      updatedPage          <- page.updateResults[Interpretation](datasetsWithCreators)
-    } yield updatedPage
-  }
 
   private def sparqlQuery(phrase: Phrase, sort: Sort.By, maybeUser: Option[AuthUser]): SparqlQuery = SparqlQuery.of(
     name = "ds free-text search",

@@ -18,7 +18,7 @@
 
 package io.renku.tokenrepository.repository.association
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.literal._
 import io.renku.control.Throttler
@@ -28,14 +28,18 @@ import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
+import io.renku.testtools.IOSpec
 import org.http4s.Status
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
-class ProjectPathFinderSpec extends AnyWordSpec with MockFactory with ExternalServiceStubbing with should.Matchers {
+class ProjectPathFinderSpec
+    extends AnyWordSpec
+    with IOSpec
+    with MockFactory
+    with ExternalServiceStubbing
+    with should.Matchers {
 
   "findProjectPath" should {
 
@@ -112,15 +116,13 @@ class ProjectPathFinderSpec extends AnyWordSpec with MockFactory with ExternalSe
     }
   }
 
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO]        = IO.timer(global)
-
   private trait TestCase {
     val gitLabUrl   = GitLabUrl(externalServiceBaseUrl)
     val projectId   = projectIds.generateOne
     val projectPath = projectPaths.generateOne
 
-    val pathFinder = new IOProjectPathFinder(gitLabUrl, Throttler.noThrottling, TestLogger())
+    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val pathFinder = new ProjectPathFinderImpl[IO](gitLabUrl, Throttler.noThrottling)
 
     lazy val projectJson: String = json"""{
       "id": ${projectId.value},

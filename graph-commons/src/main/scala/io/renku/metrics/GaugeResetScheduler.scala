@@ -18,8 +18,8 @@
 
 package io.renku.metrics
 
-import cats.MonadError
-import cats.effect.{IO, Timer}
+import cats.MonadThrow
+import cats.effect.kernel.Temporal
 import cats.syntax.all._
 import io.renku.config.MetricsConfigProvider
 import org.typelevel.log4cats.Logger
@@ -27,44 +27,37 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal
 
-trait GaugeResetScheduler[Interpretation[_]] {
-  def run(): Interpretation[Unit]
+trait GaugeResetScheduler[F[_]] {
+  def run(): F[Unit]
 }
 
-class GaugeResetSchedulerImpl[Interpretation[_], LabelValue](
-    gauges:                 List[LabeledGauge[Interpretation, LabelValue]],
-    metricsSchedulerConfig: MetricsConfigProvider[Interpretation],
-    logger:                 Logger[Interpretation]
-)(implicit ME:              MonadError[Interpretation, Throwable], timer: Timer[Interpretation])
-    extends GaugeResetScheduler[Interpretation] {
+class GaugeResetSchedulerImpl[F[_]: MonadThrow: Temporal: Logger, LabelValue](
+    gauges:                 List[LabeledGauge[F, LabelValue]],
+    metricsSchedulerConfig: MetricsConfigProvider[F]
+) extends GaugeResetScheduler[F] {
 
-  override def run(): Interpretation[Unit] = for {
+  override def run(): F[Unit] = for {
     interval <- metricsSchedulerConfig.getInterval()
     _        <- resetGauges
     _        <- resetGaugesEvery(interval).foreverM[Unit]
   } yield ()
 
-  private def resetGaugesEvery(interval: FiniteDuration): Interpretation[Unit] = {
-    for {
-      _ <- timer sleep interval
-      _ <- resetGauges
-    } yield ()
-  } recoverWith logError
+  private def resetGaugesEvery(interval: FiniteDuration): F[Unit] =
+    ().pure[F] >> Temporal[F].delayBy(resetGauges, interval) recoverWith logError
 
-  private def resetGauges: Interpretation[Unit] =
+  private def resetGauges: F[Unit] =
     gauges.map(_.reset() recoverWith logError).sequence.void
 
-  private lazy val logError: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    logger.error(exception)(s"Clearing event gauge metrics failed")
+  private lazy val logError: PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
+    Logger[F].error(exception)(s"Clearing event gauge metrics failed")
   }
 }
 
-object IOGaugeResetScheduler {
-  def apply[LabelValue](
-      gauges:    List[LabeledGauge[IO, LabelValue]],
-      config:    MetricsConfigProvider[IO],
-      logger:    Logger[IO]
-  )(implicit ME: MonadError[IO, Throwable], timer: Timer[IO]): IO[GaugeResetScheduler[IO]] = IO(
-    new GaugeResetSchedulerImpl[IO, LabelValue](gauges, config, logger)
+object GaugeResetScheduler {
+  def apply[F[_]: MonadThrow: Temporal: Logger, LabelValue](
+      gauges: List[LabeledGauge[F, LabelValue]],
+      config: MetricsConfigProvider[F]
+  ): F[GaugeResetScheduler[F]] = MonadThrow[F].catchNonFatal(
+    new GaugeResetSchedulerImpl[F, LabelValue](gauges, config)
   )
 }

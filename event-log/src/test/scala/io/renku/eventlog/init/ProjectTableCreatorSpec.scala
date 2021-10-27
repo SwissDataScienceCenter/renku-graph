@@ -29,6 +29,7 @@ import io.renku.graph.model.events.{BatchDate, EventBody, EventId, EventStatus}
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk._
@@ -37,13 +38,12 @@ import skunk.implicits._
 
 import java.time.ZoneOffset
 
-class ProjectTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
+class ProjectTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
 
-  protected override lazy val migrationsToRun: List[Migration] = List(
-    eventLogTableCreator,
-    projectPathAdder,
-    batchDateAdder
-  )
+  protected override lazy val migrationsToRun: List[Migration] = allMigrations.takeWhile {
+    case _: ProjectTableCreatorImpl[_] => false
+    case _ => true
+  }
 
   "run" should {
 
@@ -123,8 +123,8 @@ class ProjectTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Ma
   }
 
   private trait TestCase {
-    implicit val logger = TestLogger[IO]()
-    val tableCreator    = new ProjectTableCreatorImpl[IO](sessionResource)
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val tableCreator = new ProjectTableCreatorImpl[IO](sessionResource)
   }
 
   private def fetchProjectData: List[(Id, Path, EventDate)] = execute {

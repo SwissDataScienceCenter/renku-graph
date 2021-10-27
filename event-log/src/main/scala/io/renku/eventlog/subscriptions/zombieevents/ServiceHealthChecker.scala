@@ -18,7 +18,8 @@
 
 package io.renku.eventlog.subscriptions.zombieevents
 
-import cats.effect.{ConcurrentEffect, IO, Timer}
+import cats.MonadThrow
+import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
@@ -30,48 +31,34 @@ import org.http4s.Status.Ok
 import org.http4s._
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
-private trait ServiceHealthChecker[Interpretation[_]] {
-  def ping(microserviceBaseUrl: MicroserviceBaseUrl): Interpretation[Boolean]
+private trait ServiceHealthChecker[F[_]] {
+  def ping(microserviceBaseUrl: MicroserviceBaseUrl): F[Boolean]
 }
 
 private object ServiceHealthChecker {
-  def apply(
-      logger: Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      concurrentEffect: ConcurrentEffect[IO],
-      timer:            Timer[IO]
-  ): IO[ServiceHealthChecker[IO]] = IO {
-    new ServiceHealthCheckerImpl(logger)
+  def apply[F[_]: Async: Logger]: F[ServiceHealthChecker[F]] = MonadThrow[F].catchNonFatal {
+    new ServiceHealthCheckerImpl()
   }
 }
 
-private class ServiceHealthCheckerImpl[Interpretation[_]: ConcurrentEffect: Timer](
-    logger:                  Logger[Interpretation],
-    retryInterval:           FiniteDuration = 1 second,
-    maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
-)(implicit executionContext: ExecutionContext)
-    extends RestClient[Interpretation, ServiceHealthChecker[Interpretation]](Throttler.noThrottling,
-                                                                             logger,
-                                                                             retryInterval = retryInterval,
-                                                                             maxRetries = maxRetries
-    )
-    with ServiceHealthChecker[Interpretation] {
+private class ServiceHealthCheckerImpl[F[_]: Async: Logger](
+    retryInterval: FiniteDuration = 1 second,
+    maxRetries:    Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
+) extends RestClient(Throttler.noThrottling, retryInterval = retryInterval, maxRetries = maxRetries)
+    with ServiceHealthChecker[F] {
 
-  override def ping(microserviceBaseUrl: MicroserviceBaseUrl): Interpretation[Boolean] = {
+  override def ping(microserviceBaseUrl: MicroserviceBaseUrl): F[Boolean] = {
     for {
       uri    <- validateUri((microserviceBaseUrl / "ping").toString)
       result <- send(request(Method.GET, uri))(mapResponse)
     } yield result
   } recover { case NonFatal(_) => false }
 
-  private lazy val mapResponse
-      : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[Boolean]] = {
-    case (Ok, _, _) => true.pure[Interpretation]
-    case (_, _, _)  => false.pure[Interpretation]
+  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Boolean]] = {
+    case (Ok, _, _) => true.pure[F]
+    case (_, _, _)  => false.pure[F]
   }
 }

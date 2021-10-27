@@ -30,13 +30,14 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples}
 import io.renku.graph.model.events.{CompoundEventId, EventStatus}
 import io.renku.metrics.TestLabeledHistogram
+import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Duration
 
-class LostZombieEventFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec with should.Matchers {
+class LostZombieEventFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSpec with should.Matchers {
 
   "popEvent" should {
     "do nothing if there are no zombie events in the table" in new TestCase {

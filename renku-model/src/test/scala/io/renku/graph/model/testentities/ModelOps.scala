@@ -40,7 +40,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
   implicit class PersonOps(person: Person) {
     lazy val resourceId: users.ResourceId = users.ResourceId(person.asEntityId)
 
-    def to[T](implicit convert:      Person => T):         T         = convert(person)
+    def to[T](implicit convert: Person => T):              T         = convert(person)
     def toMaybe[T](implicit convert: Person => Option[T]): Option[T] = convert(person)
   }
 

@@ -18,6 +18,7 @@
 
 package io.renku.knowledgegraph.datasets.rest
 
+import cats.MonadThrow
 import cats.effect._
 import cats.syntax.all._
 import io.circe.literal._
@@ -31,28 +32,31 @@ import io.renku.http.InfoMessage._
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.knowledgegraph.datasets.model._
-import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder}
+import io.renku.logging.ExecutionTimeRecorder
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-class DatasetEndpoint[Interpretation[_]: Effect](
-    datasetFinder:         DatasetFinder[Interpretation],
+trait DatasetEndpoint[F[_]] {
+  def getDataset(identifier: Identifier): F[Response[F]]
+}
+
+class DatasetEndpointImpl[F[_]: MonadThrow: Logger](
+    datasetFinder:         DatasetFinder[F],
     renkuResourcesUrl:     renku.ResourcesUrl,
     gitLabUrl:             GitLabUrl,
-    executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
-    logger:                Logger[Interpretation]
-) extends Http4sDsl[Interpretation] {
+    executionTimeRecorder: ExecutionTimeRecorder[F]
+) extends Http4sDsl[F]
+    with DatasetEndpoint[F] {
 
   import executionTimeRecorder._
   import io.renku.tinytypes.json.TinyTypeEncoders._
   import org.http4s.circe._
 
-  def getDataset(identifier: Identifier): Interpretation[Response[Interpretation]] = measureExecutionTime {
+  def getDataset(identifier: Identifier): F[Response[F]] = measureExecutionTime {
     datasetFinder
       .findDataset(identifier)
       .flatMap(toHttpResult(identifier))
@@ -61,20 +65,20 @@ class DatasetEndpoint[Interpretation[_]: Effect](
 
   private def toHttpResult(
       identifier: Identifier
-  ): Option[Dataset] => Interpretation[Response[Interpretation]] = {
+  ): Option[Dataset] => F[Response[F]] = {
     case None          => NotFound(InfoMessage(s"No dataset with '$identifier' id found"))
     case Some(dataset) => Ok(dataset.asJson)
   }
 
   private def httpResult(
       identifier: Identifier
-  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = { case NonFatal(exception) =>
+  ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
     val errorMessage = ErrorMessage(s"Finding dataset with '$identifier' id failed")
-    logger.error(exception)(errorMessage.value)
-    InternalServerError(errorMessage)
+    Logger[F].error(exception)(errorMessage.value) >>
+      InternalServerError(errorMessage)
   }
 
-  private def finishedSuccessfully(identifier: Identifier): PartialFunction[Response[Interpretation], String] = {
+  private def finishedSuccessfully(identifier: Identifier): PartialFunction[Response[F], String] = {
     case response if response.status == Ok || response.status == NotFound =>
       s"Finding '$identifier' dataset finished"
   }
@@ -174,18 +178,14 @@ class DatasetEndpoint[Interpretation[_]: Effect](
     }
 }
 
-object IODatasetEndpoint {
+object DatasetEndpoint {
 
-  def apply(
-      timeRecorder: SparqlQueryTimeRecorder[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[DatasetEndpoint[IO]] = for {
-    datasetFinder         <- DatasetFinder(timeRecorder, logger = ApplicationLogger)
-    renkuResourceUrl      <- renku.ResourcesUrl[IO]()
-    gitLabUrl             <- GitLabUrlLoader[IO]()
-    executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
-  } yield new DatasetEndpoint[IO](datasetFinder, renkuResourceUrl, gitLabUrl, executionTimeRecorder, ApplicationLogger)
+  def apply[F[_]: Async: Logger](
+      timeRecorder: SparqlQueryTimeRecorder[F]
+  ): F[DatasetEndpoint[F]] = for {
+    datasetFinder         <- DatasetFinder[F](timeRecorder)
+    renkuResourceUrl      <- renku.ResourcesUrl[F]()
+    gitLabUrl             <- GitLabUrlLoader[F]()
+    executionTimeRecorder <- ExecutionTimeRecorder[F]()
+  } yield new DatasetEndpointImpl[F](datasetFinder, renkuResourceUrl, gitLabUrl, executionTimeRecorder)
 }

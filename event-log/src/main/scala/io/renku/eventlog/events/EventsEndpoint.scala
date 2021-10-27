@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.events
 
-import cats.effect.{ConcurrentEffect, Effect, IO}
+import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, Show}
 import io.circe.{Encoder, Json}
@@ -38,27 +38,26 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-trait EventsEndpoint[Interpretation[_]] {
-  def findEvents(request: EventsEndpoint.Request): Interpretation[Response[Interpretation]]
+trait EventsEndpoint[F[_]] {
+  def findEvents(request: EventsEndpoint.Request): F[Response[F]]
 }
 
-class EventsEndpointImpl[Interpretation[_]: Effect: MonadThrow: Logger](eventsFinder: EventsFinder[Interpretation],
-                                                                        eventLogUrl: EventLogUrl
-) extends Http4sDsl[Interpretation]
-    with EventsEndpoint[Interpretation] {
+class EventsEndpointImpl[F[_]: MonadThrow: Logger](eventsFinder: EventsFinder[F], eventLogUrl: EventLogUrl)
+    extends Http4sDsl[F]
+    with EventsEndpoint[F] {
 
   import io.renku.http.ErrorMessage._
 
-  override def findEvents(request: EventsEndpoint.Request): Interpretation[Response[Interpretation]] =
+  override def findEvents(request: EventsEndpoint.Request): F[Response[F]] =
     eventsFinder
       .findEvents(request)
-      .map(_.toHttpResponse(Effect[Interpretation], requestedUrl(request), EventLogUrl, EventInfo.infoEncoder))
+      .map(_.toHttpResponse[F, EventLogUrl](requestedUrl(request), EventLogUrl, EventInfo.infoEncoder))
       .recoverWith(httpResponse(request))
 
   private def httpResponse(
       request: EventsEndpoint.Request
-  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = { case NonFatal(exception) =>
-    Logger[Interpretation].error(exception)(show"Finding events for project '$request' failed")
+  ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
+    Logger[F].error(exception)(show"Finding events for project '$request' failed")
     InternalServerError(ErrorMessage(exception))
   }
 
@@ -74,9 +73,9 @@ class EventsEndpointImpl[Interpretation[_]: Effect: MonadThrow: Logger](eventsFi
 
 object EventsEndpoint {
 
-  def apply(sessionResource:   SessionResource[IO, EventLogDB],
-            queriesExecTimes:  LabeledHistogram[IO, SqlStatement.Name]
-  )(implicit concurrentEffect: ConcurrentEffect[IO], logger: Logger[IO]): IO[EventsEndpoint[IO]] = for {
+  def apply[F[_]: Async: Logger](sessionResource: SessionResource[F, EventLogDB],
+                                 queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[EventsEndpoint[F]] = for {
     eventsFinder <- EventsFinder(sessionResource, queriesExecTimes)
     eventlogUrl  <- EventLogUrl()
   } yield new EventsEndpointImpl(eventsFinder, eventlogUrl)

@@ -220,11 +220,11 @@ class LineageFinderSpec extends AnyWordSpec with MockFactory with ScalaCheckDriv
     val edgesFinder       = mock[EdgesFinder[Try]]
     val edgesTrimmer      = mock[EdgesTrimmer[Try]]
     val nodeDetailsFinder = mock[NodeDetailsFinder[Try]]
-    val logger            = TestLogger[Try]()
-    val lineageFinder     = new LineageFinderImpl[Try](edgesFinder, edgesTrimmer, nodeDetailsFinder, logger)
-    val maybeAuthUser     = authUsers.generateOption
-    val projectPath       = projectPaths.generateOne
-    val location          = nodeLocations.generateOne
+    implicit val logger: TestLogger[Try] = TestLogger[Try]()
+    val lineageFinder = new LineageFinderImpl[Try](edgesFinder, edgesTrimmer, nodeDetailsFinder)
+    val maybeAuthUser = authUsers.generateOption
+    val projectPath   = projectPaths.generateOne
+    val location      = nodeLocations.generateOne
 
     implicit class FailureOps(failure: Try[Option[Lineage]]) {
 

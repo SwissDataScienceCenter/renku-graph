@@ -18,28 +18,25 @@
 
 package io.renku.metrics
 
-import cats.effect.{Clock, Resource, Sync}
+import cats.effect.{Resource, Sync}
 import cats.syntax.all._
 import org.http4s.HttpRoutes
 import org.http4s.metrics.prometheus.{Prometheus, PrometheusExportService}
 import org.http4s.server.middleware.{Metrics => ServerMetrics}
 
-class RoutesMetrics[Interpretation[_]](metricsRegistry: MetricsRegistry[Interpretation]) {
+class RoutesMetrics[F[_]: Sync](metricsRegistry: MetricsRegistry) {
 
-  implicit class RoutesOps(routes: HttpRoutes[Interpretation]) {
+  implicit class RoutesOps(routes: HttpRoutes[F]) {
 
-    def withMetrics(implicit
-        F:     Sync[Interpretation],
-        clock: Clock[Interpretation]
-    ): Resource[Interpretation, HttpRoutes[Interpretation]] =
+    def withMetrics: Resource[F, HttpRoutes[F]] =
       metricsRegistry.maybeCollectorRegistry match {
         case Some(collectorRegistry) =>
-          Prometheus.metricsOps[Interpretation](collectorRegistry, "server").map { metrics =>
-            PrometheusExportService(collectorRegistry).routes <+> ServerMetrics[Interpretation](
+          Prometheus.metricsOps[F](collectorRegistry, "server").map { metrics =>
+            PrometheusExportService(collectorRegistry).routes <+> ServerMetrics[F](
               metrics
             )(routes)
           }
-        case _ => Resource.eval(F.pure(routes))
+        case _ => Resource.eval(Sync[F].pure(routes))
       }
   }
 }

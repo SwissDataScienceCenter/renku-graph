@@ -38,7 +38,7 @@ class BaseDetailsFinderSpec
     with should.Matchers
     with TinyTypeEncoders {
 
-  import BaseDetailsFinder._
+  import BaseDetailsFinderImpl._
 
   "non-modified dataset decoder" should {
 
@@ -114,7 +114,7 @@ class BaseDetailsFinderSpec
         case date: datasets.DatePublished => json"""{
           "maybeDatePublished": {"value": $date}
         }"""
-        case date: datasets.DateCreated   => json"""{
+        case date: datasets.DateCreated => json"""{
           "maybeDateCreated": {"value": $date}
         }"""
       }

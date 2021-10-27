@@ -18,28 +18,35 @@
 
 package io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import com.typesafe.config.ConfigFactory
+import io.renku.interpreters.TestLogger
+import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.config.TriplesGeneration._
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.RenkuLogTriplesGenerator
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext
 import scala.jdk.CollectionConverters._
 
-class TriplesGeneratorSpec extends AnyWordSpec with should.Matchers {
+class TriplesGeneratorSpec extends AnyWordSpec with IOSpec with should.Matchers {
 
   "apply" should {
 
     s"return an instance of RenkuLogTriplesGenerator if TriplesGeneration is $RenkuLog" in {
       val config = ConfigFactory.parseMap(
         Map(
-          "triples-generation" -> "renku-log"
+          "triples-generation" -> "renku-log",
+          "services" -> Map(
+            "triples-generator" -> Map("url" -> "http://host").asJava,
+            "gitlab"            -> Map("url" -> "http://host").asJava
+          ).asJava
         ).asJava
       )
 
-      TriplesGenerator(config).unsafeRunSync() shouldBe a[RenkuLogTriplesGenerator]
+      TriplesGenerator[IO](config)
+        .unsafeRunSync()
+        .getClass shouldBe RenkuLogTriplesGenerator[IO]().unsafeRunSync().getClass
     }
 
     s"return an instance of RemoteTriplesGenerator if TriplesGeneration is $RemoteTriplesGeneration" in {
@@ -51,11 +58,12 @@ class TriplesGeneratorSpec extends AnyWordSpec with should.Matchers {
         ).asJava
       )
 
-      TriplesGenerator(config).unsafeRunSync() shouldBe a[RemoteTriplesGenerator]
+      TriplesGenerator[IO](config)
+        .unsafeRunSync()
+        .getClass
+        .getSimpleName shouldBe RemoteTriplesGenerator[IO](config).unsafeRunSync().getClass.getSimpleName
     }
   }
 
-  private implicit val ec:    ExecutionContext = ExecutionContext.global
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(ExecutionContext.global)
-  private implicit val timer: Timer[IO]        = IO.timer(ExecutionContext.global)
+  private implicit val logger: TestLogger[IO] = TestLogger[IO]()
 }

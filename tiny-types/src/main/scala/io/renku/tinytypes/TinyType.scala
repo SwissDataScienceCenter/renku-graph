@@ -19,7 +19,7 @@
 package io.renku.tinytypes
 
 import cats.syntax.all._
-import cats.{MonadError, MonadThrow, Show}
+import cats.{MonadThrow, Show}
 import io.circe.Json
 import io.renku.tinytypes.constraints.PathSegment
 
@@ -103,8 +103,8 @@ abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT)
 
   implicit class TinyTypeConverters(tinyType: TT) {
 
-    def as[Interpretation[_]: MonadThrow, OUT](implicit converter: TinyTypeConverter[TT, OUT]): Interpretation[OUT] =
-      implicitly[MonadError[Interpretation, Throwable]].fromEither(converter(tinyType))
+    def as[F[_]: MonadThrow, OUT](implicit converter: TinyTypeConverter[TT, OUT]): F[OUT] =
+      MonadThrow[F].fromEither(converter(tinyType))
 
     def toUnsafe[OUT](implicit convert: TT => Either[Exception, OUT]): OUT =
       convert(tinyType).fold(throw _, identity)

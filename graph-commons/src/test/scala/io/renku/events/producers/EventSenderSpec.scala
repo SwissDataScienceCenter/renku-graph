@@ -18,7 +18,7 @@
 
 package io.renku.events.producers
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER
 import com.github.tomakehurst.wiremock.stubbing.Scenario
@@ -29,15 +29,15 @@ import io.renku.generators.Generators.nonBlankStrings
 import io.renku.graph.config.EventLogUrl
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
+import io.renku.testtools.IOSpec
 import org.http4s.Status.{Accepted, BadGateway, GatewayTimeout, NotFound, ServiceUnavailable}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class EventSenderSpec extends AnyWordSpec with ExternalServiceStubbing with should.Matchers {
+class EventSenderSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing with should.Matchers {
 
   "sendEvent" should {
     Set(Accepted, NotFound) foreach { status =>
@@ -126,9 +126,7 @@ class EventSenderSpec extends AnyWordSpec with ExternalServiceStubbing with shou
     }
   }
 
-  private implicit lazy val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit lazy val timer: Timer[IO]        = IO.timer(global)
-  private lazy val requestTimeout: FiniteDuration   = 1 second
+  private lazy val requestTimeout: FiniteDuration = 1 second
 
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()

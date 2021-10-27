@@ -81,8 +81,6 @@ spec:
               value: "{{ .Values.triplesGenerator.generationProcessesNumber }}"
             - name: TRANSFORMATION_PROCESSES_NUMBER
               value: "{{ .Values.triplesGenerator.transformationProcessesNumber }}"
-            - name: THREADS_NUMBER
-              value: "{{ .Values.triplesGenerator.threadsNumber }}"
             - name: JAVA_OPTS
               value: -Xmx{{ .Values.triplesGenerator.jvmXmx }} -XX:+UseG1GC
             - name: RENKU_PYTHON_DEV_VERSION

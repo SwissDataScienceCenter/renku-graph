@@ -31,6 +31,7 @@ import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Path
 import io.renku.metrics.MetricsTools._
 import io.renku.metrics.{LabeledGauge, MetricsRegistry}
+import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -38,14 +39,14 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.jdk.CollectionConverters._
 
-class UnderTriplesGenerationGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class UnderTriplesGenerationGaugeSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "apply" should {
 
     "create and register events_processing_count named gauge" in new TestCase {
 
       (metricsRegistry
-        .register[LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[IO, Throwable]))
+        .register[IO, LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[IO, Throwable]))
         .expects(*, *)
         .onCall { (builder: LibGauge.Builder, _: MonadError[IO, Throwable]) =>
           val actual = builder.create()
@@ -62,7 +63,7 @@ class UnderTriplesGenerationGaugeSpec extends AnyWordSpec with MockFactory with 
     "return a gauge with reset method provisioning it with values from the Event Log" in new TestCase {
 
       (metricsRegistry
-        .register[LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[IO, Throwable]))
+        .register[IO, LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[IO, Throwable]))
         .expects(*, *)
         .onCall((_: LibGauge.Builder, _: MonadError[IO, Throwable]) => underlying.pure[IO])
 
@@ -85,7 +86,7 @@ class UnderTriplesGenerationGaugeSpec extends AnyWordSpec with MockFactory with 
       .labelNames("project")
       .create()
 
-    val metricsRegistry = mock[MetricsRegistry[IO]]
+    val metricsRegistry = mock[MetricsRegistry]
     val statsFinder     = mock[StatsFinder[IO]]
   }
 

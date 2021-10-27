@@ -18,8 +18,9 @@
 
 package io.renku.eventlog.events.categories.zombieevents
 
+import cats.MonadThrow
 import cats.data.Kleisli
-import cats.effect.BracketThrow
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SessionResource, SqlStatement}
@@ -34,23 +35,23 @@ import skunk.implicits._
 
 import java.time.Instant
 
-private trait ZombieStatusCleaner[Interpretation[_]] {
-  def cleanZombieStatus(event: ZombieEvent): Interpretation[UpdateResult]
+private trait ZombieStatusCleaner[F[_]] {
+  def cleanZombieStatus(event: ZombieEvent): F[UpdateResult]
 }
 
-private class ZombieStatusCleanerImpl[Interpretation[_]: BracketThrow](
-    sessionResource:  SessionResource[Interpretation, EventLogDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
+private class ZombieStatusCleanerImpl[F[_]: MonadCancelThrow](
+    sessionResource:  SessionResource[F, EventLogDB],
+    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
-    with ZombieStatusCleaner[Interpretation]
+    with ZombieStatusCleaner[F]
     with TypeSerializers {
 
-  override def cleanZombieStatus(event: ZombieEvent): Interpretation[UpdateResult] = sessionResource.useK {
+  override def cleanZombieStatus(event: ZombieEvent): F[UpdateResult] = sessionResource.useK {
     cleanEventualDeliveries(event.eventId) >> updateEventStatus(event)
   }
 
-  private lazy val updateEventStatus: ZombieEvent => Kleisli[Interpretation, Session[Interpretation], UpdateResult] = {
+  private lazy val updateEventStatus: ZombieEvent => Kleisli[F, Session[F], UpdateResult] = {
     case GeneratingTriplesZombieEvent(eventId, _)   => updateStatusQuery(eventId, GeneratingTriples, New)
     case TransformingTriplesZombieEvent(eventId, _) => updateStatusQuery(eventId, TransformingTriples, TriplesGenerated)
   }
@@ -59,7 +60,7 @@ private class ZombieStatusCleanerImpl[Interpretation[_]: BracketThrow](
     SqlStatement(name = "zombie_chasing - clean deliveries")
       .command[EventId ~ projects.Id](
         sql"""DELETE FROM event_delivery
-                WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
+              WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
             """.command
       )
       .arguments(eventId.id ~ eventId.projectId)
@@ -81,20 +82,20 @@ private class ZombieStatusCleanerImpl[Interpretation[_]: BracketThrow](
       .arguments(newStatus ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ oldStatus)
       .build
       .flatMapResult {
-        case Completion.Update(1) => (Updated: UpdateResult).pure[Interpretation]
-        case Completion.Update(0) => (NotUpdated: UpdateResult).pure[Interpretation]
+        case Completion.Update(1) => (Updated: UpdateResult).pure[F]
+        case Completion.Update(0) => (NotUpdated: UpdateResult).pure[F]
         case _ =>
           new Exception(s"${categoryName.value} - zombie_chasing - update status- More than one row updated")
-            .raiseError[Interpretation, UpdateResult]
+            .raiseError[F, UpdateResult]
       }
   }
 }
 
 private object ZombieStatusCleaner {
 
-  import cats.effect.IO
-
-  def apply(sessionResource:  SessionResource[IO, EventLogDB],
-            queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
-  ): IO[ZombieStatusCleaner[IO]] = IO(new ZombieStatusCleanerImpl(sessionResource, queriesExecTimes))
+  def apply[F[_]: MonadCancelThrow](sessionResource: SessionResource[F, EventLogDB],
+                                    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[ZombieStatusCleaner[F]] = MonadThrow[F].catchNonFatal(
+    new ZombieStatusCleanerImpl(sessionResource, queriesExecTimes)
+  )
 }

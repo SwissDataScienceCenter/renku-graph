@@ -23,15 +23,18 @@ import io.renku.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import org.http4s.AuthScheme.Bearer
 import org.http4s.Credentials.Token
 import org.http4s.Header
+import org.http4s.Header.ToRaw._
 import org.http4s.headers.Authorization
+import org.http4s.headers.Authorization._
+import org.typelevel.ci._
 
 package object security {
 
   implicit class AccessTokenOps(accessToken: AccessToken) {
 
-    lazy val toHeader: Header = accessToken match {
-      case PersonalAccessToken(token) => Header("PRIVATE-TOKEN", token)
-      case OAuthAccessToken(token)    => Authorization(Token(Bearer, token))
+    lazy val toHeader: Header.Raw = accessToken match {
+      case PersonalAccessToken(token) => Header.Raw(ci"PRIVATE-TOKEN", token)
+      case OAuthAccessToken(token)    => modelledHeadersToRaw(Authorization(Token(Bearer, token))).values.head
     }
   }
 }

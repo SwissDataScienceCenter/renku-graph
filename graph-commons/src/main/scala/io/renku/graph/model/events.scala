@@ -56,7 +56,7 @@ object events {
   }
 
   final class CommitId private (val value: String) extends AnyVal with StringTinyType
-  implicit object CommitId extends TinyTypeFactory[CommitId](new CommitId(_)) with GitSha
+  implicit object CommitId                         extends TinyTypeFactory[CommitId](new CommitId(_)) with GitSha
 
   final class CommitMessage private (val value: String) extends AnyVal with StringTinyType
   implicit object CommitMessage extends TinyTypeFactory[CommitMessage](new CommitMessage(_)) with NonBlank
@@ -68,7 +68,7 @@ object events {
   }
 
   final class EventId private (val value: String) extends AnyVal with StringTinyType
-  implicit object EventId extends TinyTypeFactory[EventId](new EventId(_)) with NonBlank
+  implicit object EventId                         extends TinyTypeFactory[EventId](new EventId(_)) with NonBlank
 
   final class EventBody private (val value: String) extends AnyVal with StringTinyType
   implicit object EventBody extends TinyTypeFactory[EventBody](new EventBody(_)) with NonBlank {

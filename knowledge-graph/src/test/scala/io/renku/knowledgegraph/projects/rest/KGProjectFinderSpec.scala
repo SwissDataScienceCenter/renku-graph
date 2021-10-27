@@ -27,11 +27,17 @@ import io.renku.knowledgegraph.projects.rest.Converters._
 import io.renku.knowledgegraph.projects.rest.KGProjectFinder.KGProject
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class KGProjectFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks with should.Matchers {
+class KGProjectFinderSpec
+    extends AnyWordSpec
+    with InMemoryRdfStore
+    with ScalaCheckPropertyChecks
+    with should.Matchers
+    with IOSpec {
 
   "findProject" should {
 
@@ -57,8 +63,8 @@ class KGProjectFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
   }
 
   private trait TestCase {
-    private val logger       = TestLogger[IO]()
-    private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
-    val metadataFinder       = new KGProjectFinderImpl(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
+    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    private val timeRecorder = new SparqlQueryTimeRecorder[IO](TestExecutionTimeRecorder[IO]())
+    val metadataFinder       = new KGProjectFinderImpl[IO](rdfStoreConfig, renkuBaseUrl, timeRecorder)
   }
 }

@@ -108,8 +108,8 @@ object commandParameters {
         with Url
         with EntityIdJsonLdOps[ResourceId]
 
-    sealed trait In  extends IOStream
-    sealed trait Out extends IOStream
+    sealed trait In                                       extends IOStream
+    sealed trait Out                                      extends IOStream
     case class StdIn(override val resourceId: ResourceId) extends IOStream(resourceId, StdIn.name) with In
     object StdIn { val name: String Refined NonEmpty = "stdin" }
 
@@ -148,7 +148,7 @@ object commandParameters {
           stdOut <- cursor.downField(renku / "streamType").as[String] >>= {
                       case StdOut.name.value => StdOut(resourceId).asRight
                       case StdErr.name.value => StdErr(resourceId).asRight
-                      case name              => DecodingFailure(s"$name is cannot be decoded to ${StdIn.name}", Nil).asLeft
+                      case name => DecodingFailure(s"$name is cannot be decoded to ${StdIn.name}", Nil).asLeft
                     }
         } yield stdOut
       }

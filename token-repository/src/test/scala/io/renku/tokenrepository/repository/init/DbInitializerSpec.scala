@@ -23,7 +23,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
-import io.renku.testtools.MockedRunnableCollaborators
+import io.renku.testtools.{IOSpec, MockedRunnableCollaborators}
 import io.renku.tokenrepository.repository.InMemoryProjectsTokensDb
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -31,6 +31,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class DbInitializerSpec
     extends AnyWordSpec
+    with IOSpec
     with InMemoryProjectsTokensDb
     with MockFactory
     with should.Matchers
@@ -101,9 +102,9 @@ class DbInitializerSpec
   }
 
   private trait TestCase {
-    val logger                   = TestLogger[IO]()
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val projectPathAdder         = mock[ProjectPathAdder[IO]]
     val duplicateProjectsRemover = mock[DuplicateProjectsRemover[IO]]
-    val dbInitializer            = new DbInitializer[IO](projectPathAdder, duplicateProjectsRemover, sessionResource, logger)
+    val dbInitializer = new DbInitializerImpl[IO](projectPathAdder, duplicateProjectsRemover, sessionResource)
   }
 }

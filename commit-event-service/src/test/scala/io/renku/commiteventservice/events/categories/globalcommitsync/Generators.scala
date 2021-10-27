@@ -54,7 +54,7 @@ private object Generators {
     commitIds   <- commitIdsGen
   } yield GlobalCommitSyncEvent(Project(projectId, projectPath), commitIds)
 
-  def projectCommitStats(commitId:    CommitId): Gen[ProjectCommitStats] = projectCommitStats(Gen.const(Some(commitId)))
+  def projectCommitStats(commitId: CommitId): Gen[ProjectCommitStats] = projectCommitStats(Gen.const(Some(commitId)))
   def projectCommitStats(commitIdGen: Gen[Option[CommitId]] = commitIds.toGeneratorOfOptions): Gen[ProjectCommitStats] =
     for {
       maybeCommitId <- commitIdGen

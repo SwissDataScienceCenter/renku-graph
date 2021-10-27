@@ -18,7 +18,7 @@
 
 package io.renku.tokenrepository.repository.deletion
 
-import cats.effect.BracketThrow
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SessionResource, SqlStatement}
@@ -28,31 +28,35 @@ import io.renku.tokenrepository.repository.{ProjectsTokensDB, TokenRepositoryTyp
 import skunk.data.Completion
 import skunk.implicits._
 
-private[repository] class TokenRemover[Interpretation[_]: BracketThrow](
-    sessionResource:  SessionResource[Interpretation, ProjectsTokensDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
-) extends DbClient[Interpretation](Some(queriesExecTimes))
+private[repository] trait TokenRemover[F[_]] {
+  def delete(projectId: Id): F[Unit]
+}
+
+private[repository] class TokenRemoverImpl[F[_]: MonadCancelThrow](
+    sessionResource:  SessionResource[F, ProjectsTokensDB],
+    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+) extends DbClient[F](Some(queriesExecTimes))
+    with TokenRemover[F]
     with TokenRepositoryTypeSerializers {
 
-  def delete(projectId: Id): Interpretation[Unit] = sessionResource.useK {
+  override def delete(projectId: Id): F[Unit] = sessionResource.useK {
     measureExecutionTime {
       SqlStatement(name = "remove token")
         .command[Id](sql"""delete from projects_tokens
-              where project_id = $projectIdEncoder
-        """.command)
+                           where project_id = $projectIdEncoder""".command)
         .arguments(projectId)
         .build
         .flatMapResult(failIfMultiUpdate(projectId))
     }
   }
 
-  private def failIfMultiUpdate(projectId: Id): Completion => Interpretation[Unit] = {
-    case Completion.Delete(0 | 1) => ().pure[Interpretation]
+  private def failIfMultiUpdate(projectId: Id): Completion => F[Unit] = {
+    case Completion.Delete(0 | 1) => ().pure[F]
     case Completion.Delete(n) =>
       new RuntimeException(s"Deleting token for a projectId: $projectId removed $n records")
-        .raiseError[Interpretation, Unit]
+        .raiseError[F, Unit]
     case completion =>
       new RuntimeException(s"Deleting token for a projectId: $projectId failed with completion code $completion")
-        .raiseError[Interpretation, Unit]
+        .raiseError[F, Unit]
   }
 }

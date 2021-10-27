@@ -18,28 +18,25 @@
 
 package io.renku.knowledgegraph.lineage
 
-import cats.MonadThrow
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.Async
 import cats.syntax.all._
+import cats.{MonadThrow, Parallel}
 import io.renku.graph.model.projects.Path
 import io.renku.http.server.security.model.AuthUser
+import io.renku.knowledgegraph.lineage.model.Node.Location
+import io.renku.knowledgegraph.lineage.model._
 import io.renku.rdfstore.SparqlQueryTimeRecorder
-import model.Node.Location
-import model._
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
-trait LineageFinder[Interpretation[_]] {
-  def find(projectPath: Path, location: Location, maybeUser: Option[AuthUser]): Interpretation[Option[Lineage]]
+trait LineageFinder[F[_]] {
+  def find(projectPath: Path, location: Location, maybeUser: Option[AuthUser]): F[Option[Lineage]]
 }
 
-class LineageFinderImpl[Interpretation[_]: MonadThrow](
-    edgesFinder:       EdgesFinder[Interpretation],
-    edgesTrimmer:      EdgesTrimmer[Interpretation],
-    nodeDetailsFinder: NodeDetailsFinder[Interpretation],
-    logger:            Logger[Interpretation]
-) extends LineageFinder[Interpretation] {
+class LineageFinderImpl[F[_]: MonadThrow: Logger](
+    edgesFinder:       EdgesFinder[F],
+    edgesTrimmer:      EdgesTrimmer[F],
+    nodeDetailsFinder: NodeDetailsFinder[F]
+) extends LineageFinder[F] {
 
   import NodeDetailsFinder._
   import edgesFinder._
@@ -48,12 +45,12 @@ class LineageFinderImpl[Interpretation[_]: MonadThrow](
 
   import scala.util.control.NonFatal
 
-  def find(projectPath: Path, location: Location, maybeUser: Option[AuthUser]): Interpretation[Option[Lineage]] =
+  def find(projectPath: Path, location: Location, maybeUser: Option[AuthUser]): F[Option[Lineage]] =
     findEdges(projectPath, maybeUser) flatMap {
-      case edges if edges.isEmpty => Option.empty[Lineage].pure[Interpretation]
+      case edges if edges.isEmpty => Option.empty[Lineage].pure[F]
       case edges =>
         trim(edges, location) flatMap {
-          case trimmedEdges if trimmedEdges.isEmpty => Option.empty[Lineage].pure[Interpretation]
+          case trimmedEdges if trimmedEdges.isEmpty => Option.empty[Lineage].pure[F]
           case trimmedEdges                         => findDetailsAndLineage(trimmedEdges, projectPath)
         }
     } recoverWith loggingError(projectPath, location)
@@ -62,14 +59,14 @@ class LineageFinderImpl[Interpretation[_]: MonadThrow](
     edgesSet         <- edges.toEdgesSet
     plansDetails     <- findDetails(edges.keySet, projectPath)
     locationsDetails <- findDetails(edges.toLocationsSet, projectPath)
-    lineage          <- Lineage.from[Interpretation](edgesSet, plansDetails ++ locationsDetails)
+    lineage          <- Lineage.from[F](edgesSet, plansDetails ++ locationsDetails)
   } yield lineage.some
 
   private implicit class EdgesOps(edgesAndLocations: EdgeMap) {
 
-    lazy val toEdgesSet: Interpretation[Set[Edge]] = {
+    lazy val toEdgesSet: F[Set[Edge]] = {
       edgesAndLocations map { case (runInfo, (sources, targets)) =>
-        (sources.map(Edge(_, runInfo.toLocation)) ++ targets.map(Edge(runInfo.toLocation, _))).pure[Interpretation]
+        (sources.map(Edge(_, runInfo.toLocation)) ++ targets.map(Edge(runInfo.toLocation, _))).pure[F]
       }
     }.toList.sequence.map(_.toSet.flatten)
 
@@ -81,32 +78,25 @@ class LineageFinderImpl[Interpretation[_]: MonadThrow](
     lazy val toLocation: Node.Location = Node.Location(runInfo.entityId.value.toString)
   }
 
-  private def loggingError(projectPath: Path,
-                           location:    Location
-  ): PartialFunction[Throwable, Interpretation[Option[Lineage]]] = { case NonFatal(ex) =>
-    val message = s"Finding lineage for '$projectPath' and '$location' failed"
-    logger.error(ex)(message)
-    new Exception(message, ex).raiseError[Interpretation, Option[Lineage]]
+  private def loggingError(projectPath: Path, location: Location): PartialFunction[Throwable, F[Option[Lineage]]] = {
+    case NonFatal(ex) =>
+      val message = s"Finding lineage for '$projectPath' and '$location' failed"
+      Logger[F].error(ex)(message)
+      new Exception(message, ex).raiseError[F, Option[Lineage]]
   }
 }
 
 object LineageFinder {
 
-  def apply(
-      timeRecorder: SparqlQueryTimeRecorder[IO],
-      logger:       Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[LineageFinder[IO]] = for {
-    lineageEdgesFinder <- EdgesFinder(timeRecorder, logger)
-    lineageDataTrimmer <- LineageDataTrimmer()
-    nodeDetailsFinder  <- NodeDetailsFinder(timeRecorder, logger)
-  } yield new LineageFinderImpl[IO](
+  def apply[F[_]: Async: Parallel: Logger](
+      timeRecorder: SparqlQueryTimeRecorder[F]
+  ): F[LineageFinder[F]] = for {
+    lineageEdgesFinder <- EdgesFinder[F](timeRecorder)
+    lineageDataTrimmer <- LineageDataTrimmer[F]()
+    nodeDetailsFinder  <- NodeDetailsFinder[F](timeRecorder)
+  } yield new LineageFinderImpl[F](
     lineageEdgesFinder,
     lineageDataTrimmer,
-    nodeDetailsFinder,
-    logger
+    nodeDetailsFinder
   )
 }

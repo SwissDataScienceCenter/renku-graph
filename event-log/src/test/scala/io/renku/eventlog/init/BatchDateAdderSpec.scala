@@ -32,6 +32,7 @@ import io.renku.graph.model.events.{BatchDate, EventId, EventStatus}
 import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk._
@@ -40,7 +41,7 @@ import skunk.implicits._
 
 import java.time.{LocalDateTime, ZoneOffset}
 
-class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
+class BatchDateAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
 
   protected override lazy val migrationsToRun: List[Migration] = List(
     eventLogTableCreator,
@@ -53,7 +54,7 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
 
       createEventTable()
 
-      batchDateAdder.run().unsafeRunSync() shouldBe ((): Unit)
+      batchDateAdder.run().unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("'batch_date' column adding skipped"))
     }
@@ -62,7 +63,7 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
 
       checkColumnExists shouldBe false
 
-      batchDateAdder.run().unsafeRunSync() shouldBe ((): Unit)
+      batchDateAdder.run().unsafeRunSync() shouldBe ()
 
       checkColumnExists shouldBe true
 
@@ -70,7 +71,7 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
 
       logger.reset()
 
-      batchDateAdder.run().unsafeRunSync() shouldBe ((): Unit)
+      batchDateAdder.run().unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("'batch_date' column exists"))
     }
@@ -86,7 +87,7 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
       val event2CreatedDate = createdDates.generateOne
       storeEvent(event2, event2CreatedDate)
 
-      batchDateAdder.run().unsafeRunSync() shouldBe ((): Unit)
+      batchDateAdder.run().unsafeRunSync() shouldBe ()
 
       findBatchDates shouldBe Set(BatchDate(event1CreatedDate.value), BatchDate(event2CreatedDate.value))
 

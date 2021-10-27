@@ -20,25 +20,25 @@ package io.renku.eventlog
 
 import cats.effect._
 import io.renku.config.certificates.CertificateLoader
+import io.renku.config.sentry.SentryInitializer
 import io.renku.eventlog.init.DbInitializer
 import io.renku.eventlog.metrics.EventLogMetrics
 import io.renku.eventlog.subscriptions.EventProducersRegistry
 import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.http.server.IOHttpServer
-import io.renku.interpreters.IOSentryInitializer
+import io.renku.http.server.HttpServer
 import io.renku.metrics.GaugeResetScheduler
-import io.renku.testtools.MockedRunnableCollaborators
+import io.renku.testtools.{IOSpec, MockedRunnableCollaborators}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.util.concurrent.ConcurrentHashMap
-import scala.concurrent.ExecutionContext.Implicits.global
 
 class MicroserviceRunnerSpec
     extends AnyWordSpec
+    with IOSpec
     with MockedRunnableCollaborators
     with MockFactory
     with should.Matchers {
@@ -168,17 +168,14 @@ class MicroserviceRunnerSpec
     }
   }
 
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO]        = IO.timer(global)
-
   private trait TestCase {
     val certificateLoader      = mock[CertificateLoader[IO]]
-    val sentryInitializer      = mock[IOSentryInitializer]
+    val sentryInitializer      = mock[SentryInitializer[IO]]
     val dbInitializer          = mock[DbInitializer[IO]]
     val eventProducersRegistry = mock[EventProducersRegistry[IO]]
     val eventConsumersRegistry = mock[EventConsumersRegistry[IO]]
     val metrics                = mock[EventLogMetrics[IO]]
-    val httpServer             = mock[IOHttpServer]
+    val httpServer             = mock[HttpServer[IO]]
     val gaugeScheduler         = mock[GaugeResetScheduler[IO]]
     val runner = new MicroserviceRunner(
       certificateLoader,
@@ -189,7 +186,7 @@ class MicroserviceRunnerSpec
       eventConsumersRegistry,
       gaugeScheduler,
       httpServer,
-      new ConcurrentHashMap[CancelToken[IO], Unit]()
+      new ConcurrentHashMap[IO[Unit], Unit]()
     )
   }
 }

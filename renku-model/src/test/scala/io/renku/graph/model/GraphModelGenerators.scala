@@ -77,7 +77,7 @@ object GraphModelGenerators {
   } yield Name(s"$first $second")
 
   implicit val userResourceIds: Gen[users.ResourceId] = userResourceIds(userEmails.toGeneratorOfOptions)
-  def userResourceIds(maybeEmail:    Option[Email]): Gen[users.ResourceId] = userResourceIds(Gen.const(maybeEmail))
+  def userResourceIds(maybeEmail: Option[Email]): Gen[users.ResourceId] = userResourceIds(Gen.const(maybeEmail))
   def userResourceIds(maybeEmailGen: Gen[Option[Email]]): Gen[users.ResourceId] = for {
     maybeEmail <- maybeEmailGen
   } yield users.ResourceId
@@ -86,8 +86,8 @@ object GraphModelGenerators {
 
   implicit val userGitLabIds: Gen[users.GitLabId] = Gen.uuid.map(_ => users.GitLabId(Random.nextInt(100000000) + 1))
 
-  implicit val projectIds:          Gen[Id]                   = Gen.uuid.map(_ => Id(Random.nextInt(1000000) + 1))
-  implicit val projectNames:        Gen[projects.Name]        = nonBlankStrings(minLength = 5) map (n => projects.Name(n.value))
+  implicit val projectIds:   Gen[Id]            = Gen.uuid.map(_ => Id(Random.nextInt(1000000) + 1))
+  implicit val projectNames: Gen[projects.Name] = nonBlankStrings(minLength = 5) map (n => projects.Name(n.value))
   implicit val projectDescriptions: Gen[projects.Description] = paragraphs() map (v => projects.Description(v.value))
   implicit val projectVisibilities: Gen[Visibility]           = Gen.oneOf(Visibility.all.toList)
   def projectCreatedDates(min: Instant = Instant.EPOCH): Gen[projects.DateCreated] =
@@ -136,9 +136,9 @@ object GraphModelGenerators {
     url <- renkuBaseUrls
     id  <- datasetIdentifiers
   } yield SameAs.internal(url / "datasets" / id).fold(throw _, identity)
-  implicit val datasetSameAs:              Gen[SameAs]             = Gen.oneOf(datasetExternalSameAs, datasetInternalSameAs)
-  implicit val datasetTopmostSameAs:       Gen[TopmostSameAs]      = datasetSameAs.map(TopmostSameAs.apply)
-  implicit val datasetDerivedFroms:        Gen[DerivedFrom]        = validatedUrls map (_.value) map DerivedFrom.apply
+  implicit val datasetSameAs:        Gen[SameAs]        = Gen.oneOf(datasetExternalSameAs, datasetInternalSameAs)
+  implicit val datasetTopmostSameAs: Gen[TopmostSameAs] = datasetSameAs.map(TopmostSameAs.apply)
+  implicit val datasetDerivedFroms:  Gen[DerivedFrom]   = validatedUrls map (_.value) map DerivedFrom.apply
   implicit val datasetTopmostDerivedFroms: Gen[TopmostDerivedFrom] = datasetDerivedFroms.map(TopmostDerivedFrom.apply)
   implicit val datasetResourceIds: Gen[datasets.ResourceId] =
     datasetIdentifiers.map(id => datasets.ResourceId((renkuBaseUrls.generateOne / "datasets" / id).show))

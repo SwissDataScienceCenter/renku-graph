@@ -33,15 +33,15 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.{compoundEventIds, zippedEventPayloads}
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.{CompoundEventId, ZippedEventPayload}
-import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "handle" should {
 
@@ -121,21 +121,19 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     val projectPath   = projectPaths.generateOne
     val project       = Project(eventId.projectId, projectPath)
 
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val eventProcessor             = mock[EventProcessor[IO]]
     val eventBodyDeserializer      = mock[EventBodyDeserializer[IO]]
     val concurrentProcessesLimiter = mock[ConcurrentProcessesLimiter[IO]]
     val subscriptionMechanism      = mock[SubscriptionMechanism[IO]]
-    val logger                     = TestLogger[IO]()
-
-    (subscriptionMechanism.renewSubscription _).expects().returns(IO.unit)
-
     val handler = new EventHandler[IO](categoryName,
                                        eventBodyDeserializer,
                                        subscriptionMechanism,
                                        concurrentProcessesLimiter,
-                                       eventProcessor,
-                                       logger
+                                       eventProcessor
     )
+
+    (subscriptionMechanism.renewSubscription _).expects().returns(IO.unit)
 
     def requestContent(event: Json, payload: ZippedEventPayload): EventRequestContent =
       events.EventRequestContent.WithPayload(event, payload)

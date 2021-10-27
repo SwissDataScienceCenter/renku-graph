@@ -19,6 +19,9 @@
 package io.renku.eventlog.processingstatus
 
 import cats.MonadThrow
+import cats.effect.MonadCancelThrow
+import cats.effect.kernel.Async
+import cats.syntax.all._
 import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.graph.model.projects
 import io.renku.http.ErrorMessage
@@ -29,15 +32,14 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-trait ProcessingStatusEndpoint[Interpretation[_]] {
-  def findProcessingStatus(projectId: projects.Id): Interpretation[Response[Interpretation]]
+trait ProcessingStatusEndpoint[F[_]] {
+  def findProcessingStatus(projectId: projects.Id): F[Response[F]]
 }
 
-class ProcessingStatusEndpointImpl[Interpretation[_]: MonadThrow](
-    processingStatusFinder: ProcessingStatusFinder[Interpretation],
-    logger:                 Logger[Interpretation]
-) extends Http4sDsl[Interpretation]
-    with ProcessingStatusEndpoint[Interpretation] {
+class ProcessingStatusEndpointImpl[F[_]: MonadThrow: Logger](
+    processingStatusFinder: ProcessingStatusFinder[F]
+) extends Http4sDsl[F]
+    with ProcessingStatusEndpoint[F] {
 
   import cats.syntax.all._
   import io.circe.Encoder
@@ -50,7 +52,7 @@ class ProcessingStatusEndpointImpl[Interpretation[_]: MonadThrow](
   import org.http4s.circe._
   import processingStatusFinder._
 
-  override def findProcessingStatus(projectId: projects.Id): Interpretation[Response[Interpretation]] = {
+  override def findProcessingStatus(projectId: projects.Id): F[Response[F]] = {
     for {
       maybeProcessingStatus <- fetchStatus(projectId).value
       response              <- maybeProcessingStatus.toResponse
@@ -66,7 +68,7 @@ class ProcessingStatusEndpointImpl[Interpretation[_]: MonadThrow](
   }
 
   private implicit class StatusOps(maybeProcessingStatus: Option[ProcessingStatus]) {
-    lazy val toResponse: Interpretation[Response[Interpretation]] =
+    lazy val toResponse: F[Response[F]] =
       maybeProcessingStatus.fold {
         NotFound(InfoMessage("No processing status found").asJson)
       } { status =>
@@ -76,23 +78,21 @@ class ProcessingStatusEndpointImpl[Interpretation[_]: MonadThrow](
 
   private def internalServerError(
       projectId: projects.Id
-  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = { case NonFatal(exception) =>
+  ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
     val errorMessage = ErrorMessage(s"Finding processing status for project $projectId failed")
-    logger.error(exception)(errorMessage.value)
+    Logger[F].error(exception)(errorMessage.value)
     InternalServerError(errorMessage)
   }
 }
 
 object ProcessingStatusEndpoint {
 
-  import cats.effect.{ContextShift, IO}
   import io.renku.eventlog.EventLogDB
 
-  def apply(
-      sessionResource:     SessionResource[IO, EventLogDB],
-      queriesExecTimes:    LabeledHistogram[IO, SqlStatement.Name],
-      logger:              Logger[IO]
-  )(implicit contextShift: ContextShift[IO]): IO[ProcessingStatusEndpoint[IO]] = for {
-    statusFinder <- IOProcessingStatusFinder(sessionResource, queriesExecTimes)
-  } yield new ProcessingStatusEndpointImpl[IO](statusFinder, logger)
+  def apply[F[_]: MonadCancelThrow: Async: Logger](
+      sessionResource:  SessionResource[F, EventLogDB],
+      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[ProcessingStatusEndpoint[F]] = for {
+    statusFinder <- ProcessingStatusFinder(sessionResource, queriesExecTimes)
+  } yield new ProcessingStatusEndpointImpl[F](statusFinder)
 }

@@ -18,8 +18,9 @@
 
 package io.renku.eventlog.subscriptions.triplesgenerated
 
+import cats.MonadThrow
 import cats.data._
-import cats.effect.{BracketThrow, IO, Sync}
+import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -42,20 +43,20 @@ import java.time.Instant
 import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
 
-private class TriplesGeneratedEventFinderImpl[Interpretation[_]: Sync: BracketThrow](
-    sessionResource:             SessionResource[Interpretation, EventLogDB],
-    awaitingTransformationGauge: LabeledGauge[Interpretation, projects.Path],
-    underTransformationGauge:    LabeledGauge[Interpretation, projects.Path],
-    queriesExecTimes:            LabeledHistogram[Interpretation, SqlStatement.Name],
+private class TriplesGeneratedEventFinderImpl[F[_]: Async](
+    sessionResource:             SessionResource[F, EventLogDB],
+    awaitingTransformationGauge: LabeledGauge[F, projects.Path],
+    underTransformationGauge:    LabeledGauge[F, projects.Path],
+    queriesExecTimes:            LabeledHistogram[F, SqlStatement.Name],
     now:                         () => Instant = () => Instant.now,
     projectsFetchingLimit:       Int Refined Positive,
     projectPrioritisation:       ProjectPrioritisation,
-    pickRandomlyFrom:            List[ProjectIds] => Option[ProjectIds] = ids => ids.get((Random nextInt ids.size).toLong)
+    pickRandomlyFrom: List[ProjectIds] => Option[ProjectIds] = ids => ids.get((Random nextInt ids.size).toLong)
 ) extends DbClient(Some(queriesExecTimes))
-    with EventFinder[Interpretation, TriplesGeneratedEvent]
+    with EventFinder[F, TriplesGeneratedEvent]
     with SubscriptionTypeSerializers {
 
-  override def popEvent(): Interpretation[Option[TriplesGeneratedEvent]] = sessionResource.useK {
+  override def popEvent(): F[Option[TriplesGeneratedEvent]] = sessionResource.useK {
     for {
       maybeProjectAndEvent <- findEventAndUpdateForProcessing()
       (maybeProject, maybeTriplesGeneratedEvent) = maybeProjectAndEvent
@@ -151,10 +152,9 @@ private class TriplesGeneratedEventFinderImpl[Interpretation[_]: Sync: BracketTh
       acc :++ List.fill((priority.value * 10).setScale(2, RoundingMode.HALF_UP).toInt)(projectIdAndPath)
     }
 
-  private lazy val markAsTransformingTriples
-      : Option[TriplesGeneratedEvent] => Kleisli[Interpretation, Session[Interpretation], Option[
-        TriplesGeneratedEvent
-      ]] = {
+  private lazy val markAsTransformingTriples: Option[TriplesGeneratedEvent] => Kleisli[F, Session[F], Option[
+    TriplesGeneratedEvent
+  ]] = {
     case None =>
       Kleisli.pure(Option.empty[TriplesGeneratedEvent])
     case Some(event @ TriplesGeneratedEvent(id, _, _)) =>
@@ -191,18 +191,18 @@ private class TriplesGeneratedEventFinderImpl[Interpretation[_]: Sync: BracketTh
         _ <- awaitingTransformationGauge decrement projectPath
         _ <- underTransformationGauge increment projectPath
       } yield ()
-    } getOrElse ().pure[Interpretation]
+    } getOrElse ().pure[F]
 }
 
-private object IOTriplesGeneratedEventFinder {
+private object TriplesGeneratedEventFinder {
 
   private val ProjectsFetchingLimit: Int Refined Positive = 10
 
-  def apply(sessionResource:             SessionResource[IO, EventLogDB],
-            awaitingTransformationGauge: LabeledGauge[IO, projects.Path],
-            underTransformationGauge:    LabeledGauge[IO, projects.Path],
-            queriesExecTimes:            LabeledHistogram[IO, SqlStatement.Name]
-  ): IO[EventFinder[IO, TriplesGeneratedEvent]] = IO {
+  def apply[F[_]: Async](sessionResource: SessionResource[F, EventLogDB],
+                         awaitingTransformationGauge: LabeledGauge[F, projects.Path],
+                         underTransformationGauge:    LabeledGauge[F, projects.Path],
+                         queriesExecTimes:            LabeledHistogram[F, SqlStatement.Name]
+  ): F[EventFinder[F, TriplesGeneratedEvent]] = MonadThrow[F].catchNonFatal {
     new TriplesGeneratedEventFinderImpl(sessionResource,
                                         awaitingTransformationGauge,
                                         underTransformationGauge,

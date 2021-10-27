@@ -32,7 +32,7 @@ sealed trait Entity {
 
 object Entity {
 
-  final case class InputEntity(location: Location, checksum: Checksum) extends Entity
+  final case class InputEntity(location: Location, checksum: Checksum)                          extends Entity
   final case class OutputEntity(location: Location, checksum: Checksum, generation: Generation) extends Entity
 
   object OutputEntity {

@@ -18,7 +18,8 @@
 
 package io.renku.knowledgegraph.datasets.rest
 
-import cats.effect.{ConcurrentEffect, Timer}
+import cats.MonadThrow
+import cats.effect.Async
 import eu.timepit.refined.auto._
 import io.circe.Decoder.decodeList
 import io.renku.graph.model.Schemas._
@@ -28,18 +29,19 @@ import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
+private trait PartsFinder[F[_]] {
+  def findParts(identifier: Identifier): F[List[DatasetPart]]
+}
 
-private class PartsFinder[Interpretation[_]: ConcurrentEffect: Timer](
-    rdfStoreConfig:          RdfStoreConfig,
-    logger:                  Logger[Interpretation],
-    timeRecorder:            SparqlQueryTimeRecorder[Interpretation]
-)(implicit executionContext: ExecutionContext)
-    extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder) {
+private class PartsFinderImpl[F[_]: Async: Logger](
+    rdfStoreConfig: RdfStoreConfig,
+    timeRecorder:   SparqlQueryTimeRecorder[F]
+) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
+    with PartsFinder[F] {
 
-  import PartsFinder._
+  import PartsFinderImpl._
 
-  def findParts(identifier: Identifier): Interpretation[List[DatasetPart]] =
+  def findParts(identifier: Identifier): F[List[DatasetPart]] =
     queryExpecting[List[DatasetPart]](using = query(identifier))
 
   private def query(identifier: Identifier) = SparqlQuery.of(
@@ -63,7 +65,7 @@ private class PartsFinder[Interpretation[_]: ConcurrentEffect: Timer](
   )
 }
 
-private object PartsFinder {
+private object PartsFinderImpl {
 
   import io.circe.Decoder
 
@@ -78,4 +80,13 @@ private object PartsFinder {
 
     _.downField("results").downField("bindings").as(decodeList[DatasetPart])
   }
+}
+
+private object PartsFinder {
+
+  def apply[F[_]: Async: Logger](rdfStoreConfig: RdfStoreConfig,
+                                 timeRecorder: SparqlQueryTimeRecorder[F]
+  ): F[PartsFinder[F]] =
+    MonadThrow[F].catchNonFatal(new PartsFinderImpl[F](rdfStoreConfig, timeRecorder))
+
 }

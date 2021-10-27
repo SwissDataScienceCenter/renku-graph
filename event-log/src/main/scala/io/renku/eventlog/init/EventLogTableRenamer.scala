@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.BracketThrow
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
@@ -28,25 +28,24 @@ import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-private trait EventLogTableRenamer[Interpretation[_]] {
-  def run(): Interpretation[Unit]
+private trait EventLogTableRenamer[F[_]] {
+  def run(): F[Unit]
 }
 
 private object EventLogTableRenamer {
-  def apply[Interpretation[_]: BracketThrow: Logger](
-      sessionResource: SessionResource[Interpretation, EventLogDB]
-  ): EventLogTableRenamer[Interpretation] =
-    new EventLogTableRenamerImpl(sessionResource)
+  def apply[F[_]: MonadCancelThrow: Logger](
+      sessionResource: SessionResource[F, EventLogDB]
+  ): EventLogTableRenamer[F] = new EventLogTableRenamerImpl(sessionResource)
 }
 
-private class EventLogTableRenamerImpl[Interpretation[_]: BracketThrow: Logger](
-    sessionResource: SessionResource[Interpretation, EventLogDB]
-) extends EventLogTableRenamer[Interpretation]
+private class EventLogTableRenamerImpl[F[_]: MonadCancelThrow: Logger](
+    sessionResource: SessionResource[F, EventLogDB]
+) extends EventLogTableRenamer[F]
     with EventTableCheck {
 
-  override def run(): Interpretation[Unit] = sessionResource.useK {
+  override def run(): F[Unit] = sessionResource.useK {
     checkOldTableExists >>= {
-      case false => Kleisli.liftF(Logger[Interpretation] info "'event' table already exists")
+      case false => Kleisli.liftF(Logger[F] info "'event' table already exists")
       case true =>
         whenEventTableExists(
           dropOldTable(),
@@ -55,22 +54,19 @@ private class EventLogTableRenamerImpl[Interpretation[_]: BracketThrow: Logger](
     }
   }
 
-  private lazy val checkOldTableExists: Kleisli[Interpretation, Session[Interpretation], Boolean] = {
+  private lazy val checkOldTableExists: Kleisli[F, Session[F], Boolean] = {
     val query: Query[Void, Boolean] = sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_log')"
       .query(bool)
     Kleisli(_.unique(query).recover { case _ => false })
   }
 
-  private def renameTable(): Kleisli[Interpretation, Session[Interpretation], Unit] =
-    for {
-      _ <- execute(sql"ALTER TABLE event_log RENAME TO event".command)
-      _ <- Kleisli.liftF(Logger[Interpretation] info "'event_log' table renamed to 'event'")
-    } yield ()
+  private def renameTable(): Kleisli[F, Session[F], Unit] = for {
+    _ <- execute(sql"ALTER TABLE event_log RENAME TO event".command)
+    _ <- Kleisli.liftF(Logger[F] info "'event_log' table renamed to 'event'")
+  } yield ()
 
-  private def dropOldTable(): Kleisli[Interpretation, Session[Interpretation], Unit] =
-    for {
-      _ <- execute(sql"DROP TABLE IF EXISTS event_log".command)
-      _ <- Kleisli.liftF(Logger[Interpretation] info "'event_log' table dropped")
-    } yield ()
-
+  private def dropOldTable(): Kleisli[F, Session[F], Unit] = for {
+    _ <- execute(sql"DROP TABLE IF EXISTS event_log".command)
+    _ <- Kleisli.liftF(Logger[F] info "'event_log' table dropped")
+  } yield ()
 }

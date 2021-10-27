@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions
 
 import cats._
-import cats.effect.{ContextShift, Effect, IO, Timer}
+import cats.effect.Async
 import cats.syntax.all._
 import io.circe.Json
 import io.renku.db.{SessionResource, SqlStatement}
@@ -30,23 +30,20 @@ import io.renku.graph.model.projects
 import io.renku.metrics.{LabeledGauge, LabeledHistogram}
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
-trait EventProducersRegistry[Interpretation[_]] {
-  def run(): Interpretation[Unit]
-  def register(subscriptionRequest: Json): Interpretation[SubscriptionResult]
+trait EventProducersRegistry[F[_]] {
+  def run(): F[Unit]
+  def register(subscriptionRequest: Json): F[SubscriptionResult]
 }
 
-private[subscriptions] class EventProducersRegistryImpl[Interpretation[_]: Effect: Applicative](
-    categories:      Set[SubscriptionCategory[Interpretation]]
-)(implicit parallel: Parallel[Interpretation])
-    extends EventProducersRegistry[Interpretation] {
+private[subscriptions] class EventProducersRegistryImpl[F[_]: Parallel: Applicative](
+    categories: Set[SubscriptionCategory[F]]
+) extends EventProducersRegistry[F] {
 
-  override def run(): Interpretation[Unit] = categories.toList.map(_.run()).parSequence.void
+  override def run(): F[Unit] = categories.toList.map(_.run()).parSequence.void
 
-  override def register(subscriptionRequest: Json): Interpretation[SubscriptionResult] =
+  override def register(subscriptionRequest: Json): F[SubscriptionResult] =
     if (categories.isEmpty) {
-      (UnsupportedPayload("No category supports this payload"): SubscriptionResult).pure[Interpretation]
+      (UnsupportedPayload("No category supports this payload"): SubscriptionResult).pure[F]
     } else {
       categories.toList
         .traverse(_ register subscriptionRequest)
@@ -61,22 +58,17 @@ private[subscriptions] class EventProducersRegistryImpl[Interpretation[_]: Effec
 object EventProducersRegistry {
 
   sealed trait SubscriptionResult
-  final case object SuccessfulSubscription extends SubscriptionResult
+  final case object SuccessfulSubscription             extends SubscriptionResult
   final case class UnsupportedPayload(message: String) extends SubscriptionResult
 
-  def apply(
-      sessionResource:                SessionResource[IO, EventLogDB],
-      awaitingTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
-      underTriplesGenerationGauge:    LabeledGauge[IO, projects.Path],
-      awaitingTransformationGauge:    LabeledGauge[IO, projects.Path],
-      underTransformationGauge:       LabeledGauge[IO, projects.Path],
-      queriesExecTimes:               LabeledHistogram[IO, SqlStatement.Name]
-  )(implicit
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO],
-      executionContext: ExecutionContext,
-      logger:           Logger[IO]
-  ): IO[EventProducersRegistry[IO]] = for {
+  def apply[F[_]: Async: Parallel: Logger](
+      sessionResource:                SessionResource[F, EventLogDB],
+      awaitingTriplesGenerationGauge: LabeledGauge[F, projects.Path],
+      underTriplesGenerationGauge:    LabeledGauge[F, projects.Path],
+      awaitingTransformationGauge:    LabeledGauge[F, projects.Path],
+      underTransformationGauge:       LabeledGauge[F, projects.Path],
+      queriesExecTimes:               LabeledHistogram[F, SqlStatement.Name]
+  ): F[EventProducersRegistry[F]] = for {
     subscriberTracker <- SubscriberTracker(sessionResource, queriesExecTimes)
     awaitingGenerationCategory <- awaitinggeneration.SubscriptionCategory(sessionResource,
                                                                           awaitingTriplesGenerationGauge,
@@ -84,20 +76,19 @@ object EventProducersRegistry {
                                                                           queriesExecTimes,
                                                                           subscriberTracker
                                   )
-    memberSyncCategory <- membersync.SubscriptionCategory(sessionResource, queriesExecTimes, subscriberTracker, logger)
-    commitSyncCategory <- commitsync.SubscriptionCategory(sessionResource, queriesExecTimes, subscriberTracker, logger)
+    memberSyncCategory <- membersync.SubscriptionCategory(sessionResource, queriesExecTimes, subscriberTracker)
+    commitSyncCategory <- commitsync.SubscriptionCategory(sessionResource, queriesExecTimes, subscriberTracker)
     globalCommitSyncCategory <-
-      globalcommitsync.SubscriptionCategory(sessionResource, queriesExecTimes, subscriberTracker, logger)
+      globalcommitsync.SubscriptionCategory(sessionResource, queriesExecTimes, subscriberTracker)
     triplesGeneratedCategory <- triplesgenerated.SubscriptionCategory(sessionResource,
                                                                       awaitingTransformationGauge,
                                                                       underTransformationGauge,
                                                                       queriesExecTimes,
                                                                       subscriberTracker
                                 )
-    zombieEventsCategory <-
-      zombieevents.SubscriptionCategory(sessionResource, queriesExecTimes, subscriberTracker, logger)
+    zombieEventsCategory <- zombieevents.SubscriptionCategory(sessionResource, queriesExecTimes, subscriberTracker)
   } yield new EventProducersRegistryImpl(
-    Set[SubscriptionCategory[IO]](
+    Set[SubscriptionCategory[F]](
       awaitingGenerationCategory,
       memberSyncCategory,
       commitSyncCategory,

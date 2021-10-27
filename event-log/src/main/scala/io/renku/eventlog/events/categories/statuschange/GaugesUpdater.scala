@@ -25,18 +25,18 @@ import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledGauge
 
-private trait GaugesUpdater[Interpretation[_]] {
-  def updateGauges(dbUpdateResults: DBUpdateResults): Interpretation[Unit]
+private trait GaugesUpdater[F[_]] {
+  def updateGauges(dbUpdateResults: DBUpdateResults): F[Unit]
 }
 
-private class GaugesUpdaterImpl[Interpretation[_]: Applicative](
-    awaitingGenerationGauge:     LabeledGauge[Interpretation, projects.Path],
-    awaitingTransformationGauge: LabeledGauge[Interpretation, projects.Path],
-    underTransformationGauge:    LabeledGauge[Interpretation, projects.Path],
-    underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path]
-) extends GaugesUpdater[Interpretation] {
+private class GaugesUpdaterImpl[F[_]: Applicative](
+    awaitingGenerationGauge:     LabeledGauge[F, projects.Path],
+    awaitingTransformationGauge: LabeledGauge[F, projects.Path],
+    underTransformationGauge:    LabeledGauge[F, projects.Path],
+    underTriplesGenerationGauge: LabeledGauge[F, projects.Path]
+) extends GaugesUpdater[F] {
 
-  override def updateGauges(dbUpdateResults: DBUpdateResults): Interpretation[Unit] = dbUpdateResults match {
+  override def updateGauges(dbUpdateResults: DBUpdateResults): F[Unit] = dbUpdateResults match {
 
     case DBUpdateResults.ForProjects(projectsAndCounts) =>
       projectsAndCounts

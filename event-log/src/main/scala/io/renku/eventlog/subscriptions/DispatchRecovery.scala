@@ -26,29 +26,26 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-private trait DispatchRecovery[Interpretation[_], CategoryEvent] {
+private trait DispatchRecovery[F[_], CategoryEvent] {
 
-  def returnToQueue(event: CategoryEvent): Interpretation[Unit]
+  def returnToQueue(event: CategoryEvent): F[Unit]
 
-  def recover(url: SubscriberUrl, event: CategoryEvent): PartialFunction[Throwable, Interpretation[Unit]]
+  def recover(url: SubscriberUrl, event: CategoryEvent): PartialFunction[Throwable, F[Unit]]
 }
 
 private object LoggingDispatchRecovery {
 
-  def apply[Interpretation[_]: MonadThrow, CategoryEvent](
-      categoryName: CategoryName,
-      logger:       Logger[Interpretation]
-  )(implicit show:  Show[CategoryEvent]): Interpretation[DispatchRecovery[Interpretation, CategoryEvent]] =
-    MonadThrow[Interpretation].catchNonFatal {
-      new DispatchRecovery[Interpretation, CategoryEvent] {
+  def apply[F[_]: MonadThrow: Logger, CategoryEvent](
+      categoryName: CategoryName
+  )(implicit show:  Show[CategoryEvent]): F[DispatchRecovery[F, CategoryEvent]] = MonadThrow[F].catchNonFatal {
+    new DispatchRecovery[F, CategoryEvent] {
 
-        override def returnToQueue(event: CategoryEvent): Interpretation[Unit] = ().pure[Interpretation]
+      override def returnToQueue(event: CategoryEvent): F[Unit] = ().pure[F]
 
-        override def recover(url:   SubscriberUrl,
-                             event: CategoryEvent
-        ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-          logger.error(exception)(show"$categoryName: $event, url = $url failed")
-        }
+      override def recover(url: SubscriberUrl, event: CategoryEvent): PartialFunction[Throwable, F[Unit]] = {
+        case NonFatal(exception) =>
+          Logger[F].error(exception)(show"$categoryName: $event, url = $url failed")
       }
     }
+  }
 }

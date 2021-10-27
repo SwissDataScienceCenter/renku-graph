@@ -37,7 +37,7 @@ package io.renku.triplesgenerator.events.categories.membersync
  */
 
 import Generators._
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.auto._
 import io.circe.Encoder
@@ -52,15 +52,15 @@ import io.renku.http.client.AccessToken
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
+import io.renku.testtools.IOSpec
 import org.http4s.Status.{Forbidden, Unauthorized}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
 class GitLabProjectMembersFinderSpec
     extends AnyWordSpec
+    with IOSpec
     with ExternalServiceStubbing
     with ScalaCheckPropertyChecks
     with should.Matchers {
@@ -139,24 +139,22 @@ class GitLabProjectMembersFinderSpec
     }
   }
 
-  private implicit lazy val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit lazy val timer: Timer[IO]        = IO.timer(global)
-
   private trait TestCase {
 
     val path = projectPaths.generateOne
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
 
     private val gitLabUrl = GitLabUrl(externalServiceBaseUrl)
-    val finder            = new IOGitLabProjectMembersFinder(gitLabUrl.apiV4, Throttler.noThrottling, TestLogger())
+    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val finder = new GitLabProjectMembersFinderImpl[IO](gitLabUrl.apiV4, Throttler.noThrottling)
   }
 
   private implicit val projectMemberEncoder: Encoder[GitLabProjectMember] = Encoder.instance[GitLabProjectMember] {
     member =>
       json"""{
-      "id":        ${member.gitLabId.value},
-      "username":  ${member.name.value},
-      "name":      ${member.name.value}
-    }"""
+        "id":        ${member.gitLabId.value},
+        "username":  ${member.name.value},
+        "name":      ${member.name.value}
+      }"""
   }
 }

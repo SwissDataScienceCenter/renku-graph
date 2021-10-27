@@ -30,12 +30,13 @@ import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, EntityTypes, JsonLD}
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.generators.VersionGenerators.renkuVersionPairs
 import org.scalatest._
 import matchers._
 import org.scalatest.wordspec.AnyWordSpec
 
-class RenkuVersionFinderSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers {
+class RenkuVersionFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore with should.Matchers {
 
   private implicit lazy val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
 
@@ -69,11 +70,11 @@ class RenkuVersionFinderSpec extends AnyWordSpec with InMemoryRdfStore with shou
   }
 
   private trait TestCase {
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val currentVersionPair    = renkuVersionPairs.generateOne
-    val logger                = TestLogger[IO]()
-    val executionTimeRecorder = TestExecutionTimeRecorder(logger)
+    val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
     private val timeRecorder  = new SparqlQueryTimeRecorder(executionTimeRecorder)
-    val versionPairFinder     = new RenkuVersionPairFinderImpl[IO](rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
+    val versionPairFinder     = new RenkuVersionPairFinderImpl[IO](rdfStoreConfig, renkuBaseUrl, timeRecorder)
   }
 
   private def versionPairOnTG(version: RenkuVersionPair) =

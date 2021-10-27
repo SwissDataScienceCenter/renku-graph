@@ -22,22 +22,18 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import org.http4s.Request
 
-sealed trait HttpRequest[Interpretation[_]] {
-  def request: Request[Interpretation]
+sealed trait HttpRequest[F[_]] {
+  def request: Request[F]
 }
 
 object HttpRequest {
 
-  def apply[Interpretation[_]](request: Request[Interpretation]): UnnamedRequest[Interpretation] = UnnamedRequest(
+  def apply[F[_]](request: Request[F]): UnnamedRequest[F] = UnnamedRequest(
     request
   )
-  def apply[Interpretation[_]](request: Request[Interpretation],
-                               name:    String Refined NonEmpty
-  ): NamedRequest[Interpretation] =
+  def apply[F[_]](request: Request[F], name: String Refined NonEmpty): NamedRequest[F] =
     NamedRequest(request, name)
 
-  final case class UnnamedRequest[Interpretation[_]](request: Request[Interpretation])
-      extends HttpRequest[Interpretation]
-  final case class NamedRequest[Interpretation[_]](request: Request[Interpretation], name: String Refined NonEmpty)
-      extends HttpRequest[Interpretation]
+  final case class UnnamedRequest[F[_]](request: Request[F])                              extends HttpRequest[F]
+  final case class NamedRequest[F[_]](request: Request[F], name: String Refined NonEmpty) extends HttpRequest[F]
 }

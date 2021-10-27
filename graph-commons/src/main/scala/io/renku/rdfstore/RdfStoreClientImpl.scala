@@ -18,7 +18,7 @@
 
 package io.renku.rdfstore
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.effect._
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
@@ -30,28 +30,25 @@ import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepA
 import io.renku.http.client.{HttpRequest, RestClient}
 import io.renku.http.rest.paging.Paging.PagedResultsFinder
 import io.renku.http.rest.paging.PagingRequest
-import org.http4s.{Header, Uri}
+import org.http4s.MediaRange._
+import org.http4s.{MediaType, Uri}
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
-abstract class RdfStoreClientImpl[Interpretation[_]: ConcurrentEffect: Timer](
-    rdfStoreConfig:          RdfStoreConfig,
-    logger:                  Logger[Interpretation],
-    timeRecorder:            SparqlQueryTimeRecorder[Interpretation],
-    retryInterval:           FiniteDuration = SleepAfterConnectionIssue,
-    maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-    idleTimeoutOverride:     Option[Duration] = None,
-    requestTimeoutOverride:  Option[Duration] = None
-)(implicit executionContext: ExecutionContext)
-    extends RestClient[Interpretation, RdfStoreClientImpl[Interpretation]](Throttler.noThrottling,
-                                                                           logger,
-                                                                           Some(timeRecorder.instance),
-                                                                           retryInterval,
-                                                                           maxRetries,
-                                                                           idleTimeoutOverride,
-                                                                           requestTimeoutOverride
+abstract class RdfStoreClientImpl[F[_]: Async: Logger](
+    rdfStoreConfig:         RdfStoreConfig,
+    timeRecorder:           SparqlQueryTimeRecorder[F],
+    retryInterval:          FiniteDuration = SleepAfterConnectionIssue,
+    maxRetries:             Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
+    idleTimeoutOverride:    Option[Duration] = None,
+    requestTimeoutOverride: Option[Duration] = None
+) extends RestClient(Throttler.noThrottling,
+                     Some(timeRecorder.instance),
+                     retryInterval,
+                     maxRetries,
+                     idleTimeoutOverride,
+                     requestTimeoutOverride
     ) {
 
   import RdfStoreClientImpl._
@@ -64,19 +61,19 @@ abstract class RdfStoreClientImpl[Interpretation[_]: ConcurrentEffect: Timer](
   import org.http4s.{Request, Response, Status}
   import rdfStoreConfig._
 
-  protected def updateWithNoResult(using: SparqlQuery): Interpretation[Unit] =
-    updateWitMapping[Unit](using, toFullResponseMapper(_ => ().pure[Interpretation]))
+  protected def updateWithNoResult(using: SparqlQuery): F[Unit] =
+    updateWitMapping[Unit](using, toFullResponseMapper(_ => ().pure[F]))
 
   protected def updateWitMapping[ResultType](
       using: SparqlQuery,
-      mapResponse: PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[
+      mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[
         ResultType
       ]]
-  ): Interpretation[ResultType] = runQuery(using, mapResponse, RdfUpdate)
+  ): F[ResultType] = runQuery(using, mapResponse, RdfUpdate)
 
   protected def queryExpecting[ResultType](
       using:          SparqlQuery
-  )(implicit decoder: Decoder[ResultType]): Interpretation[ResultType] =
+  )(implicit decoder: Decoder[ResultType]): F[ResultType] =
     runQuery(
       using,
       toFullResponseMapper(responseMapperFor[ResultType]),
@@ -85,36 +82,33 @@ abstract class RdfStoreClientImpl[Interpretation[_]: ConcurrentEffect: Timer](
 
   private def runQuery[ResultType](
       query: SparqlQuery,
-      mapResponse: PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[
+      mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[
         ResultType
       ]],
       queryType: RdfQueryType
-  ): Interpretation[ResultType] =
-    for {
-      uri    <- validateUri((fusekiBaseUrl / datasetName / path(queryType)).toString)
-      result <- send(sparqlQueryRequest(uri, queryType, query))(mapResponse)
-    } yield result
+  ): F[ResultType] = for {
+    uri    <- validateUri((fusekiBaseUrl / datasetName / path(queryType)).toString)
+    result <- send(sparqlQueryRequest(uri, queryType, query))(mapResponse)
+  } yield result
 
   private def sparqlQueryRequest(uri: Uri, queryType: RdfQueryType, query: SparqlQuery) = HttpRequest(
     request(POST, uri, rdfStoreConfig.authCredentials)
       .withEntity(toEntity(queryType, query))
       .putHeaders(`Content-Type`(`x-www-form-urlencoded`),
-                  Header(Accept.name.value, "application/sparql-results+json")
+                  Accept(new MediaType(`application/*`.mainType, "sparql-results+json"))
       ),
     name = query.name
   )
 
   private def toFullResponseMapper[ResultType](
-      mapResponse: Response[Interpretation] => Interpretation[ResultType]
-  ): PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[ResultType]] = {
-    case (Ok, _, response) =>
-      mapResponse(response)
+      mapResponse: Response[F] => F[ResultType]
+  ): PartialFunction[(Status, Request[F], Response[F]), F[ResultType]] = { case (Ok, _, response) =>
+    mapResponse(response)
   }
 
   private def responseMapperFor[ResultType](implicit
       decoder: Decoder[ResultType]
-  ): Response[Interpretation] => Interpretation[ResultType] =
-    _.as[ResultType](implicitly[MonadError[Interpretation, Throwable]], jsonOf[Interpretation, ResultType])
+  ): Response[F] => F[ResultType] = _.as[ResultType](MonadThrow[F], jsonOf[F, ResultType])
 
   private def toEntity(queryType: RdfQueryType, query: SparqlQuery): String = queryType match {
     case _: RdfQuery => s"query=${urlEncode(query.toString)}"
@@ -129,22 +123,22 @@ abstract class RdfStoreClientImpl[Interpretation[_]: ConcurrentEffect: Timer](
   protected def pagedResultsFinder[ResultType](
       query:           SparqlQuery,
       maybeCountQuery: Option[SparqlQuery] = None
-  )(implicit decoder:  Decoder[ResultType]): PagedResultsFinder[Interpretation, ResultType] =
-    new PagedResultsFinder[Interpretation, ResultType] {
+  )(implicit decoder:  Decoder[ResultType]): PagedResultsFinder[F, ResultType] =
+    new PagedResultsFinder[F, ResultType] {
 
       import io.renku.http.rest.paging.model.Total
       import io.renku.tinytypes.json.TinyTypeDecoders._
 
-      override def findResults(pagingRequest: PagingRequest): Interpretation[List[ResultType]] =
+      override def findResults(pagingRequest: PagingRequest): F[List[ResultType]] =
         for {
-          queryWithPaging <- query.include[Interpretation](pagingRequest)
+          queryWithPaging <- query.include[F](pagingRequest)
           results         <- queryExpecting[List[ResultType]](using = queryWithPaging)
         } yield results
 
       override def findTotal() =
         queryExpecting[Option[Total]](using = (maybeCountQuery getOrElse query).toCountQuery).flatMap {
-          case Some(total) => total.pure[Interpretation]
-          case None        => new Exception("Total number of records cannot be found").raiseError[Interpretation, Total]
+          case Some(total) => total.pure[F]
+          case None        => new Exception("Total number of records cannot be found").raiseError[F, Total]
         }
 
       private implicit val totalDecoder: Decoder[Option[Total]] = {

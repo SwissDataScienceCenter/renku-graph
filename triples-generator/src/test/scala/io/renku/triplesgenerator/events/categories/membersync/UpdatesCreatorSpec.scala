@@ -28,12 +28,13 @@ import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.{projects, users}
 import io.renku.jsonld.syntax._
 import io.renku.rdfstore.InMemoryRdfStore
+import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.categories.membersync.Generators._
 import io.renku.triplesgenerator.events.categories.membersync.PersonOps._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers {
+class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore with should.Matchers {
 
   "removal" should {
 

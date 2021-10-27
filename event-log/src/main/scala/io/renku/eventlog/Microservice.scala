@@ -33,30 +33,20 @@ import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
 import io.renku.eventlog.subscriptions._
 import io.renku.events.consumers
 import io.renku.events.consumers.EventConsumersRegistry
+import io.renku.graph.model.projects
 import io.renku.http.server.HttpServer
 import io.renku.logging.ApplicationLogger
 import io.renku.metrics._
 import io.renku.microservices.IOMicroservice
 import natchez.Trace.Implicits.noop
 import org.typelevel.log4cats.Logger
-import pureconfig.ConfigSource
 
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors.newFixedThreadPool
-import scala.concurrent.ExecutionContext
 
 object Microservice extends IOMicroservice {
 
-  val ServicePort: Int Refined Positive = 9005
-
-  protected implicit override val executionContext: ExecutionContext =
-    ExecutionContext fromExecutorService newFixedThreadPool(ConfigSource.default.at("threads-number").loadOrThrow[Int])
-
-  protected implicit override def contextShift: ContextShift[IO] = IO.contextShift(executionContext)
-
-  protected implicit override def timer: Timer[IO] = IO.timer(executionContext)
-
-  private implicit val logger: Logger[IO] = ApplicationLogger
+  val ServicePort:             Int Refined Positive = 9005
+  private implicit val logger: Logger[IO]           = ApplicationLogger
 
   override def run(args: List[String]): IO[ExitCode] = for {
     sessionPoolResource <- new EventLogDbConfigProvider[IO]() map SessionPoolResource[IO, EventLogDB]
@@ -66,44 +56,38 @@ object Microservice extends IOMicroservice {
   private def runMicroservice(sessionPoolResource: Resource[IO, SessionResource[IO, EventLogDB]]) =
     sessionPoolResource.use { sessionResource =>
       for {
-        certificateLoader           <- CertificateLoader[IO](ApplicationLogger)
-        sentryInitializer           <- SentryInitializer[IO]()
+        certificateLoader           <- CertificateLoader[IO]
+        sentryInitializer           <- SentryInitializer[IO]
         dbInitializer               <- DbInitializer(sessionResource)
-        metricsRegistry             <- MetricsRegistry()
+        metricsRegistry             <- MetricsRegistry[IO]()
         queriesExecTimes            <- QueriesExecutionTimes(metricsRegistry)
-        statsFinder                 <- IOStatsFinder(sessionResource, queriesExecTimes)
+        statsFinder                 <- StatsFinder(sessionResource, queriesExecTimes)
         eventLogMetrics             <- EventLogMetrics(metricsRegistry, statsFinder)
         awaitingGenerationGauge     <- AwaitingGenerationGauge(metricsRegistry, statsFinder)
         awaitingTransformationGauge <- AwaitingTransformationGauge(metricsRegistry, statsFinder)
         underTransformationGauge    <- UnderTransformationGauge(metricsRegistry, statsFinder)
         underTriplesGenerationGauge <- UnderTriplesGenerationGauge(metricsRegistry, statsFinder)
-        metricsResetScheduler <- IOGaugeResetScheduler(
+        metricsResetScheduler <- GaugeResetScheduler[IO, projects.Path](
                                    List(awaitingGenerationGauge,
                                         underTriplesGenerationGauge,
                                         awaitingTransformationGauge,
                                         underTransformationGauge
                                    ),
-                                   MetricsConfigProvider(),
-                                   ApplicationLogger
+                                   MetricsConfigProvider()
                                  )
-        creationSubscription <- events.categories.creation.SubscriptionFactory(sessionResource,
-                                                                               awaitingGenerationGauge,
-                                                                               queriesExecTimes,
-                                                                               ApplicationLogger
-                                )
+        creationSubscription <-
+          events.categories.creation.SubscriptionFactory(sessionResource, awaitingGenerationGauge, queriesExecTimes)
         zombieEventsSubscription <- events.categories.zombieevents.SubscriptionFactory(
                                       sessionResource,
                                       awaitingGenerationGauge,
                                       underTriplesGenerationGauge,
                                       awaitingTransformationGauge,
                                       underTransformationGauge,
-                                      queriesExecTimes,
-                                      ApplicationLogger
+                                      queriesExecTimes
                                     )
         commitSyncRequestSubscription <- events.categories.commitsyncrequest.SubscriptionFactory(
                                            sessionResource,
-                                           queriesExecTimes,
-                                           ApplicationLogger
+                                           queriesExecTimes
                                          )
         statusChangeEventSubscription <- events.categories.statuschange.SubscriptionFactory(
                                            sessionResource,
@@ -120,7 +104,7 @@ object Microservice extends IOMicroservice {
                                     statusChangeEventSubscription
                                   )
         eventEndpoint            <- EventEndpoint(eventConsumersRegistry)
-        processingStatusEndpoint <- ProcessingStatusEndpoint(sessionResource, queriesExecTimes, ApplicationLogger)
+        processingStatusEndpoint <- ProcessingStatusEndpoint(sessionResource, queriesExecTimes)
         eventProducersRegistry <- EventProducersRegistry(
                                     sessionResource,
                                     awaitingGenerationGauge,
@@ -129,8 +113,8 @@ object Microservice extends IOMicroservice {
                                     underTransformationGauge,
                                     queriesExecTimes
                                   )
-        subscriptionsEndpoint <- SubscriptionsEndpoint(eventProducersRegistry, ApplicationLogger)
-        eventDetailsEndpoint  <- EventDetailsEndpoint(sessionResource, queriesExecTimes, ApplicationLogger)
+        subscriptionsEndpoint <- SubscriptionsEndpoint(eventProducersRegistry)
+        eventDetailsEndpoint  <- EventDetailsEndpoint(sessionResource, queriesExecTimes)
         eventsEndpoint        <- EventsEndpoint(sessionResource, queriesExecTimes)
         microserviceRoutes = new MicroserviceRoutes[IO](
                                eventEndpoint,
@@ -141,8 +125,6 @@ object Microservice extends IOMicroservice {
                                new RoutesMetrics[IO](metricsRegistry)
                              ).routes
         exitCode <- microserviceRoutes.use { routes =>
-                      val httpServer = new HttpServer[IO](serverPort = ServicePort.value, routes)
-
                       new MicroserviceRunner(
                         certificateLoader,
                         sentryInitializer,
@@ -151,7 +133,7 @@ object Microservice extends IOMicroservice {
                         eventProducersRegistry,
                         eventConsumersRegistry,
                         metricsResetScheduler,
-                        httpServer,
+                        HttpServer[IO](serverPort = ServicePort.value, routes),
                         subProcessesCancelTokens
                       ).run()
                     }
@@ -168,8 +150,8 @@ private class MicroserviceRunner(
     eventConsumersRegistry:   EventConsumersRegistry[IO],
     metricsResetScheduler:    GaugeResetScheduler[IO],
     httpServer:               HttpServer[IO],
-    subProcessesCancelTokens: ConcurrentHashMap[CancelToken[IO], Unit]
-)(implicit contextShift:      ContextShift[IO]) {
+    subProcessesCancelTokens: ConcurrentHashMap[IO[Unit], Unit]
+) {
 
   def run(): IO[ExitCode] = for {
     _      <- certificateLoader.run()
@@ -182,7 +164,7 @@ private class MicroserviceRunner(
     result <- httpServer.run()
   } yield result
 
-  private def gatherCancelToken(fiber: Fiber[IO, Unit]): Fiber[IO, Unit] = {
+  private def gatherCancelToken(fiber: Fiber[IO, Throwable, Unit]): Fiber[IO, Throwable, Unit] = {
     subProcessesCancelTokens.put(fiber.cancel, ())
     fiber
   }

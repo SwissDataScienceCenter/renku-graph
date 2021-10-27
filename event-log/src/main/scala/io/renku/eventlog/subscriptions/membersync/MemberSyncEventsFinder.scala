@@ -18,8 +18,9 @@
 
 package io.renku.eventlog.subscriptions.membersync
 
+import cats.MonadThrow
 import cats.data.Kleisli
-import cats.effect.{BracketThrow, IO}
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import io.renku.db.{DbClient, SessionResource, SqlStatement}
@@ -34,24 +35,23 @@ import skunk.implicits._
 
 import java.time.Instant
 
-private class MemberSyncEventFinderImpl[Interpretation[_]: BracketThrow](
-    sessionResource:  SessionResource[Interpretation, EventLogDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
+private class MemberSyncEventFinderImpl[F[_]: MonadCancelThrow](
+    sessionResource:  SessionResource[F, EventLogDB],
+    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
-    with EventFinder[Interpretation, MemberSyncEvent]
+    with EventFinder[F, MemberSyncEvent]
     with SubscriptionTypeSerializers {
 
-  override def popEvent(): Interpretation[Option[MemberSyncEvent]] = sessionResource.useK {
+  override def popEvent(): F[Option[MemberSyncEvent]] = sessionResource.useK {
     findEventAndMarkTaken()
   }
 
-  private def findEventAndMarkTaken() =
-    findEvent >>= {
-      case Some((projectId, maybeSyncedDate, event)) =>
-        setSyncDate(projectId, maybeSyncedDate) map toNoneIfEventAlreadyTaken(event)
-      case None => Kleisli.pure(Option.empty[MemberSyncEvent])
-    }
+  private def findEventAndMarkTaken() = findEvent >>= {
+    case Some((projectId, maybeSyncedDate, event)) =>
+      setSyncDate(projectId, maybeSyncedDate) map toNoneIfEventAlreadyTaken(event)
+    case None => Kleisli.pure(Option.empty[MemberSyncEvent])
+  }
 
   private def findEvent = measureExecutionTime {
     val eventDate    = EventDate(now())
@@ -82,7 +82,7 @@ private class MemberSyncEventFinderImpl[Interpretation[_]: BracketThrow](
 
   private def setSyncDate(projectId:       projects.Id,
                           maybeSyncedDate: Option[LastSyncedDate]
-  ): Kleisli[Interpretation, Session[Interpretation], Boolean] =
+  ): Kleisli[F, Session[F], Boolean] =
     if (maybeSyncedDate.isDefined) updateLastSyncedDate(projectId)
     else insertLastSyncedDate(projectId)
 
@@ -96,12 +96,12 @@ private class MemberSyncEventFinderImpl[Interpretation[_]: BracketThrow](
         .arguments(LastSyncedDate(now()) ~ projectId ~ categoryName)
         .build
         .flatMapResult {
-          case Completion.Update(1) => true.pure[Interpretation]
-          case Completion.Update(0) => false.pure[Interpretation]
+          case Completion.Update(1) => true.pure[F]
+          case Completion.Update(0) => false.pure[F]
           case completion =>
             new Exception(
               s"${categoryName.value.toLowerCase} - update last_synced failed with completion code $completion"
-            ).raiseError[Interpretation, Boolean]
+            ).raiseError[F, Boolean]
         }
     }
 
@@ -120,12 +120,12 @@ private class MemberSyncEventFinderImpl[Interpretation[_]: BracketThrow](
         .arguments(projectId ~ categoryName ~ LastSyncedDate(now()))
         .build
         .flatMapResult {
-          case Completion.Insert(1) => true.pure[Interpretation]
-          case Completion.Insert(0) => false.pure[Interpretation]
+          case Completion.Insert(1) => true.pure[F]
+          case Completion.Insert(0) => false.pure[F]
           case completion =>
             new Exception(
               s"${categoryName.value.toLowerCase} - insert last_synced failed with completion code $completion"
-            ).raiseError[Interpretation, Boolean]
+            ).raiseError[F, Boolean]
         }
     }
 
@@ -136,10 +136,10 @@ private class MemberSyncEventFinderImpl[Interpretation[_]: BracketThrow](
 }
 
 private object MemberSyncEventFinder {
-  def apply(
-      sessionResource:  SessionResource[IO, EventLogDB],
-      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
-  ): IO[EventFinder[IO, MemberSyncEvent]] = IO {
+  def apply[F[_]: MonadCancelThrow](
+      sessionResource:  SessionResource[F, EventLogDB],
+      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[EventFinder[F, MemberSyncEvent]] = MonadThrow[F].catchNonFatal {
     new MemberSyncEventFinderImpl(sessionResource, queriesExecTimes)
   }
 }

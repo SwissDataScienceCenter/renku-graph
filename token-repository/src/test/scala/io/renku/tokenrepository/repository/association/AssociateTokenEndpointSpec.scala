@@ -18,8 +18,8 @@
 
 package io.renku.tokenrepository.repository.association
 
-import cats.MonadError
 import cats.effect.IO
+import cats.syntax.all._
 import io.circe.Json
 import io.circe.literal._
 import io.circe.syntax.EncoderOps
@@ -32,6 +32,7 @@ import io.renku.http.client.AccessToken
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
+import io.renku.testtools.IOSpec
 import org.http4s._
 import org.http4s.headers.`Content-Type`
 import org.http4s.implicits._
@@ -39,7 +40,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class AssociateTokenEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class AssociateTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "associateToken" should {
 
@@ -49,7 +50,7 @@ class AssociateTokenEndpointSpec extends AnyWordSpec with MockFactory with shoul
       (tokensAssociator
         .associate(_: Id, _: AccessToken))
         .expects(projectId, accessToken)
-        .returning(context.pure(()))
+        .returning(IO.unit)
 
       val request = Request(Method.PUT, uri"projects" / projectId.toString / "tokens")
         .withEntity(accessToken.asJson)
@@ -69,7 +70,7 @@ class AssociateTokenEndpointSpec extends AnyWordSpec with MockFactory with shoul
       (tokensAssociator
         .associate(_: Id, _: AccessToken))
         .expects(projectId, accessToken)
-        .returning(context.pure(()))
+        .returning(IO.unit)
 
       val request = Request(Method.PUT, uri"projects" / projectId.toString / "tokens")
         .withEntity(accessToken.asJson)
@@ -105,7 +106,7 @@ class AssociateTokenEndpointSpec extends AnyWordSpec with MockFactory with shoul
       (tokensAssociator
         .associate(_: Id, _: AccessToken))
         .expects(projectId, accessToken)
-        .returning(context.raiseError(exception))
+        .returning(exception.raiseError[IO, Unit])
 
       val request = Request(Method.PUT, uri"projects" / projectId.toString / "tokens")
         .withEntity(accessToken.asJson)
@@ -123,12 +124,10 @@ class AssociateTokenEndpointSpec extends AnyWordSpec with MockFactory with shoul
 
   private trait TestCase {
 
-    val context = MonadError[IO, Throwable]
-
     val projectId = projectIds.generateOne
 
-    val tokensAssociator = mock[IOTokenAssociator]
-    val logger           = TestLogger[IO]()
-    val associateToken   = new AssociateTokenEndpoint[IO](tokensAssociator, logger).associateToken _
+    val tokensAssociator = mock[TokenAssociator[IO]]
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val associateToken = new AssociateTokenEndpointImpl[IO](tokensAssociator).associateToken _
   }
 }

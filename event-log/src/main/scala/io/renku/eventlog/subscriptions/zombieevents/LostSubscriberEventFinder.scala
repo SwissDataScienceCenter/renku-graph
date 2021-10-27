@@ -18,8 +18,9 @@
 
 package io.renku.eventlog.subscriptions.zombieevents
 
+import cats.MonadThrow
 import cats.data.Kleisli
-import cats.effect.{BracketThrow, IO}
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import io.renku.db.{DbClient, SessionResource, SqlStatement}
@@ -36,15 +37,15 @@ import skunk.implicits._
 
 import java.time.Instant.now
 
-private class LostSubscriberEventFinder[Interpretation[_]: BracketThrow](
-    sessionResource:  SessionResource[Interpretation, EventLogDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
+private class LostSubscriberEventFinder[F[_]: MonadCancelThrow](
+    sessionResource:  SessionResource[F, EventLogDB],
+    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
 ) extends DbClient(Some(queriesExecTimes))
-    with EventFinder[Interpretation, ZombieEvent]
+    with EventFinder[F, ZombieEvent]
     with ZombieEventSubProcess
     with TypeSerializers {
 
-  override def popEvent(): Interpretation[Option[ZombieEvent]] = sessionResource.useK {
+  override def popEvent(): F[Option[ZombieEvent]] = sessionResource.useK {
     findEvents >>= markEventTaken()
   }
 
@@ -73,8 +74,7 @@ private class LostSubscriberEventFinder[Interpretation[_]: BracketThrow](
       .build(_.option)
   }
 
-  private def markEventTaken()
-      : Option[ZombieEvent] => Kleisli[Interpretation, Session[Interpretation], Option[ZombieEvent]] = {
+  private def markEventTaken(): Option[ZombieEvent] => Kleisli[F, Session[F], Option[ZombieEvent]] = {
     case None        => Kleisli.pure(Option.empty[ZombieEvent])
     case Some(event) => updateMessage(event.eventId) map toNoneIfEventAlreadyTaken(event)
   }
@@ -93,12 +93,12 @@ private class LostSubscriberEventFinder[Interpretation[_]: BracketThrow](
         )
         .build
         .flatMapResult {
-          case Completion.Update(0) => false.pure[Interpretation]
-          case Completion.Update(1) => true.pure[Interpretation]
+          case Completion.Update(0) => false.pure[F]
+          case Completion.Update(1) => true.pure[F]
           case completion =>
             new Exception(
               s"${categoryName.value.toLowerCase} - lse - update message failed with status $completion"
-            ).raiseError[Interpretation, Boolean]
+            ).raiseError[F, Boolean]
         }
     }
 
@@ -111,10 +111,10 @@ private class LostSubscriberEventFinder[Interpretation[_]: BracketThrow](
 }
 
 private object LostSubscriberEventFinder {
-  def apply(
-      sessionResource:  SessionResource[IO, EventLogDB],
-      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
-  ): IO[EventFinder[IO, ZombieEvent]] = IO {
-    new LostSubscriberEventFinder[IO](sessionResource, queriesExecTimes)
+  def apply[F[_]: MonadCancelThrow](
+      sessionResource:  SessionResource[F, EventLogDB],
+      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[EventFinder[F, ZombieEvent]] = MonadThrow[F].catchNonFatal {
+    new LostSubscriberEventFinder[F](sessionResource, queriesExecTimes)
   }
 }

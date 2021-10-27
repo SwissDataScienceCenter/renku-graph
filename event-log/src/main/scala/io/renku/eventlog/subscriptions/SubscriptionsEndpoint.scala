@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions
 
 import cats.MonadThrow
-import cats.effect.Effect
+import cats.effect.kernel.Concurrent
 import io.circe.Json
 import io.renku.eventlog.subscriptions.EventProducersRegistry.{SubscriptionResult, UnsupportedPayload}
 import io.renku.http.ErrorMessage
@@ -29,15 +29,14 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-trait SubscriptionsEndpoint[Interpretation[_]] {
-  def addSubscription(request: Request[Interpretation]): Interpretation[Response[Interpretation]]
+trait SubscriptionsEndpoint[F[_]] {
+  def addSubscription(request: Request[F]): F[Response[F]]
 }
 
-class SubscriptionsEndpointImpl[Interpretation[_]: Effect: MonadThrow](
-    subscriptionCategoryRegistry: EventProducersRegistry[Interpretation],
-    logger:                       Logger[Interpretation]
-) extends Http4sDsl[Interpretation]
-    with SubscriptionsEndpoint[Interpretation] {
+class SubscriptionsEndpointImpl[F[_]: Concurrent: Logger](
+    subscriptionCategoryRegistry: EventProducersRegistry[F]
+) extends Http4sDsl[F]
+    with SubscriptionsEndpoint[F] {
 
   import SubscriptionsEndpointImpl._
   import cats.syntax.all._
@@ -46,7 +45,7 @@ class SubscriptionsEndpointImpl[Interpretation[_]: Effect: MonadThrow](
   import org.http4s.circe._
   import org.http4s.{Request, Response}
 
-  override def addSubscription(request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
+  override def addSubscription(request: Request[F]): F[Response[F]] = {
     for {
       json         <- request.asJson recoverWith badRequest
       eitherResult <- subscriptionCategoryRegistry register json
@@ -55,17 +54,17 @@ class SubscriptionsEndpointImpl[Interpretation[_]: Effect: MonadThrow](
     } yield response
   } recoverWith httpResponse
 
-  private lazy val badRequest: PartialFunction[Throwable, Interpretation[Json]] = { case NonFatal(exception) =>
-    BadRequestError(exception).raiseError[Interpretation, Json]
+  private lazy val badRequest: PartialFunction[Throwable, F[Json]] = { case NonFatal(exception) =>
+    BadRequestError(exception).raiseError[F, Json]
   }
 
-  private def badRequestIfError(eitherErrorSuccess: SubscriptionResult): Interpretation[Unit] =
+  private def badRequestIfError(eitherErrorSuccess: SubscriptionResult): F[Unit] =
     eitherErrorSuccess match {
-      case UnsupportedPayload(message) => BadRequestError(message).raiseError[Interpretation, Unit]
-      case _                           => ().pure[Interpretation]
+      case UnsupportedPayload(message) => BadRequestError(message).raiseError[F, Unit]
+      case _                           => ().pure[F]
     }
 
-  private lazy val httpResponse: PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
+  private lazy val httpResponse: PartialFunction[Throwable, F[Response[F]]] = {
     case NotFoundError => NotFound("Category not found")
     case exception: BadRequestError =>
       BadRequest {
@@ -73,7 +72,7 @@ class SubscriptionsEndpointImpl[Interpretation[_]: Effect: MonadThrow](
       }
     case NonFatal(exception) =>
       val errorMessage = ErrorMessage("Registering subscriber failed")
-      logger.error(exception)(errorMessage.value)
+      Logger[F].error(exception)(errorMessage.value)
       InternalServerError(errorMessage)
   }
 }
@@ -92,12 +91,9 @@ private object SubscriptionsEndpointImpl {
 
 object SubscriptionsEndpoint {
 
-  import cats.effect.{ContextShift, IO}
-
-  def apply[T <: SubscriptionInfo](
-      subscriptionCategoryRegistry: EventProducersRegistry[IO],
-      logger:                       Logger[IO]
-  )(implicit contextShift:          ContextShift[IO]): IO[SubscriptionsEndpoint[IO]] = IO {
-    new SubscriptionsEndpointImpl[IO](subscriptionCategoryRegistry, logger)
+  def apply[F[_]: Concurrent: Logger, T <: SubscriptionInfo](
+      subscriptionCategoryRegistry: EventProducersRegistry[F]
+  ): F[SubscriptionsEndpoint[F]] = MonadThrow[F].catchNonFatal {
+    new SubscriptionsEndpointImpl[F](subscriptionCategoryRegistry)
   }
 }

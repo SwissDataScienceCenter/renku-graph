@@ -21,7 +21,7 @@ package io.renku.events.consumers
 import cats.data.EitherT
 import cats.data.EitherT.fromEither
 import cats.syntax.all._
-import cats.{Monad, MonadError, Show}
+import cats.{Monad, MonadThrow, Show}
 import io.circe.{Decoder, DecodingFailure, Json}
 import io.renku.events.EventRequestContent
 import io.renku.events.consumers.EventSchedulingResult._
@@ -31,28 +31,31 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-trait EventHandler[Interpretation[_]] {
-  def tryHandling(request: EventRequestContent): Interpretation[EventSchedulingResult]
+trait EventHandler[F[_]] {
+  def tryHandling(request: EventRequestContent): F[EventSchedulingResult]
 
   protected def createHandlingProcess(
       request: EventRequestContent
-  ): Interpretation[EventHandlingProcess[Interpretation]]
+  ): F[EventHandlingProcess[F]]
 }
 
-abstract class EventHandlerWithProcessLimiter[Interpretation[_]: Monad](
-    processesLimiter: ConcurrentProcessesLimiter[Interpretation]
-) extends EventHandler[Interpretation] {
+abstract class EventHandlerWithProcessLimiter[F[_]: Monad](
+    processesLimiter: ConcurrentProcessesLimiter[F]
+) extends EventHandler[F] {
+
   val categoryName: CategoryName
 
-  final override def tryHandling(request: EventRequestContent): Interpretation[EventSchedulingResult] = (for {
-    _                    <- fromEither[Interpretation](request.event.validateCategoryName)
-    eventHandlingProcess <- EitherT.right(createHandlingProcess(request))
-    r                    <- EitherT.right[EventSchedulingResult](processesLimiter tryExecuting eventHandlingProcess)
-  } yield r).merge
+  final override def tryHandling(request: EventRequestContent): F[EventSchedulingResult] = {
+    for {
+      _                    <- fromEither[F](request.event.validateCategoryName)
+      eventHandlingProcess <- EitherT.right(createHandlingProcess(request))
+      r                    <- EitherT.right[EventSchedulingResult](processesLimiter tryExecuting eventHandlingProcess)
+    } yield r
+  }.merge
 
   protected def createHandlingProcess(
       request: EventRequestContent
-  ): Interpretation[EventHandlingProcess[Interpretation]]
+  ): F[EventHandlingProcess[F]]
 
   implicit class JsonOps(json: Json) {
 
@@ -92,12 +95,12 @@ abstract class EventHandlerWithProcessLimiter[Interpretation[_]: Monad](
   }
 
   protected implicit class LoggerOps(
-      logger:    Logger[Interpretation]
-  )(implicit ME: MonadError[Interpretation, Throwable]) {
+      logger:    Logger[F]
+  )(implicit ME: MonadThrow[F]) {
 
     def log[EventInfo](
         eventInfo: EventInfo
-    )(result:      EventSchedulingResult)(implicit show: Show[EventInfo]): Interpretation[Unit] =
+    )(result:      EventSchedulingResult)(implicit show: Show[EventInfo]): F[Unit] =
       result match {
         case Accepted =>
           logger.info(show"$categoryName: $eventInfo -> $result")
@@ -108,25 +111,25 @@ abstract class EventHandlerWithProcessLimiter[Interpretation[_]: Monad](
 
     def logInfo[EventInfo](eventInfo: EventInfo, message: String)(implicit
         show:                         Show[EventInfo]
-    ): Interpretation[Unit] = logger.info(show"$categoryName: $eventInfo -> $message")
+    ): F[Unit] = logger.info(show"$categoryName: $eventInfo -> $message")
 
     def logError[EventInfo](eventInfo: EventInfo, exception: Throwable)(implicit
         show:                          Show[EventInfo]
-    ): Interpretation[Unit] = logger.error(exception)(show"$categoryName: $eventInfo -> Failure")
+    ): F[Unit] = logger.error(exception)(show"$categoryName: $eventInfo -> Failure")
   }
 
   protected implicit class EitherTOps[T](
-      operation: Interpretation[T]
-  )(implicit ME: MonadError[Interpretation, Throwable]) {
+      operation: F[T]
+  )(implicit ME: MonadThrow[F]) {
 
     def toRightT(
         recoverTo: EventSchedulingResult
-    ): EitherT[Interpretation, EventSchedulingResult, T] = EitherT {
-      operation map (_.asRight[EventSchedulingResult]) recover as(recoverTo)
+    ): EitherT[F, EventSchedulingResult, T] = EitherT {
+      operation.map(_.asRight[EventSchedulingResult]) recover as(recoverTo)
     }
 
-    lazy val toRightT: EitherT[Interpretation, EventSchedulingResult, T] = EitherT {
-      operation map (_.asRight[EventSchedulingResult]) recover asSchedulingError
+    lazy val toRightT: EitherT[F, EventSchedulingResult, T] = EitherT {
+      operation.map(_.asRight[EventSchedulingResult]) recover asSchedulingError
     }
 
     private def as(

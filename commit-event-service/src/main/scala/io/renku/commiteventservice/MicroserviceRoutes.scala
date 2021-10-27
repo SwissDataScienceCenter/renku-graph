@@ -18,45 +18,37 @@
 
 package io.renku.commiteventservice
 
-import cats.effect.{Clock, ConcurrentEffect, ContextShift, IO, Resource, Timer}
+import cats.MonadThrow
+import cats.effect.Resource
+import cats.effect.kernel.Concurrent
+import cats.syntax.all._
 import io.renku.commiteventservice.events.EventEndpoint
 import io.renku.events.consumers.EventConsumersRegistry
-import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
+import io.renku.metrics.RoutesMetrics
 import org.http4s.dsl.Http4sDsl
 
-import scala.concurrent.ExecutionContext
-
-private class MicroserviceRoutes[Interpretation[_]: ConcurrentEffect](
-    eventEndpoint: EventEndpoint[Interpretation],
-    routesMetrics: RoutesMetrics[Interpretation]
-)(implicit clock:  Clock[Interpretation])
-    extends Http4sDsl[Interpretation] {
+private class MicroserviceRoutes[F[_]: MonadThrow](
+    eventEndpoint: EventEndpoint[F],
+    routesMetrics: RoutesMetrics[F]
+) extends Http4sDsl[F] {
 
   import eventEndpoint._
   import org.http4s.HttpRoutes
   import routesMetrics._
 
   // format: off
-  lazy val routes: Resource[Interpretation, HttpRoutes[Interpretation]] = HttpRoutes.of[Interpretation] {
-    case GET -> Root / "ping" => Ok("pong")
-    case request@POST -> Root / "events" => processEvent(request)
+  lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
+    case           GET  -> Root / "ping"   => Ok("pong")
+    case request @ POST -> Root / "events" => processEvent(request)
   }.withMetrics
   // format: on
 }
 
 private object MicroserviceRoutes {
-  def apply(
-      consumersRegistry: EventConsumersRegistry[IO],
-      metricsRegistry:   MetricsRegistry[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[MicroserviceRoutes[IO]] =
-    for {
-      eventEndpoint <- EventEndpoint(consumersRegistry)
-    } yield new MicroserviceRoutes(
-      eventEndpoint,
-      new RoutesMetrics[IO](metricsRegistry)
-    )
+  def apply[F[_]: MonadThrow: Concurrent](
+      consumersRegistry: EventConsumersRegistry[F],
+      routesMetrics:     RoutesMetrics[F]
+  ): F[MicroserviceRoutes[F]] = for {
+    eventEndpoint <- EventEndpoint[F](consumersRegistry)
+  } yield new MicroserviceRoutes(eventEndpoint, routesMetrics)
 }

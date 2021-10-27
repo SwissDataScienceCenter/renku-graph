@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.BracketThrow
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
@@ -28,29 +28,29 @@ import skunk.codec.all.varchar
 import skunk.implicits.toStringOps
 import skunk.{Query, Session, Void}
 
-private trait PayloadTypeChanger[Interpretation[_]] {
-  def run(): Interpretation[Unit]
+private trait PayloadTypeChanger[F[_]] {
+  def run(): F[Unit]
 }
 
 private object PayloadTypeChanger {
-  def apply[Interpretation[_]: BracketThrow: Logger](
-      sessionResource: SessionResource[Interpretation, EventLogDB]
-  ): PayloadTypeChanger[Interpretation] = new PayloadTypeChangerImpl(sessionResource)
+  def apply[F[_]: MonadCancelThrow: Logger](
+      sessionResource: SessionResource[F, EventLogDB]
+  ): PayloadTypeChanger[F] = new PayloadTypeChangerImpl(sessionResource)
 }
 
-private class PayloadTypeChangerImpl[Interpretation[_]: BracketThrow: Logger](
-    sessionResource: SessionResource[Interpretation, EventLogDB]
-) extends PayloadTypeChanger[Interpretation] {
+private class PayloadTypeChangerImpl[F[_]: MonadCancelThrow: Logger](
+    sessionResource: SessionResource[F, EventLogDB]
+) extends PayloadTypeChanger[F] {
 
-  override def run(): Interpretation[Unit] = sessionResource.useK {
+  override def run(): F[Unit] = sessionResource.useK {
     checkIfAlreadyMigrated >>= {
       case true =>
-        Kleisli.liftF(Logger[Interpretation].info("event_payload.payload already in bytea type"))
+        Kleisli.liftF(Logger[F].info("event_payload.payload already in bytea type"))
       case false => migrate
     }
   }
 
-  private lazy val checkIfAlreadyMigrated: Kleisli[Interpretation, Session[Interpretation], Boolean] = {
+  private lazy val checkIfAlreadyMigrated: Kleisli[F, Session[F], Boolean] = {
     val query: Query[Void, String] =
       sql"""SELECT data_type FROM information_schema.columns
             WHERE column_name = 'payload' AND table_name = 'event_payload' 

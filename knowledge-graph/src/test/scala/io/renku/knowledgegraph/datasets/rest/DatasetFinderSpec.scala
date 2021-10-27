@@ -29,13 +29,19 @@ import io.renku.interpreters.TestLogger
 import io.renku.knowledgegraph.datasets.model._
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.util.Random
 
-class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks with should.Matchers {
+class DatasetFinderSpec
+    extends AnyWordSpec
+    with InMemoryRdfStore
+    with ScalaCheckPropertyChecks
+    with should.Matchers
+    with IOSpec {
 
   "findDataset" should {
 
@@ -455,13 +461,13 @@ class DatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChec
 
   private trait TestCase {
     implicit val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
-    private val logger       = TestLogger[IO]()
-    private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
-    val datasetFinder = new DatasetFinderImpl(
-      new BaseDetailsFinder(rdfStoreConfig, logger, timeRecorder),
-      new CreatorsFinder(rdfStoreConfig, logger, timeRecorder),
-      new PartsFinder(rdfStoreConfig, logger, timeRecorder),
-      new ProjectsFinder(rdfStoreConfig, logger, timeRecorder)
+    private implicit val logger = TestLogger[IO]()
+    private val timeRecorder    = new SparqlQueryTimeRecorder[IO](TestExecutionTimeRecorder[IO]())
+    val datasetFinder = new DatasetFinderImpl[IO](
+      new BaseDetailsFinderImpl[IO](rdfStoreConfig, timeRecorder),
+      new CreatorsFinderImpl[IO](rdfStoreConfig, timeRecorder),
+      new PartsFinderImpl[IO](rdfStoreConfig, timeRecorder),
+      new ProjectsFinderImpl[IO](rdfStoreConfig, timeRecorder)
     )
   }
 

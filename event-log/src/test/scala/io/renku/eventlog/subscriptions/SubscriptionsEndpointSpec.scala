@@ -29,6 +29,7 @@ import io.renku.http.server.EndpointTester._
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
+import io.renku.testtools.IOSpec
 import org.http4s.MediaType.application
 import org.http4s.Status._
 import org.http4s._
@@ -38,7 +39,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class SubscriptionsEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "addSubscription" should {
 
@@ -52,7 +53,7 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
           .expects(payload)
           .returning(SuccessfulSubscription.pure[IO])
 
-        val response = addSubscription(request).unsafeRunSync()
+        val response = endpoint.addSubscription(request).unsafeRunSync()
 
         response.status                          shouldBe Accepted
         response.contentType                     shouldBe Some(`Content-Type`(application.json))
@@ -64,7 +65,7 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
     s"return $BadRequest when the body of the request is malformed" in new TestCase {
       val request = Request[IO](Method.POST, uri"subscriptions").withEntity("malformedJson")
 
-      val response = addSubscription(request).unsafeRunSync()
+      val response = endpoint.addSubscription(request).unsafeRunSync()
 
       response.status      shouldBe BadRequest
       response.contentType shouldBe Some(`Content-Type`(application.json))
@@ -85,7 +86,7 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
         .expects(payload)
         .returning(UnsupportedPayload(errorMessage).pure[IO])
 
-      val response = addSubscription(request).unsafeRunSync()
+      val response = endpoint.addSubscription(request).unsafeRunSync()
 
       response.status                           shouldBe BadRequest
       response.contentType                      shouldBe Some(`Content-Type`(application.json))
@@ -106,7 +107,7 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
         .expects(payload)
         .returning(exception.raiseError[IO, SubscriptionResult])
 
-      val response = addSubscription(request).unsafeRunSync()
+      val response = endpoint.addSubscription(request).unsafeRunSync()
 
       val expectedMessage = "Registering subscriber failed"
       response.status                           shouldBe InternalServerError
@@ -118,8 +119,8 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
   }
 
   private trait TestCase {
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val subscriptionCategoryRegistry = mock[EventProducersRegistry[IO]]
-    val logger                       = TestLogger[IO]()
-    val addSubscription              = new SubscriptionsEndpointImpl[IO](subscriptionCategoryRegistry, logger).addSubscription _
+    val endpoint                     = new SubscriptionsEndpointImpl[IO](subscriptionCategoryRegistry)
   }
 }

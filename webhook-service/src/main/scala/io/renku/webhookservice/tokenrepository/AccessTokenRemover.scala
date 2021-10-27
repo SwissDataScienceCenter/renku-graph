@@ -18,7 +18,7 @@
 
 package io.renku.webhookservice.tokenrepository
 
-import cats.effect.{ConcurrentEffect, Timer}
+import cats.effect.Async
 import cats.syntax.all._
 import io.renku.control.Throttler
 import io.renku.graph.model.projects.Id
@@ -27,31 +27,33 @@ import io.renku.http.client.RestClient
 import org.http4s.Status
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
-trait AccessTokenRemover[Interpretation[_]] {
-  def removeAccessToken(projectId: Id): Interpretation[Unit]
+trait AccessTokenRemover[F[_]] {
+  def removeAccessToken(projectId: Id): F[Unit]
 }
 
-class AccessTokenRemoverImpl[Interpretation[_]: ConcurrentEffect: Timer](
-    tokenRepositoryUrl:      TokenRepositoryUrl,
-    logger:                  Logger[Interpretation]
-)(implicit executionContext: ExecutionContext)
-    extends RestClient[Interpretation, AccessTokenRemover[Interpretation]](Throttler.noThrottling, logger)
-    with AccessTokenRemover[Interpretation] {
+object AccessTokenRemover {
+  def apply[F[_]: Async: Logger]: F[AccessTokenRemover[F]] =
+    for {
+      tokenRepositoryUrl <- TokenRepositoryUrl[F]()
+    } yield new AccessTokenRemoverImpl[F](tokenRepositoryUrl)
+}
+
+class AccessTokenRemoverImpl[F[_]: Async: Logger](
+    tokenRepositoryUrl: TokenRepositoryUrl
+) extends RestClient[F, AccessTokenRemover[F]](Throttler.noThrottling)
+    with AccessTokenRemover[F] {
 
   import org.http4s.Method.DELETE
   import org.http4s.Status.NoContent
   import org.http4s.{Request, Response}
 
-  override def removeAccessToken(projectId: Id): Interpretation[Unit] =
+  override def removeAccessToken(projectId: Id): F[Unit] =
     for {
       uri <- validateUri(s"$tokenRepositoryUrl/projects/$projectId/tokens")
       _   <- send(request(DELETE, uri))(mapResponse)
     } yield ()
 
-  private lazy val mapResponse
-      : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[Unit]] = {
-    case (NoContent, _, _) => ().pure[Interpretation]
+  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Unit]] = {
+    case (NoContent, _, _) => ().pure[F]
   }
 }

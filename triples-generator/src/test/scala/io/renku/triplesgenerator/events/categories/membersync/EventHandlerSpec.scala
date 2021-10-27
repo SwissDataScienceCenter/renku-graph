@@ -29,14 +29,14 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.projects
-import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "handle" should {
 
@@ -77,9 +77,9 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
   private trait TestCase {
     val projectPath = projectPaths.generateOne
 
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val membersSynchronizer = mock[MembersSynchronizer[IO]]
-    val logger              = TestLogger[IO]()
-    val handler             = new EventHandler[IO](categoryName, membersSynchronizer, logger)
+    val handler             = new EventHandler[IO](categoryName, membersSynchronizer)
 
     def requestContent(event: Json): EventRequestContent = EventRequestContent.NoPayload(event)
   }

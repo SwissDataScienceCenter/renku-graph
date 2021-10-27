@@ -21,7 +21,7 @@ package io.renku.events.consumers
 import cats.Show
 import cats.data.EitherT
 import cats.effect.Concurrent
-import cats.effect.concurrent.Deferred
+import cats.effect.kernel.Deferred
 import cats.syntax.all._
 import io.renku.graph.model.projects
 
@@ -37,10 +37,10 @@ sealed trait EventSchedulingResult extends Product with Serializable
 
 object EventSchedulingResult {
   type Accepted = Accepted.type
-  case object Accepted             extends EventSchedulingResult
-  case object Busy                 extends EventSchedulingResult
-  case object UnsupportedEventType extends EventSchedulingResult
-  case object BadRequest           extends EventSchedulingResult
+  case object Accepted                                   extends EventSchedulingResult
+  case object Busy                                       extends EventSchedulingResult
+  case object UnsupportedEventType                       extends EventSchedulingResult
+  case object BadRequest                                 extends EventSchedulingResult
   final case class SchedulingError(throwable: Throwable) extends EventSchedulingResult
 
   implicit def show[SE <: EventSchedulingResult]: Show[SE] = Show.show {
@@ -54,27 +54,26 @@ object EventSchedulingResult {
 
 import EventSchedulingResult._
 
-class EventHandlingProcess[Interpretation[_]: Concurrent] private (
-    deferred:                Deferred[Interpretation, Unit],
-    val process:             EitherT[Interpretation, EventSchedulingResult, Accepted],
-    val maybeReleaseProcess: Option[Interpretation[Unit]] = None
+class EventHandlingProcess[F[_]: Concurrent] private (
+    deferred:                Deferred[F, Unit],
+    val process:             EitherT[F, EventSchedulingResult, Accepted],
+    val maybeReleaseProcess: Option[F[Unit]] = None
 ) {
-  def waitToFinish(): Interpretation[Unit] = deferred.get
+  def waitToFinish(): F[Unit] = deferred.get
 }
 
 object EventHandlingProcess {
-  def withWaitingForCompletion[Interpretation[_]: Concurrent](
-      process:        Deferred[Interpretation, Unit] => EitherT[Interpretation, EventSchedulingResult, Accepted],
-      releaseProcess: Interpretation[Unit]
-  ): Interpretation[EventHandlingProcess[Interpretation]] =
-    Deferred[Interpretation, Unit].map(deferred =>
-      new EventHandlingProcess[Interpretation](deferred, process(deferred), releaseProcess.some)
-    )
 
-  def apply[Interpretation[_]: Concurrent](
-      process: EitherT[Interpretation, EventSchedulingResult, Accepted]
-  ): Interpretation[EventHandlingProcess[Interpretation]] = for {
-    deferred <- Deferred[Interpretation, Unit]
+  def withWaitingForCompletion[F[_]: Concurrent](
+      process:        Deferred[F, Unit] => EitherT[F, EventSchedulingResult, Accepted],
+      releaseProcess: F[Unit]
+  ): F[EventHandlingProcess[F]] =
+    Deferred[F, Unit].map(deferred => new EventHandlingProcess[F](deferred, process(deferred), releaseProcess.some))
+
+  def apply[F[_]: Concurrent](
+      process: EitherT[F, EventSchedulingResult, Accepted]
+  ): F[EventHandlingProcess[F]] = for {
+    deferred <- Deferred[F, Unit]
     _        <- deferred.complete(())
-  } yield new EventHandlingProcess[Interpretation](deferred, process)
+  } yield new EventHandlingProcess[F](deferred, process)
 }

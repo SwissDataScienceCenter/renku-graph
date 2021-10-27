@@ -18,7 +18,7 @@
 
 package io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.gitlab
 
-import cats.effect.{ConcurrentEffect, IO, Timer}
+import cats.effect.IO
 import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.literal.JsonStringContext
@@ -35,19 +35,20 @@ import io.renku.http.client.AccessToken
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
 class GitLabCommitStatFetcherSpec
     extends AnyWordSpec
+    with IOSpec
     with MockFactory
     with ExternalServiceStubbing
     with should.Matchers
     with ScalaCheckPropertyChecks {
+
   "fetchCommitStats" should {
     "return a ProjectCommitStats with count of commits " in new TestCase {
       forAll(commitIds.toGeneratorOfOptions, commitCounts) { (maybeLatestCommit, commitCount) =>
@@ -68,7 +69,6 @@ class GitLabCommitStatFetcherSpec
           )
         )
       }
-
     }
 
     "return None if the gitlab API returns a NotFound" in new TestCase {
@@ -84,7 +84,6 @@ class GitLabCommitStatFetcherSpec
       }
 
       gitLabCommitStatFetcher.fetchCommitStats(projectId).unsafeRunSync() shouldBe None
-
     }
 
     "throw an UnauthorizedException if the gitlab API returns an UnauthorizedException" in new TestCase {
@@ -102,9 +101,6 @@ class GitLabCommitStatFetcherSpec
     }
   }
 
-  private implicit val ce:    ConcurrentEffect[IO] = IO.ioConcurrentEffect(IO.contextShift(global))
-  private implicit val timer: Timer[IO]            = IO.timer(global)
-
   private trait TestCase {
     val projectId: projects.Id = projectIds.generateOne
 
@@ -112,15 +108,14 @@ class GitLabCommitStatFetcherSpec
 
     val gitLabUrl           = GitLabUrl(externalServiceBaseUrl)
     val gitLabCommitFetcher = mock[GitLabCommitFetcher[IO]]
-
+    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val gitLabCommitStatFetcher =
-      new GitLabCommitStatFetcherImpl[IO](gitLabCommitFetcher, gitLabUrl.apiV4, Throttler.noThrottling, TestLogger())
+      new GitLabCommitStatFetcherImpl[IO](gitLabCommitFetcher, gitLabUrl.apiV4, Throttler.noThrottling)
   }
 
-  private def jsonCommitCount(count: CommitCount) =
-    json"""{
-           "statistics": {
-             "commit_count": ${count.value}
-           }
-          }""".noSpaces
+  private def jsonCommitCount(count: CommitCount) = json"""{
+    "statistics": {
+      "commit_count": ${count.value}
+    }
+  }""".noSpaces
 }

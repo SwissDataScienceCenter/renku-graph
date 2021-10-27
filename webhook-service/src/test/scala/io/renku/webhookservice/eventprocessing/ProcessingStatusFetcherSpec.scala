@@ -18,8 +18,7 @@
 
 package io.renku.webhookservice.eventprocessing
 
-import ProcessingStatusGenerator._
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.api.Refined
@@ -32,20 +31,22 @@ import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
+import io.renku.testtools.IOSpec
 import io.renku.webhookservice.eventprocessing.ProcessingStatusFetcher.ProcessingStatus
+import io.renku.webhookservice.eventprocessing.ProcessingStatusGenerator._
 import org.http4s.Status
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.math.BigDecimal.RoundingMode
 
-class IOProcessingStatusFetcherSpec
+class ProcessingStatusFetcherSpec
     extends AnyWordSpec
     with ExternalServiceStubbing
     with ScalaCheckPropertyChecks
-    with should.Matchers {
+    with should.Matchers
+    with IOSpec {
 
   "fetchProcessingStatus" should {
 
@@ -184,13 +185,11 @@ class IOProcessingStatusFetcherSpec
     }
   }
 
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO]        = IO.timer(global)
-
   private trait TestCase {
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val projectId   = projectIds.generateOne
     val eventLogUrl = EventLogUrl(externalServiceBaseUrl)
-    val fetcher     = new ProcessingStatusFetcherImpl[IO](eventLogUrl, TestLogger())
+    val fetcher     = new ProcessingStatusFetcherImpl[IO](eventLogUrl)
   }
 
   private implicit val processingStatusEncoder: Encoder[ProcessingStatus] = Encoder.instance[ProcessingStatus] {

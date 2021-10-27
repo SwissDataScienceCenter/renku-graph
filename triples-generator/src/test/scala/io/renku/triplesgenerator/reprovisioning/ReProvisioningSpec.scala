@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.reprovisioning
 
-import cats.effect.{IO, Timer}
+import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
@@ -27,16 +27,16 @@ import io.renku.graph.model.RenkuVersionPair
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.generators.VersionGenerators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "run" should {
 
@@ -368,9 +368,8 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
     }
   }
 
-  private implicit val timer: Timer[IO] = IO.timer(global)
-
   private trait TestCase {
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val versionCompatibilityPairs            = renkuVersionPairs.generateNonEmptyList(2)
     val maybeCurrentVersionCompatibilityPair = renkuVersionPairs.generateOption
     val renkuVersionPairFinder               = mock[RenkuVersionPairFinder[IO]]
@@ -379,8 +378,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
     val eventsReScheduler                    = mock[EventsReScheduler[IO]]
     val renkuVersionPairUpdater              = mock[RenkuVersionPairUpdater[IO]]
     val reProvisioningStatus                 = mock[ReProvisioningStatus[IO]]
-    val logger                               = TestLogger[IO]()
-    val executionTimeRecorder                = TestExecutionTimeRecorder(logger)
+    val executionTimeRecorder                = TestExecutionTimeRecorder[IO]()
     val reProvisioning = new ReProvisioningImpl[IO](
       renkuVersionPairFinder,
       versionCompatibilityPairs,
@@ -390,7 +388,6 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       renkuVersionPairUpdater,
       reProvisioningStatus,
       executionTimeRecorder,
-      logger,
       250 millis
     )
   }

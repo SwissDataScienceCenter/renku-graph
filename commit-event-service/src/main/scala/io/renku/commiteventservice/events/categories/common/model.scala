@@ -105,19 +105,19 @@ import io.renku.commiteventservice.events.categories.common.Person._
 private[categories] sealed trait Author extends Person
 private[categories] object Author {
   final case class FullAuthor(name: users.Name, email: Email) extends Author with WithEmail
-  final case class AuthorWithName(name: users.Name) extends Author
+  final case class AuthorWithName(name: users.Name)           extends Author
 
-  def apply(username:    users.Name, email: Email): Author = FullAuthor(username, email)
-  def withName(username: users.Name): Author = AuthorWithName(username)
-  def withEmail(email:   Email): Author = FullAuthor(email.extractName, email)
+  def apply(username: users.Name, email: Email): Author = FullAuthor(username, email)
+  def withName(username: users.Name):            Author = AuthorWithName(username)
+  def withEmail(email: Email):                   Author = FullAuthor(email.extractName, email)
 }
 
 private[categories] sealed trait Committer extends Person
 private[categories] object Committer {
   final case class FullCommitter(name: users.Name, email: Email) extends Committer with WithEmail
-  final case class CommitterWithName(name: users.Name) extends Committer
+  final case class CommitterWithName(name: users.Name)           extends Committer
 
-  def apply(username:    users.Name, email: Email): Committer = FullCommitter(username, email)
-  def withName(username: users.Name): Committer = CommitterWithName(username)
-  def withEmail(email:   Email): Committer = FullCommitter(email.extractName, email)
+  def apply(username: users.Name, email: Email): Committer = FullCommitter(username, email)
+  def withName(username: users.Name):            Committer = CommitterWithName(username)
+  def withEmail(email: Email):                   Committer = FullCommitter(email.extractName, email)
 }

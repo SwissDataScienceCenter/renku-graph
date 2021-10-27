@@ -32,6 +32,7 @@ import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{CompoundEventId, EventBody, EventId, EventStatus}
 import io.renku.graph.model.projects
 import io.renku.metrics.{LabeledGauge, TestLabeledHistogram}
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -43,6 +44,7 @@ import java.time.temporal.ChronoUnit.HOURS
 
 class EventPersisterSpec
     extends AnyWordSpec
+    with IOSpec
     with InMemoryEventLogDbSpec
     with MockFactory
     with TypeSerializers

@@ -18,7 +18,8 @@
 
 package io.renku.knowledgegraph.datasets.rest
 
-import cats.effect.{ConcurrentEffect, Timer}
+import cats.MonadThrow
+import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder.decodeList
@@ -30,18 +31,19 @@ import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
+private trait CreatorsFinder[F[_]] {
+  def findCreators(identifier: Identifier): F[Set[DatasetCreator]]
+}
 
-private class CreatorsFinder[Interpretation[_]: ConcurrentEffect: Timer](
-    rdfStoreConfig:          RdfStoreConfig,
-    logger:                  Logger[Interpretation],
-    timeRecorder:            SparqlQueryTimeRecorder[Interpretation]
-)(implicit executionContext: ExecutionContext)
-    extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder) {
+private class CreatorsFinderImpl[F[_]: Async: Logger](
+    rdfStoreConfig: RdfStoreConfig,
+    timeRecorder:   SparqlQueryTimeRecorder[F]
+) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
+    with CreatorsFinder[F] {
 
   import CreatorsFinder._
 
-  def findCreators(identifier: Identifier): Interpretation[Set[DatasetCreator]] =
+  def findCreators(identifier: Identifier): F[Set[DatasetCreator]] =
     queryExpecting[List[DatasetCreator]](using = query(identifier)).map(_.toSet)
 
   private def query(identifier: Identifier) = SparqlQuery.of(
@@ -63,6 +65,11 @@ private class CreatorsFinder[Interpretation[_]: ConcurrentEffect: Timer](
 }
 
 private object CreatorsFinder {
+
+  def apply[F[_]: Async: Logger](rdfStoreConfig: RdfStoreConfig,
+                                 timeRecorder: SparqlQueryTimeRecorder[F]
+  ): F[CreatorsFinder[F]] =
+    MonadThrow[F].catchNonFatal(new CreatorsFinderImpl(rdfStoreConfig, timeRecorder))
 
   import io.circe.Decoder
 

@@ -19,7 +19,7 @@
 package io.renku.commiteventservice.events.categories.common
 
 import cats.MonadThrow
-import cats.effect.{ConcurrentEffect, IO, Timer}
+import cats.effect.{Async, Temporal}
 import cats.syntax.all._
 import io.circe.literal._
 import io.renku.commiteventservice.events.categories.commitsync.categoryName
@@ -32,19 +32,18 @@ import io.renku.graph.model.events.EventStatus.AwaitingDeletion
 import io.renku.tinytypes.json.TinyTypeEncoders
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-private[categories] trait CommitEventsRemover[Interpretation[_]] {
-  def removeDeletedEvent(project: Project, commitId: CommitId): Interpretation[UpdateResult]
+private[categories] trait CommitEventsRemover[F[_]] {
+  def removeDeletedEvent(project: Project, commitId: CommitId): F[UpdateResult]
 }
 
-private class CommitEventsRemoverImpl[Interpretation[_]: MonadThrow](
-    eventSender: EventSender[Interpretation]
-) extends CommitEventsRemover[Interpretation]
+private class CommitEventsRemoverImpl[F[_]: MonadThrow](
+    eventSender: EventSender[F]
+) extends CommitEventsRemover[F]
     with TinyTypeEncoders {
 
-  override def removeDeletedEvent(project: Project, commitId: CommitId): Interpretation[UpdateResult] =
+  override def removeDeletedEvent(project: Project, commitId: CommitId): F[UpdateResult] =
     eventSender
       .sendEvent(
         EventRequestContent.NoPayload(json"""{
@@ -61,17 +60,13 @@ private class CommitEventsRemoverImpl[Interpretation[_]: MonadThrow](
       .map(_ => Deleted: UpdateResult)
       .recoverWith { case NonFatal(e) =>
         Failed(s"$categoryName - Commit Remover failed to send commit deletion status", e)
-          .pure[Interpretation]
+          .pure[F]
           .widen[UpdateResult]
       }
 }
 
 private[categories] object CommitEventsRemover {
-
-  def apply()(implicit
-      concurrentEffect: ConcurrentEffect[IO],
-      timer:            Timer[IO],
-      executionContext: ExecutionContext,
-      logger:           Logger[IO]
-  ): IO[CommitEventsRemover[IO]] = EventSender() map (new CommitEventsRemoverImpl[IO](_))
+  def apply[F[_]: Async: Temporal: Logger]: F[CommitEventsRemover[F]] = for {
+    sender <- EventSender[F]
+  } yield new CommitEventsRemoverImpl[F](sender)
 }

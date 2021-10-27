@@ -21,21 +21,17 @@ package io.renku.eventlog.init
 import cats.effect.IO
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk.implicits._
 
-class EventPayloadTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
+class EventPayloadTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
 
-  protected override lazy val migrationsToRun: List[Migration] = List(
-    eventLogTableCreator,
-    projectPathAdder,
-    batchDateAdder,
-    projectTableCreator,
-    projectPathRemover,
-    eventLogTableRenamer,
-    eventStatusRenamer
-  )
+  protected override lazy val migrationsToRun: List[Migration] = allMigrations.takeWhile {
+    case _: EventPayloadTableCreatorImpl[_] => false
+    case _ => true
+  }
 
   "run" should {
     "fail if the 'event' table does not exist" in new TestCase {
@@ -92,7 +88,7 @@ class EventPayloadTableCreatorSpec extends AnyWordSpec with DbInitSpec with shou
   }
 
   private trait TestCase {
-    implicit val logger = TestLogger[IO]()
-    val tableCreator    = new EventPayloadTableCreatorImpl[IO](sessionResource)
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val tableCreator = new EventPayloadTableCreatorImpl[IO](sessionResource)
   }
 }

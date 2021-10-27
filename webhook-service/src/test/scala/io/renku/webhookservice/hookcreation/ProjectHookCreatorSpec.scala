@@ -18,7 +18,7 @@
 
 package io.renku.webhookservice.hookcreation
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Json
 import io.renku.control.Throttler
@@ -29,6 +29,7 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
+import io.renku.testtools.IOSpec
 import io.renku.webhookservice.WebhookServiceGenerators.{projectHookUrls, serializedHookTokens}
 import io.renku.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import org.http4s.Status
@@ -37,9 +38,12 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
-class IOProjectHookCreatorSpec extends AnyWordSpec with MockFactory with ExternalServiceStubbing with should.Matchers {
+class ProjectHookCreatorSpec
+    extends AnyWordSpec
+    with MockFactory
+    with ExternalServiceStubbing
+    with should.Matchers
+    with IOSpec {
 
   "create" should {
 
@@ -104,9 +108,6 @@ class IOProjectHookCreatorSpec extends AnyWordSpec with MockFactory with Externa
     }
   }
 
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO]        = IO.timer(global)
-
   private trait TestCase {
     val projectHook = projectHooks.generateOne
     val projectId   = projectHook.projectId
@@ -122,7 +123,9 @@ class IOProjectHookCreatorSpec extends AnyWordSpec with MockFactory with Externa
         )
         .toString()
 
-    val hookCreator = new IOProjectHookCreator(gitLabUrl, Throttler.noThrottling, TestLogger())
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+
+    val hookCreator = new ProjectHookCreatorImpl[IO](gitLabUrl, Throttler.noThrottling)
   }
 
   private implicit lazy val projectHooks: Gen[ProjectHook] = for {

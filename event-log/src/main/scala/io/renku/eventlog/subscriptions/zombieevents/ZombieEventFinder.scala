@@ -19,26 +19,25 @@
 package io.renku.eventlog.subscriptions.zombieevents
 
 import cats.data.OptionT
-import cats.effect.{ConcurrentEffect, IO, Timer}
+import cats.effect.Async
 import cats.syntax.all._
-import cats.{MonadError, Parallel}
+import cats.{MonadThrow, Parallel}
 import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.subscriptions.EventFinder
 import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-private class ZombieEventFinder[Interpretation[_]: MonadError[*[_], Throwable]](
-    longProcessingEventsFinder: EventFinder[Interpretation, ZombieEvent],
-    lostSubscriberEventFinder:  EventFinder[Interpretation, ZombieEvent],
-    zombieNodesCleaner:         ZombieNodesCleaner[Interpretation],
-    lostZombieEventFinder:      EventFinder[Interpretation, ZombieEvent],
-    logger:                     Logger[Interpretation]
-) extends EventFinder[Interpretation, ZombieEvent] {
-  override def popEvent(): Interpretation[Option[ZombieEvent]] = for {
+private class ZombieEventFinder[F[_]: MonadThrow: Logger](
+    longProcessingEventsFinder: EventFinder[F, ZombieEvent],
+    lostSubscriberEventFinder:  EventFinder[F, ZombieEvent],
+    zombieNodesCleaner:         ZombieNodesCleaner[F],
+    lostZombieEventFinder:      EventFinder[F, ZombieEvent]
+) extends EventFinder[F, ZombieEvent] {
+
+  override def popEvent(): F[Option[ZombieEvent]] = for {
     _ <- zombieNodesCleaner.removeZombieNodes() recoverWith logError
     maybeEvent <- OptionT(longProcessingEventsFinder.popEvent())
                     .orElseF(lostSubscriberEventFinder.popEvent())
@@ -46,32 +45,25 @@ private class ZombieEventFinder[Interpretation[_]: MonadError[*[_], Throwable]](
                     .value
   } yield maybeEvent
 
-  private lazy val logError: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(e) =>
-    logger.error(e)("ZombieEventSourceCleaner - failure during clean up")
+  private lazy val logError: PartialFunction[Throwable, F[Unit]] = { case NonFatal(e) =>
+    Logger[F].error(e)("ZombieEventSourceCleaner - failure during clean up")
   }
 }
 
 private object ZombieEventFinder {
 
-  def apply(
-      sessionResource:  SessionResource[IO, EventLogDB],
-      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name],
-      logger:           Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      concurrentEffect: ConcurrentEffect[IO],
-      parallel:         Parallel[IO],
-      timer:            Timer[IO]
-  ): IO[EventFinder[IO, ZombieEvent]] = for {
+  def apply[F[_]: Async: Parallel: Logger](
+      sessionResource:  SessionResource[F, EventLogDB],
+      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[EventFinder[F, ZombieEvent]] = for {
     longProcessingEventFinder <- LongProcessingEventFinder(sessionResource, queriesExecTimes)
     lostSubscriberEventFinder <- LostSubscriberEventFinder(sessionResource, queriesExecTimes)
-    zombieNodesCleaner        <- ZombieNodesCleaner(sessionResource, queriesExecTimes, logger)
+    zombieNodesCleaner        <- ZombieNodesCleaner(sessionResource, queriesExecTimes)
     lostZombieEventFinder     <- LostZombieEventFinder(sessionResource, queriesExecTimes)
-  } yield new ZombieEventFinder[IO](longProcessingEventFinder,
-                                    lostSubscriberEventFinder,
-                                    zombieNodesCleaner,
-                                    lostZombieEventFinder,
-                                    logger
+  } yield new ZombieEventFinder[F](longProcessingEventFinder,
+                                   lostSubscriberEventFinder,
+                                   zombieNodesCleaner,
+                                   lostZombieEventFinder
   )
 }
 

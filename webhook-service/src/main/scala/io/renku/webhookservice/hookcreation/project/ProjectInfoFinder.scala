@@ -18,7 +18,8 @@
 
 package io.renku.webhookservice.hookcreation.project
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{Async, MonadCancelThrow}
+import cats.syntax.all._
 import io.renku.config.GitLab
 import io.renku.control.Throttler
 import io.renku.graph.config.GitLabUrlLoader
@@ -28,24 +29,16 @@ import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.http.client.{AccessToken, RestClient}
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
-private[hookcreation] trait ProjectInfoFinder[Interpretation[_]] {
-  def findProjectInfo(
-      projectId:        projects.Id,
-      maybeAccessToken: Option[AccessToken]
-  ): Interpretation[ProjectInfo]
+private[hookcreation] trait ProjectInfoFinder[F[_]] {
+  def findProjectInfo(projectId: projects.Id, maybeAccessToken: Option[AccessToken]): F[ProjectInfo]
 }
 
-private[hookcreation] class ProjectInfoFinderImpl(
-    gitLabUrl:               GitLabUrl,
-    gitLabThrottler:         Throttler[IO, GitLab],
-    logger:                  Logger[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends RestClient(gitLabThrottler, logger)
-    with ProjectInfoFinder[IO] {
+private[hookcreation] class ProjectInfoFinderImpl[F[_]: Async: Logger](
+    gitLabUrl:       GitLabUrl,
+    gitLabThrottler: Throttler[F, GitLab]
+) extends RestClient(gitLabThrottler)
+    with ProjectInfoFinder[F] {
 
-  import cats.effect._
   import io.circe._
   import io.renku.http.client.RestClientError.UnauthorizedException
   import io.renku.tinytypes.json.TinyTypeDecoders._
@@ -55,18 +48,18 @@ private[hookcreation] class ProjectInfoFinderImpl(
   import org.http4s.circe._
   import org.http4s.dsl.io._
 
-  def findProjectInfo(projectId: projects.Id, maybeAccessToken: Option[AccessToken]): IO[ProjectInfo] =
+  def findProjectInfo(projectId: projects.Id, maybeAccessToken: Option[AccessToken]): F[ProjectInfo] =
     for {
       uri         <- validateUri(s"$gitLabUrl/api/v4/projects/$projectId")
       projectInfo <- send(request(GET, uri, maybeAccessToken))(mapResponse)
     } yield projectInfo
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[ProjectInfo]] = {
+  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[ProjectInfo]] = {
     case (Ok, _, response)    => response.as[ProjectInfo]
-    case (Unauthorized, _, _) => IO.raiseError(UnauthorizedException)
+    case (Unauthorized, _, _) => MonadCancelThrow[F].raiseError(UnauthorizedException)
   }
 
-  private implicit lazy val projectInfoDecoder: EntityDecoder[IO, ProjectInfo] = {
+  private implicit lazy val projectInfoDecoder: EntityDecoder[F, ProjectInfo] = {
     implicit val hookNameDecoder: Decoder[ProjectInfo] = (cursor: HCursor) =>
       for {
         id         <- cursor.downField("id").as[projects.Id]
@@ -74,7 +67,7 @@ private[hookcreation] class ProjectInfoFinderImpl(
         path       <- cursor.downField("path_with_namespace").as[projects.Path]
       } yield ProjectInfo(id, visibility, path)
 
-    jsonOf[IO, ProjectInfo]
+    jsonOf[F, ProjectInfo]
   }
 
   private def defaultToPublic(maybeVisibility: Option[Visibility]): Visibility =
@@ -82,14 +75,9 @@ private[hookcreation] class ProjectInfoFinderImpl(
 }
 
 private[hookcreation] object ProjectInfoFinder {
-  def apply(
-      gitLabThrottler: Throttler[IO, GitLab],
-      logger:          Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[ProjectInfoFinder[IO]] = for {
-    gitLabUrl <- GitLabUrlLoader[IO]()
-  } yield new ProjectInfoFinderImpl(gitLabUrl, gitLabThrottler, logger)
+  def apply[F[_]: Async: Logger](
+      gitLabThrottler: Throttler[F, GitLab]
+  ): F[ProjectInfoFinder[F]] = for {
+    gitLabUrl <- GitLabUrlLoader[F]()
+  } yield new ProjectInfoFinderImpl(gitLabUrl, gitLabThrottler)
 }
