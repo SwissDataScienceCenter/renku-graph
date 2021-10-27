@@ -18,7 +18,7 @@
 
 package io.renku.crypto
 
-import cats.MonadError
+import cats.MonadThrow
 import eu.timepit.refined.W
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.MinSize
@@ -31,9 +31,9 @@ import javax.crypto.Cipher.{DECRYPT_MODE, ENCRYPT_MODE}
 import javax.crypto.spec.{IvParameterSpec, SecretKeySpec}
 import scala.util.Try
 
-abstract class AesCrypto[Interpretation[_], NONENCRYPTED, ENCRYPTED](
-    secret:    Secret
-)(implicit ME: MonadError[Interpretation, Throwable]) {
+abstract class AesCrypto[F[_]: MonadThrow, NONENCRYPTED, ENCRYPTED](
+    secret: Secret
+) {
 
   private val base64Decoder    = Base64.getDecoder
   private val base64Encoder    = Base64.getEncoder
@@ -43,8 +43,8 @@ abstract class AesCrypto[Interpretation[_], NONENCRYPTED, ENCRYPTED](
   private val encryptingCipher = cipher(ENCRYPT_MODE)
   private val decryptingCipher = cipher(DECRYPT_MODE)
 
-  def encrypt(nonEncrypted: NONENCRYPTED): Interpretation[ENCRYPTED]
-  def decrypt(encrypted:    ENCRYPTED):    Interpretation[NONENCRYPTED]
+  def encrypt(nonEncrypted: NONENCRYPTED): F[ENCRYPTED]
+  def decrypt(encrypted:    ENCRYPTED):    F[NONENCRYPTED]
 
   private def cipher(mode: Int): Cipher = {
     val c = Cipher.getInstance(algorithm)
@@ -52,21 +52,21 @@ abstract class AesCrypto[Interpretation[_], NONENCRYPTED, ENCRYPTED](
     c
   }
 
-  protected def encryptAndEncode(toEncryptAndEncode: String): Interpretation[String] = pure {
+  protected def encryptAndEncode(toEncryptAndEncode: String): F[String] = pure {
     new String(
       base64Encoder.encode(encryptingCipher.doFinal(toEncryptAndEncode.getBytes(UTF_8))),
       UTF_8
     )
   }
 
-  protected def decodeAndDecrypt(toDecodeAndDecrypt: String): Interpretation[String] = pure {
+  protected def decodeAndDecrypt(toDecodeAndDecrypt: String): F[String] = pure {
     new String(
       decryptingCipher.doFinal(base64Decoder.decode(toDecodeAndDecrypt.getBytes(UTF_8))),
       UTF_8
     )
   }
 
-  protected def pure[T](value: => T): Interpretation[T] = ME.fromTry {
+  protected def pure[T](value: => T): F[T] = MonadThrow[F].fromTry {
     Try(value)
   }
 }

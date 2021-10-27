@@ -19,7 +19,7 @@
 package io.renku.generators
 
 import cats.data.NonEmptyList
-import cats.{Functor, Semigroupal}
+import cats.{Applicative, Functor, Semigroupal}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
@@ -298,8 +298,8 @@ object Generators {
     implicit val mapEncoder: Encoder[Map[String, Any]] = Encoder.instance[Map[String, Any]] { map =>
       Json.obj(
         map.map {
-          case (key, value: String) => key -> Json.fromString(value)
-          case (key, value: Number) => key -> Json.fromBigDecimal(value.doubleValue())
+          case (key, value: String)  => key -> Json.fromString(value)
+          case (key, value: Number)  => key -> Json.fromBigDecimal(value.doubleValue())
           case (key, value: Boolean) => key -> Json.fromBoolean(value)
           case (key, value: List[_]) => key -> Json.arr(value.map(_.toString).map(Json.fromString): _*)
           case (_, value) =>
@@ -382,6 +382,11 @@ object Generators {
         a <- fa
         b <- fb
       } yield a -> b
+    }
+
+    implicit val genApplicative: Applicative[Gen] = new Applicative[Gen] {
+      override def pure[A](x: A) = Gen.const(x)
+      override def ap[A, B](ff: Gen[A => B])(fa: Gen[A]): Gen[B] = ff.flatMap(f => fa.map(f))
     }
 
     implicit val functorGen: Functor[Gen] = new Functor[Gen] {

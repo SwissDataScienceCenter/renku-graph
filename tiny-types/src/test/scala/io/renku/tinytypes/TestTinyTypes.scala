@@ -41,7 +41,7 @@ object TestTinyTypes {
   implicit object UrlTestType extends TinyTypeFactory[UrlTestType](new UrlTestType(_)) with Url with UrlOps[UrlTestType]
 
   class IntTestType private (val value: Int) extends AnyVal with IntTinyType
-  implicit object IntTestType extends TinyTypeFactory[IntTestType](new IntTestType(_))
+  implicit object IntTestType                extends TinyTypeFactory[IntTestType](new IntTestType(_))
 
   class LongTestType private (val value: Long) extends AnyVal with LongTinyType
 

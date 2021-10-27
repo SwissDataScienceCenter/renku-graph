@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.data.NonEmptyList
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
@@ -31,12 +31,11 @@ import io.renku.tinytypes.{BigDecimalTinyType, TinyTypeFactory}
 
 import java.time.Duration
 
-private trait ProjectPrioritisation[Interpretation[_]] {
+private trait ProjectPrioritisation[F[_]] {
   def prioritise(projects: List[ProjectInfo], totalOccupancy: Long): List[(ProjectIds, Priority)]
 }
 
-private class ProjectPrioritisationImpl[Interpretation[_]](subscribers: Subscribers[Interpretation])
-    extends ProjectPrioritisation[Interpretation] {
+private class ProjectPrioritisationImpl[F[_]](subscribers: Subscribers[F]) extends ProjectPrioritisation[F] {
   import ProjectPrioritisation.Priority._
 
   private val FreeSpotsRatio = .15
@@ -145,10 +144,10 @@ private class ProjectPrioritisationImpl[Interpretation[_]](subscribers: Subscrib
 
 private object ProjectPrioritisation {
 
-  def apply[Interpretation[_]](subscribers: Subscribers[Interpretation])(implicit
-      ME:                                   MonadError[Interpretation, Throwable]
-  ): Interpretation[ProjectPrioritisation[Interpretation]] =
-    ME.catchNonFatal(new ProjectPrioritisationImpl[Interpretation](subscribers))
+  def apply[F[_]: MonadThrow](
+      subscribers: Subscribers[F]
+  ): F[ProjectPrioritisation[F]] =
+    MonadThrow[F].catchNonFatal(new ProjectPrioritisationImpl[F](subscribers))
 
   final case class ProjectInfo(id:               projects.Id,
                                path:             projects.Path,

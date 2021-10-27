@@ -23,13 +23,14 @@ import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage.ErrorMessage
 import io.renku.http.server.EndpointTester._
 import io.renku.http.server.security.EndpointSecurityException.{AuthenticationFailure, AuthorizationFailure}
+import io.renku.testtools.IOSpec
 import org.http4s.MediaType._
 import org.http4s.Status.{NotFound, Unauthorized}
 import org.http4s.headers.`Content-Type`
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EndpointSecurityExceptionSpec extends AnyWordSpec with should.Matchers {
+class EndpointSecurityExceptionSpec extends AnyWordSpec with IOSpec with should.Matchers {
 
   "AuthenticationFailure.toHttpResponse" should {
 

@@ -177,7 +177,7 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
 
       val json = sameAs.asJsonLD.toJson
 
-      json.hcursor.downField("@type").as[String]                                    shouldBe Right((schema / "URL").toString)
+      json.hcursor.downField("@type").as[String] shouldBe Right((schema / "URL").toString)
       json.hcursor.downField((schema / "url").toString).downField("@id").as[String] shouldBe Right(sameAs.toString)
     }
 
@@ -186,7 +186,7 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
 
       val json = sameAs.asJsonLD.toJson
 
-      json.hcursor.downField("@type").as[String]                                       shouldBe Right((schema / "URL").toString)
+      json.hcursor.downField("@type").as[String] shouldBe Right((schema / "URL").toString)
       json.hcursor.downField((schema / "url").toString).downField("@value").as[String] shouldBe Right(sameAs.toString)
     }
   }
@@ -209,7 +209,7 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
 
       val json = DerivedFrom.jsonLDEncoder(derivedFrom).toJson
 
-      json.hcursor.downField("@type").as[String]                                    shouldBe Right((schema / "URL").toString)
+      json.hcursor.downField("@type").as[String] shouldBe Right((schema / "URL").toString)
       json.hcursor.downField((schema / "url").toString).downField("@id").as[String] shouldBe Right(derivedFrom.toString)
     }
   }

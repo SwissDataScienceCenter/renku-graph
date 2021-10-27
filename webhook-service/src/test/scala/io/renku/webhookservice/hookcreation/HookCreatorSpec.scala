@@ -18,8 +18,7 @@
 
 package io.renku.webhookservice.hookcreation
 
-import cats._
-import cats.effect.{ConcurrentEffect, ContextShift, IO}
+import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
@@ -28,12 +27,13 @@ import io.renku.graph.model.projects.Id
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
+import io.renku.testtools.IOSpec
 import io.renku.webhookservice.CommitSyncRequestSender
 import io.renku.webhookservice.WebhookServiceGenerators._
-import io.renku.webhookservice.crypto.IOHookTokenCrypto
+import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.hookcreation.HookCreator.CreationResult.{HookCreated, HookExisted}
 import io.renku.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
-import io.renku.webhookservice.hookcreation.project.ProjectInfoFinder
+import io.renku.webhookservice.hookcreation.project.{ProjectInfo, ProjectInfoFinder}
 import io.renku.webhookservice.hookvalidation.HookValidator
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
 import io.renku.webhookservice.model.{CommitSyncRequest, HookToken, Project}
@@ -42,9 +42,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext
-
-class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers with IOSpec {
 
   "createHook" should {
 
@@ -53,27 +51,27 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
       (projectHookValidator
         .validateHook(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
-        .returning(context.pure(HookMissing))
+        .returning(HookMissing.pure[IO])
 
       (projectInfoFinder
         .findProjectInfo(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
-        .returning(context.pure(projectInfo))
+        .returning(projectInfo.pure[IO])
 
       (hookTokenCrypto
         .encrypt(_: HookToken))
         .expects(HookToken(projectId))
-        .returning(context.pure(serializedHookToken))
+        .returning(serializedHookToken.pure[IO])
 
       (projectHookCreator
         .create(_: ProjectHook, _: AccessToken))
         .expects(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
-        .returning(context.unit)
+        .returning(IO.unit)
 
       (accessTokenAssociator
         .associate(_: Id, _: AccessToken))
         .expects(projectId, accessToken)
-        .returning(context.unit)
+        .returning(IO.unit)
 
       (commitSyncRequestSender.sendCommitSyncRequest _)
         .expects(CommitSyncRequest(Project(projectInfo.id, projectInfo.path)))
@@ -89,7 +87,7 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
       (projectHookValidator
         .validateHook(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
-        .returning(context.pure(HookExists))
+        .returning(HookExists.pure[IO])
 
       hookCreation.createHook(projectId, accessToken).unsafeRunSync() shouldBe HookExisted
 
@@ -102,7 +100,7 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
       (projectHookValidator
         .validateHook(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
-        .returning(context.raiseError(exception))
+        .returning(exception.raiseError[IO, HookValidator.HookValidationResult])
 
       intercept[Exception] {
         hookCreation.createHook(projectId, accessToken).unsafeRunSync()
@@ -116,13 +114,13 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
       (projectHookValidator
         .validateHook(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
-        .returning(context.pure(HookMissing))
+        .returning(HookMissing.pure[IO])
 
       val exception = exceptions.generateOne
       (projectInfoFinder
         .findProjectInfo(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
-        .returning(context.raiseError(exception))
+        .returning(exception.raiseError[IO, ProjectInfo])
 
       intercept[Exception] {
         hookCreation.createHook(projectId, accessToken).unsafeRunSync()
@@ -136,18 +134,18 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
       (projectHookValidator
         .validateHook(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
-        .returning(context.pure(HookMissing))
+        .returning(HookMissing.pure[IO])
 
       (projectInfoFinder
         .findProjectInfo(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
-        .returning(context.pure(projectInfo))
+        .returning(projectInfo.pure[IO])
 
       val exception = exceptions.generateOne
       (hookTokenCrypto
         .encrypt(_: HookToken))
         .expects(HookToken(projectId))
-        .returning(context.raiseError(exception))
+        .returning(exception.raiseError[IO, HookTokenCrypto.SerializedHookToken])
 
       intercept[Exception] {
         hookCreation.createHook(projectId, accessToken).unsafeRunSync()
@@ -161,23 +159,23 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
       (projectHookValidator
         .validateHook(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
-        .returning(context.pure(HookMissing))
+        .returning(HookMissing.pure[IO])
 
       (projectInfoFinder
         .findProjectInfo(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
-        .returning(context.pure(projectInfo))
+        .returning(projectInfo.pure[IO])
 
       (hookTokenCrypto
         .encrypt(_: HookToken))
         .expects(HookToken(projectId))
-        .returning(context.pure(serializedHookToken))
+        .returning(serializedHookToken.pure[IO])
 
       val exception = exceptions.generateOne
       (projectHookCreator
         .create(_: ProjectHook, _: AccessToken))
         .expects(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
-        .returning(context.raiseError(exception))
+        .returning(exception.raiseError[IO, Unit])
 
       intercept[Exception] {
         hookCreation.createHook(projectId, accessToken).unsafeRunSync()
@@ -191,28 +189,28 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
       (projectHookValidator
         .validateHook(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
-        .returning(context.pure(HookMissing))
+        .returning(HookMissing.pure[IO])
 
       (projectInfoFinder
         .findProjectInfo(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
-        .returning(context.pure(projectInfo))
+        .returning(projectInfo.pure[IO])
 
       (hookTokenCrypto
         .encrypt(_: HookToken))
         .expects(HookToken(projectId))
-        .returning(context.pure(serializedHookToken))
+        .returning(serializedHookToken.pure[IO])
 
       (projectHookCreator
         .create(_: ProjectHook, _: AccessToken))
         .expects(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
-        .returning(context.unit)
+        .returning(IO.unit)
 
       val exception = exceptions.generateOne
       (accessTokenAssociator
         .associate(_: Id, _: AccessToken))
         .expects(projectId, accessToken)
-        .returning(context.raiseError(exception))
+        .returning(exception.raiseError[IO, Unit])
 
       intercept[Exception] {
         hookCreation.createHook(projectId, accessToken).unsafeRunSync()
@@ -226,27 +224,27 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
       (projectHookValidator
         .validateHook(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
-        .returning(context.pure(HookMissing))
+        .returning(HookMissing.pure[IO])
 
       (projectInfoFinder
         .findProjectInfo(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
-        .returning(context.pure(projectInfo))
+        .returning(projectInfo.pure[IO])
 
       (hookTokenCrypto
         .encrypt(_: HookToken))
         .expects(HookToken(projectId))
-        .returning(context.pure(serializedHookToken))
+        .returning(serializedHookToken.pure[IO])
 
       (projectHookCreator
         .create(_: ProjectHook, _: AccessToken))
         .expects(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
-        .returning(context.unit)
+        .returning(IO.unit)
 
       (accessTokenAssociator
         .associate(_: Id, _: AccessToken))
         .expects(projectId, accessToken)
-        .returning(context.unit)
+        .returning(IO.unit)
 
       (commitSyncRequestSender.sendCommitSyncRequest _)
         .expects(CommitSyncRequest(Project(projectInfo.id, projectInfo.path)))
@@ -258,9 +256,6 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
     }
   }
 
-  private implicit val contextShift: ContextShift[IO]     = IO.contextShift(ExecutionContext.global)
-  private implicit val concurrent:   ConcurrentEffect[IO] = IO.ioConcurrentEffect
-
   private trait TestCase {
     val projectInfo         = projectInfos.generateOne
     val projectId           = projectInfo.id
@@ -268,13 +263,11 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
     val serializedHookToken = serializedHookTokens.generateOne
     val accessToken         = accessTokens.generateOne
 
-    val context: MonadError[IO, Throwable] = MonadError[IO, Throwable]
-
-    val logger                  = TestLogger[IO]()
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val projectInfoFinder       = mock[ProjectInfoFinder[IO]]
     val projectHookValidator    = mock[HookValidator[IO]]
     val projectHookCreator      = mock[ProjectHookCreator[IO]]
-    val hookTokenCrypto         = mock[IOHookTokenCrypto]
+    val hookTokenCrypto         = mock[HookTokenCrypto[IO]]
     val accessTokenAssociator   = mock[AccessTokenAssociator[IO]]
     val commitSyncRequestSender = mock[CommitSyncRequestSender[IO]]
 
@@ -285,8 +278,7 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
       hookTokenCrypto,
       projectHookCreator,
       accessTokenAssociator,
-      commitSyncRequestSender,
-      logger
+      commitSyncRequestSender
     )
   }
 }

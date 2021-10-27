@@ -18,8 +18,9 @@
 
 package io.renku.triplesgenerator.config
 
-import cats.MonadError
+import cats.MonadThrow
 import com.typesafe.config.{Config, ConfigFactory}
+import org.typelevel.log4cats.Logger
 
 trait TriplesGeneration extends Product with Serializable
 
@@ -30,10 +31,8 @@ object TriplesGeneration {
   import cats.syntax.all._
   import io.renku.config.ConfigLoader._
 
-  def apply[Interpretation[_]](
-      config:    Config = ConfigFactory.load
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[TriplesGeneration] =
-    find[Interpretation, String]("triples-generation", config) map {
+  def apply[F[_]: MonadThrow: Logger](config: Config = ConfigFactory.load): F[TriplesGeneration] =
+    find[F, String]("triples-generation", config) map {
       case "renku-log"        => RenkuLog
       case "remote-generator" => RemoteTriplesGeneration
     }

@@ -19,6 +19,7 @@
 package io.renku.knowledgegraph.projects.rest
 
 import cats.data.OptionT
+import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
 import io.renku.config.GitLab
@@ -30,30 +31,29 @@ import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.projects.model._
 import io.renku.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
 import io.renku.knowledgegraph.projects.rest.KGProjectFinder.{KGProject, Parent}
+import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.util.Try
 
-private trait ProjectFinder[Interpretation[_]] {
-  def findProject(path: Path, maybeAuthUser: Option[AuthUser]): Interpretation[Option[Project]]
+private trait ProjectFinder[F[_]] {
+  def findProject(path: Path, maybeAuthUser: Option[AuthUser]): F[Option[Project]]
 }
 
-private class ProjectFinderImpl[Interpretation[_]: MonadThrow](
-    kgProjectFinder:     KGProjectFinder[Interpretation],
-    gitLabProjectFinder: GitLabProjectFinder[Interpretation],
-    accessTokenFinder:   AccessTokenFinder[Interpretation]
-)(implicit parallel:     Parallel[Interpretation])
-    extends ProjectFinder[Interpretation] {
+private class ProjectFinderImpl[F[_]: MonadThrow: Parallel](
+    kgProjectFinder:     KGProjectFinder[F],
+    gitLabProjectFinder: GitLabProjectFinder[F],
+    accessTokenFinder:   AccessTokenFinder[F]
+) extends ProjectFinder[F] {
 
   import accessTokenFinder._
   import gitLabProjectFinder.{findProject => findProjectInGitLab}
   import kgProjectFinder.{findProject => findInKG}
 
-  def findProject(path: Path, maybeAuthUser: Option[AuthUser]): Interpretation[Option[Project]] =
+  def findProject(path: Path, maybeAuthUser: Option[AuthUser]): F[Option[Project]] =
     ((OptionT(findInKG(path)), findInGitLab(path, maybeAuthUser)) parMapN (merge(path, _, _))).value
 
   private def findInGitLab(path: Path, maybeAuthUser: Option[AuthUser]) = for {
-    accessToken   <- OptionT.fromOption[Interpretation](maybeAuthUser.map(_.accessToken)) orElseF findAccessToken(path)
+    accessToken   <- OptionT.fromOption[F](maybeAuthUser.map(_.accessToken)) orElseF findAccessToken(path)
     gitLabProject <- findProjectInGitLab(path, Some(accessToken))
   } yield gitLabProject
 
@@ -93,21 +93,15 @@ private class ProjectFinderImpl[Interpretation[_]: MonadThrow](
 }
 
 private object ProjectFinder {
-  import cats.effect.{ContextShift, IO, Timer}
-  import io.renku.rdfstore.SparqlQueryTimeRecorder
-  import org.typelevel.log4cats.Logger
 
-  def apply(
-      gitLabThrottler: Throttler[IO, GitLab],
-      logger:          Logger[IO],
-      timeRecorder:    SparqlQueryTimeRecorder[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[ProjectFinder[IO]] = for {
-    kgProjectFinder     <- KGProjectFinder(timeRecorder, logger = logger)
-    gitLabProjectFinder <- GitLabProjectFinder(gitLabThrottler, logger)
-    accessTokenFinder   <- AccessTokenFinder(logger)
+  import io.renku.rdfstore.SparqlQueryTimeRecorder
+
+  def apply[F[_]: Async: Parallel: Logger](
+      gitLabThrottler: Throttler[F, GitLab],
+      timeRecorder:    SparqlQueryTimeRecorder[F]
+  ): F[ProjectFinder[F]] = for {
+    kgProjectFinder     <- KGProjectFinder[F](timeRecorder)
+    gitLabProjectFinder <- GitLabProjectFinder[F](gitLabThrottler)
+    accessTokenFinder   <- AccessTokenFinder[F]
   } yield new ProjectFinderImpl(kgProjectFinder, gitLabProjectFinder, accessTokenFinder)
 }

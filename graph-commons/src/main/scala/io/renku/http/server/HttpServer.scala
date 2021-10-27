@@ -21,26 +21,32 @@ package io.renku.http.server
 import cats.data.Kleisli
 import cats.effect._
 import cats.syntax.all._
-import org.http4s.server.blaze._
-import org.http4s.{HttpRoutes, Request, Response}
+import org.http4s.blaze.server._
+import org.http4s.{HttpApp, HttpRoutes, Request, Response}
 
-import scala.concurrent.ExecutionContext
+trait HttpServer[F[_]] {
+  val httpApp: HttpApp[F]
+  def run(): F[ExitCode]
+}
 
-class HttpServer[F[_]: ConcurrentEffect](
-    serverPort:    Int,
-    serviceRoutes: HttpRoutes[F]
-)(implicit timer:  Timer[F], executionContext: ExecutionContext) {
+object HttpServer {
+  def apply[F[_]: Async](serverPort: Int, serviceRoutes: HttpRoutes[F]): HttpServer[F] =
+    new HttpServerImpl[F](serverPort, serviceRoutes)
+}
+
+class HttpServerImpl[F[_]: Async](serverPort: Int, serviceRoutes: HttpRoutes[F]) extends HttpServer[F] {
 
   import QueryParameterTools.resourceNotFound
 
-  def run(): F[ExitCode] =
-    BlazeServerBuilder[F](executionContext)
-      .bindHttp(serverPort, "0.0.0.0")
-      .withHttpApp(serviceRoutes.orNotFound)
-      .serve
-      .compile
-      .drain
-      .as(ExitCode.Success)
+  lazy val httpApp: HttpApp[F] = serviceRoutes.orNotFound
+
+  def run(): F[ExitCode] = BlazeServerBuilder[F]
+    .bindHttp(serverPort, "0.0.0.0")
+    .withHttpApp(httpApp)
+    .serve
+    .compile
+    .drain
+    .as(ExitCode.Success)
 
   private implicit class RoutesOps(routes: HttpRoutes[F]) {
     def orNotFound: Kleisli[F, Request[F], Response[F]] = Kleisli {

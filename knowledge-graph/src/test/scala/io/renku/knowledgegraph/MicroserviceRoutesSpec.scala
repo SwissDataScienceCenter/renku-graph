@@ -19,7 +19,7 @@
 package io.renku.knowledgegraph
 
 import cats.data.{Kleisli, OptionT}
-import cats.effect.{Clock, IO, Resource}
+import cats.effect.{IO, Resource}
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
@@ -40,8 +40,9 @@ import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.{Phras
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
 import io.renku.knowledgegraph.datasets.rest._
-import io.renku.knowledgegraph.graphql.{LineageQueryContext, QueryEndpoint, QueryRunner}
+import io.renku.knowledgegraph.graphql.QueryEndpoint
 import io.renku.knowledgegraph.projects.rest.ProjectEndpoint
+import io.renku.testtools.IOSpec
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
@@ -53,17 +54,21 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import scala.concurrent.ExecutionContext
 import scala.language.reflectiveCalls
 
-class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyChecks with should.Matchers {
+class MicroserviceRoutesSpec
+    extends AnyWordSpec
+    with MockFactory
+    with ScalaCheckPropertyChecks
+    with should.Matchers
+    with IOSpec {
 
   "routes" should {
 
     "define a GET /ping endpoint returning OK with 'pong' body" in new TestCase {
 
       val response = routes(maybeAuthUser).call(
-        Request(Method.GET, uri"ping")
+        Request(Method.GET, uri"/ping")
       )
 
       response.status       shouldBe Ok
@@ -72,7 +77,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
 
     "define a GET /metrics endpoint returning OK with some prometheus metrics" in new TestCase {
       val response = routes(maybeAuthUser).call(
-        Request(Method.GET, uri"metrics")
+        Request(Method.GET, uri"/metrics")
       )
 
       response.status     shouldBe Ok
@@ -84,7 +89,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
 
         val phrase = nonEmptyStrings().generateOne
         val request =
-          Request[IO](Method.GET, uri"knowledge-graph/datasets".withQueryParam(query.parameterName, phrase))
+          Request[IO](Method.GET, uri"/knowledge-graph/datasets".withQueryParam(query.parameterName, phrase))
         (datasetsSearchEndpoint
           .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest, _: Option[AuthUser]))
           .expects(Phrase(phrase).some,
@@ -103,7 +108,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
       "when a valid 'query' and no 'sort', `page` and `per_page` parameters given" in new TestCase {
         val phrase = nonEmptyStrings().generateOne
         val request =
-          Request[IO](Method.GET, uri"knowledge-graph/datasets".withQueryParam(query.parameterName, phrase))
+          Request[IO](Method.GET, uri"/knowledge-graph/datasets".withQueryParam(query.parameterName, phrase))
 
         routes(givenAuthFailing())
           .call(request)
@@ -113,7 +118,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
     s"define a GET /knowledge-graph/datasets?query=<phrase> endpoint returning $Ok " +
       s"when no ${query.parameterName} parameter given" in new TestCase {
 
-        val request = Request[IO](Method.GET, uri"knowledge-graph/datasets")
+        val request = Request[IO](Method.GET, uri"/knowledge-graph/datasets")
 
         (datasetsSearchEndpoint
           .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest, _: Option[AuthUser]))
@@ -131,7 +136,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
 
     s"define a GET /knowledge-graph/datasets?query=<phrase> endpoint returning $Unauthorized when user authentication failed " +
       s"and when no parameters are given" in new TestCase {
-        val request = Request[IO](Method.GET, uri"knowledge-graph/datasets")
+        val request = Request[IO](Method.GET, uri"/knowledge-graph/datasets")
 
         routes(givenAuthFailing())
           .call(request)
@@ -146,7 +151,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
           val phrase = phrases.generateOne
           val request = Request[IO](
             Method.GET,
-            uri"knowledge-graph/datasets"
+            uri"/knowledge-graph/datasets"
               .withQueryParam("query", phrase.value)
               .withQueryParam("sort", s"${sortBy.property}:${sortBy.direction}")
           )
@@ -168,7 +173,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
           val request =
             Request[IO](
               Method.GET,
-              uri"knowledge-graph/datasets"
+              uri"/knowledge-graph/datasets"
                 .withQueryParam("query", phrase.value)
                 .withQueryParam("sort", s"${sortBy.property}:${sortBy.direction}")
             )
@@ -184,7 +189,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
         forAll(phrases, pages, perPages) { (phrase, page, perPage) =>
           val request = Request[IO](
             Method.GET,
-            uri"knowledge-graph/datasets"
+            uri"/knowledge-graph/datasets"
               .withQueryParam("query", phrase.value)
               .withQueryParam("page", page.value)
               .withQueryParam("per_page", perPage.value)
@@ -208,7 +213,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
           val request =
             Request[IO](
               Method.GET,
-              uri"knowledge-graph/datasets"
+              uri"/knowledge-graph/datasets"
                 .withQueryParam("query", phrase.value)
                 .withQueryParam("page", page.value)
                 .withQueryParam("per_page", perPage.value)
@@ -233,7 +238,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
         val response = routes(maybeAuthUser).call {
           Request(
             Method.GET,
-            uri"knowledge-graph/datasets"
+            uri"/knowledge-graph/datasets"
               .withQueryParam("query", blankStrings().generateOne)
               .withQueryParam("sort", s"$sortProperty:${Direction.Asc}")
               .withQueryParam("page", requestedPage.toString)
@@ -258,7 +263,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
       (datasetsEndpoint.getDataset _).expects(id).returning(IO.pure(Response[IO](Ok)))
 
       val response = routes(maybeAuthUser).call(
-        Request(Method.GET, uri"knowledge-graph/datasets" / id.value)
+        Request(Method.GET, uri"/knowledge-graph/datasets" / id.value)
       )
 
       response.status shouldBe Ok
@@ -268,7 +273,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
 
       routes()
         .call(
-          Request(Method.GET, uri"knowledge-graph/datasets/")
+          Request(Method.GET, uri"/knowledge-graph/datasets/")
         )
         .status shouldBe NotFound
     }
@@ -278,7 +283,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
       (queryEndpoint.schema _).expects().returning(IO.pure(Response[IO](Ok)))
 
       val response = routes(maybeAuthUser).call(
-        Request(Method.GET, uri"knowledge-graph/graphql")
+        Request(Method.GET, uri"/knowledge-graph/graphql")
       )
 
       response.status shouldBe Ok
@@ -286,7 +291,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
 
     "define a POST /knowledge-graph/graphql endpoint" in new TestCase {
 
-      val request: Request[IO] = Request(Method.POST, uri"knowledge-graph/graphql")
+      val request: Request[IO] = Request(Method.POST, uri"/knowledge-graph/graphql")
       (queryEndpoint
         .handleQuery(_: Request[IO], _: Option[AuthUser]))
         .expects(request, maybeAuthUser)
@@ -298,7 +303,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
     }
 
     s"define a POST /knowledge-graph/graphql endpoint endpoint returning $Unauthorized when user authentication failed" in new TestCase {
-      val request: Request[IO] = Request(Method.POST, uri"knowledge-graph/graphql")
+      val request: Request[IO] = Request(Method.POST, uri"/knowledge-graph/graphql")
 
       routes(givenAuthFailing())
         .call(request)
@@ -322,7 +327,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
       val namespace = nonBlankStrings().generateOne.value
 
       val response = routes(maybeAuthUser).call(
-        Request(Method.GET, uri"knowledge-graph/projects" / namespace)
+        Request(Method.GET, uri"/knowledge-graph/projects" / namespace)
       )
 
       response.status            shouldBe NotFound
@@ -335,7 +340,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
         (projectDatasetsEndpoint.getProjectDatasets _).expects(projectPath).returning(IO.pure(Response[IO](Ok)))
 
         val response = routes(maybeAuthUser).call(
-          Request(Method.GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath/datasets"))
+          Request(Method.GET, Uri.unsafeFromString(s"/knowledge-graph/projects/$projectPath/datasets"))
         )
 
         response.status shouldBe Ok
@@ -345,17 +350,16 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
     }
   }
 
-  private implicit val clock: Clock[IO] = IO.timer(ExecutionContext.global).clock
-
   private trait TestCase {
 
     val maybeAuthUser           = authUsers.generateOption
-    val queryEndpoint           = mock[IOQueryEndpoint]
+    val queryEndpoint           = mock[QueryEndpoint[IO]]
     val projectEndpoint         = mock[ProjectEndpoint[IO]]
-    val projectDatasetsEndpoint = mock[IOProjectDatasetsEndpointStub]
-    val datasetsEndpoint        = mock[IODatasetEndpointStub]
-    val datasetsSearchEndpoint  = mock[IODatasetsSearchEndpointStub]
+    val projectDatasetsEndpoint = mock[ProjectDatasetsEndpoint[IO]]
+    val datasetsEndpoint        = mock[DatasetEndpoint[IO]]
+    val datasetsSearchEndpoint  = mock[DatasetsSearchEndpoint[IO]]
     val routesMetrics           = TestRoutesMetrics()
+
     def routes(maybeAuthUser: Option[AuthUser] = None): Resource[IO, Kleisli[IO, Request[IO], Response[IO]]] = routes(
       givenAuthIfNeededMiddleware(returning = OptionT.some[IO](maybeAuthUser))
     )
@@ -373,8 +377,4 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
         routesMetrics
       ).routes.map(_.or(notAvailableResponse))
   }
-
-  class IOQueryEndpoint(
-      queryRunner: QueryRunner[IO, LineageQueryContext[IO]]
-  ) extends QueryEndpoint[IO](queryRunner)
 }

@@ -19,8 +19,8 @@
 package io.renku.triplesgenerator.events.categories.awaitinggeneration
 
 import cats.data.EitherT
-import cats.effect.concurrent.Deferred
-import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, IO, Timer}
+import cats.effect.kernel.Deferred
+import cats.effect.{Async, Concurrent}
 import cats.syntax.all._
 import cats.{MonadThrow, Show}
 import com.typesafe.config.{Config, ConfigFactory}
@@ -33,38 +33,36 @@ import io.renku.graph.model.events.{CategoryName, EventBody}
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
-private[events] class EventHandler[Interpretation[_]: MonadThrow: ConcurrentEffect: ContextShift: Logger](
+private[events] class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
     override val categoryName:  CategoryName,
-    eventProcessor:             EventProcessor[Interpretation],
-    eventBodyDeserializer:      EventBodyDeserializer[Interpretation],
-    subscriptionMechanism:      SubscriptionMechanism[Interpretation],
-    concurrentProcessesLimiter: ConcurrentProcessesLimiter[Interpretation]
-) extends consumers.EventHandlerWithProcessLimiter[Interpretation](concurrentProcessesLimiter) {
+    eventProcessor:             EventProcessor[F],
+    eventBodyDeserializer:      EventBodyDeserializer[F],
+    subscriptionMechanism:      SubscriptionMechanism[F],
+    concurrentProcessesLimiter: ConcurrentProcessesLimiter[F]
+) extends consumers.EventHandlerWithProcessLimiter[F](concurrentProcessesLimiter) {
 
   import eventBodyDeserializer.toCommitEvent
 
   override def createHandlingProcess(
       requestContent: EventRequestContent
-  ): Interpretation[EventHandlingProcess[Interpretation]] =
-    EventHandlingProcess.withWaitingForCompletion[Interpretation](
+  ): F[EventHandlingProcess[F]] =
+    EventHandlingProcess.withWaitingForCompletion[F](
       deferred => startProcessEvent(requestContent, deferred),
       subscriptionMechanism.renewSubscription()
     )
 
-  private def startProcessEvent(requestContent: EventRequestContent, deferred: Deferred[Interpretation, Unit]) = for {
+  private def startProcessEvent(requestContent: EventRequestContent, deferred: Deferred[F, Unit]) = for {
     eventBody <- requestContent match {
                    case EventRequestContent.WithPayload(_, payload: String) => EitherT.rightT(EventBody(payload))
-                   case _ => EitherT.leftT(BadRequest)
+                   case _                                                   => EitherT.leftT(BadRequest)
                  }
     commitEvent <- toCommitEvent(eventBody).toRightT(recoverTo = BadRequest)
-    result <- Concurrent[Interpretation]
+    result <- Concurrent[F]
                 .start(eventProcessor.process(commitEvent) >> deferred.complete(()))
                 .toRightT
                 .map(_ => Accepted)
-                .semiflatTap(Logger[Interpretation].log(commitEvent))
-                .leftSemiflatTap(Logger[Interpretation].log(commitEvent))
+                .semiflatTap(Logger[F].log(commitEvent))
+                .leftSemiflatTap(Logger[F].log(commitEvent))
   } yield result
 
   private implicit lazy val eventInfoToString: Show[CommitEvent] = Show.show { event =>
@@ -74,23 +72,18 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow: ConcurrentEffe
 
 object EventHandler {
 
-  def apply(
-      metricsRegistry:       MetricsRegistry[IO],
-      subscriptionMechanism: SubscriptionMechanism[IO],
+  def apply[F[_]: Async: Logger](
+      metricsRegistry:       MetricsRegistry,
+      subscriptionMechanism: SubscriptionMechanism[F],
       config:                Config = ConfigFactory.load()
-  )(implicit
-      contextShift:     ContextShift[IO],
-      executionContext: ExecutionContext,
-      timer:            Timer[IO],
-      logger:           Logger[IO]
-  ): IO[EventHandler[IO]] = for {
-    eventProcessor           <- IOCommitEventProcessor(metricsRegistry)
-    generationProcesses      <- GenerationProcessesNumber[IO](config)
+  ): F[EventHandler[F]] = for {
+    eventProcessor           <- CommitEventProcessor(metricsRegistry)
+    generationProcesses      <- GenerationProcessesNumber[F](config)
     concurrentProcessLimiter <- ConcurrentProcessesLimiter(Refined.unsafeApply(generationProcesses.value))
-  } yield new EventHandler[IO](categoryName,
-                               eventProcessor,
-                               EventBodyDeserializer(),
-                               subscriptionMechanism,
-                               concurrentProcessLimiter
+  } yield new EventHandler[F](categoryName,
+                              eventProcessor,
+                              EventBodyDeserializer[F],
+                              subscriptionMechanism,
+                              concurrentProcessLimiter
   )
 }

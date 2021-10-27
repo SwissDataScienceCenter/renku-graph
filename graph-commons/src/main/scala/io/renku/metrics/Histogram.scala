@@ -18,7 +18,7 @@
 
 package io.renku.metrics
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
@@ -26,7 +26,7 @@ import io.prometheus.client.{Histogram => LibHistogram}
 
 import scala.jdk.CollectionConverters._
 
-trait Histogram[Interpretation[_]] {
+trait Histogram[F[_]] {
   protected def histogram: LibHistogram
 
   lazy val name: String = histogram.describe().asScala.head.name
@@ -35,28 +35,21 @@ trait Histogram[Interpretation[_]] {
 
 object Histogram {
 
-  trait Timer[Interpretation[_]] {
-    def observeDuration: Interpretation[Double]
+  trait Timer[F[_]] {
+    def observeDuration: F[Double]
   }
-  final class TimerImpl[Interpretation[_]] private[metrics] (
-      timer:     LibHistogram.Timer
-  )(implicit ME: MonadError[Interpretation, Throwable])
-      extends Timer[Interpretation] {
-    def observeDuration: Interpretation[Double] = ME.catchNonFatal {
+  final class TimerImpl[F[_]: MonadThrow] private[metrics] (timer: LibHistogram.Timer) extends Timer[F] {
+    def observeDuration: F[Double] = MonadThrow[F].catchNonFatal {
       timer.observeDuration()
     }
   }
 
-  def apply[Interpretation[_], LabelValue](
-      name:      String Refined NonEmpty,
-      help:      String Refined NonEmpty,
-      labelName: String Refined NonEmpty,
-      buckets:   Seq[Double]
-  )(
-      metricsRegistry: MetricsRegistry[Interpretation]
-  )(implicit
-      ME: MonadError[Interpretation, Throwable]
-  ): Interpretation[LabeledHistogram[Interpretation, LabelValue]] = {
+  def apply[F[_]: MonadThrow, LabelValue](
+      name:          String Refined NonEmpty,
+      help:          String Refined NonEmpty,
+      labelName:     String Refined NonEmpty,
+      buckets:       Seq[Double]
+  )(metricsRegistry: MetricsRegistry): F[LabeledHistogram[F, LabelValue]] = {
 
     val builder = LibHistogram
       .build()
@@ -66,21 +59,20 @@ object Histogram {
       .buckets(buckets: _*)
 
     for {
-      histogram <- metricsRegistry register [LibHistogram, LibHistogram.Builder] builder
-    } yield new LabeledHistogramImpl[Interpretation, LabelValue](histogram)
+      histogram <- metricsRegistry register [F, LibHistogram, LibHistogram.Builder] builder
+    } yield new LabeledHistogramImpl[F, LabelValue](histogram)
   }
 }
 
-trait LabeledHistogram[Interpretation[_], LabelValue] extends Histogram[Interpretation] {
-  def startTimer(labelValue: LabelValue): Interpretation[Histogram.Timer[Interpretation]]
+trait LabeledHistogram[F[_], LabelValue] extends Histogram[F] {
+  def startTimer(labelValue: LabelValue): F[Histogram.Timer[F]]
 }
 
-class LabeledHistogramImpl[Interpretation[_], LabelValue] private[metrics] (
+class LabeledHistogramImpl[F[_]: MonadThrow, LabelValue] private[metrics] (
     protected val histogram: LibHistogram
-)(implicit ME:               MonadError[Interpretation, Throwable])
-    extends LabeledHistogram[Interpretation, LabelValue] {
+) extends LabeledHistogram[F, LabelValue] {
 
-  override def startTimer(labelValue: LabelValue): Interpretation[Histogram.Timer[Interpretation]] = ME.catchNonFatal {
+  override def startTimer(labelValue: LabelValue): F[Histogram.Timer[F]] = MonadThrow[F].catchNonFatal {
     new Histogram.TimerImpl(histogram.labels(labelValue.toString).startTimer())
   }
 }

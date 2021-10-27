@@ -18,20 +18,18 @@
 
 package io.renku.interpreters
 
-import cats.MonadError
-import cats.effect.IO
+import cats.MonadThrow
 import io.prometheus.client.{CollectorRegistry, SimpleCollector}
 import io.renku.metrics.MetricsRegistry
 
-object TestMetricsRegistry extends MetricsRegistry[IO] {
+object TestMetricsRegistry extends MetricsRegistry {
 
   private val collectorRegistry: CollectorRegistry = new CollectorRegistry()
 
-  override def register[Collector <: SimpleCollector[_], Builder <: SimpleCollector.Builder[Builder, Collector]](
-      collectorBuilder: Builder
-  )(implicit ME:        MonadError[IO, Throwable]): IO[Collector] = IO {
-    collectorBuilder register collectorRegistry
-  }
+  override def register[F[_]: MonadThrow,
+                        Collector <: SimpleCollector[_],
+                        Builder <: SimpleCollector.Builder[Builder, Collector]
+  ](collectorBuilder: Builder): F[Collector] = MonadThrow[F].catchNonFatal(collectorBuilder register collectorRegistry)
 
   override def maybeCollectorRegistry: Option[CollectorRegistry] = Some(collectorRegistry)
 

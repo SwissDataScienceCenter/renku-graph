@@ -35,6 +35,7 @@ import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
 import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.testtools.IOSpec
 import io.renku.tinytypes.json.TinyTypeEncoders
 import org.http4s.Status._
 import org.http4s._
@@ -50,7 +51,8 @@ class ProjectDatasetsEndpointSpec
     with MockFactory
     with ScalaCheckPropertyChecks
     with should.Matchers
-    with TinyTypeEncoders {
+    with TinyTypeEncoders
+    with IOSpec {
 
   import ProjectDatasetsFinder._
 
@@ -121,14 +123,10 @@ class ProjectDatasetsEndpointSpec
     val projectDatasetsFinder = mock[ProjectDatasetsFinder[IO]]
     val renkuResourcesUrl     = renkuResourcesUrls.generateOne
     val gitLabUrl             = gitLabUrls.generateOne
-    val logger                = TestLogger[IO]()
-    val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
-    val endpoint = new ProjectDatasetsEndpoint[IO](projectDatasetsFinder,
-                                                   renkuResourcesUrl,
-                                                   gitLabUrl,
-                                                   executionTimeRecorder,
-                                                   logger
-    )
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
+    val endpoint =
+      new ProjectDatasetsEndpointImpl[IO](projectDatasetsFinder, renkuResourcesUrl, gitLabUrl, executionTimeRecorder)
 
     lazy val toJson: ((Identifier, InitialVersion, Title, Name, SameAsOrDerived, List[ImageUri])) => Json = {
       case (id, initialVersion, title, name, Left(sameAs), images) =>

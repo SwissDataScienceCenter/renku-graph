@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories
 
-import cats.effect.{BracketThrow, ContextShift, IO, Sync, Timer}
+import cats.effect.{Async, Sync}
 import cats.syntax.all._
 import io.renku.compression.Zip
 import io.renku.data.ErrorMessage
@@ -32,36 +32,31 @@ import io.renku.jsonld.JsonLD
 import io.renku.tinytypes.json.TinyTypeEncoders
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
-private trait EventStatusUpdater[Interpretation[_]] {
+private trait EventStatusUpdater[F[_]] {
   def toTriplesGenerated(eventId:        CompoundEventId,
                          projectPath:    projects.Path,
                          payload:        JsonLD,
                          processingTime: EventProcessingTime
-  ): Interpretation[Unit]
+  ): F[Unit]
 
-  def toTriplesStore(eventId:        CompoundEventId,
-                     projectPath:    projects.Path,
-                     processingTime: EventProcessingTime
-  ): Interpretation[Unit]
+  def toTriplesStore(eventId: CompoundEventId, projectPath: projects.Path, processingTime: EventProcessingTime): F[Unit]
 
   def rollback[S <: EventStatus](eventId: CompoundEventId, projectPath: projects.Path)(implicit
       rollbackStatus:                     () => S
-  ): Interpretation[Unit]
+  ): F[Unit]
 
   def toFailure(eventId:     CompoundEventId,
                 projectPath: projects.Path,
                 eventStatus: FailureStatus,
                 exception:   Throwable
-  ): Interpretation[Unit]
+  ): F[Unit]
 }
 
-private class EventStatusUpdaterImpl[Interpretation[_]: BracketThrow: Sync](
-    eventSender:  EventSender[Interpretation],
+private class EventStatusUpdaterImpl[F[_]: Sync](
+    eventSender:  EventSender[F],
     categoryName: CategoryName,
     zipper:       Zip
-) extends EventStatusUpdater[Interpretation]
+) extends EventStatusUpdater[F]
     with TinyTypeEncoders {
 
   import io.circe.literal._
@@ -71,7 +66,7 @@ private class EventStatusUpdaterImpl[Interpretation[_]: BracketThrow: Sync](
                                   projectPath:    projects.Path,
                                   payload:        JsonLD,
                                   processingTime: EventProcessingTime
-  ): Interpretation[Unit] = for {
+  ): F[Unit] = for {
     zippedContent <- zip(payload.toJson.noSpaces).map(ZippedEventPayload.apply)
     _ <- eventSender.sendEvent(
            eventContent = events.EventRequestContent.WithPayload(
@@ -94,7 +89,7 @@ private class EventStatusUpdaterImpl[Interpretation[_]: BracketThrow: Sync](
   override def toTriplesStore(eventId:        CompoundEventId,
                               projectPath:    projects.Path,
                               processingTime: EventProcessingTime
-  ): Interpretation[Unit] = eventSender.sendEvent(
+  ): F[Unit] = eventSender.sendEvent(
     eventContent = EventRequestContent.NoPayload(json"""{ 
       "categoryName": "EVENTS_STATUS_CHANGE",
       "id": ${eventId.id},
@@ -111,7 +106,7 @@ private class EventStatusUpdaterImpl[Interpretation[_]: BracketThrow: Sync](
   override def rollback[S <: EventStatus](
       eventId:               CompoundEventId,
       projectPath:           projects.Path
-  )(implicit rollbackStatus: () => S): Interpretation[Unit] = eventSender.sendEvent(
+  )(implicit rollbackStatus: () => S): F[Unit] = eventSender.sendEvent(
     eventContent = EventRequestContent.NoPayload(json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",
       "id":           ${eventId.id},
@@ -128,7 +123,7 @@ private class EventStatusUpdaterImpl[Interpretation[_]: BracketThrow: Sync](
                          projectPath: projects.Path,
                          eventStatus: FailureStatus,
                          exception:   Throwable
-  ): Interpretation[Unit] = eventSender.sendEvent(
+  ): F[Unit] = eventSender.sendEvent(
     eventContent = EventRequestContent.NoPayload(json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",
       "id":           ${eventId.id},
@@ -148,14 +143,7 @@ private object EventStatusUpdater {
   implicit val rollbackToNew:              () => EventStatus.New              = () => EventStatus.New
   implicit val rollbackToTriplesGenerated: () => EventStatus.TriplesGenerated = () => EventStatus.TriplesGenerated
 
-  def apply(
-      categoryName: CategoryName
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO],
-      logger:           Logger[IO]
-  ): IO[EventStatusUpdater[IO]] = for {
-    eventSender <- EventSender()
+  def apply[F[_]: Async: Logger](categoryName: CategoryName): F[EventStatusUpdater[F]] = for {
+    eventSender <- EventSender[F]
   } yield new EventStatusUpdaterImpl(eventSender, categoryName, Zip)
 }

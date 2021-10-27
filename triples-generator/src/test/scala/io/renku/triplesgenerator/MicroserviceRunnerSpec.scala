@@ -20,13 +20,14 @@ package io.renku.triplesgenerator
 
 import cats.effect._
 import io.renku.config.certificates.CertificateLoader
+import io.renku.config.sentry.SentryInitializer
 import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.http.server.IOHttpServer
+import io.renku.http.server.HttpServer
+import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
-import io.renku.interpreters.{IOSentryInitializer, TestLogger}
-import io.renku.testtools.MockedRunnableCollaborators
+import io.renku.testtools.{IOSpec, MockedRunnableCollaborators}
 import io.renku.triplesgenerator.config.certificates.GitCertificateInstaller
 import io.renku.triplesgenerator.init.CliVersionCompatibilityVerifier
 import io.renku.triplesgenerator.reprovisioning.ReProvisioning
@@ -35,10 +36,10 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.util.concurrent.ConcurrentHashMap
-import scala.concurrent.ExecutionContext
 
 class MicroserviceRunnerSpec
     extends AnyWordSpec
+    with IOSpec
     with MockedRunnableCollaborators
     with MockFactory
     with should.Matchers {
@@ -172,12 +173,12 @@ class MicroserviceRunnerSpec
   private trait TestCase {
     val certificateLoader       = mock[CertificateLoader[IO]]
     val gitCertificateInstaller = mock[GitCertificateInstaller[IO]]
-    val sentryInitializer       = mock[IOSentryInitializer]
+    val sentryInitializer       = mock[SentryInitializer[IO]]
     val cliVersionCompatChecker = mock[CliVersionCompatibilityVerifier[IO]]
     val eventConsumersRegistry  = mock[EventConsumersRegistry[IO]]
     val reProvisioning          = mock[ReProvisioning[IO]]
-    val httpServer              = mock[IOHttpServer]
-    val logger                  = TestLogger[IO]()
+    val httpServer              = mock[HttpServer[IO]]
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
 
     val runner = new MicroserviceRunner(
       certificateLoader,
@@ -187,11 +188,7 @@ class MicroserviceRunnerSpec
       eventConsumersRegistry,
       reProvisioning,
       httpServer,
-      new ConcurrentHashMap[CancelToken[IO], Unit](),
-      logger
+      new ConcurrentHashMap[IO[Unit], Unit]()
     )
   }
-
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(ExecutionContext.global)
-  private implicit val timer: Timer[IO]        = IO.timer(ExecutionContext.global)
 }

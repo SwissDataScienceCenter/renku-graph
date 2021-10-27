@@ -20,40 +20,40 @@ package io.renku.triplesgenerator.init
 
 import cats.MonadError
 import cats.data.NonEmptyList
-import cats.effect.IO
+import cats.effect.kernel.Async
 import cats.syntax.all._
 import io.renku.graph.model.{CliVersion, RenkuVersionPair}
 import io.renku.triplesgenerator.config.TriplesGeneration
 import io.renku.triplesgenerator.config.TriplesGeneration.{RemoteTriplesGeneration, RenkuLog}
 
-trait CliVersionCompatibilityVerifier[Interpretation[_]] {
-  def run(): Interpretation[Unit]
+trait CliVersionCompatibilityVerifier[F[_]] {
+  def run(): F[Unit]
 }
 
-private class CliVersionCompatibilityVerifierImpl[Interpretation[_]](cliVersion:        CliVersion,
-                                                                     renkuVersionPairs: NonEmptyList[RenkuVersionPair]
-)(implicit ME:                                                                          MonadError[Interpretation, Throwable])
-    extends CliVersionCompatibilityVerifier[Interpretation] {
-  override def run(): Interpretation[Unit] =
+private class CliVersionCompatibilityVerifierImpl[F[_]](cliVersion:        CliVersion,
+                                                        renkuVersionPairs: NonEmptyList[RenkuVersionPair]
+)(implicit ME:                                                             MonadError[F, Throwable])
+    extends CliVersionCompatibilityVerifier[F] {
+  override def run(): F[Unit] =
     if (cliVersion != renkuVersionPairs.head.cliVersion)
       ME.raiseError(
         new IllegalStateException(
           s"Incompatible versions. cliVersion: $cliVersion versionPairs: ${renkuVersionPairs.head.cliVersion}"
         )
       )
-    else ().pure[Interpretation]
+    else ().pure[F]
 }
 
-object IOCliVersionCompatibilityChecker {
+object CliVersionCompatibilityChecker {
 
-  def apply(triplesGeneration: TriplesGeneration,
-            renkuVersionPairs: NonEmptyList[RenkuVersionPair]
-  ): IO[CliVersionCompatibilityVerifier[IO]] = {
+  def apply[F[_]: Async](triplesGeneration: TriplesGeneration,
+                         renkuVersionPairs: NonEmptyList[RenkuVersionPair]
+  ): F[CliVersionCompatibilityVerifier[F]] = {
     // the concept of TriplesGeneration flag is a temporary solution
     // to provide acceptance-tests with the expected CLI version
     triplesGeneration match {
-      case RenkuLog                => CliVersionLoader[IO]()
-      case RemoteTriplesGeneration => renkuVersionPairs.head.cliVersion.pure[IO]
+      case RenkuLog                => CliVersionLoader[F]()
+      case RemoteTriplesGeneration => renkuVersionPairs.head.cliVersion.pure[F]
     }
-  }.map(cliVersion => new CliVersionCompatibilityVerifierImpl[IO](cliVersion, renkuVersionPairs))
+  }.map(cliVersion => new CliVersionCompatibilityVerifierImpl[F](cliVersion, renkuVersionPairs))
 }

@@ -37,7 +37,6 @@ private object TestSparqlQueryRunner extends IOApp {
   import eu.timepit.refined.auto._
   import io.renku.graph.model.Schemas._
 
-  import scala.concurrent.ExecutionContext.Implicits.global
   import scala.language.reflectiveCalls
 
   override def run(args: List[String]): IO[ExitCode] =
@@ -54,14 +53,13 @@ private object TestSparqlQueryRunner extends IOApp {
     println("]")
   }
 
-  private lazy val logger = TestLogger[IO]()
+  private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
   private lazy val queryRunner = new RdfStoreClientImpl(
     RdfStoreConfig(FusekiBaseUrl(s"http://localhost:$fusekiPort"),
                    datasetName,
                    BasicAuthCredentials(BasicAuthUsername("not-needed"), BasicAuthPassword("not-needed"))
     ),
-    logger,
-    new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
+    new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO]())
   ) {
 
     import io.circe.Decoder._

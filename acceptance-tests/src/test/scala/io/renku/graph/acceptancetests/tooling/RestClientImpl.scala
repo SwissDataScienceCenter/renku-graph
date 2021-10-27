@@ -18,35 +18,28 @@
 
 package io.renku.graph.acceptancetests.tooling
 
-import cats.effect.{ConcurrentEffect, IO, Timer}
+import cats.effect.IO
+import cats.effect.unsafe.IORuntime
 import eu.timepit.refined.auto._
 import io.renku.control.Throttler
 import io.renku.http.client.{AccessToken, RestClient}
-import io.renku.interpreters.TestLogger
 import org.http4s._
+import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class RestClientImpl()(implicit
-    executionContext: ExecutionContext,
-    concurrentEffect: ConcurrentEffect[IO],
-    timer:            Timer[IO]
-) extends RestClient[IO, RestClientImpl](Throttler.noThrottling,
-                                         TestLogger(),
-                                         retryInterval = 500 millis,
-                                         maxRetries = 1
-    ) {
+class RestClientImpl(implicit logger: Logger[IO])
+    extends RestClient[IO, RestClientImpl](Throttler.noThrottling, retryInterval = 500 millis, maxRetries = 1) {
 
-  def GET(url: String): Response[IO] = {
+  def GET(url: String)(implicit ioRuntime: IORuntime): Response[IO] = {
     for {
       uri      <- validateUri(url)
       response <- send(request(Method.GET, uri))(mapResponse)
     } yield response
   }.unsafeRunSync()
 
-  def GET(url: String, accessToken: AccessToken): Response[IO] = {
+  def GET(url: String, accessToken: AccessToken)(implicit ioRuntime: IORuntime): Response[IO] = {
     for {
       uri      <- validateUri(url)
       response <- send(request(Method.GET, uri, accessToken))(mapResponse)

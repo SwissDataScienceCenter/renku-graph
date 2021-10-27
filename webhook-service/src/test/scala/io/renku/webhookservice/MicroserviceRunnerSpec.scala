@@ -20,23 +20,22 @@ package io.renku.webhookservice
 
 import cats.effect._
 import io.renku.config.certificates.CertificateLoader
+import io.renku.config.sentry.SentryInitializer
 import io.renku.generators.Generators
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
-import io.renku.http.server.IOHttpServer
-import io.renku.interpreters.IOSentryInitializer
-import io.renku.testtools.MockedRunnableCollaborators
+import io.renku.http.server.HttpServer
+import io.renku.testtools.{IOSpec, MockedRunnableCollaborators}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-
-import scala.concurrent.ExecutionContext.Implicits.global
 
 class MicroserviceRunnerSpec
     extends AnyWordSpec
     with MockedRunnableCollaborators
     with MockFactory
-    with should.Matchers {
+    with should.Matchers
+    with IOSpec {
 
   "run" should {
 
@@ -85,12 +84,10 @@ class MicroserviceRunnerSpec
     }
   }
 
-  private implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
-
   private trait TestCase {
     val certificateLoader = mock[CertificateLoader[IO]]
-    val sentryInitializer = mock[IOSentryInitializer]
-    val httpServer        = mock[IOHttpServer]
+    val sentryInitializer = mock[SentryInitializer[IO]]
+    val httpServer        = mock[HttpServer[IO]]
     val runner            = new MicroserviceRunner(certificateLoader, sentryInitializer, httpServer)
   }
 }

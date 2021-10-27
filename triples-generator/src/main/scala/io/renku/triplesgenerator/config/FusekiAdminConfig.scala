@@ -40,15 +40,15 @@ object FusekiAdminConfig {
   import ConfigLoader._
   import io.renku.http.client.BasicAuthConfigReaders._
 
-  def apply[Interpretation[_]](
+  def apply[F[_]](
       config:    Config = ConfigFactory.load()
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[FusekiAdminConfig] =
+  )(implicit ME: MonadError[F, Throwable]): F[FusekiAdminConfig] =
     for {
-      url         <- find[Interpretation, FusekiBaseUrl]("services.fuseki.url", config)
-      datasetName <- find[Interpretation, DatasetName]("services.fuseki.dataset-name", config)
-      datasetType <- find[Interpretation, DatasetType]("services.fuseki.dataset-type", config)
-      username    <- find[Interpretation, BasicAuthUsername]("services.fuseki.admin.username", config)
-      password    <- find[Interpretation, BasicAuthPassword]("services.fuseki.admin.password", config)
+      url         <- find[F, FusekiBaseUrl]("services.fuseki.url", config)
+      datasetName <- find[F, DatasetName]("services.fuseki.dataset-name", config)
+      datasetType <- find[F, DatasetType]("services.fuseki.dataset-type", config)
+      username    <- find[F, BasicAuthUsername]("services.fuseki.admin.username", config)
+      password    <- find[F, BasicAuthPassword]("services.fuseki.admin.password", config)
     } yield FusekiAdminConfig(url, datasetName, datasetType, BasicAuthCredentials(username, password))
 }
 

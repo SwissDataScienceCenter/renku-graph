@@ -20,7 +20,7 @@ package io.renku.eventlog.events.categories
 package statuschange
 
 import cats.Show
-import cats.effect.{ContextShift, IO}
+import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Encoder
@@ -37,16 +37,16 @@ import io.renku.graph.model.events.ZippedEventPayload
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.metrics.TestLabeledHistogram
+import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
 class EventHandlerSpec
     extends AnyWordSpec
+    with IOSpec
     with MockFactory
     with should.Matchers
     with Eventually
@@ -136,7 +136,6 @@ class EventHandlerSpec
     }
   }
 
-  private implicit val cs: ContextShift[IO] = IO.contextShift(global)
   private trait TestCase {
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()

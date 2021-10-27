@@ -18,7 +18,7 @@
 
 package io.renku.commiteventservice.events.categories.globalcommitsync
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import cats.syntax.all._
 import io.circe.literal._
 import io.circe.syntax._
@@ -33,16 +33,16 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, jsons}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
+import io.renku.testtools.IOSpec
 import io.renku.tinytypes.json.TinyTypeEncoders._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
 class EventHandlerSpec
     extends AnyWordSpec
+    with IOSpec
     with MockFactory
     with should.Matchers
     with Eventually
@@ -130,37 +130,28 @@ class EventHandlerSpec
 
   }
 
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO]        = IO.timer(global)
-
   private trait TestCase {
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val commitEventSynchronizer    = mock[GlobalCommitEventSynchronizer[IO]]
     val subscriptionMechanism      = mock[SubscriptionMechanism[IO]]
     val concurrentProcessesLimiter = mock[ConcurrentProcessesLimiter[IO]]
-    val logger                     = TestLogger[IO]()
 
     (subscriptionMechanism.renewSubscription _).expects().returns(IO.unit)
 
     val handler =
-      new EventHandler[IO](categoryName,
-                           commitEventSynchronizer,
-                           subscriptionMechanism,
-                           concurrentProcessesLimiter,
-                           logger
-      )
+      new EventHandler[IO](categoryName, commitEventSynchronizer, subscriptionMechanism, concurrentProcessesLimiter)
 
     def requestContent(event: Json): EventRequestContent = EventRequestContent.NoPayload(event)
   }
 
   private implicit def eventEncoder[E <: GlobalCommitSyncEvent]: Encoder[E] = Encoder.instance[E] {
     case GlobalCommitSyncEvent(project, commitIds) => json"""{
-        "categoryName": "GLOBAL_COMMIT_SYNC",
-        "project": {
-          "id":         ${project.id.value},
-          "path":       ${project.path.value}
-        },
-        "commits":    ${Json.arr(commitIds.map(_.asJson): _*)}
-      }"""
+      "categoryName": "GLOBAL_COMMIT_SYNC",
+      "project": {
+        "id":         ${project.id.value},
+        "path":       ${project.path.value}
+      },
+      "commits":    ${Json.arr(commitIds.map(_.asJson): _*)}
+    }"""
   }
-
 }

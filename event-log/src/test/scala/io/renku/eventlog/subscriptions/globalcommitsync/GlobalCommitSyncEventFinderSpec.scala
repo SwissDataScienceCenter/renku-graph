@@ -35,6 +35,7 @@ import io.renku.graph.model.events.EventStatus.AwaitingDeletion
 import io.renku.graph.model.events.{CommitId, CompoundEventId, EventStatus, LastSyncedDate}
 import io.renku.graph.model.projects
 import io.renku.metrics.TestLabeledHistogram
+import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.handlers.CallHandler2
 import org.scalamock.scalatest.MockFactory
@@ -48,6 +49,7 @@ import scala.util.Random
 
 class GlobalCommitSyncEventFinderSpec
     extends AnyWordSpec
+    with IOSpec
     with InMemoryEventLogDbSpec
     with SubscriptionDataProvisioning
     with MockFactory
@@ -204,7 +206,6 @@ class GlobalCommitSyncEventFinderSpec
 
         currentTime.expects().returning(now)
         finder.popEvent().unsafeRunSync() shouldBe None
-
       }
   }
 

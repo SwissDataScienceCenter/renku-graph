@@ -20,12 +20,13 @@ package io.renku.logging
 
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.slf4j.{Logger => Slf4jLogger}
 
-class IOLoggerSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class IOLoggerSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "error(Throwable)(String)" should {
     "call relevant method on the underlying logger" in new TestCase {

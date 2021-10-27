@@ -27,10 +27,11 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventStatuses}
 import io.renku.graph.model.events.{CompoundEventId, EventDetails}
 import io.renku.metrics.TestLabeledHistogram
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EventDetailsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec with should.Matchers {
+class EventDetailsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSpec with should.Matchers {
 
   "findDetails" should {
 

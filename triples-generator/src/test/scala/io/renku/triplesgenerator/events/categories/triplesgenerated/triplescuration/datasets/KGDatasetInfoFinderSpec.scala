@@ -31,10 +31,11 @@ import io.renku.jsonld.EntityId
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class KGDatasetInfoFinderSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers {
+class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore with should.Matchers {
 
   "findTopmostSameAs" should {
     "return None if there is no dataset with that id" in new TestCase {
@@ -136,9 +137,9 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with InMemoryRdfStore with sho
   }
 
   private trait TestCase {
-    private val logger       = TestLogger[IO]()
-    private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
-    val kgDatasetInfoFinder  = new KGDatasetInfoFinderImpl(rdfStoreConfig, logger, timeRecorder)
+    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO]())
+    val kgDatasetInfoFinder  = new KGDatasetInfoFinderImpl(rdfStoreConfig, timeRecorder)
   }
 
   private def removeTopmostSameAs(datasetId: EntityId): Unit = runUpdate {

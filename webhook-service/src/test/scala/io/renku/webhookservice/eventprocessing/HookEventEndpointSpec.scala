@@ -34,10 +34,11 @@ import io.renku.http.server.EndpointTester._
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.testtools.IOSpec
 import io.renku.webhookservice.CommitSyncRequestSender
 import io.renku.webhookservice.WebhookServiceGenerators._
+import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
-import io.renku.webhookservice.crypto.IOHookTokenCrypto
 import io.renku.webhookservice.model.{CommitSyncRequest, HookToken}
 import org.http4s.Status._
 import org.http4s._
@@ -47,7 +48,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers with IOSpec {
 
   "processPushEvent" should {
 
@@ -60,8 +61,8 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
 
       expectDecryptionOf(serializedHookToken, returning = HookToken(syncRequest.project.id))
 
-      val request = Request(Method.POST, uri"webhooks" / "events")
-        .withHeaders(Headers.of(Header("X-Gitlab-Token", serializedHookToken.toString)))
+      val request = Request(Method.POST, uri"/webhooks" / "events")
+        .withHeaders(Headers("X-Gitlab-Token" -> serializedHookToken.toString))
         .withEntity(pushEventPayloadFrom(commitId, syncRequest))
 
       val response = processPushEvent(request).unsafeRunSync()
@@ -79,8 +80,8 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
 
     "return BAD_REQUEST for invalid push event payload" in new TestCase {
 
-      val request = Request(Method.POST, uri"webhooks" / "events")
-        .withHeaders(Headers.of(Header("X-Gitlab-Token", serializedHookToken.toString)))
+      val request = Request(Method.POST, uri"/webhooks" / "events")
+        .withHeaders(Headers("X-Gitlab-Token" -> serializedHookToken.toString))
         .withEntity(Json.obj())
 
       val response = processPushEvent(request).unsafeRunSync()
@@ -94,7 +95,7 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
 
     "return UNAUTHORIZED if X-Gitlab-Token token is not present in the header" in new TestCase {
 
-      val request = Request(Method.POST, uri"webhooks" / "events")
+      val request = Request(Method.POST, uri"/webhooks" / "events")
         .withEntity(pushEventPayloadFrom(commitId, syncRequest))
 
       val response = processPushEvent(request).unsafeRunSync()
@@ -111,8 +112,8 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
         .expects(serializedHookToken)
         .returning(HookToken(projectIds.generateOne).pure[IO])
 
-      val request = Request(Method.POST, uri"webhooks" / "events")
-        .withHeaders(Headers.of(Header("X-Gitlab-Token", serializedHookToken.toString)))
+      val request = Request(Method.POST, uri"/webhooks" / "events")
+        .withHeaders(Headers("X-Gitlab-Token" -> serializedHookToken.toString))
         .withEntity(pushEventPayloadFrom(commitId, syncRequest))
 
       val response = processPushEvent(request).unsafeRunSync()
@@ -130,8 +131,8 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
         .expects(serializedHookToken)
         .returning(exception.raiseError[IO, HookToken])
 
-      val request = Request(Method.POST, uri"webhooks" / "events")
-        .withHeaders(Headers.of(Header("X-Gitlab-Token", serializedHookToken.toString)))
+      val request = Request(Method.POST, uri"/webhooks" / "events")
+        .withHeaders(Headers(("X-Gitlab-Token", serializedHookToken.toString)))
         .withEntity(pushEventPayloadFrom(commitId, syncRequest))
 
       val response = processPushEvent(request).unsafeRunSync()
@@ -155,13 +156,12 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
         )
     }.generateOne
 
-    val logger                  = TestLogger[IO]()
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val commitSyncRequestSender = mock[CommitSyncRequestSender[IO]]
-    val hookTokenCrypto         = mock[IOHookTokenCrypto]
+    val hookTokenCrypto         = mock[HookTokenCrypto[IO]]
     val processPushEvent = new HookEventEndpointImpl[IO](
       hookTokenCrypto,
-      commitSyncRequestSender,
-      logger
+      commitSyncRequestSender
     ).processPushEvent _
 
     def expectDecryptionOf(hookAuthToken: SerializedHookToken, returning: HookToken) =

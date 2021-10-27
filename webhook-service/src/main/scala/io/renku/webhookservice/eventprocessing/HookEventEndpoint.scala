@@ -18,7 +18,7 @@
 
 package io.renku.webhookservice.eventprocessing
 
-import cats.MonadError
+import cats.data.NonEmptyList
 import cats.effect._
 import cats.syntax.all._
 import io.circe.Decoder
@@ -34,91 +34,92 @@ import io.renku.webhookservice.model.{CommitSyncRequest, HookToken, Project}
 import org.http4s._
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
-import org.http4s.util.CaseInsensitiveString
+import org.typelevel.ci.CIString
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-trait HookEventEndpoint[Interpretation[_]] {
-  def processPushEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]]
+trait HookEventEndpoint[F[_]] {
+  def processPushEvent(request: Request[F]): F[Response[F]]
 }
 
-class HookEventEndpointImpl[Interpretation[_]: MonadError[*[_], Throwable]](
-    hookTokenCrypto:         HookTokenCrypto[Interpretation],
-    commitSyncRequestSender: CommitSyncRequestSender[Interpretation],
-    logger:                  Logger[Interpretation]
-)(implicit
-    contextShift: ContextShift[Interpretation],
-    concurrent:   Concurrent[Interpretation]
-) extends Http4sDsl[Interpretation]
-    with HookEventEndpoint[Interpretation] {
+class HookEventEndpointImpl[F[_]: Concurrent: Logger](
+    hookTokenCrypto:         HookTokenCrypto[F],
+    commitSyncRequestSender: CommitSyncRequestSender[F]
+) extends Http4sDsl[F]
+    with HookEventEndpoint[F] {
 
   import HookEventEndpoint._
   import commitSyncRequestSender._
   import hookTokenCrypto._
 
-  def processPushEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
+  def processPushEvent(request: Request[F]): F[Response[F]] = {
     for {
       pushEvent <- request.as[(CommitId, CommitSyncRequest)] recoverWith badRequest
       authToken <- findHookToken(request)
       hookToken <- decrypt(authToken) recoverWith unauthorizedException
       _         <- validate(hookToken, pushEvent._2)
-      _         <- contextShift.shift *> concurrent.start(sendCommitSyncRequest(pushEvent._2))
+      _         <- Spawn[F].start(sendCommitSyncRequest(pushEvent._2))
       _         <- logInfo(pushEvent)
       response  <- Accepted(InfoMessage("Event accepted"))
     } yield response
   } recoverWith httpResponse
 
-  private implicit lazy val startCommitEntityDecoder: EntityDecoder[Interpretation, (CommitId, CommitSyncRequest)] =
-    jsonOf[Interpretation, (CommitId, CommitSyncRequest)]
+  private implicit lazy val startCommitEntityDecoder: EntityDecoder[F, (CommitId, CommitSyncRequest)] =
+    jsonOf[F, (CommitId, CommitSyncRequest)]
 
-  private lazy val badRequest: PartialFunction[Throwable, Interpretation[(CommitId, CommitSyncRequest)]] = {
-    case NonFatal(exception) => BadRequestError(exception).raiseError[Interpretation, (CommitId, CommitSyncRequest)]
+  private lazy val badRequest: PartialFunction[Throwable, F[(CommitId, CommitSyncRequest)]] = {
+    case NonFatal(exception) => BadRequestError(exception).raiseError[F, (CommitId, CommitSyncRequest)]
   }
 
   private case class BadRequestError(cause: Throwable) extends Exception(cause)
 
-  private def findHookToken(request: Request[Interpretation]): Interpretation[SerializedHookToken] =
-    request.headers.get(CaseInsensitiveString("X-Gitlab-Token")) match {
-      case None => UnauthorizedException.raiseError[Interpretation, SerializedHookToken]
-      case Some(rawToken) =>
+  private def findHookToken(request: Request[F]): F[SerializedHookToken] =
+    request.headers.get(CIString("X-Gitlab-Token")) match {
+      case None => UnauthorizedException.raiseError[F, SerializedHookToken]
+      case Some(NonEmptyList(rawToken, _)) =>
         SerializedHookToken
           .from(rawToken.value)
           .fold(
-            _ => UnauthorizedException.raiseError[Interpretation, SerializedHookToken],
-            _.pure[Interpretation]
+            _ => UnauthorizedException.raiseError[F, SerializedHookToken],
+            _.pure[F]
           )
     }
 
-  private lazy val unauthorizedException: PartialFunction[Throwable, Interpretation[HookToken]] = { case NonFatal(_) =>
-    UnauthorizedException.raiseError[Interpretation, HookToken]
+  private lazy val unauthorizedException: PartialFunction[Throwable, F[HookToken]] = { case NonFatal(_) =>
+    UnauthorizedException.raiseError[F, HookToken]
   }
 
-  private def validate(hookToken: HookToken, pushEvent: CommitSyncRequest): Interpretation[Unit] =
-    if (hookToken.projectId == pushEvent.project.id) ().pure[Interpretation]
-    else UnauthorizedException.raiseError[Interpretation, Unit]
+  private def validate(hookToken: HookToken, pushEvent: CommitSyncRequest): F[Unit] =
+    if (hookToken.projectId == pushEvent.project.id) ().pure[F]
+    else UnauthorizedException.raiseError[F, Unit]
 
-  private lazy val httpResponse: PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
+  private lazy val httpResponse: PartialFunction[Throwable, F[Response[F]]] = {
     case BadRequestError(exception) => BadRequest(ErrorMessage(exception))
     case ex @ UnauthorizedException =>
-      Response[Interpretation](Status.Unauthorized)
+      Response[F](Status.Unauthorized)
         .withEntity[ErrorMessage](ErrorMessage(ex))
-        .pure[Interpretation]
+        .pure[F]
     case NonFatal(exception) =>
-      logger.error(exception)(exception.getMessage)
+      Logger[F].error(exception)(exception.getMessage)
       InternalServerError(ErrorMessage(exception))
   }
 
-  private lazy val logInfo: ((CommitId, CommitSyncRequest)) => Interpretation[Unit] = {
+  private lazy val logInfo: ((CommitId, CommitSyncRequest)) => F[Unit] = {
     case (commitId, CommitSyncRequest(project)) =>
-      logger.info(
+      Logger[F].info(
         s"Push event for eventId = $commitId, projectId = ${project.id}, projectPath = ${project.path} -> accepted"
       )
   }
 }
 
-private object HookEventEndpoint {
+object HookEventEndpoint {
+
+  def apply[F[_]: Async: Logger](
+      hookTokenCrypto: HookTokenCrypto[F]
+  ): F[HookEventEndpoint[F]] = for {
+    commitSyncRequestSender <- CommitSyncRequestSender[F]
+  } yield new HookEventEndpointImpl[F](hookTokenCrypto, commitSyncRequestSender)
 
   private implicit val projectDecoder: Decoder[Project] = cursor => {
     import io.renku.tinytypes.json.TinyTypeDecoders._
@@ -135,18 +136,5 @@ private object HookEventEndpoint {
       project  <- cursor.downField("project").as[Project]
     } yield commitId -> CommitSyncRequest(project)
   }
-}
 
-object IOHookEventEndpoint {
-  def apply(
-      hookTokenCrypto: HookTokenCrypto[IO],
-      logger:          Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      clock:            Clock[IO],
-      timer:            Timer[IO]
-  ): IO[HookEventEndpoint[IO]] = for {
-    commitSyncRequestSender <- CommitSyncRequestSender(logger)
-  } yield new HookEventEndpointImpl[IO](hookTokenCrypto, commitSyncRequestSender, logger)
 }

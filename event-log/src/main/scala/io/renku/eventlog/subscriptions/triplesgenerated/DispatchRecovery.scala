@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions.triplesgenerated
 
 import cats.MonadThrow
-import cats.effect.{ConcurrentEffect, IO, Timer}
+import cats.effect.Async
 import cats.syntax.all._
 import io.circe.literal._
 import io.renku.eventlog.subscriptions.DispatchRecovery
@@ -31,16 +31,14 @@ import io.renku.graph.model.events.EventStatus.{TransformationNonRecoverableFail
 import io.renku.tinytypes.json.TinyTypeEncoders
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-private class DispatchRecoveryImpl[Interpretation[_]: MonadThrow](
-    eventSender:   EventSender[Interpretation]
-)(implicit logger: Logger[Interpretation])
-    extends subscriptions.DispatchRecovery[Interpretation, TriplesGeneratedEvent]
+private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
+    eventSender: EventSender[F]
+) extends subscriptions.DispatchRecovery[F, TriplesGeneratedEvent]
     with TinyTypeEncoders {
 
-  override def returnToQueue(event: TriplesGeneratedEvent): Interpretation[Unit] = eventSender.sendEvent(
+  override def returnToQueue(event: TriplesGeneratedEvent): F[Unit] = eventSender.sendEvent(
     EventRequestContent.NoPayload(json"""{
         "categoryName": "EVENTS_STATUS_CHANGE",
         "id":           ${event.id.id},
@@ -56,7 +54,7 @@ private class DispatchRecoveryImpl[Interpretation[_]: MonadThrow](
   override def recover(
       url:   SubscriberUrl,
       event: TriplesGeneratedEvent
-  ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
+  ): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
     eventSender.sendEvent(
       EventRequestContent.NoPayload(json"""{
         "categoryName": "EVENTS_STATUS_CHANGE",
@@ -68,7 +66,7 @@ private class DispatchRecoveryImpl[Interpretation[_]: MonadThrow](
         "newStatus": $TransformationNonRecoverableFailure,
         "message":   ${EventMessage(exception)} }"""),
       errorMessage = s"${SubscriptionCategory.name}: $event, url = $url -> $TransformationNonRecoverableFailure"
-    ) >> logger.error(exception)(
+    ) >> Logger[F].error(exception)(
       s"${SubscriptionCategory.name}: $event, url = $url -> $TransformationNonRecoverableFailure"
     )
   }
@@ -76,11 +74,6 @@ private class DispatchRecoveryImpl[Interpretation[_]: MonadThrow](
 
 private object DispatchRecovery {
 
-  def apply()(implicit
-      effect:           ConcurrentEffect[IO],
-      timer:            Timer[IO],
-      executionContext: ExecutionContext,
-      logger:           Logger[IO]
-  ): IO[DispatchRecovery[IO, TriplesGeneratedEvent]] =
-    EventSender() map (new DispatchRecoveryImpl[IO](_))
+  def apply[F[_]: Async: Logger]: F[DispatchRecovery[F, TriplesGeneratedEvent]] =
+    EventSender[F].map(new DispatchRecoveryImpl[F](_))
 }

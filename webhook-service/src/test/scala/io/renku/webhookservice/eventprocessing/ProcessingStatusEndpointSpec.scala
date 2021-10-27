@@ -18,8 +18,7 @@
 
 package io.renku.webhookservice.eventprocessing
 
-import ProcessingStatusGenerator._
-import cats.MonadError
+import cats.MonadThrow
 import cats.data.OptionT
 import cats.effect.IO
 import io.circe.Json
@@ -36,7 +35,9 @@ import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
 import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.testtools.IOSpec
 import io.renku.webhookservice.eventprocessing.ProcessingStatusFetcher.ProcessingStatus
+import io.renku.webhookservice.eventprocessing.ProcessingStatusGenerator._
 import io.renku.webhookservice.hookvalidation.HookValidator
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
 import io.renku.webhookservice.hookvalidation.HookValidator.NoAccessTokenException
@@ -47,7 +48,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers with IOSpec {
 
   "fetchProcessingStatus" should {
 
@@ -181,19 +182,18 @@ class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with sho
   }
 
   private trait TestCase {
-    val context = MonadError[IO, Throwable]
+    val context = MonadThrow[IO]
 
     val projectId = projectIds.generateOne
 
     val hookValidator           = mock[HookValidator[IO]]
     val processingStatusFetcher = mock[ProcessingStatusFetcher[IO]]
-    val logger                  = TestLogger[IO]()
-    val executionTimeRecorder   = TestExecutionTimeRecorder[IO](logger)
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
     val fetchProcessingStatus = new ProcessingStatusEndpointImpl[IO](
       hookValidator,
       processingStatusFetcher,
-      executionTimeRecorder,
-      logger
+      executionTimeRecorder
     ).fetchProcessingStatus _
   }
 }

@@ -18,8 +18,9 @@
 
 package io.renku.eventlog
 
+import cats.MonadThrow
 import cats.data.ValidatedNel
-import cats.effect.{Clock, ConcurrentEffect, ContextShift, Resource}
+import cats.effect.Resource
 import cats.syntax.all._
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
@@ -40,15 +41,14 @@ import org.http4s.dsl.Http4sDsl
 
 import scala.util.Try
 
-private class MicroserviceRoutes[F[_]: ConcurrentEffect](
+private class MicroserviceRoutes[F[_]: MonadThrow](
     eventEndpoint:            EventEndpoint[F],
     eventsEndpoint:           EventsEndpoint[F],
     processingStatusEndpoint: ProcessingStatusEndpoint[F],
     subscriptionsEndpoint:    SubscriptionsEndpoint[F],
     eventDetailsEndpoint:     EventDetailsEndpoint[F],
     routesMetrics:            RoutesMetrics[F]
-)(implicit clock:             Clock[F], contextShift: ContextShift[F])
-    extends Http4sDsl[F] {
+) extends Http4sDsl[F] {
 
   import EventStatusParameter._
   import ProjectIdParameter._
@@ -70,8 +70,8 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     case           GET   -> Root / "ping"                                              => Ok("pong")
     case request @ POST  -> Root / "subscriptions"                                     => addSubscription(request)
   }.withMetrics
-  
   // format: on
+
   private object ProjectIdParameter {
 
     private implicit val queryParameterDecoder: QueryParamDecoder[projects.Id] = (value: QueryParameterValue) =>

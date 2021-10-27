@@ -19,25 +19,24 @@
 package io.renku.knowledgegraph
 
 import cats.MonadError
-import cats.effect.{ContextShift, ExitCode, IO}
+import cats.effect.{ExitCode, IO}
 import io.renku.config.certificates.CertificateLoader
+import io.renku.config.sentry.SentryInitializer
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
-import io.renku.http.server.IOHttpServer
-import io.renku.interpreters.IOSentryInitializer
+import io.renku.http.server.HttpServer
 import io.renku.knowledgegraph.metrics.KGMetrics
-import io.renku.testtools.MockedRunnableCollaborators
+import io.renku.testtools.{IOSpec, MockedRunnableCollaborators}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-
-import scala.concurrent.ExecutionContext.Implicits.global
 
 class MicroserviceRunnerSpec
     extends AnyWordSpec
     with MockedRunnableCollaborators
     with MockFactory
-    with should.Matchers {
+    with should.Matchers
+    with IOSpec {
 
   "run" should {
 
@@ -99,14 +98,12 @@ class MicroserviceRunnerSpec
     }
   }
 
-  private implicit val cs: ContextShift[IO] = IO.contextShift(global)
-
   private trait TestCase {
     val context = MonadError[IO, Throwable]
 
     val certificateLoader = mock[CertificateLoader[IO]]
-    val sentryInitializer = mock[IOSentryInitializer]
-    val httpServer        = mock[IOHttpServer]
+    val sentryInitializer = mock[SentryInitializer[IO]]
+    val httpServer        = mock[HttpServer[IO]]
     val kgMetrics         = mock[KGMetrics[IO]]
     val runner            = new MicroserviceRunner(certificateLoader, sentryInitializer, httpServer, kgMetrics)
   }

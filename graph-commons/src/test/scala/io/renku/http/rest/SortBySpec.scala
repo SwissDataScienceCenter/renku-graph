@@ -42,7 +42,7 @@ class SortBySpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
     "return Left for a invalid name" in {
       val Left(exception) = TestSort.from(s"invalid:$Desc")
 
-      exception            shouldBe an[IllegalArgumentException]
+      exception shouldBe an[IllegalArgumentException]
       exception.getMessage shouldBe s"'invalid' is not a valid sort property. Allowed properties: ${TestSort.properties.mkString(", ")}"
     }
 

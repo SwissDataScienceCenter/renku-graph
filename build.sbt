@@ -9,6 +9,8 @@ releaseVersionBump := sbtrelease.Version.Bump.Minor
 releaseIgnoreUntrackedFiles := true
 releaseTagName := (ThisBuild / version).value
 
+lazy val jsonLD = "io.renku" %% "jsonld4s" % "0.1.27"
+
 lazy val root = Project(
   id = "renku-graph",
   base = file(".")
@@ -17,7 +19,6 @@ lazy val root = Project(
   publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 ).aggregate(
   generators,
-  jsonLd,
   tinyTypes,
   renkuModel,
   graphCommons,
@@ -33,16 +34,8 @@ lazy val generators = Project(
   id = "generators",
   base = file("generators")
 ).settings(
-  commonSettings
-).enablePlugins(
-  AutomateHeaderPlugin
-)
-
-lazy val jsonLd = Project(
-  id = "json-ld",
-  base = file("json-ld")
-).settings(
-  commonSettings
+  commonSettings,
+  libraryDependencies += jsonLD
 ).enablePlugins(
   AutomateHeaderPlugin
 )
@@ -62,12 +55,12 @@ lazy val renkuModel = Project(
   id = "renku-model",
   base = file("renku-model")
 ).settings(
-  commonSettings
+  commonSettings,
+  libraryDependencies += jsonLD,
+  libraryDependencies += jsonLD % Test
 ).dependsOn(
   tinyTypes % "compile->compile",
-  tinyTypes % "test->test",
-  jsonLd    % "compile->compile",
-  jsonLd    % "test->test"
+  tinyTypes % "test->test"
 ).enablePlugins(
   AutomateHeaderPlugin
 )
@@ -76,10 +69,9 @@ lazy val graphCommons = Project(
   id = "graph-commons",
   base = file("graph-commons")
 ).settings(
-  commonSettings
+  commonSettings,
+  libraryDependencies += jsonLD
 ).dependsOn(
-  jsonLd     % "compile->compile",
-  jsonLd     % "test->test",
   renkuModel % "compile->compile",
   renkuModel % "test->test"
 ).enablePlugins(
@@ -188,7 +180,7 @@ lazy val commonSettings = Seq(
   publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo"))),
   Compile / packageDoc / publishArtifact := false,
   Compile / packageSrc / publishArtifact := false,
-  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.13.0" cross CrossVersion.full),
+  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.13.2" cross CrossVersion.full),
   // format: off
   scalacOptions ++= Seq(
     "-deprecation", // Emit warning and location for usages of deprecated APIs.

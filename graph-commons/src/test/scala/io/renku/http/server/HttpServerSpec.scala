@@ -24,51 +24,53 @@ import io.circe.literal._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.httpPorts
 import io.renku.http.server.EndpointTester._
+import io.renku.testtools.IOSpec
 import org.http4s._
-import org.http4s.client.blaze.BlazeClientBuilder
+import org.http4s.client.Client
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.`Content-Type`
+import org.scalatest.BeforeAndAfter
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
-class HttpServerSpec extends AnyWordSpec with Http4sDsl[IO] with should.Matchers {
+class HttpServerSpec extends AnyWordSpec with IOSpec with Http4sDsl[IO] with should.Matchers with BeforeAndAfter {
 
   "run" should {
 
-    "create an http server to serve the given routes" in {
+    "create an http server to serve the given routes" in new TestCase {
 
-      val response = execute(Request[IO](Method.GET, baseUri / "resource"))
+      client
+        .run(Request[IO](Method.GET, baseUri / "resource"))
+        .use { response =>
+          IO {
+            response.status                     shouldBe Status.Ok
+            response.as[String].unsafeRunSync() shouldBe "response"
+          }
+        }
+        .unsafeRunSync()
 
-      response.status                     shouldBe Status.Ok
-      response.as[String].unsafeRunSync() shouldBe "response"
     }
 
-    "create an http server which responds with NOT_FOUND and JSON body for non-existing resource" in {
+    "create an http server which responds with NOT_FOUND and JSON body for non-existing resource" in new TestCase {
 
-      val response = execute(Request[IO](Method.GET, baseUri / "non-existing"))
+      client
+        .run(Request[IO](Method.GET, baseUri / "non-existing"))
+        .use { response =>
+          IO {
+            response.status                   shouldBe Status.NotFound
+            response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+            response.as[Json].unsafeRunSync() shouldBe json"""{"message": "Resource not found"}"""
+          }
+        }
+        .unsafeRunSync()
 
-      response.status                   shouldBe Status.NotFound
-      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync() shouldBe json"""{"message": "Resource not found"}"""
     }
   }
 
-  private def execute(request: Request[IO]): Response[IO] =
-    BlazeClientBuilder[IO](global).resource
-      .use { httpClient =>
-        httpClient.run(request).use { response =>
-          IO.pure(response)
-        }
-      }
-      .unsafeRunSync()
-
-  private implicit lazy val timer:        Timer[IO]        = IO.timer(global)
-  private implicit lazy val contextShift: ContextShift[IO] = IO.contextShift(global)
-
-  private lazy val port    = httpPorts.generateOne
-  private lazy val baseUri = Uri.unsafeFromString(s"http://localhost:$port")
-  private lazy val routes  = HttpRoutes.of[IO] { case GET -> Root / "resource" => Ok("response") }
-  new HttpServer[IO](port.value, routes).run().unsafeRunAsyncAndForget()
+  private trait TestCase {
+    private lazy val port = httpPorts.generateOne
+    lazy val baseUri: Uri = Uri.unsafeFromString(s"http://localhost:$port")
+    private lazy val routes = HttpRoutes.of[IO] { case GET -> Root / "resource" => Ok("response") }
+    val client: Client[IO] = Client.fromHttpApp(HttpServer[IO](port.value, routes).httpApp)
+  }
 }

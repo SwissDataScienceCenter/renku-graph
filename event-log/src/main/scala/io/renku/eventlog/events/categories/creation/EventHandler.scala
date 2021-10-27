@@ -19,7 +19,7 @@
 package io.renku.eventlog.events.categories.creation
 
 import cats.data.EitherT.fromEither
-import cats.effect.{Concurrent, ContextShift, IO, Timer}
+import cats.effect.{Concurrent, MonadCancelThrow}
 import cats.syntax.all._
 import cats.{MonadThrow, Show}
 import io.circe.{ACursor, Decoder, DecodingFailure}
@@ -34,30 +34,24 @@ import io.renku.graph.model.projects
 import io.renku.metrics.{LabeledGauge, LabeledHistogram}
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
-private class EventHandler[Interpretation[_]: MonadThrow: Concurrent](
+private class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
     override val categoryName: CategoryName,
-    eventPersister:            EventPersister[Interpretation],
-    logger:                    Logger[Interpretation]
-) extends consumers.EventHandlerWithProcessLimiter[Interpretation](ConcurrentProcessesLimiter.withoutLimit) {
+    eventPersister:            EventPersister[F]
+) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
 
   import eventPersister._
   import io.renku.graph.model.projects
   import io.renku.tinytypes.json.TinyTypeDecoders._
 
-  override def createHandlingProcess(
-      request: EventRequestContent
-  ): Interpretation[EventHandlingProcess[Interpretation]] =
-    EventHandlingProcess[Interpretation](storeEvent(request))
+  override def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]] =
+    EventHandlingProcess[F](storeEvent(request))
 
   private def storeEvent(request: EventRequestContent) = for {
-    event <-
-      fromEither[Interpretation](request.event.as[Event].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult])
+    event <- fromEither[F](request.event.as[Event].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult])
     result <- storeNewEvent(event).toRightT
                 .map(_ => Accepted)
-                .semiflatTap(logger.log(event))
-                .leftSemiflatTap(logger.log(event))
+                .semiflatTap(Logger[F].log(event))
+                .leftSemiflatTap(Logger[F].log(event))
   } yield result
 
   private implicit lazy val eventInfoToString: Show[Event] = Show.show { event =>
@@ -104,15 +98,10 @@ private class EventHandler[Interpretation[_]: MonadThrow: Concurrent](
 }
 
 private object EventHandler {
-  def apply(sessionResource:    SessionResource[IO, EventLogDB],
-            waitingEventsGauge: LabeledGauge[IO, projects.Path],
-            queriesExecTimes:   LabeledHistogram[IO, SqlStatement.Name],
-            logger:             Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[EventHandler[IO]] = for {
-    eventPersister <- IOEventPersister(sessionResource, waitingEventsGauge, queriesExecTimes)
-  } yield new EventHandler[IO](categoryName, eventPersister, logger)
+  def apply[F[_]: MonadCancelThrow: Concurrent: Logger](sessionResource: SessionResource[F, EventLogDB],
+                                                        waitingEventsGauge: LabeledGauge[F, projects.Path],
+                                                        queriesExecTimes:   LabeledHistogram[F, SqlStatement.Name]
+  ): F[EventHandler[F]] = for {
+    eventPersister <- EventPersister(sessionResource, waitingEventsGauge, queriesExecTimes)
+  } yield new EventHandler[F](categoryName, eventPersister)
 }

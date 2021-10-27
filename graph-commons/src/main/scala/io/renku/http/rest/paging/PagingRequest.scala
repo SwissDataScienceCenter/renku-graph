@@ -48,7 +48,7 @@ object PagingRequest {
           .toValidatedNel
 
     object page extends OptionalValidatingQueryParamDecoderMatcher[Page]("page") {
-      val parameterName: String = "page"
+      val parameterName:               String = "page"
       def errorMessage(value: String): String = s"'$value' not a valid Page number"
     }
 
@@ -63,7 +63,7 @@ object PagingRequest {
           .toValidatedNel
 
     object perPage extends OptionalValidatingQueryParamDecoderMatcher[PerPage]("per_page") {
-      val parameterName: String = "per_page"
+      val parameterName:               String = "per_page"
       def errorMessage(value: String): String = s"'$value' not a valid PerPage number"
     }
   }

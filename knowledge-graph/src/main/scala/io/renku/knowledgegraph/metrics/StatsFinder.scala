@@ -18,7 +18,7 @@
 
 package io.renku.knowledgegraph.metrics
 
-import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
+import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder.decodeList
@@ -28,24 +28,20 @@ import io.renku.rdfstore._
 import io.renku.tinytypes.{TinyType, TinyTypeFactory}
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
-private trait StatsFinder[Interpretation[_]] {
-  def entitiesCount(): Interpretation[Map[EntityLabel, Count]]
+private trait StatsFinder[F[_]] {
+  def entitiesCount(): F[Map[EntityLabel, Count]]
 }
 
-private class StatsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer](
-    rdfStoreConfig:          RdfStoreConfig,
-    logger:                  Logger[Interpretation],
-    timeRecorder:            SparqlQueryTimeRecorder[Interpretation]
-)(implicit executionContext: ExecutionContext)
-    extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
-    with StatsFinder[Interpretation] {
+private class StatsFinderImpl[F[_]: Async: Logger](
+    rdfStoreConfig: RdfStoreConfig,
+    timeRecorder:   SparqlQueryTimeRecorder[F]
+) extends RdfStoreClientImpl[F](rdfStoreConfig, timeRecorder)
+    with StatsFinder[F] {
 
   import EntityCount._
   import io.renku.graph.model.Schemas._
 
-  override def entitiesCount(): Interpretation[Map[EntityLabel, Count]] =
+  override def entitiesCount(): F[Map[EntityLabel, Count]] =
     queryExpecting[List[(EntityLabel, Count)]](using = query) map (_.toMap)
 
   private lazy val query = SparqlQuery.of(
@@ -116,15 +112,9 @@ private object EntityCount {
 }
 
 private object StatsFinder {
-  def apply(
-      timeRecorder:   SparqlQueryTimeRecorder[IO],
-      logger:         Logger[IO],
-      rdfStoreConfig: IO[RdfStoreConfig] = RdfStoreConfig[IO]()
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[StatsFinder[IO]] = for {
-    config <- rdfStoreConfig
-  } yield new StatsFinderImpl(config, logger, timeRecorder)
+  def apply[F[_]: Async: Logger](
+      timeRecorder: SparqlQueryTimeRecorder[F]
+  ): F[StatsFinder[F]] = for {
+    config <- RdfStoreConfig[F]()
+  } yield new StatsFinderImpl[F](config, timeRecorder)
 }

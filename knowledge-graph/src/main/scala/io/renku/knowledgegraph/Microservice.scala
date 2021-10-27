@@ -28,40 +28,37 @@ import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.IOMicroservice
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
-import pureconfig.ConfigSource
 
-import java.util.concurrent.Executors.newFixedThreadPool
 import scala.concurrent.ExecutionContext
 
 object Microservice extends IOMicroservice {
 
-  protected implicit override val executionContext: ExecutionContext =
-    ExecutionContext fromExecutorService newFixedThreadPool(ConfigSource.default.at("threads-number").loadOrThrow[Int])
+  protected implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
 
-  private implicit val logger:                  Logger[IO]       = ApplicationLogger
-  protected implicit override def contextShift: ContextShift[IO] = IO.contextShift(executionContext)
-  protected implicit override def timer:        Timer[IO]        = IO.timer(executionContext)
+  import cats.effect.unsafe.implicits.global
+
+  private implicit val logger: Logger[IO] = ApplicationLogger
 
   override def run(args: List[String]): IO[ExitCode] = for {
-    certificateLoader  <- CertificateLoader[IO](logger)
-    sentryInitializer  <- SentryInitializer[IO]()
-    metricsRegistry    <- MetricsRegistry()
-    sparqlTimeRecorder <- SparqlQueryTimeRecorder(metricsRegistry)
+    certificateLoader  <- CertificateLoader[IO]
+    sentryInitializer  <- SentryInitializer[IO]
+    metricsRegistry    <- MetricsRegistry[IO]()
+    sparqlTimeRecorder <- SparqlQueryTimeRecorder[IO](metricsRegistry)
     kgMetrics          <- KGMetrics(metricsRegistry, sparqlTimeRecorder)
-    microserviceRoutes <- MicroserviceRoutes(metricsRegistry, sparqlTimeRecorder, logger)
+    microserviceRoutes <- MicroserviceRoutes(metricsRegistry, sparqlTimeRecorder)
     exicode <- microserviceRoutes.routes.use { routes =>
-                 val httpServer = new HttpServer[IO](serverPort = 9004, routes)
+                 val httpServer = HttpServer[IO](serverPort = 9004, routes)
                  new MicroserviceRunner(certificateLoader, sentryInitializer, httpServer, kgMetrics).run()
                }
   } yield exicode
 }
 
 private class MicroserviceRunner(
-    certificateLoader:   CertificateLoader[IO],
-    sentryInitializer:   SentryInitializer[IO],
-    httpServer:          HttpServer[IO],
-    kgMetrics:           KGMetrics[IO]
-)(implicit contextShift: ContextShift[IO]) {
+    certificateLoader: CertificateLoader[IO],
+    sentryInitializer: SentryInitializer[IO],
+    httpServer:        HttpServer[IO],
+    kgMetrics:         KGMetrics[IO]
+) {
 
   def run(): IO[ExitCode] = for {
     _        <- certificateLoader.run()

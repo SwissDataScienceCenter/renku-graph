@@ -29,9 +29,9 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, jsons}
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects
-import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
@@ -39,6 +39,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class EventHandlerSpec
     extends AnyWordSpec
+    with IOSpec
     with MockFactory
     with should.Matchers
     with Eventually
@@ -119,11 +120,9 @@ class EventHandlerSpec
   }
 
   private trait TestCase {
-
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val commitSyncForcer = mock[CommitSyncForcer[IO]]
-    val logger           = TestLogger[IO]()
-    val handler          = new EventHandler[IO](categoryName, commitSyncForcer, logger)
-
+    val handler          = new EventHandler[IO](categoryName, commitSyncForcer)
   }
 
   private implicit lazy val eventEncoder: Encoder[(projects.Id, projects.Path)] =

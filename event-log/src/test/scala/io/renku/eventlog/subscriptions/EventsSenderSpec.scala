@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult._
 import io.renku.eventlog.subscriptions.Generators.categoryNames
@@ -31,17 +31,22 @@ import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.interpreters.TestLogger.LogMessage.MessageAndThrowable
 import io.renku.stubbing.ExternalServiceStubbing
+import io.renku.testtools.IOSpec
 import org.http4s.Status._
 import org.http4s.multipart.Part
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class EventsSenderSpec extends AnyWordSpec with ExternalServiceStubbing with MockFactory with should.Matchers {
+class EventsSenderSpec
+    extends AnyWordSpec
+    with IOSpec
+    with ExternalServiceStubbing
+    with MockFactory
+    with should.Matchers {
 
   "sendEvent" should {
 
@@ -87,7 +92,7 @@ class EventsSenderSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
     }
 
     "return Misdelivered if call to the remote fails with ConnectivityException" in new TestCase {
-      override val sender = new EventsSenderImpl(categoryName, categoryEventEncoder, logger, retryInterval = 10 millis)
+      override val sender = new EventsSenderImpl(categoryName, categoryEventEncoder, retryInterval = 10 millis)
 
       expectEventEncoding(event)
 
@@ -147,19 +152,15 @@ class EventsSenderSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
     }
   }
 
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO]        = IO.timer(global)
-
   private trait TestCase {
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val categoryName         = categoryNames.generateOne
     val requestTimeout       = 500 millis
     val event                = testCategoryEvents.generateOne
     val subscriberUrl        = SubscriberUrl(externalServiceBaseUrl)
     val categoryEventEncoder = mock[EventEncoder[TestCategoryEvent]]
-    val logger               = TestLogger[IO]()
     val sender = new EventsSenderImpl[IO, TestCategoryEvent](categoryName,
                                                              categoryEventEncoder,
-                                                             logger,
                                                              requestTimeoutOverride = Some(requestTimeout)
     )
 

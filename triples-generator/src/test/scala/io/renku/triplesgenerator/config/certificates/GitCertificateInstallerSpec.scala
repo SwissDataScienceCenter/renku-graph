@@ -116,12 +116,10 @@ class GitCertificateInstallerSpec extends AnyWordSpec with should.Matchers with 
 
   private trait TestCase {
 
+    implicit val logger: TestLogger[Try] = TestLogger[Try]()
     val findCertificate   = mockFunction[Try[Option[Certificate]]]
     val certificateSaver  = mock[CertificateSaver[Try]]
     val gitConfigModifier = mock[GitConfigModifier[Try]]
-    val logger            = TestLogger[Try]()
-
-    val certInstaller =
-      new GitCertificateInstallerImpl[Try](findCertificate, certificateSaver, gitConfigModifier, logger)
+    val certInstaller     = new GitCertificateInstallerImpl[Try](findCertificate, certificateSaver, gitConfigModifier)
   }
 }

@@ -18,14 +18,13 @@
 
 package io.renku.db
 
-import cats.effect.{ConcurrentEffect, ContextShift, IO}
+import cats.effect.IO
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
-class SessionResourceResourceSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class SessionResourceResourceSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "use" should {
 
@@ -33,12 +32,9 @@ class SessionResourceResourceSpec extends AnyWordSpec with MockFactory with shou
 
       transactedBlock.expects(*).returning(IO.unit)
 
-      ssessionResource.use(transactedBlock).unsafeRunSync() shouldBe ((): Unit)
+      ssessionResource.use(transactedBlock).unsafeRunSync() shouldBe ()
     }
   }
-
-  private implicit val cs:         ContextShift[IO]     = IO.contextShift(global)
-  private implicit val concurrent: ConcurrentEffect[IO] = IO.ioConcurrentEffect
 
   private trait TestCase {
     import natchez.Trace.Implicits.noop

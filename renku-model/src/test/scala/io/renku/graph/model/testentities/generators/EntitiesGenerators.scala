@@ -19,7 +19,6 @@
 package io.renku.graph.model.testentities
 package generators
 
-import cats.Applicative
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
@@ -67,9 +66,4 @@ trait EntitiesGenerators extends ProjectEntitiesGenerators with ActivityGenerato
     maybeAffiliation <- userAffiliations.toGeneratorOfOptions
     maybeGitLabId    <- maybeGitLabIds
   } yield Person(name, maybeEmail, maybeAffiliation, maybeGitLabId)
-
-  protected implicit lazy val genApplicative: Applicative[Gen] = new Applicative[Gen] {
-    override def pure[A](x:   A): Gen[A] = Gen.const(x)
-    override def ap[A, B](ff: Gen[A => B])(fa: Gen[A]): Gen[B] = fa.flatMap(a => ff.map(f => f(a)))
-  }
 }

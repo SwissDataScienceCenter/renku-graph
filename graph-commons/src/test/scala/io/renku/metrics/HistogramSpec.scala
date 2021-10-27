@@ -37,7 +37,7 @@ class HistogramSpec extends AnyWordSpec with MockFactory with should.Matchers {
       "and return an instance of the LabeledHistogram" in new TestCase {
 
         (metricsRegistry
-          .register[LibHistogram, LibHistogram.Builder](_: LibHistogram.Builder)(_: MonadError[Try, Throwable]))
+          .register[Try, LibHistogram, LibHistogram.Builder](_: LibHistogram.Builder)(_: MonadError[Try, Throwable]))
           .expects(*, *)
           .onCall { (builder: LibHistogram.Builder, _: MonadError[Try, Throwable]) =>
             builder.create().pure[Try]
@@ -54,12 +54,10 @@ class HistogramSpec extends AnyWordSpec with MockFactory with should.Matchers {
   }
 
   private trait TestCase {
-    val ME = MonadError[Try, Throwable]
-
     val name = nonBlankStrings().generateOne
     val help = sentences().generateOne
 
-    val metricsRegistry = mock[MetricsRegistry[Try]]
+    val metricsRegistry = mock[MetricsRegistry]
   }
 }
 
@@ -91,8 +89,6 @@ class LabeledHistogramSpec extends AnyWordSpec with MockFactory with should.Matc
   }
 
   private trait TestCase {
-    val ME = MonadError[Try, Throwable]
-
     val label        = nonBlankStrings().generateOne.value
     private val name = nonBlankStrings().generateOne
     private val help = sentences().generateOne

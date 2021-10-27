@@ -18,6 +18,7 @@
 
 package io.renku.rdfstore
 
+import cats.MonadThrow
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
@@ -48,7 +49,6 @@ final case class SparqlQuery(name:               String Refined NonEmpty,
 
 object SparqlQuery {
 
-  import cats.MonadError
   import io.renku.tinytypes.TinyTypeFactory
   import io.renku.tinytypes.constraints.NonBlank
 
@@ -84,14 +84,12 @@ object SparqlQuery {
 
   implicit class SparqlQueryOps(sparqlQuery: SparqlQuery) {
 
-    def include[Interpretation[_]](
-        pagingRequest: PagingRequest
-    )(implicit ME:     MonadError[Interpretation, Throwable]): Interpretation[SparqlQuery] =
+    def include[F[_]: MonadThrow](pagingRequest: PagingRequest): F[SparqlQuery] =
       if (sparqlQuery.body.trim.matches("(?si)^.*(ORDER[ ]+BY[ ]+((ASC|DESC)[ ]*\\([ ]*\\?\\w+[ ]*\\)[ ]*)+)$"))
-        sparqlQuery.copy(maybePagingRequest = Some(pagingRequest)).pure[Interpretation]
+        sparqlQuery.copy(maybePagingRequest = Some(pagingRequest)).pure[F]
       else
         new Exception("Sparql query cannot be used for paging as there's no ending ORDER BY clause")
-          .raiseError[Interpretation, SparqlQuery]
+          .raiseError[F, SparqlQuery]
 
     lazy val toCountQuery: SparqlQuery = sparqlQuery.copy(
       body = s"""|SELECT (COUNT(*) AS ?$totalField)

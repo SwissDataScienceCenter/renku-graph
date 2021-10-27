@@ -26,20 +26,20 @@ import io.renku.rdfstore.SparqlQuery
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{Transformation, TransformationStepResult}
 
-private[triplesgenerated] final case class TransformationStep[Interpretation[_]](
+private[triplesgenerated] final case class TransformationStep[F[_]](
     name:           String Refined NonEmpty,
-    transformation: Transformation[Interpretation]
+    transformation: Transformation[F]
 ) {
-  def run(project: Project): TransformationStepResult[Interpretation] = transformation(project)
+  def run(project: Project): TransformationStepResult[F] = transformation(project)
 }
 
 private object TransformationStep {
 
-  private[triplesgenerated] type Transformation[Interpretation[_]] =
-    Project => TransformationStepResult[Interpretation]
+  private[triplesgenerated] type Transformation[F[_]] =
+    Project => TransformationStepResult[F]
 
-  private[triplesgenerated] type TransformationStepResult[Interpretation[_]] =
-    EitherT[Interpretation, ProcessingRecoverableError, ResultData]
+  private[triplesgenerated] type TransformationStepResult[F[_]] =
+    EitherT[F, ProcessingRecoverableError, ResultData]
 
   private[triplesgenerated] final case class ResultData(project: Project, queries: List[SparqlQuery])
 

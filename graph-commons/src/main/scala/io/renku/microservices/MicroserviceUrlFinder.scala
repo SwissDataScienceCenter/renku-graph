@@ -18,7 +18,7 @@
 
 package io.renku.microservices
 
-import cats.{MonadError, MonadThrow}
+import cats.MonadThrow
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
 import io.circe.Decoder
@@ -26,28 +26,28 @@ import io.renku.tinytypes.constraints.{Url, UrlOps}
 import io.renku.tinytypes.json.TinyTypeDecoders.urlDecoder
 import io.renku.tinytypes.{TinyTypeFactory, UrlTinyType}
 
-trait MicroserviceUrlFinder[Interpretation[_]] {
-  def findBaseUrl(): Interpretation[MicroserviceBaseUrl]
+trait MicroserviceUrlFinder[F[_]] {
+  def findBaseUrl(): F[MicroserviceBaseUrl]
 }
 
-class MicroserviceUrlFinderImpl[Interpretation[_]: MonadThrow](
+class MicroserviceUrlFinderImpl[F[_]: MonadThrow](
     microservicePort: Int Refined Positive
-) extends MicroserviceUrlFinder[Interpretation] {
+) extends MicroserviceUrlFinder[F] {
 
   import cats.syntax.all._
 
   import java.net.NetworkInterface
   import scala.jdk.CollectionConverters._
 
-  override def findBaseUrl(): Interpretation[MicroserviceBaseUrl] =
+  override def findBaseUrl(): F[MicroserviceBaseUrl] =
     findAddress flatMap {
       case Some(address) =>
-        MicroserviceBaseUrl(s"http://${address.getHostAddress}:$microservicePort").pure[Interpretation]
+        MicroserviceBaseUrl(s"http://${address.getHostAddress}:$microservicePort").pure[F]
       case None =>
-        new Exception("Cannot find service IP").raiseError[Interpretation, MicroserviceBaseUrl]
+        new Exception("Cannot find service IP").raiseError[F, MicroserviceBaseUrl]
     }
 
-  private def findAddress = MonadError[Interpretation, Throwable].catchNonFatal {
+  private def findAddress = MonadThrow[F].catchNonFatal {
     val ipAddresses = NetworkInterface.getNetworkInterfaces.asScala.toSeq.flatMap(p => p.getInetAddresses.asScala.toSeq)
     ipAddresses
       .find { address =>
@@ -60,11 +60,11 @@ class MicroserviceUrlFinderImpl[Interpretation[_]: MonadThrow](
 }
 
 object MicroserviceUrlFinder {
-  import cats.effect.IO
 
-  def apply(microservicePort: Int Refined Positive): IO[MicroserviceUrlFinder[IO]] = IO {
-    new MicroserviceUrlFinderImpl[IO](microservicePort)
-  }
+  def apply[F[_]: MonadThrow](microservicePort: Int Refined Positive): F[MicroserviceUrlFinder[F]] =
+    MonadThrow[F].catchNonFatal {
+      new MicroserviceUrlFinderImpl[F](microservicePort)
+    }
 }
 
 final class MicroserviceBaseUrl private (val value: String) extends AnyVal with UrlTinyType

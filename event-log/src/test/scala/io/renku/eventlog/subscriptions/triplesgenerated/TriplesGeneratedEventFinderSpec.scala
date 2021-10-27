@@ -35,6 +35,7 @@ import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventStatus, ZippedEventPayload}
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.metrics.{LabeledGauge, TestLabeledHistogram}
+import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -44,6 +45,7 @@ import java.time.Instant
 
 private class TriplesGeneratedEventFinderSpec
     extends AnyWordSpec
+    with IOSpec
     with InMemoryEventLogDbSpec
     with MockFactory
     with should.Matchers {
@@ -406,8 +408,6 @@ private class TriplesGeneratedEventFinderSpec
   }
 
   private trait TestCase extends TestCaseCommons {
-    val schemaVersion = projectSchemaVersions.generateOne
-
     val finder = new TriplesGeneratedEventFinderImpl(
       sessionResource,
       awaitingTransformationGauge,

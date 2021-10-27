@@ -30,10 +30,10 @@ import org.scalacheck.Gen
 
 private[triplesgenerated] object Generators {
 
-  implicit def transformationSteps[Interpretation[_]: MonadThrow]: Gen[TransformationStep[Interpretation]] = for {
+  implicit def transformationSteps[F[_]: MonadThrow]: Gen[TransformationStep[F]] = for {
     name          <- nonBlankStrings(minLength = 5)
     sparqlQueries <- sparqlQueries.toGeneratorOfList()
-  } yield TransformationStep[Interpretation](
+  } yield TransformationStep[F](
     name,
     projectMetadata => EitherT.rightT(ResultData(projectMetadata, sparqlQueries))
   )

@@ -18,8 +18,7 @@
 
 package io.renku.metrics
 
-import cats.MonadError
-import cats.effect.{ContextShift, IO}
+import cats.effect.IO
 import cats.syntax.all._
 import io.prometheus.client.{Gauge => LibGauge}
 import io.renku.config.MetricsConfigProvider
@@ -27,6 +26,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
@@ -35,29 +35,28 @@ import org.scalatest.wordspec.AnyWordSpec
 import java.lang.Thread.sleep
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger
-import scala.concurrent.ExecutionContext
-import scala.concurrent.ExecutionContext.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
 class GaugeResetSchedulerSpec
     extends AnyWordSpec
-    with MockFactory
+    with IOSpec
     with Eventually
+    with MockFactory
     with IntegrationPatience
     with should.Matchers {
 
   "run" should {
 
-    "kick off the gauge synchronization process and " +
-      "continues endlessly with interval periods" in new TestCase {
+    "kick off the gauge synchronization process " +
+      "that continues endlessly with interval periods" in new TestCase {
 
         val gaugeScheduler = newGaugeScheduler(refreshing = gauge1, gauge2)
 
-        gauge1.givenResetMethodToReturn add context.unit
-        gauge2.givenResetMethodToReturn add context.unit
+        gauge1.givenResetMethodToReturn add IO.unit
+        gauge2.givenResetMethodToReturn add IO.unit
 
-        gaugeScheduler.run().start.unsafeRunAsyncAndForget()
+        gaugeScheduler.run().start.unsafeRunAndForget()
 
         sleep(2 * interval.toMillis + 1000)
 
@@ -77,7 +76,7 @@ class GaugeResetSchedulerSpec
       val exception2 = exceptions.generateOne
       gauge2.givenResetMethodToReturn add IO.raiseError(exception2)
 
-      gaugeScheduler.run().start.unsafeRunAsyncAndForget()
+      gaugeScheduler.run().start.unsafeRunAndForget()
 
       sleep(3 * interval.toMillis + 1000)
 
@@ -92,19 +91,15 @@ class GaugeResetSchedulerSpec
     }
   }
 
-  private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
-
   private trait TestCase {
-    val logger                = TestLogger[IO]()
-    val timer                 = IO.timer(global)
-    val context               = MonadError[IO, Throwable]
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val gauge1                = new TestLabeledGauge
     val gauge2                = new TestLabeledGauge
     val interval              = 100 millis
     val metricsConfigProvider = mock[MetricsConfigProvider[IO]]
 
     def newGaugeScheduler(refreshing: LabeledGauge[IO, Double]*) =
-      new GaugeResetSchedulerImpl[IO, Double](refreshing.toList, metricsConfigProvider, logger)(context, timer)
+      new GaugeResetSchedulerImpl[IO, Double](refreshing.toList, metricsConfigProvider)
 
     (metricsConfigProvider.getInterval _).expects().returning(interval.pure[IO]).once()
 

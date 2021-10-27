@@ -18,15 +18,15 @@
 
 package io.renku.db
 
-import cats.effect.Sync
+import cats.effect.kernel.Async
 import skunk.PreparedQuery
 
 object implicits {
 
-  implicit class PreparedQueryOps[Interpretation[_], In, Out](
-      preparedQuery: PreparedQuery[Interpretation, In, Out]
+  implicit class PreparedQueryOps[F[_], In, Out](
+      preparedQuery: PreparedQuery[F, In, Out]
   ) {
-    def toList(implicit sync: Sync[Interpretation]): In => Interpretation[List[Out]] = args =>
+    def toList(implicit sync: Async[F]): In => F[List[Out]] = args =>
       preparedQuery.stream(args, chunkSize = 32).compile.toList
   }
 }

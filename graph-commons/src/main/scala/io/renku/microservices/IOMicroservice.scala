@@ -18,16 +18,16 @@
 
 package io.renku.microservices
 
-import cats.effect.{CancelToken, IO, IOApp}
+import cats.effect.{IO, IOApp}
 
 import java.util.concurrent.ConcurrentHashMap
 import scala.jdk.CollectionConverters._
 
 trait IOMicroservice extends IOApp {
 
-  protected val subProcessesCancelTokens = new ConcurrentHashMap[CancelToken[IO], Unit]()
+  protected val subProcessesCancelTokens = new ConcurrentHashMap[IO[Unit], Unit]()
 
-  def stopSubProcesses: List[CancelToken[IO]] = subProcessesCancelTokens.keys().asScala.toList
+  def stopSubProcesses: List[IO[Unit]] = subProcessesCancelTokens.keys().asScala.toList
 
   lazy val Identifier: MicroserviceIdentifier = MicroserviceIdentifier.generate
 }

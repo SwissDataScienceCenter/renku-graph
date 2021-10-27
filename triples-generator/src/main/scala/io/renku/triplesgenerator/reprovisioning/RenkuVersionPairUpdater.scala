@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.reprovisioning
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.Async
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.views.RdfResource
@@ -28,29 +28,25 @@ import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
-trait RenkuVersionPairUpdater[Interpretation[_]] {
-  def update(versionPair: RenkuVersionPair): Interpretation[Unit]
+trait RenkuVersionPairUpdater[F[_]] {
+  def update(versionPair: RenkuVersionPair): F[Unit]
 }
 
 private case object RenkuVersionPairJsonLD {
 
   def id(implicit renkuBaseUrl: RenkuBaseUrl) = EntityId.of((renkuBaseUrl / "version-pair").toString)
-  val objectType    = renku / "VersionPair"
-  val cliVersion    = renku / "cliVersion"
-  val schemaVersion = renku / "schemaVersion"
+  val objectType                              = renku / "VersionPair"
+  val cliVersion                              = renku / "cliVersion"
+  val schemaVersion                           = renku / "schemaVersion"
 }
 
-private class RenkuVersionPairUpdaterImpl(rdfStoreConfig: RdfStoreConfig,
-                                          renkuBaseUrl:   RenkuBaseUrl,
-                                          logger:         Logger[IO],
-                                          timeRecorder:   SparqlQueryTimeRecorder[IO]
-)(implicit executionContext:                              ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
-    with RenkuVersionPairUpdater[IO] {
+private class RenkuVersionPairUpdaterImpl[F[_]: Async: Logger](rdfStoreConfig: RdfStoreConfig,
+                                                               renkuBaseUrl: RenkuBaseUrl,
+                                                               timeRecorder: SparqlQueryTimeRecorder[F]
+) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
+    with RenkuVersionPairUpdater[F] {
 
-  override def update(versionPair: RenkuVersionPair): IO[Unit] = updateWithNoResult {
+  override def update(versionPair: RenkuVersionPair): F[Unit] = updateWithNoResult {
     val entityId = (renkuBaseUrl / "version-pair").showAs[RdfResource]
     SparqlQuery.of(
       name = "ReProvisioning - cli and schema version create",

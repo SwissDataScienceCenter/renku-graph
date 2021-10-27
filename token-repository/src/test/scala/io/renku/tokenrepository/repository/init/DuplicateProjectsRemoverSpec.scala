@@ -24,12 +24,17 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.InMemoryProjectsTokensDbSpec
 import io.renku.tokenrepository.repository.RepositoryGenerators.encryptedAccessTokens
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class DuplicateProjectsRemoverSpec extends AnyWordSpec with InMemoryProjectsTokensDbSpec with should.Matchers {
+class DuplicateProjectsRemoverSpec
+    extends AnyWordSpec
+    with IOSpec
+    with InMemoryProjectsTokensDbSpec
+    with should.Matchers {
 
   "run" should {
 
@@ -61,7 +66,7 @@ class DuplicateProjectsRemoverSpec extends AnyWordSpec with InMemoryProjectsToke
   }
 
   private trait TestCase {
-    val logger       = TestLogger[IO]()
-    val deduplicator = new DuplicateProjectsRemoverImpl[IO](sessionResource, logger)
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val deduplicator = new DuplicateProjectsRemoverImpl[IO](sessionResource)
   }
 }

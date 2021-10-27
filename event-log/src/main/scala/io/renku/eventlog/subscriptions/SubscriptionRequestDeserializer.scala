@@ -18,42 +18,41 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.{MonadError, MonadThrow}
+import cats.MonadThrow
 import io.circe.{Decoder, Json}
 import io.renku.eventlog.subscriptions.SubscriptionRequestDeserializer.PayloadFactory
 import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import io.renku.graph.model.events.CategoryName
 
-private trait SubscriptionRequestDeserializer[Interpretation[_], SubscriptionInfoType <: SubscriptionInfo] {
-  def deserialize(payload: Json): Interpretation[Option[SubscriptionInfoType]]
+private trait SubscriptionRequestDeserializer[F[_], SubscriptionInfoType <: SubscriptionInfo] {
+  def deserialize(payload: Json): F[Option[SubscriptionInfoType]]
 }
 
 private object SubscriptionRequestDeserializer {
 
   type PayloadFactory[SubscriptionInfoType] = (SubscriberUrl, SubscriberId, Option[Capacity]) => SubscriptionInfoType
 
-  def apply[Interpretation[_]: MonadThrow, SubscriptionInfoType <: SubscriptionInfo](
+  def apply[F[_]: MonadThrow, SubscriptionInfoType <: SubscriptionInfo](
       categoryName:   CategoryName,
       payloadFactory: PayloadFactory[SubscriptionInfoType]
-  ): Interpretation[SubscriptionRequestDeserializer[Interpretation, SubscriptionInfoType]] =
-    MonadThrow[Interpretation].catchNonFatal {
+  ): F[SubscriptionRequestDeserializer[F, SubscriptionInfoType]] =
+    MonadThrow[F].catchNonFatal {
       new SubscriptionRequestDeserializerImpl(categoryName, payloadFactory)
     }
 }
 
-private class SubscriptionRequestDeserializerImpl[Interpretation[_], SubscriptionInfoType <: SubscriptionInfo](
-    categoryName:      CategoryName,
-    payloadFactory:    PayloadFactory[SubscriptionInfoType]
-)(implicit monadError: MonadError[Interpretation, Throwable])
-    extends SubscriptionRequestDeserializer[Interpretation, SubscriptionInfoType] {
+private class SubscriptionRequestDeserializerImpl[F[_]: MonadThrow, SubscriptionInfoType <: SubscriptionInfo](
+    categoryName:   CategoryName,
+    payloadFactory: PayloadFactory[SubscriptionInfoType]
+) extends SubscriptionRequestDeserializer[F, SubscriptionInfoType] {
 
   import cats.syntax.all._
 
-  override def deserialize(payload: Json): Interpretation[Option[SubscriptionInfoType]] =
+  override def deserialize(payload: Json): F[Option[SubscriptionInfoType]] =
     payload
       .as[(String, SubscriberUrl, SubscriberId, Option[Capacity])]
       .fold(_ => Option.empty[SubscriptionInfoType], toCategoryPayload)
-      .pure[Interpretation]
+      .pure[F]
 
   private lazy val toCategoryPayload
       : ((String, SubscriberUrl, SubscriberId, Option[Capacity])) => Option[SubscriptionInfoType] = {

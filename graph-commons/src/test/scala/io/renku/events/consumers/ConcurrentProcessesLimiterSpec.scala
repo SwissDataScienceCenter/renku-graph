@@ -19,22 +19,24 @@
 package io.renku.events.consumers
 
 import cats.data.EitherT
-import cats.effect.concurrent.{Deferred, Semaphore}
-import cats.effect.{ContextShift, IO}
+import cats.effect.IO
+import cats.effect.kernel.Deferred
+import cats.effect.std.Semaphore
 import cats.syntax.all._
 import io.renku.events.consumers.EventSchedulingResult._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, positiveInts}
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.util.concurrent.atomic.AtomicBoolean
-import scala.concurrent.ExecutionContext.global
 
 class ConcurrentProcessesLimiterSpec
     extends AnyWordSpec
+    with IOSpec
     with MockFactory
     with should.Matchers
     with Eventually
@@ -182,7 +184,6 @@ class ConcurrentProcessesLimiterSpec
     }
   }
 
-  private implicit def cs: ContextShift[IO] = IO.contextShift(global)
   private trait TestCase {
 
     val processesCount = positiveInts().generateOne

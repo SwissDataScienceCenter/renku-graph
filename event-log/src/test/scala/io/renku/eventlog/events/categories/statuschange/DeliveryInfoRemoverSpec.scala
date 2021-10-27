@@ -30,10 +30,11 @@ import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import io.renku.graph.model.events.CompoundEventId
 import io.renku.metrics.TestLabeledHistogram
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class DeliveryInfoRemoverSpec extends AnyWordSpec with should.Matchers with InMemoryEventLogDbSpec {
+class DeliveryInfoRemoverSpec extends AnyWordSpec with IOSpec with should.Matchers with InMemoryEventLogDbSpec {
 
   "deleteDelivery" should {
 

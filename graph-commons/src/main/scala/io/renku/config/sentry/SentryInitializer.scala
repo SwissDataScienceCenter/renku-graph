@@ -18,23 +18,26 @@
 
 package io.renku.config.sentry
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.syntax.all._
 import io.renku.config.sentry.SentryConfig.SentryBaseUrl
 import io.sentry.SentryOptions
 
 import scala.util.Try
 
-class SentryInitializer[Interpretation[_]](
+trait SentryInitializer[F[_]] {
+  def run(): F[Unit]
+}
+
+class SentryInitializerImpl[F[_]: MonadThrow](
     maybeSentryConfig: Option[SentryConfig],
     initSentry:        String => Unit
-)(implicit ME:         MonadError[Interpretation, Throwable]) {
+) extends SentryInitializer[F] {
 
-  def run(): Interpretation[Unit] =
-    maybeSentryConfig.map(toDsn) match {
-      case Some(dsn) => ME.fromTry(Try(initSentry(dsn.toString)))
-      case _         => ME.unit
-    }
+  override def run(): F[Unit] = maybeSentryConfig.map(toDsn) match {
+    case Some(dsn) => MonadThrow[F].fromTry(Try(initSentry(dsn.toString)))
+    case _         => MonadThrow[F].unit
+  }
 
   private lazy val toDsn: SentryConfig => SentryBaseUrl = {
     case SentryConfig(baseUrl, environmentName, serviceName, stackTracePackage) =>
@@ -43,16 +46,12 @@ class SentryInitializer[Interpretation[_]](
 }
 
 object SentryInitializer {
-  import cats.MonadError
   import io.sentry.Sentry
 
-  def apply[Interpretation[_]]()(implicit
-      ME: MonadError[Interpretation, Throwable]
-  ): Interpretation[SentryInitializer[Interpretation]] =
-    for {
-      maybeSentryConfig <- SentryConfig[Interpretation]()
-    } yield new SentryInitializer(
-      maybeSentryConfig,
-      dsn => { Sentry.init((options: SentryOptions) => options.setDsn(dsn)); () }
-    )
+  def apply[F[_]: MonadThrow]: F[SentryInitializer[F]] = for {
+    maybeSentryConfig <- SentryConfig[F]()
+  } yield new SentryInitializerImpl(
+    maybeSentryConfig,
+    dsn => { Sentry.init((options: SentryOptions) => options.setDsn(dsn)); () }
+  )
 }

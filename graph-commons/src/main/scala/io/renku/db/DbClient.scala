@@ -25,13 +25,13 @@ import io.renku.db.SqlStatement.Name
 import io.renku.metrics.LabeledHistogram
 import skunk.Session
 
-abstract class DbClient[Interpretation[_]: Monad](
-    maybeHistogram: Option[LabeledHistogram[Interpretation, Name]]
+abstract class DbClient[F[_]: Monad](
+    maybeHistogram: Option[LabeledHistogram[F, Name]]
 ) {
 
   protected def measureExecutionTime[ResultType](
-      query: SqlStatement[Interpretation, ResultType]
-  ): Kleisli[Interpretation, Session[Interpretation], ResultType] = Kleisli { session =>
+      query: SqlStatement[F, ResultType]
+  ): Kleisli[F, Session[F], ResultType] = Kleisli { session =>
     maybeHistogram match {
       case None => query.queryExecution.run(session)
       case Some(histogram) =>

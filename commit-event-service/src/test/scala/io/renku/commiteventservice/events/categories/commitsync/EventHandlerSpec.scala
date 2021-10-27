@@ -18,7 +18,7 @@
 
 package io.renku.commiteventservice.events.categories.commitsync
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import cats.syntax.all._
 import io.circe.literal._
 import io.circe.syntax._
@@ -32,15 +32,15 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
 class EventHandlerSpec
     extends AnyWordSpec
+    with IOSpec
     with MockFactory
     with should.Matchers
     with Eventually
@@ -128,14 +128,10 @@ class EventHandlerSpec
     }
   }
 
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO]        = IO.timer(global)
-
   private trait TestCase {
+    implicit val logger: TestLogger[IO] = TestLogger()
     val commitEventSynchronizer = mock[CommitEventSynchronizer[IO]]
-    val logger                  = TestLogger[IO]()
-    val handler =
-      new EventHandler[IO](categoryName, commitEventSynchronizer, logger)
+    val handler                 = new EventHandler[IO](categoryName, commitEventSynchronizer)
 
     def requestContent(event: Json): EventRequestContent = events.EventRequestContent.NoPayload(event)
   }
@@ -150,7 +146,7 @@ class EventHandlerSpec
         },
         "lastSynced":   ${lastSynced.value}
       }"""
-    case MinimalCommitSyncEvent(project)              => json"""{
+    case MinimalCommitSyncEvent(project) => json"""{
         "categoryName": "COMMIT_SYNC",
         "project": {
           "id":         ${project.id.value},

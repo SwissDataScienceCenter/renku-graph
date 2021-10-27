@@ -30,6 +30,7 @@ import io.renku.http.ErrorMessage._
 import io.renku.http.server.EndpointTester._
 import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.lineage.LineageFinder
+import io.renku.testtools.IOSpec
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s._
@@ -41,7 +42,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import sangria.execution.{ExceptionHandler, QueryAnalysisError}
 
-class QueryEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class QueryEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers with IOSpec {
 
   "handleQuery" should {
 
@@ -130,9 +131,9 @@ class QueryEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
 
     val maybeAuthUser = authUsers.generateOption
     val queryRunner   = mock[IOQueryRunner]
-    val handleQuery   = new QueryEndpoint[IO](queryRunner).handleQuery _
+    val handleQuery   = new QueryEndpointImpl[IO](queryRunner).handleQuery _
 
-    private val queryWithNoVariables     = """{ resource { property } }"""
+    private val queryWithNoVariables = """{ resource { property } }"""
     lazy val queryWithNoVariablesPayload = json"""
       {                                                      
         "query": $queryWithNoVariables
@@ -142,7 +143,7 @@ class QueryEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
       ()
     }
 
-    private val queryWithVariables     = """query($variable: Type!) { resource(variable: $variable) { property } }"""
+    private val queryWithVariables = """query($variable: Type!) { resource(variable: $variable) { property } }"""
     lazy val queryWithVariablesPayload = json"""
       {
         "query": $queryWithVariables,
@@ -158,10 +159,14 @@ class QueryEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
   private val queryAnalysisErrors =
     nonEmptyStrings()
       .map { message =>
-        new Exception(message) with QueryAnalysisError { override def exceptionHandler = ExceptionHandler.empty }
+        new Exception(message) with QueryAnalysisError {
+          override def exceptionHandler = ExceptionHandler.empty
+        }
       }
 
   private class IOLineageQueryContext(override val lineageFinder: LineageFinder[IO],
                                       override val maybeUser:     Option[AuthUser]
   ) extends LineageQueryContext[IO](lineageFinder, maybeUser)
+
+  private trait IOQueryRunner extends QueryRunner[IO, LineageQueryContext[IO]]
 }

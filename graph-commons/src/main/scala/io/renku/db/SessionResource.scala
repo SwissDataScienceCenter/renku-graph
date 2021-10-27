@@ -20,30 +20,31 @@ package io.renku.db
 
 import cats.data.Kleisli
 import cats.effect._
+import cats.effect.std.Console
+import fs2.io.net.Network
 import io.renku.db.DBConfigProvider.DBConfig
 import natchez.Trace
 import skunk.{Session, Transaction}
 
-class SessionResource[Interpretation[_]: BracketThrow, TargetDB](
-    resource: Resource[Interpretation, Session[Interpretation]]
+class SessionResource[F[_]: MonadCancelThrow, TargetDB](
+    resource: Resource[F, Session[F]]
 ) {
 
   def useK[ResultType](
-      query: Kleisli[Interpretation, Session[Interpretation], ResultType]
-  ): Interpretation[ResultType] = resource.use(query.run)
+      query: Kleisli[F, Session[F], ResultType]
+  ): F[ResultType] = resource.use(query.run)
 
   def useWithTransactionK[ResultType](
-      query: Kleisli[Interpretation, (Transaction[Interpretation], Session[Interpretation]), ResultType]
-  ): Interpretation[ResultType] = resource.use { session =>
+      query: Kleisli[F, (Transaction[F], Session[F]), ResultType]
+  ): F[ResultType] = resource.use { session =>
     session.transaction.use(transaction => query.run((transaction, session)))
   }
-
 }
 
 object SessionPoolResource {
-  def apply[Interpretation[_]: Concurrent: ContextShift: Trace, TargetDB](
+  def apply[F[_]: Concurrent: Trace: Network: Console, TargetDB](
       dbConfig: DBConfig[TargetDB]
-  ): Resource[Interpretation, SessionResource[Interpretation, TargetDB]] =
+  ): Resource[F, SessionResource[F, TargetDB]] =
     Session
       .pooled(
         host = dbConfig.host.value,

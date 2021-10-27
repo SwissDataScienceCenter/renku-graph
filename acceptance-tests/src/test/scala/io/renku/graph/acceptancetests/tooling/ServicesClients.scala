@@ -18,7 +18,8 @@
 
 package io.renku.graph.acceptancetests.tooling
 
-import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
+import cats.effect.IO
+import cats.effect.unsafe.IORuntime
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.string.Url
@@ -27,38 +28,32 @@ import io.circe.literal._
 import io.renku.control.Throttler
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, BasicAuthCredentials, RestClient}
-import io.renku.interpreters.TestLogger
 import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.model.HookToken
 import org.http4s.Status.Ok
 import org.http4s.{Header, Method, Response}
 import org.scalatest.matchers.should
+import org.typelevel.ci._
+import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.control.NonFatal
 
 object WebhookServiceClient {
 
-  def apply()(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO]) =
-    new WebhookServiceClient
+  def apply()(implicit logger: Logger[IO]) = new WebhookServiceClient
 
-  class WebhookServiceClient(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ) extends ServiceClient
-      with should.Matchers {
+  class WebhookServiceClient(implicit logger: Logger[IO]) extends ServiceClient with should.Matchers {
     import io.circe.Json
 
     override val baseUrl: String Refined Url = "http://localhost:9001"
 
-    def POST(url: String, hookToken: HookToken, payload: Json): Response[IO] = {
+    def POST(url: String, hookToken: HookToken, payload: Json)(implicit ioRuntime: IORuntime): Response[IO] = {
       for {
         hookTokenCrypto    <- HookTokenCrypto[IO]()
         encryptedHookToken <- hookTokenCrypto.encrypt(hookToken)
-        tokenHeader        <- IO.pure(Header("X-Gitlab-Token", encryptedHookToken.value))
+        tokenHeader        <- IO.pure(Header.Raw(ci"X-Gitlab-Token", encryptedHookToken.value))
         uri                <- validateUri(s"$baseUrl/$url")
         response           <- send(request(Method.POST, uri) withHeaders tokenHeader withEntity payload)(mapResponse)
       } yield response
@@ -67,31 +62,19 @@ object WebhookServiceClient {
 }
 
 object CommitEventServiceClient {
-  def apply()(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): ServiceClient = new ServiceClient {
+  def apply()(implicit logger: Logger[IO]): ServiceClient = new ServiceClient {
     override val baseUrl: String Refined Url = "http://localhost:9006"
   }
 }
 
 object TriplesGeneratorClient {
-  def apply()(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): ServiceClient = new ServiceClient {
+  def apply()(implicit logger: Logger[IO]): ServiceClient = new ServiceClient {
     override val baseUrl: String Refined Url = "http://localhost:9002"
   }
 }
 
 object TokenRepositoryClient {
-  def apply()(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): ServiceClient = new ServiceClient {
+  def apply()(implicit logger: Logger[IO]): ServiceClient = new ServiceClient {
     override val baseUrl: String Refined Url = "http://localhost:9003"
   }
 }
@@ -99,22 +82,13 @@ object TokenRepositoryClient {
 object KnowledgeGraphClient {
   import sangria.ast.Document
 
-  def apply()(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): KnowledgeGraphClient = new KnowledgeGraphClient
+  def apply()(implicit logger: Logger[IO]): KnowledgeGraphClient = new KnowledgeGraphClient
 
-  class KnowledgeGraphClient(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ) extends ServiceClient {
+  class KnowledgeGraphClient(implicit logger: Logger[IO]) extends ServiceClient {
     override val baseUrl: String Refined Url = "http://localhost:9004"
 
-    def POST(query:            Document,
-             variables:        Map[String, String] = Map.empty,
-             maybeAccessToken: Option[AccessToken] = None
+    def POST(query: Document, variables: Map[String, String] = Map.empty, maybeAccessToken: Option[AccessToken] = None)(
+        implicit ioRuntime: IORuntime
     ): Response[IO] = {
       for {
         uri      <- validateUri(s"$baseUrl/knowledge-graph/graphql")
@@ -143,33 +117,18 @@ object KnowledgeGraphClient {
 
 object EventLogClient {
 
-  def apply()(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): EventLogClient = new EventLogClient
+  def apply()(implicit logger: Logger[IO]): EventLogClient = new EventLogClient
 
-  class EventLogClient(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ) extends ServiceClient {
+  class EventLogClient(implicit logger: Logger[IO]) extends ServiceClient {
     override val baseUrl: String Refined Url = "http://localhost:9005"
 
-    def fetchProcessingStatus(projectId: projects.Id): Response[IO] =
+    def fetchProcessingStatus(projectId: projects.Id)(implicit ioRuntime: IORuntime): Response[IO] =
       GET(s"processing-status?project-id=$projectId")
   }
 }
 
-abstract class ServiceClient(implicit
-    executionContext: ExecutionContext,
-    concurrentEffect: ConcurrentEffect[IO],
-    timer:            Timer[IO]
-) extends RestClient[IO, ServiceClient](Throttler.noThrottling,
-                                        TestLogger(),
-                                        retryInterval = 500 millis,
-                                        maxRetries = 1
-    ) {
+abstract class ServiceClient(implicit logger: Logger[IO])
+    extends RestClient[IO, ServiceClient](Throttler.noThrottling, retryInterval = 500 millis, maxRetries = 1) {
 
   import ServiceClient.ServiceReadiness
   import ServiceClient.ServiceReadiness._
@@ -180,35 +139,37 @@ abstract class ServiceClient(implicit
 
   val baseUrl: String Refined Url
 
-  def POST(url: String, maybeAccessToken: Option[AccessToken]): Response[IO] = {
+  def POST(url: String, maybeAccessToken: Option[AccessToken])(implicit ioRuntime: IORuntime): Response[IO] = {
     for {
       uri      <- validateUri(s"$baseUrl/$url")
       response <- send(request(Method.POST, uri, maybeAccessToken))(mapResponse)
     } yield response
   }.unsafeRunSync()
 
-  def PUT(url: String, payload: Json, maybeAccessToken: Option[AccessToken]): Response[IO] = {
+  def PUT(url:   String, payload: Json, maybeAccessToken: Option[AccessToken])(implicit
+      ioRuntime: IORuntime
+  ): Response[IO] = {
     for {
       uri      <- validateUri(s"$baseUrl/$url")
       response <- send(request(Method.PUT, uri, maybeAccessToken) withEntity payload)(mapResponse)
     } yield response
   }.unsafeRunSync()
 
-  def DELETE(url: String, basicAuth: BasicAuthCredentials): Response[IO] = {
+  def DELETE(url: String, basicAuth: BasicAuthCredentials)(implicit ioRuntime: IORuntime): Response[IO] = {
     for {
       uri      <- validateUri(s"$baseUrl/$url")
       response <- send(request(Method.DELETE, uri, basicAuth))(mapResponse)
     } yield response
   }.unsafeRunSync()
 
-  def GET(url: String, accessToken: AccessToken): Response[IO] = {
+  def GET(url: String, accessToken: AccessToken)(implicit ioRuntime: IORuntime): Response[IO] = {
     for {
       uri      <- validateUri(s"$baseUrl/$url")
       response <- send(request(Method.GET, uri, maybeAccessToken = Some(accessToken)))(mapResponse)
     } yield response
   }.unsafeRunSync()
 
-  def GET(url: String): Response[IO] = {
+  def GET(url: String)(implicit ioRuntime: IORuntime): Response[IO] = {
     for {
       uri      <- validateUri(s"$baseUrl/$url")
       response <- send(request(Method.GET, uri))(mapResponse)

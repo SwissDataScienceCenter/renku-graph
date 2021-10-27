@@ -51,4 +51,4 @@ class UUIDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Mat
 }
 
 private class UUIDString private (val value: String) extends AnyVal with StringTinyType
-private object UUIDString extends TinyTypeFactory[UUIDString](new UUIDString(_)) with UUID
+private object UUIDString                            extends TinyTypeFactory[UUIDString](new UUIDString(_)) with UUID

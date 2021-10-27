@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.metrics
 
-import cats.MonadError
+import cats.MonadThrow
 import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.config.MetricsConfigProvider
 
@@ -26,10 +26,8 @@ import scala.concurrent.duration.FiniteDuration
 
 object MetricsConfigProvider {
 
-  def apply[Interpretation[_]](
-      configuration: Config = ConfigFactory.load()
-  )(implicit ME:     MonadError[Interpretation, Throwable]): MetricsConfigProvider[Interpretation] =
-    new MetricsConfigProvider[Interpretation] {
+  def apply[F[_]: MonadThrow](configuration: Config = ConfigFactory.load()): MetricsConfigProvider[F] =
+    new MetricsConfigProvider[F] {
       override def getInterval() = find[FiniteDuration]("event-log.metrics.scheduler-reset-interval", configuration)
     }
 }

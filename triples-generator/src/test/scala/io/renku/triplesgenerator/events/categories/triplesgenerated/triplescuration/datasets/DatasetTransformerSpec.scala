@@ -135,7 +135,7 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         step.name.value shouldBe "Dataset Details Updates"
         val Success(Right(updateResult)) = step.run(project).value
         updateResult.project shouldBe ProjectFunctions.update(dataset1, dataset1.update(kgTopmostDerivedFrom))(project)
-        updateResult.queries   should contain theSameElementsAs (dataset1Queries ::: dataset2Queries ::: importedDatasetQueries ::: dataset3Queries)
+        updateResult.queries should contain theSameElementsAs (dataset1Queries ::: dataset2Queries ::: importedDatasetQueries ::: dataset3Queries)
       }
 
     "prepare updates for deleted datasets" in new TestCase {
@@ -193,7 +193,7 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       val Success(Right(updateResult)) = step.run(entitiesProjectWithAllDatasets).value
 
       updateResult.project shouldBe entitiesProjectWithAllDatasets
-      updateResult.queries   should contain theSameElementsAs (internalDsQueries ::: importedExternalDsQueries ::: ancestorInternalDsQueries ::: ancestorExternalDsQueries)
+      updateResult.queries should contain theSameElementsAs (internalDsQueries ::: importedExternalDsQueries ::: ancestorInternalDsQueries ::: ancestorExternalDsQueries)
     }
 
     "return the ProcessingRecoverableFailure if calls to KG fails with a network or HTTP error" in new TestCase {

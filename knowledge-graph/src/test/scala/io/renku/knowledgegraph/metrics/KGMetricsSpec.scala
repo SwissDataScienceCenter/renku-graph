@@ -18,7 +18,7 @@
 
 package io.renku.knowledgegraph.metrics
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -26,6 +26,7 @@ import io.renku.graph.model.Schemas.{prov, schema}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.metrics.LabeledGauge
+import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
@@ -33,11 +34,16 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.lang.Thread.sleep
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class KGMetricsSpec extends AnyWordSpec with MockFactory with Eventually with IntegrationPatience with should.Matchers {
+class KGMetricsSpec
+    extends AnyWordSpec
+    with MockFactory
+    with Eventually
+    with IntegrationPatience
+    with should.Matchers
+    with IOSpec {
 
   "run" should {
 
@@ -58,7 +64,7 @@ class KGMetricsSpec extends AnyWordSpec with MockFactory with Eventually with In
 
       sleep(500)
 
-      metrics.run().unsafeRunAsyncAndForget()
+      metrics.run().unsafeRunAndForget()
 
       sleep(1000)
 
@@ -86,7 +92,7 @@ class KGMetricsSpec extends AnyWordSpec with MockFactory with Eventually with In
 
       sleep(500)
 
-      metrics.run().start.unsafeRunAsyncAndForget()
+      metrics.run().start.unsafeRunAndForget()
 
       sleep(1000)
 
@@ -96,9 +102,6 @@ class KGMetricsSpec extends AnyWordSpec with MockFactory with Eventually with In
     }
   }
 
-  private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
-  private implicit val timer:        Timer[IO]        = IO.timer(ExecutionContext.global)
-
   private trait TestGauges {
     lazy val countsGauge = mock[LabeledGauge[IO, EntityLabel]]
   }
@@ -106,7 +109,7 @@ class KGMetricsSpec extends AnyWordSpec with MockFactory with Eventually with In
   private trait TestCase extends TestGauges {
     implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
     lazy val statsFinder = mock[StatsFinder[IO]]
-    lazy val metrics = new KGMetricsImpl(
+    lazy val metrics = new KGMetricsImpl[IO](
       statsFinder,
       countsGauge,
       initialDelay = 100 millis,

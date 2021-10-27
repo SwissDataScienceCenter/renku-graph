@@ -66,7 +66,7 @@ private object CommitSyncEventEncoder {
         },
         "lastSynced":   ${lastSyncedDate.value}
       }"""
-    case MinimalCommitSyncEvent(Project(projectId, projectPath))   => json"""{
+    case MinimalCommitSyncEvent(Project(projectId, projectPath)) => json"""{
         "categoryName": ${categoryName.value},
         "project": {
           "id":         ${projectId.value},
@@ -74,5 +74,4 @@ private object CommitSyncEventEncoder {
         }
       }"""
   }
-
 }

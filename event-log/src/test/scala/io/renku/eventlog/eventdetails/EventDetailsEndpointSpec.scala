@@ -32,6 +32,7 @@ import io.renku.http.server.EndpointTester._
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
+import io.renku.testtools.IOSpec
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s.headers.`Content-Type`
@@ -40,7 +41,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EventDetailsEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class EventDetailsEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "getDetails" should {
 
@@ -95,9 +96,8 @@ class EventDetailsEndpointSpec extends AnyWordSpec with MockFactory with should.
       eventBody <- eventBodies
     } yield EventDetails(eventId, eventBody)
 
-    val logger = TestLogger[IO]()
-
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val eventDetailsFinder  = mock[EventDetailsFinder[IO]]
-    val eventDetailEndpoint = new EventDetailsEndpointImpl[IO](eventDetailsFinder, logger)
+    val eventDetailEndpoint = new EventDetailsEndpointImpl[IO](eventDetailsFinder)
   }
 }

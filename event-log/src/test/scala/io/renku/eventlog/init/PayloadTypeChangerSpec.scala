@@ -30,13 +30,14 @@ import io.renku.graph.model.events.{BatchDate, CompoundEventId, EventBody, Event
 import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk.codec.all._
 import skunk.implicits._
 import skunk.{Command, Query, ~}
 
-class PayloadTypeChangerSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
+class PayloadTypeChangerSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
 
   protected override lazy val migrationsToRun: List[Migration] = allMigrations.takeWhile {
     case _: PayloadTypeChangerImpl[_] => false

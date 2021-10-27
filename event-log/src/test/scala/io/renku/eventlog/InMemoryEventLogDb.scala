@@ -19,10 +19,11 @@
 package io.renku.eventlog
 
 import cats.data.Kleisli
-import cats.effect.{ContextShift, IO}
+import cats.effect.IO
 import cats.syntax.all._
 import com.dimafeng.testcontainers._
 import io.renku.db.SessionResource
+import io.renku.testtools.IOSpec
 import natchez.Trace.Implicits.noop
 import org.scalatest.Suite
 import org.testcontainers.utility.DockerImageName
@@ -30,12 +31,8 @@ import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
 trait InMemoryEventLogDb extends ForAllTestContainer with TypeSerializers {
-  self: Suite =>
-
-  implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
+  self: Suite with IOSpec =>
 
   private val dbConfig = new EventLogDbConfigProvider[IO].get().unsafeRunSync()
 
@@ -69,7 +66,7 @@ trait InMemoryEventLogDb extends ForAllTestContainer with TypeSerializers {
     session.prepare(query).use(_.unique(tableName ~ indexName)).recover(_ => false)
   })
 
-  def verify(table: String, column: String, hasType: String) = execute[Boolean] {
+  def verify(table: String, column: String, hasType: String): Boolean = execute[Boolean] {
     Kleisli { session =>
       val query: Query[String ~ String, String] =
         sql"""SELECT data_type FROM information_schema.columns WHERE
@@ -82,7 +79,7 @@ trait InMemoryEventLogDb extends ForAllTestContainer with TypeSerializers {
     }
   }
 
-  def verifyColumnExists(table: String, column: String) = execute[Boolean] {
+  def verifyColumnExists(table: String, column: String): Boolean = execute[Boolean] {
     Kleisli { session =>
       val query: Query[String ~ String, Boolean] =
         sql"""SELECT EXISTS (

@@ -18,21 +18,25 @@
 
 package io.renku.events.consumers.subscriptions
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.config.EventLogUrl
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
+import io.renku.testtools.IOSpec
 import org.http4s.Status._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
-class SubscriptionSenderSpec extends AnyWordSpec with MockFactory with ExternalServiceStubbing with should.Matchers {
+class SubscriptionSenderSpec
+    extends AnyWordSpec
+    with IOSpec
+    with MockFactory
+    with ExternalServiceStubbing
+    with should.Matchers {
 
   "postToEventLog" should {
 
@@ -44,7 +48,7 @@ class SubscriptionSenderSpec extends AnyWordSpec with MockFactory with ExternalS
           .willReturn(aResponse().withStatus(Accepted.code))
       }
 
-      sender.postToEventLog(payload).unsafeRunSync() shouldBe ((): Unit)
+      sender.postToEventLog(payload).unsafeRunSync() shouldBe ()
     }
 
     "fail when posting the payload results in any other status" in new TestCase {
@@ -62,13 +66,11 @@ class SubscriptionSenderSpec extends AnyWordSpec with MockFactory with ExternalS
     }
   }
 
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO]        = IO.timer(global)
-
   private trait TestCase {
     val payload = jsons.generateOne
 
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val eventLogUrl = EventLogUrl(externalServiceBaseUrl)
-    val sender      = new IOSubscriptionSender(eventLogUrl, TestLogger())
+    val sender      = new SubscriptionSenderImpl[IO](eventLogUrl)
   }
 }

@@ -27,11 +27,17 @@ import io.renku.interpreters.TestLogger
 import io.renku.jsonld.Property
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks with should.Matchers {
+class StatsFinderSpec
+    extends AnyWordSpec
+    with InMemoryRdfStore
+    with ScalaCheckPropertyChecks
+    with should.Matchers
+    with IOSpec {
 
   "entitiesCount" should {
 
@@ -72,11 +78,10 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
   }
 
   private trait TestCase {
-    private val logger = TestLogger[IO]()
-    val stats = new StatsFinderImpl(
+    implicit val logger = TestLogger[IO]()
+    val stats = new StatsFinderImpl[IO](
       rdfStoreConfig,
-      logger,
-      new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO](logger))
+      new SparqlQueryTimeRecorder[IO](TestExecutionTimeRecorder[IO]())
     )
   }
 

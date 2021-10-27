@@ -18,7 +18,8 @@
 
 package io.renku.triplesgenerator
 
-import cats.effect.{Clock, ConcurrentEffect, Resource}
+import cats.MonadThrow
+import cats.effect.{Clock, Resource}
 import com.typesafe.config.Config
 import io.renku.metrics.RoutesMetrics
 import io.renku.triplesgenerator.events.EventEndpoint
@@ -26,7 +27,7 @@ import org.http4s.dsl.Http4sDsl
 
 import scala.jdk.CollectionConverters._
 
-private class MicroserviceRoutes[F[_]: ConcurrentEffect](
+private class MicroserviceRoutes[F[_]: MonadThrow](
     eventEndpoint: EventEndpoint[F],
     routesMetrics: RoutesMetrics[F],
     config:        Option[Config] = None

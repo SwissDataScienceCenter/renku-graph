@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
 import cats.MonadThrow
-import cats.effect.{ConcurrentEffect, IO, Timer}
+import cats.effect.{Async, Temporal}
 import cats.syntax.all._
 import io.circe.literal._
 import io.renku.eventlog.subscriptions.DispatchRecovery
@@ -31,15 +31,14 @@ import io.renku.graph.model.events.EventStatus.{GenerationNonRecoverableFailure,
 import io.renku.tinytypes.json.TinyTypeEncoders
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-private class DispatchRecoveryImpl[Interpretation[_]: MonadThrow: Logger](
-    eventSender: EventSender[Interpretation]
-) extends subscriptions.DispatchRecovery[Interpretation, AwaitingGenerationEvent]
+private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
+    eventSender: EventSender[F]
+) extends subscriptions.DispatchRecovery[F, AwaitingGenerationEvent]
     with TinyTypeEncoders {
 
-  override def returnToQueue(event: AwaitingGenerationEvent): Interpretation[Unit] =
+  override def returnToQueue(event: AwaitingGenerationEvent): F[Unit] =
     eventSender.sendEvent(
       EventRequestContent.NoPayload(
         json"""{
@@ -58,7 +57,7 @@ private class DispatchRecoveryImpl[Interpretation[_]: MonadThrow: Logger](
   override def recover(
       url:   SubscriberUrl,
       event: AwaitingGenerationEvent
-  ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
+  ): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
     val requestContent = EventRequestContent.NoPayload(
       json"""{
         "categoryName": "EVENTS_STATUS_CHANGE",
@@ -72,17 +71,12 @@ private class DispatchRecoveryImpl[Interpretation[_]: MonadThrow: Logger](
       }"""
     )
     val errorMessage = s"${SubscriptionCategory.name}: $event, url = $url -> $GenerationNonRecoverableFailure"
-    eventSender.sendEvent(requestContent, errorMessage) >> Logger[Interpretation].error(exception)(errorMessage)
+    eventSender.sendEvent(requestContent, errorMessage) >> Logger[F].error(exception)(errorMessage)
   }
 }
 
 private object DispatchRecovery {
-
-  def apply()(implicit
-      executionContext: ExecutionContext,
-      concurrentEffect: ConcurrentEffect[IO],
-      timer:            Timer[IO],
-      logger:           Logger[IO]
-  ): IO[DispatchRecovery[IO, AwaitingGenerationEvent]] =
-    EventSender() map (new DispatchRecoveryImpl[IO](_))
+  def apply[F[_]: Async: Temporal: Logger]: F[DispatchRecovery[F, AwaitingGenerationEvent]] = for {
+    eventSender <- EventSender[F]
+  } yield new DispatchRecoveryImpl[F](eventSender)
 }
