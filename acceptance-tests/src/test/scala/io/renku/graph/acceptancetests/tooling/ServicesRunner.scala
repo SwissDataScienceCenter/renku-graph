@@ -70,39 +70,16 @@ class ServicesRunner(semaphore: Semaphore[IO])(implicit logger: Logger[IO]) {
 
   private def verifyServiceReady(serviceRun: ServiceRun): IO[Unit] =
     serviceRun.serviceClient.ping flatMap {
-      case ServiceUp =>
-        serviceRun.postServiceStart.sequence flatMap (_ => logger.info(s"Service ${serviceRun.name} started"))
-      case _ =>
-        Temporal[IO].delayBy(verifyServiceReady(serviceRun), 500 millis)
+      case ServiceUp => serviceRun.postServiceStart.sequence >> logger.info(s"Service ${serviceRun.name} started")
+      case _         => Temporal[IO].delayBy(verifyServiceReady(serviceRun), 500 millis)
     }
-
-  private def verifyServiceDown(serviceRun: ServiceRun): IO[Unit] =
-    serviceRun.serviceClient.ping flatMap {
-      case ServiceUp => Temporal[IO].delayBy(verifyServiceReady(serviceRun), 500 millis)
-      case _         => logger.info(s"Service ${serviceRun.name} stopped")
-    }
-
-  def restart(service: ServiceRun)(implicit ioRuntime: IORuntime): Unit = cancelTokens.asScala.get(service) match {
-    case None => throw new IllegalStateException(s"'${service.name}' service not found so cannot be restarted")
-    case Some(cancelToken) =>
-      {
-        for {
-          _ <- logger.info(s"Service ${service.name} stopping")
-          _ <- service.service.stopSubProcesses.sequence
-          _ <- cancelToken
-          _ <- verifyServiceDown(service)
-          _ = cancelTokens.remove(service)
-          _ <- start(service)
-        } yield ()
-      }.unsafeRunSync()
-  }
 
   def stop(service: ServiceRun)(implicit ioRuntime: IORuntime): Unit =
     cancelTokens.asScala.find { case (key, _) => key.name == service.name } match {
-      case None => throw new IllegalStateException(s"'${service.name}' service not found so cannot be restarted")
+      case None => throw new IllegalStateException(s"'${service.name}' service not found, it is already stopped")
       case Some((service, cancelToken)) =>
-        logger.info(s"${service.name} service stopping")
-        (service.onServiceStop.sequence >> cancelToken).unsafeRunSync()
+        (service.onServiceStop.sequence >> cancelToken >> logger.info(s"${service.name} service stopping"))
+          .unsafeRunSync()
     }
 
   def stopAllServices()(implicit ioRuntime: IORuntime): Unit =

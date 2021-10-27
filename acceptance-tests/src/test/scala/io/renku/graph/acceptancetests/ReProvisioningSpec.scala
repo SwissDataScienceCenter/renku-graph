@@ -25,14 +25,13 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
+import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.acceptancetests.tooling.ResponseTools.ResponseOps
-import io.renku.graph.acceptancetests.tooling.{GraphServices, ServiceRun}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.graph.model.{SchemaVersion, testentities}
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.syntax._
-import io.renku.triplesgenerator
 import org.http4s.Response
 import org.http4s.Status.Ok
 import org.scalactic.source.Position
@@ -119,13 +118,11 @@ class ReProvisioningSpec
   }
 
   private def restartTGWithNewCompatMatrix(): Unit = {
-    val newTriplesGenerator = ServiceRun(
-      "triples-generator",
-      service = triplesgenerator.Microservice,
-      serviceClient = triplesGeneratorClient,
-      serviceArgsList = List(() => "application-re-provisioning.conf")
+    val newTriplesGenerator = triplesGenerator.copy(
+      serviceArgsList = List(() => "application-re-provisioning.conf"),
+      preServiceStart = List()
     )
-    stop(newTriplesGenerator)
+    stop(triplesGenerator)
     run(newTriplesGenerator)
   }
 }

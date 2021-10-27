@@ -49,9 +49,9 @@ trait GraphServices extends GitLab with RemoteTriplesGenerator with IOSpec with 
   val knowledgeGraphClient:     KnowledgeGraphClient          = KnowledgeGraphClient()
   val eventLogClient:           EventLogClient.EventLogClient = EventLogClient()
 
-  def run(service: ServiceRun):     Unit = servicesRunner.run(service).unsafeRunSync()
-  def restart(service: ServiceRun): Unit = servicesRunner.restart(service)
-  def stop(service: ServiceRun):    Unit = servicesRunner.stop(service)
+  def run(service: ServiceRun): Unit = servicesRunner.run(service).unsafeRunSync()
+
+  def stop(service: ServiceRun): Unit = servicesRunner.stop(service)
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -89,7 +89,7 @@ trait GraphServices extends GitLab with RemoteTriplesGenerator with IOSpec with 
     preServiceStart = List(EventLog.startDB()),
     serviceArgsList = List()
   )
-  private lazy val triplesGenerator = ServiceRun(
+  protected lazy val triplesGenerator: ServiceRun = ServiceRun(
     "triples-generator",
     service = triplesgenerator.Microservice,
     serviceClient = triplesGeneratorClient,
