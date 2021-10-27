@@ -18,20 +18,22 @@
 
 package io.renku.graph.acceptancetests.db
 
+import cats.Applicative
 import cats.effect.IO
+import cats.effect.unsafe.IORuntime
 import com.dimafeng.testcontainers.FixedHostPortGenericContainer
 import io.renku.db.DBConfigProvider
-import io.renku.graph.acceptancetests.tooling.TestLogger
 import io.renku.tokenrepository.repository.{ProjectsTokensDB, ProjectsTokensDbConfigProvider}
+import org.typelevel.log4cats.Logger
+
+import scala.util.Try
 
 object TokenRepository {
 
-  private val logger = TestLogger()
+  private lazy val dbConfig: DBConfigProvider.DBConfig[ProjectsTokensDB] =
+    new ProjectsTokensDbConfigProvider[Try].get().fold(throw _, identity)
 
-  private val dbConfig: DBConfigProvider.DBConfig[ProjectsTokensDB] =
-    new ProjectsTokensDbConfigProvider[IO].get().unsafeRunSync()
-
-  private val postgresContainer = FixedHostPortGenericContainer(
+  private lazy val postgresContainer = FixedHostPortGenericContainer(
     imageName = "postgres:11.11-alpine",
     env = Map("POSTGRES_USER"     -> dbConfig.user.value,
               "POSTGRES_PASSWORD" -> dbConfig.pass.value,
@@ -43,8 +45,8 @@ object TokenRepository {
     command = Seq(s"-p ${dbConfig.port.value}")
   )
 
-  def startDB(): IO[Unit] = for {
-    _ <- IO(postgresContainer.start())
+  def startDB()(implicit ioRuntime: IORuntime, logger: Logger[IO]): IO[Unit] = for {
+    _ <- Applicative[IO].unlessA(postgresContainer.container.isRunning)(IO(postgresContainer.start()))
     _ <- logger.info("projects_tokens DB started")
   } yield ()
 }

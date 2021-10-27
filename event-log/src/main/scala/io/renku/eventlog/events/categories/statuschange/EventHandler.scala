@@ -19,7 +19,8 @@
 package io.renku.eventlog.events.categories.statuschange
 
 import cats.data.EitherT
-import cats.effect.{Concurrent, ContextShift, IO}
+import cats.effect.Concurrent
+import cats.effect.kernel.{Async, Spawn}
 import cats.syntax.all._
 import cats.{MonadThrow, Show}
 import io.circe.DecodingFailure
@@ -38,18 +39,18 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurrent: Logger](
+private class EventHandler[F[_]: MonadThrow: Async: Spawn: Concurrent: Logger](
     override val categoryName: CategoryName,
-    statusChanger:             StatusChanger[Interpretation],
-    deliveryInfoRemover:       DeliveryInfoRemover[Interpretation],
-    queriesExecTimes:          LabeledHistogram[Interpretation, SqlStatement.Name]
-) extends consumers.EventHandlerWithProcessLimiter[Interpretation](ConcurrentProcessesLimiter.withoutLimit) {
+    statusChanger:             StatusChanger[F],
+    deliveryInfoRemover:       DeliveryInfoRemover[F],
+    queriesExecTimes:          LabeledHistogram[F, SqlStatement.Name]
+) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
 
   import EventHandler._
 
   override def createHandlingProcess(
       request: EventRequestContent
-  ): Interpretation[EventHandlingProcess[Interpretation]] = EventHandlingProcess[Interpretation] {
+  ): F[EventHandlingProcess[F]] = EventHandlingProcess[F] {
     tryHandle(
       requestAs[ToTriplesGenerated],
       requestAs[ToTriplesStore],
@@ -62,17 +63,17 @@ private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurre
   }
 
   private def tryHandle(
-      options: EventRequestContent => EitherT[Interpretation, EventSchedulingResult, Accepted]*
-  ): EventRequestContent => EitherT[Interpretation, EventSchedulingResult, Accepted] = request =>
+      options: EventRequestContent => EitherT[F, EventSchedulingResult, Accepted]*
+  ): EventRequestContent => EitherT[F, EventSchedulingResult, Accepted] = request =>
     options.foldLeft(
-      EitherT.left[Accepted](UnsupportedEventType.pure[Interpretation].widen[EventSchedulingResult])
+      EitherT.left[Accepted](UnsupportedEventType.pure[F].widen[EventSchedulingResult])
     ) { case (previousOptionResult, option) => previousOptionResult orElse option(request) }
 
   private def requestAs[E <: StatusChangeEvent](request: EventRequestContent)(implicit
-      updaterFactory:                                    EventUpdaterFactory[Interpretation, E],
+      updaterFactory:                                    EventUpdaterFactory[F, E],
       show:                                              Show[E],
       decoder:                                           EventRequestContent => Either[DecodingFailure, E]
-  ): EitherT[Interpretation, EventSchedulingResult, Accepted] = EitherT(
+  ): EitherT[F, EventSchedulingResult, Accepted] = EitherT(
     decode[E](request)
       .map(startUpdate)
       .leftMap(_ => BadRequest)
@@ -81,47 +82,48 @@ private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurre
   )
 
   private def startUpdate[E <: StatusChangeEvent](implicit
-      updaterFactory: EventUpdaterFactory[Interpretation, E],
+      updaterFactory: EventUpdaterFactory[F, E],
       show:           Show[E]
-  ): E => Interpretation[Accepted] = event =>
-    (ContextShift[Interpretation].shift *> Concurrent[Interpretation]
-      .start(executeUpdate(event)))
+  ): E => F[Accepted] = event =>
+    Spawn[F]
+      .start(executeUpdate(event))
       .map(_ => Accepted)
-      .flatTap(Logger[Interpretation].log(event.show))
+      .flatTap(Logger[F].log(event.show))
 
   private def executeUpdate[E <: StatusChangeEvent](
       event:                 E
-  )(implicit updaterFactory: EventUpdaterFactory[Interpretation, E], show: Show[E]) = statusChanger
+  )(implicit updaterFactory: EventUpdaterFactory[F, E], show: Show[E]) = statusChanger
     .updateStatuses(event)(updaterFactory(deliveryInfoRemover, queriesExecTimes))
-    .recoverWith { case NonFatal(e) => Logger[Interpretation].logError(event, e) >> e.raiseError[Interpretation, Unit] }
-    .flatTap(_ => Logger[Interpretation].logInfo(event, "Processed"))
+    .recoverWith { case NonFatal(e) => Logger[F].logError(event, e) >> e.raiseError[F, Unit] }
+    .flatTap(_ => Logger[F].logInfo(event, "Processed"))
 }
 
 private object EventHandler {
 
-  def apply(sessionResource:                    SessionResource[IO, EventLogDB],
-            queriesExecTimes:                   LabeledHistogram[IO, SqlStatement.Name],
-            awaitingTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],
-            underTriplesGenerationGauge:        LabeledGauge[IO, projects.Path],
-            awaitingTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
-            underTriplesTransformationGauge:    LabeledGauge[IO, projects.Path]
-  )(implicit cs:                                ContextShift[IO], logger: Logger[IO]): IO[EventHandler[IO]] = for {
+  def apply[F[_]: MonadThrow: Async: Spawn: Concurrent: Logger](
+      sessionResource:                    SessionResource[F, EventLogDB],
+      queriesExecTimes:                   LabeledHistogram[F, SqlStatement.Name],
+      awaitingTriplesGenerationGauge:     LabeledGauge[F, projects.Path],
+      underTriplesGenerationGauge:        LabeledGauge[F, projects.Path],
+      awaitingTriplesTransformationGauge: LabeledGauge[F, projects.Path],
+      underTriplesTransformationGauge:    LabeledGauge[F, projects.Path]
+  ): F[EventHandler[F]] = for {
     deliveryInfoRemover <- DeliveryInfoRemover(queriesExecTimes)
-    gaugesUpdater <- IO(
-                       new GaugesUpdaterImpl[IO](awaitingTriplesGenerationGauge,
-                                                 awaitingTriplesTransformationGauge,
-                                                 underTriplesTransformationGauge,
-                                                 underTriplesGenerationGauge
+    gaugesUpdater <- MonadThrow[F].catchNonFatal(
+                       new GaugesUpdaterImpl[F](awaitingTriplesGenerationGauge,
+                                                awaitingTriplesTransformationGauge,
+                                                underTriplesTransformationGauge,
+                                                underTriplesGenerationGauge
                        )
                      )
-    statusChanger <- IO(new StatusChangerImpl[IO](sessionResource, gaugesUpdater))
-  } yield new EventHandler[IO](categoryName, statusChanger, deliveryInfoRemover, queriesExecTimes)
+    statusChanger <- MonadThrow[F].catchNonFatal(new StatusChangerImpl[F](sessionResource, gaugesUpdater))
+  } yield new EventHandler[F](categoryName, statusChanger, deliveryInfoRemover, queriesExecTimes)
 
   import io.renku.tinytypes.json.TinyTypeDecoders._
 
-  private def decode[E <: StatusChangeEvent](request: EventRequestContent)(implicit
-      decoder:                                        EventRequestContent => Either[DecodingFailure, E]
-  ) = decoder(request)
+  private def decode[E <: StatusChangeEvent](
+      request:        EventRequestContent
+  )(implicit decoder: EventRequestContent => Either[DecodingFailure, E]) = decoder(request)
 
   private implicit lazy val eventTriplesGeneratedDecoder
       : EventRequestContent => Either[DecodingFailure, ToTriplesGenerated] = {
@@ -178,7 +180,7 @@ private object EventHandler {
   }
 
   private implicit lazy val eventRollbackToNewDecoder: EventRequestContent => Either[DecodingFailure, RollbackToNew] = {
-    case request =>
+    request =>
       for {
         id          <- request.event.hcursor.downField("id").as[EventId]
         projectId   <- request.event.hcursor.downField("project").downField("id").as[projects.Id]
@@ -191,7 +193,7 @@ private object EventHandler {
   }
 
   private implicit lazy val eventRollbackToTriplesGeneratedDecoder
-      : EventRequestContent => Either[DecodingFailure, RollbackToTriplesGenerated] = { case request =>
+      : EventRequestContent => Either[DecodingFailure, RollbackToTriplesGenerated] = { request =>
     for {
       id          <- request.event.hcursor.downField("id").as[EventId]
       projectId   <- request.event.hcursor.downField("project").downField("id").as[projects.Id]

@@ -19,7 +19,7 @@
 package io.renku.events.consumers
 
 import cats.data.EitherT
-import cats.effect.{ContextShift, IO}
+import cats.effect.IO
 import cats.syntax.all._
 import io.circe.literal.JsonStringContext
 import io.renku.events.EventRequestContent
@@ -27,13 +27,12 @@ import io.renku.events.consumers.EventSchedulingResult._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, nonEmptyStrings}
 import io.renku.graph.model.events
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.global
-
-class EventHandlerSpec extends AnyWordSpec with should.Matchers with MockFactory {
+class EventHandlerSpec extends AnyWordSpec with IOSpec with should.Matchers with MockFactory {
 
   "tryHandling" should {
 
@@ -75,8 +74,6 @@ class EventHandlerSpec extends AnyWordSpec with should.Matchers with MockFactory
       } yield result).unsafeRunSync() shouldBe UnsupportedEventType
     }
   }
-
-  private implicit val cs: ContextShift[IO] = IO.contextShift(global)
 
   private trait TestCase {
     val processesLimiter = mock[ConcurrentProcessesLimiter[IO]]

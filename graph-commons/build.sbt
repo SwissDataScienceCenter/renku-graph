@@ -18,19 +18,15 @@
 
 name := "graph-commons"
 
-val pureConfigVersion = "0.16.0"
+val pureConfigVersion = "0.17.0"
 libraryDependencies += "com.github.pureconfig" %% "pureconfig"      % pureConfigVersion
 libraryDependencies += "com.github.pureconfig" %% "pureconfig-cats" % pureConfigVersion
 
-val refinedVersion = "0.9.26"
-libraryDependencies += "eu.timepit" %% "refined-pureconfig" % refinedVersion
+libraryDependencies += "eu.timepit"   %% "refined-pureconfig" % "0.9.27"
+libraryDependencies += "io.sentry"     % "sentry-logback"     % "5.2.4"
+libraryDependencies += "org.tpolecat" %% "skunk-core"         % "0.2.2"
 
-libraryDependencies += "io.sentry" % "sentry-logback" % "5.0.1"
-
-val skunkVersion = "0.0.28"
-libraryDependencies += "org.tpolecat" %% "skunk-core" % skunkVersion
-
-val http4sVersion = "0.21.24"
+val http4sVersion = "0.23.6"
 libraryDependencies += "org.http4s" %% "http4s-blaze-client"       % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-blaze-server"       % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-circe"              % http4sVersion
@@ -38,16 +34,14 @@ libraryDependencies += "org.http4s" %% "http4s-dsl"                % http4sVersi
 libraryDependencies += "org.http4s" %% "http4s-prometheus-metrics" % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-server"             % http4sVersion
 
-libraryDependencies += "org.typelevel" %% "cats-effect" % "2.4.1"
-
-libraryDependencies += "org.typelevel" %% "log4cats-core" % "2.0.1"
+libraryDependencies += "org.typelevel" %% "cats-effect"   % "3.2.9"
+libraryDependencies += "org.typelevel" %% "log4cats-core" % "2.1.1"
 
 // Test dependencies
-val testContainersScalaVersion = "0.39.5"
-libraryDependencies += "com.dimafeng" %% "testcontainers-scala-scalatest"  % testContainersScalaVersion % Test
-libraryDependencies += "com.dimafeng" %% "testcontainers-scala-postgresql" % testContainersScalaVersion % Test
-
-libraryDependencies += "com.github.tomakehurst" % "wiremock" % "2.27.2" % Test
+val testContainersScalaVersion = "0.39.8"
+libraryDependencies += "com.dimafeng"          %% "testcontainers-scala-scalatest"  % testContainersScalaVersion % Test
+libraryDependencies += "com.dimafeng"          %% "testcontainers-scala-postgresql" % testContainersScalaVersion % Test
+libraryDependencies += "com.github.tomakehurst" % "wiremock"                        % "2.27.2"                   % Test
 
 val jenaVersion = "3.14.0" // 4.0.0 requires IRI encoding
 libraryDependencies += "org.apache.jena" % "jena-fuseki-main"   % jenaVersion % Test

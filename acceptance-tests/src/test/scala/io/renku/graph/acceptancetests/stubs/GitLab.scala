@@ -36,8 +36,7 @@ import io.renku.generators.Generators._
 import io.renku.graph.acceptancetests.data
 import io.renku.graph.acceptancetests.data.Project.Permissions
 import io.renku.graph.acceptancetests.data.Project.Permissions._
-import io.renku.graph.acceptancetests.tooling.GraphServices.webhookServiceClient
-import io.renku.graph.acceptancetests.tooling.TestLogger
+import io.renku.graph.acceptancetests.tooling.{GraphServices, TestLogger}
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects.Id
@@ -50,12 +49,14 @@ import io.renku.http.server.security.model.AuthUser
 
 import java.time.Instant
 
-object GitLab {
+trait GitLab {
+  self: GraphServices =>
 
-  private val logger = TestLogger()
-  private val port:      Int Refined Positive = 2048
-  lazy val gitLabUrl:    GitLabUrl            = GitLabUrl(s"http://localhost:$port")
-  lazy val gitLabApiUrl: GitLabApiUrl         = gitLabUrl.apiV4
+  import GitLabWiremockInstance._
+
+  private val port:               Int Refined Positive = GitLabWiremockInstance.port
+  implicit lazy val gitLabUrl:    GitLabUrl            = GitLabUrl(s"http://localhost:$port")
+  implicit lazy val gitLabApiUrl: GitLabApiUrl         = gitLabUrl.apiV4
 
   def `GET <gitlabApi>/user returning OK`(user: AuthUser): Unit =
     `GET <gitlabApi>/user returning OK`(user.id)(user.accessToken)
@@ -184,11 +185,11 @@ object GitLab {
           "project_access": ${toJson(project)},
           "group_access":   ${toJson(group)}
         }"""
-        case ProjectPermissions(project)                => json"""{
+        case ProjectPermissions(project) => json"""{
           "project_access": ${toJson(project)},
           "group_access":   ${Json.Null}
         }"""
-        case GroupPermissions(group)                    => json"""{
+        case GroupPermissions(group) => json"""{
           "project_access": ${Json.Null},
           "group_access":   ${toJson(group)}
         }"""
@@ -286,9 +287,15 @@ object GitLab {
     }
   }
 
-  private val instance = WireMock.create().http().host("localhost").port(port.value).build()
-
   private def stubFor(mappingBuilder: MappingBuilder): StubMapping = instance.register(mappingBuilder)
+}
+
+private object GitLabWiremockInstance {
+  private val logger = TestLogger()
+
+  val port: Int Refined Positive = 2048
+
+  val instance = WireMock.create().http().host("localhost").port(port.value).build()
 
   private val server = {
     val newServer = new WireMockServer(WireMockConfiguration.wireMockConfig().port(port.value))
@@ -298,7 +305,7 @@ object GitLab {
     newServer
   }
 
-  def shutdown(): Unit = {
+  def shutdownGitLab(): Unit = {
     server.stop()
     server.shutdownServer()
     logger.info(s"GitLab stub stopped")

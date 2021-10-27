@@ -26,7 +26,7 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.http.client.AccessToken
-import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.GitLabRepoUrlFinder
+import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.{GitLabRepoUrlFinder, GitLabRepoUrlFinderImpl}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -79,8 +79,7 @@ class GitLabRepoUrlFinderSpec extends AnyWordSpec with MockFactory with should.M
 
   private trait TestCase {
     val context = MonadError[Try, Throwable]
-
-    val newRepoUrlFinder: GitLabUrl => GitLabRepoUrlFinder[Try] = new GitLabRepoUrlFinder[Try](_)
+    val newRepoUrlFinder: GitLabUrl => GitLabRepoUrlFinder[Try] = new GitLabRepoUrlFinderImpl[Try](_)
   }
 
   private lazy val protocols = Set("http", "https")

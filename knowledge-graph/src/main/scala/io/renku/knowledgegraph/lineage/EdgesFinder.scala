@@ -28,40 +28,36 @@ import io.renku.graph.model.projects.{Path, ResourceId, Visibility}
 import io.renku.graph.model.views.RdfResource
 import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.EntityId
+import io.renku.knowledgegraph.lineage.model._
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
-import model._
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
-private trait EdgesFinder[Interpretation[_]] {
-  def findEdges(projectPath: Path, maybeUser: Option[AuthUser]): Interpretation[EdgeMap]
+private trait EdgesFinder[F[_]] {
+  def findEdges(projectPath: Path, maybeUser: Option[AuthUser]): F[EdgeMap]
 }
 
-private class EdgesFinderImpl(
-    rdfStoreConfig:          RdfStoreConfig,
-    renkuBaseUrl:            RenkuBaseUrl,
-    logger:                  Logger[IO],
-    timeRecorder:            SparqlQueryTimeRecorder[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
-    with EdgesFinder[IO] {
+private class EdgesFinderImpl[F[_]: Async: Logger](
+    rdfStoreConfig: RdfStoreConfig,
+    renkuBaseUrl:   RenkuBaseUrl,
+    timeRecorder:   SparqlQueryTimeRecorder[F]
+) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
+    with EdgesFinder[F] {
 
   private type EdgeData = (ExecutionInfo, Option[Node.Location], Option[Node.Location])
 
-  override def findEdges(projectPath: Path, maybeUser: Option[AuthUser]): IO[EdgeMap] =
+  override def findEdges(projectPath: Path, maybeUser: Option[AuthUser]): F[EdgeMap] =
     queryEdges(using = query(projectPath, maybeUser)) map toNodesLocations
 
-  private def queryEdges(using: SparqlQuery): IO[Set[EdgeData]] = {
+  private def queryEdges(using: SparqlQuery): F[Set[EdgeData]] = {
     val pageSize = 2000
 
-    def fetchPaginatedResult(into: Set[EdgeData], using: SparqlQuery, offset: Int): IO[Set[EdgeData]] = {
+    def fetchPaginatedResult(into: Set[EdgeData], using: SparqlQuery, offset: Int): F[Set[EdgeData]] = {
       val queryWithOffset = using.copy(body = using.body + s"\nLIMIT $pageSize \nOFFSET $offset")
       for {
         edges <- queryExpecting[Set[EdgeData]](queryWithOffset)
         results <- edges match {
-                     case e if e.size < pageSize => (into ++ edges).pure[IO]
+                     case e if e.size < pageSize => (into ++ edges).pure[F]
                      case fullPage               => fetchPaginatedResult(into ++ fullPage, using, offset + pageSize)
                    }
       } yield results
@@ -162,12 +158,8 @@ private class EdgesFinderImpl(
 
 private object EdgesFinder {
 
-  def apply(timeRecorder: SparqlQueryTimeRecorder[IO], logger: Logger[IO])(implicit
-      executionContext:   ExecutionContext,
-      contextShift:       ContextShift[IO],
-      timer:              Timer[IO]
-  ): IO[EdgesFinder[IO]] = for {
-    config       <- RdfStoreConfig[IO]()
-    renkuBaseUrl <- RenkuBaseUrlLoader[IO]()
-  } yield new EdgesFinderImpl(config, renkuBaseUrl, logger, timeRecorder)
+  def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[EdgesFinder[F]] = for {
+    config       <- RdfStoreConfig[F]()
+    renkuBaseUrl <- RenkuBaseUrlLoader[F]()
+  } yield new EdgesFinderImpl[F](config, renkuBaseUrl, timeRecorder)
 }

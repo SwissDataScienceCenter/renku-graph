@@ -18,9 +18,8 @@
 
 package io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.gitlab
 
-import cats.Monad
 import cats.data.OptionT
-import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
+import cats.effect.{Async, Temporal}
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
@@ -39,37 +38,33 @@ import org.http4s._
 import org.http4s.circe.jsonOf
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
-private[globalcommitsync] trait GitLabCommitStatFetcher[Interpretation[_]] {
+private[globalcommitsync] trait GitLabCommitStatFetcher[F[_]] {
   def fetchCommitStats(projectId: projects.Id)(implicit
       maybeAccessToken:           Option[AccessToken]
-  ): Interpretation[Option[ProjectCommitStats]]
+  ): F[Option[ProjectCommitStats]]
 }
 
-private[globalcommitsync] class GitLabCommitStatFetcherImpl[Interpretation[_]: ConcurrentEffect: Timer: Monad](
-    gitLabCommitFetcher:     GitLabCommitFetcher[Interpretation],
-    gitLabApiUrl:            GitLabApiUrl,
-    gitLabThrottler:         Throttler[Interpretation, GitLab],
-    logger:                  Logger[Interpretation],
-    retryInterval:           FiniteDuration = RestClient.SleepAfterConnectionIssue,
-    maxRetries:              Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
-    requestTimeoutOverride:  Option[Duration] = None
-)(implicit executionContext: ExecutionContext)
-    extends RestClient(gitLabThrottler,
-                       logger,
-                       retryInterval = retryInterval,
-                       maxRetries = maxRetries,
-                       requestTimeoutOverride = requestTimeoutOverride
+private[globalcommitsync] class GitLabCommitStatFetcherImpl[F[_]: Async: Temporal: Logger](
+    gitLabCommitFetcher:    GitLabCommitFetcher[F],
+    gitLabApiUrl:           GitLabApiUrl,
+    gitLabThrottler:        Throttler[F, GitLab],
+    retryInterval:          FiniteDuration = RestClient.SleepAfterConnectionIssue,
+    maxRetries:             Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
+    requestTimeoutOverride: Option[Duration] = None
+) extends RestClient(gitLabThrottler,
+                     retryInterval = retryInterval,
+                     maxRetries = maxRetries,
+                     requestTimeoutOverride = requestTimeoutOverride
     )
-    with GitLabCommitStatFetcher[Interpretation] {
+    with GitLabCommitStatFetcher[F] {
 
   import gitLabCommitFetcher._
 
   override def fetchCommitStats(projectId: projects.Id)(implicit
       maybeAccessToken:                    Option[AccessToken]
-  ): Interpretation[Option[ProjectCommitStats]] = (for {
+  ): F[Option[ProjectCommitStats]] = (for {
     maybeLatestCommitId <- OptionT.liftF(fetchLatestGitLabCommit(projectId))
     commitCount         <- OptionT(fetchCommitCount(projectId))
   } yield ProjectCommitStats(maybeLatestCommitId, commitCount)).value
@@ -79,29 +74,26 @@ private[globalcommitsync] class GitLabCommitStatFetcherImpl[Interpretation[_]: C
     commitCount <- send(request(GET, uri, maybeAccessToken))(mapCountResponse)
   } yield commitCount
 
-  private implicit lazy val mapCountResponse
-      : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[
-        Option[CommitCount]
-      ]] = {
+  private implicit lazy val mapCountResponse: PartialFunction[(Status, Request[F], Response[F]), F[
+    Option[CommitCount]
+  ]] = {
     case (Ok, _, response)    => response.as[CommitCount].map(_.some)
-    case (NotFound, _, _)     => Option.empty[CommitCount].pure[Interpretation]
+    case (NotFound, _, _)     => Option.empty[CommitCount].pure[F]
     case (Unauthorized, _, _) => UnauthorizedException.raiseError
   }
 
-  private implicit val commitCountDecoder: EntityDecoder[Interpretation, CommitCount] = {
+  private implicit val commitCountDecoder: EntityDecoder[F, CommitCount] = {
     implicit val commitDecoder: Decoder[CommitCount] =
       _.downField("statistics").downField("commit_count").as[Int].map(CommitCount(_))
-    jsonOf[Interpretation, CommitCount]
+    jsonOf[F, CommitCount]
   }
 }
 
 private[globalcommitsync] object GitLabCommitStatFetcher {
-  def apply(gitLabThrottler: Throttler[IO, GitLab], logger: Logger[IO])(implicit
-      executionContext:      ExecutionContext,
-      contextShift:          ContextShift[IO],
-      timer:                 Timer[IO]
-  ): IO[GitLabCommitStatFetcher[IO]] = for {
-    gitLabCommitFetcher <- GitLabCommitFetcher(gitLabThrottler, logger)
-    gitLabUrl           <- GitLabUrlLoader[IO]()
-  } yield new GitLabCommitStatFetcherImpl[IO](gitLabCommitFetcher, gitLabUrl.apiV4, gitLabThrottler, logger)
+  def apply[F[_]: Async: Temporal: Logger](
+      gitLabThrottler: Throttler[F, GitLab]
+  ): F[GitLabCommitStatFetcher[F]] = for {
+    gitLabCommitFetcher <- GitLabCommitFetcher(gitLabThrottler)
+    gitLabUrl           <- GitLabUrlLoader[F]()
+  } yield new GitLabCommitStatFetcherImpl[F](gitLabCommitFetcher, gitLabUrl.apiV4, gitLabThrottler)
 }

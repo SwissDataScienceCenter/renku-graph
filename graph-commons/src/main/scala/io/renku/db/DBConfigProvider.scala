@@ -18,7 +18,7 @@
 
 package io.renku.db
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.W
@@ -30,18 +30,17 @@ import eu.timepit.refined.string.MatchesRegex
 import io.renku.config.ConfigLoader
 import io.renku.db.DBConfigProvider.DBConfig
 
-class DBConfigProvider[Interpretation[_]: MonadError[*[_], Throwable], TargetDB](
+class DBConfigProvider[F[_]: MonadThrow, TargetDB](
     namespace: String,
     dbName:    DBConfig.DbName,
     config:    Config = ConfigFactory.load()
-) extends ConfigLoader[Interpretation] {
+) extends ConfigLoader[F] {
 
   import DBConfigProvider._
 
-  def map[Out](f: DBConfig[TargetDB] => Out): Interpretation[Out] =
-    get() map f
+  def map[Out](f: DBConfig[TargetDB] => Out): F[Out] = get() map f
 
-  def get(): Interpretation[DBConfig[TargetDB]] = for {
+  def get(): F[DBConfig[TargetDB]] = for {
     host           <- find[DBConfig.Host](s"$namespace.db-host", config)
     port           <- find[DBConfig.Port](s"$namespace.db-port", config)
     user           <- find[DBConfig.User](s"$namespace.db-user", config)

@@ -30,11 +30,17 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.events.CompoundEventId
 import io.renku.metrics.TestLabeledHistogram
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EventDeliverySpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory with should.Matchers {
+class EventDeliverySpec
+    extends AnyWordSpec
+    with IOSpec
+    with InMemoryEventLogDbSpec
+    with MockFactory
+    with should.Matchers {
 
   "registerSending" should {
 

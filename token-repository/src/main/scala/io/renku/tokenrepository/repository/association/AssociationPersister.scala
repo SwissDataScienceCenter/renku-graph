@@ -31,13 +31,18 @@ import skunk.data.Completion
 import skunk.data.Completion.{Insert, Update}
 import skunk.implicits._
 
-private class AssociationPersister[Interpretation[_]: BracketThrow](
-    sessionResource:  SessionResource[Interpretation, ProjectsTokensDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
-) extends DbClient[Interpretation](Some(queriesExecTimes))
+private trait AssociationPersister[F[_]] {
+  def persistAssociation(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken): F[Unit]
+}
+
+private class AssociationPersisterImpl[F[_]: MonadCancelThrow](
+    sessionResource:  SessionResource[F, ProjectsTokensDB],
+    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+) extends DbClient[F](Some(queriesExecTimes))
+    with AssociationPersister[F]
     with TokenRepositoryTypeSerializers {
 
-  def persistAssociation(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken): Interpretation[Unit] =
+  override def persistAssociation(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken): F[Unit] =
     sessionResource.useK(upsert(projectId, projectPath, encryptedToken))
 
   private def upsert(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken) =
@@ -49,9 +54,8 @@ private class AssociationPersister[Interpretation[_]: BracketThrow](
   private def checkIfTokenExists(projectPath: Path) = measureExecutionTime {
     SqlStatement(name = "associate token - check")
       .select[Path, EncryptedAccessToken](
-        sql"SELECT token FROM projects_tokens WHERE project_path = $projectPathEncoder".query(
-          encryptedAccessTokenDecoder
-        )
+        sql"SELECT token FROM projects_tokens WHERE project_path = $projectPathEncoder"
+          .query(encryptedAccessTokenDecoder)
       )
       .arguments(projectPath)
       .build(_.option)
@@ -83,15 +87,9 @@ private class AssociationPersister[Interpretation[_]: BracketThrow](
       .flatMapResult(failIfMultiUpdate(projectId, projectPath))
   }
 
-  private def failIfMultiUpdate(projectId: Id, projectPath: Path): Completion => Interpretation[Unit] = {
-    case Insert(1) | Update(1) => ().pure[Interpretation]
+  private def failIfMultiUpdate(projectId: Id, projectPath: Path): Completion => F[Unit] = {
+    case Insert(1) | Update(1) => ().pure[F]
     case _ =>
-      new RuntimeException(s"Associating token for project $projectPath ($projectId)").raiseError[Interpretation, Unit]
+      new RuntimeException(s"Associating token for project $projectPath ($projectId)").raiseError[F, Unit]
   }
 }
-
-private class IOAssociationPersister(
-    sessionResource:     SessionResource[IO, ProjectsTokensDB],
-    queriesExecTimes:    LabeledHistogram[IO, SqlStatement.Name]
-)(implicit contextShift: ContextShift[IO])
-    extends AssociationPersister[IO](sessionResource, queriesExecTimes)

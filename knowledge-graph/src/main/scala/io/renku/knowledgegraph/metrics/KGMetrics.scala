@@ -18,58 +18,50 @@
 
 package io.renku.knowledgegraph.metrics
 
-import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
+import cats.effect.Async
+import cats.effect.kernel.Temporal
 import cats.syntax.all._
-import io.renku.logging.ApplicationLogger
 import io.renku.metrics._
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
 import scala.language.postfixOps
 import scala.util.control.NonFatal
 
-trait KGMetrics[Interpretation[_]] {
-  def run(): Interpretation[Unit]
+trait KGMetrics[F[_]] {
+  def run(): F[Unit]
 }
 
-class KGMetricsImpl[Interpretation[_]: ConcurrentEffect: Timer: Logger](
-    statsFinder:    StatsFinder[Interpretation],
-    countsGauge:    LabeledGauge[Interpretation, EntityLabel],
+class KGMetricsImpl[F[_]: Temporal: Logger](
+    statsFinder:    StatsFinder[F],
+    countsGauge:    LabeledGauge[F, EntityLabel],
     initialDelay:   FiniteDuration = KGMetrics.initialDelay,
     countsInterval: FiniteDuration = KGMetrics.countsInterval
-) extends KGMetrics[Interpretation] {
+) extends KGMetrics[F] {
 
-  def run(): Interpretation[Unit] = for {
-    _ <- Timer[Interpretation] sleep initialDelay
-    _ <- updateCounts().foreverM[Unit]
-  } yield ()
+  def run(): F[Unit] = Temporal[F].delayBy(updateCounts().foreverM[Unit], initialDelay)
 
-  private def updateCounts(): Interpretation[Unit] = {
+  private def updateCounts(): F[Unit] = {
     for {
-      _      <- ().pure[Interpretation]
+      _      <- ().pure[F]
       counts <- statsFinder.entitiesCount()
       _      <- (counts map toCountsGauge).toList.sequence
-      _      <- Timer[Interpretation] sleep countsInterval
+      _      <- Temporal[F] sleep countsInterval
     } yield ()
   } recoverWith logAndRetry
 
-  private lazy val toCountsGauge: ((EntityLabel, Count)) => Interpretation[Unit] = { case (status, count) =>
+  private lazy val toCountsGauge: ((EntityLabel, Count)) => F[Unit] = { case (status, count) =>
     countsGauge set status -> count.value.toDouble
   }
 
-  private lazy val logAndRetry: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    for {
-      _ <- Logger[Interpretation].error(exception)("Problem with gathering metrics")
-      _ <- Timer[Interpretation] sleep initialDelay
-    } yield ()
+  private lazy val logAndRetry: PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
+    Temporal[F].andWait(Logger[F].error(exception)("Problem with gathering metrics"), initialDelay)
   }
 }
 
 object KGMetrics {
 
-  import cats.effect.IO._
   import eu.timepit.refined.auto._
 
   import scala.concurrent.duration._
@@ -77,22 +69,17 @@ object KGMetrics {
   private[metrics] val initialDelay:   FiniteDuration = 10 seconds
   private[metrics] val countsInterval: FiniteDuration = 1 minute
 
-  def apply(
-      metricsRegistry: MetricsRegistry[IO],
-      timeRecorder:    SparqlQueryTimeRecorder[IO]
-  )(implicit
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO],
-      executionContext: ExecutionContext,
-      logger:           Logger[IO]
-  ): IO[KGMetrics[IO]] =
+  def apply[F[_]: Async: Logger](
+      metricsRegistry: MetricsRegistry,
+      timeRecorder:    SparqlQueryTimeRecorder[F]
+  ): F[KGMetrics[F]] =
     for {
-      statsFinder <- StatsFinder(timeRecorder, ApplicationLogger)
+      statsFinder <- StatsFinder(timeRecorder)
       entitiesCountGauge <-
-        Gauge[IO, EntityLabel](
+        Gauge[F, EntityLabel](
           name = "entities_count",
           help = "Total object by type.",
           labelName = "entities"
         )(metricsRegistry)
-    } yield new KGMetricsImpl(statsFinder, entitiesCountGauge)
+    } yield new KGMetricsImpl[F](statsFinder, entitiesCountGauge)
 }

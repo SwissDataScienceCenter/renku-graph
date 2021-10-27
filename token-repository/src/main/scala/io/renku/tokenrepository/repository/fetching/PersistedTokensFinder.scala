@@ -28,41 +28,39 @@ import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToke
 import io.renku.tokenrepository.repository.{ProjectsTokensDB, TokenRepositoryTypeSerializers}
 import skunk.implicits._
 
-private class PersistedTokensFinder[Interpretation[_]: BracketThrow](
-    sessionResource:  SessionResource[Interpretation, ProjectsTokensDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
-) extends DbClient[Interpretation](Some(queriesExecTimes))
+private trait PersistedTokensFinder[F[_]] {
+  def findToken(projectId:   Id):   OptionT[F, EncryptedAccessToken]
+  def findToken(projectPath: Path): OptionT[F, EncryptedAccessToken]
+}
+
+private class PersistedTokensFinderImpl[F[_]: MonadCancelThrow](
+    sessionResource:  SessionResource[F, ProjectsTokensDB],
+    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+) extends DbClient[F](Some(queriesExecTimes))
+    with PersistedTokensFinder[F]
     with TokenRepositoryTypeSerializers {
 
-  def findToken(projectId: Id): OptionT[Interpretation, EncryptedAccessToken] = run {
+  override def findToken(projectId: Id): OptionT[F, EncryptedAccessToken] = run {
     SqlStatement(name = "find token - id")
       .select[Id, EncryptedAccessToken](
-        sql"""select token from projects_tokens where project_id = $projectIdEncoder""".query(
-          encryptedAccessTokenDecoder
-        )
+        sql"""select token from projects_tokens where project_id = $projectIdEncoder"""
+          .query(encryptedAccessTokenDecoder)
       )
       .arguments(projectId)
       .build(_.option)
   }
 
-  def findToken(projectPath: Path): OptionT[Interpretation, EncryptedAccessToken] = run {
+  override def findToken(projectPath: Path): OptionT[F, EncryptedAccessToken] = run {
     SqlStatement(name = "find token - path")
       .select[Path, EncryptedAccessToken](
-        sql"select token from projects_tokens where project_path = $projectPathEncoder".query(
-          encryptedAccessTokenDecoder
-        )
+        sql"select token from projects_tokens where project_path = $projectPathEncoder"
+          .query(encryptedAccessTokenDecoder)
       )
       .arguments(projectPath)
       .build(_.option)
   }
 
-  private def run(query: SqlStatement[Interpretation, Option[EncryptedAccessToken]]) =
-    OptionT {
-      sessionResource.useK(measureExecutionTime(query))
-    }
+  private def run(query: SqlStatement[F, Option[EncryptedAccessToken]]) = OptionT {
+    sessionResource.useK(measureExecutionTime(query))
+  }
 }
-
-private class IOPersistedTokensFinder(
-    sessionResource:  SessionResource[IO, ProjectsTokensDB],
-    queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
-) extends PersistedTokensFinder[IO](sessionResource, queriesExecTimes)

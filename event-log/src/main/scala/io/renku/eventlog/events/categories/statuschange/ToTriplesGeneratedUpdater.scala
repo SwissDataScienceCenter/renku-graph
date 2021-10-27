@@ -19,7 +19,8 @@
 package io.renku.eventlog.events.categories.statuschange
 
 import cats.data.Kleisli
-import cats.effect.{BracketThrow, Sync}
+import cats.effect.MonadCancelThrow
+import cats.effect.kernel.Async
 import cats.kernel.Monoid
 import cats.syntax.all._
 import eu.timepit.refined.auto._
@@ -38,21 +39,21 @@ import skunk.{Session, ~}
 
 import java.time.Instant
 
-private class ToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow: Sync](
-    deliveryInfoRemover: DeliveryInfoRemover[Interpretation],
-    queriesExecTimes:    LabeledHistogram[Interpretation, SqlStatement.Name],
+private class ToTriplesGeneratedUpdater[F[_]: Async: MonadCancelThrow](
+    deliveryInfoRemover: DeliveryInfoRemover[F],
+    queriesExecTimes:    LabeledHistogram[F, SqlStatement.Name],
     now:                 () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
-    with DBUpdater[Interpretation, ToTriplesGenerated] {
+    with DBUpdater[F, ToTriplesGenerated] {
 
   private lazy val partitionSize = 50
 
   import deliveryInfoRemover._
 
-  override def updateDB(event: ToTriplesGenerated): UpdateResult[Interpretation] =
+  override def updateDB(event: ToTriplesGenerated): UpdateResult[F] =
     deleteDelivery(event.eventId) >> updateStatus(event) >>= {
       case results if results.statusCounts.isEmpty => Kleisli.pure(results)
-      case results                                 => updateDependentData(event).map(_ combine results).widen[DBUpdateResults]
+      case results => updateDependentData(event).map(_ combine results).widen[DBUpdateResults]
     }
 
   override def onRollback(event: ToTriplesGenerated) = deleteDelivery(event.eventId)
@@ -82,12 +83,12 @@ private class ToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow: Sync](
         case Completion.Update(1) =>
           DBUpdateResults
             .ForProjects(event.projectPath, Map(GeneratingTriples -> -1, TriplesGenerated -> 1))
-            .pure[Interpretation]
+            .pure[F]
         case Completion.Update(0) =>
-          Monoid[DBUpdateResults.ForProjects].empty.pure[Interpretation]
+          Monoid[DBUpdateResults.ForProjects].empty.pure[F]
         case completion =>
           new Exception(s"Could not update event ${event.eventId} to status $TriplesGenerated: $completion")
-            .raiseError[Interpretation, DBUpdateResults.ForProjects]
+            .raiseError[F, DBUpdateResults.ForProjects]
       }
   }
 
@@ -160,7 +161,7 @@ private class ToTriplesGeneratedUpdater[Interpretation[_]: BracketThrow: Sync](
 
   private def cleanUp(idsAndStatuses: List[(EventId, EventStatus)],
                       event:          ToTriplesGenerated
-  ): Kleisli[Interpretation, Session[Interpretation], Unit] = Kleisli { session =>
+  ): Kleisli[F, Session[F], Unit] = Kleisli { session =>
     idsAndStatuses
       .sliding(size = partitionSize, step = partitionSize)
       .map(executeRemovalQueries(event)(_).run(session))

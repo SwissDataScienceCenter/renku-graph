@@ -60,9 +60,9 @@ class SparqlQuerySpec extends AnyWordSpec with should.Matchers {
         body
       )
 
-      sparql.name               shouldBe name
-      sparql.prefixes           shouldBe Set(Prefix(prefixName, prefixSchema)) + Prefix(otherPrefixName, otherPrefixSchema)
-      sparql.body               shouldBe body
+      sparql.name     shouldBe name
+      sparql.prefixes shouldBe Set(Prefix(prefixName, prefixSchema)) + Prefix(otherPrefixName, otherPrefixSchema)
+      sparql.body     shouldBe body
       sparql.maybePagingRequest shouldBe None
     }
   }

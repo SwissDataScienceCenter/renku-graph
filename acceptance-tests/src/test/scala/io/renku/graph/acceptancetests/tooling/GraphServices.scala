@@ -19,51 +19,44 @@
 package io.renku.graph.acceptancetests.tooling
 
 import cats.effect._
-import cats.effect.concurrent.Semaphore
+import cats.effect.std.Semaphore
 import io.renku._
 import io.renku.graph.acceptancetests.db.{EventLog, TokenRepository}
 import io.renku.graph.acceptancetests.stubs.{GitLab, RemoteTriplesGenerator}
 import io.renku.graph.acceptancetests.tooling.KnowledgeGraphClient.KnowledgeGraphClient
 import io.renku.graph.acceptancetests.tooling.WebhookServiceClient.WebhookServiceClient
 import io.renku.graph.config.RenkuBaseUrlLoader
-import io.renku.graph.model.testentities.generators.EntitiesGenerators
-import io.renku.graph.model.{GitLabApiUrl, GitLabUrl, RenkuBaseUrl}
+import io.renku.graph.model.RenkuBaseUrl
 import io.renku.rdfstore.FusekiBaseUrl
+import io.renku.testtools.IOSpec
 import org.scalatest.{BeforeAndAfterAll, Suite}
+import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.util.Try
 
-trait GraphServices extends BeforeAndAfterAll with EntitiesGenerators {
-  this: Suite =>
+trait GraphServices extends GitLab with RemoteTriplesGenerator with IOSpec with BeforeAndAfterAll {
+  self: Suite =>
 
   protected implicit val fusekiBaseUrl: FusekiBaseUrl = RDFStore.fusekiBaseUrl
-  implicit override val renkuBaseUrl:   RenkuBaseUrl  = RenkuBaseUrlLoader[Try]().fold(throw _, identity)
-  implicit override val gitLabUrl:      GitLabUrl     = GitLab.gitLabUrl
-  implicit override val gitLabApiUrl:   GitLabApiUrl  = GitLab.gitLabApiUrl
+  implicit val renkuBaseUrl:            RenkuBaseUrl  = RenkuBaseUrlLoader[Try]().fold(throw _, identity)
+  implicit lazy val logger:             Logger[IO]    = TestLogger()
 
-  protected implicit lazy val executionContext: ExecutionContext     = GraphServices.executionContext
-  protected implicit lazy val contextShift:     ContextShift[IO]     = GraphServices.contextShift
-  protected implicit lazy val concurrent:       ConcurrentEffect[IO] = GraphServices.concurrent
-  protected implicit lazy val timer:            Timer[IO]            = GraphServices.timer
+  val restClient:               RestClientImpl                = new RestClientImpl()
+  val webhookServiceClient:     WebhookServiceClient          = WebhookServiceClient()
+  val commitEventServiceClient: ServiceClient                 = CommitEventServiceClient()
+  val triplesGeneratorClient:   ServiceClient                 = TriplesGeneratorClient()
+  val tokenRepositoryClient:    ServiceClient                 = TokenRepositoryClient()
+  val knowledgeGraphClient:     KnowledgeGraphClient          = KnowledgeGraphClient()
+  val eventLogClient:           EventLogClient.EventLogClient = EventLogClient()
 
-  protected val restClient:             RestClientImpl       = new RestClientImpl()
-  protected val webhookServiceClient:   WebhookServiceClient = GraphServices.webhookServiceClient
-  protected val tokenRepositoryClient:  ServiceClient        = GraphServices.tokenRepositoryClient
-  protected val triplesGeneratorClient: ServiceClient        = GraphServices.triplesGeneratorClient
-  protected val knowledgeGraphClient:   KnowledgeGraphClient = GraphServices.knowledgeGraphClient
-  protected val eventLogClient:         ServiceClient        = GraphServices.eventLogClient
-  protected val webhookService:         ServiceRun           = GraphServices.webhookService
-  protected val commitEventService:     ServiceRun           = GraphServices.commitEventService
-  protected val tokenRepository:        ServiceRun           = GraphServices.tokenRepository
-  protected val triplesGenerator:       ServiceRun           = GraphServices.triplesGenerator
-  protected val knowledgeGraph:         ServiceRun           = GraphServices.knowledgeGraph
-  protected val eventLog:               ServiceRun           = GraphServices.eventLog
+  def run(service: ServiceRun): Unit = servicesRunner.run(service).unsafeRunSync()
+
+  def stop(service: ServiceRun): Unit = servicesRunner.stop(service)
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
 
-    GraphServices.servicesRunner
+    servicesRunner
       .run(
         tokenRepository,
         eventLog,
@@ -74,59 +67,34 @@ trait GraphServices extends BeforeAndAfterAll with EntitiesGenerators {
       )
       .unsafeRunSync()
   }
-}
 
-object GraphServices {
-
-  implicit lazy val executionContext: ExecutionContext     = ExecutionContext.global
-  implicit lazy val contextShift:     ContextShift[IO]     = IO.contextShift(executionContext)
-  implicit lazy val concurrent:       ConcurrentEffect[IO] = IO.ioConcurrentEffect
-  implicit lazy val timer:            Timer[IO]            = IO.timer(executionContext)
-
-  val webhookServiceClient:     WebhookServiceClient          = WebhookServiceClient()
-  val commitEventServiceClient: ServiceClient                 = CommitEventServiceClient()
-  val triplesGeneratorClient:   ServiceClient                 = TriplesGeneratorClient()
-  val tokenRepositoryClient:    ServiceClient                 = TokenRepositoryClient()
-  val knowledgeGraphClient:     KnowledgeGraphClient          = KnowledgeGraphClient()
-  val eventLogClient:           EventLogClient.EventLogClient = EventLogClient()
-
-  private val webhookService = ServiceRun("webhook-service", webhookservice.Microservice, webhookServiceClient)
-  private val commitEventService = ServiceRun(
+  private lazy val webhookService = ServiceRun("webhook-service", webhookservice.Microservice, webhookServiceClient)
+  private lazy val commitEventService = ServiceRun(
     "commit-event-service",
     commiteventservice.Microservice,
     commitEventServiceClient
   )
-  private val knowledgeGraph = ServiceRun("knowledge-graph", knowledgegraph.Microservice, knowledgeGraphClient)
-  private val tokenRepository = ServiceRun(
+  private lazy val knowledgeGraph = ServiceRun("knowledge-graph", knowledgegraph.Microservice, knowledgeGraphClient)
+  private lazy val tokenRepository = ServiceRun(
     "token-repository",
     tokenrepository.Microservice,
     tokenRepositoryClient,
     preServiceStart = List(TokenRepository.startDB()),
     serviceArgsList = List()
   )
-  private val eventLog = ServiceRun(
+  private lazy val eventLog = ServiceRun(
     "event-log",
     eventlog.Microservice,
     eventLogClient,
     preServiceStart = List(EventLog.startDB()),
     serviceArgsList = List()
   )
-  private val triplesGenerator = ServiceRun(
+  protected lazy val triplesGenerator: ServiceRun = ServiceRun(
     "triples-generator",
     service = triplesgenerator.Microservice,
     serviceClient = triplesGeneratorClient,
     preServiceStart = List(RDFStore.stop(), RDFStore.start())
   )
 
-  private val servicesRunner = (Semaphore[IO](1) map (new ServicesRunner(_))).unsafeRunSync()
-
-  def run(service:      ServiceRun): Unit = servicesRunner.run(service).unsafeRunSync()
-  def restart(service:  ServiceRun): Unit = servicesRunner.restart(service)
-  def stop(serviceName: String):     Unit = servicesRunner.stop(serviceName)
-
-  sys.addShutdownHook {
-    servicesRunner.stopAllServices()
-    GitLab.shutdown()
-    RemoteTriplesGenerator.shutdown()
-  }
+  private lazy val servicesRunner = (Semaphore[IO](1) map (new ServicesRunner(_))).unsafeRunSync()
 }

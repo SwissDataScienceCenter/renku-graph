@@ -28,6 +28,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.stubbing.ExternalServiceStubbing
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -37,7 +38,8 @@ class ProjectDatasetsFinderSpec
     with InMemoryRdfStore
     with ExternalServiceStubbing
     with ScalaCheckPropertyChecks
-    with should.Matchers {
+    with should.Matchers
+    with IOSpec {
 
   "findProjectDatasets" should {
 
@@ -153,8 +155,8 @@ class ProjectDatasetsFinderSpec
   }
 
   private trait TestCase {
-    private val logger       = TestLogger[IO]()
-    private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
-    val datasetsFinder       = new ProjectDatasetsFinderImpl(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
+    private implicit val logger = TestLogger[IO]()
+    private val timeRecorder    = new SparqlQueryTimeRecorder[IO](TestExecutionTimeRecorder[IO]())
+    val datasetsFinder          = new ProjectDatasetsFinderImpl[IO](rdfStoreConfig, renkuBaseUrl, timeRecorder)
   }
 }

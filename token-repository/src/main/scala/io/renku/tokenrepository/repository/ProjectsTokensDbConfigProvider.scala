@@ -18,14 +18,14 @@
 
 package io.renku.tokenrepository.repository
 
-import cats.MonadError
+import cats.MonadThrow
 import eu.timepit.refined.auto._
 import io.renku.db.DBConfigProvider
 
 sealed trait ProjectsTokensDB
 
-class ProjectsTokensDbConfigProvider[Interpretation[_]: MonadError[*[_], Throwable]](
-) extends DBConfigProvider[Interpretation, ProjectsTokensDB](
+class ProjectsTokensDbConfigProvider[F[_]: MonadThrow](
+) extends DBConfigProvider[F, ProjectsTokensDB](
       namespace = "projects-tokens",
       dbName = "projects_tokens"
     )

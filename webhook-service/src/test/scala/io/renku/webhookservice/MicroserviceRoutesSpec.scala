@@ -19,7 +19,7 @@
 package io.renku.webhookservice
 
 import cats.data.OptionT
-import cats.effect.{Clock, IO}
+import cats.effect.IO
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
@@ -27,6 +27,7 @@ import io.renku.graph.model.projects
 import io.renku.http.server.EndpointTester._
 import io.renku.http.server.security.model.AuthUser
 import io.renku.interpreters.TestRoutesMetrics
+import io.renku.testtools.IOSpec
 import io.renku.webhookservice.eventprocessing.{HookEventEndpoint, ProcessingStatusEndpoint}
 import io.renku.webhookservice.hookcreation.HookCreationEndpoint
 import io.renku.webhookservice.hookvalidation.HookValidationEndpoint
@@ -39,17 +40,21 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import scala.concurrent.ExecutionContext
 import scala.language.reflectiveCalls
 
-class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyChecks with should.Matchers {
+class MicroserviceRoutesSpec
+    extends AnyWordSpec
+    with MockFactory
+    with ScalaCheckPropertyChecks
+    with should.Matchers
+    with IOSpec {
 
   "routes" should {
 
     "define a GET /ping endpoint returning OK with 'pong' body" in new TestCase {
 
       val response = routes.call(
-        Request(Method.GET, uri"ping")
+        Request(Method.GET, uri"/ping")
       )
 
       response.status       shouldBe Ok
@@ -58,7 +63,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
 
     "define a GET /metrics endpoint returning OK with some prometheus metrics" in new TestCase {
       val response = routes.call(
-        Request(Method.GET, uri"metrics")
+        Request(Method.GET, uri"/metrics")
       )
 
       response.status     shouldBe Ok
@@ -68,7 +73,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
     "define a POST webhooks/events endpoint returning response from the endpoint" in new TestCase {
 
       val responseStatus = Gen.oneOf(Ok, BadRequest).generateOne
-      val request        = Request[IO](Method.POST, uri"webhooks/events")
+      val request        = Request[IO](Method.POST, uri"/webhooks/events")
       (hookEventEndpoint
         .processPushEvent(_: Request[IO]))
         .expects(request)
@@ -82,7 +87,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
     "define a GET projects/:id/events/status endpoint returning response from the endpoint" in new TestCase {
 
       val projectId      = projectIds.generateOne
-      val request        = Request[IO](Method.GET, uri"projects" / projectId.toString / "events" / "status")
+      val request        = Request[IO](Method.GET, uri"/projects" / projectId.toString / "events" / "status")
       val responseStatus = Gen.oneOf(Ok, BadRequest).generateOne
       (processingStatusEndpoint
         .fetchProcessingStatus(_: projects.Id))
@@ -95,13 +100,13 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
     }
 
     s"define a GET projects/:id/events/status endpoint returning $NotFound when no :id path parameter given" in new TestCase {
-      routes.call(Request(Method.GET, uri"projects/")).status shouldBe NotFound
+      routes.call(Request(Method.GET, uri"/projects/")).status shouldBe NotFound
     }
 
     "define a POST projects/:id/webhooks endpoint returning response from the endpoint" in new TestCase {
 
       val projectId      = projectIds.generateOne
-      val request        = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks")
+      val request        = Request[IO](Method.POST, uri"/projects" / projectId.toString / "webhooks")
       val responseStatus = Gen.oneOf(Ok, BadRequest).generateOne
       (hookCreationEndpoint
         .createHook(_: projects.Id, _: AuthUser))
@@ -117,7 +122,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
       override val authenticationResponse = OptionT.none[IO, AuthUser]
 
       val projectId = projectIds.generateOne
-      val request   = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks")
+      val request   = Request[IO](Method.POST, uri"/projects" / projectId.toString / "webhooks")
 
       routes.call(request).status shouldBe Unauthorized
     }
@@ -125,7 +130,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
     "define a POST projects/:id/webhooks/validation endpoint returning response from the endpoint" in new TestCase {
 
       val projectId      = projectIds.generateOne
-      val request        = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks" / "validation")
+      val request        = Request[IO](Method.POST, uri"/projects" / projectId.toString / "webhooks" / "validation")
       val responseStatus = Gen.oneOf(Ok, BadRequest).generateOne
       (hookValidationEndpoint
         .validateHook(_: projects.Id, _: AuthUser))
@@ -141,13 +146,11 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
       override val authenticationResponse = OptionT.none[IO, AuthUser]
 
       val projectId = projectIds.generateOne
-      val request   = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks" / "validation")
+      val request   = Request[IO](Method.POST, uri"/projects" / projectId.toString / "webhooks" / "validation")
 
       routes.call(request).status shouldBe Unauthorized
     }
   }
-
-  private implicit val clock: Clock[IO] = IO.timer(ExecutionContext.global).clock
 
   private trait TestCase {
 

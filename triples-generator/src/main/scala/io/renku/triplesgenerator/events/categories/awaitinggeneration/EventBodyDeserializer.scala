@@ -19,7 +19,6 @@
 package io.renku.triplesgenerator.events.categories.awaitinggeneration
 
 import cats.MonadThrow
-import cats.effect.IO
 import cats.syntax.all._
 import io.circe.parser._
 import io.circe.{Decoder, DecodingFailure, Error, ParsingFailure}
@@ -28,14 +27,14 @@ import io.renku.graph.model.events._
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.tinytypes.json.TinyTypeDecoders._
 
-private trait EventBodyDeserializer[Interpretation[_]] {
-  def toCommitEvent(eventBody: EventBody): Interpretation[CommitEvent]
+private trait EventBodyDeserializer[F[_]] {
+  def toCommitEvent(eventBody: EventBody): F[CommitEvent]
 }
 
-private class EventBodyDeserializerImpl[Interpretation[_]: MonadThrow] extends EventBodyDeserializer[Interpretation] {
+private class EventBodyDeserializerImpl[F[_]: MonadThrow] extends EventBodyDeserializer[F] {
 
-  override def toCommitEvent(eventBody: EventBody): Interpretation[CommitEvent] =
-    MonadThrow[Interpretation].fromEither {
+  override def toCommitEvent(eventBody: EventBody): F[CommitEvent] =
+    MonadThrow[F].fromEither {
       parse(eventBody.value)
         .flatMap(_.as[CommitEvent])
         .leftMap(toMeaningfulError(eventBody))
@@ -55,5 +54,5 @@ private class EventBodyDeserializerImpl[Interpretation[_]: MonadThrow] extends E
 }
 
 private object EventBodyDeserializer {
-  def apply(): EventBodyDeserializer[IO] = new EventBodyDeserializerImpl[IO]
+  def apply[F[_]: MonadThrow]: EventBodyDeserializer[F] = new EventBodyDeserializerImpl[F]
 }

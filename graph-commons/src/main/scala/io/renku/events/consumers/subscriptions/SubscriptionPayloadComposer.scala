@@ -18,9 +18,8 @@
 
 package io.renku.events.consumers.subscriptions
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.data.Kleisli
-import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -29,21 +28,20 @@ import io.circe.Json
 import io.renku.graph.model.events.CategoryName
 import io.renku.microservices._
 
-trait SubscriptionPayloadComposer[Interpretation[_]] {
-  def prepareSubscriptionPayload(): Interpretation[Json]
+trait SubscriptionPayloadComposer[F[_]] {
+  def prepareSubscriptionPayload(): F[Json]
 }
 
-private class SubscriptionPayloadComposerImpl[Interpretation[_]](
+private class SubscriptionPayloadComposerImpl[F[_]: MonadThrow](
     categoryName:           CategoryName,
-    microserviceUrlFinder:  MicroserviceUrlFinder[Interpretation],
+    microserviceUrlFinder:  MicroserviceUrlFinder[F],
     microserviceIdentifier: MicroserviceIdentifier
-)(implicit ME:              MonadError[Interpretation, Throwable])
-    extends SubscriptionPayloadComposer[Interpretation] {
+) extends SubscriptionPayloadComposer[F] {
 
   import io.circe.syntax._
   import microserviceUrlFinder._
 
-  override def prepareSubscriptionPayload(): Interpretation[Json] =
+  override def prepareSubscriptionPayload(): F[Json] =
     findBaseUrl()
       .map(newSubscriberUrl)
       .map(SubscriberBasicInfo(_, SubscriberId(microserviceIdentifier)))
@@ -54,13 +52,13 @@ private class SubscriptionPayloadComposerImpl[Interpretation[_]](
 
 object SubscriptionPayloadComposer {
 
-  def categoryAndUrlPayloadsComposerFactory(
+  def categoryAndUrlPayloadsComposerFactory[F[_]: MonadThrow](
       microservicePort:       Int Refined Positive,
       microserviceIdentifier: MicroserviceIdentifier
-  ): Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO]] =
-    Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO]] { categoryName =>
+  ): Kleisli[F, CategoryName, SubscriptionPayloadComposer[F]] =
+    Kleisli[F, CategoryName, SubscriptionPayloadComposer[F]] { categoryName =>
       for {
         subscriptionUrlFinder <- MicroserviceUrlFinder(microservicePort)
-      } yield new SubscriptionPayloadComposerImpl[IO](categoryName, subscriptionUrlFinder, microserviceIdentifier)
+      } yield new SubscriptionPayloadComposerImpl[F](categoryName, subscriptionUrlFinder, microserviceIdentifier)
     }
 }

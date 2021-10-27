@@ -18,7 +18,7 @@
 
 package io.renku.commiteventservice.events.categories.commitsync.eventgeneration
 
-import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
+import cats.effect.{Async, Temporal}
 import cats.syntax.all._
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
@@ -34,51 +34,45 @@ import org.http4s._
 import org.http4s.circe.jsonOf
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
-private trait EventDetailsFinder[Interpretation[_]] {
-  def checkIfExists(projectId:   projects.Id, commitId: CommitId): Interpretation[Boolean]
-  def getEventDetails(projectId: projects.Id, commitId: CommitId): Interpretation[Option[CommitWithParents]]
+private trait EventDetailsFinder[F[_]] {
+  def checkIfExists(projectId:   projects.Id, commitId: CommitId): F[Boolean]
+  def getEventDetails(projectId: projects.Id, commitId: CommitId): F[Option[CommitWithParents]]
 }
 
-private class EventDetailsFinderImpl[Interpretation[_]: ContextShift: Timer: ConcurrentEffect](
-    eventLogUrl:             EventLogUrl,
-    logger:                  Logger[Interpretation]
-)(implicit executionContext: ExecutionContext)
-    extends RestClient[Interpretation, EventDetailsFinder[Interpretation]](Throttler.noThrottling, logger)
-    with EventDetailsFinder[Interpretation] {
+private class EventDetailsFinderImpl[F[_]: Async: Temporal: Logger](
+    eventLogUrl: EventLogUrl
+) extends RestClient[F, EventDetailsFinder[F]](Throttler.noThrottling)
+    with EventDetailsFinder[F] {
 
   import org.http4s.Method.GET
 
-  override def checkIfExists(projectId: projects.Id, commitId: CommitId): Interpretation[Boolean] =
+  override def checkIfExists(projectId: projects.Id, commitId: CommitId): F[Boolean] =
     fetchEventDetails(projectId, commitId)(mapResponseToBoolean)
 
-  override def getEventDetails(projectId: projects.Id, commitId: CommitId): Interpretation[Option[CommitWithParents]] =
+  override def getEventDetails(projectId: projects.Id, commitId: CommitId): F[Option[CommitWithParents]] =
     fetchEventDetails(projectId, commitId)(mapResponseCommitDetails)
 
   private def fetchEventDetails[ResultType](projectId: projects.Id, commitId: CommitId)(
-      mapResponse: PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[
+      mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[
         ResultType
       ]]
   ) =
     validateUri(s"$eventLogUrl/events/$commitId/$projectId") >>= (uri => send(request(GET, uri))(mapResponse))
 
-  private lazy val mapResponseToBoolean
-      : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[Boolean]] = {
-    case (Ok, _, _)       => true.pure[Interpretation]
-    case (NotFound, _, _) => false.pure[Interpretation]
+  private lazy val mapResponseToBoolean: PartialFunction[(Status, Request[F], Response[F]), F[Boolean]] = {
+    case (Ok, _, _)       => true.pure[F]
+    case (NotFound, _, _) => false.pure[F]
   }
 
-  private lazy val mapResponseCommitDetails
-      : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[
-        Option[CommitWithParents]
-      ]] = {
+  private lazy val mapResponseCommitDetails: PartialFunction[(Status, Request[F], Response[F]), F[
+    Option[CommitWithParents]
+  ]] = {
     case (Ok, _, response) => response.as[CommitWithParents].map(_.some)
-    case (NotFound, _, _)  => Option.empty[CommitWithParents].pure[Interpretation]
+    case (NotFound, _, _)  => Option.empty[CommitWithParents].pure[F]
   }
 
   import io.renku.tinytypes.json.TinyTypeDecoders._
-  private implicit val commitDetailsEntityDecoder: EntityDecoder[Interpretation, CommitWithParents] = {
+  private implicit val commitDetailsEntityDecoder: EntityDecoder[F, CommitWithParents] = {
     implicit val commitDecoder: Decoder[CommitWithParents] = cursor =>
       for {
         id         <- cursor.downField("id").as[CommitId]
@@ -90,19 +84,13 @@ private class EventDetailsFinderImpl[Interpretation[_]: ContextShift: Timer: Con
                     )
                     .getOrElse(List.empty[CommitId])
       } yield CommitWithParents(id, projectId, parents)
-    jsonOf[Interpretation, CommitWithParents]
+    jsonOf[F, CommitWithParents]
   }
 
 }
 
 private object EventDetailsFinder {
-  def apply(
-      logger: Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[EventDetailsFinderImpl[IO]] = for {
-    eventLogUrl <- EventLogUrl[IO]()
-  } yield new EventDetailsFinderImpl(eventLogUrl, logger)
+  def apply[F[_]: Async: Temporal: Logger]: F[EventDetailsFinderImpl[F]] = for {
+    eventLogUrl <- EventLogUrl[F]()
+  } yield new EventDetailsFinderImpl(eventLogUrl)
 }

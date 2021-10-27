@@ -126,14 +126,14 @@ class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.M
   private trait TestCase {
     val projectPath = projectPaths.generateOne
 
+    implicit val logger: TestLogger[Try] = TestLogger[Try]()
     val accessTokenFinder          = mock[AccessTokenFinder[Try]]
     val gitLabProjectMembersFinder = mock[GitLabProjectMembersFinder[Try]]
     val kGProjectMembersFinder     = mock[KGProjectMembersFinder[Try]]
     val kGPersonFinder             = mock[KGPersonFinder[Try]]
     val updatesCreator             = mock[UpdatesCreator]
     val querySender                = mock[QuerySender[Try]]
-    val logger                     = TestLogger[Try]()
-    val executionTimeRecorder      = TestExecutionTimeRecorder[Try](logger, maybeHistogram = None)
+    val executionTimeRecorder      = TestExecutionTimeRecorder[Try](maybeHistogram = None)
 
     val synchronizer = new MembersSynchronizerImpl[Try](
       accessTokenFinder,
@@ -142,7 +142,6 @@ class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.M
       kGPersonFinder,
       updatesCreator,
       querySender,
-      logger,
       executionTimeRecorder
     )
   }

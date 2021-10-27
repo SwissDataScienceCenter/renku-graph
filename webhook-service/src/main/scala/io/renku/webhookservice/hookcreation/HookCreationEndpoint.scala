@@ -18,8 +18,7 @@
 
 package io.renku.webhookservice.hookcreation
 
-import HookCreator.CreationResult
-import HookCreator.CreationResult.{HookCreated, HookExisted}
+import cats.MonadThrow
 import cats.effect._
 import cats.syntax.all._
 import io.renku.config.GitLab
@@ -31,59 +30,54 @@ import io.renku.http.server.security.model.AuthUser
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.hookcreation
+import io.renku.webhookservice.hookcreation.HookCreator.CreationResult
+import io.renku.webhookservice.hookcreation.HookCreator.CreationResult.{HookCreated, HookExisted}
 import io.renku.webhookservice.model.ProjectHookUrl
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Response, Status}
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-trait HookCreationEndpoint[Interpretation[_]] {
-  def createHook(projectId: Id, authUser: AuthUser): Interpretation[Response[Interpretation]]
+trait HookCreationEndpoint[F[_]] {
+  def createHook(projectId: Id, authUser: AuthUser): F[Response[F]]
 }
 
-class HookCreationEndpointImpl[Interpretation[_]: Effect](
-    hookCreator: HookCreator[Interpretation],
-    logger:      Logger[Interpretation]
-) extends Http4sDsl[Interpretation]
-    with HookCreationEndpoint[Interpretation] {
+class HookCreationEndpointImpl[F[_]: MonadThrow: Logger](
+    hookCreator: HookCreator[F]
+) extends Http4sDsl[F]
+    with HookCreationEndpoint[F] {
 
-  def createHook(projectId: Id, authUser: AuthUser): Interpretation[Response[Interpretation]] = {
+  def createHook(projectId: Id, authUser: AuthUser): F[Response[F]] = {
     for {
       creationResult <- hookCreator.createHook(projectId, authUser.accessToken)
       response       <- toHttpResponse(creationResult)
     } yield response
   } recoverWith httpResponse
 
-  private lazy val toHttpResponse: CreationResult => Interpretation[Response[Interpretation]] = {
+  private lazy val toHttpResponse: CreationResult => F[Response[F]] = {
     case HookCreated => Created(InfoMessage("Hook created"))
     case HookExisted => Ok(InfoMessage("Hook already existed"))
   }
 
-  private lazy val httpResponse: PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
+  private lazy val httpResponse: PartialFunction[Throwable, F[Response[F]]] = {
     case ex @ UnauthorizedException =>
-      Response[Interpretation](Status.Unauthorized)
+      Response[F](Status.Unauthorized)
         .withEntity[ErrorMessage](ErrorMessage(ex))
-        .pure[Interpretation]
+        .pure[F]
     case NonFatal(exception) =>
-      logger.error(exception)(exception.getMessage)
-      InternalServerError(ErrorMessage(exception))
+      Logger[F]
+        .error(exception)(exception.getMessage)
+        .flatMap(_ => InternalServerError(ErrorMessage(exception)))
   }
 }
 
-object IOHookCreationEndpoint {
-  def apply(
+object HookCreationEndpoint {
+  def apply[F[_]: Async: Logger](
       projectHookUrl:  ProjectHookUrl,
-      gitLabThrottler: Throttler[IO, GitLab],
-      hookTokenCrypto: HookTokenCrypto[IO],
-      logger:          Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      clock:            Clock[IO],
-      timer:            Timer[IO]
-  ): IO[HookCreationEndpoint[IO]] = for {
-    hookCreator <- hookcreation.HookCreator(projectHookUrl, gitLabThrottler, hookTokenCrypto, logger)
-  } yield new HookCreationEndpointImpl[IO](hookCreator, logger)
+      gitLabThrottler: Throttler[F, GitLab],
+      hookTokenCrypto: HookTokenCrypto[F]
+  ): F[HookCreationEndpoint[F]] = for {
+    hookCreator <- hookcreation.HookCreator(projectHookUrl, gitLabThrottler, hookTokenCrypto)
+  } yield new HookCreationEndpointImpl[F](hookCreator)
 }

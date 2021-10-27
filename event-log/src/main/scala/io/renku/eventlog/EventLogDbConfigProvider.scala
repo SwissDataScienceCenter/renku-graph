@@ -24,8 +24,8 @@ import io.renku.db.DBConfigProvider
 
 sealed trait EventLogDB
 
-class EventLogDbConfigProvider[Interpretation[_]: MonadThrow](
-) extends DBConfigProvider[Interpretation, EventLogDB](
+class EventLogDbConfigProvider[F[_]: MonadThrow](
+) extends DBConfigProvider[F, EventLogDB](
       namespace = "event-log",
       dbName = "event_log"
     )

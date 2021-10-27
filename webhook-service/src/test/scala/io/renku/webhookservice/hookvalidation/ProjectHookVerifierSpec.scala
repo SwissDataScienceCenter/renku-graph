@@ -18,7 +18,7 @@
 
 package io.renku.webhookservice.hookvalidation
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Json
 import io.renku.control.Throttler
@@ -31,6 +31,7 @@ import io.renku.graph.model.projects.Id
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
+import io.renku.testtools.IOSpec
 import io.renku.webhookservice.WebhookServiceGenerators._
 import io.renku.webhookservice.hookvalidation.ProjectHookVerifier.HookIdentifier
 import io.renku.webhookservice.model.ProjectHookUrl
@@ -40,9 +41,12 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
-class IOProjectHookVerifierSpec extends AnyWordSpec with MockFactory with ExternalServiceStubbing with should.Matchers {
+class ProjectHookVerifierSpec
+    extends AnyWordSpec
+    with MockFactory
+    with ExternalServiceStubbing
+    with should.Matchers
+    with IOSpec {
 
   "checkHookPresence" should {
 
@@ -137,15 +141,13 @@ class IOProjectHookVerifierSpec extends AnyWordSpec with MockFactory with Extern
     }
   }
 
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO]        = IO.timer(global)
-
   private trait TestCase {
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val gitLabUrl     = GitLabUrl(externalServiceBaseUrl)
     val projectHookId = projectHookIds.generateOne
     val projectId     = projectHookId.projectId
 
-    val verifier = new IOProjectHookVerifier(gitLabUrl, Throttler.noThrottling, TestLogger())
+    val verifier = new ProjectHookVerifierImpl[IO](gitLabUrl, Throttler.noThrottling)
   }
 
   private def withHooks(projectId: Id, oneHookUrl: ProjectHookUrl): String =

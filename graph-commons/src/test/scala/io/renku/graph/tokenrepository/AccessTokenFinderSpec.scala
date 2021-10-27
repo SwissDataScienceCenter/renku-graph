@@ -18,7 +18,7 @@
 
 package io.renku.graph.tokenrepository
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.syntax.EncoderOps
 import io.renku.generators.CommonGraphGenerators._
@@ -28,14 +28,18 @@ import io.renku.http.client.AccessToken
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
+import io.renku.testtools.IOSpec
 import org.http4s.Status
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
-class AccessTokenFinderSpec extends AnyWordSpec with ExternalServiceStubbing with MockFactory with should.Matchers {
+class AccessTokenFinderSpec
+    extends AnyWordSpec
+    with IOSpec
+    with ExternalServiceStubbing
+    with MockFactory
+    with should.Matchers {
 
   import AccessTokenFinder._
 
@@ -187,12 +191,9 @@ class AccessTokenFinderSpec extends AnyWordSpec with ExternalServiceStubbing wit
     }
   }
 
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO]        = IO.timer(global)
-
   private trait TestCase {
+    private implicit val logger: TestLogger[IO] = TestLogger()
     val tokenRepositoryUrl = TokenRepositoryUrl(externalServiceBaseUrl)
-
-    val accessTokenFinder = new AccessTokenFinderImpl[IO](tokenRepositoryUrl, TestLogger())
+    val accessTokenFinder  = new AccessTokenFinderImpl[IO](tokenRepositoryUrl)
   }
 }

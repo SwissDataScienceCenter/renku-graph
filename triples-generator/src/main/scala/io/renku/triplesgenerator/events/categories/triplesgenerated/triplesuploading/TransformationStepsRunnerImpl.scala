@@ -20,7 +20,7 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuplo
 
 import cats.MonadThrow
 import cats.data.EitherT
-import cats.effect.{ConcurrentEffect, Timer}
+import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.config.{GitLabUrlLoader, RenkuBaseUrlLoader}
 import io.renku.graph.model.entities.Project
@@ -30,19 +30,18 @@ import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableE
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-private[triplesgenerated] trait TransformationStepsRunner[Interpretation[_]] {
-  def run(steps: List[TransformationStep[Interpretation]], project: Project): Interpretation[TriplesUploadResult]
+private[triplesgenerated] trait TransformationStepsRunner[F[_]] {
+  def run(steps: List[TransformationStep[F]], project: Project): F[TriplesUploadResult]
 }
 
-private[triplesgenerated] class TransformationStepsRunnerImpl[Interpretation[_]: MonadThrow](
-    triplesUploader: TriplesUploader[Interpretation],
-    updatesUploader: UpdatesUploader[Interpretation],
+private[triplesgenerated] class TransformationStepsRunnerImpl[F[_]: MonadThrow](
+    triplesUploader: TriplesUploader[F],
+    updatesUploader: UpdatesUploader[F],
     renkuBaseUrl:    RenkuBaseUrl,
     gitLabUrl:       GitLabUrl
-) extends TransformationStepsRunner[Interpretation] {
+) extends TransformationStepsRunner[F] {
 
   private implicit val gitLabApiUrl: GitLabApiUrl = gitLabUrl.apiV4
   private implicit val renkuUrl:     RenkuBaseUrl = renkuBaseUrl
@@ -50,25 +49,21 @@ private[triplesgenerated] class TransformationStepsRunnerImpl[Interpretation[_]:
   import TriplesUploadResult._
   import io.renku.jsonld.syntax._
 
-  override def run(steps:   List[TransformationStep[Interpretation]],
-                   project: Project
-  ): Interpretation[TriplesUploadResult] =
+  override def run(steps: List[TransformationStep[F]], project: Project): F[TriplesUploadResult] =
     runAllSteps(project, steps) >>= {
       case (updatedProject, _: DeliverySuccess) => encodeAndSend(updatedProject)
-      case (_, failure) => failure.pure[Interpretation]
+      case (_, failure)                         => failure.pure[F]
     }
 
-  private def runAllSteps(project: Project,
-                          steps:   List[TransformationStep[Interpretation]]
-  ): Interpretation[(Project, TriplesUploadResult)] =
-    steps.foldLeft((project, DeliverySuccess: TriplesUploadResult).pure[Interpretation])((lastStepResults, nextStep) =>
+  private def runAllSteps(project: Project, steps: List[TransformationStep[F]]): F[(Project, TriplesUploadResult)] =
+    steps.foldLeft((project, DeliverySuccess: TriplesUploadResult).pure[F])((lastStepResults, nextStep) =>
       lastStepResults >>= {
         case (_, _: TriplesUploadFailure) => lastStepResults
-        case (previousMetadata, _) => runSingleStep(nextStep, previousMetadata)
+        case (previousMetadata, _)        => runSingleStep(nextStep, previousMetadata)
       }
     )
 
-  private def runSingleStep(nextStep: TransformationStep[Interpretation], previousProject: Project) = {
+  private def runSingleStep(nextStep: TransformationStep[F], previousProject: Project) = {
     for {
       stepResults    <- nextStep run previousProject
       sendingResults <- EitherT.right[ProcessingRecoverableError](execute(stepResults.queries))
@@ -82,7 +77,7 @@ private[triplesgenerated] class TransformationStepsRunnerImpl[Interpretation[_]:
 
   private def execute(queries: List[SparqlQuery]) =
     queries
-      .foldLeft((DeliverySuccess: TriplesUploadResult).pure[Interpretation]) { (lastResult, query) =>
+      .foldLeft((DeliverySuccess: TriplesUploadResult).pure[F]) { (lastResult, query) =>
         lastResult >>= {
           case _: DeliverySuccess => updatesUploader send query
           case _ => lastResult
@@ -91,18 +86,18 @@ private[triplesgenerated] class TransformationStepsRunnerImpl[Interpretation[_]:
 
   private def transformationFailure(
       project:            Project,
-      transformationStep: TransformationStep[Interpretation]
-  ): PartialFunction[Throwable, Interpretation[(Project, TriplesUploadResult)]] = { case NonFatal(exception) =>
+      transformationStep: TransformationStep[F]
+  ): PartialFunction[Throwable, F[(Project, TriplesUploadResult)]] = { case NonFatal(exception) =>
     (project,
      InvalidUpdatesFailure(s"${transformationStep.name} transformation step failed: $exception"): TriplesUploadResult
-    ).pure[Interpretation]
+    ).pure[F]
   }
 
   private def encodeAndSend(project: Project) =
     project.asJsonLD.flatten
       .leftMap(error =>
         InvalidTriplesFailure(s"Metadata for project ${project.path} failed: ${error.getMessage}")
-          .pure[Interpretation]
+          .pure[F]
           .widen[TriplesUploadResult]
       )
       .map(triplesUploader.upload)
@@ -111,21 +106,14 @@ private[triplesgenerated] class TransformationStepsRunnerImpl[Interpretation[_]:
 
 private[triplesgenerated] object TransformationStepsRunner {
 
-  import cats.effect.IO
-
-  def apply(timeRecorder: SparqlQueryTimeRecorder[IO])(implicit
-      executionContext:   ExecutionContext,
-      concurrentEffect:   ConcurrentEffect[IO],
-      timer:              Timer[IO],
-      logger:             Logger[IO]
-  ): IO[TransformationStepsRunnerImpl[IO]] = for {
-    rdfStoreConfig <- RdfStoreConfig[IO]()
-    renkuBaseUrl   <- RenkuBaseUrlLoader[IO]()
-    gitlabUrl      <- GitLabUrlLoader[IO]()
-  } yield new TransformationStepsRunnerImpl[IO](new TriplesUploaderImpl[IO](rdfStoreConfig, timeRecorder),
-                                                new UpdatesUploaderImpl(rdfStoreConfig, timeRecorder),
-                                                renkuBaseUrl,
-                                                gitlabUrl
+  def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[TransformationStepsRunnerImpl[F]] = for {
+    rdfStoreConfig <- RdfStoreConfig[F]()
+    renkuBaseUrl   <- RenkuBaseUrlLoader[F]()
+    gitlabUrl      <- GitLabUrlLoader[F]()
+  } yield new TransformationStepsRunnerImpl[F](new TriplesUploaderImpl[F](rdfStoreConfig, timeRecorder),
+                                               new UpdatesUploaderImpl(rdfStoreConfig, timeRecorder),
+                                               renkuBaseUrl,
+                                               gitlabUrl
   )
 }
 
@@ -140,8 +128,8 @@ private[triplesgenerated] object TriplesUploadResult {
     val message: String = "Delivery success"
   }
 
-  sealed trait TriplesUploadFailure extends TriplesUploadResult
-  final case class RecoverableFailure(message: String) extends Exception(message) with TriplesUploadFailure
+  sealed trait TriplesUploadFailure                       extends TriplesUploadResult
+  final case class RecoverableFailure(message: String)    extends Exception(message) with TriplesUploadFailure
   final case class InvalidTriplesFailure(message: String) extends Exception(message) with TriplesUploadFailure
   final case class InvalidUpdatesFailure(message: String) extends Exception(message) with TriplesUploadFailure
 }

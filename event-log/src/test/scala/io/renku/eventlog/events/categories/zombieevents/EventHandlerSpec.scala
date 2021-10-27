@@ -31,10 +31,10 @@ import io.renku.graph.model.EventsGenerators.compoundEventIds
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.projects
-import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.metrics.LabeledGauge
+import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
@@ -43,6 +43,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class EventHandlerSpec
     extends AnyWordSpec
+    with IOSpec
     with MockFactory
     with should.Matchers
     with Eventually
@@ -197,8 +198,8 @@ class EventHandlerSpec
 
   private trait TestCase {
 
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val zombieStatusCleaner                = mock[ZombieStatusCleaner[IO]]
-    val logger                             = TestLogger[IO]()
     val awaitingTriplesGenerationGauge     = mock[LabeledGauge[IO, projects.Path]]
     val underTriplesGenerationGauge        = mock[LabeledGauge[IO, projects.Path]]
     val awaitingTriplesTransformationGauge = mock[LabeledGauge[IO, projects.Path]]
@@ -208,8 +209,7 @@ class EventHandlerSpec
                                        awaitingTriplesGenerationGauge,
                                        underTriplesGenerationGauge,
                                        awaitingTriplesTransformationGauge,
-                                       underTriplesTransformationGauge,
-                                       logger
+                                       underTriplesTransformationGauge
     )
   }
 

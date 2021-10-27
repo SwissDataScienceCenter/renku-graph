@@ -39,10 +39,10 @@ object model {
 
   object ProjectHookUrl {
 
-    def fromConfig[Interpretation[_]: MonadThrow](
+    def fromConfig[F[_]: MonadThrow](
         config: Config = ConfigFactory.load
-    ): Interpretation[ProjectHookUrl] =
-      SelfUrl[Interpretation](config).map(from)
+    ): F[ProjectHookUrl] =
+      SelfUrl[F](config).map(from)
 
     def from(selfUrl: SelfUrl): ProjectHookUrl = new ProjectHookUrl((selfUrl / "webhooks" / "events").value)
   }
@@ -53,9 +53,9 @@ object model {
 
     private implicit val configReader: ConfigReader[SelfUrl] = urlTinyTypeReader(SelfUrl)
 
-    def apply[Interpretation[_]: MonadThrow](
+    def apply[F[_]: MonadThrow](
         config: Config = ConfigFactory.load
-    ): Interpretation[SelfUrl] =
-      find[Interpretation, SelfUrl]("services.self.url", config)
+    ): F[SelfUrl] =
+      find[F, SelfUrl]("services.self.url", config)
   }
 }

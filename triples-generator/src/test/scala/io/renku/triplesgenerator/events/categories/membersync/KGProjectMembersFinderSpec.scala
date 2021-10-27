@@ -25,6 +25,7 @@ import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.categories.membersync.PersonOps._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -32,6 +33,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class KGProjectMembersFinderSpec
     extends AnyWordSpec
+    with IOSpec
     with InMemoryRdfStore
     with ScalaCheckPropertyChecks
     with should.Matchers {
@@ -55,8 +57,8 @@ class KGProjectMembersFinderSpec
   }
 
   private trait TestCase {
-    private val logger       = TestLogger[IO]()
-    private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
-    val finder               = new KGProjectMembersFinderImpl(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
+    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO]())
+    val finder               = new KGProjectMembersFinderImpl(rdfStoreConfig, renkuBaseUrl, timeRecorder)
   }
 }

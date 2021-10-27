@@ -124,11 +124,11 @@ object Activity {
       endedAtTime   <- cursor.downField(prov / "endedAtTime").as[EndTime]
       agent <- cursor.downField(prov / "wasAssociatedWith").as[List[Agent]] >>= {
                  case agent :: Nil => Right(agent)
-                 case _            => Left(DecodingFailure(s"Activity $resourceId without or with multiple agents", Nil))
+                 case _ => Left(DecodingFailure(s"Activity $resourceId without or with multiple agents", Nil))
                }
       author <- cursor.downField(prov / "wasAssociatedWith").as[List[Person]] >>= {
                   case author :: Nil => Right(author)
-                  case _             => Left(DecodingFailure(s"Activity $resourceId without or with multiple authors", Nil))
+                  case _ => Left(DecodingFailure(s"Activity $resourceId without or with multiple authors", Nil))
                 }
       association <- cursor.downField(prov / "qualifiedAssociation").as[Association]
       usages      <- cursor.downField(prov / "qualifiedUsage").as[List[Usage]]

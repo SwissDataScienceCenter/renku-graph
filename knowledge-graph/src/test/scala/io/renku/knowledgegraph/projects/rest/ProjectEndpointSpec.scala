@@ -18,7 +18,6 @@
 
 package io.renku.knowledgegraph.projects.rest
 
-import ProjectsGenerators._
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.syntax._
@@ -43,7 +42,9 @@ import io.renku.knowledgegraph.projects.model.Project._
 import io.renku.knowledgegraph.projects.model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
 import io.renku.knowledgegraph.projects.model.Urls._
 import io.renku.knowledgegraph.projects.model._
+import io.renku.knowledgegraph.projects.rest.ProjectsGenerators._
 import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.testtools.IOSpec
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.MediaType._
 import org.http4s.Status._
@@ -55,7 +56,12 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class ProjectEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyChecks with should.Matchers {
+class ProjectEndpointSpec
+    extends AnyWordSpec
+    with MockFactory
+    with ScalaCheckPropertyChecks
+    with should.Matchers
+    with IOSpec {
 
   "getProject" should {
 
@@ -128,15 +134,14 @@ class ProjectEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
   }
 
   private trait TestCase {
-    val projectFinder         = mock[ProjectFinder[IO]]
-    val renkuResourcesUrl     = renkuResourcesUrls.generateOne
-    val logger                = TestLogger[IO]()
-    val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
+    val projectFinder     = mock[ProjectFinder[IO]]
+    val renkuResourcesUrl = renkuResourcesUrls.generateOne
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
     val getProject = new ProjectEndpointImpl[IO](
       projectFinder,
       renkuResourcesUrl,
-      executionTimeRecorder,
-      logger
+      executionTimeRecorder
     ).getProject _
   }
 
@@ -217,7 +222,7 @@ class ProjectEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
                        case (Some(project), Some(group)) => Right(Permissions(project, group))
                        case (Some(project), None)        => Right(Permissions(project))
                        case (None, Some(group))          => Right(Permissions(group))
-                       case _                            => Left(DecodingFailure("Neither projectAccess nor groupAccess", Nil))
+                       case _ => Left(DecodingFailure("Neither projectAccess nor groupAccess", Nil))
                      }
     } yield permissions
   }

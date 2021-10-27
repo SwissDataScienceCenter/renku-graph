@@ -30,7 +30,7 @@ object RenkuBaseUrlLoader {
 
   private implicit val renkuBaseUrlReader: ConfigReader[RenkuBaseUrl] = urlTinyTypeReader(RenkuBaseUrl)
 
-  def apply[Interpretation[_]: MonadThrow](
+  def apply[F[_]: MonadThrow](
       config: Config = ConfigFactory.load()
-  ): Interpretation[RenkuBaseUrl] = find[Interpretation, RenkuBaseUrl]("services.renku.url", config)
+  ): F[RenkuBaseUrl] = find[F, RenkuBaseUrl]("services.renku.url", config)
 }

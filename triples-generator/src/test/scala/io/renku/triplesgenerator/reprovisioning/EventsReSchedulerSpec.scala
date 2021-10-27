@@ -18,19 +18,18 @@
 
 package io.renku.triplesgenerator.reprovisioning
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.literal._
 import io.renku.graph.config.EventLogUrl
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
+import io.renku.testtools.IOSpec
 import org.http4s.Status.{Accepted, BadRequest}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
-class EventsReSchedulerSpec extends AnyWordSpec with ExternalServiceStubbing with should.Matchers {
+class EventsReSchedulerSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing with should.Matchers {
 
   "triggerEventsReScheduling" should {
 
@@ -62,11 +61,9 @@ class EventsReSchedulerSpec extends AnyWordSpec with ExternalServiceStubbing wit
     }
   }
 
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO]        = IO.timer(global)
-
   private trait TestCase {
+    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val eventLogUrl = EventLogUrl(externalServiceBaseUrl)
-    val sender      = new EventsReSchedulerImpl[IO](eventLogUrl, TestLogger())
+    val sender      = new EventsReSchedulerImpl[IO](eventLogUrl)
   }
 }

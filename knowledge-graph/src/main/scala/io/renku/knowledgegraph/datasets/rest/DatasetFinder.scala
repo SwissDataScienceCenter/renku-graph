@@ -18,46 +18,44 @@
 
 package io.renku.knowledgegraph.datasets.rest
 
-import cats.effect.{Concurrent, ContextShift, IO, Timer}
+import cats.MonadThrow
+import cats.effect.{Async, Spawn}
 import cats.syntax.all._
 import io.renku.graph.model.datasets.{Identifier, ImageUri, Keyword}
 import io.renku.knowledgegraph.datasets.model._
-import io.renku.logging.ApplicationLogger
 import io.renku.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
-private trait DatasetFinder[Interpretation[_]] {
-  def findDataset(identifier: Identifier): Interpretation[Option[Dataset]]
+private trait DatasetFinder[F[_]] {
+  def findDataset(identifier: Identifier): F[Option[Dataset]]
 }
 
-private class DatasetFinderImpl[Interpretation[_]: Timer: ContextShift: Concurrent](
-    baseDetailsFinder:       BaseDetailsFinder[Interpretation],
-    creatorsFinder:          CreatorsFinder[Interpretation],
-    partsFinder:             PartsFinder[Interpretation],
-    projectsFinder:          ProjectsFinder[Interpretation]
-)(implicit executionContext: ExecutionContext)
-    extends DatasetFinder[Interpretation] {
+private class DatasetFinderImpl[F[_]: Spawn](
+    baseDetailsFinder: BaseDetailsFinder[F],
+    creatorsFinder:    CreatorsFinder[F],
+    partsFinder:       PartsFinder[F],
+    projectsFinder:    ProjectsFinder[F]
+) extends DatasetFinder[F] {
 
   import baseDetailsFinder._
   import creatorsFinder._
   import partsFinder._
   import projectsFinder._
 
-  def findDataset(identifier: Identifier): Interpretation[Option[Dataset]] = for {
-    usedInFiber       <- Concurrent[Interpretation].start(findUsedIn(identifier))
-    maybeDetailsFiber <- Concurrent[Interpretation].start(findBaseDetails(identifier))
-    keywordsFiber     <- Concurrent[Interpretation].start(findKeywords(identifier))
-    imagesFiber       <- Concurrent[Interpretation].start(findImages(identifier))
-    creatorsFiber     <- Concurrent[Interpretation].start(findCreators(identifier))
-    partsFiber        <- Concurrent[Interpretation].start(findParts(identifier))
-    usedIn            <- usedInFiber.join
-    maybeDetails      <- maybeDetailsFiber.join
-    keywords          <- keywordsFiber.join
-    imageUrls         <- imagesFiber.join
-    creators          <- creatorsFiber.join
-    parts             <- partsFiber.join
+  def findDataset(identifier: Identifier): F[Option[Dataset]] = for {
+    usedInFiber       <- Spawn[F].start(findUsedIn(identifier))
+    maybeDetailsFiber <- Spawn[F].start(findBaseDetails(identifier))
+    keywordsFiber     <- Spawn[F].start(findKeywords(identifier))
+    imagesFiber       <- Spawn[F].start(findImages(identifier))
+    creatorsFiber     <- Spawn[F].start(findCreators(identifier))
+    partsFiber        <- Spawn[F].start(findParts(identifier))
+    usedIn <- usedInFiber.joinWith(MonadThrow[F].raiseError(new Exception("DatasetFinder usedIn fiber canceled")))
+    maybeDetails <-
+      maybeDetailsFiber.joinWith(MonadThrow[F].raiseError(new Exception("DatasetFinder maybeDetails fiber canceled")))
+    keywords <- keywordsFiber.joinWith(MonadThrow[F].raiseError(new Exception("DatasetFinder keywords fiber canceled")))
+    imageUrls <- imagesFiber.joinWith(MonadThrow[F].raiseError(new Exception("DatasetFinder imageUrls fiber canceled")))
+    creators <- creatorsFiber.joinWith(MonadThrow[F].raiseError(new Exception("DatasetFinder creators fiber canceled")))
+    parts    <- partsFiber.joinWith(MonadThrow[F].raiseError(new Exception("DatasetFinder parts fiber canceled")))
   } yield maybeDetails map { details =>
     details.copy(
       creators = creators,
@@ -85,20 +83,18 @@ private class DatasetFinderImpl[Interpretation[_]: Timer: ContextShift: Concurre
 
 private object DatasetFinder {
 
-  def apply(
-      timeRecorder:   SparqlQueryTimeRecorder[IO],
-      rdfStoreConfig: IO[RdfStoreConfig] = RdfStoreConfig[IO](),
-      logger:         Logger[IO] = ApplicationLogger
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[DatasetFinder[IO]] = for {
-    config <- rdfStoreConfig
-  } yield new DatasetFinderImpl[IO](
-    new BaseDetailsFinder(config, logger, timeRecorder),
-    new CreatorsFinder(config, logger, timeRecorder),
-    new PartsFinder(config, logger, timeRecorder),
-    new ProjectsFinder(config, logger, timeRecorder)
+  def apply[F[_]: Async: Logger](
+      timeRecorder: SparqlQueryTimeRecorder[F]
+  ): F[DatasetFinder[F]] = for {
+    config           <- RdfStoreConfig[F]()
+    baseDetailFinder <- BaseDetailsFinder[F](config, timeRecorder)
+    creatorsFinder   <- CreatorsFinder[F](config, timeRecorder)
+    partsFinder      <- PartsFinder[F](config, timeRecorder)
+    projectsFinder   <- ProjectsFinder[F](config, timeRecorder)
+  } yield new DatasetFinderImpl[F](
+    baseDetailFinder,
+    creatorsFinder,
+    partsFinder,
+    projectsFinder
   )
 }

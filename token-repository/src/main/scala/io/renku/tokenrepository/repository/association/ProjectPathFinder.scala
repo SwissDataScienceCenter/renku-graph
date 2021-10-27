@@ -18,7 +18,9 @@
 
 package io.renku.tokenrepository.repository.association
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.Async
+import cats.effect.kernel.Temporal
+import cats.syntax.all._
 import io.renku.config.GitLab
 import io.renku.control.{RateLimit, Throttler}
 import io.renku.graph.config.GitLabUrlLoader
@@ -27,22 +29,15 @@ import io.renku.http.client.{AccessToken, RestClient}
 import org.http4s.circe.jsonOf
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
-trait ProjectPathFinder[Interpretation[_]] {
-  def findProjectPath(
-      projectId:        projects.Id,
-      maybeAccessToken: Option[AccessToken]
-  ): Interpretation[Option[projects.Path]]
+trait ProjectPathFinder[F[_]] {
+  def findProjectPath(projectId: projects.Id, maybeAccessToken: Option[AccessToken]): F[Option[projects.Path]]
 }
 
-private class IOProjectPathFinder(
-    gitLabUrl:               GitLabUrl,
-    gitLabThrottler:         Throttler[IO, GitLab],
-    logger:                  Logger[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends RestClient(gitLabThrottler, logger)
-    with ProjectPathFinder[IO] {
+private class ProjectPathFinderImpl[F[_]: Async: Temporal: Logger](
+    gitLabUrl:       GitLabUrl,
+    gitLabThrottler: Throttler[F, GitLab]
+) extends RestClient(gitLabThrottler)
+    with ProjectPathFinder[F] {
 
   import cats.effect._
   import cats.syntax.all._
@@ -53,36 +48,29 @@ private class IOProjectPathFinder(
   import org.http4s._
   import org.http4s.dsl.io._
 
-  def findProjectPath(projectId: projects.Id, maybeAccessToken: Option[AccessToken]): IO[Option[projects.Path]] =
+  def findProjectPath(projectId: projects.Id, maybeAccessToken: Option[AccessToken]): F[Option[projects.Path]] =
     for {
       uri     <- validateUri(s"$gitLabUrl/api/v4/projects/$projectId")
       project <- send(request(GET, uri, maybeAccessToken))(mapResponse)
     } yield project
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[projects.Path]]] = {
+  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[projects.Path]]] = {
     case (Ok, _, response)    => response.as[projects.Path].map(Option.apply)
-    case (NotFound, _, _)     => None.pure[IO]
-    case (Unauthorized, _, _) => None.pure[IO]
+    case (NotFound, _, _)     => Option.empty[projects.Path].pure[F]
+    case (Unauthorized, _, _) => Option.empty[projects.Path].pure[F]
   }
 
-  private implicit lazy val projectPathDecoder: EntityDecoder[IO, projects.Path] = {
+  private implicit lazy val projectPathDecoder: EntityDecoder[F, projects.Path] = {
     lazy val decoder: Decoder[projects.Path] = _.downField("path_with_namespace").as[projects.Path]
-    jsonOf[IO, projects.Path](implicitly[Sync[IO]], decoder)
+    jsonOf[F, projects.Path](Sync[F], decoder)
   }
 }
 
-object IOProjectPathFinder {
+object ProjectPathFinder {
 
-  def apply(
-      logger: Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[ProjectPathFinder[IO]] =
-    for {
-      gitLabRateLimit <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
-      gitLabThrottler <- Throttler[IO, GitLab](gitLabRateLimit)
-      gitLabUrl       <- GitLabUrlLoader[IO]()
-    } yield new IOProjectPathFinder(gitLabUrl, gitLabThrottler, logger)
+  def apply[F[_]: Async: Temporal: Logger]: F[ProjectPathFinder[F]] = for {
+    gitLabRateLimit <- RateLimit.fromConfig[F, GitLab]("services.gitlab.rate-limit")
+    gitLabThrottler <- Throttler[F, GitLab](gitLabRateLimit)
+    gitLabUrl       <- GitLabUrlLoader[F]()
+  } yield new ProjectPathFinderImpl(gitLabUrl, gitLabThrottler)
 }

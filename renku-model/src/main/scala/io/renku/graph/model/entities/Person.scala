@@ -92,7 +92,7 @@ object Person {
     for {
       _ <- cursor.downField(schema / "additionalType").as[String].flatMap {
              case `gitLabSameAsAdditionalType` => ().asRight
-             case additionalType               => DecodingFailure(s"Unknown $additionalType type of Person SameAs", Nil).asLeft
+             case additionalType => DecodingFailure(s"Unknown $additionalType type of Person SameAs", Nil).asLeft
            }
       gitLabId <- cursor.downField(schema / "identifier").as[GitLabId]
     } yield gitLabId

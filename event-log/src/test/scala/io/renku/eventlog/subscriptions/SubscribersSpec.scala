@@ -18,8 +18,7 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.effect.concurrent.Deferred
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{Deferred, IO}
 import cats.syntax.all._
 import io.renku.eventlog.subscriptions.Generators._
 import io.renku.events.consumers.subscriptions.SubscriberUrl
@@ -27,13 +26,12 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
-class SubscribersSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class SubscribersSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "add" should {
 
@@ -157,17 +155,14 @@ class SubscribersSpec extends AnyWordSpec with MockFactory with should.Matchers 
     }
   }
 
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO]        = IO.timer(global)
-
   private trait TestCase {
     val categoryName     = categoryNames.generateOne
     val subscriptionInfo = subscriptionInfos.generateOne
     val subscriberUrl    = subscriptionInfo.subscriberUrl
 
-    val subscribersRegistry = mock[SubscribersRegistry]
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val subscribersRegistry = mock[SubscribersRegistry[IO]]
     val subscriberTracker   = mock[SubscriberTracker[IO]]
-    val logger              = TestLogger[IO]()
-    val subscribers         = new SubscribersImpl(categoryName, subscribersRegistry, subscriberTracker, logger)
+    val subscribers         = new SubscribersImpl(categoryName, subscribersRegistry, subscriberTracker)
   }
 }

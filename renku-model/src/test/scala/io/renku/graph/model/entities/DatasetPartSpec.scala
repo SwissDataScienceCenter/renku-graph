@@ -58,7 +58,7 @@ class DatasetPartSpec extends AnyWordSpec with should.Matchers with ScalaCheckPr
     }
 
     "fail if invalidationTime is older than the part" in {
-      val datasetPart      = datasetPartEntities(timestampsNotInTheFuture.generateOne).generateOne.to[entities.DatasetPart]
+      val datasetPart = datasetPartEntities(timestampsNotInTheFuture.generateOne).generateOne.to[entities.DatasetPart]
       val invalidationTime = timestamps(max = datasetPart.dateCreated.value).generateAs(InvalidationTime)
 
       val Left(error) = datasetPart

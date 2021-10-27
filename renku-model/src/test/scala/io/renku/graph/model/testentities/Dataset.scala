@@ -128,7 +128,7 @@ object Dataset {
         renkuBaseUrl: RenkuBaseUrl
     ): entities.Dataset.Identification => Provenance => entities.Dataset.Provenance =
       identification => {
-        case p: Internal => toEntitiesInternal(renkuBaseUrl)(identification)(p)
+        case p: Internal         => toEntitiesInternal(renkuBaseUrl)(identification)(p)
         case p: ImportedExternal => toEntitiesImportedExternal(renkuBaseUrl)(identification)(p)
         case p: ImportedInternalAncestorExternal =>
           toEntitiesImportedInternalAncestorExternal(renkuBaseUrl)(identification)(p)

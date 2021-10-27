@@ -28,16 +28,21 @@ import io.renku.graph.model.testentities.CommandParameterBase.{CommandInput, Com
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Warn
-import io.renku.jsonld.EntityId
 import io.renku.jsonld.syntax._
 import io.renku.knowledgegraph.lineage.model._
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.stubbing.ExternalServiceStubbing
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EdgesFinderSpec extends AnyWordSpec with InMemoryRdfStore with ExternalServiceStubbing with should.Matchers {
+class EdgesFinderSpec
+    extends AnyWordSpec
+    with InMemoryRdfStore
+    with ExternalServiceStubbing
+    with should.Matchers
+    with IOSpec {
 
   "findEdges" should {
 
@@ -45,6 +50,7 @@ class EdgesFinderSpec extends AnyWordSpec with InMemoryRdfStore with ExternalSer
       "case when the user is not authenticated and the project is public" in new TestCase {
 
         val exemplarData = LineageExemplarData(projectEntities(visibilityPublic).generateOne)
+
         import exemplarData._
 
         loadToStore(project)
@@ -75,11 +81,8 @@ class EdgesFinderSpec extends AnyWordSpec with InMemoryRdfStore with ExternalSer
         )
       }
 
-    /** in1   in2       in3   in2
-      *  \    /          \    /
-      *   plan            plan
-      *    |               |
-      *   out1            out2
+    /** in1 in2 in3 in2 \ / \ / plan plan
+      * | | out1 out2
       */
     "return all the edges including executions with overridden inputs/outputs" in new TestCase {
 
@@ -180,18 +183,16 @@ class EdgesFinderSpec extends AnyWordSpec with InMemoryRdfStore with ExternalSer
   }
 
   private trait TestCase {
-    val logger                = TestLogger[IO]()
-    val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
-    val edgesFinder = new EdgesFinderImpl(
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
+    val edgesFinder = new EdgesFinderImpl[IO](
       rdfStoreConfig,
       renkuBaseUrl,
-      logger,
-      new SparqlQueryTimeRecorder(executionTimeRecorder)
+      new SparqlQueryTimeRecorder[IO](executionTimeRecorder)
     )
   }
 
   private implicit class NodeDefOps(nodeDef: NodeDef) {
     lazy val toNodeLocation: Node.Location = Node.Location(nodeDef.location)
-    lazy val toEntityId:     EntityId      = EntityId.of(nodeDef.location)
   }
 }

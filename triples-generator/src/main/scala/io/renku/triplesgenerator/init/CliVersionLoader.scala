@@ -28,17 +28,17 @@ private[init] object CliVersionLoader {
 
   private implicit val cliVersionLoader: ConfigReader[CliVersion] = stringTinyTypeReader(CliVersion)
 
-  def apply[Interpretation[_]]()(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[CliVersion] =
+  def apply[F[_]]()(implicit ME: MonadError[F, Throwable]): F[CliVersion] =
     apply(findRenkuVersion)
 
-  private[init] def apply[Interpretation[_]](
-      renkuVersionFinder: Interpretation[CliVersion]
-  )(implicit ME:          MonadError[Interpretation, Throwable]): Interpretation[CliVersion] =
+  private[init] def apply[F[_]](
+      renkuVersionFinder: F[CliVersion]
+  )(implicit ME:          MonadError[F, Throwable]): F[CliVersion] =
     renkuVersionFinder
 
-  private def findRenkuVersion[Interpretation[_]](implicit
-      ME: MonadError[Interpretation, Throwable]
-  ): Interpretation[CliVersion] = {
+  private def findRenkuVersion[F[_]](implicit
+      ME: MonadError[F, Throwable]
+  ): F[CliVersion] = {
     import ammonite.ops._
     import cats.syntax.all._
 

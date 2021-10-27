@@ -19,7 +19,8 @@
 package io.renku.eventlog.events.categories.statuschange
 
 import cats.data.Kleisli
-import cats.effect.{BracketThrow, Sync}
+import cats.effect.MonadCancelThrow
+import cats.effect.kernel.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.implicits._
@@ -38,16 +39,16 @@ import skunk.{Session, ~}
 
 import java.time.Instant
 
-private class ToTriplesStoreUpdater[Interpretation[_]: BracketThrow: Sync](
-    deliveryInfoRemover: DeliveryInfoRemover[Interpretation],
-    queriesExecTimes:    LabeledHistogram[Interpretation, SqlStatement.Name],
+private class ToTriplesStoreUpdater[F[_]: MonadCancelThrow: Async](
+    deliveryInfoRemover: DeliveryInfoRemover[F],
+    queriesExecTimes:    LabeledHistogram[F, SqlStatement.Name],
     now:                 () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
-    with DBUpdater[Interpretation, ToTriplesStore] {
+    with DBUpdater[F, ToTriplesStore] {
 
   import deliveryInfoRemover._
 
-  override def updateDB(event: ToTriplesStore): UpdateResult[Interpretation] = for {
+  override def updateDB(event: ToTriplesStore): UpdateResult[F] = for {
     _                      <- deleteDelivery(event.eventId)
     updateResults          <- updateEvent(event)
     ancestorsUpdateResults <- updateAncestorsStatus(event) recoverWith retryOnDeadlock(event)
@@ -77,10 +78,10 @@ private class ToTriplesStoreUpdater[Interpretation[_]: BracketThrow: Sync](
         case Completion.Update(1) =>
           DBUpdateResults
             .ForProjects(event.projectPath, Map(TransformingTriples -> -1, TriplesStore -> 1))
-            .pure[Interpretation]
+            .pure[F]
         case _ =>
           new Exception(s"Could not update event ${event.eventId} to status ${EventStatus.TriplesStore}")
-            .raiseError[Interpretation, DBUpdateResults.ForProjects]
+            .raiseError[F, DBUpdateResults.ForProjects]
       }
   }
 
@@ -146,8 +147,8 @@ private class ToTriplesStoreUpdater[Interpretation[_]: BracketThrow: Sync](
 
   private def retryOnDeadlock(
       event: ToTriplesStore
-  ): PartialFunction[Throwable, Kleisli[Interpretation, Session[Interpretation], DBUpdateResults.ForProjects]] = {
-    case DeadlockDetected(_) => updateAncestorsStatus(event)
+  ): PartialFunction[Throwable, Kleisli[F, Session[F], DBUpdateResults.ForProjects]] = { case DeadlockDetected(_) =>
+    updateAncestorsStatus(event)
   }
 
   private def `status IN`(statuses: Set[EventStatus]) =

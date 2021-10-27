@@ -18,7 +18,8 @@
 
 package io.renku.config.sentry
 
-import cats.MonadError
+import cats.MonadThrow
+import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -43,12 +44,12 @@ class SentryInitializerSpec extends AnyWordSpec with MockFactory with should.Mat
           s"environment=${urlEncode(sentryConfig.environmentName.toString)}"
       }
 
-      sentryInitializer(Some(sentryConfig)).run() shouldBe context.unit
+      sentryInitializer(Some(sentryConfig)).run() shouldBe MonadThrow[Try].unit
     }
 
     "do nothing if no config given" in new TestCase {
       val maybeConfig = None
-      sentryInitializer(maybeConfig).run() shouldBe context.unit
+      sentryInitializer(maybeConfig).run() shouldBe MonadThrow[Try].unit
     }
 
     "fail if Sentry initialisation fails" in new TestCase {
@@ -57,14 +58,12 @@ class SentryInitializerSpec extends AnyWordSpec with MockFactory with should.Mat
       val exception = exceptions.generateOne
       initSentry.expects(*).throwing(exception)
 
-      sentryInitializer(Some(sentryConfig)).run() shouldBe context.raiseError(exception)
+      sentryInitializer(Some(sentryConfig)).run() shouldBe exception.raiseError[Try, Unit]
     }
   }
 
   private trait TestCase {
-    val context = MonadError[Try, Throwable]
-
     val initSentry        = mockFunction[String, Unit]
-    val sentryInitializer = new SentryInitializer[Try](_, initSentry)
+    val sentryInitializer = new SentryInitializerImpl[Try](_, initSentry)
   }
 }

@@ -23,12 +23,13 @@ import io.renku.db.SqlStatement
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.metrics.TestLabeledHistogram
+import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.InMemoryProjectsTokensDbSpec
 import io.renku.tokenrepository.repository.RepositoryGenerators._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class PersistedTokensFinderSpec extends AnyWordSpec with InMemoryProjectsTokensDbSpec with should.Matchers {
+class PersistedTokensFinderSpec extends AnyWordSpec with IOSpec with InMemoryProjectsTokensDbSpec with should.Matchers {
 
   "findToken" should {
 
@@ -60,6 +61,6 @@ class PersistedTokensFinderSpec extends AnyWordSpec with InMemoryProjectsTokensD
     val projectPath = projectPaths.generateOne
 
     private val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val finder                   = new PersistedTokensFinder(sessionResource, queriesExecTimes)
+    val finder                   = new PersistedTokensFinderImpl(sessionResource, queriesExecTimes)
   }
 }

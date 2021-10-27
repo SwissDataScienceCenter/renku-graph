@@ -75,7 +75,7 @@ object projects {
     private val pathExtractor = "^.*\\/projects\\/(.*)$".r
     implicit lazy val projectPathConverter: TinyTypeConverter[ResourceId, Path] = {
       case ResourceId(pathExtractor(path)) => Path.from(path)
-      case illegalValue                    => Left(new IllegalArgumentException(s"'$illegalValue' cannot be converted to a ProjectPath"))
+      case illegalValue => Left(new IllegalArgumentException(s"'$illegalValue' cannot be converted to a ProjectPath"))
     }
   }
 
@@ -135,7 +135,7 @@ object projects {
       JsonLDDecoder.decodeString.emap { decoded =>
         all.find(_.value == decoded) match {
           case Some(value) => value.asRight
-          case None        => s"'$decoded' is not a valid project visibility. Allowed values are: ${all.mkString(", ")}".asLeft
+          case None => s"'$decoded' is not a valid project visibility. Allowed values are: ${all.mkString(", ")}".asLeft
         }
       }
 
@@ -162,6 +162,6 @@ object projects {
     type Zero = Zero.type
 
     final class NonZero private (val value: Int) extends AnyVal with ForksCount
-    object NonZero extends TinyTypeFactory[NonZero](new NonZero(_)) with PositiveInt
+    object NonZero                               extends TinyTypeFactory[NonZero](new NonZero(_)) with PositiveInt
   }
 }

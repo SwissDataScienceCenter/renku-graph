@@ -18,16 +18,16 @@
 
 package io.renku.config
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.syntax.all._
 import com.typesafe.config.Config
 import io.renku.tinytypes._
 import pureconfig._
 import pureconfig.error.{CannotConvert, ConfigReaderFailures}
 
-abstract class ConfigLoader[Interpretation[_]](implicit ME: MonadError[Interpretation, Throwable]) {
+abstract class ConfigLoader[F[_]: MonadThrow] {
 
-  protected def find[T](key: String, config: Config)(implicit reader: ConfigReader[T]): Interpretation[T] =
+  protected def find[T](key: String, config: Config)(implicit reader: ConfigReader[T]): F[T] =
     ConfigLoader.find(key, config)
 }
 
@@ -37,19 +37,17 @@ object ConfigLoader {
     override def getMessage: String = failures.toList.map(_.description).mkString("; ")
   }
 
-  def find[Interpretation[_], T](
+  def find[F[_]: MonadThrow, T](
       key:           String,
       config:        Config
-  )(implicit reader: ConfigReader[T], ME: MonadError[Interpretation, Throwable]): Interpretation[T] =
-    fromEither {
-      ConfigSource.fromConfig(config).at(key).load[T]
-    }
+  )(implicit reader: ConfigReader[T]): F[T] = fromEither {
+    ConfigSource.fromConfig(config).at(key).load[T]
+  }
 
-  private def fromEither[Interpretation[_], T](
+  private def fromEither[F[_]: MonadThrow, T](
       loadedConfig: ConfigReaderFailures Either T
-  )(implicit ME:    MonadError[Interpretation, Throwable]): Interpretation[T] =
-    ME.fromEither[T] {
-
+  ): F[T] =
+    MonadThrow[F].fromEither[T] {
       loadedConfig leftMap (new ConfigLoadingException(_))
     }
 

@@ -18,8 +18,7 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.Parallel
-import cats.effect.{ContextShift, IO}
+import cats.effect.IO
 import cats.syntax.all._
 import io.circe.Json
 import io.renku.eventlog.subscriptions.EventProducersRegistry._
@@ -27,13 +26,12 @@ import io.renku.eventlog.subscriptions.SubscriptionCategory._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.events.CategoryName
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.global
-
-private class EventProducersRegistrySpec extends AnyWordSpec with MockFactory with should.Matchers {
+private class EventProducersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "run" should {
 
@@ -88,9 +86,6 @@ private class EventProducersRegistrySpec extends AnyWordSpec with MockFactory wi
       } shouldBe exception
     }
   }
-
-  private implicit lazy val cs:       ContextShift[IO] = IO.contextShift(global)
-  private implicit lazy val parallel: Parallel[IO]     = IO.ioParallel
 
   trait TestCase {
     trait TestSubscriptionCategory extends SubscriptionCategory[IO] {

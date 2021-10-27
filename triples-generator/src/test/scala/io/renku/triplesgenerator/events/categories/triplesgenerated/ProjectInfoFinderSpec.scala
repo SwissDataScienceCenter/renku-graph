@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
 import com.github.tomakehurst.wiremock.client.WireMock._
@@ -40,6 +40,7 @@ import io.renku.http.client.UrlEncoder._
 import io.renku.interpreters.TestLogger
 import io.renku.json.JsonOps._
 import io.renku.stubbing.ExternalServiceStubbing
+import io.renku.testtools.IOSpec
 import io.renku.tinytypes.json.TinyTypeEncoders
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import org.http4s.Status.{Forbidden, ServiceUnavailable, Unauthorized}
@@ -47,12 +48,12 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.{postfixOps, reflectiveCalls}
 
 class ProjectInfoFinderSpec
     extends AnyWordSpec
+    with IOSpec
     with ExternalServiceStubbing
     with should.Matchers
     with ScalaCheckPropertyChecks
@@ -212,20 +213,18 @@ class ProjectInfoFinderSpec
     }
   }
 
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO]        = IO.timer(global)
   private lazy val requestTimeout = 2 seconds
 
   private trait TestCase {
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
 
+    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val gitLabUrl = GitLabUrl(externalServiceBaseUrl).apiV4
-    val finder = new ProjectInfoFinderImpl(gitLabUrl,
-                                           Throttler.noThrottling,
-                                           TestLogger(),
-                                           retryInterval = 100 millis,
-                                           maxRetries = 1,
-                                           requestTimeoutOverride = Some(requestTimeout)
+    val finder = new ProjectInfoFinderImpl[IO](gitLabUrl,
+                                               Throttler.noThrottling,
+                                               retryInterval = 100 millis,
+                                               maxRetries = 1,
+                                               requestTimeoutOverride = Some(requestTimeout)
     )
   }
 

@@ -18,8 +18,9 @@
 
 package io.renku.tokenrepository.repository.fetching
 
+import cats.MonadThrow
 import cats.data.OptionT
-import cats.effect.{ContextShift, Effect, IO}
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.circe.syntax._
 import io.renku.db.{SessionResource, SqlStatement}
@@ -36,46 +37,50 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-class FetchTokenEndpoint[Interpretation[_]: Effect](
-    tokenFinder: TokenFinder[Interpretation],
-    logger:      Logger[Interpretation]
-) extends Http4sDsl[Interpretation] {
-
+trait FetchTokenEndpoint[F[_]] {
   def fetchToken[ID](
       projectIdentifier: ID
-  )(implicit findToken:  ID => OptionT[Interpretation, AccessToken]): Interpretation[Response[Interpretation]] =
+  )(implicit findToken:  ID => OptionT[F, AccessToken]): F[Response[F]]
+
+  implicit val findById:   projects.Id => OptionT[F, AccessToken]
+  implicit val findByPath: projects.Path => OptionT[F, AccessToken]
+}
+
+class FetchTokenEndpointImpl[F[_]: MonadThrow: Logger](tokenFinder: TokenFinder[F])
+    extends Http4sDsl[F]
+    with FetchTokenEndpoint[F] {
+
+  override def fetchToken[ID](
+      projectIdentifier: ID
+  )(implicit findToken:  ID => OptionT[F, AccessToken]): F[Response[F]] =
     findToken(projectIdentifier).value
       .flatMap(toHttpResult(projectIdentifier))
       .recoverWith(httpResult(projectIdentifier))
 
   private def toHttpResult[ID](
       projectIdentifier: ID
-  ): Option[AccessToken] => Interpretation[Response[Interpretation]] = {
-    case Some(token) =>
-      Ok(token.asJson)
-    case None =>
-      NotFound(InfoMessage(s"Token for project: $projectIdentifier not found"))
+  ): Option[AccessToken] => F[Response[F]] = {
+    case Some(token) => Ok(token.asJson)
+    case None        => NotFound(InfoMessage(s"Token for project: $projectIdentifier not found"))
   }
 
   private def httpResult[ID](
       projectIdentifier: ID
-  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = { case NonFatal(exception) =>
+  ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
     val errorMessage = ErrorMessage(s"Finding token for project: $projectIdentifier failed")
-    logger.error(exception)(errorMessage.value)
+    Logger[F].error(exception)(errorMessage.value)
     InternalServerError(errorMessage)
   }
 
-  implicit val findById:   projects.Id => OptionT[Interpretation, AccessToken]   = tokenFinder.findToken
-  implicit val findByPath: projects.Path => OptionT[Interpretation, AccessToken] = tokenFinder.findToken
+  implicit val findById:   projects.Id => OptionT[F, AccessToken]   = tokenFinder.findToken
+  implicit val findByPath: projects.Path => OptionT[F, AccessToken] = tokenFinder.findToken
 }
 
-object IOFetchTokenEndpoint {
-  def apply(
-      sessionResource:     SessionResource[IO, ProjectsTokensDB],
-      queriesExecTimes:    LabeledHistogram[IO, SqlStatement.Name],
-      logger:              Logger[IO]
-  )(implicit contextShift: ContextShift[IO]): IO[FetchTokenEndpoint[IO]] =
-    for {
-      tokenFinder <- IOTokenFinder(sessionResource, queriesExecTimes)
-    } yield new FetchTokenEndpoint[IO](tokenFinder, logger)
+object FetchTokenEndpoint {
+  def apply[F[_]: MonadCancelThrow: Logger](
+      sessionResource:  SessionResource[F, ProjectsTokensDB],
+      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[FetchTokenEndpoint[F]] = for {
+    tokenFinder <- TokenFinder(sessionResource, queriesExecTimes)
+  } yield new FetchTokenEndpointImpl[F](tokenFinder)
 }

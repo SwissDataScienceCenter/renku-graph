@@ -18,7 +18,7 @@
 
 package io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.gitlab
 
-import cats.effect.{ConcurrentEffect, IO, Timer}
+import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Json
 import io.circe.literal._
@@ -34,14 +34,18 @@ import io.renku.http.client.AccessToken
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
+import io.renku.testtools.IOSpec
 import org.http4s.Status
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
-class GitLabCommitFetcherSpec extends AnyWordSpec with MockFactory with ExternalServiceStubbing with should.Matchers {
+class GitLabCommitFetcherSpec
+    extends AnyWordSpec
+    with IOSpec
+    with MockFactory
+    with ExternalServiceStubbing
+    with should.Matchers {
 
   "fetchGitLabCommits" should {
 
@@ -189,16 +193,14 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with MockFactory with External
     }
   }
 
-  private implicit val ce:    ConcurrentEffect[IO] = IO.ioConcurrentEffect(IO.contextShift(global))
-  private implicit val timer: Timer[IO]            = IO.timer(global)
-
   private trait TestCase {
     implicit val maybeAccessToken: Option[AccessToken] = personalAccessTokens.generateSome
     val projectId      = projectIds.generateOne
     val commitInfoList = commitInfos.generateNonEmptyList().toList
 
-    val gitLabApiUrl        = GitLabUrl(externalServiceBaseUrl).apiV4
-    val gitLabCommitFetcher = new GitLabCommitFetcherImpl[IO](gitLabApiUrl, Throttler.noThrottling, TestLogger())
+    val gitLabApiUrl = GitLabUrl(externalServiceBaseUrl).apiV4
+    private implicit val logger: TestLogger[IO] = TestLogger()
+    val gitLabCommitFetcher = new GitLabCommitFetcherImpl[IO](gitLabApiUrl, Throttler.noThrottling)
   }
 
   private def commitsJson(from: List[CommitInfo]) =

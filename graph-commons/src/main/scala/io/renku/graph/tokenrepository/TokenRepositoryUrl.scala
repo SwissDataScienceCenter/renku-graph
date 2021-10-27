@@ -33,8 +33,8 @@ object TokenRepositoryUrl
 
   private implicit val configReader: ConfigReader[TokenRepositoryUrl] = urlTinyTypeReader(TokenRepositoryUrl)
 
-  def apply[Interpretation[_]: MonadThrow](
+  def apply[F[_]: MonadThrow](
       config: Config = ConfigFactory.load
-  ): Interpretation[TokenRepositoryUrl] =
-    find[Interpretation, TokenRepositoryUrl]("services.token-repository.url", config)
+  ): F[TokenRepositoryUrl] =
+    find[F, TokenRepositoryUrl]("services.token-repository.url", config)
 }

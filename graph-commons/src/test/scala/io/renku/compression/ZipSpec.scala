@@ -22,6 +22,7 @@ import cats.effect.IO
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
+import io.renku.testtools.IOSpec
 import org.scalacheck.Arbitrary
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -29,7 +30,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import java.io.EOFException
 import java.util.zip.ZipException
 
-class ZipSpec extends AnyWordSpec with should.Matchers {
+class ZipSpec extends AnyWordSpec with IOSpec with should.Matchers {
 
   "zip and unzip" should {
     "zip and unzip the content from String to Byte Array " in {

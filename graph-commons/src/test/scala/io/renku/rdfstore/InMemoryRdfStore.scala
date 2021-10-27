@@ -18,7 +18,6 @@
 
 package io.renku.rdfstore
 
-import cats.MonadError
 import cats.data.Validated
 import cats.effect._
 import cats.syntax.all._
@@ -32,30 +31,24 @@ import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.{JsonLD, JsonLDEncoder}
 import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.testtools.IOSpec
 import org.apache.jena.rdf.model.ModelFactory
 import org.apache.jena.rdfconnection.{RDFConnection, RDFConnectionFuseki}
 import org.apache.jena.riot.{Lang, RDFDataMgr}
 import org.http4s.Uri
-import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, Suite}
+import org.scalatest._
 
 import java.io.ByteArrayInputStream
 import java.net.{ServerSocket, SocketException}
 import java.nio.charset.StandardCharsets.UTF_8
-import scala.concurrent.ExecutionContext
-import scala.concurrent.ExecutionContext.global
 import scala.language.reflectiveCalls
 import scala.util.Random.nextInt
 import scala.xml.Elem
 
 trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
-  this: Suite =>
+  this: Suite with IOSpec =>
 
   protected val givenServerRunning: Boolean = false
-
-  protected implicit val ec:    ExecutionContext          = global
-  protected implicit val cs:    ContextShift[IO]          = IO.contextShift(global)
-  protected implicit val timer: Timer[IO]                 = IO.timer(global)
-  protected val context:        MonadError[IO, Throwable] = MonadError[IO, Throwable]
 
   private lazy val fusekiServerPort: Int Refined Positive =
     if (givenServerRunning) 3030
@@ -158,11 +151,10 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
     objects.map(encoder.apply): _*
   )
 
-  private lazy val logger = TestLogger[IO]()
+  private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
   private lazy val queryRunner = new RdfStoreClientImpl(
     rdfStoreConfig,
-    logger,
-    new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
+    new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO]())
   ) {
 
     import io.circe.Decoder._

@@ -32,6 +32,7 @@ import io.renku.graph.model.events.EventStatus.AwaitingDeletion
 import io.renku.graph.model.events.{CompoundEventId, EventStatus, LastSyncedDate}
 import io.renku.graph.model.projects
 import io.renku.metrics.TestLabeledHistogram
+import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -42,6 +43,7 @@ import java.time.temporal.ChronoUnit
 
 class CommitSyncEventFinderSpec
     extends AnyWordSpec
+    with IOSpec
     with InMemoryEventLogDbSpec
     with SubscriptionDataProvisioning
     with MockFactory
@@ -222,14 +224,13 @@ class CommitSyncEventFinderSpec
                        createdDate: CreatedDate = createdDates.generateOne,
                        eventStatus: EventStatus =
                          Gen.oneOf(EventStatus.all.filterNot(_ == AwaitingDeletion)).generateOne
-  ): Unit =
-    storeEvent(
-      eventId,
-      eventStatus,
-      executionDates.generateOne,
-      eventDate,
-      eventBodies.generateOne,
-      createdDate,
-      projectPath = projectPath
-    )
+  ): Unit = storeEvent(
+    eventId,
+    eventStatus,
+    executionDates.generateOne,
+    eventDate,
+    eventBodies.generateOne,
+    createdDate,
+    projectPath = projectPath
+  )
 }

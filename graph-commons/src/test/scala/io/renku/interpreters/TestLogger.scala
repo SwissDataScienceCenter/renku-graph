@@ -27,7 +27,7 @@ import org.typelevel.log4cats.Logger
 import java.util.concurrent.ConcurrentLinkedQueue
 import scala.jdk.CollectionConverters._
 
-class TestLogger[Interpretation[_]: Monad] extends Logger[Interpretation] with should.Matchers {
+class TestLogger[F[_]: Monad] extends Logger[F] with should.Matchers {
 
   import TestLogger.Level._
   import TestLogger._
@@ -58,54 +58,54 @@ class TestLogger[Interpretation[_]: Monad] extends Logger[Interpretation] with s
 
   def reset(): Unit = invocations.clear()
 
-  override def error(t: Throwable)(message: => String): Interpretation[Unit] = {
+  override def error(t: Throwable)(message: => String): F[Unit] = {
     invocations add LogEntry(Error, MessageAndThrowable(message, t))
-    implicitly[Monad[Interpretation]].pure(())
+    implicitly[Monad[F]].pure(())
   }
 
-  override def warn(t: Throwable)(message: => String): Interpretation[Unit] = {
+  override def warn(t: Throwable)(message: => String): F[Unit] = {
     invocations add LogEntry(Warn, MessageAndThrowable(message, t))
-    implicitly[Monad[Interpretation]].pure(())
+    implicitly[Monad[F]].pure(())
   }
 
-  override def info(t: Throwable)(message: => String): Interpretation[Unit] = {
+  override def info(t: Throwable)(message: => String): F[Unit] = {
     invocations add LogEntry(Info, MessageAndThrowable(message, t))
-    implicitly[Monad[Interpretation]].pure(())
+    implicitly[Monad[F]].pure(())
   }
 
-  override def debug(t: Throwable)(message: => String): Interpretation[Unit] = {
+  override def debug(t: Throwable)(message: => String): F[Unit] = {
     invocations add LogEntry(Debug, MessageAndThrowable(message, t))
-    implicitly[Monad[Interpretation]].pure(())
+    implicitly[Monad[F]].pure(())
   }
 
-  override def trace(t: Throwable)(message: => String): Interpretation[Unit] = {
+  override def trace(t: Throwable)(message: => String): F[Unit] = {
     invocations add LogEntry(Trace, MessageAndThrowable(message, t))
-    implicitly[Monad[Interpretation]].pure(())
+    implicitly[Monad[F]].pure(())
   }
 
-  override def error(message: => String): Interpretation[Unit] = {
+  override def error(message: => String): F[Unit] = {
     invocations add LogEntry(Error, Message(message))
-    implicitly[Monad[Interpretation]].pure(())
+    implicitly[Monad[F]].pure(())
   }
 
-  override def warn(message: => String): Interpretation[Unit] = {
+  override def warn(message: => String): F[Unit] = {
     invocations add LogEntry(Warn, Message(message))
-    implicitly[Monad[Interpretation]].pure(())
+    implicitly[Monad[F]].pure(())
   }
 
-  override def info(message: => String): Interpretation[Unit] = {
+  override def info(message: => String): F[Unit] = {
     invocations add LogEntry(Info, Message(message))
-    implicitly[Monad[Interpretation]].pure(())
+    implicitly[Monad[F]].pure(())
   }
 
-  override def debug(message: => String): Interpretation[Unit] = {
+  override def debug(message: => String): F[Unit] = {
     invocations add LogEntry(Debug, Message(message))
-    implicitly[Monad[Interpretation]].pure(())
+    implicitly[Monad[F]].pure(())
   }
 
-  override def trace(message: => String): Interpretation[Unit] = {
+  override def trace(message: => String): F[Unit] = {
     invocations add LogEntry(Trace, Message(message))
-    implicitly[Monad[Interpretation]].pure(())
+    implicitly[Monad[F]].pure(())
   }
 
   private def invocationsPrettyPrint: String =
@@ -121,7 +121,7 @@ class TestLogger[Interpretation[_]: Monad] extends Logger[Interpretation] with s
 
 object TestLogger {
 
-  def apply[Interpretation[_]: Monad](): TestLogger[Interpretation] = new TestLogger[Interpretation]
+  def apply[F[_]: Monad](): TestLogger[F] = new TestLogger[F]
 
   private[TestLogger] case class LogEntry(level: Level, message: LogMessage)
 
@@ -149,7 +149,7 @@ object TestLogger {
     val message: String
   }
   object LogMessage {
-    final case class Message(message: String) extends LogMessage
+    final case class Message(message: String)                                               extends LogMessage
     final case class MessageAndThrowableMatcher(message: String, throwableMatcher: Matcher) extends LogMessage
     final case class MessageAndThrowable(message: String, throwable: Throwable) extends LogMessage {
       override def equals(other: Any): Boolean = other match {

@@ -28,7 +28,7 @@ import io.renku.metrics.{Gauge, LabeledGauge, MetricsRegistry}
 object UnderTriplesGenerationGauge {
 
   def apply(
-      metricsRegistry: MetricsRegistry[IO],
+      metricsRegistry: MetricsRegistry,
       statsFinder:     StatsFinder[IO]
   ): IO[LabeledGauge[IO, projects.Path]] =
     Gauge[IO, projects.Path](

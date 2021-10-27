@@ -18,37 +18,34 @@
 
 package io.renku.knowledgegraph.graphql
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.Parallel
+import cats.effect.Async
+import cats.syntax.all._
 import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.lineage.LineageFinder
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
 trait QueryContext[QueryContextT] {
   self: QueryContextT =>
   type Params
+
   def updateContext(p: Params): QueryContextT
 }
 
-class LineageQueryContext[Interpretation[_]](
-    val lineageFinder: LineageFinder[Interpretation],
+class LineageQueryContext[F[_]](
+    val lineageFinder: LineageFinder[F],
     val maybeUser:     Option[AuthUser] = None
-) extends QueryContext[LineageQueryContext[Interpretation]] {
+) extends QueryContext[LineageQueryContext[F]] {
 
   override type Params = Option[AuthUser]
-  override def updateContext(p: Option[AuthUser]): LineageQueryContext[Interpretation] =
-    new LineageQueryContext[Interpretation](lineageFinder, p)
+
+  override def updateContext(p: Option[AuthUser]): LineageQueryContext[F] =
+    new LineageQueryContext[F](lineageFinder, p)
 }
 
 object LineageQueryContext {
-  def apply(
-      timeRecorder: SparqlQueryTimeRecorder[IO],
-      logger:       Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[LineageQueryContext[IO]] = LineageFinder(timeRecorder, logger) map (new LineageQueryContext[IO](_))
+  def apply[F[_]: Async: Parallel: Logger](
+      timeRecorder: SparqlQueryTimeRecorder[F]
+  ): F[LineageQueryContext[F]] = LineageFinder[F](timeRecorder) map (new LineageQueryContext[F](_))
 }

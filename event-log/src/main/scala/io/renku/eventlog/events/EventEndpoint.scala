@@ -21,7 +21,7 @@ package io.renku.eventlog.events
 import cats.MonadThrow
 import cats.data.EitherT
 import cats.data.EitherT.right
-import cats.effect.Effect
+import cats.effect.kernel.Concurrent
 import cats.syntax.all._
 import io.circe.Json
 import io.renku.events.EventRequestContent
@@ -30,36 +30,36 @@ import io.renku.events.consumers.{EventConsumersRegistry, EventSchedulingResult}
 import io.renku.graph.model.events.ZippedEventPayload
 import io.renku.http.InfoMessage._
 import io.renku.http.{ErrorMessage, InfoMessage}
+import org.http4s._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.`Content-Type`
 import org.http4s.multipart.{Multipart, Part}
-import org.http4s._
 
 import scala.util.control.NonFatal
 
-trait EventEndpoint[Interpretation[_]] {
-  def processEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]]
+trait EventEndpoint[F[_]] {
+  def processEvent(request: Request[F]): F[Response[F]]
 }
 
-class EventEndpointImpl[Interpretation[_]: Effect: MonadThrow](
-    eventConsumersRegistry: EventConsumersRegistry[Interpretation]
-) extends Http4sDsl[Interpretation]
-    with EventEndpoint[Interpretation] {
+class EventEndpointImpl[F[_]: Concurrent](
+    eventConsumersRegistry: EventConsumersRegistry[F]
+) extends Http4sDsl[F]
+    with EventEndpoint[F] {
 
   import org.http4s.circe._
 
-  def processEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
+  def processEvent(request: Request[F]): F[Response[F]] = {
     for {
       multipart      <- toMultipart(request)
       eventJson      <- toEvent(multipart)
       requestContent <- getRequestContent(multipart, eventJson)
-      result         <- right[Response[Interpretation]](eventConsumersRegistry.handle(requestContent) >>= toHttpResult)
+      result         <- right[Response[F]](eventConsumersRegistry.handle(requestContent) >>= toHttpResult)
     } yield result
   }.merge recoverWith { case NonFatal(error) =>
     toHttpResult(EventSchedulingResult.SchedulingError(error))
   }
 
-  private lazy val toHttpResult: EventSchedulingResult => Interpretation[Response[Interpretation]] = {
+  private lazy val toHttpResult: EventSchedulingResult => F[Response[F]] = {
     case EventSchedulingResult.Accepted             => Accepted(InfoMessage("Event accepted"))
     case EventSchedulingResult.Busy                 => TooManyRequests(InfoMessage("Too many events to handle"))
     case EventSchedulingResult.UnsupportedEventType => BadRequest(ErrorMessage("Unsupported Event Type"))
@@ -68,71 +68,68 @@ class EventEndpointImpl[Interpretation[_]: Effect: MonadThrow](
   }
 
   private def toMultipart(
-      request: Request[Interpretation]
-  ): EitherT[Interpretation, Response[Interpretation], Multipart[Interpretation]] = EitherT {
+      request: Request[F]
+  ): EitherT[F, Response[F], Multipart[F]] = EitherT {
     request
-      .as[Multipart[Interpretation]]
-      .map(_.asRight[Response[Interpretation]])
+      .as[Multipart[F]]
+      .map(_.asRight[Response[F]])
       .recoverWith { case NonFatal(_) =>
-        BadRequest(ErrorMessage("Not multipart request")).map(_.asLeft[Multipart[Interpretation]])
+        BadRequest(ErrorMessage("Not multipart request")).map(_.asLeft[Multipart[F]])
       }
   }
 
-  private def toEvent(multipart: Multipart[Interpretation]): EitherT[Interpretation, Response[Interpretation], Json] =
+  private def toEvent(multipart: Multipart[F]): EitherT[F, Response[F], Json] =
     EitherT {
       multipart.parts
         .find(_.name.contains("event"))
-        .map(_.as[Json].map(_.asRight[Response[Interpretation]]).recoverWith { case NonFatal(_) =>
+        .map(_.as[Json].map(_.asRight[Response[F]]).recoverWith { case NonFatal(_) =>
           BadRequest(ErrorMessage("Malformed event body")).map(_.asLeft[Json])
         })
         .getOrElse(BadRequest(ErrorMessage("Missing event part")).map(_.asLeft[Json]))
     }
 
   private def getRequestContent(
-      multipart: Multipart[Interpretation],
+      multipart: Multipart[F],
       eventJson: Json
-  ): EitherT[Interpretation, Response[Interpretation], EventRequestContent] = EitherT {
+  ): EitherT[F, Response[F], EventRequestContent] = EitherT {
     import EventRequestContent._
     multipart.parts
       .find(_.name.contains("payload"))
       .map { part =>
-        part.headers
-          .find(_.name == `Content-Type`.name)
+        part.headers.headers
+          .find(_.name == `Content-Type`.headerInstance.name)
           .map(toEventRequestContent(part, eventJson))
           .getOrElse(
             BadRequest(ErrorMessage("Content-type not provided for payload")).map(_.asLeft[EventRequestContent])
           )
       }
-      .getOrElse(NoPayload(eventJson).asRight[Response[Interpretation]].widen[EventRequestContent].pure[Interpretation])
+      .getOrElse(NoPayload(eventJson).asRight[Response[F]].widen[EventRequestContent].pure[F])
   }
 
-  private def toEventRequestContent(part:      Part[Interpretation],
+  private def toEventRequestContent(part:      Part[F],
                                     eventJson: Json
-  ): Header => Interpretation[Either[Response[Interpretation], EventRequestContent]] = {
-    case header if header.value == `Content-Type`(MediaType.application.zip).value =>
+  ): Header.Raw => F[Either[Response[F], EventRequestContent]] = {
+    case header if header.value == MediaType.application.zip.show =>
       part
         .as[Array[Byte]]
         .map(ZippedEventPayload)
         .map(
           WithPayload[ZippedEventPayload](eventJson, _)
-            .asRight[Response[Interpretation]]
+            .asRight[Response[F]]
             .widen[EventRequestContent]
         )
-    case header if header.value == `Content-Type`(MediaType.text.plain).value =>
+    case header if header.value == MediaType.text.plain.show =>
       part
         .as[String]
-        .map(WithPayload[String](eventJson, _).asRight[Response[Interpretation]].widen[EventRequestContent])
+        .map(WithPayload[String](eventJson, _).asRight[Response[F]].widen[EventRequestContent])
     case _ =>
       BadRequest(ErrorMessage("Event payload type unsupported")).map(_.asLeft[EventRequestContent])
   }
 }
 
 object EventEndpoint {
-  import cats.effect.{ContextShift, IO}
-
-  def apply(
-      subscriptionsRegistry: EventConsumersRegistry[IO]
-  )(implicit contextShift:   ContextShift[IO]): IO[EventEndpoint[IO]] = IO {
-    new EventEndpointImpl[IO](subscriptionsRegistry)
-  }
+  def apply[F[_]: Concurrent](subscriptionsRegistry: EventConsumersRegistry[F]): F[EventEndpoint[F]] =
+    MonadThrow[F].catchNonFatal {
+      new EventEndpointImpl[F](subscriptionsRegistry)
+    }
 }

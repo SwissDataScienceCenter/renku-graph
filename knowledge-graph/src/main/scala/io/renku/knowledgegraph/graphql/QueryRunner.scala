@@ -18,6 +18,7 @@
 
 package io.renku.knowledgegraph.graphql
 
+import cats.MonadThrow
 import cats.effect.Async
 import io.circe.Json
 import sangria.execution.Executor
@@ -28,13 +29,29 @@ import sangria.schema.Schema
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
 
-class QueryRunner[Interpretation[_]: Async, T <: QueryContext[T]](
-    val schema:              Schema[T, Unit],
-    val repository:          T
-)(implicit executionContext: ExecutionContext) {
+trait QueryRunner[F[_], T <: QueryContext[T]] {
+  val schema:     Schema[T, Unit]
+  val repository: T
 
-  def run(userQuery: UserQuery, updateCtxParameters: repository.Params): Interpretation[Json] =
-    Async[Interpretation].async { callback =>
+  def run(userQuery: UserQuery, updateCtxParameters: repository.Params): F[Json]
+}
+
+object QueryRunner {
+  def apply[F[_]: Async, T <: QueryContext[T]](
+      schema:                  Schema[T, Unit],
+      repository:              T
+  )(implicit executionContext: ExecutionContext): F[QueryRunner[F, T]] =
+    MonadThrow[F].catchNonFatal(new QueryRunnerImpl(schema, repository))
+}
+
+class QueryRunnerImpl[F[_]: Async, T <: QueryContext[T]](
+    override val schema:     Schema[T, Unit],
+    override val repository: T
+)(implicit executionContext: ExecutionContext)
+    extends QueryRunner[F, T] {
+
+  def run(userQuery: UserQuery, updateCtxParameters: repository.Params): F[Json] =
+    Async[F].async_[Json] { callback =>
       Executor
         .execute(schema,
                  userQuery.query,

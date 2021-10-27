@@ -18,7 +18,7 @@
 
 package io.renku.graph.http.server.security
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.literal._
@@ -33,15 +33,15 @@ import io.renku.http.server.security._
 import io.renku.http.server.security.model.AuthUser
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
+import io.renku.testtools.IOSpec
 import org.http4s.Header
 import org.http4s.Status._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.reflectiveCalls
 
-class GitLabAuthenticatorSpec extends AnyWordSpec with should.Matchers with ExternalServiceStubbing {
+class GitLabAuthenticatorSpec extends AnyWordSpec with IOSpec with should.Matchers with ExternalServiceStubbing {
 
   "authenticate" should {
 
@@ -88,20 +88,18 @@ class GitLabAuthenticatorSpec extends AnyWordSpec with should.Matchers with Exte
     }
   }
 
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO]        = IO.timer(global)
-
   private trait TestCase {
     val accessToken = accessTokens.generateOne
 
+    private implicit val logger: TestLogger[IO] = TestLogger()
     val gitLabApiUrl  = GitLabUrl(externalServiceBaseUrl).apiV4
-    val authenticator = new GitLabAuthenticatorImpl(gitLabApiUrl, Throttler.noThrottling, TestLogger())
+    val authenticator = new GitLabAuthenticatorImpl[IO](gitLabApiUrl, Throttler.noThrottling)
   }
 
-  private def `/api/v4/user`(header: Header) = new {
+  private def `/api/v4/user`(header: Header.Raw) = new {
     def returning(response: ResponseDefinitionBuilder) = stubFor {
       get("/api/v4/user")
-        .withHeader(header.name.value, equalTo(header.value))
+        .withHeader(header.name.toString, equalTo(header.value))
         .willReturn(response)
     }
   }

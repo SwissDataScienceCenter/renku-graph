@@ -30,11 +30,12 @@ import io.renku.http.server.security.EndpointSecurityException.AuthorizationFail
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class ProjectAuthorizerSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers {
+class ProjectAuthorizerSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore with should.Matchers {
 
   "authorize" should {
 
@@ -102,9 +103,10 @@ class ProjectAuthorizerSpec extends AnyWordSpec with InMemoryRdfStore with shoul
 
       loadToStore(project)
 
-      authorizer.authorize(project.path, maybeAuthUser = None).value.unsafeRunSync() shouldBe Left(
-        AuthorizationFailure
-      )
+      authorizer
+        .authorize(project.path, maybeAuthUser = None)
+        .value
+        .unsafeRunSync() shouldBe AuthorizationFailure.asLeft
     }
   }
 
@@ -112,8 +114,8 @@ class ProjectAuthorizerSpec extends AnyWordSpec with InMemoryRdfStore with shoul
   private implicit lazy val gitLabApiUrl: GitLabApiUrl = gitLabUrls.generateOne.apiV4
 
   private trait TestCase {
-    private val logger       = TestLogger[IO]()
-    private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
-    val authorizer           = new ProjectAuthorizerImpl(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
+    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO]())
+    val authorizer           = new ProjectAuthorizerImpl(rdfStoreConfig, renkuBaseUrl, timeRecorder)
   }
 }

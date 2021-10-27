@@ -21,7 +21,8 @@ package io.renku.commiteventservice.events.categories.commitsync
 import cats.MonadThrow
 import cats.data.EitherT
 import cats.data.EitherT.fromEither
-import cats.effect.{Concurrent, ContextShift, IO, Timer}
+import cats.effect.kernel.Temporal
+import cats.effect.{Async, Concurrent, Spawn}
 import cats.syntax.all._
 import io.circe.Decoder
 import io.renku.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer
@@ -34,14 +35,12 @@ import io.renku.graph.model.events.{CategoryName, CommitId, LastSyncedDate}
 import io.renku.logging.ExecutionTimeRecorder
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-private[events] class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurrent](
+private[events] class EventHandler[F[_]: MonadThrow: Spawn: Concurrent: Logger](
     override val categoryName: CategoryName,
-    commitEventSynchronizer:   CommitEventSynchronizer[Interpretation],
-    logger:                    Logger[Interpretation]
-) extends consumers.EventHandlerWithProcessLimiter[Interpretation](ConcurrentProcessesLimiter.withoutLimit) {
+    commitEventSynchronizer:   CommitEventSynchronizer[F]
+) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
 
   import commitEventSynchronizer._
   import io.renku.graph.model.projects
@@ -49,28 +48,28 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow: ContextShift: 
 
   override def createHandlingProcess(
       request: EventRequestContent
-  ): Interpretation[EventHandlingProcess[Interpretation]] =
-    EventHandlingProcess[Interpretation](startSynchronizingEvents(request))
+  ): F[EventHandlingProcess[F]] =
+    EventHandlingProcess[F](startSynchronizingEvents(request))
 
   private def startSynchronizingEvents(
       request: EventRequestContent
-  ): EitherT[Interpretation, EventSchedulingResult, Accepted] =
+  ): EitherT[F, EventSchedulingResult, Accepted] =
     for {
       event <-
-        fromEither[Interpretation](
+        fromEither[F](
           request.event.as[CommitSyncEvent].leftMap(_ => BadRequest)
         )
-      result <- (ContextShift[Interpretation].shift *> Concurrent[Interpretation]
-                  .start(synchronizeEvents(event) recoverWith logError(event))).toRightT
+      result <- Spawn[F]
+                  .start(synchronizeEvents(event) recoverWith logError(event))
+                  .toRightT
                   .map(_ => Accepted)
-                  .semiflatTap(logger log event)
-                  .leftSemiflatTap(logger log event)
+                  .semiflatTap(Logger[F] log event)
+                  .leftSemiflatTap(Logger[F] log event)
     } yield result
 
-  private def logError(event: CommitSyncEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
-    case NonFatal(exception) =>
-      logger.logError(event, exception)
-      exception.raiseError[Interpretation, Unit]
+  private def logError(event: CommitSyncEvent): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
+    Logger[F].logError(event, exception)
+    exception.raiseError[F, Unit]
   }
 
   private implicit val eventDecoder: Decoder[CommitSyncEvent] = cursor =>
@@ -94,15 +93,10 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow: ContextShift: 
 }
 
 private[events] object EventHandler {
-  def apply(
-      gitLabThrottler:       Throttler[IO, GitLab],
-      executionTimeRecorder: ExecutionTimeRecorder[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO],
-      logger:           Logger[IO]
-  ): IO[EventHandler[IO]] = for {
+  def apply[F[_]: Async: Spawn: Concurrent: Temporal: Logger](
+      gitLabThrottler:       Throttler[F, GitLab],
+      executionTimeRecorder: ExecutionTimeRecorder[F]
+  ): F[EventHandler[F]] = for {
     commitEventSynchronizer <- CommitEventSynchronizer(gitLabThrottler, executionTimeRecorder)
-  } yield new EventHandler[IO](categoryName, commitEventSynchronizer, logger)
+  } yield new EventHandler[F](categoryName, commitEventSynchronizer)
 }

@@ -35,9 +35,9 @@ trait LinkOps {
 
 object Links {
 
-  def apply(link: (Rel, Href)): Links = Links(NonEmptyList.of(Link(link)))
-  def of(link:    Link, other: Link*): Links = Links(NonEmptyList.of(link, other: _*))
-  def of(link:    (Rel, Href), other: (Rel, Href)*): Links = Links(NonEmptyList.of(link, other: _*).map(Link.apply))
+  def apply(link: (Rel, Href)):                   Links = Links(NonEmptyList.of(Link(link)))
+  def of(link: Link, other: Link*):               Links = Links(NonEmptyList.of(link, other: _*))
+  def of(link: (Rel, Href), other: (Rel, Href)*): Links = Links(NonEmptyList.of(link, other: _*).map(Link.apply))
 
   def self(href: Href): Links = Links(NonEmptyList.of(Link.self(href)))
 
@@ -54,7 +54,7 @@ object Links {
   final case class Link(rel: Rel, href: Href)
 
   object Link {
-    def self(href:   Href):        Link = Link(Rel.Self, href)
+    def self(href: Href):          Link = Link(Rel.Self, href)
     def apply(tuple: (Rel, Href)): Link = Link(tuple._1, tuple._2)
   }
 

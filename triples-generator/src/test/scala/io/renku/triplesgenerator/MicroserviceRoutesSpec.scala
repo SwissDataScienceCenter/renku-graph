@@ -18,10 +18,11 @@
 
 package io.renku.triplesgenerator
 
-import cats.effect.{Clock, IO}
+import cats.effect.IO
 import cats.syntax.all._
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestRoutesMetrics
+import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.EventEndpoint
 import org.http4s.Method.POST
 import org.http4s.Status._
@@ -31,15 +32,14 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext
 import scala.language.reflectiveCalls
 
-class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class MicroserviceRoutesSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "routes" should {
 
     "define a POST /events endpoint" in new TestCase {
-      val request        = Request[IO](POST, uri"events")
+      val request        = Request[IO](POST, uri"/events")
       val expectedStatus = Accepted
       (eventEndpoint.processEvent _).expects(request).returning(Response[IO](expectedStatus).pure[IO])
 
@@ -50,7 +50,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
 
     "define a GET /ping endpoint returning OK with 'pong' body" in new TestCase {
 
-      val response = routes.call(Request(Method.GET, uri"ping"))
+      val response = routes.call(Request(Method.GET, uri"/ping"))
 
       response.status       shouldBe Ok
       response.body[String] shouldBe "pong"
@@ -58,7 +58,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
 
     "define a GET /metrics endpoint returning OK with some prometheus metrics" in new TestCase {
       val response = routes.call(
-        Request(Method.GET, uri"metrics")
+        Request(Method.GET, uri"/metrics")
       )
 
       response.status     shouldBe Ok
@@ -66,15 +66,10 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
     }
   }
 
-  private implicit val clock: Clock[IO] = IO.timer(ExecutionContext.global).clock
-
   private trait TestCase {
 
     val eventEndpoint = mock[EventEndpoint[IO]]
     val routesMetrics = TestRoutesMetrics()
-    val routes = new MicroserviceRoutes[IO](
-      eventEndpoint,
-      routesMetrics
-    ).routes.map(_.or(notAvailableResponse))
+    val routes        = new MicroserviceRoutes[IO](eventEndpoint, routesMetrics).routes.map(_.or(notAvailableResponse))
   }
 }

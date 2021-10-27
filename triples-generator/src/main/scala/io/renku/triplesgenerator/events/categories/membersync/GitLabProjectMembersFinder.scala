@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories.membersync
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.Async
 import cats.syntax.all._
 import io.circe.Decoder
 import io.renku.config.GitLab
@@ -34,45 +34,35 @@ import org.http4s.Method.GET
 import org.http4s._
 import org.http4s.circe.jsonOf
 import org.http4s.dsl.io.{NotFound, Ok}
-import org.http4s.util.CaseInsensitiveString
+import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
 
-private trait GitLabProjectMembersFinder[Interpretation[_]] {
-  def findProjectMembers(path: Path)(implicit
-      maybeAccessToken:        Option[AccessToken]
-  ): Interpretation[Set[GitLabProjectMember]]
+private trait GitLabProjectMembersFinder[F[_]] {
+  def findProjectMembers(path: Path)(implicit maybeAccessToken: Option[AccessToken]): F[Set[GitLabProjectMember]]
 }
 
-private class IOGitLabProjectMembersFinder(
+private class GitLabProjectMembersFinderImpl[F[_]: Async: Logger](
     gitLabApiUrl:    GitLabApiUrl,
-    gitLabThrottler: Throttler[IO, GitLab],
-    logger:          Logger[IO],
+    gitLabThrottler: Throttler[F, GitLab],
     retryInterval:   FiniteDuration = RestClient.SleepAfterConnectionIssue
-)(implicit
-    executionContext: ExecutionContext,
-    contextShift:     ContextShift[IO],
-    timer:            Timer[IO]
-) extends RestClient(gitLabThrottler, logger, retryInterval = retryInterval)
-    with GitLabProjectMembersFinder[IO] {
+) extends RestClient(gitLabThrottler, retryInterval = retryInterval)
+    with GitLabProjectMembersFinder[F] {
 
   override def findProjectMembers(
       path:                    Path
-  )(implicit maybeAccessToken: Option[AccessToken]): IO[Set[GitLabProjectMember]] =
+  )(implicit maybeAccessToken: Option[AccessToken]): F[Set[GitLabProjectMember]] =
     for {
       users   <- fetch(s"$gitLabApiUrl/projects/${urlEncode(path.value)}/users")
       members <- fetch(s"$gitLabApiUrl/projects/${urlEncode(path.value)}/members")
     } yield users ++ members
 
   private def fetch(
-      url:       String,
-      maybePage: Option[Int] = None,
-      allUsers:  Set[GitLabProjectMember] = Set.empty
-  )(implicit
-      maybeAccessToken: Option[AccessToken]
-  ): IO[Set[GitLabProjectMember]] = for {
+      url:                     String,
+      maybePage:               Option[Int] = None,
+      allUsers:                Set[GitLabProjectMember] = Set.empty
+  )(implicit maybeAccessToken: Option[AccessToken]): F[Set[GitLabProjectMember]] = for {
     uri                     <- addPageToUrl(url, maybePage)
     fetchedUsersAndNextPage <- send(request(GET, uri, maybeAccessToken))(mapResponse)
     allUsers                <- addNextPage(url, allUsers, fetchedUsersAndNextPage)
@@ -84,13 +74,13 @@ private class IOGitLabProjectMembersFinder(
   }
 
   private lazy val mapResponse
-      : PartialFunction[(Status, Request[IO], Response[IO]), IO[(Set[GitLabProjectMember], Option[Int])]] = {
+      : PartialFunction[(Status, Request[F], Response[F]), F[(Set[GitLabProjectMember], Option[Int])]] = {
     case (Ok, _, response) =>
       response
         .as[List[GitLabProjectMember]]
         .map(members => members.toSet -> maybeNextPage(response))
     case (NotFound, _, _) =>
-      (Set.empty[GitLabProjectMember] -> Option.empty[Int]).pure[IO]
+      (Set.empty[GitLabProjectMember] -> Option.empty[Int]).pure[F]
 
   }
 
@@ -98,16 +88,16 @@ private class IOGitLabProjectMembersFinder(
       url:                          String,
       allUsers:                     Set[GitLabProjectMember],
       fetchedUsersAndMaybeNextPage: (Set[GitLabProjectMember], Option[Int])
-  )(implicit maybeAccessToken:      Option[AccessToken]): IO[Set[GitLabProjectMember]] =
+  )(implicit maybeAccessToken:      Option[AccessToken]): F[Set[GitLabProjectMember]] =
     fetchedUsersAndMaybeNextPage match {
       case (fetchedUsers, maybeNextPage @ Some(_)) => fetch(url, maybeNextPage, allUsers ++ fetchedUsers)
-      case (fetchedUsers, None)                    => (allUsers ++ fetchedUsers).pure[IO]
+      case (fetchedUsers, None)                    => (allUsers ++ fetchedUsers).pure[F]
     }
 
-  private def maybeNextPage(response: Response[IO]): Option[Int] =
-    response.headers.get(CaseInsensitiveString("X-Next-Page")).flatMap(_.value.toIntOption)
+  private def maybeNextPage(response: Response[F]): Option[Int] =
+    response.headers.get(ci"X-Next-Page").flatMap(_.head.value.toIntOption)
 
-  private implicit lazy val projectDecoder: EntityDecoder[IO, List[GitLabProjectMember]] = {
+  private implicit lazy val projectDecoder: EntityDecoder[F, List[GitLabProjectMember]] = {
     import io.renku.graph.model.users
 
     implicit val decoder: Decoder[GitLabProjectMember] = { cursor =>
@@ -117,19 +107,15 @@ private class IOGitLabProjectMembersFinder(
       } yield GitLabProjectMember(id, name)
     }
 
-    jsonOf[IO, List[GitLabProjectMember]]
+    jsonOf[F, List[GitLabProjectMember]]
   }
 }
 
-private object IOGitLabProjectMembersFinder {
+private object GitLabProjectMembersFinder {
 
-  def apply(gitLabThrottler: Throttler[IO, GitLab], logger: Logger[IO])(implicit
-      executionContext:      ExecutionContext,
-      contextShift:          ContextShift[IO],
-      timer:                 Timer[IO]
-  ): IO[GitLabProjectMembersFinder[IO]] = for {
-    gitLabUrl <- GitLabUrlLoader[IO]()
-  } yield new IOGitLabProjectMembersFinder(gitLabUrl.apiV4, gitLabThrottler, logger)
+  def apply[F[_]: Async: Logger](gitLabThrottler: Throttler[F, GitLab]): F[GitLabProjectMembersFinder[F]] = for {
+    gitLabUrl <- GitLabUrlLoader[F]()
+  } yield new GitLabProjectMembersFinderImpl[F](gitLabUrl.apiV4, gitLabThrottler)
 }
 
 private final case class GitLabProjectMember(gitLabId: GitLabId, name: Name)

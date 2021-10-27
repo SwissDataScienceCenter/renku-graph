@@ -19,7 +19,7 @@
 package io.renku.knowledgegraph.projects.rest
 
 import cats.data.OptionT
-import cats.effect.{ContextShift, IO}
+import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
@@ -35,13 +35,12 @@ import io.renku.knowledgegraph.projects.rest.Converters._
 import io.renku.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
 import io.renku.knowledgegraph.projects.rest.KGProjectFinder.KGProject
 import io.renku.knowledgegraph.projects.rest.ProjectsGenerators._
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext
-
-class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matchers with IOSpec {
 
   "findProject" should {
 
@@ -201,13 +200,11 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
     }
   }
 
-  private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
-
   private trait TestCase {
     val kgProjectFinder     = mock[KGProjectFinder[IO]]
     val accessTokenFinder   = mock[AccessTokenFinder[IO]]
     val gitLabProjectFinder = mock[GitLabProjectFinder[IO]]
-    val projectFinder       = new ProjectFinderImpl(kgProjectFinder, gitLabProjectFinder, accessTokenFinder)
+    val projectFinder       = new ProjectFinderImpl[IO](kgProjectFinder, gitLabProjectFinder, accessTokenFinder)
   }
 
   private def projectFrom(kgProject: KGProject, gitLabProject: GitLabProject) =

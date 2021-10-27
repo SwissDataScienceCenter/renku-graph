@@ -24,6 +24,7 @@ import io.renku.http.rest.paging.PagingResponse.PagingInfo
 import io.renku.http.rest.paging.model.Total
 import io.renku.tinytypes.UrlTinyType
 import io.renku.tinytypes.constraints.UrlOps
+import org.http4s.Header
 
 final class PagingResponse[Result] private (val results: List[Result], val pagingInfo: PagingInfo) {
   override lazy val toString: String = s"PagingResponse(pagingInfo: $pagingInfo, results: $results)"
@@ -31,26 +32,26 @@ final class PagingResponse[Result] private (val results: List[Result], val pagin
 
 object PagingResponse {
 
-  def from[Interpretation[_]: MonadThrow, Result](
+  def from[F[_]: MonadThrow, Result](
       results:       List[Result],
       pagingRequest: PagingRequest,
       total:         Total
-  ): Interpretation[PagingResponse[Result]] = {
+  ): F[PagingResponse[Result]] = {
 
     val pagingInfo = new PagingInfo(pagingRequest, total)
 
     import pagingRequest._
 
     if (results.isEmpty && (page.value - 1) * perPage.value >= total.value) {
-      new PagingResponse[Result](results, pagingInfo).pure[Interpretation]
+      new PagingResponse[Result](results, pagingInfo).pure[F]
     } else if (results.nonEmpty && ((page.value - 1) * perPage.value + results.size) == total.value) {
-      new PagingResponse[Result](results, pagingInfo).pure[Interpretation]
+      new PagingResponse[Result](results, pagingInfo).pure[F]
     } else if (results.nonEmpty && (results.size == perPage.value) && (page.value * perPage.value) <= total.value) {
-      new PagingResponse[Result](results, pagingInfo).pure[Interpretation]
+      new PagingResponse[Result](results, pagingInfo).pure[F]
     } else
       new IllegalArgumentException(
         s"PagingResponse cannot be instantiated for ${results.size} results, total: $total, page: ${pagingRequest.page} and perPage: ${pagingRequest.perPage}"
-      ).raiseError[Interpretation, PagingResponse[Result]]
+      ).raiseError[F, PagingResponse[Result]]
   }
 
   final class PagingInfo private[PagingResponse] (val pagingRequest: PagingRequest, val total: Total) {
@@ -59,30 +60,29 @@ object PagingResponse {
 
   implicit class ResponseOps[Result](response: PagingResponse[Result]) {
 
-    import cats.effect.Effect
     import io.circe.syntax._
     import io.circe.{Encoder, Json}
     import org.http4s.circe.jsonEncoderOf
     import org.http4s.{EntityEncoder, Response, Status}
 
-    def updateResults[Interpretation[_]: MonadThrow](newResults: List[Result]): Interpretation[PagingResponse[Result]] =
+    def updateResults[F[_]: MonadThrow](newResults: List[Result]): F[PagingResponse[Result]] =
       if (response.results.size == newResults.size)
-        new PagingResponse[Result](newResults, response.pagingInfo).pure[Interpretation]
+        new PagingResponse[Result](newResults, response.pagingInfo).pure[F]
       else
         new IllegalArgumentException("Cannot update Paging Results as there's different number of results")
-          .raiseError[Interpretation, PagingResponse[Result]]
+          .raiseError[F, PagingResponse[Result]]
 
-    def toHttpResponse[Interpretation[_]: Effect, ResourceUrl <: UrlTinyType](implicit
+    def toHttpResponse[F[_], ResourceUrl <: UrlTinyType](implicit
         resourceUrl:    ResourceUrl,
         resourceUrlOps: UrlOps[ResourceUrl],
         encoder:        Encoder[Result]
-    ): Response[Interpretation] =
-      Response(Status.Ok)
+    ): Response[F] =
+      Response[F](Status.Ok)
         .withEntity(response.results.asJson)
-        .putHeaders(PagingHeaders.from(response).toSeq: _*)
+        .putHeaders(PagingHeaders.from(response).toSeq.map(Header.ToRaw.rawToRaw): _*)
 
-    private implicit def resultsEntityEncoder[Interpretation[_]: Effect](implicit
+    private implicit def resultsEntityEncoder[F[_]](implicit
         encoder: Encoder[Result]
-    ): EntityEncoder[Interpretation, Json] = jsonEncoderOf[Interpretation, Json]
+    ): EntityEncoder[F, Json] = jsonEncoderOf[F, Json]
   }
 }

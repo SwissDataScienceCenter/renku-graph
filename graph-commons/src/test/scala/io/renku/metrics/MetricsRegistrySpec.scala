@@ -21,33 +21,36 @@ package io.renku.metrics
 import com.typesafe.config.ConfigFactory
 import io.prometheus.client.{Gauge => LibGauge}
 import io.renku.metrics.MetricsRegistry.{DisabledMetricsRegistry, EnabledMetricsRegistry}
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.jdk.CollectionConverters._
+import scala.util.{Success, Try}
 
-class MetricsRegistrySpec extends AnyWordSpec with should.Matchers {
+class MetricsRegistrySpec extends AnyWordSpec with IOSpec with should.Matchers {
 
   "apply" should {
 
     "return a disabled Metrics Registry if the 'metrics.enabled' flag is set to false" in {
-      val registry = MetricsRegistry(
+      val Success(registry) = MetricsRegistry[Try](
         ConfigFactory.parseMap(Map("metrics" -> Map("enabled" -> false).asJava).asJava)
-      ).unsafeRunSync()
+      )
 
       registry shouldBe a[DisabledMetricsRegistry.type]
     }
 
     "return an enabled Metrics Registry if the 'metrics.enabled' flag is set to true" in {
-      val registry = MetricsRegistry(
+      val Success(registry) = MetricsRegistry[Try](
         ConfigFactory.parseMap(Map("metrics" -> Map("enabled" -> true).asJava).asJava)
-      ).unsafeRunSync()
+      )
 
       registry shouldBe a[EnabledMetricsRegistry.type]
     }
 
     "return an enabled Metrics Registry if there is no value for the 'metrics.enabled' flag" in {
-      MetricsRegistry(ConfigFactory.empty()).unsafeRunSync() shouldBe a[EnabledMetricsRegistry.type]
+      val Success(registry) = MetricsRegistry[Try](ConfigFactory.empty())
+      registry shouldBe a[EnabledMetricsRegistry.type]
     }
   }
 
@@ -56,15 +59,14 @@ class MetricsRegistrySpec extends AnyWordSpec with should.Matchers {
     "register the given collector in the collector registry" in {
       val gaugeName = "gauge_name"
 
-      val gauge = EnabledMetricsRegistry
-        .register[LibGauge, LibGauge.Builder](
+      val Success(gauge) = EnabledMetricsRegistry
+        .register[Try, LibGauge, LibGauge.Builder](
           LibGauge
             .build()
             .name(gaugeName)
             .help("some gauge info")
             .labelNames("label")
         )
-        .unsafeRunSync()
 
       gauge.labels("lbl").set(2)
 
@@ -81,15 +83,14 @@ class MetricsRegistrySpec extends AnyWordSpec with should.Matchers {
     "not register the given collector in any registry" in {
       val gaugeName = "gauge_name"
 
-      val gauge = DisabledMetricsRegistry
-        .register[LibGauge, LibGauge.Builder](
+      val Success(gauge) = DisabledMetricsRegistry
+        .register[Try, LibGauge, LibGauge.Builder](
           LibGauge
             .build()
             .name(gaugeName)
             .help("some gauge info")
             .labelNames("label")
         )
-        .unsafeRunSync()
 
       gauge.labels("lbl").set(2)
 

@@ -21,6 +21,6 @@ package io.renku.http.server.security
 import io.renku.http.client.AccessToken
 import io.renku.http.server.security.model.AuthUser
 
-trait Authenticator[Interpretation[_]] {
-  def authenticate(accessToken: AccessToken): Interpretation[Either[EndpointSecurityException, AuthUser]]
+trait Authenticator[F[_]] {
+  def authenticate(accessToken: AccessToken): F[Either[EndpointSecurityException, AuthUser]]
 }

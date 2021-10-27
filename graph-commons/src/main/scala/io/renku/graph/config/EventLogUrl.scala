@@ -32,8 +32,8 @@ object EventLogUrl extends TinyTypeFactory[EventLogUrl](new EventLogUrl(_)) with
 
   private implicit val urlReader: ConfigReader[EventLogUrl] = urlTinyTypeReader(EventLogUrl)
 
-  def apply[Interpretation[_]: MonadThrow](
+  def apply[F[_]: MonadThrow](
       config: Config = ConfigFactory.load
-  ): Interpretation[EventLogUrl] =
-    find[Interpretation, EventLogUrl]("services.event-log.url", config)
+  ): F[EventLogUrl] =
+    find[F, EventLogUrl]("services.event-log.url", config)
 }

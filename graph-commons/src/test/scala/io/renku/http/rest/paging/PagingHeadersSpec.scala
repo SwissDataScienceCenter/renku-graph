@@ -32,6 +32,7 @@ import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import org.typelevel.ci._
 
 import scala.util.Try
 
@@ -53,16 +54,16 @@ class PagingHeadersSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
 
           val totalPages = findTotalPages(pagingInfo)
           PagingHeaders.from(response) should contain theSameElementsAs Set(
-            Header("Total", total.toString),
-            Header("Total-Pages", totalPages.toString),
-            Header("Per-Page", perPage.toString),
-            Header("Page", page.toString),
-            Header("Next-Page", (page.value + 1).toString),
-            Header("Prev-Page", (page.value - 1).toString),
-            Header("Link", s"""<${resourceUrl ? (pageParamName -> (page.value + 1))}>; rel="next""""),
-            Header("Link", s"""<${resourceUrl ? (pageParamName -> (page.value - 1))}>; rel="prev""""),
-            Header("Link", s"""<${resourceUrl ? (pageParamName -> first.value)}>; rel="first""""),
-            Header("Link", s"""<${resourceUrl ? (pageParamName -> totalPages)}>; rel="last"""")
+            Header.Raw(ci"Total", total.toString),
+            Header.Raw(ci"Total-Pages", totalPages.toString),
+            Header.Raw(ci"Per-Page", perPage.toString),
+            Header.Raw(ci"Page", page.toString),
+            Header.Raw(ci"Next-Page", (page.value + 1).toString),
+            Header.Raw(ci"Prev-Page", (page.value - 1).toString),
+            Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> (page.value + 1))}>; rel="next""""),
+            Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> (page.value - 1))}>; rel="prev""""),
+            Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> first.value)}>; rel="first""""),
+            Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> totalPages)}>; rel="last"""")
           )
         }
       }
@@ -79,14 +80,14 @@ class PagingHeadersSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
 
           val totalPages = findTotalPages(pagingInfo)
           PagingHeaders.from(response) should contain theSameElementsAs Set(
-            Header("Total", total.toString),
-            Header("Total-Pages", totalPages.toString),
-            Header("Per-Page", perPage.toString),
-            Header("Page", page.toString),
-            Header("Prev-Page", (page.value - 1).toString),
-            Header("Link", s"""<${resourceUrl ? (pageParamName -> (page.value - 1))}>; rel="prev""""),
-            Header("Link", s"""<${resourceUrl ? (pageParamName -> first.value)}>; rel="first""""),
-            Header("Link", s"""<${resourceUrl ? (pageParamName -> totalPages)}>; rel="last"""")
+            Header.Raw(ci"Total", total.toString),
+            Header.Raw(ci"Total-Pages", totalPages.toString),
+            Header.Raw(ci"Per-Page", perPage.toString),
+            Header.Raw(ci"Page", page.toString),
+            Header.Raw(ci"Prev-Page", (page.value - 1).toString),
+            Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> (page.value - 1))}>; rel="prev""""),
+            Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> first.value)}>; rel="first""""),
+            Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> totalPages)}>; rel="last"""")
           )
         }
       }
@@ -103,14 +104,14 @@ class PagingHeadersSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
 
           val totalPages = findTotalPages(pagingInfo)
           PagingHeaders.from(response) should contain theSameElementsAs Set(
-            Header("Total", total.toString),
-            Header("Total-Pages", totalPages.toString),
-            Header("Per-Page", perPage.toString),
-            Header("Page", page.toString),
-            Header("Next-Page", (page.value + 1).toString),
-            Header("Link", s"""<${resourceUrl ? (pageParamName -> (page.value + 1))}>; rel="next""""),
-            Header("Link", s"""<${resourceUrl ? (pageParamName -> first.value)}>; rel="first""""),
-            Header("Link", s"""<${resourceUrl ? (pageParamName -> totalPages)}>; rel="last"""")
+            Header.Raw(ci"Total", total.toString),
+            Header.Raw(ci"Total-Pages", totalPages.toString),
+            Header.Raw(ci"Per-Page", perPage.toString),
+            Header.Raw(ci"Page", page.toString),
+            Header.Raw(ci"Next-Page", (page.value + 1).toString),
+            Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> (page.value + 1))}>; rel="next""""),
+            Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> first.value)}>; rel="first""""),
+            Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> totalPages)}>; rel="last"""")
           )
         }
       }
@@ -125,12 +126,12 @@ class PagingHeadersSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
           implicit val resourceUrl: UrlTestType = resourceUrlFrom(page, perPage)
 
           PagingHeaders.from(response) should contain theSameElementsAs Set(
-            Header("Total", total.toString),
-            Header("Total-Pages", "1"),
-            Header("Per-Page", perPage.toString),
-            Header("Page", page.toString),
-            Header("Link", s"""<${resourceUrl ? (pageParamName -> first.value)}>; rel="first""""),
-            Header("Link", s"""<${resourceUrl ? (pageParamName -> 1)}>; rel="last"""")
+            Header.Raw(ci"Total", total.toString),
+            Header.Raw(ci"Total-Pages", "1"),
+            Header.Raw(ci"Per-Page", perPage.toString),
+            Header.Raw(ci"Page", page.toString),
+            Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> first.value)}>; rel="first""""),
+            Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> 1)}>; rel="last"""")
           )
         }
       }
@@ -147,12 +148,12 @@ class PagingHeadersSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
         implicit val resourceUrl: UrlTestType = resourceUrlFrom(page, perPage)
 
         PagingHeaders.from(response) should contain theSameElementsAs Set(
-          Header("Total", "0"),
-          Header("Total-Pages", "0"),
-          Header("Per-Page", perPage.toString),
-          Header("Page", page.toString),
-          Header("Link", s"""<${resourceUrl ? (pageParamName -> first.value)}>; rel="first""""),
-          Header("Link", s"""<${resourceUrl ? (pageParamName -> 1)}>; rel="last"""")
+          Header.Raw(ci"Total", "0"),
+          Header.Raw(ci"Total-Pages", "0"),
+          Header.Raw(ci"Per-Page", perPage.toString),
+          Header.Raw(ci"Page", page.toString),
+          Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> first.value)}>; rel="first""""),
+          Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> 1)}>; rel="last"""")
         )
 
       }
@@ -195,6 +196,7 @@ class PagingHeadersSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
     } yield PagingResponse
       .from[Try, NonBlank](results.toList, PagingRequest(first, perPage), total)
       .fold(throw _, identity)
+
   private lazy val onePageOnly: Gen[PagingResponse[NonBlank]] =
     for {
       perPage <- perPages

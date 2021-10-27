@@ -36,28 +36,19 @@ import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.microservices.IOMicroservice
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.config.certificates.GitCertificateInstaller
-import io.renku.triplesgenerator.config.{IOVersionCompatibilityConfig, TriplesGeneration}
-import io.renku.triplesgenerator.events.IOEventEndpoint
-import io.renku.triplesgenerator.init.{CliVersionCompatibilityVerifier, IOCliVersionCompatibilityChecker}
-import io.renku.triplesgenerator.reprovisioning.{IOReProvisioning, ReProvisioning, ReProvisioningStatus}
+import io.renku.triplesgenerator.config.{TriplesGeneration, VersionCompatibilityConfig}
+import io.renku.triplesgenerator.events.EventEndpoint
+import io.renku.triplesgenerator.init.{CliVersionCompatibilityChecker, CliVersionCompatibilityVerifier}
+import io.renku.triplesgenerator.reprovisioning.{ReProvisioning, ReProvisioningStatus}
 import org.typelevel.log4cats.Logger
-import pureconfig._
 
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors.newFixedThreadPool
-import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 object Microservice extends IOMicroservice {
 
-  val ServicePort: Int Refined Positive = 9002
-
-  protected implicit override val executionContext: ExecutionContext =
-    ExecutionContext fromExecutorService newFixedThreadPool(ConfigSource.default.at("threads-number").loadOrThrow[Int])
-
-  protected implicit override def contextShift: ContextShift[IO] = IO.contextShift(executionContext)
-  protected implicit override def timer:        Timer[IO]        = IO.timer(executionContext)
-  private implicit val logger:                  Logger[IO]       = ApplicationLogger
+  val ServicePort:             Int Refined Positive = 9002
+  private implicit val logger: Logger[IO]           = ApplicationLogger
 
   private def parseConfigArgs(args: List[String]): IO[Config] = IO {
     args.headOption match {
@@ -68,18 +59,18 @@ object Microservice extends IOMicroservice {
 
   override def run(args: List[String]): IO[ExitCode] = for {
     config                         <- parseConfigArgs(args)
-    certificateLoader              <- CertificateLoader[IO](ApplicationLogger)
-    gitCertificateInstaller        <- GitCertificateInstaller[IO](ApplicationLogger)
-    triplesGeneration              <- TriplesGeneration[IO]()
-    sentryInitializer              <- SentryInitializer[IO]()
-    metricsRegistry                <- MetricsRegistry()
-    renkuVersionPairs              <- IOVersionCompatibilityConfig(ApplicationLogger, config)
-    cliVersionCompatChecker        <- IOCliVersionCompatibilityChecker(triplesGeneration, renkuVersionPairs)
+    certificateLoader              <- CertificateLoader[IO]
+    gitCertificateInstaller        <- GitCertificateInstaller[IO]
+    triplesGeneration              <- TriplesGeneration[IO](config)
+    sentryInitializer              <- SentryInitializer[IO]
+    metricsRegistry                <- MetricsRegistry[IO]()
+    renkuVersionPairs              <- VersionCompatibilityConfig[IO](config)
+    cliVersionCompatChecker        <- CliVersionCompatibilityChecker[IO](triplesGeneration, renkuVersionPairs)
     gitLabRateLimit                <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
     gitLabThrottler                <- Throttler[IO, GitLab](gitLabRateLimit)
-    sparqlTimeRecorder             <- SparqlQueryTimeRecorder(metricsRegistry)
-    awaitingGenerationSubscription <- events.categories.awaitinggeneration.SubscriptionFactory(metricsRegistry)
-    membersSyncSubscription        <- events.categories.membersync.SubscriptionFactory(gitLabThrottler, sparqlTimeRecorder)
+    sparqlTimeRecorder             <- SparqlQueryTimeRecorder[IO](metricsRegistry)
+    awaitingGenerationSubscription <- events.categories.awaitinggeneration.SubscriptionFactory[IO](metricsRegistry)
+    membersSyncSubscription <- events.categories.membersync.SubscriptionFactory(gitLabThrottler, sparqlTimeRecorder)
     triplesGeneratedSubscription <-
       events.categories.triplesgenerated.SubscriptionFactory(metricsRegistry, gitLabThrottler, sparqlTimeRecorder)
     eventConsumersRegistry <- consumers.EventConsumersRegistry(
@@ -87,57 +78,55 @@ object Microservice extends IOMicroservice {
                                 membersSyncSubscription,
                                 triplesGeneratedSubscription
                               )
-    reProvisioningStatus    <- ReProvisioningStatus(eventConsumersRegistry, ApplicationLogger, sparqlTimeRecorder)
-    reProvisioning          <- IOReProvisioning(reProvisioningStatus, renkuVersionPairs, sparqlTimeRecorder, ApplicationLogger)
-    eventProcessingEndpoint <- IOEventEndpoint(eventConsumersRegistry, reProvisioningStatus)
+    reProvisioningStatus    <- ReProvisioningStatus(eventConsumersRegistry, sparqlTimeRecorder)
+    reProvisioning          <- ReProvisioning(reProvisioningStatus, renkuVersionPairs, sparqlTimeRecorder)
+    eventProcessingEndpoint <- EventEndpoint(eventConsumersRegistry, reProvisioningStatus)
     microserviceRoutes =
       new MicroserviceRoutes[IO](eventProcessingEndpoint, new RoutesMetrics[IO](metricsRegistry), config.some).routes
     exitCode <- microserviceRoutes.use { routes =>
-                  new MicroserviceRunner(
+                  new MicroserviceRunner[IO](
                     certificateLoader,
                     gitCertificateInstaller,
                     sentryInitializer,
                     cliVersionCompatChecker,
                     eventConsumersRegistry,
                     reProvisioning,
-                    new HttpServer[IO](serverPort = ServicePort.value, routes),
-                    subProcessesCancelTokens,
-                    ApplicationLogger
+                    HttpServer[IO](serverPort = ServicePort.value, routes),
+                    subProcessesCancelTokens
                   ).run()
                 }
   } yield exitCode
 }
 
-private class MicroserviceRunner(
-    certificateLoader:               CertificateLoader[IO],
-    gitCertificateInstaller:         GitCertificateInstaller[IO],
-    sentryInitializer:               SentryInitializer[IO],
-    cliVersionCompatibilityVerifier: CliVersionCompatibilityVerifier[IO],
-    eventConsumersRegistry:          EventConsumersRegistry[IO],
-    reProvisioning:                  ReProvisioning[IO],
-    httpServer:                      HttpServer[IO],
-    subProcessesCancelTokens:        ConcurrentHashMap[CancelToken[IO], Unit],
-    logger:                          Logger[IO]
-)(implicit contextShift:             ContextShift[IO]) {
+private class MicroserviceRunner[F[_]: Spawn: Logger](
+    certificateLoader:               CertificateLoader[F],
+    gitCertificateInstaller:         GitCertificateInstaller[F],
+    sentryInitializer:               SentryInitializer[F],
+    cliVersionCompatibilityVerifier: CliVersionCompatibilityVerifier[F],
+    eventConsumersRegistry:          EventConsumersRegistry[F],
+    reProvisioning:                  ReProvisioning[F],
+    httpServer:                      HttpServer[F],
+    subProcessesCancelTokens:        ConcurrentHashMap[F[Unit], Unit]
+) {
 
-  def run(): IO[ExitCode] = {
+  def run(): F[ExitCode] = {
     for {
       _        <- certificateLoader.run()
       _        <- gitCertificateInstaller.run()
       _        <- sentryInitializer.run()
       _        <- cliVersionCompatibilityVerifier.run()
-      _        <- eventConsumersRegistry.run().start.map(gatherCancelToken)
-      _        <- reProvisioning.run().start.map(gatherCancelToken)
+      _        <- Spawn[F].start(eventConsumersRegistry.run()).map(gatherCancelToken)
+      _        <- Spawn[F].start(reProvisioning.run()).map(gatherCancelToken)
       exitCode <- httpServer.run()
     } yield exitCode
-  } recoverWith logAndThrow(logger)
+  } recoverWith logAndThrow
 
-  private def gatherCancelToken(fiber: Fiber[IO, Unit]): Fiber[IO, Unit] = {
+  private def gatherCancelToken(fiber: Fiber[F, Throwable, Unit]): Fiber[F, Throwable, Unit] = {
     subProcessesCancelTokens.put(fiber.cancel, ())
     fiber
   }
 
-  private def logAndThrow(logger: Logger[IO]): PartialFunction[Throwable, IO[ExitCode]] = { case NonFatal(exception) =>
-    logger.error(exception)(exception.getMessage).flatMap(_ => exception.raiseError[IO, ExitCode])
+  private lazy val logAndThrow: PartialFunction[Throwable, F[ExitCode]] = { case NonFatal(exception) =>
+    Logger[F].error(exception)(exception.getMessage).flatMap(_ => exception.raiseError[F, ExitCode])
   }
 }

@@ -18,7 +18,8 @@
 
 package io.renku.knowledgegraph.datasets.rest
 
-import cats.effect.{ConcurrentEffect, Timer}
+import cats.MonadThrow
+import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.{DecodingFailure, HCursor}
@@ -30,19 +31,24 @@ import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
+private trait BaseDetailsFinder[F[_]] {
+  def findBaseDetails(identifier: Identifier): F[Option[Dataset]]
 
-private class BaseDetailsFinder[Interpretation[_]: ConcurrentEffect: Timer](
-    rdfStoreConfig:          RdfStoreConfig,
-    logger:                  Logger[Interpretation],
-    timeRecorder:            SparqlQueryTimeRecorder[Interpretation]
-)(implicit executionContext: ExecutionContext)
-    extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder) {
+  def findKeywords(identifier: Identifier): F[List[Keyword]]
 
-  import BaseDetailsFinder._
+  def findImages(identifier: Identifier): F[List[ImageUri]]
+}
+
+private class BaseDetailsFinderImpl[F[_]: Async: Logger](
+    rdfStoreConfig: RdfStoreConfig,
+    timeRecorder:   SparqlQueryTimeRecorder[F]
+) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
+    with BaseDetailsFinder[F] {
+
+  import BaseDetailsFinderImpl._
   import io.renku.graph.model.Schemas._
 
-  def findBaseDetails(identifier: Identifier): Interpretation[Option[Dataset]] =
+  def findBaseDetails(identifier: Identifier): F[Option[Dataset]] =
     queryExpecting[List[Dataset]](using = queryForDatasetDetails(identifier)) >>= toSingleDataset
 
   private def queryForDatasetDetails(identifier: Identifier) = SparqlQuery.of(
@@ -88,7 +94,7 @@ private class BaseDetailsFinder[Interpretation[_]: ConcurrentEffect: Timer](
         |""".stripMargin
   )
 
-  def findKeywords(identifier: Identifier): Interpretation[List[Keyword]] =
+  def findKeywords(identifier: Identifier): F[List[Keyword]] =
     queryExpecting[List[Keyword]](using = queryKeywords(identifier))
 
   private def queryKeywords(identifier: Identifier) = SparqlQuery.of(
@@ -103,7 +109,7 @@ private class BaseDetailsFinder[Interpretation[_]: ConcurrentEffect: Timer](
         |""".stripMargin
   )
 
-  def findImages(identifier: Identifier): Interpretation[List[ImageUri]] =
+  def findImages(identifier: Identifier): F[List[ImageUri]] =
     queryExpecting[List[ImageUri]](using = queryImages(identifier))
 
   private def queryImages(identifier: Identifier) = SparqlQuery.of(
@@ -120,15 +126,23 @@ private class BaseDetailsFinder[Interpretation[_]: ConcurrentEffect: Timer](
         |""".stripMargin
   )
 
-  private lazy val toSingleDataset: List[Dataset] => Interpretation[Option[Dataset]] = {
-    case Nil            => Option.empty[Dataset].pure[Interpretation]
-    case dataset :: Nil => Option(dataset).pure[Interpretation]
+  private lazy val toSingleDataset: List[Dataset] => F[Option[Dataset]] = {
+    case Nil            => Option.empty[Dataset].pure[F]
+    case dataset :: Nil => Option(dataset).pure[F]
     case dataset :: _ =>
-      new Exception(s"More than one dataset with ${dataset.id} id").raiseError[Interpretation, Option[Dataset]]
+      new Exception(s"More than one dataset with ${dataset.id} id").raiseError[F, Option[Dataset]]
   }
 }
 
 private object BaseDetailsFinder {
+
+  def apply[F[_]: Async: Logger](rdfStoreConfig: RdfStoreConfig,
+                                 timeRecorder: SparqlQueryTimeRecorder[F]
+  ): F[BaseDetailsFinder[F]] =
+    MonadThrow[F].catchNonFatal(new BaseDetailsFinderImpl[F](rdfStoreConfig, timeRecorder))
+}
+
+private object BaseDetailsFinderImpl {
 
   import io.circe.Decoder
   import Decoder._

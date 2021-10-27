@@ -102,7 +102,7 @@ class HookTokenCryptoSpec extends AnyWordSpec with should.Matchers {
   private trait TestCase {
 
     private val secret = new String(Base64.getEncoder.encode("1234567890123456".getBytes("utf-8")), "utf-8")
-    val hookTokenCrypto = new HookTokenCrypto[Try](
+    val hookTokenCrypto = new HookTokenCryptoImpl[Try](
       RefType
         .applyRef[Secret](secret)
         .getOrElse(throw new IllegalArgumentException("Wrong secret"))

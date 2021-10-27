@@ -18,7 +18,8 @@
 
 package io.renku.tokenrepository
 
-import cats.effect.{Clock, ConcurrentEffect, Resource}
+import cats.MonadThrow
+import cats.effect.{Clock, Resource}
 import io.renku.graph.http.server.binders.{ProjectId, ProjectPath}
 import io.renku.metrics.RoutesMetrics
 import io.renku.tokenrepository.repository.association.AssociateTokenEndpoint
@@ -26,7 +27,7 @@ import io.renku.tokenrepository.repository.deletion.DeleteTokenEndpoint
 import io.renku.tokenrepository.repository.fetching.FetchTokenEndpoint
 import org.http4s.dsl.Http4sDsl
 
-private class MicroserviceRoutes[F[_]: ConcurrentEffect](
+private class MicroserviceRoutes[F[_]: MonadThrow](
     fetchTokenEndpoint:     FetchTokenEndpoint[F],
     associateTokenEndpoint: AssociateTokenEndpoint[F],
     deleteTokenEndpoint:    DeleteTokenEndpoint[F],

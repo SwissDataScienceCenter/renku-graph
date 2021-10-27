@@ -19,7 +19,7 @@
 package io.renku.triplesgenerator.reprovisioning
 
 import cats.effect.IO
-import cats.effect.concurrent.Ref
+import cats.effect.kernel.Ref
 import eu.timepit.refined.auto._
 import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.generators.Generators.Implicits._
@@ -29,6 +29,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQuery, SparqlQueryTimeRecorder}
+import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.reprovisioning.ReProvisioningJsonLD.{Running, objectType}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -38,7 +39,12 @@ import java.lang.Thread.sleep
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with MockFactory with InMemoryRdfStore {
+class ReProvisioningStatusSpec
+    extends AnyWordSpec
+    with IOSpec
+    with should.Matchers
+    with MockFactory
+    with InMemoryRdfStore {
 
   "setRunning" should {
 
@@ -46,7 +52,7 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
 
       findStatus shouldBe None
 
-      reProvisioningStatus.setRunning().unsafeRunSync() shouldBe ((): Unit)
+      reProvisioningStatus.setRunning().unsafeRunSync() shouldBe ()
 
       findStatus shouldBe Some(Running.toString)
     }
@@ -55,13 +61,13 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
   "clear" should {
 
     "completely remove the ReProvisioning object" in new TestCase {
-      reProvisioningStatus.setRunning().unsafeRunSync() shouldBe ((): Unit)
+      reProvisioningStatus.setRunning().unsafeRunSync() shouldBe ()
 
       findStatus shouldBe Some(Running.toString)
 
       expectNotificationSent
 
-      reProvisioningStatus.clear().unsafeRunSync() should be((): Unit)
+      reProvisioningStatus.clear().unsafeRunSync() shouldBe ()
 
       findStatus shouldBe None
     }
@@ -72,7 +78,7 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
 
       expectNotificationSent
 
-      reProvisioningStatus.clear().unsafeRunSync() should be((): Unit)
+      reProvisioningStatus.clear().unsafeRunSync() shouldBe ()
 
       findStatus shouldBe None
     }
@@ -81,13 +87,13 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
   "isReProvisioning" should {
 
     "reflect the state of the re-provisioning status in the DB" in new TestCase {
-      reProvisioningStatus.setRunning().unsafeRunSync() shouldBe ((): Unit)
+      reProvisioningStatus.setRunning().unsafeRunSync() shouldBe ()
 
       reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe true
     }
 
     "cache the value of the flag in the DB once it's set to false" in new TestCase {
-      reProvisioningStatus.setRunning().unsafeRunSync() shouldBe ((): Unit)
+      reProvisioningStatus.setRunning().unsafeRunSync() shouldBe ()
 
       reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe true
       reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe true
@@ -95,7 +101,7 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
       clearStatus()
       reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe false
 
-      reProvisioningStatus.setRunning().unsafeRunSync() shouldBe ((): Unit)
+      reProvisioningStatus.setRunning().unsafeRunSync() shouldBe ()
       sleep(cacheRefreshInterval.toMillis - cacheRefreshInterval.toMillis * 2 / 3)
       reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe false
 
@@ -104,7 +110,7 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
     }
 
     "check if re-provisioning is done and notify availability to event-log" in new TestCase {
-      reProvisioningStatus.setRunning().unsafeRunSync()       shouldBe ((): Unit)
+      reProvisioningStatus.setRunning().unsafeRunSync()       shouldBe ()
       reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe true
 
       expectNotificationSent
@@ -118,18 +124,17 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
   }
 
   private trait TestCase {
-    val cacheRefreshInterval            = 1 second
-    val statusRefreshInterval           = 1 second
+    val cacheRefreshInterval  = 1 second
+    val statusRefreshInterval = 1 second
+    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
     private val renkuBaseUrl            = renkuBaseUrls.generateOne
-    private val logger                  = TestLogger[IO]()
-    private val timeRecorder            = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
+    private val timeRecorder            = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO]())
     private val statusCacheCheckTimeRef = Ref.of[IO, Long](0L).unsafeRunSync()
     val eventConsumersRegistry          = mock[EventConsumersRegistry[IO]]
 
     val reProvisioningStatus = new ReProvisioningStatusImpl(eventConsumersRegistry,
                                                             rdfStoreConfig,
                                                             renkuBaseUrl,
-                                                            logger,
                                                             timeRecorder,
                                                             statusRefreshInterval,
                                                             cacheRefreshInterval,

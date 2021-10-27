@@ -21,25 +21,16 @@ package io.renku.eventlog.init
 import cats.effect.IO
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class TimestampZoneAdderSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
-  protected override lazy val migrationsToRun: List[Migration] = List(
-    eventLogTableCreator,
-    projectPathAdder,
-    batchDateAdder,
-    projectTableCreator,
-    projectPathRemover,
-    eventLogTableRenamer,
-    eventStatusRenamer,
-    eventPayloadTableCreator,
-    eventPayloadSchemaVersionAdder,
-    subscriptionCategorySyncTimeTableCreator,
-    statusesProcessingTimeTableCreator,
-    subscriberTableCreator,
-    eventDeliveryTableCreator
-  )
+class TimestampZoneAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
+
+  protected override lazy val migrationsToRun: List[Migration] = allMigrations.takeWhile {
+    case _: TimestampZoneAdderImpl[_] => false
+    case _ => true
+  }
 
   private val timestampType   = "timestamp without time zone"
   private val timestamptzType = "timestamp with time zone"
@@ -91,13 +82,11 @@ class TimestampZoneAdderSpec extends AnyWordSpec with DbInitSpec with should.Mat
       verify("event", "latest_event_date", timestamptzType)
 
       logger.loggedOnly(Info("Fields are already in timestamptz type"))
-
     }
-
   }
 
   private trait TestCase {
-    implicit val logger = TestLogger[IO]()
-    val tableRefactor   = new TimestampZoneAdderImpl[IO](sessionResource)
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val tableRefactor = new TimestampZoneAdderImpl[IO](sessionResource)
   }
 }

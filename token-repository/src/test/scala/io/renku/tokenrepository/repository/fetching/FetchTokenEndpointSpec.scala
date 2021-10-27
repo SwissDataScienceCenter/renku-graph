@@ -33,13 +33,14 @@ import io.renku.http.client.AccessToken._
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
+import io.renku.testtools.IOSpec
 import org.http4s._
 import org.http4s.headers.`Content-Type`
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class FetchTokenEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class FetchTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "fetchToken" should {
 
@@ -148,8 +149,8 @@ class FetchTokenEndpointSpec extends AnyWordSpec with MockFactory with should.Ma
   }
 
   private trait TestCase {
-    val tokensFinder = mock[IOTokenFinder]
-    val logger       = TestLogger[IO]()
-    val endpoint     = new FetchTokenEndpoint[IO](tokensFinder, logger)
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val tokensFinder = mock[TokenFinder[IO]]
+    val endpoint     = new FetchTokenEndpointImpl[IO](tokensFinder)
   }
 }
