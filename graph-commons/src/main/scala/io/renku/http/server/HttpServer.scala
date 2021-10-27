@@ -40,7 +40,7 @@ class HttpServerImpl[F[_]: Async](serverPort: Int, serviceRoutes: HttpRoutes[F])
   import QueryParameterTools.resourceNotFound
 
   lazy val serverBuilder: ServerBuilder[F] = BlazeServerBuilder[F]
-    .bindHttp(serverPort, "0.0.0.0")
+    .bindLocal(serverPort)
     .withHttpApp(serviceRoutes.orNotFound)
 
   def run(): F[ExitCode] = serverBuilder.serve.compile.drain.as(ExitCode.Success)
