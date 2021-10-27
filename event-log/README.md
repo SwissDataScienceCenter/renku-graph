@@ -14,6 +14,8 @@ This is a microservice which provides CRUD operations for Event Log DB.
 |  GET   | ```/processing-status?project-id=:id``` | Finds processing status of events belonging to a project       |
 |  POST  | ```/subscriptions```                    | Adds a subscription for events                                 |
 
+All endpoints (except for `/ping` and `/metrics`) will return 503 while the database is migrating.
+
 #### GET /events
 
 Returns information about the selected events.
@@ -36,6 +38,7 @@ NOTES:
 |----------------------------|---------------------------------|
 | OK (200)                   | If finding events is successful |
 | INTERNAL SERVER ERROR (500)| When there are problems         |
+| SERVICE UNAVAILABLE ERROR (503)| When a migration is running |
 
 Response body example:
 
@@ -75,6 +78,7 @@ Finds event details.
 | OK (200)                   | If the details are found                                      |
 | NOT_FOUND (404)            | If the event does not exists                                  |
 | INTERNAL SERVER ERROR (500)| When there are problems                                       |
+| SERVICE UNAVAILABLE ERROR (503)| When a migration is running |
 
 Response body example:
 
@@ -322,6 +326,7 @@ Forces issuing a commit sync event for the given project
 | ACCEPTED (202)             | When event is accepted                                                               |
 | BAD_REQUEST (400)          | When request body is not a valid JSON Event                                          |
 | INTERNAL SERVER ERROR (500)| When there are problems with event creation                                          |
+| SERVICE UNAVAILABLE ERROR (503)| When a migration is running |
 
 #### GET /metrics
 
@@ -357,6 +362,7 @@ Finds processing status of events belonging to the project with the given `id` f
 | BAD_REQUEST (400)          | If the `project-id` parameter is not given or invalid                              |
 | NOT_FOUND (404)            | If no events can be found for the given project or no `project-id` parameter given |
 | INTERNAL SERVER ERROR (500)| When some problems occurs                                                          |
+| SERVICE UNAVAILABLE ERROR (503)| When a migration is running |
 
 Response body examples:
 
@@ -600,6 +606,7 @@ or
 | ACCEPTED (202)             | When subscription was successfully added/renewed                                                    |
 | BAD_REQUEST (400)          | When there payload is invalid e.g. no `statuses` are different than `NEW` and `RECOVERABLE_FAILURE` |
 | INTERNAL SERVER ERROR (500)| When there were problems with processing the request                                                |
+| SERVICE UNAVAILABLE ERROR (503)| When a migration is running |
 
 ## DB schema
 

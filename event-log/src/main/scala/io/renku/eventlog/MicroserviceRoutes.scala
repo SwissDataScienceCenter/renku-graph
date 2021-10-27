@@ -18,9 +18,9 @@
 
 package io.renku.eventlog
 
-import cats.MonadThrow
 import cats.data.ValidatedNel
 import cats.effect.Resource
+import cats.effect.kernel.{Ref, Sync}
 import cats.syntax.all._
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
@@ -41,13 +41,14 @@ import org.http4s.dsl.Http4sDsl
 
 import scala.util.Try
 
-private class MicroserviceRoutes[F[_]: MonadThrow](
+private class MicroserviceRoutes[F[_]: Sync](
     eventEndpoint:            EventEndpoint[F],
     eventsEndpoint:           EventsEndpoint[F],
     processingStatusEndpoint: ProcessingStatusEndpoint[F],
     subscriptionsEndpoint:    SubscriptionsEndpoint[F],
     eventDetailsEndpoint:     EventDetailsEndpoint[F],
-    routesMetrics:            RoutesMetrics[F]
+    routesMetrics:            RoutesMetrics[F],
+    isMigrating:              Ref[F, Boolean]
 ) extends Http4sDsl[F] {
 
   import EventStatusParameter._
@@ -61,16 +62,22 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   import routesMetrics._
   import subscriptionsEndpoint._
 
+
   // format: off
   lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
-    case GET             -> Root / "events" :? `project-path`(validatedProjectPath) +& status(status) +& page(page) +& perPage(perPage) => maybeFindEvents(validatedProjectPath, status, page, perPage)
-    case request @ POST  -> Root / "events"                                            => processEvent(request)
-    case           GET   -> Root / "events"/ EventId(eventId) / ProjectId(projectId)   => getDetails(CompoundEventId(eventId, projectId))
-    case           GET   -> Root / "processing-status" :? `project-id`(maybeProjectId) => maybeFindProcessingStatus(maybeProjectId)
+    case GET             -> Root / "events" :? `project-path`(validatedProjectPath) +& status(status) +& page(page) +& perPage(perPage) => respond503IfMigrating(maybeFindEvents(validatedProjectPath, status, page, perPage))
+    case request @ POST  -> Root / "events"                                            => respond503IfMigrating(processEvent(request))
+    case           GET   -> Root / "events"/ EventId(eventId) / ProjectId(projectId)   => respond503IfMigrating(getDetails(CompoundEventId(eventId, projectId)))
+    case           GET   -> Root / "processing-status" :? `project-id`(maybeProjectId) => respond503IfMigrating(maybeFindProcessingStatus(maybeProjectId))
     case           GET   -> Root / "ping"                                              => Ok("pong")
-    case request @ POST  -> Root / "subscriptions"                                     => addSubscription(request)
+    case request @ POST  -> Root / "subscriptions"                                     => respond503IfMigrating(addSubscription(request))
   }.withMetrics
   // format: on
+
+  def respond503IfMigrating(otherwise: => F[Response[F]]): F[Response[F]] = isMigrating.get.flatMap {
+    case true  => ServiceUnavailable()
+    case false => otherwise
+  }
 
   private object ProjectIdParameter {
 

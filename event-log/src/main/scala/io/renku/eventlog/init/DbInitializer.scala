@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.init
 
+import cats.effect.kernel.Ref
 import cats.effect.{IO, MonadCancelThrow}
 import cats.syntax.all._
 import io.renku.db.SessionResource
@@ -32,20 +33,33 @@ trait DbInitializer[F[_]] {
   def run(): F[Unit]
 }
 
-class DbInitializerImpl[F[_]: MonadCancelThrow: Logger](migrators: List[Runnable[F, Unit]]) extends DbInitializer[F] {
+class DbInitializerImpl[F[_]: MonadCancelThrow: Logger](migrators: List[Runnable[F, Unit]],
+                                                        isMigrating: Ref[F, Boolean]
+) extends DbInitializer[F] {
 
   override def run(): F[Unit] = {
-    migrators.map(_.run()).sequence >> Logger[F].info("Event Log database initialization success")
-  } recoverWith logging
+    for {
+      _ <- isMigrating.update(_ => true)
+      _ <- migrators.map(_.run()).sequence
+      _ <- Logger[F].info("Event Log database initialization success")
+      _ <- isMigrating.update(_ => false)
+    } yield ()
 
-  private lazy val logging: PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
-    Logger[F].error(exception)("Event Log database initialization failure")
-    exception.raiseError[F, Unit]
+  } recoverWith logAndResetMigrationStatus
+
+  private lazy val logAndResetMigrationStatus: PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
+    for {
+      _ <- isMigrating.update(_ => false)
+      _ <- Logger[F].error(exception)("Event Log database initialization failure")
+      _ <- exception.raiseError[F, Unit]
+    } yield ()
   }
 }
 
 object DbInitializer {
-  def apply(sessionResource: SessionResource[IO, EventLogDB])(implicit logger: Logger[IO]): IO[DbInitializer[IO]] = IO {
+  def apply(sessionResource: SessionResource[IO, EventLogDB], isMigrating: Ref[IO, Boolean])(implicit
+      logger:                Logger[IO]
+  ): IO[DbInitializer[IO]] = IO {
     new DbInitializerImpl[IO](
       migrators = List[Runnable[IO, Unit]](
         EventLogTableCreator(sessionResource),
@@ -62,7 +76,8 @@ object DbInitializer {
         EventDeliveryTableCreator(sessionResource),
         TimestampZoneAdder(sessionResource),
         PayloadTypeChanger(sessionResource)
-      )
+      ),
+      isMigrating
     )
   }
 

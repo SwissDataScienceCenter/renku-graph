@@ -19,6 +19,7 @@
 package io.renku.eventlog
 
 import cats.effect._
+import cats.effect.kernel.Ref
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
@@ -41,8 +42,6 @@ import io.renku.microservices.IOMicroservice
 import natchez.Trace.Implicits.noop
 import org.typelevel.log4cats.Logger
 
-import java.util.concurrent.ConcurrentHashMap
-
 object Microservice extends IOMicroservice {
 
   val ServicePort:             Int Refined Positive = 9005
@@ -58,7 +57,8 @@ object Microservice extends IOMicroservice {
       for {
         certificateLoader           <- CertificateLoader[IO]
         sentryInitializer           <- SentryInitializer[IO]
-        dbInitializer               <- DbInitializer(sessionResource)
+        isMigrating                 <- Ref.of[IO, Boolean](true)
+        dbInitializer               <- DbInitializer(sessionResource, isMigrating)
         metricsRegistry             <- MetricsRegistry[IO]()
         queriesExecTimes            <- QueriesExecutionTimes(metricsRegistry)
         statsFinder                 <- StatsFinder(sessionResource, queriesExecTimes)
@@ -122,7 +122,8 @@ object Microservice extends IOMicroservice {
                                processingStatusEndpoint,
                                subscriptionsEndpoint,
                                eventDetailsEndpoint,
-                               new RoutesMetrics[IO](metricsRegistry)
+                               new RoutesMetrics[IO](metricsRegistry),
+                               isMigrating
                              ).routes
         exitCode <- microserviceRoutes.use { routes =>
                       new MicroserviceRunner(
@@ -133,8 +134,7 @@ object Microservice extends IOMicroservice {
                         eventProducersRegistry,
                         eventConsumersRegistry,
                         metricsResetScheduler,
-                        HttpServer[IO](serverPort = ServicePort.value, routes),
-                        subProcessesCancelTokens
+                        HttpServer[IO](serverPort = ServicePort.value, routes)
                       ).run()
                     }
       } yield exitCode
@@ -142,30 +142,26 @@ object Microservice extends IOMicroservice {
 }
 
 private class MicroserviceRunner(
-    certificateLoader:        CertificateLoader[IO],
-    sentryInitializer:        SentryInitializer[IO],
-    dbInitializer:            DbInitializer[IO],
-    metrics:                  EventLogMetrics[IO],
-    eventProducersRegistry:   EventProducersRegistry[IO],
-    eventConsumersRegistry:   EventConsumersRegistry[IO],
-    metricsResetScheduler:    GaugeResetScheduler[IO],
-    httpServer:               HttpServer[IO],
-    subProcessesCancelTokens: ConcurrentHashMap[IO[Unit], Unit]
+    certificateLoader:      CertificateLoader[IO],
+    sentryInitializer:      SentryInitializer[IO],
+    dbInitializer:          DbInitializer[IO],
+    metrics:                EventLogMetrics[IO],
+    eventProducersRegistry: EventProducersRegistry[IO],
+    eventConsumersRegistry: EventConsumersRegistry[IO],
+    metricsResetScheduler:  GaugeResetScheduler[IO],
+    httpServer:             HttpServer[IO]
 ) {
 
   def run(): IO[ExitCode] = for {
+
     _      <- certificateLoader.run()
     _      <- sentryInitializer.run()
-    _      <- dbInitializer.run()
-    _      <- metrics.run().start map gatherCancelToken
-    _      <- metricsResetScheduler.run().start map gatherCancelToken
-    _      <- eventProducersRegistry.run().start map gatherCancelToken
-    _      <- eventConsumersRegistry.run().start map gatherCancelToken
+    _      <- dbInitializer.run().start
+    _      <- metrics.run().start
+    _      <- metricsResetScheduler.run().start
+    _      <- eventProducersRegistry.run().start
+    _      <- eventConsumersRegistry.run().start
     result <- httpServer.run()
   } yield result
 
-  private def gatherCancelToken(fiber: Fiber[IO, Throwable, Unit]): Fiber[IO, Throwable, Unit] = {
-    subProcessesCancelTokens.put(fiber.cancel, ())
-    fiber
-  }
 }

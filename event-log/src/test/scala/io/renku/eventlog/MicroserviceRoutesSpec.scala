@@ -18,7 +18,7 @@
 
 package io.renku.eventlog
 
-import cats.effect.IO
+import cats.effect.{IO, Ref}
 import cats.syntax.all._
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
@@ -59,7 +59,7 @@ class MicroserviceRoutesSpec
 
   "routes" should {
 
-    "define a GET /events - case with project-path only" in new TestCase {
+    "define a GET /events - case with project-path only" in new TestCase with IsNotMigrating {
       val projectPath = projectPaths.generateOne
 
       val request = Request[IO](method = GET, uri"/events".withQueryParam("project-path", projectPath.value))
@@ -71,7 +71,7 @@ class MicroserviceRoutesSpec
       routes.call(request).status shouldBe Ok
     }
 
-    "define a GET /events - case with status only" in new TestCase {
+    "define a GET /events - case with status only" in new TestCase with IsNotMigrating {
       val eventStatus = eventStatuses.generateOne
 
       val request = Request[IO](method = GET, uri"/events".withQueryParam("status", eventStatus.value))
@@ -83,7 +83,7 @@ class MicroserviceRoutesSpec
       routes.call(request).status shouldBe Ok
     }
 
-    "define a GET /events - case with project-path and status" in new TestCase {
+    "define a GET /events - case with project-path and status" in new TestCase with IsNotMigrating {
       val projectPath   = projectPaths.generateOne
       val eventStatus   = eventStatuses.generateOne
       val pagingRequest = pagingRequests.generateOne
@@ -114,16 +114,17 @@ class MicroserviceRoutesSpec
         .withQueryParam("status", eventStatuses.generateOne.show)
         .withQueryParam("per_page", nonEmptyStrings().generateOne)
     ) foreach { uri =>
-      s"define a GET $uri returning $BadRequest for invalid project path" in new TestCase {
+      s"define a GET $uri returning $BadRequest for invalid project path" in new TestCase with IsNotMigrating {
         routes.call(Request[IO](method = GET, uri)).status shouldBe BadRequest
       }
     }
 
-    "define a GET /events not finding the endpoint when no project-path or status parameter is present" in new TestCase {
+    "define a GET /events not finding the endpoint when no project-path or status parameter is present" in new TestCase
+      with IsNotMigrating {
       routes.call(Request[IO](method = GET, uri"/events")).status shouldBe NotFound
     }
 
-    "define a GET /events/:event-id/:project-id endpoint" in new TestCase {
+    "define a GET /events/:event-id/:project-id endpoint" in new TestCase with IsNotMigrating {
       val eventId = compoundEventIds.generateOne
 
       val request = Request[IO](
@@ -138,7 +139,7 @@ class MicroserviceRoutesSpec
       response.status shouldBe Ok
     }
 
-    "define a POST /events endpoint" in new TestCase {
+    "define a POST /events endpoint" in new TestCase with IsNotMigrating {
       val request        = Request[IO](POST, uri"/events")
       val expectedStatus = Gen.oneOf(Accepted, BadRequest, InternalServerError, TooManyRequests).generateOne
       (eventEndpoint.processEvent _).expects(request).returning(Response[IO](expectedStatus).pure[IO])
@@ -164,7 +165,7 @@ class MicroserviceRoutesSpec
       response.body[String] shouldBe "pong"
     }
 
-    "define a GET /processing-status?project-id=:id endpoint" in new TestCase {
+    "define a GET /processing-status?project-id=:id endpoint" in new TestCase with IsNotMigrating {
       val projectId = projectIds.generateOne
 
       val request = Request[IO](GET, uri"/processing-status".withQueryParam("project-id", projectId.toString))
@@ -176,7 +177,7 @@ class MicroserviceRoutesSpec
     }
 
     "define a GET /processing-status?project-id=:id endpoint " +
-      s"returning $NotFound if no project-id parameter is given" in new TestCase {
+      s"returning $NotFound if no project-id parameter is given" in new TestCase with IsNotMigrating {
 
         val request = Request[IO](GET, uri"/processing-status")
 
@@ -188,7 +189,7 @@ class MicroserviceRoutesSpec
       }
 
     "define a GET /processing-status?project-id=:id endpoint " +
-      s"returning $BadRequest if illegal project-id parameter value is given" in new TestCase {
+      s"returning $BadRequest if illegal project-id parameter value is given" in new TestCase with IsNotMigrating {
         val request = Request[IO](GET, uri"/processing-status".withQueryParam("project-id", "non int value"))
 
         val response = routes.call(request)
@@ -198,7 +199,7 @@ class MicroserviceRoutesSpec
         response.body[ErrorMessage] shouldBe ErrorMessage("'project-id' parameter with invalid value")
       }
 
-    "define a POST /subscriptions endpoint" in new TestCase {
+    "define a POST /subscriptions endpoint" in new TestCase with IsNotMigrating {
       val request = Request[IO](POST, uri"/subscriptions")
 
       (subscriptionsEndpoint.addSubscription _).expects(request).returning(Response[IO](Accepted).pure[IO])
@@ -207,6 +208,24 @@ class MicroserviceRoutesSpec
 
       response.status shouldBe Accepted
     }
+
+    "All endpoints except ping return 503 Service Unavailable if isMigrating" in new TestCase {
+      (() => isMigrating.get)
+        .expects()
+        .returning(IO(true))
+
+      val projectPath = projectPaths.generateOne
+
+      val request = Request[IO](method = GET, uri"/events".withQueryParam("project-path", projectPath.value))
+
+      routes.call(request).status shouldBe ServiceUnavailable
+
+      val response = routes.call(Request(GET, uri"/ping"))
+
+      response.status       shouldBe Ok
+      response.body[String] shouldBe "pong"
+    }
+
   }
 
   private trait TestCase {
@@ -216,13 +235,23 @@ class MicroserviceRoutesSpec
     val subscriptionsEndpoint    = mock[SubscriptionsEndpoint[IO]]
     val eventDetailsEndpoint     = mock[EventDetailsEndpoint[IO]]
     val routesMetrics            = TestRoutesMetrics()
+    val isMigrating              = mock[Ref[IO, Boolean]]
     val routes = new MicroserviceRoutes[IO](
       eventEndpoint,
       eventsEndpoint,
       processingStatusEndpoint,
       subscriptionsEndpoint,
       eventDetailsEndpoint,
-      routesMetrics
+      routesMetrics,
+      isMigrating
     ).routes.map(_.or(notAvailableResponse))
+  }
+
+  private trait IsNotMigrating {
+    self: TestCase =>
+
+    (() => isMigrating.get)
+      .expects()
+      .returning(IO(false))
   }
 }
