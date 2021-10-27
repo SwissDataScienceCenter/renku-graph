@@ -27,6 +27,7 @@ import io.prometheus.client.Histogram
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.generators.jsonld.JsonLDGenerators.jsonLDEntities
 import io.renku.graph.model.events.EventStatus.New
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects.Path
@@ -35,7 +36,6 @@ import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.jsonld.JsonLD
-import io.renku.jsonld.generators.JsonLDGenerators.jsonLDEntities
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.metrics.MetricsRegistry
 import io.renku.testtools.IOSpec

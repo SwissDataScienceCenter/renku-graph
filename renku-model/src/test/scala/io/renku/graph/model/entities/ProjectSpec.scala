@@ -23,6 +23,7 @@ import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.generators.jsonld.JsonLDGenerators.entityIds
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.graph.model._
@@ -32,7 +33,6 @@ import io.renku.graph.model.testentities._
 import io.renku.jsonld.JsonLDDecoder._
 import io.renku.jsonld.JsonLDEncoder.encodeOption
 import io.renku.jsonld._
-import io.renku.jsonld.generators.JsonLDGenerators.entityIds
 import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

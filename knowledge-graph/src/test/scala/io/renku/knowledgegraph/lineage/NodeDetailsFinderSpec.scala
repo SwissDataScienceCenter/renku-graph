@@ -116,7 +116,7 @@ class NodeDetailsFinderSpec
 
   "findDetails - activityIds" should {
 
-    import io.renku.jsonld.generators.JsonLDGenerators._
+    import io.renku.generators.jsonld.JsonLDGenerators._
 
     "find details of all Plans for the given activity ids" in new TestCase {
 

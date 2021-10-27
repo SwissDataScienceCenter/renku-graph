@@ -26,8 +26,8 @@ import eu.timepit.refined.auto._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.generators.jsonld.JsonLDGenerators._
 import io.renku.interpreters.TestLogger
-import io.renku.jsonld.generators.JsonLDGenerators._
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.rdfstore.{FusekiBaseUrl, SparqlQueryTimeRecorder}
 import io.renku.stubbing.ExternalServiceStubbing

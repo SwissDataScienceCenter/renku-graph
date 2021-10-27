@@ -27,12 +27,12 @@ import io.renku.events.EventRequestContent
 import io.renku.events.producers.EventSender
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.generators.jsonld.JsonLDGenerators.jsonLDEntities
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events
 import io.renku.graph.model.events.EventStatus._
 import io.renku.http.client.RestClient._
-import io.renku.jsonld.generators.JsonLDGenerators.jsonLDEntities
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.ByteArrayTinyType
 import io.renku.tinytypes.contenttypes.ZippedContent

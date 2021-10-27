@@ -24,10 +24,10 @@ import io.renku.compression.Zip
 import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
+import io.renku.generators.jsonld.JsonLDGenerators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.ZippedEventPayload
-import io.renku.jsonld.generators.JsonLDGenerators._
 import io.renku.jsonld.parser.ParsingFailure
 import io.renku.testtools.IOSpec
 import org.scalacheck.Arbitrary

@@ -29,13 +29,13 @@ import io.renku.events.consumers.Project
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.generators.jsonld.JsonLDGenerators.jsonLDEntities
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.graph.model.events.{CommitId, EventId}
 import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.JsonLD
-import io.renku.jsonld.generators.JsonLDGenerators.jsonLDEntities
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
