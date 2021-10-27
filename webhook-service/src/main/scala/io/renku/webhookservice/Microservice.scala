@@ -27,15 +27,8 @@ import io.renku.http.server.HttpServer
 import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.IOMicroservice
-import pureconfig.ConfigSource
-
-import java.util.concurrent.Executors.newFixedThreadPool
-import scala.concurrent.ExecutionContext
 
 object Microservice extends IOMicroservice {
-
-  protected implicit val executionContext: ExecutionContext =
-    ExecutionContext fromExecutorService newFixedThreadPool(ConfigSource.default.at("threads-number").loadOrThrow[Int])
 
   private implicit val logger: ApplicationLogger.type = ApplicationLogger
 

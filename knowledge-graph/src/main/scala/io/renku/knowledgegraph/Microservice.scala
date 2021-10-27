@@ -28,15 +28,12 @@ import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.IOMicroservice
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
-import pureconfig.ConfigSource
 
-import java.util.concurrent.Executors.newFixedThreadPool
 import scala.concurrent.ExecutionContext
 
 object Microservice extends IOMicroservice {
 
-  protected implicit val executionContext: ExecutionContext =
-    ExecutionContext fromExecutorService newFixedThreadPool(ConfigSource.default.at("threads-number").loadOrThrow[Int])
+  protected implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
 
   import cats.effect.unsafe.implicits.global
 

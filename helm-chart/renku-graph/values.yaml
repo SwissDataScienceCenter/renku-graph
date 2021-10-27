@@ -18,7 +18,6 @@ webhookService:
   jvmXmx: 200M
   gitlab:
     rateLimit: 100/sec
-  threadsNumber: 3
   hookToken:
     ## A secret for signing request header tokens to be sent by GitLab with the Push Events
     ## Generated using: `openssl rand -hex 8|base64`
@@ -68,7 +67,6 @@ triplesGenerator:
   ## a demanded number of concurrent triples generation processes
   generationProcessesNumber: 4
   transformationProcessesNumber: 2
-  threadsNumber: 6
   # set this to a pip-installable renku-python version which will be installed on startup
   renkuPythonDevVersion:
 
@@ -88,7 +86,6 @@ knowledgeGraph:
   gitlab:
     rateLimit: 100/sec
   jvmXmx: 512M
-  threadsNumber: 4
   services:
     renku:
       ## Renku knowledge-graph resources path e.g. `knowledge-graph` would assume
@@ -109,7 +106,6 @@ eventLog:
     limits:
       memory: 2500Mi
   jvmXmx: 1536M
-  threadsNumber: 6
   connectionPool: 10
 
 commitEventService:
@@ -128,7 +124,6 @@ commitEventService:
   jvmXmx: 512M
   gitlab:
     rateLimit: 100/sec
-  threadsNumber: 3
 
 sentry:
   enabled: false
