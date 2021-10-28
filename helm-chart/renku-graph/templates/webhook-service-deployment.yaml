@@ -21,6 +21,8 @@ spec:
         app: {{ include "webhookService.name" . }}
         release: {{ .Release.Name }}
     spec:
+      initContainers:
+        {{- include "certificates.initContainer" . | nindent 8 }}
       containers:
         - name: webhook-service
           image: "{{ .Values.webhookService.image.repository }}:{{ .Values.webhookService.image.tag }}"
@@ -79,7 +81,11 @@ spec:
               path: /ping
               port: http-webhook-sv
           resources:
-  {{- toYaml .Values.webhookService.resources | nindent 12 }}
+            {{- toYaml .Values.webhookService.resources | nindent 12 }}
+          volumeMounts:
+            {{- include "certificates.volumeMounts.openjdk14" . | nindent 12 }}
+      volumes:
+        {{- include "certificates.volumes" . | nindent 8 }}
   {{- with .Values.nodeSelector }}
 nodeSelector:
   {{ toYaml . | indent 8 }}

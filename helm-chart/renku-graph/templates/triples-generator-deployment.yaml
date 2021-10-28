@@ -21,6 +21,8 @@ spec:
         app: {{ include "triplesGenerator.name" . }}
         release: {{ .Release.Name }}
     spec:
+      initContainers:
+        {{- include "certificates.initContainer" . | nindent 8 }}
       containers:
         - name: triples-generator
           image: "{{ .Values.triplesGenerator.image.repository }}:{{ .Values.triplesGenerator.image.tag }}"
@@ -112,7 +114,11 @@ spec:
             initialDelaySeconds: 120
             {{- end }}
           resources:
-  {{- toYaml .Values.triplesGenerator.resources | nindent 12 }}
+            {{- toYaml .Values.triplesGenerator.resources | nindent 12 }}
+          volumeMounts:
+            {{- include "certificates.volumeMounts.openjdk15" . | nindent 12 }}
+      volumes:
+        {{- include "certificates.volumes" . | nindent 8 }}
   {{- with .Values.nodeSelector }}
 nodeSelector:
   {{ toYaml . | indent 8 }}

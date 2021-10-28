@@ -21,6 +21,8 @@ spec:
         app: {{ include "knowledgeGraph.name" . }}
         release: {{ .Release.Name }}
     spec:
+      initContainers:
+        {{- include "certificates.initContainer" . | nindent 8 }}
       containers:
         - name: knowledge-graph
           image: "{{ .Values.knowledgeGraph.image.repository }}:{{ .Values.knowledgeGraph.image.tag }}"
@@ -79,7 +81,11 @@ spec:
               path: /ping
               port: http-kg
           resources:
-  {{- toYaml .Values.knowledgeGraph.resources | nindent 12 }}
+            {{- toYaml .Values.knowledgeGraph.resources | nindent 12 }}
+          volumeMounts:
+            {{- include "certificates.volumeMounts.openjdk14" . | nindent 12 }}
+      volumes:
+        {{- include "certificates.volumes" . | nindent 8 }}
   {{- with .Values.nodeSelector }}
 nodeSelector:
   {{ toYaml . | indent 8 }}
