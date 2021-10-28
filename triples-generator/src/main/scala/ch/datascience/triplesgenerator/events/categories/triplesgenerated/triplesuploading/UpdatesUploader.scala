@@ -19,6 +19,7 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplesuploading
 
 import cats.effect.{ConcurrentEffect, Timer}
+import cats.syntax.all._
 import ch.datascience.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
 import ch.datascience.rdfstore._
 import eu.timepit.refined.api.Refined
@@ -26,26 +27,33 @@ import eu.timepit.refined.numeric.NonNegative
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration._
 
 private trait UpdatesUploader[Interpretation[_]] {
   def send(updateQuery: SparqlQuery): Interpretation[TriplesUploadResult]
 }
 
 private class UpdatesUploaderImpl[Interpretation[_]: ConcurrentEffect: Timer](
-    rdfStoreConfig: RdfStoreConfig,
-    logger:         Logger[Interpretation],
-    timeRecorder:   SparqlQueryTimeRecorder[Interpretation],
-    retryInterval:  FiniteDuration = SleepAfterConnectionIssue,
-    maxRetries:     Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
-)(implicit
-    executionContext: ExecutionContext
-) extends RdfStoreClientImpl[Interpretation](rdfStoreConfig, logger, timeRecorder, retryInterval, maxRetries)
+    rdfStoreConfig:          RdfStoreConfig,
+    logger:                  Logger[Interpretation],
+    timeRecorder:            SparqlQueryTimeRecorder[Interpretation],
+    retryInterval:           FiniteDuration = SleepAfterConnectionIssue,
+    maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
+    idleTimeout:             Duration = 5 minutes,
+    requestTimeout:          Duration = 4 minutes
+)(implicit executionContext: ExecutionContext)
+    extends RdfStoreClientImpl[Interpretation](rdfStoreConfig,
+                                               logger,
+                                               timeRecorder,
+                                               retryInterval,
+                                               maxRetries,
+                                               idleTimeoutOverride = idleTimeout.some,
+                                               requestTimeoutOverride = requestTimeout.some
+    )
     with UpdatesUploader[Interpretation] {
 
   import LogMessage._
   import TriplesUploadResult._
-  import cats.syntax.all._
   import org.http4s.Status.{BadRequest, Ok}
   import org.http4s.{Request, Response, Status}
 
