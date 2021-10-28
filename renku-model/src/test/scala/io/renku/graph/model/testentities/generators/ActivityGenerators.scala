@@ -19,7 +19,6 @@
 package io.renku.graph.model.testentities
 package generators
 
-import EntitiesGenerators.ActivityGenFactory
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{nonBlankStrings, nonEmptyStrings, positiveInts, relativePaths, sentences, timestamps, timestampsNotInTheFuture}
@@ -31,6 +30,7 @@ import io.renku.graph.model.parameterValues.ValueOverride
 import io.renku.graph.model.testentities.Entity.{InputEntity, OutputEntity}
 import io.renku.graph.model.testentities.Plan.CommandParameters
 import io.renku.graph.model.testentities.Plan.CommandParameters.CommandParameterFactory
+import io.renku.graph.model.testentities.generators.EntitiesGenerators.ActivityGenFactory
 import io.renku.tinytypes.InstantTinyType
 import org.scalacheck.Gen
 
@@ -57,6 +57,9 @@ trait ActivityGenerators {
     nonBlankStrings().map(_.value).toGeneratorOf[plans.ProgrammingLanguage]
   implicit val planSuccessCodes: Gen[plans.SuccessCode] =
     positiveInts().map(_.value).toGeneratorOf[plans.SuccessCode]
+
+  def planDatesCreated(after: InstantTinyType): Gen[plans.DateCreated] =
+    timestampsNotInTheFuture(after.value).toGeneratorOf(plans.DateCreated)
 
   implicit val commandParameterNames: Gen[commandParameters.Name] =
     nonBlankStrings().map(_.value).toGeneratorOf[commandParameters.Name]
@@ -86,19 +89,24 @@ trait ActivityGenerators {
   lazy val parameterValueOverrides: Gen[ValueOverride] =
     nonBlankStrings().map(v => ValueOverride(v.value))
 
-  def activityEntities(planGen: Gen[Plan]): ActivityGenFactory =
+  def activityEntities(planGen: projects.DateCreated => Gen[Plan]): ActivityGenFactory =
     executionPlanners(planGen, _: projects.DateCreated).map(_.buildProvenanceUnsafe())
 
-  def planEntities(parameterFactories: CommandParameterFactory*): Gen[Plan] = for {
-    name    <- planNames
-    command <- planCommands
-  } yield Plan(name, command, CommandParameters.of(parameterFactories: _*))
+  def planEntities(parameterFactories: CommandParameterFactory*): projects.DateCreated => Gen[Plan] =
+    projectDateCreated =>
+      for {
+        name        <- planNames
+        command     <- planCommands
+        dateCreated <- planDatesCreated(after = projectDateCreated)
+      } yield Plan.of(name, command, dateCreated, CommandParameters.of(parameterFactories: _*))
 
-  def executionPlanners(planGen: Gen[Plan], project: Project): Gen[ExecutionPlanner] =
+  def executionPlanners(planGen: projects.DateCreated => Gen[Plan], project: Project): Gen[ExecutionPlanner] =
     executionPlanners(planGen, project.topAncestorDateCreated)
 
-  def executionPlanners(planGen: Gen[Plan], projectDateCreated: projects.DateCreated): Gen[ExecutionPlanner] = for {
-    plan       <- planGen
+  def executionPlanners(planGen:            projects.DateCreated => Gen[Plan],
+                        projectDateCreated: projects.DateCreated
+  ): Gen[ExecutionPlanner] = for {
+    plan       <- planGen(projectDateCreated)
     author     <- personEntities
     cliVersion <- cliVersions
   } yield ExecutionPlanner.of(plan,
@@ -108,7 +116,7 @@ trait ActivityGenerators {
                               projectDateCreated
   )
 
-  def executionPlannersDecoupledFromProject(planGen: Gen[Plan]): Gen[ExecutionPlanner] =
+  def executionPlannersDecoupledFromProject(planGen: projects.DateCreated => Gen[Plan]): Gen[ExecutionPlanner] =
     executionPlanners(planGen, projectCreatedDates().generateOne)
 
   implicit class ActivityGenFactoryOps(factory: ActivityGenFactory) {

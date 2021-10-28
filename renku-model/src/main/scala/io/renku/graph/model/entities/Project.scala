@@ -115,6 +115,13 @@ object ProjectWithoutParent extends ProjectFactory {
           }
       }
       .sequence
+      .void |+| activities
+      .map { activity =>
+        import activity.association.plan
+        if ((plan.dateCreated.value compareTo dateCreated.value) >= 0) ().validNel[String]
+        else s"Plan ${plan.resourceId} dateCreated ${plan.dateCreated} is older than project $dateCreated".invalidNel
+      }
+      .sequence
       .void
 }
 
