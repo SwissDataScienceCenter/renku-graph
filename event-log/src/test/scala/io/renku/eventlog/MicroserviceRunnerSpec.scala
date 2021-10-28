@@ -80,16 +80,19 @@ class MicroserviceRunnerSpec
       } shouldBe exception
     }
 
-    "fail if db initialisation fails" in new TestCase {
+    "return Success ExitCode even if DB initialisation fails" in new TestCase {
 
       given(certificateLoader).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
       val exception = exceptions.generateOne
       given(dbInitializer).fails(becauseOf = exception)
+      given(metrics).succeeds(returning = ())
+      given(gaugeScheduler).succeeds(returning = ())
+      given(eventProducersRegistry).succeeds(returning = ())
+      given(eventConsumersRegistry).succeeds(returning = ())
+      given(httpServer).succeeds(returning = ExitCode.Success)
 
-      intercept[Exception] {
-        runner.run().unsafeRunSync()
-      } shouldBe exception
+      runner.run().unsafeRunSync() shouldBe ExitCode.Success
     }
 
     "fail if starting the http server fails" in new TestCase {
