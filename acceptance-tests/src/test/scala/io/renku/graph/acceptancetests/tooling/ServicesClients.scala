@@ -18,19 +18,22 @@
 
 package io.renku.graph.acceptancetests.tooling
 
-import cats.effect.IO
+import cats.Monad
 import cats.effect.unsafe.IORuntime
+import cats.effect.{IO, Temporal}
+import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.string.Url
-import io.circe.Json
 import io.circe.literal._
+import io.circe.{Json, JsonObject}
 import io.renku.control.Throttler
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, BasicAuthCredentials, RestClient}
 import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.model.HookToken
 import org.http4s.Status.Ok
+import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
 import org.http4s.{Header, Method, Response}
 import org.scalatest.matchers.should
 import org.typelevel.ci._
@@ -124,6 +127,24 @@ object EventLogClient {
 
     def fetchProcessingStatus(projectId: projects.Id)(implicit ioRuntime: IORuntime): Response[IO] =
       GET(s"processing-status?project-id=$projectId")
+
+    def waitForReadiness(implicit ioRuntime: IORuntime): IO[Unit] =
+      Monad[IO].whileM_(isRunning)(Temporal[IO] sleep (100 millis))
+
+    private def isRunning(implicit ioRuntime: IORuntime) = getStatus.flatMap { status =>
+      status
+        .as[JsonObject]
+        .flatMap(jsonObject =>
+          jsonObject("isMigrating")
+            .map(isMigrating => IO(isMigrating.asBoolean.contains(true)))
+            .getOrElse(new Exception("No migration status found").raiseError[IO, Boolean])
+        )
+    }
+
+    private def getStatus = for {
+      uri      <- validateUri(s"$baseUrl/migration-status")
+      response <- send(request(Method.GET, uri))(mapResponse)
+    } yield response
   }
 }
 

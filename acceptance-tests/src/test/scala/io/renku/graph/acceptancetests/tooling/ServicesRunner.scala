@@ -70,6 +70,7 @@ class ServicesRunner(semaphore: Semaphore[IO])(implicit
           _ <- verifyServiceReady(serviceRun)
         } yield ()
     }
+
   }
 
   private def verifyServiceReady(serviceRun: ServiceRun): IO[Unit] =

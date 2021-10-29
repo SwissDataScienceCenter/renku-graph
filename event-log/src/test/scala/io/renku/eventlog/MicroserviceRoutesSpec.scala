@@ -20,6 +20,8 @@ package io.renku.eventlog
 
 import cats.effect.{IO, Ref}
 import cats.syntax.all._
+import io.circe.Json
+import io.circe.literal.JsonStringContext
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
 import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
@@ -207,6 +209,13 @@ class MicroserviceRoutesSpec
       val response = routes.call(request)
 
       response.status shouldBe Accepted
+    }
+
+    "define a GET /migration-status endpoint returning OK with 'pong' body" in new TestCase with IsNotMigrating {
+      val response = routes.call(Request(GET, uri"/migration-status"))
+
+      response.status     shouldBe Ok
+      response.body[Json] shouldBe json"""{"isMigrating": false}"""
     }
 
     "All endpoints except ping return 503 Service Unavailable if isMigrating" in new TestCase {

@@ -22,6 +22,7 @@ import cats.data.ValidatedNel
 import cats.effect.Resource
 import cats.effect.kernel.{Ref, Sync}
 import cats.syntax.all._
+import io.circe.literal.JsonStringContext
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
 import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
@@ -37,6 +38,7 @@ import io.renku.http.rest.paging.model.{Page, PerPage}
 import io.renku.http.server.QueryParameterTools.{resourceNotFound, toBadRequest}
 import io.renku.metrics.RoutesMetrics
 import org.http4s._
+import org.http4s.circe.jsonEncoder
 import org.http4s.dsl.Http4sDsl
 
 import scala.util.Try
@@ -70,6 +72,7 @@ private class MicroserviceRoutes[F[_]: Sync](
     case           GET   -> Root / "events"/ EventId(eventId) / ProjectId(projectId)   => respond503IfMigrating(getDetails(CompoundEventId(eventId, projectId)))
     case           GET   -> Root / "processing-status" :? `project-id`(maybeProjectId) => respond503IfMigrating(maybeFindProcessingStatus(maybeProjectId))
     case           GET   -> Root / "ping"                                              => Ok("pong")
+    case           GET   -> Root / "migration-status"                                  => isMigrating.get.flatMap {isMigrating => Ok(json"""{"isMigrating": $isMigrating}""")}
     case request @ POST  -> Root / "subscriptions"                                     => respond503IfMigrating(addSubscription(request))
   }.withMetrics
   // format: on
