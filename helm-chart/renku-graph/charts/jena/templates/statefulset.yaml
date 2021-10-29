@@ -23,7 +23,8 @@ spec:
         release: { { .Release.Name } }
         role: master
       annotations:
-        checksum/config: { { include ("jena.lucene-config.yaml") . | sha256sum } }
+        checksum/config1: { { include (print $.Template.BasePath "/lucene-config.yaml") . | sha256sum } }
+        checksum/config2: { { include (print $.Template.BasePath "/fuseki-server.yaml") . | sha256sum } }
     spec:
       containers:
         - name: {{ .Chart.Name }}
