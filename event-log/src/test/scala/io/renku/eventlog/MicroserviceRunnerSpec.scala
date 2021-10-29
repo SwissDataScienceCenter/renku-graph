@@ -86,8 +86,6 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       val exception = exceptions.generateOne
       given(dbInitializer).fails(becauseOf = exception)
-      given(metrics).succeeds(returning = ())
-      given(gaugeScheduler).succeeds(returning = ())
       given(eventProducersRegistry).succeeds(returning = ())
       given(eventConsumersRegistry).succeeds(returning = ())
       given(httpServer).succeeds(returning = ExitCode.Success)

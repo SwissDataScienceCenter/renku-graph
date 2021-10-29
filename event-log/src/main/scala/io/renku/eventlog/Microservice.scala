@@ -161,11 +161,11 @@ private class MicroserviceRunner(
              for {
                _ <- metrics.run().start
                _ <- metricsResetScheduler.run().start
-               _ <- eventProducersRegistry.run().start
-               _ <- eventConsumersRegistry.run().start
              } yield ()
            }
            .start
+    _      <- eventProducersRegistry.run().start
+    _      <- eventConsumersRegistry.run().start
     result <- httpServer.run()
   } yield result
 
