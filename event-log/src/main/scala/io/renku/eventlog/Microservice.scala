@@ -153,14 +153,19 @@ private class MicroserviceRunner(
 ) {
 
   def run(): IO[ExitCode] = for {
-
-    _      <- certificateLoader.run()
-    _      <- sentryInitializer.run()
-    _      <- dbInitializer.run().start
-    _      <- metrics.run().start
-    _      <- metricsResetScheduler.run().start
-    _      <- eventProducersRegistry.run().start
-    _      <- eventConsumersRegistry.run().start
+    _ <- certificateLoader.run()
+    _ <- sentryInitializer.run()
+    _ <- dbInitializer
+           .run()
+           .flatMap { _ =>
+             for {
+               _ <- metrics.run().start
+               _ <- metricsResetScheduler.run().start
+               _ <- eventProducersRegistry.run().start
+               _ <- eventConsumersRegistry.run().start
+             } yield ()
+           }
+           .start
     result <- httpServer.run()
   } yield result
 
