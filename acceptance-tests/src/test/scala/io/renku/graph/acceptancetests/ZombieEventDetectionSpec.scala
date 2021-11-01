@@ -42,6 +42,7 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.Eventually
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
+import org.scalatest.time.{Minutes, Seconds, Span}
 import skunk.data.Completion
 import skunk.implicits._
 import skunk.{Command, Session, ~}
@@ -62,6 +63,11 @@ class ZombieEventDetectionSpec
     with AcceptanceTestPatience
     with should.Matchers {
 
+  implicit override val patienceConfig: PatienceConfig = PatienceConfig(
+    timeout = scaled(Span(3, Minutes)),
+    interval = scaled(Span(10, Seconds))
+  )
+
   Scenario(
     s"An event which got stuck in either $GeneratingTriples or $TransformingTriples status " +
       s"should be detected and re-processes"
@@ -81,11 +87,11 @@ class ZombieEventDetectionSpec
     And("the event commit in GitLab")
     `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
 
-    And("access token is present")
-    givenAccessTokenPresentFor(project)
-
     And("the event classified as zombie is the latest commit in GitLab")
     `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(projectId, commitId)
+
+    And("access token is present")
+    givenAccessTokenPresentFor(project)
 
     And("an event that should be classified as zombie is in the EventLog DB")
     insertProjectToDB(project, eventDate) shouldBe 1
