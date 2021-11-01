@@ -49,13 +49,13 @@ private class SubscribersImpl[F[_]: MonadThrow: Logger] private[subscriptions] (
   override def add(subscriptionInfo: SubscriptionInfo): F[Unit] = for {
     wasAdded <- subscribersRegistry add subscriptionInfo
     _        <- subscriberTracker add subscriptionInfo
-    _        <- whenA(wasAdded)(Logger[F].info(s"$categoryName: $subscriptionInfo added"))
+    _        <- whenA(wasAdded)(Logger[F].info(show"$categoryName: $subscriptionInfo added"))
   } yield ()
 
   override def delete(subscriberUrl: SubscriberUrl): F[Unit] = for {
     removed <- subscribersRegistry delete subscriberUrl
     _       <- subscriberTracker remove subscriberUrl
-    _       <- whenA(removed)(Logger[F].info(s"$categoryName: $subscriberUrl gone - deleting"))
+    _       <- whenA(removed)(Logger[F].info(show"$categoryName: $subscriberUrl gone - deleting"))
   } yield ()
 
   override def markBusy(subscriberUrl: SubscriberUrl): F[Unit] =
