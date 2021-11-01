@@ -1,4 +1,4 @@
-[![pullreminders](https://pullreminders.com/badge.svg)](https://pullreminders.com?ref=badge)
+\[![pullreminders](https://pullreminders.com/badge.svg)](https://pullreminders.com?ref=badge)
 
 # renku-graph
 
@@ -32,5 +32,94 @@ The standard release process is done manually.
 
 #### Hotfixes
 
-In a case of hotfixes, changes to a relevant commit/tag needs to be done and pushed to a special branch with name following the `hotfix-<major>.<minor>` pattern. Once the fix is pushed, CI will test the change with other Renku services. Tagging has to be done manually.
+In a case of hotfixes, changes to a relevant commit/tag needs to be done and pushed to a special branch with name
+following the `hotfix-<major>.<minor>` pattern. Once the fix is pushed, CI will test the change with other Renku
+services. Tagging has to be done manually.
+
+### Event Flow
+
+This section describes the flow of events starting from a commit on GitLab until the data is stored in the triples
+store. The solid lines represent an event being sent and the dotted lines represent non-event-like data (request or
+response).
+
+#### Project creation flow and new commit flow
+
+When a project is created on GitLab or a new commit is pushed to GitLab the following flow is triggered:
+A `MinimalCommitSyncEvent` is created if a new project is created and a `FullCommitSyncEvent` is created when a new
+commit is pushed.
+
+```mermaid
+sequenceDiagram
+    participant GitLab
+    participant WebhookService
+    participant EventLog
+    participant CommmitEventService
+    participant TriplesGenerator
+    participant TriplesStore
+    GitLab ->>WebhookService: WebhookEvent
+    WebhookService ->>EventLog: CommitSyncRequest 
+    loop Continuously pulling
+    EventLog -->>EventLog: find latest event 
+    end
+    EventLog ->>CommmitEventService: MinimalCommitSyncEvent or FullCommitSyncEvent
+    Note over CommmitEventService, GitLab: this process will be repeated for each commit that is not yet in EventLog or if a commit in EventLog should be removed
+    loop Until the commit from gitlab is already in the EventLog
+    CommmitEventService -->>GitLab: get commit
+    GitLab ->>CommmitEventService: CommitInfo
+    CommmitEventService ->>EventLog: NewCommitEvent or AwaitingDeletion
+    end
+    loop Continuously pulling
+    EventLog -->>EventLog: find AwaitingGenerationEvent
+    end
+    EventLog ->>TriplesGenerator: AwaitingGenerationEvent
+    TriplesGenerator ->>EventLog: TriplesGeneratedEvent
+    loop Continuously pulling
+    EventLog -->>EventLog: find TriplesGeneratedEvent
+    end
+    EventLog ->>TriplesGenerator: TriplesGeneratedEvent
+    TriplesGenerator -->>TriplesStore: JsonLD
+    TriplesGenerator ->>EventLog: TriplesStoreEvent
+```
+
+#### Global Commit Sync flow:
+
+This flow traverses the whole commit history of a project and find out:
+
+1. if there are commits on GitLab that need to be created on the `Eventlog`
+2. if there are commits that are not on GitLab that should be removed from the `EventLog`
+
+This process is scheduled to be triggered at a minimum rate of once per week per project and at a maximum rate of once
+per hour per project. The commit history traversal only begins when the number of commits on GitLab and on
+the `EventLog` does not match and the most recent commit on GitLab is different from the most recent commit on
+the `EventLog`.
+
+```mermaid
+sequenceDiagram
+    participant GitLab
+    participant EventLog
+    participant CommmitEventService
+    participant TriplesGenerator
+    participant TriplesStore
+    Note over CommmitEventService, EventLog: The scheduling time depends on the usage of the project
+    loop Every hour or week
+    EventLog ->>CommmitEventService: GlobalCommitSyncEvent
+    CommmitEventService -->>EventLog: get all commits
+    EventLog -->>CommmitEventService: return all commits
+    CommmitEventService -->>GitLab: get all commits
+    GitLab -->>CommmitEventService: return all commits
+    CommmitEventService ->>EventLog: AwaitingDeletionEvent or NewCommitEvent
+    end
+    loop Continuously pulling
+    EventLog -->>EventLog: find AwaitingGenerationEvent
+    end
+    EventLog ->>TriplesGenerator: AwaitingGenerationEvent
+    TriplesGenerator ->>EventLog: TriplesGeneratedEvent
+    loop Continuously pulling
+    EventLog -->>EventLog: find TriplesGeneratedEvent
+    end
+    EventLog ->>TriplesGenerator: TriplesGeneratedEvent
+    TriplesGenerator -->>TriplesStore: JsonLD
+    TriplesGenerator ->>EventLog: TriplesStoreEvent
+```
+
 
