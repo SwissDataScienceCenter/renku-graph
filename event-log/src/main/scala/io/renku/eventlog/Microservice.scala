@@ -148,25 +148,21 @@ private class MicroserviceRunner(
     metrics:                EventLogMetrics[IO],
     eventProducersRegistry: EventProducersRegistry[IO],
     eventConsumersRegistry: EventConsumersRegistry[IO],
-    metricsResetScheduler:  GaugeResetScheduler[IO],
+    gaugeScheduler:         GaugeResetScheduler[IO],
     httpServer:             HttpServer[IO]
 ) {
 
   def run(): IO[ExitCode] = for {
-    _ <- certificateLoader.run()
-    _ <- sentryInitializer.run()
-    _ <- dbInitializer
-           .run()
-           .flatMap { _ =>
-             for {
-               _ <- metrics.run().start
-               _ <- metricsResetScheduler.run().start
-             } yield ()
-           }
-           .start
+    _      <- certificateLoader.run()
+    _      <- sentryInitializer.run()
+    _      <- (dbInitializer.run() >> startDBDependentProcesses()).start
     _      <- eventProducersRegistry.run().start
     _      <- eventConsumersRegistry.run().start
     result <- httpServer.run()
   } yield result
 
+  private def startDBDependentProcesses() = for {
+    _ <- metrics.run().start
+    _ <- gaugeScheduler.run().start
+  } yield ()
 }

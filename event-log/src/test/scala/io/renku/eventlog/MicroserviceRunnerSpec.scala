@@ -31,14 +31,19 @@ import io.renku.http.server.HttpServer
 import io.renku.metrics.GaugeResetScheduler
 import io.renku.testtools.{IOSpec, MockedRunnableCollaborators}
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+
+import java.lang.Thread.sleep
 
 class MicroserviceRunnerSpec
     extends AnyWordSpec
     with IOSpec
     with MockedRunnableCollaborators
     with MockFactory
+    with Eventually
+    with IntegrationPatience
     with should.Matchers {
 
   "run" should {
@@ -51,12 +56,15 @@ class MicroserviceRunnerSpec
         given(sentryInitializer).succeeds(returning = ())
         given(dbInitializer).succeeds(returning = ())
         given(metrics).succeeds(returning = ())
+        given(gaugeScheduler).succeeds(returning = ())
         given(eventProducersRegistry).succeeds(returning = ())
         given(eventConsumersRegistry).succeeds(returning = ())
-        given(gaugeScheduler).succeeds(returning = ())
         given(httpServer).succeeds(returning = ExitCode.Success)
 
         runner.run().unsafeRunSync() shouldBe ExitCode.Success
+
+        // waiting for the internal processes to call run() on metrics and gaugeScheduler
+        sleep(1000)
       }
 
     "fail if Certificate loading fails" in new TestCase {
@@ -99,15 +107,18 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       given(dbInitializer).succeeds(returning = ())
       given(metrics).succeeds(returning = ())
+      given(gaugeScheduler).succeeds(returning = ())
       given(eventProducersRegistry).succeeds(returning = ())
       given(eventConsumersRegistry).succeeds(returning = ())
-      given(gaugeScheduler).succeeds(returning = ())
       val exception = exceptions.generateOne
       given(httpServer).fails(becauseOf = exception)
 
       intercept[Exception] {
         runner.run().unsafeRunSync()
       } shouldBe exception
+
+      // waiting for the internal processes to call run() on metrics and gaugeScheduler
+      sleep(1000)
     }
 
     "return Success ExitCode even if Event Producers Registry initialisation fails" in new TestCase {
@@ -116,12 +127,15 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       given(dbInitializer).succeeds(returning = ())
       given(metrics).succeeds(returning = ())
+      given(gaugeScheduler).succeeds(returning = ())
       given(eventProducersRegistry).fails(becauseOf = exceptions.generateOne)
       given(eventConsumersRegistry).succeeds(returning = ())
-      given(gaugeScheduler).succeeds(returning = ())
       given(httpServer).succeeds(returning = ExitCode.Success)
 
       runner.run().unsafeRunSync() shouldBe ExitCode.Success
+
+      // waiting for the internal processes to call run() on metrics and gaugeScheduler
+      sleep(1000)
     }
 
     "return Success ExitCode even if Event Consumers Registry initialisation fails" in new TestCase {
@@ -130,12 +144,15 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       given(dbInitializer).succeeds(returning = ())
       given(metrics).succeeds(returning = ())
+      given(gaugeScheduler).succeeds(returning = ())
       given(eventProducersRegistry).succeeds(returning = ())
       given(eventConsumersRegistry).fails(becauseOf = exceptions.generateOne)
-      given(gaugeScheduler).succeeds(returning = ())
       given(httpServer).succeeds(returning = ExitCode.Success)
 
       runner.run().unsafeRunSync() shouldBe ExitCode.Success
+
+      // waiting for the internal processes to call run() on metrics and gaugeScheduler
+      sleep(1000)
     }
 
     "return Success ExitCode even if Event Log Metrics initialisation fails" in new TestCase {
@@ -150,6 +167,9 @@ class MicroserviceRunnerSpec
       given(httpServer).succeeds(returning = ExitCode.Success)
 
       runner.run().unsafeRunSync() shouldBe ExitCode.Success
+
+      // waiting for the internal processes to call run() on metrics and gaugeScheduler
+      sleep(1000)
     }
 
     "return Success ExitCode even if Event Log Metrics scheduler initialisation fails" in new TestCase {
@@ -164,6 +184,9 @@ class MicroserviceRunnerSpec
       given(httpServer).succeeds(returning = ExitCode.Success)
 
       runner.run().unsafeRunSync() shouldBe ExitCode.Success
+
+      // waiting for the internal processes to call run() on metrics and gaugeScheduler
+      sleep(1000)
     }
   }
 
