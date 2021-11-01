@@ -49,7 +49,6 @@ class DbInitializerImpl[F[_]: MonadCancelThrow: Logger](migrators: List[Runnable
 
   private lazy val logAndResetMigrationStatus: PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
     for {
-      _ <- isMigrating.update(_ => false)
       _ <- Logger[F].error(exception)("Event Log database initialization failure")
       _ <- exception.raiseError[F, Unit]
     } yield ()

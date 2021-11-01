@@ -60,10 +60,6 @@ class DbInitializerSpec
         .expects(where((f: Boolean => Boolean) => f(true) == true && f(false) == true))
         .returning(IO.unit)
 
-      (isMigrating.update _)
-        .expects(where((f: Boolean => Boolean) => f(true) == false && f(false) == false))
-        .returning(IO.unit)
-
       given(migrator1).succeeds(returning = ())
       val exception = exceptions.generateOne
       given(migrator2).fails(becauseOf = exception)
