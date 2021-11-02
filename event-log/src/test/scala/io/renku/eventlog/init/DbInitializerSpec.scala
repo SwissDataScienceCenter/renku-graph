@@ -37,17 +37,28 @@ class DbInitializerSpec
 
   "run" should {
 
-    "succeed if all the migration processes run fine" in new TestCase {
+    "succeed if all the migration processes run fine" +
+      "set and unset the value of isMigrating before/after migrating" in new TestCase {
+        (isMigrating.update _)
+          .expects(where((f: Boolean => Boolean) => f(true) == true && f(false) == true))
+          .returning(IO.unit)
 
-      given(migrator1).succeeds(returning = ())
-      given(migrator2).succeeds(returning = ())
+        given(migrator1).succeeds(returning = ())
+        given(migrator2).succeeds(returning = ())
 
-      dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
+        (isMigrating.update _)
+          .expects(where((f: Boolean => Boolean) => f(true) == false && f(false) == false))
+          .returning(IO.unit)
 
-      logger.loggedOnly(Info("Event Log database initialization success"))
-    }
+        dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
+
+        logger.loggedOnly(Info("Event Log database initialization success"))
+      }
 
     "fail if of the migrators fails" in new TestCase {
+      (isMigrating.update _)
+        .expects(where((f: Boolean => Boolean) => f(true) == true && f(false) == true))
+        .returning(IO.unit)
 
       given(migrator1).succeeds(returning = ())
       val exception = exceptions.generateOne
@@ -63,10 +74,12 @@ class DbInitializerSpec
 
     import DbInitializer.Runnable
 
-    val migrator1 = mock[EventLogTableCreator[IO]]
-    val migrator2 = mock[EventPayloadTableCreator[IO]]
+    val migrator1   = mock[EventLogTableCreator[IO]]
+    val migrator2   = mock[EventPayloadTableCreator[IO]]
+    val isMigrating = mock[Ref[IO, Boolean]]
+
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
 
-    val dbInitializer = new DbInitializerImpl[IO](List[Runnable[IO, Unit]](migrator1, migrator2))
+    val dbInitializer = new DbInitializerImpl[IO](List[Runnable[IO, Unit]](migrator1, migrator2), isMigrating)
   }
 }

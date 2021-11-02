@@ -130,6 +130,9 @@ class EventFlowsSpec extends AnyFeatureSpec with GivenWhenThen with GraphService
       eventually {
         EventLog.findEvents(project.id).map(_._2).toSet shouldBe Set(GenerationRecoverableFailure)
       }
+
+      // Removing the error so the logs are not polluted with unauthorized exceptions
+      `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
     }
 
     Scenario("A non recoverable transformation error arises and the events are reported as a non recoverable failure") {

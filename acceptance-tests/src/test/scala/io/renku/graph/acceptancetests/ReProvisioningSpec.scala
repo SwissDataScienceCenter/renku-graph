@@ -18,21 +18,18 @@
 
 package io.renku.graph.acceptancetests
 
-import cats.effect.IO
 import io.circe.Json
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
-import io.renku.graph.acceptancetests.tooling.GraphServices
-import io.renku.graph.acceptancetests.tooling.ResponseTools.ResponseOps
+import io.renku.graph.acceptancetests.tooling.{GraphServices, ServiceClient}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.graph.model.{SchemaVersion, testentities}
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.syntax._
-import org.http4s.Response
 import org.http4s.Status.Ok
 import org.scalactic.source.Position
 import org.scalatest.GivenWhenThen
@@ -108,11 +105,11 @@ class ReProvisioningSpec
       .generateOne
   }
 
-  private def projectDetailsResponseIsValid(projectDetailsResponse:       Response[IO],
+  private def projectDetailsResponseIsValid(projectDetailsResponse:       ServiceClient.ClientResponse,
                                             expectedProjectSchemaVersion: SchemaVersion
   ) = {
     projectDetailsResponse.status shouldBe Ok
-    val Right(projectDetails)       = projectDetailsResponse.bodyAsJson.as[Json]
+    val Right(projectDetails)       = projectDetailsResponse.jsonBody.as[Json]
     val Right(projectSchemaVersion) = projectDetails.hcursor.downField("version").as[String]
     projectSchemaVersion shouldBe expectedProjectSchemaVersion.value
   }

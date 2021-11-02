@@ -18,20 +18,25 @@
 
 package io.renku.graph.acceptancetests.tooling
 
-import cats.effect.IO
+import cats.Monad
 import cats.effect.unsafe.IORuntime
+import cats.effect.{IO, Temporal}
+import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.string.Url
 import io.circe.Json
 import io.circe.literal._
 import io.renku.control.Throttler
+import io.renku.graph.acceptancetests.tooling.ServiceClient.ClientResponse
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, BasicAuthCredentials, RestClient}
 import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.model.HookToken
 import org.http4s.Status.Ok
-import org.http4s.{Header, Method, Response}
+import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
+import org.http4s.{Header, Headers, Method, Status}
+import org.scalatest.Assertions.fail
 import org.scalatest.matchers.should
 import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
@@ -49,7 +54,7 @@ object WebhookServiceClient {
 
     override val baseUrl: String Refined Url = "http://localhost:9001"
 
-    def POST(url: String, hookToken: HookToken, payload: Json)(implicit ioRuntime: IORuntime): Response[IO] = {
+    def POST(url: String, hookToken: HookToken, payload: Json)(implicit ioRuntime: IORuntime): ClientResponse = {
       for {
         hookTokenCrypto    <- HookTokenCrypto[IO]()
         encryptedHookToken <- hookTokenCrypto.encrypt(hookToken)
@@ -89,7 +94,7 @@ object KnowledgeGraphClient {
 
     def POST(query: Document, variables: Map[String, String] = Map.empty, maybeAccessToken: Option[AccessToken] = None)(
         implicit ioRuntime: IORuntime
-    ): Response[IO] = {
+    ): ClientResponse = {
       for {
         uri      <- validateUri(s"$baseUrl/knowledge-graph/graphql")
         payload  <- preparePayload(query, variables)
@@ -122,8 +127,23 @@ object EventLogClient {
   class EventLogClient(implicit logger: Logger[IO]) extends ServiceClient {
     override val baseUrl: String Refined Url = "http://localhost:9005"
 
-    def fetchProcessingStatus(projectId: projects.Id)(implicit ioRuntime: IORuntime): Response[IO] =
+    def fetchProcessingStatus(projectId: projects.Id)(implicit ioRuntime: IORuntime): ClientResponse =
       GET(s"processing-status?project-id=$projectId")
+
+    def waitForReadiness(implicit ioRuntime: IORuntime): IO[Unit] =
+      Monad[IO].whileM_(isRunning)(Temporal[IO] sleep (100 millis))
+
+    private def isRunning(implicit ioRuntime: IORuntime) = getStatus.flatMap { jsonBody =>
+      jsonBody.hcursor
+        .downField("isMigrating")
+        .as[Boolean]
+        .fold(_ => new Exception("Could not decode status").raiseError[IO, Boolean], isMigrating => IO(isMigrating))
+    }
+
+    private def getStatus = for {
+      uri      <- validateUri(s"$baseUrl/migration-status")
+      response <- send(request(Method.GET, uri))(mapResponse)
+    } yield response.jsonBody
   }
 }
 
@@ -139,7 +159,7 @@ abstract class ServiceClient(implicit logger: Logger[IO])
 
   val baseUrl: String Refined Url
 
-  def POST(url: String, maybeAccessToken: Option[AccessToken])(implicit ioRuntime: IORuntime): Response[IO] = {
+  def POST(url: String, maybeAccessToken: Option[AccessToken])(implicit ioRuntime: IORuntime): ClientResponse = {
     for {
       uri      <- validateUri(s"$baseUrl/$url")
       response <- send(request(Method.POST, uri, maybeAccessToken))(mapResponse)
@@ -148,28 +168,30 @@ abstract class ServiceClient(implicit logger: Logger[IO])
 
   def PUT(url:   String, payload: Json, maybeAccessToken: Option[AccessToken])(implicit
       ioRuntime: IORuntime
-  ): Response[IO] = {
+  ): Status = {
     for {
-      uri      <- validateUri(s"$baseUrl/$url")
-      response <- send(request(Method.PUT, uri, maybeAccessToken) withEntity payload)(mapResponse)
-    } yield response
+      uri <- validateUri(s"$baseUrl/$url")
+      status <- send(request(Method.PUT, uri, maybeAccessToken) withEntity payload) { case (status, _, _) =>
+                  status.pure[IO]
+                }
+    } yield status
   }.unsafeRunSync()
 
-  def DELETE(url: String, basicAuth: BasicAuthCredentials)(implicit ioRuntime: IORuntime): Response[IO] = {
+  def DELETE(url: String, basicAuth: BasicAuthCredentials)(implicit ioRuntime: IORuntime): ClientResponse = {
     for {
       uri      <- validateUri(s"$baseUrl/$url")
       response <- send(request(Method.DELETE, uri, basicAuth))(mapResponse)
     } yield response
   }.unsafeRunSync()
 
-  def GET(url: String, accessToken: AccessToken)(implicit ioRuntime: IORuntime): Response[IO] = {
+  def GET(url: String, accessToken: AccessToken)(implicit ioRuntime: IORuntime): ClientResponse = {
     for {
       uri      <- validateUri(s"$baseUrl/$url")
       response <- send(request(Method.GET, uri, maybeAccessToken = Some(accessToken)))(mapResponse)
     } yield response
   }.unsafeRunSync()
 
-  def GET(url: String)(implicit ioRuntime: IORuntime): Response[IO] = {
+  def GET(url: String)(implicit ioRuntime: IORuntime): ClientResponse = {
     for {
       uri      <- validateUri(s"$baseUrl/$url")
       response <- send(request(Method.GET, uri))(mapResponse)
@@ -178,17 +200,17 @@ abstract class ServiceClient(implicit logger: Logger[IO])
 
   def ping: IO[ServiceReadiness] = {
     for {
-      uri      <- validateUri(s"$baseUrl/ping")
-      response <- send(request(Method.GET, uri))(mapResponse)
+      uri    <- validateUri(s"$baseUrl/ping")
+      status <- send(request(Method.GET, uri)) { case (status, _, _) => status.pure[IO] }
     } yield
-      if (response.status == Ok) ServiceUp
+      if (status == Ok) ServiceUp
       else ServiceDown
   } recover { case NonFatal(_) =>
     ServiceDown
   }
 
-  protected lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Response[IO]]] = {
-    case (_, _, response) => IO.pure(response)
+  protected lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[ClientResponse]] = {
+    case (status, _, response) => response.as[Json].map(json => ClientResponse(status, json, response.headers))
   }
 }
 
@@ -197,5 +219,17 @@ object ServiceClient {
   object ServiceReadiness {
     final case object ServiceUp   extends ServiceReadiness
     final case object ServiceDown extends ServiceReadiness
+  }
+
+  case class ClientResponse(status: Status, jsonBody: Json, headers: Headers) {
+
+    def headerLink(rel: String): String =
+      headers.headers
+        .find(_.value contains s"""rel="$rel"""")
+        .map { header =>
+          val value = header.value
+          value.substring(value.lastIndexOf("<") + 1, value.lastIndexOf(">"))
+        }
+        .getOrElse(fail(s"""No link with the rel="$rel""""))
   }
 }

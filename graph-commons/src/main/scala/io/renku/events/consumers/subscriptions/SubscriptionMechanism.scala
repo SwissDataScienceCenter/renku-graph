@@ -109,9 +109,6 @@ object SubscriptionMechanism {
   import io.renku.config.ConfigLoader.find
 
   import scala.concurrent.duration._
-  import scala.language.postfixOps
-
-  private val RenewDelay = 5 minutes
 
   def apply[F[_]: Async: Logger](
       categoryName:                       CategoryName,
@@ -119,13 +116,14 @@ object SubscriptionMechanism {
       configuration:                      Config = ConfigFactory.load()
   ): F[SubscriptionMechanism[F]] = for {
     initialDelay                <- find[F, FiniteDuration]("event-subscription-initial-delay", configuration)
+    renewDelay                  <- find[F, FiniteDuration]("event-subscription-renew-delay", configuration)
     subscriptionPayloadComposer <- subscriptionPayloadComposerFactory(categoryName)
     subscriptionSender          <- SubscriptionSender[F]
   } yield new SubscriptionMechanismImpl[F](categoryName,
                                            subscriptionPayloadComposer,
                                            subscriptionSender,
                                            initialDelay,
-                                           RenewDelay
+                                           renewDelay
   )
 
   def noOpSubscriptionMechanism[F[_]: MonadThrow](category: CategoryName): SubscriptionMechanism[F] =

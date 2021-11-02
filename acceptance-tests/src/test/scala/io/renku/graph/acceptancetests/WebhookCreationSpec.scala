@@ -24,7 +24,6 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
 import io.renku.graph.acceptancetests.data.dataProjects
 import io.renku.graph.acceptancetests.flows.AccessTokenPresence
-import io.renku.graph.acceptancetests.tooling.ResponseTools._
 import io.renku.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
@@ -103,7 +102,7 @@ class WebhookCreationSpec
 
       tokenRepositoryClient
         .GET(s"projects/${project.id}/tokens")
-        .bodyAsJson shouldBe expectedAccessTokenJson
+        .jsonBody shouldBe expectedAccessTokenJson
     }
   }
 }
