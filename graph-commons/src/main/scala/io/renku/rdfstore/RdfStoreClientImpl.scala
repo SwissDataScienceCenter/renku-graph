@@ -30,6 +30,7 @@ import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepA
 import io.renku.http.client.{HttpRequest, RestClient}
 import io.renku.http.rest.paging.Paging.PagedResultsFinder
 import io.renku.http.rest.paging.PagingRequest
+import io.renku.jsonld.JsonLD
 import org.http4s.MediaRange._
 import org.http4s.{MediaType, Uri}
 import org.typelevel.log4cats.Logger
@@ -56,19 +57,18 @@ abstract class RdfStoreClientImpl[F[_]: Async: Logger](
   import org.http4s.MediaType.application._
   import org.http4s.Method.POST
   import org.http4s.Status._
-  import org.http4s.circe.jsonOf
   import org.http4s.headers._
   import org.http4s.{Request, Response, Status}
   import rdfStoreConfig._
+  import org.http4s.circe._
+  import eu.timepit.refined.auto._
 
   protected def updateWithNoResult(using: SparqlQuery): F[Unit] =
     updateWitMapping[Unit](using, toFullResponseMapper(_ => ().pure[F]))
 
   protected def updateWitMapping[ResultType](
-      using: SparqlQuery,
-      mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[
-        ResultType
-      ]]
+      using:       SparqlQuery,
+      mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[ResultType]]
   ): F[ResultType] = runQuery(using, mapResponse, RdfUpdate)
 
   protected def queryExpecting[ResultType](
@@ -79,12 +79,28 @@ abstract class RdfStoreClientImpl[F[_]: Async: Logger](
     RdfQuery
   )
 
+  protected def upload(jsonLD: JsonLD): F[Unit] = upload[Unit](jsonLD)(jsonUploadMapResponse)
+
+  protected def upload[ResultType](jsonLD: JsonLD)(mapResponse: ResponseMapping[ResultType]): F[ResultType] = for {
+    uri          <- validateUri((fusekiBaseUrl / datasetName / "data").toString)
+    uploadResult <- send(uploadRequest(uri, jsonLD))(mapResponse)
+  } yield uploadResult
+
+  private def uploadRequest(uploadUri: Uri, jsonLD: JsonLD) = HttpRequest(
+    request(POST, uploadUri, rdfStoreConfig.authCredentials)
+      .withEntity(jsonLD.toJson)
+      .putHeaders(`Content-Type`(`ld+json`)),
+    name = "json-ld upload"
+  )
+
+  private lazy val jsonUploadMapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Unit]] = {
+    case (Ok, _, _) => ().pure[F]
+  }
+
   private def runQuery[ResultType](
-      query: SparqlQuery,
-      mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[
-        ResultType
-      ]],
-      queryType: RdfQueryType
+      query:       SparqlQuery,
+      mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[ResultType]],
+      queryType:   RdfQueryType
   ): F[ResultType] = for {
     uri    <- validateUri((fusekiBaseUrl / datasetName / path(queryType)).toString)
     result <- send(sparqlQueryRequest(uri, queryType, query))(mapResponse)

@@ -24,13 +24,14 @@ import eu.timepit.refined.auto._
 import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.renkuBaseUrls
+import io.renku.graph.model.RenkuBaseUrl
 import io.renku.graph.model.Schemas._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQuery, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.reprovisioning.ReProvisioningJsonLD.{Running, objectType}
+import io.renku.triplesgenerator.reprovisioning.ReProvisioningInfo.Status.Running
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -126,15 +127,14 @@ class ReProvisioningStatusSpec
   private trait TestCase {
     val cacheRefreshInterval  = 1 second
     val statusRefreshInterval = 1 second
-    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    private val renkuBaseUrl            = renkuBaseUrls.generateOne
+    private implicit val logger:       TestLogger[IO] = TestLogger[IO]()
+    private implicit val renkuBaseUrl: RenkuBaseUrl   = renkuBaseUrls.generateOne
     private val timeRecorder            = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO]())
     private val statusCacheCheckTimeRef = Ref.of[IO, Long](0L).unsafeRunSync()
     val eventConsumersRegistry          = mock[EventConsumersRegistry[IO]]
 
     val reProvisioningStatus = new ReProvisioningStatusImpl(eventConsumersRegistry,
                                                             rdfStoreConfig,
-                                                            renkuBaseUrl,
                                                             timeRecorder,
                                                             statusRefreshInterval,
                                                             cacheRefreshInterval,
@@ -150,8 +150,8 @@ class ReProvisioningStatusSpec
   private def findStatus: Option[String] =
     runQuery(s"""|SELECT DISTINCT ?status
                  |WHERE {
-                 |  ?id rdf:type renku:ReProvisioning;
-                 |      renku:reProvisioningStatus ?status
+                 |  ?id a renku:ReProvisioning;
+                 |      renku:status ?status
                  |}
                  |""".stripMargin)
       .unsafeRunSync()
@@ -161,11 +161,11 @@ class ReProvisioningStatusSpec
   private def clearStatus(): Unit = runUpdate {
     SparqlQuery.of(
       name = "re-provisioning - status remove",
-      Prefixes of rdf -> "rdf",
+      Prefixes of renku -> "renku",
       s"""|DELETE { ?s ?p ?o }
           |WHERE {
           | ?s ?p ?o;
-          |    rdf:type <$objectType> .
+          |    a renku:ReProvisioning.
           |}
           |""".stripMargin
     )
