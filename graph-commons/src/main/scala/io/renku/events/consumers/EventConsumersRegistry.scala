@@ -42,16 +42,14 @@ class EventConsumersRegistryImpl[F[_]: MonadThrow: Parallel](
 
   private def tryNextHandler(requestContent: EventRequestContent,
                              handlers:       List[EventHandler[F]]
-  ): F[EventSchedulingResult] =
-    handlers.headOption match {
-      case Some(handler) =>
-        handler.tryHandling(requestContent) >>= {
-          case UnsupportedEventType => tryNextHandler(requestContent, handlers.tail)
-          case otherResult          => otherResult.pure[F]
-        }
-      case None =>
-        (UnsupportedEventType: EventSchedulingResult).pure[F]
-    }
+  ): F[EventSchedulingResult] = handlers.headOption match {
+    case Some(handler) =>
+      handler.tryHandling(requestContent) >>= {
+        case UnsupportedEventType => tryNextHandler(requestContent, handlers.tail)
+        case otherResult          => otherResult.pure[F]
+      }
+    case None => (UnsupportedEventType: EventSchedulingResult).pure[F]
+  }
 
   def subscriptionMechanism(categoryName: CategoryName): F[SubscriptionMechanism[F]] =
     subscriptionsMechanisms

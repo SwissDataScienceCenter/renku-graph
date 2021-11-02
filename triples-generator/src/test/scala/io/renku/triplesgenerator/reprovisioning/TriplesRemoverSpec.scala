@@ -38,12 +38,6 @@ class TriplesRemoverSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
 
     "remove all the triples from the storage except for CLI version" in new TestCase {
       val versionPair = renkuVersionPairs.generateOne
-      val versionPairJsonLD = JsonLD.entity(
-        id = RenkuVersionPairJsonLD.id,
-        types = EntityTypes.of(RenkuVersionPairJsonLD.objectType),
-        RenkuVersionPairJsonLD.cliVersion    -> JsonLD.fromString(versionPair.cliVersion.toString),
-        RenkuVersionPairJsonLD.schemaVersion -> JsonLD.fromString(versionPair.schemaVersion.toString)
-      )
 
       val reProvisioningJsonLD = JsonLD.entity(
         id = ReProvisioningJsonLD.id,
@@ -54,18 +48,15 @@ class TriplesRemoverSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
       loadToStore(
         anyProjectEntities.generateOne.asJsonLD,
         anyProjectEntities.generateOne.asJsonLD,
-        versionPairJsonLD,
+        versionPair.asJsonLD,
         reProvisioningJsonLD
       )
 
-      val versionRelatedTriplesCount =
-        versionPairJsonLD.properties.size + 1 + reProvisioningJsonLD.properties.size + 1 // +1 for rdf:type
+      val versionRelatedTriplesCount = 2 + 1 + reProvisioningJsonLD.properties.size + 1 // +1 for rdf:type
 
       rdfStoreSize should be > versionRelatedTriplesCount
 
-      triplesRemover
-        .removeAllTriples()
-        .unsafeRunSync() shouldBe ((): Unit)
+      triplesRemover.removeAllTriples().unsafeRunSync() shouldBe ()
 
       rdfStoreSize shouldBe versionRelatedTriplesCount
     }

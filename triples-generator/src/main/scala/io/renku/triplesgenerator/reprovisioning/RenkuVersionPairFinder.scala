@@ -22,8 +22,7 @@ import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.graph.model.Schemas._
-import io.renku.graph.model.views.RdfResource
+import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model.{RenkuBaseUrl, RenkuVersionPair}
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
@@ -34,22 +33,21 @@ trait RenkuVersionPairFinder[F[_]] {
 }
 
 private class RenkuVersionPairFinderImpl[F[_]: Async: Logger](
-    rdfStoreConfig: RdfStoreConfig,
-    renkuBaseUrl:   RenkuBaseUrl,
-    timeRecorder:   SparqlQueryTimeRecorder[F]
-) extends RdfStoreClientImpl[F](rdfStoreConfig, timeRecorder)
+    rdfStoreConfig:      RdfStoreConfig,
+    timeRecorder:        SparqlQueryTimeRecorder[F]
+)(implicit renkuBaseUrl: RenkuBaseUrl)
+    extends RdfStoreClientImpl[F](rdfStoreConfig, timeRecorder)
     with RenkuVersionPairFinder[F] {
 
   override def find(): F[Option[RenkuVersionPair]] = queryExpecting[List[RenkuVersionPair]] {
-    val entityId = (renkuBaseUrl / "version-pair").showAs[RdfResource]
     SparqlQuery.of(
-      name = "version pair find",
-      Prefixes.of(rdf -> "rdf"),
-      s"""|SELECT DISTINCT ?schemaVersion ?cliVersion
+      name = "re-provisioning - version pair find",
+      Prefixes of renku -> "renku",
+      s"""|SELECT DISTINCT ?schemaVersion ?cliVersion 
           |WHERE {
-          |  $entityId rdf:type <${RenkuVersionPairJsonLD.objectType}>;
-          |      <${RenkuVersionPairJsonLD.schemaVersion}> ?schemaVersion;
-          |      <${RenkuVersionPairJsonLD.cliVersion}> ?cliVersion.
+          |  ?entityId a <${renkuVersionPairEntityType.show}>;
+          |            renku:schemaVersion ?schemaVersion;
+          |            renku:cliVersion ?cliVersion.
           |}
           |""".stripMargin
     )
@@ -66,7 +64,8 @@ private object RenkuVersionPairFinder {
   def apply[F[_]: Async: Logger](rdfStoreConfig: RdfStoreConfig,
                                  renkuBaseUrl: RenkuBaseUrl,
                                  timeRecorder: SparqlQueryTimeRecorder[F]
-  ): F[RenkuVersionPairFinderImpl[F]] = MonadThrow[F].catchNonFatal(
-    new RenkuVersionPairFinderImpl[F](rdfStoreConfig, renkuBaseUrl, timeRecorder)
-  )
+  ): F[RenkuVersionPairFinderImpl[F]] = MonadThrow[F].catchNonFatal {
+    implicit val baseUrl: RenkuBaseUrl = renkuBaseUrl
+    new RenkuVersionPairFinderImpl[F](rdfStoreConfig, timeRecorder)
+  }
 }

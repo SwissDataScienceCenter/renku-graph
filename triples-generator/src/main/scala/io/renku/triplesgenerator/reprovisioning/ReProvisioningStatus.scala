@@ -68,7 +68,7 @@ private class ReProvisioningStatusImpl[F[_]: Async: Logger](
   override def setRunning(): F[Unit] = updateWithNoResult {
     SparqlQuery.of(
       name = "re-provisioning - status insert",
-      Prefixes.of(rdf -> "rdf"),
+      Prefixes of rdf -> "rdf",
       s"""|INSERT DATA { 
           |  <${id(renkuBaseUrl)}> rdf:type <$objectType>;
           |                        <$reProvisioningStatus> '$Running'.

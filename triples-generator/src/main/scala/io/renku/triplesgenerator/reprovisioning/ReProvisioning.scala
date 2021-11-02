@@ -23,7 +23,7 @@ import cats.effect.{Async, Temporal}
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.graph.config.RenkuBaseUrlLoader
-import io.renku.graph.model.RenkuVersionPair
+import io.renku.graph.model.{RenkuBaseUrl, RenkuVersionPair}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
@@ -113,15 +113,18 @@ object ReProvisioning {
     executionTimeRecorder  <- ExecutionTimeRecorder[F]()
     triplesRemover         <- TriplesRemoverImpl(rdfStoreConfig, timeRecorder)
     renkuVersionPairFinder <- RenkuVersionPairFinder(rdfStoreConfig, renkuBaseUrl, timeRecorder)
-  } yield new ReProvisioningImpl[F](
-    renkuVersionPairFinder,
-    versionCompatibilityPairs,
-    new ReProvisionJudgeImpl(),
-    triplesRemover,
-    eventsReScheduler,
-    new RenkuVersionPairUpdaterImpl(rdfStoreConfig, renkuBaseUrl, timeRecorder),
-    reProvisioningStatus,
-    executionTimeRecorder,
-    SleepWhenBusy
-  )
+  } yield {
+    implicit val baseUrl: RenkuBaseUrl = renkuBaseUrl
+    new ReProvisioningImpl[F](
+      renkuVersionPairFinder,
+      versionCompatibilityPairs,
+      new ReProvisionJudgeImpl(),
+      triplesRemover,
+      eventsReScheduler,
+      new RenkuVersionPairUpdaterImpl(rdfStoreConfig, timeRecorder),
+      reProvisioningStatus,
+      executionTimeRecorder,
+      SleepWhenBusy
+    )
+  }
 }

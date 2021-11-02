@@ -73,12 +73,11 @@ abstract class RdfStoreClientImpl[F[_]: Async: Logger](
 
   protected def queryExpecting[ResultType](
       using:          SparqlQuery
-  )(implicit decoder: Decoder[ResultType]): F[ResultType] =
-    runQuery(
-      using,
-      toFullResponseMapper(responseMapperFor[ResultType]),
-      RdfQuery
-    )
+  )(implicit decoder: Decoder[ResultType]): F[ResultType] = runQuery(
+    using,
+    toFullResponseMapper(responseMapperFor[ResultType]),
+    RdfQuery
+  )
 
   private def runQuery[ResultType](
       query: SparqlQuery,
