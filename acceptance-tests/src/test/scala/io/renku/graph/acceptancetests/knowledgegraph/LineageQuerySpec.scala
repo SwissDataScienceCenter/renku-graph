@@ -26,7 +26,6 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
 import io.renku.graph.acceptancetests.tooling.GraphServices
-import io.renku.graph.acceptancetests.tooling.ResponseTools._
 import io.renku.graph.model
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.projects
@@ -77,7 +76,7 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
       Then("he should get OK response with project lineage in Json")
       response.status shouldBe Ok
 
-      val lineageJson = response.bodyAsJson.hcursor.downField("data").downField("lineage")
+      val lineageJson = response.jsonBody.hcursor.downField("data").downField("lineage")
       lineageJson.downField("edges").as[List[Json]].map(_.toSet) shouldBe theExpectedEdges(exemplarData)
       lineageJson.downField("nodes").as[List[Json]].map(_.toSet) shouldBe theExpectedNodes(exemplarData)
     }
@@ -98,7 +97,7 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
       Then("he should get OK response with project lineage in Json")
       response.status shouldBe Ok
 
-      val lineageJson = response.bodyAsJson.hcursor.downField("data").downField("lineage")
+      val lineageJson = response.jsonBody.hcursor.downField("data").downField("lineage")
       lineageJson.downField("edges").as[List[Json]].map(_.toSet) shouldBe theExpectedEdges(exemplarData)
       lineageJson.downField("nodes").as[List[Json]].map(_.toSet) shouldBe theExpectedNodes(exemplarData)
     }
@@ -144,7 +143,7 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
       Then("he should get OK response with project lineage in Json")
       response.status shouldBe Ok
 
-      val lineageJson = response.bodyAsJson.hcursor.downField("data").downField("lineage")
+      val lineageJson = response.jsonBody.hcursor.downField("data").downField("lineage")
       lineageJson.downField("edges").as[List[Json]].map(_.toSet) shouldBe theExpectedEdges(accessibleExemplarData)
       lineageJson.downField("nodes").as[List[Json]].map(_.toSet) shouldBe theExpectedNodes(accessibleExemplarData)
     }
@@ -177,7 +176,7 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
       Then("he should get an OK response without lineage")
       privateProjectResponse.status shouldBe Ok
 
-      privateProjectResponse.bodyAsJson.hcursor.downField("data").downField("lineage").as[Json] shouldBe Right(
+      privateProjectResponse.jsonBody.hcursor.downField("data").downField("lineage").as[Json] shouldBe Right(
         Json.Null
       )
     }
@@ -200,8 +199,8 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
       )
 
       Then("he should get a not found response without lineage")
-      response.status                                                             shouldBe Ok
-      response.bodyAsJson.hcursor.downField("data").downField("lineage").as[Json] shouldBe Right(Json.Null)
+      response.status                                                           shouldBe Ok
+      response.jsonBody.hcursor.downField("data").downField("lineage").as[Json] shouldBe Right(Json.Null)
     }
   }
 

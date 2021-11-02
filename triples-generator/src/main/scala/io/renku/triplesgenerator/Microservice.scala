@@ -42,7 +42,6 @@ import io.renku.triplesgenerator.init.{CliVersionCompatibilityChecker, CliVersio
 import io.renku.triplesgenerator.reprovisioning.{ReProvisioning, ReProvisioningStatus}
 import org.typelevel.log4cats.Logger
 
-import java.util.concurrent.ConcurrentHashMap
 import scala.util.control.NonFatal
 
 object Microservice extends IOMicroservice {
@@ -91,8 +90,7 @@ object Microservice extends IOMicroservice {
                     cliVersionCompatChecker,
                     eventConsumersRegistry,
                     reProvisioning,
-                    HttpServer[IO](serverPort = ServicePort.value, routes),
-                    subProcessesCancelTokens
+                    HttpServer[IO](serverPort = ServicePort.value, routes)
                   ).run()
                 }
   } yield exitCode
@@ -105,8 +103,7 @@ private class MicroserviceRunner[F[_]: Spawn: Logger](
     cliVersionCompatibilityVerifier: CliVersionCompatibilityVerifier[F],
     eventConsumersRegistry:          EventConsumersRegistry[F],
     reProvisioning:                  ReProvisioning[F],
-    httpServer:                      HttpServer[F],
-    subProcessesCancelTokens:        ConcurrentHashMap[F[Unit], Unit]
+    httpServer:                      HttpServer[F]
 ) {
 
   def run(): F[ExitCode] = {
@@ -115,16 +112,11 @@ private class MicroserviceRunner[F[_]: Spawn: Logger](
       _        <- gitCertificateInstaller.run()
       _        <- sentryInitializer.run()
       _        <- cliVersionCompatibilityVerifier.run()
-      _        <- Spawn[F].start(eventConsumersRegistry.run()).map(gatherCancelToken)
-      _        <- Spawn[F].start(reProvisioning.run()).map(gatherCancelToken)
+      _        <- Spawn[F].start(eventConsumersRegistry.run())
+      _        <- Spawn[F].start(reProvisioning.run())
       exitCode <- httpServer.run()
     } yield exitCode
   } recoverWith logAndThrow
-
-  private def gatherCancelToken(fiber: Fiber[F, Throwable, Unit]): Fiber[F, Throwable, Unit] = {
-    subProcessesCancelTokens.put(fiber.cancel, ())
-    fiber
-  }
 
   private lazy val logAndThrow: PartialFunction[Throwable, F[ExitCode]] = { case NonFatal(exception) =>
     Logger[F].error(exception)(exception.getMessage).flatMap(_ => exception.raiseError[F, ExitCode])

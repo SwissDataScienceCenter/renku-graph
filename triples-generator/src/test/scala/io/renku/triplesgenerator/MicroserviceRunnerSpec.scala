@@ -35,8 +35,6 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import java.util.concurrent.ConcurrentHashMap
-
 class MicroserviceRunnerSpec
     extends AnyWordSpec
     with IOSpec
@@ -187,8 +185,7 @@ class MicroserviceRunnerSpec
       cliVersionCompatChecker,
       eventConsumersRegistry,
       reProvisioning,
-      httpServer,
-      new ConcurrentHashMap[IO[Unit], Unit]()
+      httpServer
     )
   }
 }

@@ -11,10 +11,13 @@ This is a microservice which provides CRUD operations for Event Log DB.
 |  POST  | ```/events```                           | Sends an event for processing                                  |
 |  GET   | ```/metrics```                          | Returns Prometheus metrics of the service                      |
 |  GET   | ```/ping```                             | Verifies service health                                        |
+|  GET   | ```/migration-status```                 | Returns whether or not DB is currently migrating                                        |
 |  GET   | ```/processing-status?project-id=:id``` | Finds processing status of events belonging to a project       |
 |  POST  | ```/subscriptions```                    | Adds a subscription for events                                 |
 
-#### GET /events
+All endpoints (except for `/ping` and `/metrics`) will return 503 while the database is migrating.
+
+### GET /events
 
 Returns information about the selected events.
 
@@ -36,6 +39,7 @@ NOTES:
 |----------------------------|---------------------------------|
 | OK (200)                   | If finding events is successful |
 | INTERNAL SERVER ERROR (500)| When there are problems         |
+| SERVICE UNAVAILABLE ERROR (503)| When a migration is running |
 
 Response body example:
 
@@ -64,7 +68,7 @@ Response body example:
 ]
 ```
 
-#### GET /events/:event-id/:project-id`
+### GET /events/:event-id/:project-id`
 
 Finds event details.
 
@@ -75,6 +79,7 @@ Finds event details.
 | OK (200)                   | If the details are found                                      |
 | NOT_FOUND (404)            | If the event does not exists                                  |
 | INTERNAL SERVER ERROR (500)| When there are problems                                       |
+| SERVICE UNAVAILABLE ERROR (503)| When a migration is running |
 
 Response body example:
 
@@ -88,7 +93,7 @@ Response body example:
 }
 ```
 
-#### POST /events
+### POST /events
 
 Accepts an event as multipart requests.
 
@@ -322,8 +327,9 @@ Forces issuing a commit sync event for the given project
 | ACCEPTED (202)             | When event is accepted                                                               |
 | BAD_REQUEST (400)          | When request body is not a valid JSON Event                                          |
 | INTERNAL SERVER ERROR (500)| When there are problems with event creation                                          |
+| SERVICE UNAVAILABLE ERROR (503)| When a migration is running |
 
-#### GET /metrics
+### GET /metrics
 
 To fetch various Prometheus metrics of the service.
 
@@ -334,7 +340,7 @@ To fetch various Prometheus metrics of the service.
 | OK (200)                   | Containing the metrics |
 | INTERNAL SERVER ERROR (500)| Otherwise              |
 
-#### GET /ping
+### GET /ping
 
 Verifies service health.
 
@@ -345,7 +351,26 @@ Verifies service health.
 | OK (200)                   | If service is healthy |
 | INTERNAL SERVER ERROR (500)| Otherwise             |
 
-#### GET /processing-status?project-id=:id
+### GET /migration-status
+
+Verifies service health.
+
+**Response**
+
+| Status                     | Description           |
+|----------------------------|-----------------------|
+| OK (200)                   | Containing JSON with migration status (true/false)
+| INTERNAL SERVER ERROR (500)| Otherwise |
+
+Response body example:
+
+```json
+{
+  "isMigrating": false
+}
+```
+
+### GET /processing-status?project-id=:id
 
 Finds processing status of events belonging to the project with the given `id` from the latest batch.
 
@@ -357,6 +382,7 @@ Finds processing status of events belonging to the project with the given `id` f
 | BAD_REQUEST (400)          | If the `project-id` parameter is not given or invalid                              |
 | NOT_FOUND (404)            | If no events can be found for the given project or no `project-id` parameter given |
 | INTERNAL SERVER ERROR (500)| When some problems occurs                                                          |
+| SERVICE UNAVAILABLE ERROR (503)| When a migration is running |
 
 Response body examples:
 
@@ -380,7 +406,7 @@ Response body examples:
 }
 ```
 
-#### POST /subscriptions
+### POST /subscriptions
 
 Allow subscription for __categories__ specified bellow.
 
@@ -600,6 +626,7 @@ or
 | ACCEPTED (202)             | When subscription was successfully added/renewed                                                    |
 | BAD_REQUEST (400)          | When there payload is invalid e.g. no `statuses` are different than `NEW` and `RECOVERABLE_FAILURE` |
 | INTERNAL SERVER ERROR (500)| When there were problems with processing the request                                                |
+| SERVICE UNAVAILABLE ERROR (503)| When a migration is running |
 
 ## DB schema
 
