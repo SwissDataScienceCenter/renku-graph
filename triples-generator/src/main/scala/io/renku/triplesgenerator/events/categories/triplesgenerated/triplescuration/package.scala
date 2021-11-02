@@ -29,8 +29,8 @@ import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableE
 
 package object triplescuration {
 
-  private[triplesgenerated] type TransformationResults[Interpretation[_]] =
-    EitherT[Interpretation, ProcessingRecoverableError, Project]
+  private[triplesgenerated] type TransformationResults[F[_]] =
+    EitherT[F, ProcessingRecoverableError, Project]
 
   implicit class JsonOps(json: Json) {
 
@@ -109,7 +109,7 @@ package object triplescuration {
       getValues(property.toString)(decode, encode) match {
         case Nil      => OptionT.none[F, T]
         case x +: Nil => OptionT.some[F](x)
-        case _        => OptionT.liftF(new IllegalStateException(s"Multiple values found for $property").raiseError[F, T])
+        case _ => OptionT.liftF(new IllegalStateException(s"Multiple values found for $property").raiseError[F, T])
       }
 
     def remove(property: Property): Json = root.obj.modify(_.remove(property.toString))(json)

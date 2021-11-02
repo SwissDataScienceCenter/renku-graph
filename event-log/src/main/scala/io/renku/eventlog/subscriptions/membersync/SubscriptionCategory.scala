@@ -18,7 +18,8 @@
 
 package io.renku.eventlog.subscriptions.membersync
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.Async
+import cats.syntax.all._
 import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog.subscriptions._
 import io.renku.eventlog.subscriptions.membersync.MemberSyncEventEncoder.encodeEvent
@@ -26,36 +27,28 @@ import io.renku.eventlog.{EventLogDB, subscriptions}
 import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
 private[subscriptions] object SubscriptionCategory {
 
-  def apply(sessionResource:   SessionResource[IO, EventLogDB],
-            queriesExecTimes:  LabeledHistogram[IO, SqlStatement.Name],
-            subscriberTracker: SubscriberTracker[IO],
-            logger:            Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[subscriptions.SubscriptionCategory[IO]] = for {
-    subscribers      <- Subscribers(categoryName, subscriberTracker, logger)
+  def apply[F[_]: Async: Logger](sessionResource: SessionResource[F, EventLogDB],
+                                 queriesExecTimes:  LabeledHistogram[F, SqlStatement.Name],
+                                 subscriberTracker: SubscriberTracker[F]
+  ): F[subscriptions.SubscriptionCategory[F]] = for {
+    subscribers      <- Subscribers(categoryName, subscriberTracker)
     eventsFinder     <- MemberSyncEventFinder(sessionResource, queriesExecTimes)
-    dispatchRecovery <- LoggingDispatchRecovery[IO, MemberSyncEvent](categoryName, logger)
-    eventDelivery    <- EventDelivery.noOp[IO, MemberSyncEvent]
-    eventsDistributor <- IOEventsDistributor(categoryName,
-                                             subscribers,
-                                             eventsFinder,
-                                             eventDelivery,
-                                             EventEncoder(encodeEvent),
-                                             dispatchRecovery,
-                                             logger
+    dispatchRecovery <- LoggingDispatchRecovery[F, MemberSyncEvent](categoryName)
+    eventDelivery    <- EventDelivery.noOp[F, MemberSyncEvent]
+    eventsDistributor <- EventsDistributor(categoryName,
+                                           subscribers,
+                                           eventsFinder,
+                                           eventDelivery,
+                                           EventEncoder(encodeEvent),
+                                           dispatchRecovery
                          )
     deserializer <-
-      SubscriptionRequestDeserializer[IO, SubscriptionCategoryPayload](categoryName, SubscriptionCategoryPayload.apply)
-  } yield new SubscriptionCategoryImpl[IO, SubscriptionCategoryPayload](categoryName,
-                                                                        subscribers,
-                                                                        eventsDistributor,
-                                                                        deserializer
+      SubscriptionRequestDeserializer[F, SubscriptionCategoryPayload](categoryName, SubscriptionCategoryPayload.apply)
+  } yield new SubscriptionCategoryImpl[F, SubscriptionCategoryPayload](categoryName,
+                                                                       subscribers,
+                                                                       eventsDistributor,
+                                                                       deserializer
   )
 }

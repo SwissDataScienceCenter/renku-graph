@@ -18,6 +18,7 @@
 
 package io.renku.webhookservice.hookvalidation
 
+import cats.MonadThrow
 import cats.effect._
 import cats.syntax.all._
 import io.renku.config.GitLab
@@ -35,52 +36,45 @@ import org.http4s.dsl.Http4sDsl
 import org.http4s.{Response, Status}
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-trait HookValidationEndpoint[Interpretation[_]] {
-  def validateHook(projectId: Id, authUser: AuthUser): Interpretation[Response[Interpretation]]
+trait HookValidationEndpoint[F[_]] {
+  def validateHook(projectId: Id, authUser: AuthUser): F[Response[F]]
 }
 
-class HookValidationEndpointImpl[Interpretation[_]: Effect](
-    hookValidator: HookValidator[Interpretation],
-    logger:        Logger[Interpretation]
-) extends Http4sDsl[Interpretation]
-    with HookValidationEndpoint[Interpretation] {
+class HookValidationEndpointImpl[F[_]: MonadThrow: Logger](
+    hookValidator: HookValidator[F]
+) extends Http4sDsl[F]
+    with HookValidationEndpoint[F] {
 
-  def validateHook(projectId: Id, authUser: AuthUser): Interpretation[Response[Interpretation]] = {
+  def validateHook(projectId: Id, authUser: AuthUser): F[Response[F]] = {
     for {
       creationResult <- hookValidator.validateHook(projectId, Some(authUser.accessToken))
       response       <- toHttpResponse(creationResult)
     } yield response
   } recoverWith withHttpResult
 
-  private lazy val toHttpResponse: HookValidationResult => Interpretation[Response[Interpretation]] = {
+  private lazy val toHttpResponse: HookValidationResult => F[Response[F]] = {
     case HookExists  => Ok(InfoMessage("Hook valid"))
     case HookMissing => NotFound(InfoMessage("Hook not found"))
   }
 
-  private lazy val withHttpResult: PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
+  private lazy val withHttpResult: PartialFunction[Throwable, F[Response[F]]] = {
     case ex @ UnauthorizedException =>
-      Response[Interpretation](Status.Unauthorized)
+      Response[F](Status.Unauthorized)
         .withEntity[ErrorMessage](ErrorMessage(ex))
-        .pure[Interpretation]
+        .pure[F]
     case NonFatal(exception) =>
-      logger.error(exception)(exception.getMessage)
-      InternalServerError(ErrorMessage(exception))
+      Logger[F].error(exception)(exception.getMessage) >>
+        InternalServerError(ErrorMessage(exception))
   }
 }
 
-object IOHookValidationEndpoint {
-  def apply(
+object HookValidationEndpoint {
+  def apply[F[_]: Async: Logger](
       projectHookUrl:  ProjectHookUrl,
-      gitLabThrottler: Throttler[IO, GitLab],
-      logger:          Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[HookValidationEndpoint[IO]] = for {
+      gitLabThrottler: Throttler[F, GitLab]
+  ): F[HookValidationEndpoint[F]] = for {
     hookValidator <- hookvalidation.HookValidator(projectHookUrl, gitLabThrottler)
-  } yield new HookValidationEndpointImpl[IO](hookValidator, logger)
+  } yield new HookValidationEndpointImpl[F](hookValidator)
 }

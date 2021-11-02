@@ -19,6 +19,7 @@
 package io.renku.knowledgegraph.lineage.graphql
 
 import cats.effect.IO
+import cats.effect.unsafe.IORuntime
 import eu.timepit.refined.auto._
 import io.renku.knowledgegraph.graphql.Arguments._
 import io.renku.knowledgegraph.graphql.CommonQueryFields._
@@ -30,7 +31,7 @@ object QueryFields {
 
   import modelSchema._
 
-  def apply(): List[Field[LineageQueryContext[IO], Unit]] =
+  def apply()(implicit runtime: IORuntime): List[Field[LineageQueryContext[IO], Unit]] =
     fields[LineageQueryContext[IO], Unit](
       Field(
         name = "lineage",

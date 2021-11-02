@@ -18,8 +18,9 @@
 
 package io.renku.eventlog.metrics
 
+import cats.MonadThrow
 import cats.data.NonEmptyList
-import cats.effect.{BracketThrow, ContextShift, IO, Sync}
+import cats.effect.kernel.Async
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -37,36 +38,36 @@ import skunk.implicits._
 
 import java.time.Instant
 
-trait StatsFinder[Interpretation[_]] {
-  def countEventsByCategoryName(): Interpretation[Map[CategoryName, Long]]
+trait StatsFinder[F[_]] {
 
-  def statuses(): Interpretation[Map[EventStatus, Long]]
+  def countEventsByCategoryName(): F[Map[CategoryName, Long]]
 
-  def countEvents(statuses:   Set[EventStatus],
-                  maybeLimit: Option[Int Refined Positive] = None
-  ): Interpretation[Map[Path, Long]]
+  def statuses(): F[Map[EventStatus, Long]]
+
+  def countEvents(statuses: Set[EventStatus], maybeLimit: Option[Int Refined Positive] = None): F[Map[Path, Long]]
 }
 
-class StatsFinderImpl[Interpretation[_]: Sync: BracketThrow](
-    sessionResource:  SessionResource[Interpretation, EventLogDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
+class StatsFinderImpl[F[_]: Async](
+    sessionResource:  SessionResource[F, EventLogDB],
+    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
-    with StatsFinder[Interpretation]
+    with StatsFinder[F]
     with SubscriptionTypeSerializers {
 
-  override def countEventsByCategoryName(): Interpretation[Map[CategoryName, Long]] = sessionResource.useK {
+  override def countEventsByCategoryName(): F[Map[CategoryName, Long]] = sessionResource.useK {
     measureExecutionTime(countEventsPerCategoryName).map(_.toMap)
   }
 
-  // format: off
-
   private def countEventsPerCategoryName = {
-    val (eventDate, lastSyncedDate) = (EventDate.apply _ &&& LastSyncedDate.apply _) (now())
-    SqlStatement(name = "category name events count").select[CategoryName ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~
-      CategoryName ~ CategoryName ~ CategoryName ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ CategoryName ~
-      CategoryName ~ CategoryName  ~ LastSyncedDate ~ CategoryName ~ CategoryName, (CategoryName, Long)](
-      sql"""
+    val (eventDate, lastSyncedDate) = (EventDate.apply _ &&& LastSyncedDate.apply)(now())
+    SqlStatement(name = "category name events count")
+      .select[CategoryName ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~
+                CategoryName ~ CategoryName ~ CategoryName ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ CategoryName ~
+                CategoryName ~ CategoryName ~ LastSyncedDate ~ CategoryName ~ CategoryName,
+              (CategoryName, Long)
+      ](
+        sql"""
           SELECT all_counts.category_name, SUM(all_counts.count)
           FROM (
             (
@@ -122,34 +123,42 @@ class StatsFinderImpl[Interpretation[_]: Sync: BracketThrow](
             )
           ) all_counts
           GROUP BY all_counts.category_name
-          """.query(categoryNameDecoder ~ numeric).map { case categoryName ~ (count: BigDecimal) => (categoryName, count.longValue) }
-    ).arguments(membersync.categoryName ~ eventDate ~ lastSyncedDate ~ eventDate ~ lastSyncedDate ~ eventDate ~
-      lastSyncedDate ~ membersync.categoryName ~ membersync.categoryName ~ commitsync.categoryName ~ eventDate ~
-      lastSyncedDate ~ eventDate ~ lastSyncedDate ~ commitsync.categoryName ~ commitsync.categoryName ~ 
-      globalcommitsync.categoryName ~ lastSyncedDate ~ globalcommitsync.categoryName ~ globalcommitsync.categoryName).build(_.toList)
+          """.query(categoryNameDecoder ~ numeric).map { case categoryName ~ (count: BigDecimal) =>
+          (categoryName, count.longValue)
+        }
+      )
+      .arguments(
+        membersync.categoryName ~ eventDate ~ lastSyncedDate ~ eventDate ~ lastSyncedDate ~ eventDate ~
+          lastSyncedDate ~ membersync.categoryName ~ membersync.categoryName ~ commitsync.categoryName ~ eventDate ~
+          lastSyncedDate ~ eventDate ~ lastSyncedDate ~ commitsync.categoryName ~ commitsync.categoryName ~
+          globalcommitsync.categoryName ~ lastSyncedDate ~ globalcommitsync.categoryName ~ globalcommitsync.categoryName
+      )
+      .build(_.toList)
   }
 
-  override def statuses(): Interpretation[Map[EventStatus, Long]] = sessionResource.useK { 
+  override def statuses(): F[Map[EventStatus, Long]] = sessionResource.useK {
     measureExecutionTime(findStatuses)
       .map(_.toMap)
       .map(addMissingStatues)
   }
 
-  private lazy val findStatuses: SqlStatement[Interpretation, List[(EventStatus, Long)]] = SqlStatement(name = "statuses count").select[Void, (EventStatus, Long)](
-        sql"""SELECT status, COUNT(event_id) FROM event GROUP BY status;"""
-          .query(eventStatusDecoder ~ int8)
-          .map { case status ~ count => (status, count) }
-  ).arguments(Void).build(_.toList)
-
+  private lazy val findStatuses: SqlStatement[F, List[(EventStatus, Long)]] = SqlStatement(name = "statuses count")
+    .select[Void, (EventStatus, Long)](
+      sql"""SELECT status, COUNT(event_id) FROM event GROUP BY status;"""
+        .query(eventStatusDecoder ~ int8)
+        .map { case status ~ count => (status, count) }
+    )
+    .arguments(Void)
+    .build(_.toList)
 
   private def addMissingStatues(stats: Map[EventStatus, Long]): Map[EventStatus, Long] =
     EventStatus.all.map(status => status -> stats.getOrElse(status, 0L)).toMap
 
-  override def countEvents(statuses: Set[EventStatus],
+  override def countEvents(statuses:   Set[EventStatus],
                            maybeLimit: Option[Int Refined Positive] = None
-                          ): Interpretation[Map[Path, Long]] =
+  ): F[Map[Path, Long]] =
     NonEmptyList.fromList(statuses.toList) match {
-      case None => Map.empty[Path, Long].pure[Interpretation]
+      case None => Map.empty[Path, Long].pure[F]
       case Some(statusesList) =>
         sessionResource.useK {
           measureExecutionTime(countProjectsEvents(statusesList, maybeLimit))
@@ -157,15 +166,16 @@ class StatsFinderImpl[Interpretation[_]: Sync: BracketThrow](
         }
     }
 
-  private def countProjectsEvents(statuses: NonEmptyList[EventStatus],
+  private def countProjectsEvents(statuses:   NonEmptyList[EventStatus],
                                   maybeLimit: Option[Int Refined Positive] = None
-                                 ) = maybeLimit match {
-    case None => prepareQuery(statuses)
+  ) = maybeLimit match {
+    case None        => prepareQuery(statuses)
     case Some(limit) => prepareQuery(statuses, limit)
   }
 
-  private def prepareQuery(statuses: NonEmptyList[EventStatus]) = SqlStatement(name = "projects events count")
-    .select[Void, Path ~ Long]( sql"""SELECT
+  private def prepareQuery(statuses: NonEmptyList[EventStatus]) =
+    SqlStatement(name = "projects events count")
+      .select[Void, Path ~ Long](sql"""SELECT
                                       project_path,
                                       (SELECT count(event_id) FROM event evt_int WHERE evt_int.project_id = prj.project_id AND status IN (#${statuses.toSql})) AS count
                                       FROM project prj
@@ -174,40 +184,44 @@ class StatsFinderImpl[Interpretation[_]: Sync: BracketThrow](
                                               FROM event evt
                                               WHERE evt.project_id = prj.project_id AND status IN (#${statuses.toSql})
                                             )
-              """.query(projectPathDecoder ~ int8).map { case path ~ count => (path, count) }
-  ).arguments(Void).build(_.toList)
+              """.query(projectPathDecoder ~ int8).map { case path ~ count => (path, count) })
+      .arguments(Void)
+      .build(_.toList)
 
   private def prepareQuery(statuses: NonEmptyList[EventStatus], limit: Int Refined Positive) =
-    SqlStatement(name = "projects events count limit").select[Int, (Path, Long)](
-          sql"""
-              SELECT
-                project_path,
-                (select count(event_id) FROM event evt_int WHERE evt_int.project_id = prj.project_id AND status IN (#${statuses.toSql})) AS count
-              FROM (select project_id, project_path, latest_event_date
-                    FROM project
-                    ORDER BY latest_event_date desc) prj
-              WHERE EXISTS (
-                      SELECT project_id
-                      FROM event evt
-                      WHERE evt.project_id = prj.project_id AND status IN (#${statuses.toSql})
-                    )
-              LIMIT $int4;
-              """
-            .query(projectPathDecoder ~ int8)
-            .map { case projectPath ~ count => (projectPath, count) }
-    ).arguments(limit).build(_.toList)
+    SqlStatement(name = "projects events count limit")
+      .select[Int, (Path, Long)](
+        sql"""
+      SELECT
+        project_path,
+        (select count(event_id) FROM event evt_int WHERE evt_int.project_id = prj.project_id AND status IN (#${statuses.toSql})) AS count
+      FROM (select project_id, project_path, latest_event_date
+            FROM project
+            ORDER BY latest_event_date desc) prj
+      WHERE EXISTS (
+              SELECT project_id
+              FROM event evt
+              WHERE evt.project_id = prj.project_id AND status IN (#${statuses.toSql})
+            )
+      LIMIT $int4;
+      """
+          .query(projectPathDecoder ~ int8)
+          .map { case projectPath ~ count => (projectPath, count) }
+      )
+      .arguments(limit)
+      .build(_.toList)
 
   private implicit class StatusesOps(statuses: NonEmptyList[EventStatus]) {
     lazy val toSql: String = statuses.map(status => s"'$status'").mkString_(", ")
   }
 }
 
-object IOStatsFinder {
+object StatsFinder {
 
-  def apply(
-             sessionResource: SessionResource[IO, EventLogDB],
-             queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
-           )(implicit contextShift: ContextShift[IO]): IO[StatsFinder[IO]] = IO {
+  def apply[F[_]: MonadThrow: Async](
+      sessionResource:  SessionResource[F, EventLogDB],
+      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[StatsFinder[F]] = MonadThrow[F].catchNonFatal {
     new StatsFinderImpl(sessionResource, queriesExecTimes)
   }
 }

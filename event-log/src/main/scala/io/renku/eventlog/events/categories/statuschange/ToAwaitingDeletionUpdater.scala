@@ -19,7 +19,7 @@
 package io.renku.eventlog.events.categories.statuschange
 
 import cats.data.Kleisli
-import cats.effect.{BracketThrow, Sync}
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
@@ -35,14 +35,14 @@ import skunk.~
 
 import java.time.Instant
 
-private class ToAwaitingDeletionUpdater[Interpretation[_]: BracketThrow: Sync](
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
+private class ToAwaitingDeletionUpdater[F[_]: MonadCancelThrow](
+    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
-    with DBUpdater[Interpretation, ToAwaitingDeletion] {
+    with DBUpdater[F, ToAwaitingDeletion] {
 
-  override def updateDB(event: ToAwaitingDeletion): UpdateResult[Interpretation] = measureExecutionTime {
-    SqlStatement[Interpretation](name = "to_awaiting_deletion - status update")
+  override def updateDB(event: ToAwaitingDeletion): UpdateResult[F] = measureExecutionTime {
+    SqlStatement[F](name = "to_awaiting_deletion - status update")
       .select[ExecutionDate ~ projects.Id ~ EventId, EventStatus](
         sql"""UPDATE event evt
               SET status = '#${AwaitingDeletion.value}', execution_date = $executionDateEncoder
@@ -63,11 +63,11 @@ private class ToAwaitingDeletionUpdater[Interpretation[_]: BracketThrow: Sync](
         case Some(oldEventStatus) =>
           DBUpdateResults
             .ForProjects(event.projectPath, Map(oldEventStatus -> -1, AwaitingDeletion -> 1))
-            .pure[Interpretation]
+            .pure[F]
             .widen[DBUpdateResults]
         case _ =>
           new Exception(s"Could not update event ${event.eventId} to status $AwaitingDeletion")
-            .raiseError[Interpretation, DBUpdateResults]
+            .raiseError[F, DBUpdateResults]
       }
   }
 

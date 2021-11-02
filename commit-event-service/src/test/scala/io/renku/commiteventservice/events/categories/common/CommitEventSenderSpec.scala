@@ -18,8 +18,8 @@
 
 package io.renku.commiteventservice.events.categories.common
 
-import cats.MonadError
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
+import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Encoder
 import io.circe.literal._
@@ -31,14 +31,18 @@ import io.renku.generators.Generators._
 import io.renku.graph.config.EventLogUrl
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
+import io.renku.testtools.IOSpec
 import org.http4s.Status._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
-class CommitEventSenderSpec extends AnyWordSpec with MockFactory with ExternalServiceStubbing with should.Matchers {
+class CommitEventSenderSpec
+    extends AnyWordSpec
+    with IOSpec
+    with MockFactory
+    with ExternalServiceStubbing
+    with should.Matchers {
 
   "send" should {
 
@@ -48,7 +52,7 @@ class CommitEventSenderSpec extends AnyWordSpec with MockFactory with ExternalSe
       (eventSerializer
         .serialiseToJsonString(_: CommitEvent))
         .expects(newCommitEvent)
-        .returning(context.pure(eventBody))
+        .returning(eventBody.pure[IO])
 
       stubFor {
         post("/events")
@@ -68,7 +72,7 @@ class CommitEventSenderSpec extends AnyWordSpec with MockFactory with ExternalSe
       (eventSerializer
         .serialiseToJsonString(_: CommitEvent))
         .expects(skippedCommitEvent)
-        .returning(context.pure(eventBody))
+        .returning(eventBody.pure[IO])
 
       stubFor {
         post("/events")
@@ -88,7 +92,7 @@ class CommitEventSenderSpec extends AnyWordSpec with MockFactory with ExternalSe
       (eventSerializer
         .serialiseToJsonString(_: CommitEvent))
         .expects(newCommitEvent)
-        .returning(context.pure(eventBody))
+        .returning(eventBody.pure[IO])
 
       val status = BadRequest
       stubFor {
@@ -111,7 +115,7 @@ class CommitEventSenderSpec extends AnyWordSpec with MockFactory with ExternalSe
       (eventSerializer
         .serialiseToJsonString(_: CommitEvent))
         .expects(newCommitEvent)
-        .returning(context.raiseError(exception))
+        .returning(exception.raiseError[IO, String])
 
       intercept[Exception] {
         eventSender.send(newCommitEvent).unsafeRunSync()
@@ -119,18 +123,14 @@ class CommitEventSenderSpec extends AnyWordSpec with MockFactory with ExternalSe
     }
   }
 
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO]        = IO.timer(global)
-
   private trait TestCase {
-    val context = MonadError[IO, Throwable]
-
     val newCommitEvent = newCommitEvents.generateOne
 
+    private implicit val logger: TestLogger[IO] = TestLogger()
     val eventLogUrl = EventLogUrl(externalServiceBaseUrl)
     class TestCommitEventSerializer extends CommitEventSerializer[IO]
     val eventSerializer = mock[TestCommitEventSerializer]
-    val eventSender     = new CommitEventSenderImpl[IO](eventLogUrl, eventSerializer, TestLogger())
+    val eventSender     = new CommitEventSenderImpl[IO](eventLogUrl, eventSerializer)
   }
 
   private def commitEventEncoder[T <: CommitEvent](eventBody: String): Encoder[T] = Encoder.instance[T] {

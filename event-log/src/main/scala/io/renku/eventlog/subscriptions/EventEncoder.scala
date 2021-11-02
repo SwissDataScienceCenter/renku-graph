@@ -23,7 +23,7 @@ import io.renku.http.client.RestClient.PartEncoder
 import org.http4s.multipart.Part
 
 private trait EventEncoder[CategoryEvent] {
-  def encodeParts[Interpretation[_]](event: CategoryEvent): Vector[Part[Interpretation]]
+  def encodeParts[F[_]](event: CategoryEvent): Vector[Part[F]]
 }
 
 private object EventEncoder {
@@ -31,7 +31,7 @@ private object EventEncoder {
       eventEncoder:           CategoryEvent => Json
   )(implicit jsonPartEncoder: PartEncoder[Json]): EventEncoder[CategoryEvent] =
     new EventEncoder[CategoryEvent] {
-      def encodeParts[Interpretation[_]](event: CategoryEvent): Vector[Part[Interpretation]] = Vector(
+      def encodeParts[F[_]](event: CategoryEvent): Vector[Part[F]] = Vector(
         jsonPartEncoder.encode("event", eventEncoder(event))
       )
     }
@@ -44,7 +44,7 @@ private object EventEncoder {
       payloadPartEncoder: PartEncoder[PayloadType]
   ): EventEncoder[CategoryEvent] =
     new EventEncoder[CategoryEvent] {
-      def encodeParts[Interpretation[_]](event: CategoryEvent): Vector[Part[Interpretation]] = Vector(
+      def encodeParts[F[_]](event: CategoryEvent): Vector[Part[F]] = Vector(
         jsonPartEncoder.encode("event", eventEncoder(event)),
         payloadPartEncoder.encode("payload", payloadEncoder(event))
       )

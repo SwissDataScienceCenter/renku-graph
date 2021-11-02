@@ -18,15 +18,8 @@
 
 organization := "io.renku"
 name := "generators"
-scalaVersion := "2.13.6"
 
-val refinedVersion = "0.9.26"
-libraryDependencies += "eu.timepit" %% "refined" % refinedVersion
-
-val circeVersion = "0.14.1"
-libraryDependencies += "io.circe" %% "circe-core" % circeVersion
-
-val catsVersion = "2.6.0"
-libraryDependencies += "org.typelevel" %% "cats-core" % catsVersion
-
+libraryDependencies += "eu.timepit"     %% "refined"    % "0.9.27"
+libraryDependencies += "io.circe"       %% "circe-core" % "0.14.1"
+libraryDependencies += "org.typelevel"  %% "cats-core"  % "2.6.1"
 libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.14.3" // version 1.15.1 is broken

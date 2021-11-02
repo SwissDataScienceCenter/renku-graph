@@ -19,8 +19,7 @@
 package io.renku.eventlog.events.categories
 package creation
 
-import cats.MonadError
-import cats.effect.{ContextShift, IO}
+import cats.effect.IO
 import cats.syntax.all._
 import io.circe.literal.JsonStringContext
 import io.circe.syntax._
@@ -36,14 +35,18 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.events.EventStatus
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level._
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.global
-
-class EventHandlerSpec extends AnyWordSpec with MockFactory with TableDrivenPropertyChecks with should.Matchers {
+class EventHandlerSpec
+    extends AnyWordSpec
+    with IOSpec
+    with MockFactory
+    with TableDrivenPropertyChecks
+    with should.Matchers {
 
   "createHandlingProcess" should {
 
@@ -116,7 +119,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with TableDrivenProp
       val event     = newOrSkippedEvents.generateOne
       val exception = exceptions.generateOne
 
-      (eventPersister.storeNewEvent _).expects(event).returning(context.raiseError(exception))
+      (eventPersister.storeNewEvent _).expects(event).returning(exception.raiseError[IO, EventPersister.Result])
 
       handler
         .createHandlingProcess(requestContent(event.asJson))
@@ -134,16 +137,11 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with TableDrivenProp
     }
   }
 
-  private implicit val cs: ContextShift[IO] = IO.contextShift(global)
-
   private trait TestCase {
 
-    val context = MonadError[IO, Throwable]
-
-    val logger         = TestLogger[IO]()
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val eventPersister = mock[EventPersister[IO]]
-
-    val handler = new EventHandler[IO](categoryName, eventPersister, logger)
+    val handler        = new EventHandler[IO](categoryName, eventPersister)
   }
 
   private def toJson(event: Event): Json =

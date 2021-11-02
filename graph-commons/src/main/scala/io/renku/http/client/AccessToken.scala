@@ -46,7 +46,7 @@ object AccessToken {
       Json.obj("personalAccessToken" -> Json.fromString(new String(base64Encoder.encode(token.getBytes(UTF_8)), UTF_8)))
   }
 
-  implicit val accessTokenDecoder: Decoder[AccessToken] = (cursor: HCursor) => {
+  implicit val accessTokenDecoder: Decoder[AccessToken] = (cursor: HCursor) =>
     for {
       maybeOauth    <- cursor.downField("oauthAccessToken").as[Option[String]].flatMap(to(OAuthAccessToken.from))
       maybePersonal <- cursor.downField("personalAccessToken").as[Option[String]].flatMap(to(PersonalAccessToken.from))
@@ -54,7 +54,6 @@ object AccessToken {
                                  ifNone = DecodingFailure("Access token cannot be deserialized", Nil)
                )
     } yield token
-  }
 
   private def to[T <: AccessToken](
       from: String => Either[IllegalArgumentException, T]

@@ -19,12 +19,13 @@
 package io.renku.db
 
 import cats.data.Kleisli
-import cats.effect.{Concurrent, ContextShift, IO, Resource}
+import cats.effect.{IO, Resource}
 import com.dimafeng.testcontainers.{ForAllTestContainer, PostgreSQLContainer}
 import eu.timepit.refined.auto._
 import io.renku.db.SqlStatement.Name
 import io.renku.db.TestDbConfig.newDbConfig
 import io.renku.metrics.{LabeledHistogram, TestLabeledHistogram}
+import io.renku.testtools.IOSpec
 import natchez.Trace.Implicits.noop
 import org.scalatest.Suite
 import org.scalatest.matchers.should
@@ -34,9 +35,7 @@ import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
-class DbClientSpec extends AnyWordSpec with should.Matchers with ContainerTestDb {
+class DbClientSpec extends AnyWordSpec with IOSpec with should.Matchers with ContainerTestDb {
 
   "measureExecutionTime" should {
 
@@ -84,8 +83,6 @@ trait ContainerTestDb extends ForAllTestContainer {
   self: Suite =>
 
   private trait TestDB
-  private implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
-  private implicit val concurrent:   Concurrent[IO]   = IO.ioConcurrentEffect
 
   private val dbConfig: DBConfigProvider.DBConfig[TestDB] = newDbConfig[TestDB]
 
@@ -96,13 +93,12 @@ trait ContainerTestDb extends ForAllTestContainer {
     password = dbConfig.pass
   )
 
-  lazy val sessionPoolResource: Resource[IO, Resource[IO, Session[IO]]] =
-    Session.pooled(
-      host = container.host,
-      port = container.container.getMappedPort(dbConfig.port),
-      user = dbConfig.user.value,
-      database = dbConfig.name.value,
-      password = Some(dbConfig.pass),
-      max = dbConfig.connectionPool.value
-    )
+  lazy val sessionPoolResource: Resource[IO, Resource[IO, Session[IO]]] = Session.pooled(
+    host = container.host,
+    port = container.container.getMappedPort(dbConfig.port),
+    user = dbConfig.user.value,
+    database = dbConfig.name.value,
+    password = Some(dbConfig.pass),
+    max = dbConfig.connectionPool.value
+  )
 }

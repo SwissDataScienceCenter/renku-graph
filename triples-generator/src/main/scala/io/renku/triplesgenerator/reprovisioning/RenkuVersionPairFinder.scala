@@ -18,7 +18,8 @@
 
 package io.renku.triplesgenerator.reprovisioning
 
-import cats.effect.{ConcurrentEffect, IO, Timer}
+import cats.MonadThrow
+import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas._
@@ -28,23 +29,18 @@ import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
-trait RenkuVersionPairFinder[Interpretation[_]] {
-  def find(): Interpretation[Option[RenkuVersionPair]]
+trait RenkuVersionPairFinder[F[_]] {
+  def find(): F[Option[RenkuVersionPair]]
 }
 
-private class RenkuVersionPairFinderImpl[Interpretation[_]: ConcurrentEffect: Timer](
+private class RenkuVersionPairFinderImpl[F[_]: Async: Logger](
     rdfStoreConfig: RdfStoreConfig,
     renkuBaseUrl:   RenkuBaseUrl,
-    logger:         Logger[Interpretation],
-    timeRecorder:   SparqlQueryTimeRecorder[Interpretation]
-)(implicit
-    executionContext: ExecutionContext
-) extends RdfStoreClientImpl[Interpretation](rdfStoreConfig, logger, timeRecorder)
-    with RenkuVersionPairFinder[Interpretation] {
+    timeRecorder:   SparqlQueryTimeRecorder[F]
+) extends RdfStoreClientImpl[F](rdfStoreConfig, timeRecorder)
+    with RenkuVersionPairFinder[F] {
 
-  override def find(): Interpretation[Option[RenkuVersionPair]] = queryExpecting[List[RenkuVersionPair]] {
+  override def find(): F[Option[RenkuVersionPair]] = queryExpecting[List[RenkuVersionPair]] {
     val entityId = (renkuBaseUrl / "version-pair").showAs[RdfResource]
     SparqlQuery.of(
       name = "version pair find",
@@ -58,24 +54,19 @@ private class RenkuVersionPairFinderImpl[Interpretation[_]: ConcurrentEffect: Ti
           |""".stripMargin
     )
   } >>= {
-    case Nil         => Option.empty[RenkuVersionPair].pure[Interpretation]
-    case head :: Nil => head.some.pure[Interpretation]
+    case Nil         => Option.empty[RenkuVersionPair].pure[F]
+    case head :: Nil => head.some.pure[F]
     case versionPairs =>
       new IllegalStateException(s"Too many Version pair found: $versionPairs")
-        .raiseError[Interpretation, Option[RenkuVersionPair]]
+        .raiseError[F, Option[RenkuVersionPair]]
   }
 }
 
 private object RenkuVersionPairFinder {
-  def apply(rdfStoreConfig: RdfStoreConfig,
-            renkuBaseUrl:   RenkuBaseUrl,
-            logger:         Logger[IO],
-            timeRecorder:   SparqlQueryTimeRecorder[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      concurrentEffect: ConcurrentEffect[IO],
-      timer:            Timer[IO]
-  ): IO[RenkuVersionPairFinderImpl[IO]] = IO(
-    new RenkuVersionPairFinderImpl[IO](rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
+  def apply[F[_]: Async: Logger](rdfStoreConfig: RdfStoreConfig,
+                                 renkuBaseUrl: RenkuBaseUrl,
+                                 timeRecorder: SparqlQueryTimeRecorder[F]
+  ): F[RenkuVersionPairFinderImpl[F]] = MonadThrow[F].catchNonFatal(
+    new RenkuVersionPairFinderImpl[F](rdfStoreConfig, renkuBaseUrl, timeRecorder)
   )
 }

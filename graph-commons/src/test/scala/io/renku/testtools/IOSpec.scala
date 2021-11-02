@@ -16,12 +16,13 @@
  * limitations under the License.
  */
 
-package io.renku.interpreters
+package io.renku.testtools
 
-import cats.effect.IO
-import io.renku.config.sentry.{SentryConfig, SentryInitializer}
+import cats.effect.unsafe.IORuntime
+import org.scalatest.Suite
 
-abstract class IOSentryInitializer(
-    maybeSentryConfig: Option[SentryConfig],
-    initSentry:        String => Unit
-) extends SentryInitializer[IO](maybeSentryConfig, initSentry)
+trait IOSpec {
+  self: Suite =>
+
+  implicit val ioRuntime: IORuntime = cats.effect.unsafe.implicits.global
+}

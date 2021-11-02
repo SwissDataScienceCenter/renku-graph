@@ -18,7 +18,8 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.effect.{BracketThrow, IO}
+import cats.effect.MonadCancelThrow
+import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SessionResource, SqlStatement}
 import io.renku.eventlog.{EventLogDB, Microservice, TypeSerializers}
@@ -29,21 +30,20 @@ import skunk._
 import skunk.data.Completion
 import skunk.implicits._
 
-private trait SubscriberTracker[Interpretation[_]] {
-  def add(subscriptionInfo: SubscriptionInfo): Interpretation[Boolean]
-
-  def remove(subscriberUrl: SubscriberUrl): Interpretation[Boolean]
+private trait SubscriberTracker[F[_]] {
+  def add(subscriptionInfo: SubscriptionInfo): F[Boolean]
+  def remove(subscriberUrl: SubscriberUrl):    F[Boolean]
 }
 
-private class SubscriberTrackerImpl[Interpretation[_]: BracketThrow](
-    sessionResource:  SessionResource[Interpretation, EventLogDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
+private class SubscriberTrackerImpl[F[_]: MonadCancelThrow](
+    sessionResource:  SessionResource[F, EventLogDB],
+    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name],
     sourceUrl:        MicroserviceBaseUrl
 ) extends DbClient(Some(queriesExecTimes))
-    with SubscriberTracker[Interpretation]
+    with SubscriberTracker[F]
     with TypeSerializers {
 
-  override def add(subscriptionInfo: SubscriptionInfo): Interpretation[Boolean] = sessionResource.useK {
+  override def add(subscriptionInfo: SubscriptionInfo): F[Boolean] = sessionResource.useK {
     measureExecutionTime(
       SqlStatement(name = "subscriber - add")
         .command[SubscriberId ~ SubscriberUrl ~ MicroserviceBaseUrl ~ SubscriberId](
@@ -60,7 +60,7 @@ private class SubscriberTrackerImpl[Interpretation[_]: BracketThrow](
     ) map insertToTableResult
   }
 
-  override def remove(subscriberUrl: SubscriberUrl): Interpretation[Boolean] = sessionResource.useK {
+  override def remove(subscriberUrl: SubscriberUrl): F[Boolean] = sessionResource.useK {
     measureExecutionTime(
       SqlStatement(name = "subscriber - delete")
         .command[SubscriberUrl ~ MicroserviceBaseUrl](
@@ -85,10 +85,10 @@ private class SubscriberTrackerImpl[Interpretation[_]: BracketThrow](
 }
 
 private object SubscriberTracker {
-  def apply(sessionResource:  SessionResource[IO, EventLogDB],
-            queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
-  ): IO[SubscriberTracker[IO]] = for {
+  def apply[F[_]: MonadCancelThrow](sessionResource: SessionResource[F, EventLogDB],
+                                    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[SubscriberTracker[F]] = for {
     microserviceUrlFinder <- MicroserviceUrlFinder(Microservice.ServicePort)
     sourceUrl             <- microserviceUrlFinder.findBaseUrl()
-  } yield new SubscriberTrackerImpl(sessionResource, queriesExecTimes, sourceUrl)
+  } yield new SubscriberTrackerImpl[F](sessionResource, queriesExecTimes, sourceUrl)
 }

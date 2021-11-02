@@ -18,6 +18,7 @@
 
 package io.renku.commiteventservice.events.categories.common
 
+import cats.MonadThrow
 import cats.effect._
 import cats.syntax.all._
 import io.renku.commiteventservice.events.categories.commitsync.categoryName
@@ -27,30 +28,24 @@ import io.renku.events.consumers.Project
 import io.renku.graph.model.events.BatchDate
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-private[categories] trait CommitToEventLog[Interpretation[_]] {
-  def storeCommitInEventLog(project:     Project,
-                            startCommit: CommitInfo,
-                            batchDate:   BatchDate
-  ): Interpretation[UpdateResult]
+private[categories] trait CommitToEventLog[F[_]] {
+  def storeCommitInEventLog(project: Project, startCommit: CommitInfo, batchDate: BatchDate): F[UpdateResult]
 }
 
-private[categories] class CommitToEventLogImpl[Interpretation[_]: MonadThrow](
-    commitEventSender: CommitEventSender[Interpretation]
-) extends CommitToEventLog[Interpretation] {
+private[categories] class CommitToEventLogImpl[F[_]: MonadThrow](
+    commitEventSender: CommitEventSender[F]
+) extends CommitToEventLog[F] {
 
   import commitEventSender._
 
-  def storeCommitInEventLog(project:     Project,
-                            startCommit: CommitInfo,
-                            batchDate:   BatchDate
-  ): Interpretation[UpdateResult] = {
+  def storeCommitInEventLog(project: Project, startCommit: CommitInfo, batchDate: BatchDate): F[UpdateResult] = {
     val commitEvent = toCommitEvent(project, batchDate)(startCommit)
-    send(commitEvent).map(_ => Created).widen[UpdateResult] recover { case NonFatal(exception) =>
-      Failed(failureMessageFor(commitEvent), exception)
-    }
+    send(commitEvent)
+      .map(_ => Created)
+      .widen[UpdateResult]
+      .recover { case NonFatal(exception) => Failed(failureMessageFor(commitEvent), exception) }
   }
 
   private def toCommitEvent(project: Project, batchDate: BatchDate)(commitInfo: CommitInfo) =
@@ -79,23 +74,11 @@ private[categories] class CommitToEventLogImpl[Interpretation[_]: MonadThrow](
         )
     }
 
-  private def failureMessageFor(
-      startCommit: CommitEvent
-  ) =
+  private def failureMessageFor(startCommit: CommitEvent) =
     s"$categoryName: id = ${startCommit.id}, projectId = ${startCommit.project.id}, projectPath = ${startCommit.project.path} -> storing in the event log failed"
-
 }
-
 private[categories] object CommitToEventLog {
-  def apply(
-      logger: Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      clock:            Clock[IO],
-      timer:            Timer[IO]
-  ): IO[CommitToEventLog[IO]] =
-    for {
-      eventSender <- CommitEventSender(logger)
-    } yield new CommitToEventLogImpl[IO](eventSender)
+  def apply[F[_]: Async: Temporal: Logger]: F[CommitToEventLog[F]] = for {
+    eventSender <- CommitEventSender[F]
+  } yield new CommitToEventLogImpl[F](eventSender)
 }

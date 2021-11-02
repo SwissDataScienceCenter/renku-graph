@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.BracketThrow
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import skunk.codec.all._
 import skunk.implicits.toStringOps
@@ -27,19 +27,18 @@ import skunk.{Query, Session}
 
 private trait EventTableCheck {
 
-  def whenEventTableExists[Interpretation[_]: BracketThrow](
-      eventTableExistsMessage: => Kleisli[Interpretation, Session[Interpretation], Unit],
-      otherwise:               => Kleisli[Interpretation, Session[Interpretation], Unit]
-  ): Kleisli[Interpretation, Session[Interpretation], Unit] = checkTableExists flatMap {
+  def whenEventTableExists[F[_]: MonadCancelThrow](
+      eventTableExistsMessage: => Kleisli[F, Session[F], Unit],
+      otherwise:               => Kleisli[F, Session[F], Unit]
+  ): Kleisli[F, Session[F], Unit] = checkTableExists flatMap {
     case true  => eventTableExistsMessage
     case false => otherwise
   }
 
-  private def checkTableExists[Interpretation[_]: BracketThrow]
-      : Kleisli[Interpretation, Session[Interpretation], Boolean] = {
+  private def checkTableExists[F[_]: MonadCancelThrow]: Kleisli[F, Session[F], Boolean] = {
     val query: Query[skunk.Void, Boolean] = sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event')"
       .query(bool)
-    Kleisli[Interpretation, Session[Interpretation], Boolean] { session =>
+    Kleisli[F, Session[F], Boolean] { session =>
       session.unique(query).recover { case _ => false }
     }
   }

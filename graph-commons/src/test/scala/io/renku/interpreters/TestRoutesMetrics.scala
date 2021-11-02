@@ -22,7 +22,6 @@ import cats.effect.IO
 import io.renku.metrics.RoutesMetrics
 
 class TestRoutesMetrics(val metricsRegistry: TestMetricsRegistry.type) extends RoutesMetrics[IO](metricsRegistry) {
-
   def clearRegistry(): Unit = metricsRegistry.clear()
 }
 

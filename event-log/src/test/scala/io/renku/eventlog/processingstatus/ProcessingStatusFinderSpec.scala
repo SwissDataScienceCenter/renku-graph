@@ -31,13 +31,14 @@ import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{BatchDate, EventStatus}
 import io.renku.graph.model.projects.Id
 import io.renku.metrics.TestLabeledHistogram
+import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.temporal.ChronoUnit._
 
-class ProcessingStatusFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec with should.Matchers {
+class ProcessingStatusFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSpec with should.Matchers {
 
   "fetchStatus" should {
 

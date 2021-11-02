@@ -19,7 +19,7 @@
 package io.renku.triplesgenerator.events.categories.membersync
 
 import cats.MonadThrow
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.Async
 import cats.syntax.all._
 import io.renku.config.GitLab
 import io.renku.control.Throttler
@@ -30,28 +30,26 @@ import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-private trait MembersSynchronizer[Interpretation[_]] {
-  def synchronizeMembers(projectPath: projects.Path): Interpretation[Unit]
+private trait MembersSynchronizer[F[_]] {
+  def synchronizeMembers(projectPath: projects.Path): F[Unit]
 }
 
-private class MembersSynchronizerImpl[Interpretation[_]: MonadThrow](
-    accessTokenFinder:          AccessTokenFinder[Interpretation],
-    gitLabProjectMembersFinder: GitLabProjectMembersFinder[Interpretation],
-    kGProjectMembersFinder:     KGProjectMembersFinder[Interpretation],
-    kGPersonFinder:             KGPersonFinder[Interpretation],
+private class MembersSynchronizerImpl[F[_]: MonadThrow: Logger](
+    accessTokenFinder:          AccessTokenFinder[F],
+    gitLabProjectMembersFinder: GitLabProjectMembersFinder[F],
+    kGProjectMembersFinder:     KGProjectMembersFinder[F],
+    kGPersonFinder:             KGPersonFinder[F],
     updatesCreator:             UpdatesCreator,
-    querySender:                QuerySender[Interpretation],
-    logger:                     Logger[Interpretation],
-    executionTimeRecorder:      ExecutionTimeRecorder[Interpretation]
-) extends MembersSynchronizer[Interpretation] {
+    querySender:                QuerySender[F],
+    executionTimeRecorder:      ExecutionTimeRecorder[F]
+) extends MembersSynchronizer[F] {
 
   import executionTimeRecorder._
   import io.renku.graph.tokenrepository.AccessTokenFinder._
 
-  override def synchronizeMembers(projectPath: projects.Path): Interpretation[Unit] = measureExecutionTime {
+  override def synchronizeMembers(projectPath: projects.Path): F[Unit] = measureExecutionTime {
     for {
       maybeAccessToken <- accessTokenFinder.findAccessToken(projectPath)
       membersInGitLab  <- gitLabProjectMembersFinder.findProjectMembers(projectPath)(maybeAccessToken)
@@ -64,7 +62,7 @@ private class MembersSynchronizerImpl[Interpretation[_]: MonadThrow](
       _ <- (insertionUpdates ::: removalUpdates).map(querySender.send).sequence
     } yield SyncSummary(projectPath, membersAdded = membersToAdd.size, membersRemoved = membersToRemove.size)
   } flatMap logSummary recoverWith { case NonFatal(exception) =>
-    logger.error(exception)(s"$categoryName: Members synchronized for project $projectPath FAILED")
+    Logger[F].error(exception)(s"$categoryName: Members synchronized for project $projectPath FAILED")
   }
 
   def findMembersToAdd(membersInGitLab: Set[GitLabProjectMember],
@@ -81,9 +79,9 @@ private class MembersSynchronizerImpl[Interpretation[_]: MonadThrow](
 
   private case class SyncSummary(projectPath: projects.Path, membersAdded: Int, membersRemoved: Int)
 
-  private def logSummary: ((ElapsedTime, SyncSummary)) => Interpretation[Unit] = {
+  private def logSummary: ((ElapsedTime, SyncSummary)) => F[Unit] = {
     case (elapsedTime, SyncSummary(projectPath, membersAdded, membersRemoved)) =>
-      logger.info(
+      Logger[F].info(
         s"$categoryName: Members for project: $projectPath synchronized in ${elapsedTime}ms: " +
           s"$membersAdded member(s) added, $membersRemoved member(s) removed"
       )
@@ -91,29 +89,26 @@ private class MembersSynchronizerImpl[Interpretation[_]: MonadThrow](
 }
 
 private object MembersSynchronizer {
-  def apply(gitLabThrottler: Throttler[IO, GitLab], timeRecorder: SparqlQueryTimeRecorder[IO])(implicit
-      executionContext:      ExecutionContext,
-      contextShift:          ContextShift[IO],
-      timer:                 Timer[IO],
-      logger:                Logger[IO]
-  ): IO[MembersSynchronizer[IO]] = for {
-    accessTokenFinder          <- AccessTokenFinder(logger)
-    gitLabProjectMembersFinder <- IOGitLabProjectMembersFinder(gitLabThrottler, logger)
-    kGProjectMembersFinder     <- KGProjectMembersFinder(logger, timeRecorder)
+  def apply[F[_]: Async: Logger](gitLabThrottler: Throttler[F, GitLab],
+                                 timeRecorder: SparqlQueryTimeRecorder[F]
+  ): F[MembersSynchronizer[F]] = for {
+    accessTokenFinder          <- AccessTokenFinder[F]
+    gitLabProjectMembersFinder <- GitLabProjectMembersFinder(gitLabThrottler)
+    kGProjectMembersFinder     <- KGProjectMembersFinder(timeRecorder)
     kGPersonFinder             <- KGPersonFinder(timeRecorder)
-    updatesCreator             <- UpdatesCreator()
-    rdfStoreConfig             <- RdfStoreConfig[IO]()
-    querySender <- IO(new RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder) with QuerySender[IO] {
-                     override def send(query: SparqlQuery): IO[Unit] = updateWithNoResult(query)
-                   })
-    executionTimeRecorder <- ExecutionTimeRecorder[IO](logger, maybeHistogram = None)
-  } yield new MembersSynchronizerImpl[IO](accessTokenFinder,
-                                          gitLabProjectMembersFinder,
-                                          kGProjectMembersFinder,
-                                          kGPersonFinder,
-                                          updatesCreator,
-                                          querySender,
-                                          logger,
-                                          executionTimeRecorder
+    updatesCreator             <- UpdatesCreator[F]
+    rdfStoreConfig             <- RdfStoreConfig[F]()
+    querySender <-
+      MonadThrow[F].catchNonFatal(new RdfStoreClientImpl(rdfStoreConfig, timeRecorder) with QuerySender[F] {
+        override def send(query: SparqlQuery): F[Unit] = updateWithNoResult(query)
+      })
+    executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = None)
+  } yield new MembersSynchronizerImpl[F](accessTokenFinder,
+                                         gitLabProjectMembersFinder,
+                                         kGProjectMembersFinder,
+                                         kGPersonFinder,
+                                         updatesCreator,
+                                         querySender,
+                                         executionTimeRecorder
   )
 }

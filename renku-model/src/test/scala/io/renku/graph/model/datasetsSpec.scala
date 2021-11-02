@@ -18,13 +18,13 @@
 
 package io.renku.graph.model
 
-import GraphModelGenerators._
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import io.circe.Json
 import io.circe.syntax._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.datasets._
 import io.renku.jsonld.EntityId
 import io.renku.jsonld.syntax._
@@ -177,7 +177,7 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
 
       val json = sameAs.asJsonLD.toJson
 
-      json.hcursor.downField("@type").as[String]                                    shouldBe Right((schema / "URL").toString)
+      json.hcursor.downField("@type").as[String] shouldBe Right((schema / "URL").toString)
       json.hcursor.downField((schema / "url").toString).downField("@id").as[String] shouldBe Right(sameAs.toString)
     }
 
@@ -186,7 +186,7 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
 
       val json = sameAs.asJsonLD.toJson
 
-      json.hcursor.downField("@type").as[String]                                       shouldBe Right((schema / "URL").toString)
+      json.hcursor.downField("@type").as[String] shouldBe Right((schema / "URL").toString)
       json.hcursor.downField((schema / "url").toString).downField("@value").as[String] shouldBe Right(sameAs.toString)
     }
   }
@@ -209,7 +209,7 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
 
       val json = DerivedFrom.jsonLDEncoder(derivedFrom).toJson
 
-      json.hcursor.downField("@type").as[String]                                    shouldBe Right((schema / "URL").toString)
+      json.hcursor.downField("@type").as[String] shouldBe Right((schema / "URL").toString)
       json.hcursor.downField((schema / "url").toString).downField("@id").as[String] shouldBe Right(derivedFrom.toString)
     }
   }

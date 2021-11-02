@@ -18,8 +18,7 @@
 
 package io.renku.webhookservice.crypto
 
-import HookTokenCrypto.SerializedHookToken
-import cats.MonadError
+import cats.MonadThrow
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.W
@@ -32,59 +31,68 @@ import io.renku.crypto.AesCrypto
 import io.renku.crypto.AesCrypto.Secret
 import io.renku.graph.model.projects.Id
 import io.renku.tinytypes.json.TinyTypeDecoders._
+import io.renku.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import io.renku.webhookservice.model.HookToken
 
 import scala.util.control.NonFatal
 
-class HookTokenCrypto[Interpretation[_]](
-    secret:    Secret
-)(implicit ME: MonadError[Interpretation, Throwable])
-    extends AesCrypto[Interpretation, HookToken, SerializedHookToken](secret) {
+trait HookTokenCrypto[F[_]] {
 
-  override def encrypt(hookToken: HookToken): Interpretation[SerializedHookToken] =
+  def decrypt(serializedToken: SerializedHookToken): F[HookToken]
+
+  def encrypt(hookToken: HookToken): F[SerializedHookToken]
+}
+
+class HookTokenCryptoImpl[F[_]: MonadThrow](
+    secret: Secret
+) extends AesCrypto[F, HookToken, SerializedHookToken](secret)
+    with HookTokenCrypto[F] {
+
+  override def encrypt(hookToken: HookToken): F[SerializedHookToken] =
     for {
       serializedToken  <- serialize(hookToken)
       encoded          <- encryptAndEncode(serializedToken)
       validatedDecoded <- validate(encoded)
     } yield validatedDecoded
 
-  override def decrypt(serializedToken: SerializedHookToken): Interpretation[HookToken] = {
+  override def decrypt(serializedToken: SerializedHookToken): F[HookToken] = {
     for {
       decoded      <- decodeAndDecrypt(serializedToken.value)
       deserialized <- deserialize(decoded)
     } yield deserialized
   } recoverWith meaningfulError
 
-  private def serialize(hook: HookToken): Interpretation[String] = pure {
+  private def serialize(hook: HookToken): F[String] = pure {
     Json.obj("projectId" -> Json.fromInt(hook.projectId.value)).noSpaces
   }
 
-  private def validate(value: String): Interpretation[SerializedHookToken] =
-    ME.fromEither[SerializedHookToken] {
+  private def validate(value: String): F[SerializedHookToken] =
+    MonadThrow[F].fromEither[SerializedHookToken] {
       SerializedHookToken.from(value)
     }
 
   private implicit val hookTokenDecoder: Decoder[HookToken] = (cursor: HCursor) =>
     cursor.downField("projectId").as[Id].map(HookToken)
 
-  private def deserialize(json: String): Interpretation[HookToken] = ME.fromEither {
+  private def deserialize(json: String): F[HookToken] = MonadThrow[F].fromEither {
     parse(json)
       .flatMap(_.as[HookToken])
   }
 
-  private lazy val meaningfulError: PartialFunction[Throwable, Interpretation[HookToken]] = { case NonFatal(cause) =>
-    ME.raiseError(new RuntimeException("HookToken decryption failed", cause))
+  private lazy val meaningfulError: PartialFunction[Throwable, F[HookToken]] = { case NonFatal(cause) =>
+    MonadThrow[F].raiseError(new RuntimeException("HookToken decryption failed", cause))
   }
 }
 
 object HookTokenCrypto {
+
   import io.renku.config.ConfigLoader._
 
-  def apply[Interpretation[_]](
-      config:    Config = ConfigFactory.load()
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[HookTokenCrypto[Interpretation]] =
-    find[Interpretation, Secret]("services.gitlab.hook-token-secret", config)
-      .map(new HookTokenCrypto[Interpretation](_))
+  def apply[F[_]: MonadThrow](
+      config: Config = ConfigFactory.load()
+  ): F[HookTokenCrypto[F]] =
+    find[F, Secret]("services.gitlab.hook-token-secret", config)
+      .map(new HookTokenCryptoImpl[F](_))
 
   type SerializedHookToken = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
 

@@ -18,8 +18,9 @@
 
 package io.renku.eventlog.subscriptions.globalcommitsync
 
+import cats.MonadThrow
 import cats.data.Kleisli
-import cats.effect.{BracketThrow, IO, Sync}
+import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import io.renku.db.implicits._
@@ -38,24 +39,23 @@ import skunk.implicits._
 
 import java.time.{Duration, Instant}
 
-private class GlobalCommitSyncEventFinderImpl[Interpretation[_]: BracketThrow: Sync](
-    sessionResource:       SessionResource[Interpretation, EventLogDB],
-    lastSyncedDateUpdater: LastSyncedDateUpdater[Interpretation],
-    queriesExecTimes:      LabeledHistogram[Interpretation, SqlStatement.Name],
+private class GlobalCommitSyncEventFinderImpl[F[_]: Async](
+    sessionResource:       SessionResource[F, EventLogDB],
+    lastSyncedDateUpdater: LastSyncedDateUpdater[F],
+    queriesExecTimes:      LabeledHistogram[F, SqlStatement.Name],
     now:                   () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
-    with EventFinder[Interpretation, GlobalCommitSyncEvent]
+    with EventFinder[F, GlobalCommitSyncEvent]
     with SubscriptionTypeSerializers {
 
-  override def popEvent(): Interpretation[Option[GlobalCommitSyncEvent]] =
-    sessionResource.useK(findEventAndMarkTaken)
+  override def popEvent(): F[Option[GlobalCommitSyncEvent]] = sessionResource.useK(findEventAndMarkTaken)
 
   private def findEventAndMarkTaken =
     findProject >>= updateLastSyncDate >>= findCommits
 
   private def updateLastSyncDate(
       maybeProject: Option[(Project, Option[LastSyncedDate])]
-  ): Kleisli[Interpretation, Session[Interpretation], Option[(Project, Option[LastSyncedDate])]] = maybeProject match {
+  ): Kleisli[F, Session[F], Option[(Project, Option[LastSyncedDate])]] = maybeProject match {
     case Some(projectAndMaybeLastSync @ (project, _)) =>
       Kleisli.liftF(
         lastSyncedDateUpdater
@@ -117,18 +117,16 @@ private class GlobalCommitSyncEventFinderImpl[Interpretation[_]: BracketThrow: S
     case Completion.Update(1) | Completion.Insert(1) => Some(projectAndMaybeLastSync)
     case _                                           => None
   }
-
 }
 
 private object GlobalCommitSyncEventFinder {
   val syncInterval = Duration.ofDays(7)
 
-  def apply(
-      sessionResource:       SessionResource[IO, EventLogDB],
-      lastSyncedDateUpdater: LastSyncedDateUpdater[IO],
-      queriesExecTimes:      LabeledHistogram[IO, SqlStatement.Name]
-  ): IO[EventFinder[IO, GlobalCommitSyncEvent]] = IO(
+  def apply[F[_]: Async](
+      sessionResource:       SessionResource[F, EventLogDB],
+      lastSyncedDateUpdater: LastSyncedDateUpdater[F],
+      queriesExecTimes:      LabeledHistogram[F, SqlStatement.Name]
+  ): F[EventFinder[F, GlobalCommitSyncEvent]] = MonadThrow[F].catchNonFatal(
     new GlobalCommitSyncEventFinderImpl(sessionResource, lastSyncedDateUpdater, queriesExecTimes)
   )
-
 }

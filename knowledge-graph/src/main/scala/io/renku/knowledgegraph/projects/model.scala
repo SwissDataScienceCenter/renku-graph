@@ -56,7 +56,7 @@ private object model {
 
   object Project {
     final class Tag private (val value: String) extends AnyVal with StringTinyType
-    implicit object Tag extends TinyTypeFactory[Tag](new Tag(_)) with NonBlank
+    implicit object Tag                         extends TinyTypeFactory[Tag](new Tag(_)) with NonBlank
 
     final class StarsCount private (val value: Int) extends AnyVal with IntTinyType
     implicit object StarsCount extends TinyTypeFactory[StarsCount](new StarsCount(_)) with NonNegativeInt
@@ -83,13 +83,13 @@ private object model {
   object Permissions {
 
     final case class ProjectPermissions(projectAccessLevel: ProjectAccessLevel) extends Permissions
-    final case class GroupPermissions(groupAccessLevel: GroupAccessLevel) extends Permissions
+    final case class GroupPermissions(groupAccessLevel: GroupAccessLevel)       extends Permissions
     final case class ProjectAndGroupPermissions(projectAccessLevel: ProjectAccessLevel,
                                                 groupAccessLevel:   GroupAccessLevel
     ) extends Permissions
 
-    def apply(accessLevel:        ProjectAccessLevel): Permissions = ProjectPermissions(accessLevel)
-    def apply(accessLevel:        GroupAccessLevel): Permissions = GroupPermissions(accessLevel)
+    def apply(accessLevel: ProjectAccessLevel): Permissions = ProjectPermissions(accessLevel)
+    def apply(accessLevel: GroupAccessLevel):   Permissions = GroupPermissions(accessLevel)
     def apply(projectAccessLevel: ProjectAccessLevel, groupAccessLevel: GroupAccessLevel): Permissions =
       ProjectAndGroupPermissions(projectAccessLevel, groupAccessLevel)
 
@@ -178,9 +178,9 @@ private object model {
     }
 
     final class WebUrl private (val value: String) extends AnyVal with StringTinyType
-    implicit object WebUrl extends TinyTypeFactory[WebUrl](new WebUrl(_)) with Url
+    implicit object WebUrl                         extends TinyTypeFactory[WebUrl](new WebUrl(_)) with Url
 
     final class ReadmeUrl private (val value: String) extends AnyVal with StringTinyType
-    implicit object ReadmeUrl extends TinyTypeFactory[ReadmeUrl](new ReadmeUrl(_)) with Url
+    implicit object ReadmeUrl                         extends TinyTypeFactory[ReadmeUrl](new ReadmeUrl(_)) with Url
   }
 }

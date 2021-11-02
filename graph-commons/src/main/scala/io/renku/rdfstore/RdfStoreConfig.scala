@@ -38,14 +38,14 @@ object RdfStoreConfig {
   import io.renku.config.ConfigLoader._
   import io.renku.http.client.BasicAuthConfigReaders._
 
-  def apply[Interpretation[_]: MonadThrow](
+  def apply[F[_]: MonadThrow](
       config: Config = ConfigFactory.load()
-  ): Interpretation[RdfStoreConfig] =
+  ): F[RdfStoreConfig] =
     for {
-      url         <- find[Interpretation, FusekiBaseUrl]("services.fuseki.url", config)
-      datasetName <- find[Interpretation, DatasetName]("services.fuseki.dataset-name", config)
-      username    <- find[Interpretation, BasicAuthUsername]("services.fuseki.renku.username", config)
-      password    <- find[Interpretation, BasicAuthPassword]("services.fuseki.renku.password", config)
+      url         <- find[F, FusekiBaseUrl]("services.fuseki.url", config)
+      datasetName <- find[F, DatasetName]("services.fuseki.dataset-name", config)
+      username    <- find[F, BasicAuthUsername]("services.fuseki.renku.username", config)
+      password    <- find[F, BasicAuthPassword]("services.fuseki.renku.password", config)
     } yield RdfStoreConfig(url, datasetName, BasicAuthCredentials(username, password))
 }
 

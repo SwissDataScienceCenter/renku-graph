@@ -25,32 +25,26 @@ import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
 import io.renku.graph.acceptancetests.data.{RdfStoreData, dataProjects}
-import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning.`data in the RDF store`
-import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
+import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.acceptancetests.tooling.ResponseTools._
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events
 import io.renku.graph.model.events.{EventId, EventProcessingTime, EventStatus}
-import io.renku.graph.model.testentities.generators.EntitiesGenerators
+import io.renku.graph.model.testentities.generators.EntitiesGenerators.{anyVisibility, projectEntities}
 import io.renku.http.client.AccessToken
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.jsonld.syntax._
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
-import org.scalatest.concurrent.Eventually
 import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers.should
 
 class EventsResourceSpec
     extends AnyFeatureSpec
     with GivenWhenThen
     with GraphServices
     with RdfStoreData
-    with should.Matchers
-    with Eventually
-    with AcceptanceTestPatience
-    with EntitiesGenerators {
+    with RdfStoreProvisioning {
 
   Feature("GET /events?project-path=<path> to return info about all the project events") {
 

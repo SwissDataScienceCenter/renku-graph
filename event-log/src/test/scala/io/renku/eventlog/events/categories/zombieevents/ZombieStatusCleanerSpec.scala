@@ -29,6 +29,7 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.events.EventStatus.{GeneratingTriples, New, TransformingTriples, TriplesGenerated}
 import io.renku.metrics.TestLabeledHistogram
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -37,6 +38,7 @@ import java.time.Instant
 
 class ZombieStatusCleanerSpec
     extends AnyWordSpec
+    with IOSpec
     with InMemoryEventLogDbSpec
     with MockFactory
     with TypeSerializers

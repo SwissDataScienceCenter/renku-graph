@@ -33,12 +33,13 @@ import io.renku.graph.model.events.CompoundEventId
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model.{Page, PerPage}
 import io.renku.metrics.TestLabeledHistogram
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.Random
 
-class EventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec with should.Matchers {
+class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSpec with should.Matchers {
 
   "findEvents" should {
 

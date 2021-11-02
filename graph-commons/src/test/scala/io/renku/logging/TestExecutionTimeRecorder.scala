@@ -18,8 +18,7 @@
 
 package io.renku.logging
 
-import cats.MonadError
-import cats.effect.Clock
+import cats.MonadThrow
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
@@ -29,47 +28,31 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.duration.TimeUnit
 import scala.util.Try
 
 object TestExecutionTimeRecorder {
 
-  def apply[Interpretation[_]](
-      logger:         Logger[Interpretation],
-      maybeHistogram: Option[Histogram] = None
-  )(implicit ME:      MonadError[Interpretation, Throwable]): TestExecutionTimeRecorder[Interpretation] =
-    new TestExecutionTimeRecorder[Interpretation](
-      threshold = elapsedTimes.generateOne,
-      logger,
-      maybeHistogram
-    )
-
-  private implicit def clock[Interpretation[_]]: Clock[Interpretation] = new Clock[Interpretation] {
-    override def realTime(unit:  TimeUnit) = ???
-    override def monotonic(unit: TimeUnit) = ???
-  }
+  def apply[F[_]: MonadThrow: Logger](maybeHistogram: Option[Histogram] = None): TestExecutionTimeRecorder[F] =
+    new TestExecutionTimeRecorder[F](threshold = elapsedTimes.generateOne, maybeHistogram)
 }
 
-class TestExecutionTimeRecorder[Interpretation[_]](
+class TestExecutionTimeRecorder[F[_]: MonadThrow: Logger](
     threshold:      ElapsedTime,
-    logger:         Logger[Interpretation],
     maybeHistogram: Option[Histogram]
-)(implicit clock:   Clock[Interpretation], ME: MonadError[Interpretation, Throwable])
-    extends ExecutionTimeRecorder[Interpretation](threshold, logger, maybeHistogram) {
+) extends ExecutionTimeRecorder[F](threshold) {
 
   val elapsedTime:            ElapsedTime = threshold
   lazy val executionTimeInfo: String      = s" in ${threshold}ms"
 
   override def measureExecutionTime[BlockOut](
-      block:               => Interpretation[BlockOut],
+      block:               => F[BlockOut],
       maybeHistogramLabel: Option[String Refined NonEmpty] = None
-  ): Interpretation[(ElapsedTime, BlockOut)] =
-    for {
-      _ <- ME.unit
-      maybeHistogramTimer = startTimer(maybeHistogramLabel)
-      result <- block
-      _ = maybeHistogramTimer map (_.observeDuration())
-    } yield threshold -> result
+  ): F[(ElapsedTime, BlockOut)] = for {
+    _ <- MonadThrow[F].unit
+    maybeHistogramTimer = startTimer(maybeHistogramLabel)
+    result <- block
+    _ = maybeHistogramTimer map (_.observeDuration())
+  } yield threshold -> result
 
   private def startTimer(maybeHistogramLabel: Option[String Refined NonEmpty]) = maybeHistogram flatMap { histogram =>
     maybeHistogramLabel

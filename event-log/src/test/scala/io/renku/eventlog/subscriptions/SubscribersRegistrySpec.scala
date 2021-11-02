@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.subscriptions.Generators._
@@ -26,6 +26,7 @@ import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.generators.Generators.Implicits.GenOps
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Debug, Info}
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
@@ -35,11 +36,10 @@ import org.scalatest.wordspec.AnyWordSpec
 import java.lang.Thread.sleep
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.Matchers with Eventually {
+class SubscribersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers with Eventually {
 
   implicit override val patienceConfig: PatienceConfig = PatienceConfig(
     timeout = scaled(Span(30, Seconds)),
@@ -152,7 +152,7 @@ class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.M
         .map(callerId => IO(callFindSubscriber(callerId, collectedCallerIds)))
         .sequence
         .start
-        .unsafeRunAsyncAndForget()
+        .unsafeRunAndForget()
 
       Thread sleep 500
 
@@ -255,9 +255,6 @@ class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.M
     }
   }
 
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO]        = IO.timer(global)
-
   private trait TestCase {
 
     val subscriptionInfo = subscriptionInfos.generateOne
@@ -266,8 +263,8 @@ class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.M
 
     val busySleep       = 500 milliseconds
     val checkupInterval = 500 milliseconds
-    val logger          = TestLogger[IO]()
-    lazy val registry   = SubscribersRegistry(categoryName, logger, checkupInterval, busySleep).unsafeRunSync()
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    lazy val registry = SubscribersRegistry[IO](categoryName, checkupInterval, busySleep).unsafeRunSync()
 
     def callFindSubscriber(callerId: Int, collectedCallers: ConcurrentHashMap[Unit, List[Int]]) = {
 

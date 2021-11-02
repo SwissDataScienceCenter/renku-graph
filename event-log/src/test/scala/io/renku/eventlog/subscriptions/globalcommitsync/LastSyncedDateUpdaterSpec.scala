@@ -33,6 +33,7 @@ import io.renku.graph.model.EventsGenerators.lastSyncedDates
 import io.renku.graph.model.events.{CategoryName, LastSyncedDate}
 import io.renku.graph.model.projects
 import io.renku.metrics.TestLabeledHistogram
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -42,6 +43,7 @@ import skunk.{Query, ~}
 
 class LastSyncedDateUpdaterSpec
     extends AnyWordSpec
+    with IOSpec
     with InMemoryEventLogDbSpec
     with SubscriptionDataProvisioning
     with MockFactory
@@ -88,8 +90,7 @@ class LastSyncedDateUpdaterSpec
 
   private trait TestCase {
     val project = projectsGen.generateOne
-    val updater =
-      new LastSyncedDateUpdateImpl[IO](sessionResource, TestLabeledHistogram[Name]("query_id"))
+    val updater = new LastSyncedDateUpdateImpl[IO](sessionResource, TestLabeledHistogram[Name]("query_id"))
 
     upsertProject(project.id, project.path, eventDates.generateOne)
   }

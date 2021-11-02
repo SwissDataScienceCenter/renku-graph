@@ -18,28 +18,27 @@
 
 package io.renku.triplesgenerator.config.certificates
 
-import cats.MonadError
+import cats.{MonadError, MonadThrow}
 import io.renku.config.certificates.Certificate
 
 import java.io.{File, PrintWriter}
 import java.nio.file.{Files, Path, Paths}
 
-private trait CertificateSaver[Interpretation[_]] {
-  def save(certificate: Certificate): Interpretation[Path]
+private trait CertificateSaver[F[_]] {
+  def save(certificate: Certificate): F[Path]
 }
 
 private object CertificateSaver {
-  def apply[Interpretation[_]]()(implicit ME: MonadError[Interpretation, Throwable]): CertificateSaver[Interpretation] =
-    new CertificateSaverImpl[Interpretation]()
+  def apply[F[_]: MonadThrow](): CertificateSaver[F] =
+    new CertificateSaverImpl[F]()
 }
 
-private class CertificateSaverImpl[Interpretation[_]](implicit ME: MonadError[Interpretation, Throwable])
-    extends CertificateSaver[Interpretation] {
+private class CertificateSaverImpl[F[_]](implicit ME: MonadError[F, Throwable]) extends CertificateSaver[F] {
 
   private val certPathDirectory: Path = Paths.get(s"${System.getProperty("user.home")}${File.separator}/git-certs")
   private val certPath:          Path = certPathDirectory.resolve("cert.pem")
 
-  override def save(certificate: Certificate): Interpretation[Path] = ME.catchNonFatal {
+  override def save(certificate: Certificate): F[Path] = ME.catchNonFatal {
 
     Files.createDirectory(certPathDirectory)
 

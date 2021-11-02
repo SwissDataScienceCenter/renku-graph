@@ -18,23 +18,24 @@
 
 package io.renku.tokenrepository.repository.association
 
-import cats.MonadError
 import cats.effect.IO
+import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.http.client.AccessToken
+import io.renku.testtools.IOSpec
+import io.renku.tokenrepository.repository.AccessTokenCrypto
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
-import io.renku.tokenrepository.repository.IOAccessTokenCrypto
 import io.renku.tokenrepository.repository.RepositoryGenerators._
-import io.renku.tokenrepository.repository.deletion.IOTokenRemover
+import io.renku.tokenrepository.repository.deletion.TokenRemover
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class TokenAssociatorSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "associate" should {
 
@@ -43,18 +44,18 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       (projectPathFinder
         .findProjectPath(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
-        .returning(context.pure(Some(projectPath)))
+        .returning(Some(projectPath).pure[IO])
 
       val encryptedAccessToken = encryptedAccessTokens.generateOne
       (accessTokenCrypto
         .encrypt(_: AccessToken))
         .expects(accessToken)
-        .returning(context.pure(encryptedAccessToken))
+        .returning(encryptedAccessToken.pure[IO])
 
       (associationPersister
         .persistAssociation(_: Id, _: Path, _: EncryptedAccessToken))
         .expects(projectId, projectPath, encryptedAccessToken)
-        .returning(context.unit)
+        .returning(IO.unit)
 
       tokenAssociator.associate(projectId, accessToken).unsafeRunSync() shouldBe ()
     }
@@ -63,12 +64,12 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       (projectPathFinder
         .findProjectPath(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
-        .returning(context.pure(None))
+        .returning(Option.empty[Path].pure[IO])
 
       (tokenRemover
         .delete(_: Id))
         .expects(projectId)
-        .returning(context.unit)
+        .returning(IO.unit)
 
       tokenAssociator.associate(projectId, accessToken).unsafeRunSync() shouldBe ()
     }
@@ -78,7 +79,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       (projectPathFinder
         .findProjectPath(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
-        .returning(context raiseError exception)
+        .returning(exception.raiseError[IO, Option[Path]])
 
       intercept[Exception] {
         tokenAssociator.associate(projectId, accessToken).unsafeRunSync()
@@ -90,13 +91,13 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       (projectPathFinder
         .findProjectPath(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
-        .returning(context.pure(Some(projectPath)))
+        .returning(Some(projectPath).pure[IO])
 
       val exception = exceptions.generateOne
       (accessTokenCrypto
         .encrypt(_: AccessToken))
         .expects(accessToken)
-        .returning(context.raiseError(exception))
+        .returning(exception.raiseError[IO, EncryptedAccessToken])
 
       intercept[Exception] {
         tokenAssociator.associate(projectId, accessToken).unsafeRunSync()
@@ -108,19 +109,19 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       (projectPathFinder
         .findProjectPath(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
-        .returning(context.pure(Some(projectPath)))
+        .returning(Some(projectPath).pure[IO])
 
       val encryptedAccessToken = encryptedAccessTokens.generateOne
       (accessTokenCrypto
         .encrypt(_: AccessToken))
         .expects(accessToken)
-        .returning(context.pure(encryptedAccessToken))
+        .returning(encryptedAccessToken.pure[IO])
 
       val exception = exceptions.generateOne
       (associationPersister
         .persistAssociation(_: Id, _: Path, _: EncryptedAccessToken))
         .expects(projectId, projectPath, encryptedAccessToken)
-        .returning(context.raiseError(exception))
+        .returning(exception.raiseError[IO, Unit])
 
       intercept[Exception] {
         tokenAssociator.associate(projectId, accessToken).unsafeRunSync()
@@ -131,13 +132,13 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       (projectPathFinder
         .findProjectPath(_: Id, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
-        .returning(context.pure(None))
+        .returning(Option.empty[Path].pure[IO])
 
       val exception = exceptions.generateOne
       (tokenRemover
         .delete(_: Id))
         .expects(projectId)
-        .returning(context raiseError exception)
+        .returning(exception.raiseError[IO, Unit])
 
       intercept[Exception] {
         tokenAssociator.associate(projectId, accessToken).unsafeRunSync()
@@ -149,17 +150,11 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
     val projectId   = projectIds.generateOne
     val accessToken = accessTokens.generateOne
 
-    val context = MonadError[IO, Throwable]
-
     val projectPathFinder    = mock[ProjectPathFinder[IO]]
-    val accessTokenCrypto    = mock[IOAccessTokenCrypto]
-    val associationPersister = mock[IOAssociationPersister]
-    val tokenRemover         = mock[IOTokenRemover]
-    val tokenAssociator = new TokenAssociator[IO](
-      projectPathFinder,
-      accessTokenCrypto,
-      associationPersister,
-      tokenRemover
-    )
+    val accessTokenCrypto    = mock[AccessTokenCrypto[IO]]
+    val associationPersister = mock[AssociationPersister[IO]]
+    val tokenRemover         = mock[TokenRemover[IO]]
+    val tokenAssociator =
+      new TokenAssociatorImpl[IO](projectPathFinder, accessTokenCrypto, associationPersister, tokenRemover)
   }
 }

@@ -18,8 +18,9 @@
 
 package io.renku.eventlog.events.categories.statuschange
 
+import cats.MonadThrow
 import cats.data.Kleisli
-import cats.effect.{BracketThrow, IO}
+import cats.effect.MonadCancelThrow
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers
 import io.renku.graph.model.events.{CompoundEventId, EventId}
@@ -28,20 +29,22 @@ import io.renku.metrics.LabeledHistogram
 import skunk.Session
 import skunk.data.Completion
 
-private trait DeliveryInfoRemover[Interpretation[_]] {
-  def deleteDelivery(eventId: CompoundEventId): Kleisli[Interpretation, Session[Interpretation], Unit]
+private trait DeliveryInfoRemover[F[_]] {
+  def deleteDelivery(eventId: CompoundEventId): Kleisli[F, Session[F], Unit]
 }
 
 private object DeliveryInfoRemover {
-  def apply(queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]): IO[DeliveryInfoRemover[IO]] = IO {
-    new DeliveryInfoRemoverImpl(queriesExecTimes)
+  def apply[F[_]: MonadCancelThrow](
+      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[DeliveryInfoRemover[F]] = MonadThrow[F].catchNonFatal {
+    new DeliveryInfoRemoverImpl[F](queriesExecTimes)
   }
 }
 
-private class DeliveryInfoRemoverImpl[Interpretation[_]: BracketThrow](
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
+private class DeliveryInfoRemoverImpl[F[_]: MonadCancelThrow](
+    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
 ) extends DbClient(Some(queriesExecTimes))
-    with DeliveryInfoRemover[Interpretation]
+    with DeliveryInfoRemover[F]
     with TypeSerializers {
 
   import cats.syntax.all._
@@ -49,7 +52,7 @@ private class DeliveryInfoRemoverImpl[Interpretation[_]: BracketThrow](
   import skunk._
   import skunk.implicits._
 
-  override def deleteDelivery(eventId: CompoundEventId): Kleisli[Interpretation, Session[Interpretation], Unit] =
+  override def deleteDelivery(eventId: CompoundEventId): Kleisli[F, Session[F], Unit] =
     measureExecutionTime {
       SqlStatement(name = "delivery info remove - status update")
         .command[EventId ~ projects.Id](
@@ -60,10 +63,10 @@ private class DeliveryInfoRemoverImpl[Interpretation[_]: BracketThrow](
         .arguments(eventId.id ~ eventId.projectId)
         .build
         .flatMapResult {
-          case Completion.Delete(_) => ().pure[Interpretation]
+          case Completion.Delete(_) => ().pure[F]
           case completion =>
             new Exception(s"Could not remove delivery info for ${eventId.show}: $completion")
-              .raiseError[Interpretation, Unit]
+              .raiseError[F, Unit]
         }
     }
 }

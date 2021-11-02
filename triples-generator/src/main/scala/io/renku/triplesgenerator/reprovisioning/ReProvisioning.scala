@@ -18,15 +18,14 @@
 
 package io.renku.triplesgenerator.reprovisioning
 
-import cats.MonadThrow
 import cats.data.NonEmptyList
-import cats.effect.Timer
+import cats.effect.{Async, Temporal}
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.graph.config.RenkuBaseUrlLoader
 import io.renku.graph.model.RenkuVersionPair
+import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
-import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import io.renku.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
@@ -34,29 +33,28 @@ import scala.concurrent.duration.FiniteDuration
 import scala.language.postfixOps
 import scala.util.control.NonFatal
 
-trait ReProvisioning[Interpretation[_]] {
-  def run(): Interpretation[Unit]
+trait ReProvisioning[F[_]] {
+  def run(): F[Unit]
 }
 
-class ReProvisioningImpl[Interpretation[_]: MonadThrow: Timer](
-    renkuVersionPairFinder:    RenkuVersionPairFinder[Interpretation],
+class ReProvisioningImpl[F[_]: Temporal: Logger](
+    renkuVersionPairFinder:    RenkuVersionPairFinder[F],
     versionCompatibilityPairs: NonEmptyList[RenkuVersionPair],
     reprovisionJudge:          ReProvisionJudge,
-    triplesRemover:            TriplesRemover[Interpretation],
-    eventsReScheduler:         EventsReScheduler[Interpretation],
-    renkuVersionPairUpdater:   RenkuVersionPairUpdater[Interpretation],
-    reProvisioningStatus:      ReProvisioningStatus[Interpretation],
-    executionTimeRecorder:     ExecutionTimeRecorder[Interpretation],
-    logger:                    Logger[Interpretation],
+    triplesRemover:            TriplesRemover[F],
+    eventsReScheduler:         EventsReScheduler[F],
+    renkuVersionPairUpdater:   RenkuVersionPairUpdater[F],
+    reProvisioningStatus:      ReProvisioningStatus[F],
+    executionTimeRecorder:     ExecutionTimeRecorder[F],
     sleepWhenBusy:             FiniteDuration
-) extends ReProvisioning[Interpretation] {
+) extends ReProvisioning[F] {
 
   import eventsReScheduler._
   import executionTimeRecorder._
   import reprovisionJudge.isReProvisioningNeeded
   import triplesRemover._
 
-  override def run(): Interpretation[Unit] = for {
+  override def run(): F[Unit] = for {
     maybeVersionPairInKG <- renkuVersionPairFinder.find() recoverWith tryAgain(renkuVersionPairFinder.find())
     _                    <- decideIfReProvisioningRequired(maybeVersionPairInKG)
   } yield ()
@@ -65,11 +63,13 @@ class ReProvisioningImpl[Interpretation[_]: MonadThrow: Timer](
     if (isReProvisioningNeeded(maybeVersionPairInKG, versionCompatibilityPairs))
       triggerReProvisioning recoverWith tryAgain(triggerReProvisioning)
     else
-      renkuVersionPairUpdater.update(versionCompatibilityPairs.head) >> logger.info("All projects' triples up to date")
+      renkuVersionPairUpdater.update(versionCompatibilityPairs.head) >> Logger[F].info(
+        "All projects' triples up to date"
+      )
 
   private def triggerReProvisioning = measureExecutionTime {
     for {
-      _ <- logger.info("The triples are not up to date - re-provisioning is clearing DB")
+      _ <- Logger[F].info("The triples are not up to date - re-provisioning is clearing DB")
       _ <- reProvisioningStatus.setRunning() recoverWith tryAgain(reProvisioningStatus.setRunning())
       _ <- renkuVersionPairUpdater
              .update(versionCompatibilityPairs.head)
@@ -80,60 +80,48 @@ class ReProvisioningImpl[Interpretation[_]: MonadThrow: Timer](
     } yield ()
   } flatMap logSummary
 
-  private def logSummary: ((ElapsedTime, Unit)) => Interpretation[Unit] = { case (elapsedTime, _) =>
-    logger.info(s"Clearing DB finished in ${elapsedTime}ms - re-processing all the events")
+  private def logSummary: ((ElapsedTime, Unit)) => F[Unit] = { case (elapsedTime, _) =>
+    Logger[F].info(s"Clearing DB finished in ${elapsedTime}ms - re-processing all the events")
   }
 
-  private def tryAgain[T](step: => Interpretation[T]): PartialFunction[Throwable, Interpretation[T]] = {
-    case NonFatal(exception) =>
-      {
-        for {
-          _      <- logger.error(exception)("Re-provisioning failure")
-          _      <- Timer[Interpretation] sleep sleepWhenBusy
-          result <- step
-        } yield result
-      } recoverWith tryAgain(step)
+  private def tryAgain[T](step: => F[T]): PartialFunction[Throwable, F[T]] = { case NonFatal(exception) =>
+    {
+      for {
+        _      <- Logger[F].error(exception)("Re-provisioning failure")
+        _      <- Temporal[F] sleep sleepWhenBusy
+        result <- step
+      } yield result
+    } recoverWith tryAgain(step)
   }
 }
 
-object IOReProvisioning {
+object ReProvisioning {
 
-  import cats.MonadError
-  import cats.effect.{ContextShift, IO, Timer}
-
-  import scala.concurrent.ExecutionContext
   import scala.concurrent.duration._
 
   private val SleepWhenBusy = 10 minutes
 
-  def apply(
-      reProvisioningStatus:      ReProvisioningStatus[IO],
+  def apply[F[_]: Async: Logger](
+      reProvisioningStatus:      ReProvisioningStatus[F],
       versionCompatibilityPairs: NonEmptyList[RenkuVersionPair],
-      timeRecorder:              SparqlQueryTimeRecorder[IO],
-      logger:                    Logger[IO],
+      timeRecorder:              SparqlQueryTimeRecorder[F],
       configuration:             Config = ConfigFactory.load()
-  )(implicit
-      ME:               MonadError[IO, Throwable],
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[ReProvisioning[IO]] = for {
-    rdfStoreConfig         <- RdfStoreConfig[IO](configuration)
-    eventsReScheduler      <- IOEventsReScheduler(logger)
-    renkuBaseUrl           <- RenkuBaseUrlLoader[IO]()
-    executionTimeRecorder  <- ExecutionTimeRecorder[IO](ApplicationLogger)
-    triplesRemover         <- TriplesRemoverImpl(rdfStoreConfig, logger, timeRecorder)
-    renkuVersionPairFinder <- RenkuVersionPairFinder(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
-  } yield new ReProvisioningImpl[IO](
+  ): F[ReProvisioning[F]] = for {
+    rdfStoreConfig         <- RdfStoreConfig[F](configuration)
+    eventsReScheduler      <- EventsReScheduler[F]
+    renkuBaseUrl           <- RenkuBaseUrlLoader[F]()
+    executionTimeRecorder  <- ExecutionTimeRecorder[F]()
+    triplesRemover         <- TriplesRemoverImpl(rdfStoreConfig, timeRecorder)
+    renkuVersionPairFinder <- RenkuVersionPairFinder(rdfStoreConfig, renkuBaseUrl, timeRecorder)
+  } yield new ReProvisioningImpl[F](
     renkuVersionPairFinder,
     versionCompatibilityPairs,
     new ReProvisionJudgeImpl(),
     triplesRemover,
     eventsReScheduler,
-    new RenkuVersionPairUpdaterImpl(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder),
+    new RenkuVersionPairUpdaterImpl(rdfStoreConfig, renkuBaseUrl, timeRecorder),
     reProvisioningStatus,
     executionTimeRecorder,
-    logger,
     SleepWhenBusy
   )
 }

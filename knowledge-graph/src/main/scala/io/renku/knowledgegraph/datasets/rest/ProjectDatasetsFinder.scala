@@ -18,49 +18,45 @@
 
 package io.renku.knowledgegraph.datasets.rest
 
-import ProjectDatasetsFinder.{ProjectDataset, SameAsOrDerived}
-import cats.effect.{ConcurrentEffect, IO, Timer}
+import cats.MonadThrow
+import cats.effect.kernel.Async
 import io.renku.graph.model.RenkuBaseUrl
 import io.renku.graph.model.datasets.{DerivedFrom, Identifier, ImageUri, InitialVersion, Name, SameAs, Title}
 import io.renku.graph.model.projects.{Path, ResourceId}
 import io.renku.graph.model.views.RdfResource
+import io.renku.knowledgegraph.datasets.rest.ProjectDatasetsFinder.{ProjectDataset, SameAsOrDerived}
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
-private trait ProjectDatasetsFinder[Interpretation[_]] {
-  def findProjectDatasets(projectPath: Path): Interpretation[List[ProjectDataset]]
+private trait ProjectDatasetsFinder[F[_]] {
+  def findProjectDatasets(projectPath: Path): F[List[ProjectDataset]]
 }
 
 private object ProjectDatasetsFinder {
   type SameAsOrDerived = Either[SameAs, DerivedFrom]
   type ProjectDataset  = (Identifier, InitialVersion, Title, Name, SameAsOrDerived, List[ImageUri])
 
-  def apply(rdfStoreConfig:    RdfStoreConfig,
-            renkuBaseUrl:      RenkuBaseUrl,
-            logger:            Logger[IO],
-            timeRecorder:      SparqlQueryTimeRecorder[IO]
-  )(implicit executionContext: ExecutionContext, concurrentEffect: ConcurrentEffect[IO], timer: Timer[IO]) = IO(
-    new ProjectDatasetsFinderImpl[IO](rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
+  def apply[F[_]: Async: Logger](rdfStoreConfig: RdfStoreConfig,
+                                 renkuBaseUrl: RenkuBaseUrl,
+                                 timeRecorder: SparqlQueryTimeRecorder[F]
+  ) = MonadThrow[F].catchNonFatal(
+    new ProjectDatasetsFinderImpl[F](rdfStoreConfig, renkuBaseUrl, timeRecorder)
   )
 }
 
-private class ProjectDatasetsFinderImpl[Interpretation[_]: ConcurrentEffect: Timer](
-    rdfStoreConfig:          RdfStoreConfig,
-    renkuBaseUrl:            RenkuBaseUrl,
-    logger:                  Logger[Interpretation],
-    timeRecorder:            SparqlQueryTimeRecorder[Interpretation]
-)(implicit executionContext: ExecutionContext)
-    extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
-    with ProjectDatasetsFinder[Interpretation] {
+private class ProjectDatasetsFinderImpl[F[_]: Async: Logger](
+    rdfStoreConfig: RdfStoreConfig,
+    renkuBaseUrl:   RenkuBaseUrl,
+    timeRecorder:   SparqlQueryTimeRecorder[F]
+) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
+    with ProjectDatasetsFinder[F] {
 
   import ProjectDatasetsFinderImpl._
   import eu.timepit.refined.auto._
   import io.renku.graph.model.Schemas._
 
-  def findProjectDatasets(projectPath: Path): Interpretation[List[ProjectDataset]] =
+  def findProjectDatasets(projectPath: Path): F[List[ProjectDataset]] =
     queryExpecting[List[ProjectDataset]](using = query(projectPath))
 
   private def query(path: Path) = SparqlQuery.of(

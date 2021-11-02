@@ -18,22 +18,24 @@
 
 package io.renku.tokenrepository.repository.fetching
 
-import cats.MonadError
 import cats.data.OptionT
 import cats.effect.IO
+import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects.{Id, Path}
+import io.renku.http.client.AccessToken
+import io.renku.testtools.IOSpec
+import io.renku.tokenrepository.repository.AccessTokenCrypto
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
-import io.renku.tokenrepository.repository.IOAccessTokenCrypto
 import io.renku.tokenrepository.repository.RepositoryGenerators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class TokenFinderSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "findToken(ProjectId)" should {
 
@@ -51,7 +53,7 @@ class TokenFinderSpec extends AnyWordSpec with MockFactory with should.Matchers 
       (accessTokenCrypto
         .decrypt(_: EncryptedAccessToken))
         .expects(encryptedToken)
-        .returning(context.pure(accessToken))
+        .returning(accessToken.pure[IO])
 
       tokenFinder.findToken(projectId).value.unsafeRunSync() shouldBe Some(accessToken)
     }
@@ -76,7 +78,7 @@ class TokenFinderSpec extends AnyWordSpec with MockFactory with should.Matchers 
       (tokenInRepoFinder
         .findToken(_: Id))
         .expects(projectId)
-        .returning(OptionT.liftF[IO, EncryptedAccessToken](context.raiseError(exception)))
+        .returning(OptionT.liftF[IO, EncryptedAccessToken](exception.raiseError[IO, EncryptedAccessToken]))
 
       intercept[Exception] {
         tokenFinder.findToken(projectId).value.unsafeRunSync()
@@ -97,7 +99,7 @@ class TokenFinderSpec extends AnyWordSpec with MockFactory with should.Matchers 
       (accessTokenCrypto
         .decrypt(_: EncryptedAccessToken))
         .expects(encryptedToken)
-        .returning(context.raiseError(exception))
+        .returning(exception.raiseError[IO, AccessToken])
       intercept[Exception] {
         tokenFinder.findToken(projectId).value.unsafeRunSync()
       }.getMessage shouldBe exception.getMessage
@@ -120,7 +122,7 @@ class TokenFinderSpec extends AnyWordSpec with MockFactory with should.Matchers 
       (accessTokenCrypto
         .decrypt(_: EncryptedAccessToken))
         .expects(encryptedToken)
-        .returning(context.pure(accessToken))
+        .returning(accessToken.pure[IO])
 
       tokenFinder.findToken(projectPath).value.unsafeRunSync() shouldBe Some(accessToken)
     }
@@ -145,7 +147,7 @@ class TokenFinderSpec extends AnyWordSpec with MockFactory with should.Matchers 
       (tokenInRepoFinder
         .findToken(_: Path))
         .expects(projectPath)
-        .returning(OptionT.liftF[IO, EncryptedAccessToken](context.raiseError(exception)))
+        .returning(OptionT.liftF[IO, EncryptedAccessToken](exception.raiseError[IO, EncryptedAccessToken]))
       intercept[Exception] {
         tokenFinder.findToken(projectPath).value.unsafeRunSync()
       }.getMessage shouldBe exception.getMessage
@@ -165,7 +167,7 @@ class TokenFinderSpec extends AnyWordSpec with MockFactory with should.Matchers 
       (accessTokenCrypto
         .decrypt(_: EncryptedAccessToken))
         .expects(encryptedToken)
-        .returning(context.raiseError(exception))
+        .returning(exception.raiseError[IO, AccessToken])
 
       intercept[Exception] {
         tokenFinder.findToken(projectPath).value.unsafeRunSync()
@@ -174,10 +176,8 @@ class TokenFinderSpec extends AnyWordSpec with MockFactory with should.Matchers 
   }
 
   private trait TestCase {
-    val context = MonadError[IO, Throwable]
-
-    val accessTokenCrypto = mock[IOAccessTokenCrypto]
-    val tokenInRepoFinder = mock[IOPersistedTokensFinder]
-    val tokenFinder       = new TokenFinder[IO](tokenInRepoFinder, accessTokenCrypto)
+    val accessTokenCrypto = mock[AccessTokenCrypto[IO]]
+    val tokenInRepoFinder = mock[PersistedTokensFinder[IO]]
+    val tokenFinder       = new TokenFinderImpl[IO](tokenInRepoFinder, accessTokenCrypto)
   }
 }

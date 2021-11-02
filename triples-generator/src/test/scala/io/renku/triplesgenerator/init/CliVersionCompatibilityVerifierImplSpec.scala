@@ -46,7 +46,7 @@ class CliVersionCompatibilityVerifierImplSpec extends AnyWordSpec with MockFacto
       val versionPairs       = renkuVersionPairs.generateNonEmptyList()
       val checker            = new CliVersionCompatibilityVerifierImpl[Try](cliVersion, versionPairs)
       val Failure(exception) = checker.run()
-      exception            shouldBe a[IllegalStateException]
+      exception shouldBe a[IllegalStateException]
       exception.getMessage shouldBe s"Incompatible versions. cliVersion: $cliVersion versionPairs: ${versionPairs.head.cliVersion}"
     }
 

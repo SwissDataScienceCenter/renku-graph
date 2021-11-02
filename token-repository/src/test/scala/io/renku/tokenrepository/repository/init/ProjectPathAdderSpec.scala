@@ -31,11 +31,12 @@ import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.metrics.TestLabeledHistogram
+import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import io.renku.tokenrepository.repository.RepositoryGenerators.encryptedAccessTokens
 import io.renku.tokenrepository.repository.association.ProjectPathFinder
-import io.renku.tokenrepository.repository.deletion.TokenRemover
-import io.renku.tokenrepository.repository.{IOAccessTokenCrypto, InMemoryProjectsTokensDbSpec}
+import io.renku.tokenrepository.repository.deletion.TokenRemoverImpl
+import io.renku.tokenrepository.repository.{AccessTokenCrypto, InMemoryProjectsTokensDbSpec}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
@@ -47,6 +48,7 @@ import skunk.implicits._
 
 class ProjectPathAdderSpec
     extends AnyWordSpec
+    with IOSpec
     with InMemoryProjectsTokensDbSpec
     with MockFactory
     with Eventually
@@ -140,13 +142,12 @@ class ProjectPathAdderSpec
   }
 
   private trait TestCase {
-    val logger            = TestLogger[IO]()
-    val accessTokenCrypto = mock[IOAccessTokenCrypto]
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val accessTokenCrypto = mock[AccessTokenCrypto[IO]]
     val pathFinder        = mock[ProjectPathFinder[IO]]
     val queriesExecTimes  = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val tokenRemover      = new TokenRemover[IO](sessionResource, queriesExecTimes)
-    val projectPathAdder =
-      new ProjectPathAdderImpl[IO](sessionResource, accessTokenCrypto, pathFinder, tokenRemover, logger)
+    val tokenRemover      = new TokenRemoverImpl[IO](sessionResource, queriesExecTimes)
+    val projectPathAdder  = new ProjectPathAdderImpl[IO](sessionResource, accessTokenCrypto, pathFinder, tokenRemover)
 
     def assumePathExistsInGitLab(projectId:        Id,
                                  maybeProjectPath: Option[Path],

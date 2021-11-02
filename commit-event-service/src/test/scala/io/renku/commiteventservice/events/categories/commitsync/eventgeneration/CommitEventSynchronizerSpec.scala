@@ -468,7 +468,7 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
 
   private trait TestCase {
 
-    val logger = TestLogger[Try]()
+    implicit val logger: TestLogger[Try] = TestLogger[Try]()
 
     val maybeAccessToken = personalAccessTokens.generateOption
     val batchDate        = batchDates.generateOne
@@ -484,7 +484,7 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
     val commitToEventLog    = mock[CommitToEventLog[Try]]
     val commitEventsRemover = mock[CommitEventsRemover[Try]]
 
-    val executionTimeRecorder = TestExecutionTimeRecorder[Try](logger)
+    val executionTimeRecorder = TestExecutionTimeRecorder[Try]()
 
     val commitEventSynchronizer = new CommitEventSynchronizerImpl[Try](accessTokenFinder,
                                                                        latestCommitFinder,
@@ -493,7 +493,6 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
                                                                        commitToEventLog,
                                                                        commitEventsRemover,
                                                                        executionTimeRecorder,
-                                                                       logger,
                                                                        clock
     )
 
@@ -534,10 +533,9 @@ class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with 
                          skipped:     Int = 0,
                          deleted:     Int = 0,
                          failed:      Int = 0
-  ) =
-    Info(
-      s"$categoryName: id = $commitId, projectId = ${project.id}, projectPath = ${project.path} -> events generation result: $created created, $existed existed, $skipped skipped, $deleted deleted, $failed failed in ${elapsedTime}ms"
-    )
+  ) = Info(
+    s"$categoryName: id = $commitId, projectId = ${project.id}, projectPath = ${project.path} -> events generation result: $created created, $existed existed, $skipped skipped, $deleted deleted, $failed failed in ${elapsedTime}ms"
+  )
 
   private def logNewEventFound(commitId: CommitId, project: Project, elapsedTime: ElapsedTime) = Info(
     s"$categoryName: id = $commitId, projectId = ${project.id}, projectPath = ${project.path} -> new events found in ${elapsedTime}ms"

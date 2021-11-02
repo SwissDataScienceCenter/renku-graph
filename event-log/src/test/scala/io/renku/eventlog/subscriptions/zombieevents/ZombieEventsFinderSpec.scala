@@ -79,20 +79,18 @@ class ZombieEventsFinderSpec extends AnyWordSpec with MockFactory with should.Ma
 
       logger.loggedOnly(Error("ZombieEventSourceCleaner - failure during clean up", exception))
     }
-
   }
-  private trait TestCase {
 
+  private trait TestCase {
     val longProcessingEventsFinder = mock[EventFinder[Try, ZombieEvent]]
     val lostSubscriberEventsFinder = mock[EventFinder[Try, ZombieEvent]]
     val zombieNodesCleaner         = mock[ZombieNodesCleaner[Try]]
     val lostZombieEventsFinder     = mock[EventFinder[Try, ZombieEvent]]
-    val logger                     = TestLogger[Try]()
+    implicit val logger: TestLogger[Try] = TestLogger[Try]()
     val zombieEventFinder = new ZombieEventFinder[Try](longProcessingEventsFinder,
                                                        lostSubscriberEventsFinder,
                                                        zombieNodesCleaner,
-                                                       lostZombieEventsFinder,
-                                                       logger
+                                                       lostZombieEventsFinder
     )
   }
 }

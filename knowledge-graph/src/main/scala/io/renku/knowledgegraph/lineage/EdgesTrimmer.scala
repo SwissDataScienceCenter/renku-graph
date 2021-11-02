@@ -19,32 +19,34 @@
 package io.renku.knowledgegraph.lineage
 
 import cats.MonadThrow
-import cats.effect.IO
 import cats.syntax.all._
 import io.renku.jsonld.EntityId
-import model.Node.Location
-import model._
+import io.renku.knowledgegraph.lineage.model.Node.Location
+import io.renku.knowledgegraph.lineage.model._
 
-private trait EdgesTrimmer[Interpretation[_]] {
-  def trim(edges: EdgeMap, location: Location): Interpretation[EdgeMap]
+private trait EdgesTrimmer[F[_]] {
+  def trim(edges: EdgeMap, location: Location): F[EdgeMap]
 }
 
 /** Removes graphs which are not connected to the given location of the dataset (not workflow) which are rectangles.
   */
-private class EdgesTrimmerImpl[Interpretation[_]: MonadThrow]() extends EdgesTrimmer[Interpretation] {
+private class EdgesTrimmerImpl[F[_]: MonadThrow]() extends EdgesTrimmer[F] {
 
-  /** @param edges Edges from the whole project
-    * @param location location of file the user selected in the UI
-    * @return Trimmed graph with only nodes connected to the location
+  /** @param edges
+    *   Edges from the whole project
+    * @param location
+    *   location of file the user selected in the UI
+    * @return
+    *   Trimmed graph with only nodes connected to the location
     */
-  def trim(edges: EdgeMap, location: Location): Interpretation[EdgeMap] = {
+  def trim(edges: EdgeMap, location: Location): F[EdgeMap] = {
 
     val latestEdges = removeEdgesWithOverriddenTOs(edges)
 
     List(
       findEdgesConnected[From](to = Set(location), _: EdgeMap),
       findEdgesConnected[To](to = Set(location), _:   EdgeMap)
-    ).flatMap(_.apply(latestEdges)).toMap.pure[Interpretation]
+    ).flatMap(_.apply(latestEdges)).toMap.pure[F]
   }
 
   private def removeEdgesWithOverriddenTOs(edges: EdgeMap): EdgeMap =
@@ -195,7 +197,7 @@ private class EdgesTrimmerImpl[Interpretation[_]: MonadThrow]() extends EdgesTri
 }
 
 private object LineageDataTrimmer {
-  def apply(): IO[EdgesTrimmer[IO]] = new EdgesTrimmerImpl[IO]().pure[IO]
+  def apply[F[_]: MonadThrow](): F[EdgesTrimmer[F]] = MonadThrow[F].catchNonFatal(new EdgesTrimmerImpl[F]())
 
   implicit class EntityIdOps(entityId: EntityId) {
     lazy val toLocation: Node.Location = Node.Location(entityId.value.toString)

@@ -29,6 +29,7 @@ import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.LastSyncedDate
 import io.renku.metrics.TestLabeledHistogram
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -37,6 +38,7 @@ import java.time.Duration
 
 class MemberSyncEventFinderSpec
     extends AnyWordSpec
+    with IOSpec
     with InMemoryEventLogDbSpec
     with SubscriptionDataProvisioning
     with MockFactory
@@ -143,9 +145,7 @@ class MemberSyncEventFinderSpec
   }
 
   private trait TestCase {
-
     val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-
-    val finder = new MemberSyncEventFinderImpl(sessionResource, queriesExecTimes)
+    val finder           = new MemberSyncEventFinderImpl(sessionResource, queriesExecTimes)
   }
 }

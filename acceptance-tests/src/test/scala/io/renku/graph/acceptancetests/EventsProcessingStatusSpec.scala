@@ -25,14 +25,13 @@ import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
 import io.renku.graph.acceptancetests.data._
-import io.renku.graph.acceptancetests.flows.AccessTokenPresence.givenAccessTokenPresentFor
-import io.renku.graph.acceptancetests.stubs.GitLab._
-import io.renku.graph.acceptancetests.stubs.RemoteTriplesGenerator._
+import io.renku.graph.acceptancetests.flows.AccessTokenPresence
 import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
 import io.renku.graph.acceptancetests.tooling.ResponseTools._
 import io.renku.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.CommitId
+import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.http.client.AccessToken
 import io.renku.webhookservice.model.HookToken
 import org.http4s.Status._
@@ -48,6 +47,7 @@ class EventsProcessingStatusSpec
     with ModelImplicits
     with GivenWhenThen
     with GraphServices
+    with AccessTokenPresence
     with Eventually
     with AcceptanceTestPatience
     with should.Matchers {

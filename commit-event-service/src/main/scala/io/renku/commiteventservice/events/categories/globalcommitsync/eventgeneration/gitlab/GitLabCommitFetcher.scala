@@ -18,7 +18,7 @@
 
 package io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.gitlab
 
-import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
+import cats.effect.{Async, Temporal}
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
@@ -34,42 +34,38 @@ import org.http4s.Method.GET
 import org.http4s.Status.{NotFound, Ok, Unauthorized}
 import org.http4s._
 import org.http4s.circe.jsonOf
-import org.http4s.util.CaseInsensitiveString
+import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
-private[globalcommitsync] trait GitLabCommitFetcher[Interpretation[_]] {
+private[globalcommitsync] trait GitLabCommitFetcher[F[_]] {
 
   def fetchLatestGitLabCommit(projectId: projects.Id)(implicit
       maybeAccessToken:                  Option[AccessToken]
-  ): Interpretation[Option[CommitId]]
+  ): F[Option[CommitId]]
 
   def fetchGitLabCommits(projectId: projects.Id)(implicit
       maybeAccessToken:             Option[AccessToken]
-  ): Interpretation[List[CommitId]]
+  ): F[List[CommitId]]
 }
 
-private[globalcommitsync] class GitLabCommitFetcherImpl[Interpretation[_]: ConcurrentEffect: Timer](
-    gitLabApiUrl:            GitLabApiUrl,
-    gitLabThrottler:         Throttler[Interpretation, GitLab],
-    logger:                  Logger[Interpretation],
-    retryInterval:           FiniteDuration = RestClient.SleepAfterConnectionIssue,
-    maxRetries:              Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
-    requestTimeoutOverride:  Option[Duration] = None
-)(implicit executionContext: ExecutionContext)
-    extends RestClient(gitLabThrottler,
-                       logger,
-                       retryInterval = retryInterval,
-                       maxRetries = maxRetries,
-                       requestTimeoutOverride = requestTimeoutOverride
+private[globalcommitsync] class GitLabCommitFetcherImpl[F[_]: Async: Temporal: Logger](
+    gitLabApiUrl:           GitLabApiUrl,
+    gitLabThrottler:        Throttler[F, GitLab],
+    retryInterval:          FiniteDuration = RestClient.SleepAfterConnectionIssue,
+    maxRetries:             Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
+    requestTimeoutOverride: Option[Duration] = None
+) extends RestClient(gitLabThrottler,
+                     retryInterval = retryInterval,
+                     maxRetries = maxRetries,
+                     requestTimeoutOverride = requestTimeoutOverride
     )
-    with GitLabCommitFetcher[Interpretation] {
+    with GitLabCommitFetcher[F] {
 
   override def fetchLatestGitLabCommit(projectId: projects.Id)(implicit
       maybeAccessToken:                           Option[AccessToken]
-  ): Interpretation[Option[CommitId]] = for {
+  ): F[Option[CommitId]] = for {
     uriString   <- getUriString(projectId)
     uri         <- validateUri(uriString).map(_.withQueryParam("per_page", "1"))
     maybeCommit <- send(request(GET, uri, maybeAccessToken))(mapSingleCommitResponse)
@@ -77,20 +73,20 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[Interpretation[_]: Concu
 
   override def fetchGitLabCommits(projectId: projects.Id)(implicit
       maybeAccessToken:                      Option[AccessToken]
-  ): Interpretation[List[CommitId]] = for {
+  ): F[List[CommitId]] = for {
     uri     <- getUriString(projectId)
     commits <- fetch(uri)
   } yield commits
 
-  private def getUriString(projectId: projects.Id): Interpretation[String] =
-    s"$gitLabApiUrl/projects/$projectId/repository/commits".pure[Interpretation]
+  private def getUriString(projectId: projects.Id): F[String] =
+    s"$gitLabApiUrl/projects/$projectId/repository/commits".pure[F]
 
   private def fetch(uriWithoutPage:           String,
                     maybePage:                Option[Int] = None,
                     previouslyFetchedCommits: List[CommitId] = List.empty[CommitId]
   )(implicit
       maybeAccessToken: Option[AccessToken]
-  ): Interpretation[List[CommitId]] = for {
+  ): F[List[CommitId]] = for {
     uri          <- addPageToUrl(uriWithoutPage, maybePage)
     responsePair <- send(request(GET, uri, maybeAccessToken))(mapCommitResponse)
     allCommitIds <- addNextPage(uriWithoutPage,
@@ -105,51 +101,43 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[Interpretation[_]: Concu
     case None       => validateUri(url)
   }
 
-  private implicit lazy val mapCommitResponse
-      : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]), Interpretation[
-        (List[CommitId], Option[Int])
-      ]] = {
+  private implicit lazy val mapCommitResponse: PartialFunction[(Status, Request[F], Response[F]), F[
+    (List[CommitId], Option[Int])
+  ]] = {
     case (Ok, _, response)    => response.as[List[CommitId]].map(commits => commits -> maybeNextPage(response))
-    case (NotFound, _, _)     => (List.empty[CommitId] -> Option.empty[Int]).pure[Interpretation]
+    case (NotFound, _, _)     => (List.empty[CommitId] -> Option.empty[Int]).pure[F]
     case (Unauthorized, _, _) => UnauthorizedException.raiseError
   }
 
   private implicit lazy val mapSingleCommitResponse
-      : PartialFunction[(Status, Request[Interpretation], Response[Interpretation]),
-                        Interpretation[Option[CommitId]]
-      ] = {
+      : PartialFunction[(Status, Request[F], Response[F]), F[Option[CommitId]]] = {
     case (Ok, _, response)    => response.as[List[CommitId]].map(_.headOption)
-    case (NotFound, _, _)     => Option.empty[CommitId].pure[Interpretation]
+    case (NotFound, _, _)     => Option.empty[CommitId].pure[F]
     case (Unauthorized, _, _) => UnauthorizedException.raiseError
   }
 
-  private implicit val commitIdDecoder: EntityDecoder[Interpretation, List[CommitId]] =
-    jsonOf[Interpretation, List[CommitInfo]].map(_.map(_.id))
+  private implicit val commitIdDecoder: EntityDecoder[F, List[CommitId]] =
+    jsonOf[F, List[CommitInfo]].map(_.map(_.id))
 
   private def addNextPage(
       baseUriString:            String,
       previouslyFetchedCommits: List[CommitId],
       newlyFetchedCommits:      List[CommitId],
       maybeNextPage:            Option[Int]
-  )(implicit maybeAccessToken:  Option[AccessToken]): Interpretation[List[CommitId]] =
+  )(implicit maybeAccessToken:  Option[AccessToken]): F[List[CommitId]] =
     maybeNextPage match {
       case page @ Some(_) => fetch(baseUriString, page, previouslyFetchedCommits ::: newlyFetchedCommits)
-      case None           => (previouslyFetchedCommits ::: newlyFetchedCommits).pure[Interpretation]
+      case None           => (previouslyFetchedCommits ::: newlyFetchedCommits).pure[F]
     }
 
-  private def maybeNextPage(response: Response[Interpretation]): Option[Int] =
-    response.headers.get(CaseInsensitiveString("X-Next-Page")).flatMap(_.value.toIntOption)
+  private def maybeNextPage(response: Response[F]): Option[Int] =
+    response.headers.get(ci"X-Next-Page").flatMap(_.head.value.toIntOption)
 }
 
 private[globalcommitsync] object GitLabCommitFetcher {
-  def apply(
-      gitLabThrottler: Throttler[IO, GitLab],
-      logger:          Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[GitLabCommitFetcher[IO]] = for {
-    gitLabUrl <- GitLabUrlLoader[IO]()
-  } yield new GitLabCommitFetcherImpl[IO](gitLabUrl.apiV4, gitLabThrottler, logger)
+  def apply[F[_]: Async: Temporal: Logger](
+      gitLabThrottler: Throttler[F, GitLab]
+  ): F[GitLabCommitFetcher[F]] = for {
+    gitLabUrl <- GitLabUrlLoader[F]()
+  } yield new GitLabCommitFetcherImpl[F](gitLabUrl.apiV4, gitLabThrottler)
 }

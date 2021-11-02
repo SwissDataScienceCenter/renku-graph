@@ -40,12 +40,18 @@ import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort.{DateProperty, DatePublishedProperty, ProjectsCountProperty, TitleProperty}
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks with should.Matchers {
+class DatasetsFinderSpec
+    extends AnyWordSpec
+    with InMemoryRdfStore
+    with ScalaCheckPropertyChecks
+    with should.Matchers
+    with IOSpec {
 
   "findDatasets - no phrase" should {
 
@@ -53,9 +59,9 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
       s"return all datasets when the given phrase is $maybePhrase " +
         "- case of datasets that has neither sameAs nor are imported to and/or from other projects" in new TestCase {
 
-          val (dataset1, project1)                   = publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
+          val (dataset1, project1) = publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
           val (dataset1ImportedToProject2, project2) = publicProjectEntities.importDataset(dataset1).generateOne
-          val (dataset3, project3)                   = publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
+          val (dataset3, project3) = publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
 
           loadToStore(project1, project2, project3)
 
@@ -120,9 +126,9 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
 
       s"return all datasets when the given phrase is $maybePhrase " +
         "- case of shared sameAs with modification on some projects" in new TestCase {
-          val dataset                             = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
-          val (dataset1, project1)                = publicProjectEntities.importDataset(dataset).generateOne
-          val (dataset2, project2)                = publicProjectEntities.importDataset(dataset).generateOne
+          val dataset              = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
+          val (dataset1, project1) = publicProjectEntities.importDataset(dataset).generateOne
+          val (dataset2, project2) = publicProjectEntities.importDataset(dataset).generateOne
           val (dataset2Modified, project2Updated) = project2.addDataset(dataset2.createModification())
 
           loadToStore(List(project1, project2Updated))
@@ -192,7 +198,7 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
             .unsafeRunSync()
 
-          result.results          shouldBe List((modification2, projectWithAllDatasets).toDatasetSearchResult(projectsCount = 1))
+          result.results shouldBe List((modification2, projectWithAllDatasets).toDatasetSearchResult(projectsCount = 1))
           result.pagingInfo.total shouldBe Total(1)
         }
 
@@ -220,9 +226,9 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
       s"return latest versions of datasets when the given phrase is $maybePhrase " +
         "- case if shared datasets are modified on some projects but not all" in new TestCase {
 
-          val dataset                             = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
-          val (dataset1, project1)                = publicProjectEntities.importDataset(dataset).generateOne
-          val (dataset2, project2)                = publicProjectEntities.importDataset(dataset).generateOne
+          val dataset              = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
+          val (dataset1, project1) = publicProjectEntities.importDataset(dataset).generateOne
+          val (dataset2, project2) = publicProjectEntities.importDataset(dataset).generateOne
           val (dataset2Modified, project2Updated) = project2.addDataset(dataset2.createModification())
 
           loadToStore(project1, project2Updated)
@@ -834,12 +840,11 @@ class DatasetsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
   }
 
   private trait TestCase {
-    private val logger       = TestLogger[IO]()
-    private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
-    val datasetsFinder = new DatasetsFinderImpl(
+    private implicit val logger = TestLogger[IO]()
+    private val timeRecorder    = new SparqlQueryTimeRecorder[IO](TestExecutionTimeRecorder[IO]())
+    val datasetsFinder = new DatasetsFinderImpl[IO](
       rdfStoreConfig,
-      new CreatorsFinder(rdfStoreConfig, logger, timeRecorder),
-      logger,
+      new CreatorsFinderImpl[IO](rdfStoreConfig, timeRecorder),
       timeRecorder
     )
   }

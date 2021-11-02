@@ -31,15 +31,15 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
 import io.renku.graph.model.events.CompoundEventId
-import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.EventProcessingGenerators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "createHandlingProcess" should {
 

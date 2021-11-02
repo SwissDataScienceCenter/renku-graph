@@ -20,7 +20,7 @@ package io.renku.triplesgenerator.events.categories.membersync
 
 import io.renku.rdfstore.SparqlQuery
 
-private trait QuerySender[Interpretation[_]] {
+private trait QuerySender[F[_]] {
 
-  def send(update: SparqlQuery): Interpretation[Unit]
+  def send(update: SparqlQuery): F[Unit]
 }

@@ -18,28 +18,28 @@
 
 package io.renku.graph.acceptancetests.db
 
+import cats.Applicative
 import cats.data.{Kleisli, NonEmptyList}
-import cats.effect.{Concurrent, ContextShift, IO, Resource}
+import cats.effect.IO._
+import cats.effect.unsafe.IORuntime
+import cats.effect.{IO, Resource}
 import com.dimafeng.testcontainers.FixedHostPortGenericContainer
 import io.renku.db.{DBConfigProvider, SessionResource}
 import io.renku.eventlog._
-import io.renku.graph.acceptancetests.tooling.TestLogger
 import io.renku.graph.model.events.{CommitId, EventId, EventStatus}
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Id
 import natchez.Trace.Implicits.noop
+import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.implicits._
 
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.collection.immutable
+import scala.util.Try
 
 object EventLog extends TypeSerializers {
 
-  private implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
-  private implicit val concurrent:   Concurrent[IO]   = IO.ioConcurrentEffect
-  private val logger = TestLogger()
-
-  def findEvents(projectId: Id): List[(EventId, EventStatus)] = execute { session =>
+  def findEvents(projectId: Id)(implicit ioRuntime: IORuntime): List[(EventId, EventStatus)] = execute { session =>
     val query: Query[projects.Id, (EventId, EventStatus)] =
       sql"""SELECT event_id, status
             FROM event
@@ -49,32 +49,33 @@ object EventLog extends TypeSerializers {
     session.prepare(query).use(_.stream(projectId, 32).compile.toList)
   }
 
-  def findEvents(projectId: Id, status: EventStatus*): List[CommitId] = execute { session =>
-    val query: Query[projects.Id, CommitId] =
-      sql"""SELECT event_id
+  def findEvents(projectId: Id, status: EventStatus*)(implicit ioRuntime: IORuntime): List[CommitId] = execute {
+    session =>
+      val query: Query[projects.Id, CommitId] =
+        sql"""SELECT event_id
             FROM event
             WHERE project_id = $projectIdEncoder AND #${`status IN`(status.toList)}"""
-        .query(eventIdDecoder)
-        .map(eventId => CommitId(eventId.value))
-    session.prepare(query).use(_.stream(projectId, 32).compile.toList)
+          .query(eventIdDecoder)
+          .map(eventId => CommitId(eventId.value))
+      session.prepare(query).use(_.stream(projectId, 32).compile.toList)
   }
 
   private def `status IN`(status: List[EventStatus]) =
     s"status IN (${NonEmptyList.fromListUnsafe(status).map(el => s"'$el'").toList.mkString(",")})"
 
-  def execute[O](query: Session[IO] => IO[O]): O =
+  def execute[O](query: Session[IO] => IO[O])(implicit ioRuntime: IORuntime): O =
     sessionResource
       .use(_.useK(Kleisli[IO, Session[IO], O](session => query(session))))
       .unsafeRunSync()
 
-  private val dbConfig: DBConfigProvider.DBConfig[EventLogDB] =
-    new EventLogDbConfigProvider[IO].get().unsafeRunSync()
+  private lazy val dbConfig: DBConfigProvider.DBConfig[EventLogDB] =
+    new EventLogDbConfigProvider[Try].get().fold(throw _, identity)
 
-  private val postgresContainer = FixedHostPortGenericContainer(
+  private lazy val postgresContainer = FixedHostPortGenericContainer(
     imageName = "postgres:11.11-alpine",
-    env = Map("POSTGRES_USER"     -> dbConfig.user.value,
-              "POSTGRES_PASSWORD" -> dbConfig.pass.value,
-              "POSTGRES_DB"       -> dbConfig.name.value
+    env = immutable.Map("POSTGRES_USER"     -> dbConfig.user.value,
+                        "POSTGRES_PASSWORD" -> dbConfig.pass.value,
+                        "POSTGRES_DB"       -> dbConfig.name.value
     ),
     exposedPorts = Seq(dbConfig.port.value),
     exposedHostPort = dbConfig.port.value,
@@ -82,8 +83,8 @@ object EventLog extends TypeSerializers {
     command = Seq(s"-p ${dbConfig.port.value}")
   )
 
-  def startDB(): IO[Unit] = for {
-    _ <- IO(postgresContainer.start())
+  def startDB()(implicit ioRuntime: IORuntime, logger: Logger[IO]): IO[Unit] = for {
+    _ <- Applicative[IO].unlessA(postgresContainer.container.isRunning)(IO(postgresContainer.start()))
     _ <- logger.info("event_log DB started")
   } yield ()
 
@@ -91,7 +92,7 @@ object EventLog extends TypeSerializers {
     Session
       .pooled(
         host = postgresContainer.host,
-        port = postgresContainer.container.getMappedPort(dbConfig.port.value),
+        port = dbConfig.port.value,
         database = dbConfig.name.value,
         user = dbConfig.user.value,
         password = Some(dbConfig.pass.value),

@@ -23,9 +23,9 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
 import io.renku.graph.acceptancetests.data.dataProjects
-import io.renku.graph.acceptancetests.stubs.GitLab._
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.acceptancetests.tooling.ResponseTools._
+import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.http.client.AccessToken
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen

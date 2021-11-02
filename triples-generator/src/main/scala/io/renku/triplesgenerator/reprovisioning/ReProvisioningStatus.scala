@@ -19,8 +19,7 @@
 package io.renku.triplesgenerator.reprovisioning
 
 import cats.Applicative
-import cats.effect.concurrent.Ref
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect._
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.auto._
@@ -35,34 +34,30 @@ import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-trait ReProvisioningStatus[Interpretation[_]] {
-  def isReProvisioning(): Interpretation[Boolean]
+trait ReProvisioningStatus[F[_]] {
+  def isReProvisioning(): F[Boolean]
 
-  def setRunning(): Interpretation[Unit]
+  def setRunning(): F[Unit]
 
-  def clear(): Interpretation[Unit]
+  def clear(): F[Unit]
 }
 
-private class ReProvisioningStatusImpl(
-    eventConsumersRegistry:  EventConsumersRegistry[IO],
-    rdfStoreConfig:          RdfStoreConfig,
-    renkuBaseUrl:            RenkuBaseUrl,
-    logger:                  Logger[IO],
-    timeRecorder:            SparqlQueryTimeRecorder[IO],
-    statusRefreshInterval:   FiniteDuration,
-    cacheRefreshInterval:    FiniteDuration,
-    lastCacheCheckTimeRef:   Ref[IO, Long]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
-    with ReProvisioningStatus[IO] {
+private class ReProvisioningStatusImpl[F[_]: Async: Logger](
+    eventConsumersRegistry: EventConsumersRegistry[F],
+    rdfStoreConfig:         RdfStoreConfig,
+    renkuBaseUrl:           RenkuBaseUrl,
+    timeRecorder:           SparqlQueryTimeRecorder[F],
+    statusRefreshInterval:  FiniteDuration,
+    cacheRefreshInterval:   FiniteDuration,
+    lastCacheCheckTimeRef:  Ref[F, Long]
+) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
+    with ReProvisioningStatus[F] {
 
-  private val applicative = Applicative[IO]
+  private val applicative = Applicative[F]
 
   import ReProvisioningJsonLD._
   import applicative._
@@ -70,7 +65,7 @@ private class ReProvisioningStatusImpl(
 
   private val runningStatusCheckStarted = new AtomicBoolean(false)
 
-  override def setRunning(): IO[Unit] = updateWithNoResult {
+  override def setRunning(): F[Unit] = updateWithNoResult {
     SparqlQuery.of(
       name = "re-provisioning - status insert",
       Prefixes.of(rdf -> "rdf"),
@@ -82,7 +77,7 @@ private class ReProvisioningStatusImpl(
     )
   }
 
-  override def clear(): IO[Unit] = for {
+  override def clear(): F[Unit] = for {
     _ <- deleteFromDb()
     _ <- renewAllSubscriptions()
   } yield ()
@@ -100,42 +95,42 @@ private class ReProvisioningStatusImpl(
     )
   }
 
-  override def isReProvisioning(): IO[Boolean] = for {
+  override def isReProvisioning(): F[Boolean] = for {
     isCacheExpired <- isCacheExpired
     flag <- if (isCacheExpired) fetchStatus flatMap {
               case Some(Running) => triggerPeriodicStatusCheck() map (_ => true)
               case _             => updateCacheCheckTime() map (_ => false)
             }
-            else false.pure[IO]
+            else false.pure[F]
   } yield flag
 
-  private def isCacheExpired: IO[Boolean] = for {
+  private def isCacheExpired: F[Boolean] = for {
     lastCheckTime <- lastCacheCheckTimeRef.get
-    currentTime   <- timer.clock.monotonic(TimeUnit.MILLISECONDS)
+    currentTime   <- Temporal[F].monotonic.map(_.toMillis)
   } yield currentTime - lastCheckTime > cacheRefreshInterval.toMillis
 
   private def updateCacheCheckTime() = for {
-    currentTime <- timer.clock.monotonic(TimeUnit.MILLISECONDS)
-    _           <- lastCacheCheckTimeRef set currentTime
+    currentTime <- Temporal[F].monotonic
+    _           <- lastCacheCheckTimeRef set currentTime.toMillis
   } yield ()
 
-  private def triggerPeriodicStatusCheck(): IO[Unit] =
+  private def triggerPeriodicStatusCheck(): F[Unit] =
     whenA(!runningStatusCheckStarted.get()) {
       runningStatusCheckStarted set true
-      periodicStatusCheck.start.void
+      Spawn[F].start(periodicStatusCheck).void
     }
 
-  private def periodicStatusCheck: IO[Unit] = for {
-    _ <- timer sleep statusRefreshInterval
-    _ <- fetchStatus flatMap {
-           case Some(Running) => periodicStatusCheck
-           case _ =>
-             runningStatusCheckStarted set false
-             renewAllSubscriptions()
-         }
-  } yield ()
+  private def periodicStatusCheck: F[Unit] = Temporal[F].delayBy(
+    fetchStatus >>= {
+      case Some(Running) => periodicStatusCheck
+      case _ =>
+        runningStatusCheckStarted set false
+        renewAllSubscriptions()
+    },
+    time = statusRefreshInterval
+  )
 
-  private def fetchStatus: IO[Option[Status]] = queryExpecting[Option[Status]] {
+  private def fetchStatus: F[Option[Status]] = queryExpecting[Option[Status]] {
     SparqlQuery.of(
       name = "re-provisioning - get status",
       Prefixes of rdf -> "rdf",
@@ -166,29 +161,22 @@ object ReProvisioningStatus {
   private val CacheRefreshInterval:  FiniteDuration = 2 minutes
   private val StatusRefreshInterval: FiniteDuration = 15 seconds
 
-  def apply(
-      eventConsumersRegistry: EventConsumersRegistry[IO],
-      logger:                 Logger[IO],
-      timeRecorder:           SparqlQueryTimeRecorder[IO],
+  def apply[F[_]: Async: Logger](
+      eventConsumersRegistry: EventConsumersRegistry[F],
+      timeRecorder:           SparqlQueryTimeRecorder[F],
       configuration:          Config = ConfigFactory.load()
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[ReProvisioningStatus[IO]] =
-    for {
-      rdfStoreConfig        <- RdfStoreConfig[IO](configuration)
-      renkuBaseUrl          <- RenkuBaseUrlLoader[IO]()
-      lastCacheCheckTimeRef <- Ref.of[IO, Long](0)
-    } yield new ReProvisioningStatusImpl(eventConsumersRegistry,
-                                         rdfStoreConfig,
-                                         renkuBaseUrl,
-                                         logger,
-                                         timeRecorder,
-                                         StatusRefreshInterval,
-                                         CacheRefreshInterval,
-                                         lastCacheCheckTimeRef
-    )
+  ): F[ReProvisioningStatus[F]] = for {
+    rdfStoreConfig        <- RdfStoreConfig[F](configuration)
+    renkuBaseUrl          <- RenkuBaseUrlLoader[F]()
+    lastCacheCheckTimeRef <- Ref.of[F, Long](0)
+  } yield new ReProvisioningStatusImpl(eventConsumersRegistry,
+                                       rdfStoreConfig,
+                                       renkuBaseUrl,
+                                       timeRecorder,
+                                       StatusRefreshInterval,
+                                       CacheRefreshInterval,
+                                       lastCacheCheckTimeRef
+  )
 }
 
 private case object ReProvisioningJsonLD {

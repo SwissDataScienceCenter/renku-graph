@@ -18,8 +18,8 @@
 
 package io.renku.tokenrepository.repository.deletion
 
-import cats.MonadError
 import cats.effect.IO
+import cats.syntax.all._
 import io.circe.Json
 import io.circe.literal._
 import io.renku.generators.Generators.Implicits._
@@ -29,14 +29,14 @@ import io.renku.graph.model.projects.Id
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
+import io.renku.testtools.IOSpec
 import org.http4s._
 import org.http4s.headers.`Content-Type`
-import org.http4s.implicits._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class DeleteTokenEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class DeleteTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "associateToken" should {
 
@@ -45,9 +45,7 @@ class DeleteTokenEndpointSpec extends AnyWordSpec with MockFactory with should.M
       (tokenRemover
         .delete(_: Id))
         .expects(projectId)
-        .returning(context.pure(()))
-
-      val request = Request[IO](Method.DELETE, uri"projects" / projectId.toString / "tokens")
+        .returning(IO.unit)
 
       val response = deleteToken(projectId).unsafeRunSync()
 
@@ -63,9 +61,7 @@ class DeleteTokenEndpointSpec extends AnyWordSpec with MockFactory with should.M
       (tokenRemover
         .delete(_: Id))
         .expects(projectId)
-        .returning(context.raiseError(exception))
-
-      val request = Request[IO](Method.DELETE, uri"projects" / projectId.toString / "tokens")
+        .returning(exception.raiseError[IO, Unit])
 
       val response = deleteToken(projectId).unsafeRunSync()
 
@@ -80,12 +76,10 @@ class DeleteTokenEndpointSpec extends AnyWordSpec with MockFactory with should.M
 
   private trait TestCase {
 
-    val context = MonadError[IO, Throwable]
-
     val projectId = projectIds.generateOne
 
-    val tokenRemover = mock[IOTokenRemover]
-    val logger       = TestLogger[IO]()
-    val deleteToken  = new DeleteTokenEndpoint[IO](tokenRemover, logger).deleteToken _
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val tokenRemover = mock[TokenRemover[IO]]
+    val deleteToken  = new DeleteTokenEndpointImpl[IO](tokenRemover).deleteToken _
   }
 }

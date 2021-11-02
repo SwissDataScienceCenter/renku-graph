@@ -26,16 +26,14 @@ import io.renku.http.server.HttpServer
 import io.renku.logging.ApplicationLogger
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.microservices.IOMicroservice
-import io.renku.tokenrepository.repository.association.IOAssociateTokenEndpoint
-import io.renku.tokenrepository.repository.deletion.IODeleteTokenEndpoint
-import io.renku.tokenrepository.repository.fetching.IOFetchTokenEndpoint
-import io.renku.tokenrepository.repository.init.{DbInitializer, IODbInitializer}
+import io.renku.tokenrepository.repository.association.AssociateTokenEndpoint
+import io.renku.tokenrepository.repository.deletion.DeleteTokenEndpoint
+import io.renku.tokenrepository.repository.fetching.FetchTokenEndpoint
+import io.renku.tokenrepository.repository.init.DbInitializer
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import io.renku.tokenrepository.repository.{ProjectsTokensDB, ProjectsTokensDbConfigProvider}
 import natchez.Trace.Implicits.noop
 import org.typelevel.log4cats.Logger
-
-import scala.concurrent.ExecutionContext.Implicits.global
 
 object Microservice extends IOMicroservice {
 
@@ -50,14 +48,14 @@ object Microservice extends IOMicroservice {
       sessionPoolResource: Resource[IO, SessionResource[IO, ProjectsTokensDB]]
   ) = sessionPoolResource.use { sessionResource =>
     for {
-      certificateLoader      <- CertificateLoader[IO](logger)
-      sentryInitializer      <- SentryInitializer[IO]()
-      metricsRegistry        <- MetricsRegistry()
+      certificateLoader      <- CertificateLoader[IO]
+      sentryInitializer      <- SentryInitializer[IO]
+      metricsRegistry        <- MetricsRegistry[IO]()
       queriesExecTimes       <- QueriesExecutionTimes(metricsRegistry)
-      fetchTokenEndpoint     <- IOFetchTokenEndpoint(sessionResource, queriesExecTimes, logger)
-      associateTokenEndpoint <- IOAssociateTokenEndpoint(sessionResource, queriesExecTimes, logger)
-      dbInitializer          <- IODbInitializer(sessionResource, queriesExecTimes, logger)
-      deleteTokenEndpoint    <- IODeleteTokenEndpoint(sessionResource, queriesExecTimes, logger)
+      fetchTokenEndpoint     <- FetchTokenEndpoint(sessionResource, queriesExecTimes)
+      associateTokenEndpoint <- AssociateTokenEndpoint(sessionResource, queriesExecTimes)
+      dbInitializer          <- DbInitializer(sessionResource, queriesExecTimes)
+      deleteTokenEndpoint    <- DeleteTokenEndpoint(sessionResource, queriesExecTimes)
       microserviceRoutes = new MicroserviceRoutes[IO](
                              fetchTokenEndpoint,
                              associateTokenEndpoint,
@@ -65,13 +63,11 @@ object Microservice extends IOMicroservice {
                              new RoutesMetrics[IO](metricsRegistry)
                            ).routes
       exitcode <- microserviceRoutes.use { routes =>
-                    val httpServer = new HttpServer[IO](serverPort = 9003, routes)
-
                     new MicroserviceRunner(
                       certificateLoader,
                       sentryInitializer,
                       dbInitializer,
-                      httpServer
+                      HttpServer[IO](serverPort = 9003, routes)
                     ).run()
                   }
     } yield exitcode

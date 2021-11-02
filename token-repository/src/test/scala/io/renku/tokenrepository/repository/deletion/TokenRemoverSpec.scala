@@ -23,12 +23,13 @@ import io.renku.db.SqlStatement
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.metrics.TestLabeledHistogram
+import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.InMemoryProjectsTokensDbSpec
 import io.renku.tokenrepository.repository.RepositoryGenerators.encryptedAccessTokens
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class TokenRemoverSpec extends AnyWordSpec with InMemoryProjectsTokensDbSpec with should.Matchers {
+class TokenRemoverSpec extends AnyWordSpec with IOSpec with InMemoryProjectsTokensDbSpec with should.Matchers {
 
   "delete" should {
 
@@ -53,6 +54,6 @@ class TokenRemoverSpec extends AnyWordSpec with InMemoryProjectsTokensDbSpec wit
     val projectPath = projectPaths.generateOne
 
     private val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val remover                  = new TokenRemover(sessionResource, queriesExecTimes)
+    val remover                  = new TokenRemoverImpl(sessionResource, queriesExecTimes)
   }
 }

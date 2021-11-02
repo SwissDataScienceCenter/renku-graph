@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories.membersync
 
-import cats.effect.IO
+import cats.MonadThrow
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.config.{GitLabUrlLoader, RenkuBaseUrlLoader}
@@ -131,8 +131,8 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApi
 }
 
 private object UpdatesCreator {
-  def apply(): IO[UpdatesCreator] = for {
-    renkuBaseUrl <- RenkuBaseUrlLoader[IO]()
-    gitLabUrl    <- GitLabUrlLoader[IO]()
+  def apply[F[_]: MonadThrow]: F[UpdatesCreator] = for {
+    renkuBaseUrl <- RenkuBaseUrlLoader[F]()
+    gitLabUrl    <- GitLabUrlLoader[F]()
   } yield new UpdatesCreator(renkuBaseUrl, gitLabUrl.apiV4)
 }

@@ -33,7 +33,7 @@ object users {
       with NonBlank
       with EntityIdJsonLdOps[ResourceId] {
 
-    def apply(id:       EntityId): ResourceId = ResourceId(id.value.toString)
+    def apply(id: EntityId): ResourceId = ResourceId(id.value.toString)
     def apply(gitLabId: GitLabId)(implicit renkuBaseUrl: RenkuBaseUrl): ResourceId = ResourceId(
       (renkuBaseUrl / "users" / gitLabId).show
     )
@@ -80,7 +80,7 @@ object users {
   implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank with TinyTypeJsonLDOps[Name]
 
   final class Username private (val value: String) extends AnyVal with StringTinyType
-  implicit object Username extends TinyTypeFactory[Username](new Username(_)) with NonBlank
+  implicit object Username                         extends TinyTypeFactory[Username](new Username(_)) with NonBlank
 
   final class Affiliation private (val value: String) extends AnyVal with StringTinyType
   implicit object Affiliation

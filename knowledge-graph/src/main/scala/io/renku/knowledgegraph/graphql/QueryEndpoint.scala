@@ -18,9 +18,11 @@
 
 package io.renku.knowledgegraph.graphql
 
-import cats.MonadError
 import cats.effect._
+import cats.effect.kernel.Concurrent
+import cats.effect.unsafe.IORuntime
 import cats.syntax.all._
+import cats.MonadThrow
 import io.circe.Json
 import io.renku.http.ErrorMessage
 import io.renku.http.server.security.model.AuthUser
@@ -36,23 +38,28 @@ import scala.concurrent.ExecutionContext
 import scala.util.Try
 import scala.util.control.NonFatal
 
-class QueryEndpoint[Interpretation[_]: Effect: MonadThrow](
-    queryRunner: QueryRunner[Interpretation, LineageQueryContext[Interpretation]]
-) extends Http4sDsl[Interpretation] {
+trait QueryEndpoint[F[_]] {
+  def schema(): F[Response[F]]
+
+  def handleQuery(request: Request[F], maybeUser: Option[AuthUser]): F[Response[F]]
+}
+
+class QueryEndpointImpl[F[_]: Concurrent](
+    queryRunner: QueryRunner[F, LineageQueryContext[F]]
+) extends Http4sDsl[F]
+    with QueryEndpoint[F] {
 
   import ErrorMessage._
-  import QueryEndpoint._
+  import QueryEndpointImpl._
   import org.http4s.circe._
 
-  def schema(): Interpretation[Response[Interpretation]] =
+  def schema(): F[Response[F]] =
     for {
-      schema <- MonadError[Interpretation, Throwable].fromTry(Try(renderSchema(queryRunner.schema)))
+      schema <- MonadThrow[F].fromTry(Try(renderSchema(queryRunner.schema)))
       result <- Ok(schema)
     } yield result
 
-  def handleQuery(request:   Request[Interpretation],
-                  maybeUser: Option[AuthUser]
-  ): Interpretation[Response[Interpretation]] = {
+  def handleQuery(request: Request[F], maybeUser: Option[AuthUser]): F[Response[F]] = {
     for {
       query <- request.as[UserQuery] recoverWith badRequest
       result <-
@@ -61,30 +68,30 @@ class QueryEndpoint[Interpretation[_]: Effect: MonadThrow](
     } yield response
   } recoverWith httpResponse
 
-  private lazy val badRequest: PartialFunction[Throwable, Interpretation[UserQuery]] = { case NonFatal(exception) =>
-    BadRequestError(exception).raiseError[Interpretation, UserQuery]
+  private lazy val badRequest: PartialFunction[Throwable, F[UserQuery]] = { case NonFatal(exception) =>
+    BadRequestError(exception).raiseError[F, UserQuery]
   }
 
-  private lazy val badRequestForInvalidQuery: PartialFunction[Throwable, Interpretation[Json]] = {
-    case exception: QueryAnalysisError => BadRequestError(exception).raiseError[Interpretation, Json]
+  private lazy val badRequestForInvalidQuery: PartialFunction[Throwable, F[Json]] = {
+    case exception: QueryAnalysisError => BadRequestError(exception).raiseError[F, Json]
   }
 
   private case class BadRequestError(cause: Throwable) extends Exception(cause)
 
-  private lazy val httpResponse: PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
+  private lazy val httpResponse: PartialFunction[Throwable, F[Response[F]]] = {
     case BadRequestError(exception) => BadRequest(ErrorMessage(exception))
     case NonFatal(exception)        => InternalServerError(ErrorMessage(exception))
   }
 
-  private implicit lazy val queryEntityDecoder: EntityDecoder[Interpretation, UserQuery] =
-    jsonOf[Interpretation, UserQuery]
+  private implicit lazy val queryEntityDecoder: EntityDecoder[F, UserQuery] =
+    jsonOf[F, UserQuery]
 }
 
-private object QueryEndpoint {
+object QueryEndpointImpl {
 
   import io.circe._
 
-  implicit val queryDecoder: Decoder[UserQuery] = cursor =>
+  private implicit val queryDecoder: Decoder[UserQuery] = cursor =>
     for {
       query <- cursor
                  .downField("query")
@@ -106,19 +113,19 @@ private object QueryEndpoint {
     }
 }
 
-object IOQueryEndpoint {
+object QueryEndpoint {
 
   import io.renku.rdfstore.SparqlQueryTimeRecorder
 
   def apply(
-      timeRecorder: SparqlQueryTimeRecorder[IO],
-      logger:       Logger[IO]
+      timeRecorder: SparqlQueryTimeRecorder[IO]
   )(implicit
       executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
+      runtime:          IORuntime,
+      logger:           Logger[IO]
   ): IO[QueryEndpoint[IO]] = for {
-    queryContext <- LineageQueryContext(timeRecorder, logger)
+    queryContext <- LineageQueryContext(timeRecorder)
     querySchema = QuerySchema[IO](QueryFields())
-  } yield new QueryEndpoint[IO](new QueryRunner(querySchema, queryContext))
+    queryRunner <- QueryRunner[IO, LineageQueryContext[IO]](querySchema, queryContext)
+  } yield new QueryEndpointImpl[IO](queryRunner)
 }

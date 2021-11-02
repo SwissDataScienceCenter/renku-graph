@@ -18,7 +18,6 @@
 
 package io.renku.eventlog.events.categories.statuschange
 
-import cats.Applicative
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
@@ -37,6 +36,7 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{EventId, EventStatus}
 import io.renku.graph.model.projects
+import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -46,6 +46,7 @@ import skunk.{Session, ~}
 
 class StatusChangerSpec
     extends AnyWordSpec
+    with IOSpec
     with InMemoryEventLogDbSpec
     with TypeSerializers
     with should.Matchers
@@ -164,11 +165,6 @@ class StatusChangerSpec
     implicit val dbUpdater: DBUpdater[IO, StatusChangeEvent] = new TestDbUpdater
     val gaugesUpdater = mock[GaugesUpdater[IO]]
     val statusChanger = new StatusChangerImpl[IO](sessionResource, gaugesUpdater)
-  }
-
-  private implicit val genApplicative: Applicative[Gen] = new Applicative[Gen] {
-    override def pure[A](x:   A) = Gen.const(x)
-    override def ap[A, B](ff: Gen[A => B])(fa: Gen[A]): Gen[B] = ff.flatMap(f => fa.map(f))
   }
 
   private def updateResultsGen(event: StatusChangeEvent): Gen[DBUpdateResults] = event match {

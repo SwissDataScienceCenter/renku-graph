@@ -33,6 +33,7 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus}
 import io.renku.graph.model.projects
 import io.renku.metrics.TestLabeledHistogram
+import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -43,6 +44,7 @@ import scala.util.Random
 
 class AllEventsToNewUpdaterSpec
     extends AnyWordSpec
+    with IOSpec
     with InMemoryEventLogDbSpec
     with TypeSerializers
     with should.Matchers
@@ -79,7 +81,7 @@ class AllEventsToNewUpdaterSpec
         (eventId.id, EventStatus.New, None, None, List())
       }
 
-      findEvent(CompoundEventId(skippedEvent, skippedEventProjectId)).map(_._2)                   shouldBe Some(EventStatus.Skipped)
+      findEvent(CompoundEventId(skippedEvent, skippedEventProjectId)).map(_._2) shouldBe Some(EventStatus.Skipped)
       findEvent(CompoundEventId(awaitingDeletionEvent, awaitingDeletionEventProjectId)).map(_._2) shouldBe None
       findAllDeliveries                                                                           shouldBe Nil
     }

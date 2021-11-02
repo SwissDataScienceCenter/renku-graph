@@ -18,7 +18,8 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.Async
+import cats.syntax.all._
 import io.renku.config.GitLab
 import io.renku.control.Throttler
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
@@ -28,23 +29,15 @@ import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.Microservice
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
 object SubscriptionFactory {
-  def apply(
-      metricsRegistry: MetricsRegistry[IO],
-      gitLabThrottler: Throttler[IO, GitLab],
-      timeRecorder:    SparqlQueryTimeRecorder[IO]
-  )(implicit
-      contextShift:     ContextShift[IO],
-      executionContext: ExecutionContext,
-      timer:            Timer[IO],
-      logger:           Logger[IO]
-  ): IO[(EventHandler[IO], SubscriptionMechanism[IO])] = for {
+  def apply[F[_]: Async: Logger](
+      metricsRegistry: MetricsRegistry,
+      gitLabThrottler: Throttler[F, GitLab],
+      timeRecorder:    SparqlQueryTimeRecorder[F]
+  ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
     subscriptionMechanism <- SubscriptionMechanism(
                                categoryName,
-                               categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort, Microservice.Identifier),
-                               logger
+                               categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort, Microservice.Identifier)
                              )
     handler <- EventHandler(metricsRegistry, gitLabThrottler, timeRecorder, subscriptionMechanism)
   } yield handler -> subscriptionMechanism

@@ -21,26 +21,17 @@ package io.renku.eventlog.init
 import cats.effect.IO
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk.implicits._
 
-class EventDeliveryTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
+class EventDeliveryTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
 
-  protected override lazy val migrationsToRun: List[Migration] = List(
-    eventLogTableCreator,
-    projectPathAdder,
-    batchDateAdder,
-    projectTableCreator,
-    projectPathRemover,
-    eventLogTableRenamer,
-    eventStatusRenamer,
-    eventPayloadTableCreator,
-    eventPayloadSchemaVersionAdder,
-    subscriptionCategorySyncTimeTableCreator,
-    statusesProcessingTimeTableCreator,
-    subscriberTableCreator
-  )
+  protected override lazy val migrationsToRun: List[Migration] = allMigrations.takeWhile {
+    case _: EventDeliveryTableCreatorImpl[_] => false
+    case _ => true
+  }
 
   "run" should {
 
@@ -75,7 +66,7 @@ class EventDeliveryTableCreatorSpec extends AnyWordSpec with DbInitSpec with sho
   }
 
   private trait TestCase {
-    implicit val logger = TestLogger[IO]()
-    val tableCreator    = new EventDeliveryTableCreatorImpl[IO](sessionResource)
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val tableCreator = new EventDeliveryTableCreatorImpl[IO](sessionResource)
   }
 }

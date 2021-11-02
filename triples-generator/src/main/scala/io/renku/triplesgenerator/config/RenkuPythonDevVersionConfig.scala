@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.config
 
-import cats.MonadError
+import cats.MonadThrow
 import com.typesafe.config.{Config, ConfigFactory}
 import pureconfig.ConfigReader
 
@@ -34,8 +34,6 @@ object RenkuPythonDevVersionConfig {
     case None                                  => None
   }
 
-  def apply[Interpretation[_]](
-      config:    Config = ConfigFactory.load
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[Option[RenkuPythonDevVersion]] =
-    find[Interpretation, Option[RenkuPythonDevVersion]]("renku-python-dev-version", config)
+  def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load): F[Option[RenkuPythonDevVersion]] =
+    find[F, Option[RenkuPythonDevVersion]]("renku-python-dev-version", config)
 }

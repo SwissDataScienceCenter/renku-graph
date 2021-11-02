@@ -18,7 +18,8 @@
 
 package io.renku.triplesgenerator.events.categories.membersync
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.Async
+import cats.syntax.all._
 import io.renku.graph.model.Schemas.{rdf, schema}
 import io.renku.graph.model.users
 import io.renku.graph.model.users.{GitLabId, ResourceId}
@@ -26,27 +27,24 @@ import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
-private trait KGPersonFinder[Interpretation[_]] {
+private trait KGPersonFinder[F[_]] {
   def findPersonIds(
       membersToAdd: Set[GitLabProjectMember]
-  ): Interpretation[Set[(GitLabProjectMember, Option[ResourceId])]]
+  ): F[Set[(GitLabProjectMember, Option[ResourceId])]]
 }
 
-private class KGPersonFinderImpl(
-    rdfStoreConfig:          RdfStoreConfig,
-    timeRecorder:            SparqlQueryTimeRecorder[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO], logger: Logger[IO])
-    extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
-    with KGPersonFinder[IO] {
+private class KGPersonFinderImpl[F[_]: Async: Logger](
+    rdfStoreConfig: RdfStoreConfig,
+    timeRecorder:   SparqlQueryTimeRecorder[F]
+) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
+    with KGPersonFinder[F] {
 
   import eu.timepit.refined.auto._
   import io.circe.Decoder
 
   def findPersonIds(
       membersToAdd: Set[GitLabProjectMember]
-  ): IO[Set[(GitLabProjectMember, Option[ResourceId])]] = for {
+  ): F[Set[(GitLabProjectMember, Option[ResourceId])]] = for {
     gitLabIdsAndIds <- queryExpecting[Set[(GitLabId, ResourceId)]](using = query(membersToAdd)).map(_.toMap)
   } yield membersToAdd.map(member => member -> gitLabIdsAndIds.get(member.gitLabId))
 
@@ -82,12 +80,7 @@ private class KGPersonFinderImpl(
 }
 
 private object KGPersonFinder {
-  def apply(timeRecorder: SparqlQueryTimeRecorder[IO])(implicit
-      executionContext:   ExecutionContext,
-      contextShift:       ContextShift[IO],
-      timer:              Timer[IO],
-      logger:             Logger[IO]
-  ): IO[KGPersonFinderImpl] = for {
-    rdfStoreConfig <- RdfStoreConfig[IO]()
+  def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[KGPersonFinder[F]] = for {
+    rdfStoreConfig <- RdfStoreConfig[F]()
   } yield new KGPersonFinderImpl(rdfStoreConfig, timeRecorder)
 }

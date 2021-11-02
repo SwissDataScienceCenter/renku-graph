@@ -33,6 +33,7 @@ import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
+import io.renku.testtools.IOSpec
 import io.renku.webhookservice.hookcreation.HookCreator.CreationResult.{HookCreated, HookExisted}
 import org.http4s.Status._
 import org.http4s._
@@ -41,7 +42,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class HookCreationEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class HookCreationEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers with IOSpec {
 
   "createHook" should {
 
@@ -113,9 +114,9 @@ class HookCreationEndpointSpec extends AnyWordSpec with MockFactory with should.
     val projectId = projectIds.generateOne
     val authUser  = authUsers.generateOne
 
-    val logger = TestLogger[IO]()
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
 
     val hookCreator = mock[HookCreator[IO]]
-    val createHook  = new HookCreationEndpointImpl[IO](hookCreator, logger).createHook _
+    val createHook  = new HookCreationEndpointImpl[IO](hookCreator).createHook _
   }
 }

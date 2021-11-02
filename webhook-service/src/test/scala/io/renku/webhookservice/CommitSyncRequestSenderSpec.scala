@@ -18,8 +18,7 @@
 
 package io.renku.webhookservice
 
-import WebhookServiceGenerators._
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER
 import com.github.tomakehurst.wiremock.stubbing.Scenario
@@ -32,13 +31,14 @@ import io.renku.graph.config.EventLogUrl
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.stubbing.ExternalServiceStubbing
-import model.CommitSyncRequest
+import io.renku.testtools.IOSpec
+import io.renku.webhookservice.WebhookServiceGenerators._
+import io.renku.webhookservice.model.CommitSyncRequest
 import org.http4s.Status._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -46,7 +46,8 @@ class CommitSyncRequestSenderSpec
     extends AnyWordSpec
     with MockFactory
     with ExternalServiceStubbing
-    with should.Matchers {
+    with should.Matchers
+    with IOSpec {
 
   "send" should {
 
@@ -169,22 +170,18 @@ class CommitSyncRequestSenderSpec
     }
   }
 
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO]        = IO.timer(global)
-
   private trait TestCase {
 
     val syncRequest = commitSyncRequests.generateOne
 
-    val eventLogUrl    = EventLogUrl(externalServiceBaseUrl)
-    val logger         = TestLogger[IO]()
-    val requestTimeout = 2 seconds
-    val eventSender = new CommitSyncRequestSenderImpl(eventLogUrl,
-                                                      logger,
-                                                      500 millis,
-                                                      retryInterval = 100 millis,
-                                                      maxRetries = 1,
-                                                      requestTimeoutOverride = Some(requestTimeout)
+    val eventLogUrl     = EventLogUrl(externalServiceBaseUrl)
+    implicit val logger = TestLogger[IO]()
+    val requestTimeout  = 2 seconds
+    val eventSender = new CommitSyncRequestSenderImpl[IO](eventLogUrl,
+                                                          500 millis,
+                                                          retryInterval = 100 millis,
+                                                          maxRetries = 1,
+                                                          requestTimeoutOverride = Some(requestTimeout)
     )
   }
 

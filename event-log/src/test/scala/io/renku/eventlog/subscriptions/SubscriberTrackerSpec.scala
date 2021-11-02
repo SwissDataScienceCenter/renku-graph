@@ -28,13 +28,19 @@ import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.metrics.TestLabeledHistogram
 import io.renku.microservices.MicroserviceBaseUrl
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk._
 import skunk.implicits._
 
-class SubscriberTrackerSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory with should.Matchers {
+class SubscriberTrackerSpec
+    extends AnyWordSpec
+    with IOSpec
+    with InMemoryEventLogDbSpec
+    with MockFactory
+    with should.Matchers {
 
   "add" should {
 
@@ -138,7 +144,6 @@ class SubscriberTrackerSpec extends AnyWordSpec with InMemoryEventLogDbSpec with
   }
 
   private trait TestCase {
-
     val subscriptionInfo = subscriptionInfos.generateOne
     val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
     val sourceUrl        = microserviceBaseUrls.generateOne

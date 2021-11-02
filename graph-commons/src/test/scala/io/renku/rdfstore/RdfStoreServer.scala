@@ -41,10 +41,10 @@ object RdfStoreServer extends IOApp {
 }
 
 class RdfStoreServer(
-    port:         Int Refined Positive,
-    datasetName:  DatasetName,
-    muteLogging:  Boolean = true
-)(implicit timer: Timer[IO]) {
+    port:            Int Refined Positive,
+    datasetName:     DatasetName,
+    muteLogging:     Boolean = true
+)(implicit temporal: Temporal[IO]) {
 
   if (!muteLogging) {
     import org.apache.jena.atlas.logging.LogCtl
@@ -92,30 +92,27 @@ class RdfStoreServer(
     .build
 
   def start: IO[Unit] =
-    IO(rdfStoreServer.start())
-      .map(_ => ())
-      .recoverWith {
-        case exception: FusekiException =>
-          exception.getCause match {
-            case _: BindException =>
-              (timer sleep (1 second)) flatMap (_ => start)
-            case other =>
-              IO.raiseError(new IllegalStateException(s"Cannot start fuseki on http://localhost:$port", other))
-          }
-        case other: Exception =>
-          IO.raiseError(new IllegalStateException(s"Cannot start fuseki on http://localhost:$port", other))
-      }
+    IO(rdfStoreServer.start()).void.recoverWith {
+      case exception: FusekiException =>
+        exception.getCause match {
+          case _: BindException =>
+            (temporal sleep (1 second)) >> start
+          case other =>
+            IO.raiseError(new IllegalStateException(s"Cannot start fuseki on http://localhost:$port", other))
+        }
+      case other: Exception =>
+        IO.raiseError(new IllegalStateException(s"Cannot start fuseki on http://localhost:$port", other))
+    }
 
   def stop: IO[Unit] = IO(rdfStoreServer.stop())
 
-  def clearDataset(): IO[Unit] =
-    for {
-      _ <- IO(dataset.asDatasetGraph().clear())
-      _ <- isDatasetEmpty flatMap {
-             case true  => IO.unit
-             case false => IO.raiseError(new Exception(s"Clearing $datasetName wasn't successful"))
-           }
-    } yield ()
+  def clearDataset(): IO[Unit] = for {
+    _ <- IO(dataset.asDatasetGraph().clear())
+    _ <- isDatasetEmpty flatMap {
+           case true  => IO.unit
+           case false => IO.raiseError(new Exception(s"Clearing $datasetName wasn't successful"))
+         }
+  } yield ()
 
   def isDatasetEmpty: IO[Boolean] = IO {
     dataset.asDatasetGraph().isEmpty

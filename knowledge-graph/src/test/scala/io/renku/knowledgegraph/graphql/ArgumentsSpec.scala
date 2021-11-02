@@ -79,5 +79,5 @@ class ArgumentsSpec extends AnyWordSpec with should.Matchers {
 
   type NonBlank = String Refined NonEmpty
   case class TestTinyType(value: String) extends StringTinyType
-  object TestTinyType extends TinyTypeFactory[TestTinyType](new TestTinyType(_))
+  object TestTinyType                    extends TinyTypeFactory[TestTinyType](new TestTinyType(_))
 }

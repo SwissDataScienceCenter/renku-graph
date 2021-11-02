@@ -18,6 +18,7 @@
 
 package io.renku.webhookservice.eventprocessing
 
+import cats.MonadThrow
 import cats.data.OptionT
 import cats.effect._
 import cats.syntax.all._
@@ -41,26 +42,24 @@ import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-trait ProcessingStatusEndpoint[Interpretation[_]] {
-  def fetchProcessingStatus(projectId: Id): Interpretation[Response[Interpretation]]
+trait ProcessingStatusEndpoint[F[_]] {
+  def fetchProcessingStatus(projectId: Id): F[Response[F]]
 }
 
-class ProcessingStatusEndpointImpl[Interpretation[_]: Effect: MonadThrow](
-    hookValidator:           HookValidator[Interpretation],
-    processingStatusFetcher: ProcessingStatusFetcher[Interpretation],
-    executionTimeRecorder:   ExecutionTimeRecorder[Interpretation],
-    logger:                  Logger[Interpretation]
-) extends Http4sDsl[Interpretation]
-    with ProcessingStatusEndpoint[Interpretation] {
+class ProcessingStatusEndpointImpl[F[_]: MonadThrow: Logger](
+    hookValidator:           HookValidator[F],
+    processingStatusFetcher: ProcessingStatusFetcher[F],
+    executionTimeRecorder:   ExecutionTimeRecorder[F]
+) extends Http4sDsl[F]
+    with ProcessingStatusEndpoint[F] {
 
   import HookValidationResult._
   import ProcessingStatusEndpointImpl._
   import executionTimeRecorder._
 
-  def fetchProcessingStatus(projectId: Id): Interpretation[Response[Interpretation]] = measureExecutionTime {
+  def fetchProcessingStatus(projectId: Id): F[Response[F]] = measureExecutionTime {
     {
       for {
         _        <- validateHook(projectId)
@@ -70,11 +69,11 @@ class ProcessingStatusEndpointImpl[Interpretation[_]: Effect: MonadThrow](
       .recoverWith(httpResponse(projectId))
   } map logExecutionTime(withMessage = s"Finding progress status for project '$projectId' finished")
 
-  private def validateHook(projectId: Id): OptionT[Interpretation, Unit] = OptionT {
+  private def validateHook(projectId: Id): OptionT[F, Unit] = OptionT {
     hookValidator.validateHook(projectId, maybeAccessToken = None) map hookMissingToNone recover noAccessTokenToNone
   }
 
-  private def findStatus(projectId: Id): OptionT[Interpretation, Response[Interpretation]] = OptionT.liftF {
+  private def findStatus(projectId: Id): OptionT[F, Response[F]] = OptionT.liftF {
     processingStatusFetcher
       .fetchProcessingStatus(projectId)
       .semiflatMap(processingStatus => Ok(processingStatus.asJson))
@@ -92,9 +91,9 @@ class ProcessingStatusEndpointImpl[Interpretation[_]: Effect: MonadThrow](
 
   private def httpResponse(
       projectId: projects.Id
-  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = { case NonFatal(exception) =>
-    logger.error(exception)(s"Finding progress status for project '$projectId' failed")
-    InternalServerError(ErrorMessage(exception))
+  ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
+    Logger[F].error(exception)(s"Finding progress status for project '$projectId' failed") >>
+      InternalServerError(ErrorMessage(exception))
   }
 }
 
@@ -118,18 +117,12 @@ private object ProcessingStatusEndpointImpl {
 }
 
 object ProcessingStatusEndpoint {
-  def apply(
+  def apply[F[_]: Async: Logger](
       projectHookUrl:        ProjectHookUrl,
-      gitLabThrottler:       Throttler[IO, GitLab],
-      executionTimeRecorder: ExecutionTimeRecorder[IO],
-      logger:                Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      clock:            Clock[IO],
-      timer:            Timer[IO]
-  ): IO[ProcessingStatusEndpoint[IO]] = for {
-    fetcher       <- IOProcessingStatusFetcher(logger)
+      gitLabThrottler:       Throttler[F, GitLab],
+      executionTimeRecorder: ExecutionTimeRecorder[F]
+  ): F[ProcessingStatusEndpoint[F]] = for {
+    fetcher       <- ProcessingStatusFetcher[F]
     hookValidator <- hookvalidation.HookValidator(projectHookUrl, gitLabThrottler)
-  } yield new ProcessingStatusEndpointImpl[IO](hookValidator, fetcher, executionTimeRecorder, logger)
+  } yield new ProcessingStatusEndpointImpl[F](hookValidator, fetcher, executionTimeRecorder)
 }

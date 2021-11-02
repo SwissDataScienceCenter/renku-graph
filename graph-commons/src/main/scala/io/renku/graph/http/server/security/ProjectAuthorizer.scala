@@ -18,10 +18,10 @@
 
 package io.renku.graph.http.server.security
 
-import cats.MonadError
 import cats.data.EitherT
 import cats.data.EitherT.{leftT, rightT}
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.kernel.Temporal
+import cats.effect.{Async, IO}
 import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.graph.config.RenkuBaseUrlLoader
@@ -37,47 +37,31 @@ import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
-trait ProjectAuthorizer[Interpretation[_]] {
-  def authorize(path:          projects.Path,
-                maybeAuthUser: Option[AuthUser]
-  ): EitherT[Interpretation, EndpointSecurityException, Unit]
+trait ProjectAuthorizer[F[_]] {
+  def authorize(path: projects.Path, maybeAuthUser: Option[AuthUser]): EitherT[F, EndpointSecurityException, Unit]
 }
 
 object ProjectAuthorizer {
   def apply(
       timeRecorder:   SparqlQueryTimeRecorder[IO],
       renkuBaseUrl:   IO[RenkuBaseUrl] = RenkuBaseUrlLoader[IO](),
-      rdfStoreConfig: IO[RdfStoreConfig] = RdfStoreConfig[IO](),
-      logger:         Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[ProjectAuthorizer[IO]] =
-    for {
-      config   <- rdfStoreConfig
-      renkuUrl <- renkuBaseUrl
-    } yield new ProjectAuthorizerImpl(config, renkuUrl, logger, timeRecorder)
+      rdfStoreConfig: IO[RdfStoreConfig] = RdfStoreConfig[IO]()
+  )(implicit logger:  Logger[IO]): IO[ProjectAuthorizer[IO]] = for {
+    config   <- rdfStoreConfig
+    renkuUrl <- renkuBaseUrl
+  } yield new ProjectAuthorizerImpl(config, renkuUrl, timeRecorder)
 }
 
-class ProjectAuthorizerImpl(
+class ProjectAuthorizerImpl[F[_]: Async: Temporal: Logger](
     rdfStoreConfig: RdfStoreConfig,
     renkuBaseUrl:   RenkuBaseUrl,
-    logger:         Logger[IO],
-    timeRecorder:   SparqlQueryTimeRecorder[IO]
-)(implicit
-    executionContext: ExecutionContext,
-    contextShift:     ContextShift[IO],
-    timer:            Timer[IO],
-    ME:               MonadError[IO, Throwable]
-) extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
-    with ProjectAuthorizer[IO] {
+    timeRecorder:   SparqlQueryTimeRecorder[F]
+) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
+    with ProjectAuthorizer[F] {
 
   override def authorize(path:          projects.Path,
                          maybeAuthUser: Option[AuthUser]
-  ): EitherT[IO, EndpointSecurityException, Unit] = for {
+  ): EitherT[F, EndpointSecurityException, Unit] = for {
     records <- EitherT.right(queryExpecting[List[Record]](using = query(path))(recordsDecoder))
     _       <- validate(maybeAuthUser, records)
   } yield ()
@@ -135,10 +119,10 @@ class ProjectAuthorizerImpl(
   private def validate(
       maybeAuthUser: Option[AuthUser],
       records:       List[Record]
-  ): EitherT[IO, EndpointSecurityException, Unit] = records -> maybeAuthUser match {
+  ): EitherT[F, EndpointSecurityException, Unit] = records -> maybeAuthUser match {
     case (Nil, _)                                                                            => rightT(())
     case ((Public, _) :: Nil, _)                                                             => rightT(())
     case ((_, projectMembers) :: Nil, Some(authUser)) if projectMembers contains authUser.id => rightT(())
-    case _                                                                                   => leftT(AuthorizationFailure)
+    case _ => leftT(AuthorizationFailure)
   }
 }

@@ -18,7 +18,7 @@
 
 package io.renku.webhookservice.hookcreation.project
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.literal._
 import io.renku.control.Throttler
@@ -31,14 +31,18 @@ import io.renku.http.client.AccessToken
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
+import io.renku.testtools.IOSpec
 import org.http4s.Status
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
-class ProjectInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalServiceStubbing with should.Matchers {
+class ProjectInfoFinderSpec
+    extends AnyWordSpec
+    with MockFactory
+    with ExternalServiceStubbing
+    with should.Matchers
+    with IOSpec {
 
   "findProjectInfo" should {
 
@@ -77,8 +81,6 @@ class ProjectInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSe
     }
 
     "return fetched public project info if service responds with 200 and a valid body - no token case" in new TestCase {
-
-      val oauthAccessToken = oauthAccessTokens.generateOne
 
       stubFor {
         get(s"/api/v4/projects/$projectId")
@@ -131,16 +133,15 @@ class ProjectInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalSe
     }
   }
 
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO]        = IO.timer(global)
-
   private trait TestCase {
     val gitLabUrl         = GitLabUrl(externalServiceBaseUrl)
     val projectId         = projectIds.generateOne
     val projectVisibility = projectVisibilities.generateOne
     val projectPath       = projectPaths.generateOne
 
-    val projectInfoFinder = new ProjectInfoFinderImpl(gitLabUrl, Throttler.noThrottling, TestLogger())
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+
+    val projectInfoFinder = new ProjectInfoFinderImpl[IO](gitLabUrl, Throttler.noThrottling)
 
     def projectJson(maybeAccessToken: Option[AccessToken]): String = maybeAccessToken match {
       case Some(_) =>

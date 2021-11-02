@@ -19,20 +19,18 @@
 package io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog
 
 import ammonite.ops.{Bytes, CommandResult, Path, ShelloutException}
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.jsonld.generators.JsonLDGenerators.jsonLDEntities
+import io.renku.generators.jsonld.JsonLDGenerators.jsonLDEntities
+import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
-import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.{Renku, RepositoryPath}
+import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.{RenkuImpl, RepositoryPath}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent._
-
-class RenkuSpec extends AnyWordSpec with should.Matchers with MockFactory {
+class RenkuSpec extends AnyWordSpec with IOSpec with should.Matchers with MockFactory {
 
   "export" should {
 
@@ -71,13 +69,10 @@ class RenkuSpec extends AnyWordSpec with should.Matchers with MockFactory {
     }
   }
 
-  private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
-  private implicit val timer:        Timer[IO]        = IO.timer(ExecutionContext.global)
-
   private trait TestCase {
     val path        = RepositoryPath(paths.generateOne)
     val renkuExport = mockFunction[Path, CommandResult]
 
-    val renku = new Renku(renkuExport)
+    val renku = new RenkuImpl[IO](renkuExport)
   }
 }

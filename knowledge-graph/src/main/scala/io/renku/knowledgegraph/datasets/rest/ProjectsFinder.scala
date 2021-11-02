@@ -18,7 +18,8 @@
 
 package io.renku.knowledgegraph.datasets.rest
 
-import cats.effect.{ConcurrentEffect, Timer}
+import cats.MonadThrow
+import cats.effect.kernel.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder.decodeList
@@ -32,19 +33,21 @@ import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.util.Try
 
-private class ProjectsFinder[Interpretation[_]: ConcurrentEffect: Timer](
-    rdfStoreConfig:          RdfStoreConfig,
-    logger:                  Logger[Interpretation],
-    timeRecorder:            SparqlQueryTimeRecorder[Interpretation]
-)(implicit executionContext: ExecutionContext)
-    extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder) {
+private trait ProjectsFinder[F[_]] {
+  def findUsedIn(identifier: Identifier): F[List[DatasetProject]]
+}
 
-  import ProjectsFinder._
+private class ProjectsFinderImpl[F[_]: Async: Logger](
+    rdfStoreConfig: RdfStoreConfig,
+    timeRecorder:   SparqlQueryTimeRecorder[F]
+) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
+    with ProjectsFinder[F] {
 
-  def findUsedIn(identifier: Identifier): Interpretation[List[DatasetProject]] =
+  import ProjectsFinderImpl._
+
+  def findUsedIn(identifier: Identifier): F[List[DatasetProject]] =
     queryExpecting[List[DatasetProject]](using = query(identifier))
 
   private def query(identifier: Identifier) = SparqlQuery.of(
@@ -73,7 +76,7 @@ private class ProjectsFinder[Interpretation[_]: ConcurrentEffect: Timer](
   )
 }
 
-private object ProjectsFinder {
+private object ProjectsFinderImpl {
 
   import io.circe.Decoder
 
@@ -95,4 +98,13 @@ private object ProjectsFinder {
 
     _.downField("results").downField("bindings").as(decodeList[DatasetProject])
   }
+}
+
+private object ProjectsFinder {
+
+  def apply[F[_]: Async: Logger](
+      rdfStoreConfig: RdfStoreConfig,
+      timeRecorder:   SparqlQueryTimeRecorder[F]
+  ): F[ProjectsFinder[F]] = MonadThrow[F].catchNonFatal(new ProjectsFinderImpl[F](rdfStoreConfig, timeRecorder))
+
 }

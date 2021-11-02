@@ -19,24 +19,27 @@
 package io.renku.eventlog.subscriptions
 
 import cats.effect.IO
+import cats.syntax.all._
 import io.circe.Json
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.http.server.EndpointTester.jsonEntityDecoder
+import io.renku.testtools.IOSpec
 import org.http4s.MediaType
 import org.http4s.headers.`Content-Type`
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EventEncoderSpec extends AnyWordSpec with should.Matchers {
+class EventEncoderSpec extends AnyWordSpec with IOSpec with should.Matchers {
+
   "encodeParts" should {
     "encode only event part for events without payload" in {
       val content = jsons.generateOne
       lazy val encodeEvent: String => Json = _ => content
       val Vector(part) = EventEncoder(encodeEvent).encodeParts[IO](nonEmptyStrings().generateOne)
-      part.headers.toList             should contain(`Content-Type`(MediaType.application.json))
-      part.name                     shouldBe Some("event")
-      part.as[Json].unsafeRunSync() shouldBe content
+      part.headers.get[`Content-Type`] shouldBe `Content-Type`(MediaType.application.json).some
+      part.name                        shouldBe "event".some
+      part.as[Json].unsafeRunSync()    shouldBe content
     }
 
     "encode event and payload parts" in {
@@ -46,13 +49,13 @@ class EventEncoderSpec extends AnyWordSpec with should.Matchers {
       val encodePayload: String => String = _ => payloadContent
       val Vector(eventPart, payloadPart) =
         EventEncoder(encodeEvent, encodePayload).encodeParts[IO](nonEmptyStrings().generateOne)
-      eventPart.headers.toList             should contain(`Content-Type`(MediaType.application.json))
-      eventPart.name                     shouldBe Some("event")
-      eventPart.as[Json].unsafeRunSync() shouldBe eventContent
+      eventPart.headers.get[`Content-Type`] shouldBe `Content-Type`(MediaType.application.json).some
+      eventPart.name                        shouldBe Some("event")
+      eventPart.as[Json].unsafeRunSync()    shouldBe eventContent
 
-      payloadPart.headers.toList               should contain(`Content-Type`(MediaType.text.plain))
-      payloadPart.name                       shouldBe Some("payload")
-      payloadPart.as[String].unsafeRunSync() shouldBe payloadContent
+      payloadPart.headers.get[`Content-Type`] shouldBe `Content-Type`(MediaType.text.plain).some
+      payloadPart.name                        shouldBe Some("payload")
+      payloadPart.as[String].unsafeRunSync()  shouldBe payloadContent
     }
   }
 }

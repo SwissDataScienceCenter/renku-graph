@@ -18,10 +18,9 @@
 
 package io.renku.commiteventservice.events.categories.globalcommitsync
 
-import cats.MonadThrow
 import cats.data.EitherT.fromEither
-import cats.effect.concurrent.Deferred
-import cats.effect.{Concurrent, ContextShift, IO, Timer}
+import cats.effect._
+import cats.effect.kernel.Deferred
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
@@ -37,52 +36,50 @@ import io.renku.graph.model.events.{CategoryName, CommitId}
 import io.renku.logging.ExecutionTimeRecorder
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-private[events] class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurrent](
+private[events] class EventHandler[F[_]: Spawn: Concurrent: Logger](
     override val categoryName:  CategoryName,
-    commitEventSynchronizer:    GlobalCommitEventSynchronizer[Interpretation],
-    subscriptionMechanism:      SubscriptionMechanism[Interpretation],
-    concurrentProcessesLimiter: ConcurrentProcessesLimiter[Interpretation],
-    logger:                     Logger[Interpretation]
-) extends consumers.EventHandlerWithProcessLimiter[Interpretation](concurrentProcessesLimiter) {
+    commitEventSynchronizer:    GlobalCommitEventSynchronizer[F],
+    subscriptionMechanism:      SubscriptionMechanism[F],
+    concurrentProcessesLimiter: ConcurrentProcessesLimiter[F]
+) extends consumers.EventHandlerWithProcessLimiter[F](concurrentProcessesLimiter) {
+
   import commitEventSynchronizer._
   import io.renku.graph.model.projects
   import io.renku.tinytypes.json.TinyTypeDecoders._
 
   override def createHandlingProcess(
       request: EventRequestContent
-  ): Interpretation[EventHandlingProcess[Interpretation]] =
-    EventHandlingProcess.withWaitingForCompletion[Interpretation](
-      deferred => startEventProcessing(request, deferred),
-      subscriptionMechanism.renewSubscription()
+  ): F[EventHandlingProcess[F]] =
+    EventHandlingProcess.withWaitingForCompletion[F](
+      process = startEventProcessing(request, _),
+      releaseProcess = subscriptionMechanism.renewSubscription()
     )
 
-  private def startEventProcessing(request: EventRequestContent, deferred: Deferred[Interpretation, Unit]) =
+  private def startEventProcessing(request: EventRequestContent, deferred: Deferred[F, Unit]) =
     for {
       event <-
-        fromEither[Interpretation](
+        fromEither[F](
           request.event.as[GlobalCommitSyncEvent].leftMap(_ => BadRequest)
         )
       result <-
-        (ContextShift[Interpretation].shift *> Concurrent[Interpretation]
-          .start(
-            synchronizeEvents(event)
-              .flatMap(_ => deferred.complete(()))
+        Spawn[F]
+          .start {
+            (synchronizeEvents(event) >> deferred.complete(())).void
               .recoverWith(finishProcessAndLogError(deferred, event))
-          )).toRightT
+          }
+          .toRightT
           .map(_ => Accepted)
-          .semiflatTap(logger log event)
-          .leftSemiflatTap(logger log event)
+          .semiflatTap(Logger[F] log event)
+          .leftSemiflatTap(Logger[F] log event)
     } yield result
 
-  private implicit val eventDecoder: Decoder[GlobalCommitSyncEvent] =
-    cursor =>
-      for {
-        project   <- cursor.downField("project").as[Project]
-        commitIds <- cursor.downField("commits").as[List[CommitId]]
-      } yield GlobalCommitSyncEvent(project, commitIds)
+  private implicit val eventDecoder: Decoder[GlobalCommitSyncEvent] = cursor =>
+    for {
+      project   <- cursor.downField("project").as[Project]
+      commitIds <- cursor.downField("commits").as[List[CommitId]]
+    } yield GlobalCommitSyncEvent(project, commitIds)
 
   private implicit lazy val projectDecoder: Decoder[Project] = cursor =>
     for {
@@ -92,10 +89,11 @@ private[events] class EventHandler[Interpretation[_]: MonadThrow: ContextShift: 
 
   private implicit lazy val eventInfoToString: GlobalCommitSyncEvent => String = _.toString
 
-  private def finishProcessAndLogError(deferred: Deferred[Interpretation, Unit],
+  private def finishProcessAndLogError(deferred: Deferred[F, Unit],
                                        event:    GlobalCommitSyncEvent
-  ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    deferred.complete(()) >> logger.logError(event, exception) >> exception.raiseError[Interpretation, Unit]
+  ): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
+    deferred.complete(()) >> Logger[F].logError(event, exception) >> exception
+      .raiseError[F, Unit]
   }
 }
 
@@ -104,22 +102,16 @@ private[events] object EventHandler {
   import eu.timepit.refined.auto._
   val processesLimit: Int Refined Positive = 1
 
-  def apply(
-      subscriptionMechanism: SubscriptionMechanism[IO],
-      gitLabThrottler:       Throttler[IO, GitLab],
-      executionTimeRecorder: ExecutionTimeRecorder[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO],
-      logger:           Logger[IO]
-  ): IO[EventHandler[IO]] = for {
+  def apply[F[_]: Async: Spawn: Concurrent: Temporal: Logger](
+      subscriptionMechanism: SubscriptionMechanism[F],
+      gitLabThrottler:       Throttler[F, GitLab],
+      executionTimeRecorder: ExecutionTimeRecorder[F]
+  ): F[EventHandler[F]] = for {
     concurrentProcessesLimiter    <- ConcurrentProcessesLimiter(processesLimit)
     globalCommitEventSynchronizer <- GlobalCommitEventSynchronizer(gitLabThrottler, executionTimeRecorder)
-  } yield new EventHandler[IO](categoryName,
-                               globalCommitEventSynchronizer,
-                               subscriptionMechanism,
-                               concurrentProcessesLimiter,
-                               logger
+  } yield new EventHandler[F](categoryName,
+                              globalCommitEventSynchronizer,
+                              subscriptionMechanism,
+                              concurrentProcessesLimiter
   )
 }

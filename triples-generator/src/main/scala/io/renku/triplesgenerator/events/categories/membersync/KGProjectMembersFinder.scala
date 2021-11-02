@@ -18,7 +18,8 @@
 
 package io.renku.triplesgenerator.events.categories.membersync
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.Async
+import cats.syntax.all._
 import io.renku.graph.config.RenkuBaseUrlLoader
 import io.renku.graph.model.Schemas.{rdf, schema}
 import io.renku.graph.model.projects.{Path, ResourceId}
@@ -29,26 +30,21 @@ import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
-private trait KGProjectMembersFinder[Interpretation[_]] {
-  def findProjectMembers(path: projects.Path): Interpretation[Set[KGProjectMember]]
-
+private trait KGProjectMembersFinder[F[_]] {
+  def findProjectMembers(path: projects.Path): F[Set[KGProjectMember]]
 }
 
-private class KGProjectMembersFinderImpl(
-    rdfStoreConfig:          RdfStoreConfig,
-    renkuBaseUrl:            RenkuBaseUrl,
-    logger:                  Logger[IO],
-    timeRecorder:            SparqlQueryTimeRecorder[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends RdfStoreClientImpl(rdfStoreConfig, logger, timeRecorder)
-    with KGProjectMembersFinder[IO] {
+private class KGProjectMembersFinderImpl[F[_]: Async: Logger](
+    rdfStoreConfig: RdfStoreConfig,
+    renkuBaseUrl:   RenkuBaseUrl,
+    timeRecorder:   SparqlQueryTimeRecorder[F]
+) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
+    with KGProjectMembersFinder[F] {
 
   import eu.timepit.refined.auto._
   import io.circe.Decoder
 
-  def findProjectMembers(path: projects.Path): IO[Set[KGProjectMember]] =
+  def findProjectMembers(path: projects.Path): F[Set[KGProjectMember]] =
     queryExpecting[Set[KGProjectMember]](using = query(path))
 
   private implicit lazy val recordsDecoder: Decoder[Set[KGProjectMember]] = { cursor =>
@@ -78,18 +74,13 @@ private class KGProjectMembersFinderImpl(
         |}
         |""".stripMargin
   )
-
 }
 
 private object KGProjectMembersFinder {
-  def apply(logger:     Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[KGProjectMembersFinder[IO]] = for {
-    rdfStoreConfig <- RdfStoreConfig[IO]()
-    renkuBaseUrl   <- RenkuBaseUrlLoader[IO]()
-  } yield new KGProjectMembersFinderImpl(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
+  def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[KGProjectMembersFinder[F]] = for {
+    rdfStoreConfig <- RdfStoreConfig[F]()
+    renkuBaseUrl   <- RenkuBaseUrlLoader[F]()
+  } yield new KGProjectMembersFinderImpl(rdfStoreConfig, renkuBaseUrl, timeRecorder)
 }
 
 private final case class KGProjectMember(resourceId: users.ResourceId, gitLabId: users.GitLabId)

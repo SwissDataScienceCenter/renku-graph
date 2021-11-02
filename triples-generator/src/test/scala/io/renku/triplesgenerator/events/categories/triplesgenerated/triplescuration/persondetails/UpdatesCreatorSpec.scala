@@ -23,10 +23,11 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
 import io.renku.rdfstore.InMemoryRdfStore
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers {
+class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore with should.Matchers {
 
   import UpdatesCreator._
 

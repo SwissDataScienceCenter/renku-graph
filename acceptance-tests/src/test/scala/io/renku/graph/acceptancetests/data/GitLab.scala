@@ -37,5 +37,4 @@ object GitLab {
       "path_with_namespace": ${project.path.value}
     }
   }"""
-
 }

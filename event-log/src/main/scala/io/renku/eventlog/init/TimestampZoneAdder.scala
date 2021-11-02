@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.BracketThrow
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
@@ -28,25 +28,24 @@ import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-private trait TimestampZoneAdder[Interpretation[_]] {
-  def run(): Interpretation[Unit]
+private trait TimestampZoneAdder[F[_]] {
+  def run(): F[Unit]
 }
 
 private object TimestampZoneAdder {
-  def apply[Interpretation[_]: BracketThrow: Logger](
-      sessionResource: SessionResource[Interpretation, EventLogDB]
-  ): TimestampZoneAdder[Interpretation] =
-    TimestampZoneAdderImpl(sessionResource)
+  def apply[F[_]: MonadCancelThrow: Logger](
+      sessionResource: SessionResource[F, EventLogDB]
+  ): TimestampZoneAdder[F] = TimestampZoneAdderImpl(sessionResource)
 }
 
-private case class TimestampZoneAdderImpl[Interpretation[_]: BracketThrow: Logger](
-    sessionResource: SessionResource[Interpretation, EventLogDB]
-) extends TimestampZoneAdder[Interpretation]
+private case class TimestampZoneAdderImpl[F[_]: MonadCancelThrow: Logger](
+    sessionResource: SessionResource[F, EventLogDB]
+) extends TimestampZoneAdder[F]
     with EventTableCheck {
-  override def run(): Interpretation[Unit] = sessionResource.useK {
+  override def run(): F[Unit] = sessionResource.useK {
     checkIfAlreadyTimestamptz >>= {
       case true =>
-        Kleisli.liftF(Logger[Interpretation].info("Fields are already in timestamptz type"))
+        Kleisli.liftF(Logger[F].info("Fields are already in timestamptz type"))
       case false => migrateTimestampToCEST()
     }
   }
@@ -54,7 +53,7 @@ private case class TimestampZoneAdderImpl[Interpretation[_]: BracketThrow: Logge
   private val columnsToMigrate =
     List("batch_date", "created_date", "execution_date", "event_date", "last_synced", "latest_event_date")
 
-  private lazy val checkIfAlreadyTimestamptz: Kleisli[Interpretation, Session[Interpretation], Boolean] = {
+  private lazy val checkIfAlreadyTimestamptz: Kleisli[F, Session[F], Boolean] = {
     val query: Query[Void, String ~ String] =
       sql"""
          SELECT column_name, data_type FROM information_schema.columns""".query(varchar ~ varchar)
@@ -72,7 +71,7 @@ private case class TimestampZoneAdderImpl[Interpretation[_]: BracketThrow: Logge
     }
   }
 
-  private def migrateTimestampToCEST(): Kleisli[Interpretation, Session[Interpretation], Unit] =
+  private def migrateTimestampToCEST(): Kleisli[F, Session[F], Unit] =
     for {
       _ <-
         execute(
@@ -99,5 +98,4 @@ private case class TimestampZoneAdderImpl[Interpretation[_]: BracketThrow: Logge
           sql"ALTER table project ALTER latest_event_date TYPE timestamptz USING latest_event_date AT TIME ZONE 'CEST' ".command
         )
     } yield ()
-
 }

@@ -16,10 +16,9 @@
  * limitations under the License.
  */
 
-package io.renku.jsonld.generators
+package io.renku.generators.jsonld
 
-import Generators._
-import io.renku.jsonld.JsonLD.{JsonLDEdge, JsonLDEntity}
+import io.renku.generators.Generators._
 import io.renku.jsonld._
 import org.scalacheck.{Arbitrary, Gen}
 
@@ -62,15 +61,10 @@ object JsonLDGenerators {
     value    <- jsonLDValues
   } yield property -> value
 
-  implicit val jsonLDEntities: Gen[JsonLDEntity] = for {
+  implicit val jsonLDEntities: Gen[JsonLD] = for {
     id         <- entityIds
     types      <- entityTypesObject
     properties <- nonEmptyList(valuesProperties)
   } yield JsonLD.entity(id, types, properties.toList.toMap)
 
-  implicit val jsonLDEdges: Gen[JsonLDEdge] = for {
-    source   <- entityIds
-    property <- properties
-    target   <- entityIds
-  } yield JsonLD.edge(source, property, target)
 }

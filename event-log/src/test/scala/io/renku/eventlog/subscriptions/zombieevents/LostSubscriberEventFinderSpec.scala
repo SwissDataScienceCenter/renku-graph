@@ -31,10 +31,11 @@ import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples}
 import io.renku.graph.model.events.{CompoundEventId, EventStatus}
 import io.renku.metrics.TestLabeledHistogram
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class LostSubscriberEventFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec with should.Matchers {
+class LostSubscriberEventFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSpec with should.Matchers {
 
   "popEvent" should {
 

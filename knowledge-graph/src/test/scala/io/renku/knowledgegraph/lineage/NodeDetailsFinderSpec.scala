@@ -33,6 +33,7 @@ import io.renku.knowledgegraph.lineage.model._
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.stubbing.ExternalServiceStubbing
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -40,7 +41,8 @@ class NodeDetailsFinderSpec
     extends AnyWordSpec
     with InMemoryRdfStore
     with ExternalServiceStubbing
-    with should.Matchers {
+    with should.Matchers
+    with IOSpec {
 
   import NodeDetailsFinder._
 
@@ -114,7 +116,7 @@ class NodeDetailsFinderSpec
 
   "findDetails - activityIds" should {
 
-    import io.renku.jsonld.generators.JsonLDGenerators._
+    import io.renku.generators.jsonld.JsonLDGenerators._
 
     "find details of all Plans for the given activity ids" in new TestCase {
 
@@ -220,13 +222,12 @@ class NodeDetailsFinderSpec
   }
 
   private trait TestCase {
-    val logger                = TestLogger[IO]()
-    val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
-    val nodeDetailsFinder = new NodeDetailsFinderImpl(
+    implicit val logger       = TestLogger[IO]()
+    val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
+    val nodeDetailsFinder = new NodeDetailsFinderImpl[IO](
       rdfStoreConfig,
       renkuBaseUrl,
-      logger,
-      new SparqlQueryTimeRecorder(executionTimeRecorder)
+      new SparqlQueryTimeRecorder[IO](executionTimeRecorder)
     )
   }
 

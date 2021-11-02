@@ -18,12 +18,12 @@
 
 package io.renku.graph.model.testentities
 
-import Dataset._
 import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
+import io.renku.graph.model._
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.testentities.Dataset.Provenance._
-import io.renku.graph.model._
+import io.renku.graph.model.testentities.Dataset._
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 import io.renku.tinytypes.InstantTinyType
@@ -128,7 +128,7 @@ object Dataset {
         renkuBaseUrl: RenkuBaseUrl
     ): entities.Dataset.Identification => Provenance => entities.Dataset.Provenance =
       identification => {
-        case p: Internal => toEntitiesInternal(renkuBaseUrl)(identification)(p)
+        case p: Internal         => toEntitiesInternal(renkuBaseUrl)(identification)(p)
         case p: ImportedExternal => toEntitiesImportedExternal(renkuBaseUrl)(identification)(p)
         case p: ImportedInternalAncestorExternal =>
           toEntitiesImportedInternalAncestorExternal(renkuBaseUrl)(identification)(p)

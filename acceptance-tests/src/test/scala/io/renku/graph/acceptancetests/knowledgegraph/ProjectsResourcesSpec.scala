@@ -26,10 +26,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project.Permissions._
 import io.renku.graph.acceptancetests.data.Project.{Urls, _}
 import io.renku.graph.acceptancetests.data.{Project, _}
-import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning._
-import io.renku.graph.acceptancetests.knowledgegraph.DatasetsResources._
-import io.renku.graph.acceptancetests.stubs.GitLab._
-import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
+import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.acceptancetests.tooling.ResponseTools._
 import io.renku.graph.acceptancetests.tooling.TestReadabilityTools._
@@ -45,15 +42,14 @@ import io.renku.jsonld.syntax._
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers.should
 
 class ProjectsResourcesSpec
     extends AnyFeatureSpec
     with GivenWhenThen
     with GraphServices
-    with AcceptanceTestPatience
-    with RdfStoreData
-    with should.Matchers {
+    with RdfStoreProvisioning
+    with DatasetsResources
+    with RdfStoreData {
 
   import ProjectsResources._
 
@@ -102,7 +98,7 @@ class ProjectsResourcesSpec
       projectDetails shouldBe fullJson(project)
 
       When("user then fetches project's datasets using the link from the response")
-      val datasetsLink     = projectDetails._links.get(Rel("datasets")) getOrFail (message = "No link with rel 'datasets'")
+      val datasetsLink = projectDetails._links.get(Rel("datasets")) getOrFail (message = "No link with rel 'datasets'")
       val datasetsResponse = restClient GET datasetsLink.toString
 
       Then("he should get OK response with the projects datasets")
@@ -189,7 +185,7 @@ object ProjectsResources {
       "dateCreated": ${dateCreated.value},
       "creator": $creator
     }"""
-    case (dateCreated, _)             => json"""{
+    case (dateCreated, _) => json"""{
       "dateCreated": ${dateCreated.value}
     }"""
   }
@@ -199,7 +195,7 @@ object ProjectsResources {
       "name": ${name.value},
       "email": ${email.value}
     }"""
-    case Person(name, _, _, _)           => json"""{
+    case Person(name, _, _, _) => json"""{
       "name": ${name.value}
     }"""
   }
@@ -213,12 +209,12 @@ object ProjectsResources {
         "level": {"name": ${groupAccessLevel.name.value}, "value": ${groupAccessLevel.value.value}}
       }
     }"""
-    case ProjectPermissions(projectAccessLevel)                           => json"""{
+    case ProjectPermissions(projectAccessLevel) => json"""{
       "projectAccess": {
         "level": {"name": ${projectAccessLevel.name.value}, "value": ${projectAccessLevel.value.value}}
       }
     }"""
-    case GroupPermissions(groupAccessLevel)                               => json"""{
+    case GroupPermissions(groupAccessLevel) => json"""{
       "groupAccess": {
         "level": {"name": ${groupAccessLevel.name.value}, "value": ${groupAccessLevel.value.value}}
       }
