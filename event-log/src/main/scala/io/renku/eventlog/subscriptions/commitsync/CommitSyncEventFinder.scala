@@ -27,7 +27,7 @@ import io.renku.db.{DbClient, SessionResource, SqlStatement}
 import io.renku.eventlog.subscriptions.{EventFinder, SubscriptionTypeSerializers}
 import io.renku.eventlog.{EventDate, EventLogDB}
 import io.renku.graph.model.events.EventStatus.AwaitingDeletion
-import io.renku.graph.model.events.{CategoryName, EventStatus, LastSyncedDate}
+import io.renku.graph.model.events.{CategoryName, CompoundEventId, EventStatus, LastSyncedDate}
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
 import skunk._
