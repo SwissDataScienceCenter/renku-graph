@@ -39,9 +39,7 @@ import scala.language.postfixOps
 
 trait ReProvisioningStatus[F[_]] {
   def isReProvisioning(): F[Boolean]
-
-  def setRunning(): F[Unit]
-
+  def setRunning(on: Controller): F[Unit]
   def clear(): F[Unit]
 }
 
@@ -64,7 +62,9 @@ private class ReProvisioningStatusImpl[F[_]: Async: Logger](
 
   private val runningStatusCheckStarted = new AtomicBoolean(false)
 
-  override def setRunning(): F[Unit] = upload(ReProvisioningInfo(ReProvisioningInfo.Status.Running).asJsonLD)
+  override def setRunning(on: Controller): F[Unit] = upload(
+    ReProvisioningInfo(ReProvisioningInfo.Status.Running, on).asJsonLD
+  )
 
   override def clear(): F[Unit] = for {
     _ <- deleteFromDb()
@@ -84,14 +84,14 @@ private class ReProvisioningStatusImpl[F[_]: Async: Logger](
     )
   }
 
-  override def isReProvisioning(): F[Boolean] = for {
-    isCacheExpired <- isCacheExpired
-    flag <- if (isCacheExpired) fetchStatus >>= {
-              case Some(ReProvisioningInfo.Status.Running) => triggerPeriodicStatusCheck() map (_ => true)
-              case _                                       => updateCacheCheckTime() map (_ => false)
-            }
-            else false.pure[F]
-  } yield flag
+  override def isReProvisioning(): F[Boolean] = isCacheExpired >>= {
+    case true =>
+      fetchStatus >>= {
+        case Some(ReProvisioningInfo.Status.Running) => triggerPeriodicStatusCheck() map (_ => true)
+        case _                                       => updateCacheCheckTime() map (_ => false)
+      }
+    case false => false.pure[F]
+  }
 
   private def isCacheExpired: F[Boolean] = for {
     lastCheckTime <- lastCacheCheckTimeRef.get

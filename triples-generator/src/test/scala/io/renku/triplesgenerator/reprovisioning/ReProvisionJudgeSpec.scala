@@ -29,7 +29,8 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class ReProvisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFactory {
 
-  "isReProvisioningNeeded" should {
+  "reProvisioningNeeded" should {
+
     "return true when the config schema version is different than the current schema version" in new TestCase {
       // Compat matrix
       /** current cli version is 1.2.1 current schema version 12 [1.2.3 -> 13, 1.2.1 -> 12] OR for a RollBack current
@@ -37,7 +38,7 @@ class ReProvisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFac
         */
       val newVersionPair = renkuVersionPairs.generateNonEmptyList(2, 2)
 
-      judge.isReProvisioningNeeded(currentVersionPair.some, newVersionPair) shouldBe true
+      judge.reProvisioningNeeded(currentVersionPair.some, newVersionPair) shouldBe true
     }
 
     "return true when the last two schema versions are the same but the cli versions are different" in new TestCase {
@@ -47,7 +48,7 @@ class ReProvisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFac
       val newVersionPair =
         renkuVersionPairs.generateNonEmptyList(2, 2).map(_.copy(schemaVersion = currentVersionPair.schemaVersion))
 
-      judge.isReProvisioningNeeded(currentVersionPair.some, newVersionPair) shouldBe true
+      judge.reProvisioningNeeded(currentVersionPair.some, newVersionPair) shouldBe true
     }
 
     "return false when the schema version is the same and the cli version is different" in new TestCase {
@@ -56,12 +57,12 @@ class ReProvisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFac
         */
       val newVersionPair = renkuVersionPairs.generateOne.copy(schemaVersion = currentVersionPair.schemaVersion)
 
-      judge.isReProvisioningNeeded(currentVersionPair.some, NonEmptyList.one(newVersionPair)) shouldBe false
+      judge.reProvisioningNeeded(currentVersionPair.some, NonEmptyList.one(newVersionPair)) shouldBe false
     }
 
     "return true when the current schema version is None" in new TestCase {
-      judge.isReProvisioningNeeded(maybeCurrentVersionPair = None,
-                                   NonEmptyList.one(renkuVersionPairs.generateOne)
+      judge.reProvisioningNeeded(maybeCurrentVersionPair = None,
+                                 NonEmptyList.one(renkuVersionPairs.generateOne)
       ) shouldBe true
     }
   }

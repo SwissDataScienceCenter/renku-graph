@@ -18,6 +18,7 @@
 
 package io.renku.microservices
 
+import io.renku.graph.model.views.TinyTypeJsonLDOps
 import io.renku.tinytypes.constraints.NonBlank
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 
@@ -28,7 +29,8 @@ import scala.util.Random
 final class MicroserviceIdentifier private (val value: String) extends AnyVal with StringTinyType
 object MicroserviceIdentifier
     extends TinyTypeFactory[MicroserviceIdentifier](new MicroserviceIdentifier(_))
-    with NonBlank {
+    with NonBlank
+    with TinyTypeJsonLDOps[MicroserviceIdentifier] {
 
   def generate: MicroserviceIdentifier = generate(LocalDateTime.now _)
 

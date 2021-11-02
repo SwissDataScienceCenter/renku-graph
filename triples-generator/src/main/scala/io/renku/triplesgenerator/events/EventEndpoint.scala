@@ -52,10 +52,10 @@ class EventEndpointImpl[F[_]: Async](
   import io.renku.http.InfoMessage._
   import org.http4s._
 
-  override def processEvent(request: Request[F]): F[Response[F]] =
-    reProvisioningStatus.isReProvisioning() >>= { isReProvisioning =>
-      if (isReProvisioning) ServiceUnavailable(InfoMessage("Temporarily unavailable: currently re-provisioning"))
-      else {
+  override def processEvent(request: Request[F]): F[Response[F]] = reProvisioningStatus.isReProvisioning() >>= {
+    case true => ServiceUnavailable(InfoMessage("Temporarily unavailable: currently re-provisioning"))
+    case false =>
+      {
         for {
           multipart      <- toMultipart(request)
           eventJson      <- toEvent(multipart)
@@ -65,7 +65,7 @@ class EventEndpointImpl[F[_]: Async](
       }.merge recoverWith { case NonFatal(error) =>
         toHttpResult(EventSchedulingResult.SchedulingError(error))
       }
-    }
+  }
 
   private def toMultipart(
       request: Request[F]

@@ -18,6 +18,7 @@
 
 package io.renku.triplesgenerator.reprovisioning
 
+import Generators._
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
@@ -27,6 +28,7 @@ import io.renku.graph.model.RenkuVersionPair
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.generators.VersionGenerators._
 import org.scalamock.scalatest.MockFactory
@@ -47,12 +49,14 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
           .expects()
           .returning(IO(maybeCurrentVersionCompatibilityPair))
 
-        (reprovisionJudge.isReProvisioningNeeded _)
+        (reprovisionJudge.reProvisioningNeeded _)
           .expects(maybeCurrentVersionCompatibilityPair, versionCompatibilityPairs)
           .returning(true)
 
+        (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.url.pure[IO])
+
         (reProvisioningStatus.setRunning _)
-          .expects()
+          .expects(controller)
           .returning(IO.unit)
 
         (renkuVersionPairUpdater.update _)
@@ -85,7 +89,7 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
         .expects()
         .returning(IO(maybeCurrentVersionCompatibilityPair))
 
-      (reprovisionJudge.isReProvisioningNeeded _)
+      (reprovisionJudge.reProvisioningNeeded _)
         .expects(maybeCurrentVersionCompatibilityPair, versionCompatibilityPairs)
         .returning(false)
 
@@ -110,7 +114,7 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
           .expects()
           .returning(maybeCurrentVersionCompatibilityPair.pure[IO])
 
-        (reprovisionJudge.isReProvisioningNeeded _)
+        (reprovisionJudge.reProvisioningNeeded _)
           .expects(maybeCurrentVersionCompatibilityPair, versionCompatibilityPairs)
           .returning(false)
 
@@ -127,6 +131,51 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       )
     }
 
+    "do not fail but simply retry if finding microservice URL fails" in new TestCase {
+      val exception = exceptions.generateOne
+
+      inSequence {
+        (renkuVersionPairFinder.find _)
+          .expects()
+          .returning(maybeCurrentVersionCompatibilityPair.pure[IO])
+
+        (reprovisionJudge.reProvisioningNeeded _)
+          .expects(maybeCurrentVersionCompatibilityPair, versionCompatibilityPairs)
+          .returning(true)
+
+        (microserviceUrlFinder.findBaseUrl _).expects().returning(exception.raiseError[IO, MicroserviceBaseUrl])
+        (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.url.pure[IO])
+
+        (reProvisioningStatus.setRunning _)
+          .expects(controller)
+          .returning(IO.unit)
+
+        (renkuVersionPairUpdater.update _)
+          .expects(versionCompatibilityPairs.head)
+          .returning(IO.unit)
+
+        (triplesRemover.removeAllTriples _)
+          .expects()
+          .returning(IO.unit)
+
+        (eventsReScheduler.triggerEventsReScheduling _)
+          .expects()
+          .returning(IO.unit)
+
+        (reProvisioningStatus.clear _)
+          .expects()
+          .returning(IO.unit)
+      }
+
+      reProvisioning.run().unsafeRunSync() shouldBe ((): Unit)
+
+      logger.loggedOnly(
+        Info("The triples are not up to date - re-provisioning is clearing DB"),
+        Error("Re-provisioning failure", exception),
+        Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
+      )
+    }
+
     "do not fail but simply retry if setRunning method fails" in new TestCase {
       val exception = exceptions.generateOne
 
@@ -135,16 +184,18 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
           .expects()
           .returning(maybeCurrentVersionCompatibilityPair.pure[IO])
 
-        (reprovisionJudge.isReProvisioningNeeded _)
+        (reprovisionJudge.reProvisioningNeeded _)
           .expects(maybeCurrentVersionCompatibilityPair, versionCompatibilityPairs)
           .returning(true)
 
+        (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.url.pure[IO])
+
         (reProvisioningStatus.setRunning _)
-          .expects()
+          .expects(controller)
           .returning(exception.raiseError[IO, Unit])
 
         (reProvisioningStatus.setRunning _)
-          .expects()
+          .expects(controller)
           .returning(IO.unit)
 
         (renkuVersionPairUpdater.update _)
@@ -182,12 +233,14 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
           .expects()
           .returning(maybeCurrentVersionCompatibilityPair.pure[IO])
 
-        (reprovisionJudge.isReProvisioningNeeded _)
+        (reprovisionJudge.reProvisioningNeeded _)
           .expects(maybeCurrentVersionCompatibilityPair, versionCompatibilityPairs)
           .returning(true)
 
+        (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.url.pure[IO])
+
         (reProvisioningStatus.setRunning _)
-          .expects()
+          .expects(controller)
           .returning(IO.unit)
 
         (renkuVersionPairUpdater.update _)
@@ -229,12 +282,14 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
           .expects()
           .returning(maybeCurrentVersionCompatibilityPair.pure[IO])
 
-        (reprovisionJudge.isReProvisioningNeeded _)
+        (reprovisionJudge.reProvisioningNeeded _)
           .expects(maybeCurrentVersionCompatibilityPair, versionCompatibilityPairs)
           .returning(true)
 
+        (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.url.pure[IO])
+
         (reProvisioningStatus.setRunning _)
-          .expects()
+          .expects(controller)
           .returning(IO.unit)
 
         (renkuVersionPairUpdater.update _)
@@ -277,12 +332,14 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
           .expects()
           .returning(maybeCurrentVersionCompatibilityPair.pure[IO])
 
-        (reprovisionJudge.isReProvisioningNeeded _)
+        (reprovisionJudge.reProvisioningNeeded _)
           .expects(maybeCurrentVersionCompatibilityPair, versionCompatibilityPairs)
           .returning(true)
 
+        (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.url.pure[IO])
+
         (reProvisioningStatus.setRunning _)
-          .expects()
+          .expects(controller)
           .returning(IO.unit)
 
         (renkuVersionPairUpdater.update _)
@@ -329,25 +386,21 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
           .expects()
           .returning(maybeCurrentVersionCompatibilityPair.pure[IO])
 
-        (reprovisionJudge.isReProvisioningNeeded _)
+        (reprovisionJudge.reProvisioningNeeded _)
           .expects(maybeCurrentVersionCompatibilityPair, versionCompatibilityPairs)
           .returning(true)
 
-        (reProvisioningStatus.setRunning _)
-          .expects()
-          .returning(IO.unit)
+        (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.url.pure[IO])
+
+        (reProvisioningStatus.setRunning _).expects(controller).returning(IO.unit)
 
         (renkuVersionPairUpdater.update _)
           .expects(versionCompatibilityPairs.head)
           .returning(IO.unit)
 
-        (triplesRemover.removeAllTriples _)
-          .expects()
-          .returning(IO.unit)
+        (triplesRemover.removeAllTriples _).expects().returning(IO.unit)
 
-        (eventsReScheduler.triggerEventsReScheduling _)
-          .expects()
-          .returning(IO.unit)
+        (eventsReScheduler.triggerEventsReScheduling _).expects().returning(IO.unit)
 
         (reProvisioningStatus.clear _)
           .expects()
@@ -369,6 +422,8 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
   }
 
   private trait TestCase {
+    val controller = controllers.generateOne
+
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val versionCompatibilityPairs            = renkuVersionPairs.generateNonEmptyList(2)
     val maybeCurrentVersionCompatibilityPair = renkuVersionPairs.generateOption
@@ -377,6 +432,7 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
     val triplesRemover                       = mock[TriplesRemover[IO]]
     val eventsReScheduler                    = mock[EventsReScheduler[IO]]
     val renkuVersionPairUpdater              = mock[RenkuVersionPairUpdater[IO]]
+    val microserviceUrlFinder                = mock[MicroserviceUrlFinder[IO]]
     val reProvisioningStatus                 = mock[ReProvisioningStatus[IO]]
     val executionTimeRecorder                = TestExecutionTimeRecorder[IO]()
     val reProvisioning = new ReProvisioningImpl[IO](
@@ -386,8 +442,10 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       triplesRemover,
       eventsReScheduler,
       renkuVersionPairUpdater,
+      microserviceUrlFinder,
       reProvisioningStatus,
       executionTimeRecorder,
+      controller.identifier,
       250 millis
     )
   }

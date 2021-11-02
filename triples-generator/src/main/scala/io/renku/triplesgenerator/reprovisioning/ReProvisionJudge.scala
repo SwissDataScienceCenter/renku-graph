@@ -23,15 +23,15 @@ import io.renku.graph.model.{CliVersion, RenkuVersionPair, SchemaVersion}
 
 trait ReProvisionJudge {
 
-  def isReProvisioningNeeded(maybeCurrentVersionPair:   Option[RenkuVersionPair],
-                             versionCompatibilityPairs: NonEmptyList[RenkuVersionPair]
+  def reProvisioningNeeded(maybeCurrentVersionPair:   Option[RenkuVersionPair],
+                           versionCompatibilityPairs: NonEmptyList[RenkuVersionPair]
   ): Boolean
 }
 
 private class ReProvisionJudgeImpl extends ReProvisionJudge {
 
-  override def isReProvisioningNeeded(maybeCurrentVersionPair:   Option[RenkuVersionPair],
-                                      versionCompatibilityPairs: NonEmptyList[RenkuVersionPair]
+  override def reProvisioningNeeded(maybeCurrentVersionPair:   Option[RenkuVersionPair],
+                                    versionCompatibilityPairs: NonEmptyList[RenkuVersionPair]
   ): Boolean =
     `is current schema version different from latest`(maybeCurrentVersionPair.map(_.schemaVersion),
                                                       versionCompatibilityPairs.head.schemaVersion

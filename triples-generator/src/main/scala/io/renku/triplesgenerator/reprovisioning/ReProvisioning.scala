@@ -26,7 +26,9 @@ import io.renku.graph.config.RenkuBaseUrlLoader
 import io.renku.graph.model.{RenkuBaseUrl, RenkuVersionPair}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
+import io.renku.microservices.{MicroserviceIdentifier, MicroserviceUrlFinder}
 import io.renku.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
+import io.renku.triplesgenerator.Microservice
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.FiniteDuration
@@ -40,18 +42,20 @@ trait ReProvisioning[F[_]] {
 class ReProvisioningImpl[F[_]: Temporal: Logger](
     renkuVersionPairFinder:    RenkuVersionPairFinder[F],
     versionCompatibilityPairs: NonEmptyList[RenkuVersionPair],
-    reprovisionJudge:          ReProvisionJudge,
+    reProvisionJudge:          ReProvisionJudge,
     triplesRemover:            TriplesRemover[F],
     eventsReScheduler:         EventsReScheduler[F],
-    renkuVersionPairUpdater:   RenkuVersionPairUpdater[F],
+    versionPairUpdater:        RenkuVersionPairUpdater[F],
+    microserviceUrlFinder:     MicroserviceUrlFinder[F],
     reProvisioningStatus:      ReProvisioningStatus[F],
     executionTimeRecorder:     ExecutionTimeRecorder[F],
+    microserviceIdentifier:    MicroserviceIdentifier,
     sleepWhenBusy:             FiniteDuration
 ) extends ReProvisioning[F] {
 
   import eventsReScheduler._
   import executionTimeRecorder._
-  import reprovisionJudge.isReProvisioningNeeded
+  import reProvisionJudge.reProvisioningNeeded
   import triplesRemover._
 
   override def run(): F[Unit] = for {
@@ -60,38 +64,41 @@ class ReProvisioningImpl[F[_]: Temporal: Logger](
   } yield ()
 
   private def decideIfReProvisioningRequired(maybeVersionPairInKG: Option[RenkuVersionPair]) =
-    if (isReProvisioningNeeded(maybeVersionPairInKG, versionCompatibilityPairs))
+    if (reProvisioningNeeded(maybeVersionPairInKG, versionCompatibilityPairs))
       triggerReProvisioning recoverWith tryAgain(triggerReProvisioning)
     else
-      renkuVersionPairUpdater.update(versionCompatibilityPairs.head) >> Logger[F].info(
-        "All projects' triples up to date"
-      )
+      versionPairUpdater.update(versionCompatibilityPairs.head) >>
+        Logger[F].info("All projects' triples up to date")
 
   private def triggerReProvisioning = measureExecutionTime {
     for {
       _ <- Logger[F].info("The triples are not up to date - re-provisioning is clearing DB")
-      _ <- reProvisioningStatus.setRunning() recoverWith tryAgain(reProvisioningStatus.setRunning())
-      _ <- renkuVersionPairUpdater
+      _ <- setRunningStatusInTS()
+      _ <- versionPairUpdater
              .update(versionCompatibilityPairs.head)
-             .recoverWith(tryAgain(renkuVersionPairUpdater.update(versionCompatibilityPairs.head)))
+             .recoverWith(tryAgain(versionPairUpdater.update(versionCompatibilityPairs.head)))
       _ <- removeAllTriples() recoverWith tryAgain(removeAllTriples())
       _ <- triggerEventsReScheduling() recoverWith tryAgain(triggerEventsReScheduling())
       _ <- reProvisioningStatus.clear() recoverWith tryAgain(reProvisioningStatus.clear())
     } yield ()
-  } flatMap logSummary
+  } >>= logSummary
+
+  private def setRunningStatusInTS() = findController >>= { controller =>
+    reProvisioningStatus.setRunning(on = controller) recoverWith tryAgain(reProvisioningStatus.setRunning(controller))
+  }
+
+  private lazy val findController = microserviceUrlFinder
+    .findBaseUrl()
+    .recoverWith(tryAgain(microserviceUrlFinder.findBaseUrl()))
+    .map(Controller(_, microserviceIdentifier))
 
   private def logSummary: ((ElapsedTime, Unit)) => F[Unit] = { case (elapsedTime, _) =>
     Logger[F].info(s"Clearing DB finished in ${elapsedTime}ms - re-processing all the events")
   }
 
   private def tryAgain[T](step: => F[T]): PartialFunction[Throwable, F[T]] = { case NonFatal(exception) =>
-    {
-      for {
-        _      <- Logger[F].error(exception)("Re-provisioning failure")
-        _      <- Temporal[F] sleep sleepWhenBusy
-        result <- step
-      } yield result
-    } recoverWith tryAgain(step)
+    Logger[F].error(exception)("Re-provisioning failure") >>
+      Temporal[F].delayBy(step, sleepWhenBusy) recoverWith tryAgain(step)
   }
 }
 
@@ -110,6 +117,7 @@ object ReProvisioning {
     rdfStoreConfig         <- RdfStoreConfig[F](configuration)
     eventsReScheduler      <- EventsReScheduler[F]
     renkuBaseUrl           <- RenkuBaseUrlLoader[F]()
+    microserviceUrlFinder  <- MicroserviceUrlFinder[F](Microservice.ServicePort)
     executionTimeRecorder  <- ExecutionTimeRecorder[F]()
     triplesRemover         <- TriplesRemoverImpl(rdfStoreConfig, timeRecorder)
     renkuVersionPairFinder <- RenkuVersionPairFinder(rdfStoreConfig, renkuBaseUrl, timeRecorder)
@@ -122,8 +130,10 @@ object ReProvisioning {
       triplesRemover,
       eventsReScheduler,
       new RenkuVersionPairUpdaterImpl(rdfStoreConfig, timeRecorder),
+      microserviceUrlFinder,
       reProvisioningStatus,
       executionTimeRecorder,
+      Microservice.Identifier,
       SleepWhenBusy
     )
   }

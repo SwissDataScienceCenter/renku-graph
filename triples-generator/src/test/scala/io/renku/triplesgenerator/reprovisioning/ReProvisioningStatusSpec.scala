@@ -18,8 +18,10 @@
 
 package io.renku.triplesgenerator.reprovisioning
 
+import Generators._
 import cats.effect.IO
 import cats.effect.kernel.Ref
+import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.generators.Generators.Implicits._
@@ -51,50 +53,56 @@ class ReProvisioningStatusSpec
 
     "insert the ReProvisioningJsonLD object" in new TestCase {
 
-      findStatus shouldBe None
+      findInfo shouldBe None
 
-      reProvisioningStatus.setRunning().unsafeRunSync() shouldBe ()
+      val controller = controllers.generateOne
+      reProvisioningStatus.setRunning(on = controller).unsafeRunSync() shouldBe ()
 
-      findStatus shouldBe Some(Running.toString)
+      findInfo shouldBe (Running.value, controller.url.value, controller.identifier.value).some
     }
   }
 
   "clear" should {
 
     "completely remove the ReProvisioning object" in new TestCase {
-      reProvisioningStatus.setRunning().unsafeRunSync() shouldBe ()
+      val controller = controllers.generateOne
 
-      findStatus shouldBe Some(Running.toString)
+      reProvisioningStatus.setRunning(on = controller).unsafeRunSync() shouldBe ()
+
+      findInfo shouldBe (Running.value, controller.url.value, controller.identifier.value).some
 
       expectNotificationSent
 
       reProvisioningStatus.clear().unsafeRunSync() shouldBe ()
 
-      findStatus shouldBe None
+      findInfo shouldBe None
     }
 
     "not throw an error if the ReProvisioning object isn't there" in new TestCase {
 
-      findStatus shouldBe None
+      findInfo shouldBe None
 
       expectNotificationSent
 
       reProvisioningStatus.clear().unsafeRunSync() shouldBe ()
 
-      findStatus shouldBe None
+      findInfo shouldBe None
     }
   }
 
   "isReProvisioning" should {
 
-    "reflect the state of the re-provisioning status in the DB" in new TestCase {
-      reProvisioningStatus.setRunning().unsafeRunSync() shouldBe ()
+    "reflect the state of the re-provisioning info in the DB" in new TestCase {
+      val controller = controllers.generateOne
+
+      reProvisioningStatus.setRunning(on = controller).unsafeRunSync() shouldBe ()
 
       reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe true
     }
 
     "cache the value of the flag in the DB once it's set to false" in new TestCase {
-      reProvisioningStatus.setRunning().unsafeRunSync() shouldBe ()
+      val controller = controllers.generateOne
+      reProvisioningStatus.setRunning(on = controller).unsafeRunSync() shouldBe ()
 
       reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe true
       reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe true
@@ -102,7 +110,7 @@ class ReProvisioningStatusSpec
       clearStatus()
       reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe false
 
-      reProvisioningStatus.setRunning().unsafeRunSync() shouldBe ()
+      reProvisioningStatus.setRunning(on = controller).unsafeRunSync() shouldBe ()
       sleep(cacheRefreshInterval.toMillis - cacheRefreshInterval.toMillis * 2 / 3)
       reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe false
 
@@ -111,8 +119,9 @@ class ReProvisioningStatusSpec
     }
 
     "check if re-provisioning is done and notify availability to event-log" in new TestCase {
-      reProvisioningStatus.setRunning().unsafeRunSync()       shouldBe ()
-      reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe true
+      val controller = controllers.generateOne
+      reProvisioningStatus.setRunning(on = controller).unsafeRunSync() shouldBe ()
+      reProvisioningStatus.isReProvisioning().unsafeRunSync()          shouldBe true
 
       expectNotificationSent
 
@@ -147,15 +156,17 @@ class ReProvisioningStatusSpec
         .returning(IO.unit)
   }
 
-  private def findStatus: Option[String] =
-    runQuery(s"""|SELECT DISTINCT ?status
+  private def findInfo: Option[(String, String, String)] =
+    runQuery(s"""|SELECT DISTINCT ?status ?controllerUrl ?controllerIdentifier
                  |WHERE {
                  |  ?id a renku:ReProvisioning;
-                 |      renku:status ?status
+                 |      renku:status ?status;
+                 |      renku:controllerUrl ?controllerUrl;
+                 |      renku:controllerIdentifier ?controllerIdentifier
                  |}
                  |""".stripMargin)
       .unsafeRunSync()
-      .map(row => row("status"))
+      .map(row => (row("status"), row("controllerUrl"), row("controllerIdentifier")))
       .headOption
 
   private def clearStatus(): Unit = runUpdate {
