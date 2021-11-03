@@ -22,12 +22,13 @@ import io.renku.graph.model.RenkuBaseUrl
 import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model.views.TinyTypeJsonLDOps
 import io.renku.jsonld._
-import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}
+import io.renku.microservices.MicroserviceBaseUrl
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.renku.triplesgenerator.reprovisioning.ReProvisioningInfo.Status.Running
 
-private final case class ReProvisioningInfo(status: ReProvisioningInfo.Status.Running, controller: Controller)
-final case class Controller(url: MicroserviceBaseUrl, identifier: MicroserviceIdentifier)
+private final case class ReProvisioningInfo(status:        ReProvisioningInfo.Status.Running,
+                                            controllerUrl: MicroserviceBaseUrl
+)
 
 private object ReProvisioningInfo {
 
@@ -56,9 +57,8 @@ private object ReProvisioningInfo {
     JsonLD.entity(
       EntityId.of((renkuBaseUrl / "re-provisioning").toString),
       EntityTypes of reProvisioningInfoEntityType,
-      renku / "status"               -> entity.status.asInstanceOf[Status].asJsonLD,
-      renku / "controllerUrl"        -> entity.controller.url.asJsonLD,
-      renku / "controllerIdentifier" -> entity.controller.identifier.asJsonLD
+      renku / "status"        -> entity.status.asInstanceOf[Status].asJsonLD,
+      renku / "controllerUrl" -> entity.controllerUrl.asJsonLD
     )
   }
 }

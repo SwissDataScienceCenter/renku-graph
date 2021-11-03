@@ -18,10 +18,10 @@
 
 package io.renku.triplesgenerator.reprovisioning
 
-import Generators._
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
+import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger
@@ -46,7 +46,7 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       inSequence {
         (reprovisionJudge.reProvisioningNeeded _).expects().returning(true.pure[IO])
 
-        (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.url.pure[IO])
+        (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.pure[IO])
 
         (reProvisioningStatus.setRunning _).expects(controller).returning(IO.unit)
 
@@ -105,7 +105,7 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
         (reprovisionJudge.reProvisioningNeeded _).expects().returning(true.pure[IO])
 
         (microserviceUrlFinder.findBaseUrl _).expects().returning(exception.raiseError[IO, MicroserviceBaseUrl])
-        (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.url.pure[IO])
+        (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.pure[IO])
 
         (reProvisioningStatus.setRunning _).expects(controller).returning(IO.unit)
 
@@ -134,7 +134,7 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
         (reprovisionJudge.reProvisioningNeeded _).expects().returning(true.pure[IO])
 
-        (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.url.pure[IO])
+        (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.pure[IO])
 
         (reProvisioningStatus.setRunning _).expects(controller).returning(exception.raiseError[IO, Unit])
         (reProvisioningStatus.setRunning _).expects(controller).returning(IO.unit)
@@ -164,7 +164,7 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
         (reprovisionJudge.reProvisioningNeeded _).expects().returning(true.pure[IO])
 
-        (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.url.pure[IO])
+        (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.pure[IO])
 
         (reProvisioningStatus.setRunning _).expects(controller).returning(IO.unit)
 
@@ -196,7 +196,7 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
         (reprovisionJudge.reProvisioningNeeded _).expects().returning(true.pure[IO])
 
-        (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.url.pure[IO])
+        (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.pure[IO])
 
         (reProvisioningStatus.setRunning _).expects(controller).returning(IO.unit)
 
@@ -228,7 +228,7 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
         (reprovisionJudge.reProvisioningNeeded _).expects().returning(true.pure[IO])
 
-        (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.url.pure[IO])
+        (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.pure[IO])
 
         (reProvisioningStatus.setRunning _).expects(controller).returning(IO.unit)
 
@@ -262,7 +262,7 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
         (reprovisionJudge.reProvisioningNeeded _).expects().returning(true.pure[IO])
 
-        (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.url.pure[IO])
+        (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.pure[IO])
 
         (reProvisioningStatus.setRunning _).expects(controller).returning(IO.unit)
 
@@ -287,7 +287,7 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
   }
 
   private trait TestCase {
-    val controller = controllers.generateOne
+    val controller = microserviceBaseUrls.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val configuredRenkuVersionPairs  = renkuVersionPairs.generateNonEmptyList(2)
@@ -308,7 +308,6 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       microserviceUrlFinder,
       reProvisioningStatus,
       executionTimeRecorder,
-      controller.identifier,
       250 millis
     )
   }

@@ -28,7 +28,7 @@ import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.graph.config.RenkuBaseUrlLoader
 import io.renku.graph.model.RenkuBaseUrl
 import io.renku.graph.model.Schemas.renku
-import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}
+import io.renku.microservices.MicroserviceBaseUrl
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
@@ -38,9 +38,9 @@ import scala.language.postfixOps
 
 trait ReProvisioningStatus[F[_]] {
   def underReProvisioning(): F[Boolean]
-  def setRunning(on: Controller): F[Unit]
-  def clear():                        F[Unit]
-  def findReProvisioningController(): F[Option[Controller]]
+  def setRunning(on: MicroserviceBaseUrl): F[Unit]
+  def clear():                     F[Unit]
+  def findReProvisioningService(): F[Option[MicroserviceBaseUrl]]
 }
 
 private class ReProvisioningStatusImpl[F[_]: Async: Logger](
@@ -69,25 +69,25 @@ private class ReProvisioningStatusImpl[F[_]: Async: Logger](
     case false => false.pure[F]
   }
 
-  override def setRunning(on: Controller): F[Unit] = upload(
+  override def setRunning(on: MicroserviceBaseUrl): F[Unit] = upload(
     ReProvisioningInfo(ReProvisioningInfo.Status.Running, on).asJsonLD
   )
 
   override def clear(): F[Unit] = deleteFromDb() >> renewAllSubscriptions()
 
-  override def findReProvisioningController(): F[Option[Controller]] = queryExpecting[Option[Controller]] {
-    SparqlQuery.of(
-      name = "re-provisioning - fetch controller",
-      Prefixes of renku -> "renku",
-      s"""|SELECT ?url ?id
-          |WHERE { 
-          |  ?entityId a renku:ReProvisioning;
-          |              renku:controllerUrl ?url;
-          |              renku:controllerIdentifier ?id.
-          |}
-          |""".stripMargin
-    )
-  }(controllerDecoder)
+  override def findReProvisioningService(): F[Option[MicroserviceBaseUrl]] =
+    queryExpecting[Option[MicroserviceBaseUrl]] {
+      SparqlQuery.of(
+        name = "re-provisioning - fetch controller",
+        Prefixes of renku -> "renku",
+        s"""|SELECT ?url ?id
+            |WHERE { 
+            |  ?entityId a renku:ReProvisioning;
+            |              renku:controllerUrl ?url;
+            |}
+            |""".stripMargin
+      )
+    }(controllerUrlDecoder)
 
   private def deleteFromDb() = updateWithNoResult {
     SparqlQuery.of(
@@ -150,13 +150,10 @@ private class ReProvisioningStatusImpl[F[_]: Async: Logger](
       .map(_.headOption)
   }
 
-  private lazy val controllerDecoder: Decoder[Option[Controller]] = {
+  private lazy val controllerUrlDecoder: Decoder[Option[MicroserviceBaseUrl]] = {
 
-    val ofControllers: Decoder[Controller] = cursor =>
-      for {
-        url <- cursor.downField("url").downField("value").as[MicroserviceBaseUrl]
-        id  <- cursor.downField("id").downField("value").as[MicroserviceIdentifier]
-      } yield Controller(url, id)
+    val ofControllers: Decoder[MicroserviceBaseUrl] =
+      _.downField("url").downField("value").as[MicroserviceBaseUrl]
 
     _.downField("results")
       .downField("bindings")

@@ -27,9 +27,8 @@ import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators.cliVersions
 import io.renku.graph.model.RenkuVersionPair
 import io.renku.http.client.ServiceHealthChecker
-import io.renku.microservices.MicroserviceUrlFinder
+import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
 import io.renku.triplesgenerator.generators.VersionGenerators._
-import io.renku.triplesgenerator.reprovisioning.Generators.controllers
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -117,12 +116,12 @@ class ReProvisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFac
 
         (reProvisioningStatus.underReProvisioning _).expects().returning(true.pure[Try])
 
-        val controller = controllers.generateOne
-        (reProvisioningStatus.findReProvisioningController _).expects().returning(controller.some.pure[Try])
+        val controller = microserviceBaseUrls.generateOne
+        (reProvisioningStatus.findReProvisioningService _).expects().returning(controller.some.pure[Try])
 
         (microserviceUrlFinder.findBaseUrl _).expects().returning(microserviceBaseUrls.generateOne.pure[Try])
 
-        (serviceHealthChecker.ping _).expects(controller.url).returning(true.pure[Try])
+        (serviceHealthChecker.ping _).expects(controller).returning(true.pure[Try])
 
         val newVersionPair = NonEmptyList.of(
           currentVersionPair.copy(cliVersion = cliVersions.generateOne),
@@ -141,12 +140,12 @@ class ReProvisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFac
 
         (reProvisioningStatus.underReProvisioning _).expects().returning(true.pure[Try])
 
-        val controller = controllers.generateOne
-        (reProvisioningStatus.findReProvisioningController _).expects().returning(controller.some.pure[Try])
+        val controller = microserviceBaseUrls.generateOne
+        (reProvisioningStatus.findReProvisioningService _).expects().returning(controller.some.pure[Try])
 
         (microserviceUrlFinder.findBaseUrl _).expects().returning(microserviceBaseUrls.generateOne.pure[Try])
 
-        (serviceHealthChecker.ping _).expects(controller.url).returning(false.pure[Try])
+        (serviceHealthChecker.ping _).expects(controller).returning(false.pure[Try])
 
         val newVersionPair = NonEmptyList.of(
           currentVersionPair.copy(cliVersion = cliVersions.generateOne),
@@ -165,10 +164,10 @@ class ReProvisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFac
 
         (reProvisioningStatus.underReProvisioning _).expects().returning(true.pure[Try])
 
-        val controller = controllers.generateOne
-        (reProvisioningStatus.findReProvisioningController _).expects().returning(controller.some.pure[Try])
+        val controller = microserviceBaseUrls.generateOne
+        (reProvisioningStatus.findReProvisioningService _).expects().returning(controller.some.pure[Try])
 
-        (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.url.pure[Try])
+        (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.pure[Try])
 
         val newVersionPair = NonEmptyList.of(
           currentVersionPair.copy(cliVersion = cliVersions.generateOne),
@@ -187,8 +186,9 @@ class ReProvisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFac
 
         (reProvisioningStatus.underReProvisioning _).expects().returning(true.pure[Try])
 
-        val controller = controllers.generateOne
-        (reProvisioningStatus.findReProvisioningController _).expects().returning(Option.empty[Controller].pure[Try])
+        (reProvisioningStatus.findReProvisioningService _)
+          .expects()
+          .returning(Option.empty[MicroserviceBaseUrl].pure[Try])
 
         val newVersionPair = NonEmptyList.of(
           currentVersionPair.copy(cliVersion = cliVersions.generateOne),

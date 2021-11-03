@@ -83,12 +83,12 @@ private class ReProvisionJudgeImpl[F[_]: MonadThrow](renkuVersionPairFinder: Ren
       reProvisioningStatus.underReProvisioning() >>= {
         case false => false.pure[F]
         case true =>
-          reProvisioningStatus.findReProvisioningController() >>= {
+          reProvisioningStatus.findReProvisioningService() >>= {
             case None => true.pure[F]
-            case Some(controller) =>
+            case Some(controllerUrl) =>
               microserviceUrlFinder.findBaseUrl() >>= {
-                case controller.url => true.pure[F]
-                case _              => ping(controller.url).map(!_)
+                case `controllerUrl` => true.pure[F]
+                case _               => ping(controllerUrl).map(!_)
               }
           }
       }

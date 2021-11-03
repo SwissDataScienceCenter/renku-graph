@@ -18,12 +18,12 @@
 
 package io.renku.triplesgenerator.reprovisioning
 
-import Generators._
 import cats.effect.IO
 import cats.effect.kernel.Ref
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.events.consumers.EventConsumersRegistry
+import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.renkuBaseUrls
 import io.renku.graph.model.RenkuBaseUrl
@@ -52,7 +52,7 @@ class ReProvisioningStatusSpec
   "underReProvisioning" should {
 
     "reflect the state of the re-provisioning info in the DB" in new TestCase {
-      val controller = controllers.generateOne
+      val controller = microserviceBaseUrls.generateOne
 
       reProvisioningStatus.setRunning(on = controller).unsafeRunSync() shouldBe ()
 
@@ -60,7 +60,7 @@ class ReProvisioningStatusSpec
     }
 
     "cache the value of the flag in the DB once it's set to false" in new TestCase {
-      val controller = controllers.generateOne
+      val controller = microserviceBaseUrls.generateOne
       reProvisioningStatus.setRunning(on = controller).unsafeRunSync() shouldBe ()
 
       reProvisioningStatus.underReProvisioning().unsafeRunSync() shouldBe true
@@ -78,7 +78,7 @@ class ReProvisioningStatusSpec
     }
 
     "check if re-provisioning is done and notify availability to event-log" in new TestCase {
-      val controller = controllers.generateOne
+      val controller = microserviceBaseUrls.generateOne
       reProvisioningStatus.setRunning(on = controller).unsafeRunSync() shouldBe ()
       reProvisioningStatus.underReProvisioning().unsafeRunSync()       shouldBe true
 
@@ -98,21 +98,21 @@ class ReProvisioningStatusSpec
 
       findInfo shouldBe None
 
-      val controller = controllers.generateOne
+      val controller = microserviceBaseUrls.generateOne
       reProvisioningStatus.setRunning(on = controller).unsafeRunSync() shouldBe ()
 
-      findInfo shouldBe (Running.value, controller.url.value, controller.identifier.value).some
+      findInfo shouldBe (Running.value, controller.value).some
     }
   }
 
   "clear" should {
 
     "completely remove the ReProvisioning object" in new TestCase {
-      val controller = controllers.generateOne
+      val controller = microserviceBaseUrls.generateOne
 
       reProvisioningStatus.setRunning(on = controller).unsafeRunSync() shouldBe ()
 
-      findInfo shouldBe (Running.value, controller.url.value, controller.identifier.value).some
+      findInfo shouldBe (Running.value, controller.value).some
 
       expectNotificationSent
 
@@ -136,14 +136,14 @@ class ReProvisioningStatusSpec
   "findReProvisioningController" should {
 
     "return Controller if exists in the KG" in new TestCase {
-      val controller = controllers.generateOne
+      val controller = microserviceBaseUrls.generateOne
       reProvisioningStatus.setRunning(on = controller).unsafeRunSync() shouldBe ()
 
-      reProvisioningStatus.findReProvisioningController().unsafeRunSync() shouldBe controller.some
+      reProvisioningStatus.findReProvisioningService().unsafeRunSync() shouldBe controller.some
     }
 
     "return nothing if there's no Controller info in the KG" in new TestCase {
-      reProvisioningStatus.findReProvisioningController().unsafeRunSync() shouldBe None
+      reProvisioningStatus.findReProvisioningService().unsafeRunSync() shouldBe None
     }
   }
 
@@ -170,18 +170,17 @@ class ReProvisioningStatusSpec
         .returning(IO.unit)
   }
 
-  private def findInfo: Option[(String, String, String)] =
-    runQuery(s"""|SELECT DISTINCT ?status ?controllerUrl ?controllerIdentifier
-                 |WHERE {
-                 |  ?id a renku:ReProvisioning;
-                 |      renku:status ?status;
-                 |      renku:controllerUrl ?controllerUrl;
-                 |      renku:controllerIdentifier ?controllerIdentifier
-                 |}
-                 |""".stripMargin)
-      .unsafeRunSync()
-      .map(row => (row("status"), row("controllerUrl"), row("controllerIdentifier")))
-      .headOption
+  private def findInfo: Option[(String, String)] = runQuery {
+    s"""|SELECT DISTINCT ?status ?controllerUrl
+        |WHERE {
+        |  ?id a renku:ReProvisioning;
+        |      renku:status ?status;
+        |      renku:controllerUrl ?controllerUrl
+        |}
+        |""".stripMargin
+  }.unsafeRunSync()
+    .map(row => row("status") -> row("controllerUrl"))
+    .headOption
 
   private def clearStatus(): Unit = runUpdate {
     SparqlQuery.of(

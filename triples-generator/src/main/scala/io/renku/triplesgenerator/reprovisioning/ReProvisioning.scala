@@ -26,7 +26,7 @@ import io.renku.graph.config.RenkuBaseUrlLoader
 import io.renku.graph.model.RenkuVersionPair
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
-import io.renku.microservices.{MicroserviceIdentifier, MicroserviceUrlFinder}
+import io.renku.microservices.MicroserviceUrlFinder
 import io.renku.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import io.renku.triplesgenerator.Microservice
 import org.typelevel.log4cats.Logger
@@ -48,7 +48,6 @@ class ReProvisioningImpl[F[_]: Temporal: Logger](
     microserviceUrlFinder:     MicroserviceUrlFinder[F],
     reProvisioningStatus:      ReProvisioningStatus[F],
     executionTimeRecorder:     ExecutionTimeRecorder[F],
-    microserviceIdentifier:    MicroserviceIdentifier,
     sleepWhenBusy:             FiniteDuration
 ) extends ReProvisioning[F] {
 
@@ -77,16 +76,15 @@ class ReProvisioningImpl[F[_]: Temporal: Logger](
     } yield ()
   } >>= logSummary
 
-  private def setRunningStatusInTS() = findControllerInfo >>= { controllerInfo =>
-    reProvisioningStatus.setRunning(on = controllerInfo) recoverWith tryAgain(
-      reProvisioningStatus.setRunning(controllerInfo)
+  private def setRunningStatusInTS() = findControllerUrl >>= { controllerUrl =>
+    reProvisioningStatus.setRunning(on = controllerUrl) recoverWith tryAgain(
+      reProvisioningStatus.setRunning(controllerUrl)
     )
   }
 
-  private lazy val findControllerInfo = microserviceUrlFinder
+  private lazy val findControllerUrl = microserviceUrlFinder
     .findBaseUrl()
     .recoverWith(tryAgain(microserviceUrlFinder.findBaseUrl()))
-    .map(Controller(_, microserviceIdentifier))
 
   private def logSummary: ((ElapsedTime, Unit)) => F[Unit] = { case (elapsedTime, _) =>
     Logger[F].info(s"Clearing DB finished in ${elapsedTime}ms - re-processing all the events")
@@ -131,7 +129,6 @@ object ReProvisioning {
       microserviceUrlFinder,
       reProvisioningStatus,
       executionTimeRecorder,
-      Microservice.Identifier,
       SleepWhenBusy
     )
   }

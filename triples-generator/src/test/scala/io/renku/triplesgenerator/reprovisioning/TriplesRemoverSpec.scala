@@ -18,8 +18,8 @@
 
 package io.renku.triplesgenerator.reprovisioning
 
-import Generators._
 import cats.effect.IO
+import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits.GenOps
 import io.renku.generators.Generators._
 import io.renku.graph.model.testentities._
@@ -41,7 +41,7 @@ class TriplesRemoverSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
         anyProjectEntities.generateOne.asJsonLD,
         anyProjectEntities.generateOne.asJsonLD,
         renkuVersionPairs.generateOne.asJsonLD,
-        ReProvisioningInfo(ReProvisioningInfo.Status.Running, controllers.generateOne).asJsonLD
+        ReProvisioningInfo(ReProvisioningInfo.Status.Running, microserviceBaseUrls.generateOne).asJsonLD
       )
 
       val graphMetadataTriples = runQuery {
