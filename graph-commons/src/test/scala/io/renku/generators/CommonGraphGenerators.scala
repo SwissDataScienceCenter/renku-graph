@@ -43,7 +43,7 @@ import io.renku.http.server.security.EndpointSecurityException.{AuthenticationFa
 import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.Schema
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
-import io.renku.microservices.MicroserviceBaseUrl
+import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}
 import io.renku.rdfstore._
 import org.http4s.Status
 import org.http4s.Status._
@@ -110,6 +110,9 @@ object CommonGraphGenerators {
     ip3  <- positiveInts(999)
     ip4  <- positiveInts(999)
   } yield MicroserviceBaseUrl(s"$protocol://$ip1$ip2$ip3$ip4:$port")
+
+  implicit val microserviceIdentifiers: Gen[MicroserviceIdentifier] =
+    Gen.uuid map (_ => MicroserviceIdentifier.generate)
 
   implicit val renkuResourcesUrls: Gen[renku.ResourcesUrl] = for {
     url  <- httpUrls()

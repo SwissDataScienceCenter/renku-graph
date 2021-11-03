@@ -100,7 +100,7 @@ private[triplesgenerated] class TransformationStepsRunnerImpl[F[_]: MonadThrow](
           .pure[F]
           .widen[TriplesUploadResult]
       )
-      .map(triplesUploader.upload)
+      .map(triplesUploader.uploadTriples)
       .merge
 }
 

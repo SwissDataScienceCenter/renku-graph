@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.reprovisioning
 import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.{CliVersion, RenkuVersionPair, SchemaVersion}
+import io.renku.graph.model.{CliVersion, RenkuBaseUrl, RenkuVersionPair, SchemaVersion}
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
@@ -48,18 +48,18 @@ class RenkuVersionPairUpdaterSpec extends AnyWordSpec with IOSpec with InMemoryR
 
   private trait TestCase {
     val currentRenkuVersionPair = renkuVersionPairs.generateOne
-    private val renkuBaseUrl    = renkuBaseUrls.generateOne
 
-    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    private implicit val renkuBaseUrl: RenkuBaseUrl   = renkuBaseUrls.generateOne
+    private implicit val logger:       TestLogger[IO] = TestLogger[IO]()
     private val timeRecorder         = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO]())
     val newVersionCompatibilityPairs = renkuVersionPairs.generateOne
 
-    val renkuVersionPairUpdater = new RenkuVersionPairUpdaterImpl(rdfStoreConfig, renkuBaseUrl, timeRecorder)
+    val renkuVersionPairUpdater = new RenkuVersionPairUpdaterImpl(rdfStoreConfig, timeRecorder)
 
     def findPairInDb: Set[RenkuVersionPair] =
-      runQuery(s"""|SELECT DISTINCT ?schemaVersion ?cliVersion
+      runQuery(s"""|SELECT DISTINCT ?schemaVersion ?cliVersion 
                    |WHERE {
-                   |   ?id rdf:type renku:VersionPair;
+                   |   ?id a renku:VersionPair;
                    |       renku:schemaVersion ?schemaVersion ;
                    |       renku:cliVersion ?cliVersion.
                    |}

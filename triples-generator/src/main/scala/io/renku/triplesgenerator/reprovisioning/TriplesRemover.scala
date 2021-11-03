@@ -60,7 +60,7 @@ private class TriplesRemoverImpl[F[_]: Async: Logger](
         |WHERE { ?subject ?p ?o 
         |  MINUS {
         |    ?subject a ?type
-        |    FILTER (?type IN (<${RenkuVersionPairJsonLD.objectType}>, <${ReProvisioningJsonLD.objectType}>)) 
+        |    FILTER (?type IN (renku:VersionPair, renku:ReProvisioning)) 
         |  }
         |}
         |LIMIT 1
@@ -76,7 +76,7 @@ private class TriplesRemoverImpl[F[_]: Async: Logger](
         |  WHERE { ?s ?p ?o 
         |    MINUS {
         |      ?s a ?type
-        |      FILTER (?type IN (<${RenkuVersionPairJsonLD.objectType}>, <${ReProvisioningJsonLD.objectType}>)) 
+        |      FILTER (?type IN (renku:VersionPair, renku:ReProvisioning)) 
         |    }
         |  }
         |  LIMIT ${removalBatchSize.value}

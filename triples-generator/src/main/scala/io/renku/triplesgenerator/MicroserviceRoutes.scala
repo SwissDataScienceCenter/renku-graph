@@ -40,12 +40,17 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
 
   // format: off
   lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
-    case request @ POST -> Root / "events" => processEvent(request)
-    case GET            -> Root / "ping"   => Ok("pong")
-    case GET            -> Root / "config-info"   => Ok( config.map(_.entrySet().asScala.map{mapEntry =>
-                                                         mapEntry.getKey -> mapEntry.getValue.render()
-                                                       }.mkString("\n")).getOrElse("No config found")
-                                                     )
+    case request @ POST -> Root / "events"        => processEvent(request)
+    case GET            -> Root / "ping"          => Ok("pong")
+    case GET            -> Root / "config-info"   => Ok(configInfo)
   }.withMetrics
   // format: on
+
+  private lazy val configInfo = config
+    .map(
+      _.entrySet().asScala
+        .map(mapEntry => mapEntry.getKey -> mapEntry.getValue.render())
+        .mkString("\n")
+    )
+    .getOrElse("No config found")
 }

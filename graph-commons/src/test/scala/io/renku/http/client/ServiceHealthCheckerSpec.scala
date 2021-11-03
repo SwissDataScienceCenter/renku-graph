@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.zombieevents
+package io.renku.http.client
 
 import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.WireMock._
