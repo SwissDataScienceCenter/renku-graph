@@ -42,7 +42,11 @@ class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
   "createTransformationStep" should {
 
     "create update queries when project is in KG" in new TestCase {
-      val kgProjectInfo = (projectNames.generateOne, projectResourceIds.generateOption, projectVisibilities.generateOne)
+      val kgProjectInfo = (projectNames.generateOne,
+                           projectResourceIds.generateOption,
+                           projectVisibilities.generateOne,
+                           projectDescriptions.generateOne
+      )
 
       (kgProjectFinder.find _)
         .expects(project.resourceId)
