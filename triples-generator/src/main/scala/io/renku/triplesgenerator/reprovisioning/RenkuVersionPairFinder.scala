@@ -61,11 +61,10 @@ private class RenkuVersionPairFinderImpl[F[_]: Async: Logger](
 }
 
 private object RenkuVersionPairFinder {
-  def apply[F[_]: Async: Logger](rdfStoreConfig: RdfStoreConfig,
-                                 renkuBaseUrl: RenkuBaseUrl,
-                                 timeRecorder: SparqlQueryTimeRecorder[F]
-  ): F[RenkuVersionPairFinderImpl[F]] = MonadThrow[F].catchNonFatal {
-    implicit val baseUrl: RenkuBaseUrl = renkuBaseUrl
+  def apply[F[_]: Async: Logger](
+      rdfStoreConfig:      RdfStoreConfig,
+      timeRecorder:        SparqlQueryTimeRecorder[F]
+  )(implicit renkuBaseUrl: RenkuBaseUrl): F[RenkuVersionPairFinderImpl[F]] = MonadThrow[F].catchNonFatal {
     new RenkuVersionPairFinderImpl[F](rdfStoreConfig, timeRecorder)
   }
 }

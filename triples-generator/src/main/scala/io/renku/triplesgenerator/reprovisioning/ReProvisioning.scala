@@ -23,7 +23,7 @@ import cats.effect.{Async, Temporal}
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.graph.config.RenkuBaseUrlLoader
-import io.renku.graph.model.{RenkuBaseUrl, RenkuVersionPair}
+import io.renku.graph.model.RenkuVersionPair
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.microservices.{MicroserviceIdentifier, MicroserviceUrlFinder}
@@ -40,9 +40,8 @@ trait ReProvisioning[F[_]] {
 }
 
 class ReProvisioningImpl[F[_]: Temporal: Logger](
-    renkuVersionPairFinder:    RenkuVersionPairFinder[F],
     versionCompatibilityPairs: NonEmptyList[RenkuVersionPair],
-    reProvisionJudge:          ReProvisionJudge,
+    reProvisionJudge:          ReProvisionJudge[F],
     triplesRemover:            TriplesRemover[F],
     eventsReScheduler:         EventsReScheduler[F],
     versionPairUpdater:        RenkuVersionPairUpdater[F],
@@ -58,21 +57,16 @@ class ReProvisioningImpl[F[_]: Temporal: Logger](
   import reProvisionJudge.reProvisioningNeeded
   import triplesRemover._
 
-  override def run(): F[Unit] = for {
-    maybeVersionPairInKG <- renkuVersionPairFinder.find() recoverWith tryAgain(renkuVersionPairFinder.find())
-    _                    <- decideIfReProvisioningRequired(maybeVersionPairInKG)
-  } yield ()
-
-  private def decideIfReProvisioningRequired(maybeVersionPairInKG: Option[RenkuVersionPair]) =
-    if (reProvisioningNeeded(maybeVersionPairInKG, versionCompatibilityPairs))
+  override def run(): F[Unit] = (reProvisioningNeeded() recoverWith tryAgain(reProvisioningNeeded())) >>= {
+    case true =>
       triggerReProvisioning recoverWith tryAgain(triggerReProvisioning)
-    else
-      versionPairUpdater.update(versionCompatibilityPairs.head) >>
-        Logger[F].info("All projects' triples up to date")
+    case false =>
+      versionPairUpdater.update(versionCompatibilityPairs.head) >> Logger[F].info("Triples Store up to date")
+  }
 
   private def triggerReProvisioning = measureExecutionTime {
     for {
-      _ <- Logger[F].info("The triples are not up to date - re-provisioning is clearing DB")
+      _ <- Logger[F].info("Triples Store is not on the required schema version - kicking-off re-provisioning")
       _ <- setRunningStatusInTS()
       _ <- versionPairUpdater
              .update(versionCompatibilityPairs.head)
@@ -113,20 +107,17 @@ object ReProvisioning {
       versionCompatibilityPairs: NonEmptyList[RenkuVersionPair],
       timeRecorder:              SparqlQueryTimeRecorder[F],
       configuration:             Config = ConfigFactory.load()
-  ): F[ReProvisioning[F]] = for {
-    rdfStoreConfig         <- RdfStoreConfig[F](configuration)
-    eventsReScheduler      <- EventsReScheduler[F]
-    renkuBaseUrl           <- RenkuBaseUrlLoader[F]()
-    microserviceUrlFinder  <- MicroserviceUrlFinder[F](Microservice.ServicePort)
-    executionTimeRecorder  <- ExecutionTimeRecorder[F]()
-    triplesRemover         <- TriplesRemoverImpl(rdfStoreConfig, timeRecorder)
-    renkuVersionPairFinder <- RenkuVersionPairFinder(rdfStoreConfig, renkuBaseUrl, timeRecorder)
-  } yield {
-    implicit val baseUrl: RenkuBaseUrl = renkuBaseUrl
-    new ReProvisioningImpl[F](
-      renkuVersionPairFinder,
+  ): F[ReProvisioning[F]] = RenkuBaseUrlLoader[F]() flatMap { implicit renkuBaseUrl =>
+    for {
+      rdfStoreConfig        <- RdfStoreConfig[F](configuration)
+      eventsReScheduler     <- EventsReScheduler[F]
+      reProvisioningJudge   <- ReProvisionJudge[F](rdfStoreConfig, versionCompatibilityPairs, timeRecorder)
+      microserviceUrlFinder <- MicroserviceUrlFinder[F](Microservice.ServicePort)
+      executionTimeRecorder <- ExecutionTimeRecorder[F]()
+      triplesRemover        <- TriplesRemoverImpl(rdfStoreConfig, timeRecorder)
+    } yield new ReProvisioningImpl[F](
       versionCompatibilityPairs,
-      new ReProvisionJudgeImpl(),
+      reProvisioningJudge,
       triplesRemover,
       eventsReScheduler,
       new RenkuVersionPairUpdaterImpl(rdfStoreConfig, timeRecorder),

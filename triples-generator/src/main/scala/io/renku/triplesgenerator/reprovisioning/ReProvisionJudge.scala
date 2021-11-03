@@ -18,38 +18,47 @@
 
 package io.renku.triplesgenerator.reprovisioning
 
+import cats.MonadThrow
 import cats.data.NonEmptyList
-import io.renku.graph.model.{CliVersion, RenkuVersionPair, SchemaVersion}
+import cats.effect.Async
+import cats.syntax.all._
+import io.renku.graph.model.{CliVersion, RenkuBaseUrl, RenkuVersionPair, SchemaVersion}
+import io.renku.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
+import org.typelevel.log4cats.Logger
 
-trait ReProvisionJudge {
-
-  def reProvisioningNeeded(maybeCurrentVersionPair:   Option[RenkuVersionPair],
-                           versionCompatibilityPairs: NonEmptyList[RenkuVersionPair]
-  ): Boolean
+private trait ReProvisionJudge[F[_]] {
+  def reProvisioningNeeded(): F[Boolean]
 }
 
-private class ReProvisionJudgeImpl extends ReProvisionJudge {
+private object ReProvisionJudge {
+  def apply[F[_]: Async: Logger](rdfStoreConfig: RdfStoreConfig,
+                                 versionCompatibilityPairs: NonEmptyList[RenkuVersionPair],
+                                 timeRecorder:              SparqlQueryTimeRecorder[F]
+  )(implicit renkuBaseUrl:                                  RenkuBaseUrl) = for {
+    renkuVersionPairFinder <- RenkuVersionPairFinder(rdfStoreConfig, timeRecorder)
+  } yield new ReProvisionJudgeImpl[F](renkuVersionPairFinder, versionCompatibilityPairs)
+}
 
-  override def reProvisioningNeeded(maybeCurrentVersionPair:   Option[RenkuVersionPair],
-                                    versionCompatibilityPairs: NonEmptyList[RenkuVersionPair]
-  ): Boolean =
-    `is current schema version different from latest`(maybeCurrentVersionPair.map(_.schemaVersion),
-                                                      versionCompatibilityPairs.head.schemaVersion
-    ) || `are latest schema versions same but cli versions different`(versionCompatibilityPairs.toList,
-                                                                      maybeCurrentVersionPair.map(_.cliVersion)
-    )
+private class ReProvisionJudgeImpl[F[_]: MonadThrow](renkuVersionPairFinder: RenkuVersionPairFinder[F],
+                                                     versionCompatibilityPairs: NonEmptyList[RenkuVersionPair]
+) extends ReProvisionJudge[F] {
 
-  private def `is current schema version different from latest`(maybeCurrent: Option[SchemaVersion],
-                                                                latest:       SchemaVersion
-  ) = !(maybeCurrent contains latest)
+  override def reProvisioningNeeded(): F[Boolean] =
+    renkuVersionPairFinder.find() map decide
 
-  private def `are latest schema versions same but cli versions different`(
-      versionCompatibilityPairs: List[RenkuVersionPair],
-      maybeCurrentCliVersion:    Option[CliVersion]
-  ) = versionCompatibilityPairs match {
-    case RenkuVersionPair(latestCliVersion, latestSchemaVersion) :: RenkuVersionPair(_, oldSchemaVersion) :: _
-        if latestSchemaVersion == oldSchemaVersion =>
-      !(maybeCurrentCliVersion contains latestCliVersion)
-    case _ => false
-  }
+  private def decide(maybeCurrentVersionPair: Option[RenkuVersionPair]): Boolean =
+    `is current schema version different from latest`(
+      maybeCurrentVersionPair.map(_.schemaVersion)
+    ) || `are latest schema versions same but cli versions different`(maybeCurrentVersionPair.map(_.cliVersion))
+
+  private def `is current schema version different from latest`(maybeCurrent: Option[SchemaVersion]) =
+    !(maybeCurrent contains versionCompatibilityPairs.head.schemaVersion)
+
+  private def `are latest schema versions same but cli versions different`(maybeCurrentCliVersion: Option[CliVersion]) =
+    versionCompatibilityPairs.toList match {
+      case RenkuVersionPair(latestCliVersion, latestSchemaVersion) :: RenkuVersionPair(_, oldSchemaVersion) :: _
+          if latestSchemaVersion == oldSchemaVersion =>
+        !(maybeCurrentCliVersion contains latestCliVersion)
+      case _ => false
+    }
 }

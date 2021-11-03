@@ -22,10 +22,13 @@ import cats.data.NonEmptyList
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.RenkuVersionPair
 import io.renku.triplesgenerator.generators.VersionGenerators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+
+import scala.util.Try
 
 class ReProvisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFactory {
 
@@ -36,39 +39,50 @@ class ReProvisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFac
       /** current cli version is 1.2.1 current schema version 12 [1.2.3 -> 13, 1.2.1 -> 12] OR for a RollBack current
         * cli version is 1.2.1 current schema version 12 [1.2.3 -> 11, 1.2.1 -> 12]
         */
+
+      val currentVersionPair = renkuVersionPairs.generateOne
+      (versionPairFinder.find _).expects().returning(currentVersionPair.some.pure[Try])
+
       val newVersionPair = renkuVersionPairs.generateNonEmptyList(2, 2)
 
-      judge.reProvisioningNeeded(currentVersionPair.some, newVersionPair) shouldBe true
+      judge(newVersionPair).reProvisioningNeeded() shouldBe true.pure[Try]
     }
 
     "return true when the last two schema versions are the same but the cli versions are different" in new TestCase {
       // Compat matrix
-      /** current cli version is 1.2.1 current schema version 13 [1.2.3 -> 13, 1.2.1 -> 13]
-        */
+      /** current cli version is 1.2.1 current schema version 13 [1.2.3 -> 13, 1.2.1 -> 13] */
+
+      val currentVersionPair = renkuVersionPairs.generateOne
+      (versionPairFinder.find _).expects().returning(currentVersionPair.some.pure[Try])
+
       val newVersionPair =
         renkuVersionPairs.generateNonEmptyList(2, 2).map(_.copy(schemaVersion = currentVersionPair.schemaVersion))
 
-      judge.reProvisioningNeeded(currentVersionPair.some, newVersionPair) shouldBe true
+      judge(newVersionPair).reProvisioningNeeded() shouldBe true.pure[Try]
     }
 
     "return false when the schema version is the same and the cli version is different" in new TestCase {
 
-      /** current cli version is 1.2.1 current schema version 13 Compat matrix: [1.2.3 -> 13]
-        */
+      /** current cli version is 1.2.1 current schema version 13 Compat matrix: [1.2.3 -> 13] */
+
+      val currentVersionPair = renkuVersionPairs.generateOne
+      (versionPairFinder.find _).expects().returning(currentVersionPair.some.pure[Try])
+
       val newVersionPair = renkuVersionPairs.generateOne.copy(schemaVersion = currentVersionPair.schemaVersion)
 
-      judge.reProvisioningNeeded(currentVersionPair.some, NonEmptyList.one(newVersionPair)) shouldBe false
+      judge(NonEmptyList.one(newVersionPair)).reProvisioningNeeded() shouldBe false.pure[Try]
     }
 
     "return true when the current schema version is None" in new TestCase {
-      judge.reProvisioningNeeded(maybeCurrentVersionPair = None,
-                                 NonEmptyList.one(renkuVersionPairs.generateOne)
-      ) shouldBe true
+      (versionPairFinder.find _).expects().returning(Option.empty[RenkuVersionPair].pure[Try])
+
+      judge(NonEmptyList.one(renkuVersionPairs.generateOne)).reProvisioningNeeded() shouldBe true.pure[Try]
     }
   }
 
   private trait TestCase {
-    val currentVersionPair = renkuVersionPairs.generateOne
-    val judge              = new ReProvisionJudgeImpl()
+    val versionPairFinder = mock[RenkuVersionPairFinder[Try]]
+    def judge(compatibilityMatrix: NonEmptyList[RenkuVersionPair]) =
+      new ReProvisionJudgeImpl(versionPairFinder, compatibilityMatrix)
   }
 }
