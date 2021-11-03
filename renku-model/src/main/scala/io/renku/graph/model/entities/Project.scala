@@ -31,6 +31,7 @@ sealed trait Project extends Product with Serializable {
   val resourceId:   ResourceId
   val path:         Path
   val name:         Name
+  val description:  Description
   val agent:        CliVersion
   val dateCreated:  DateCreated
   val maybeCreator: Option[Person]
@@ -47,6 +48,7 @@ sealed trait Project extends Product with Serializable {
 final case class ProjectWithoutParent(resourceId:   ResourceId,
                                       path:         Path,
                                       name:         Name,
+                                      description:  Description,
                                       agent:        CliVersion,
                                       dateCreated:  DateCreated,
                                       maybeCreator: Option[Person],
@@ -62,6 +64,7 @@ object ProjectWithoutParent extends ProjectFactory {
   def from(resourceId:   ResourceId,
            path:         Path,
            name:         Name,
+           description:  Description,
            agent:        CliVersion,
            dateCreated:  DateCreated,
            maybeCreator: Option[Person],
@@ -78,6 +81,7 @@ object ProjectWithoutParent extends ProjectFactory {
         ProjectWithoutParent(resourceId,
                              path,
                              name,
+                             description,
                              agent,
                              dateCreated,
                              maybeCreator,
@@ -121,6 +125,7 @@ object ProjectWithoutParent extends ProjectFactory {
 final case class ProjectWithParent(resourceId:       ResourceId,
                                    path:             Path,
                                    name:             Name,
+                                   description:      Description,
                                    agent:            CliVersion,
                                    dateCreated:      DateCreated,
                                    maybeCreator:     Option[Person],
@@ -137,6 +142,7 @@ object ProjectWithParent extends ProjectFactory {
   def from(resourceId:       ResourceId,
            path:             Path,
            name:             Name,
+           description:      Description,
            agent:            CliVersion,
            dateCreated:      DateCreated,
            maybeCreator:     Option[Person],
@@ -152,6 +158,7 @@ object ProjectWithParent extends ProjectFactory {
     ProjectWithParent(resourceId,
                       path,
                       name,
+                      description,
                       agent,
                       dateCreated,
                       maybeCreator,
@@ -259,6 +266,7 @@ object Project {
         schema / "name"             -> project.name.asJsonLD,
         renku / "projectPath"       -> project.path.asJsonLD,
         renku / "projectNamespaces" -> project.namespaces.asJsonLD,
+        schema / "description"      -> project.description.asJsonLD,
         schema / "agent"            -> project.agent.asJsonLD,
         schema / "dateCreated"      -> project.dateCreated.asJsonLD,
         schema / "creator"          -> project.maybeCreator.asJsonLD,
@@ -279,6 +287,7 @@ object Project {
   final case class GitLabProjectInfo(name:            Name,
                                      path:            Path,
                                      dateCreated:     DateCreated,
+                                     description:     Description,
                                      maybeCreator:    Option[ProjectMember],
                                      members:         Set[ProjectMember],
                                      visibility:      Visibility,

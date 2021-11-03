@@ -23,12 +23,13 @@ import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model
 import io.renku.graph.model._
-import io.renku.graph.model.projects.{DateCreated, ForksCount, Name, Path, Visibility}
+import io.renku.graph.model.projects.{DateCreated, Description, ForksCount, Name, Path, Visibility}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
 
 sealed trait Project extends Project.ProjectOps with Product with Serializable {
   val path:         Path
   val name:         Name
+  val description:  Description
   val agent:        CliVersion
   val dateCreated:  DateCreated
   val maybeCreator: Option[Person]
@@ -46,6 +47,7 @@ sealed trait Project extends Project.ProjectOps with Product with Serializable {
 
 final case class ProjectWithoutParent(path:         Path,
                                       name:         Name,
+                                      description:  Description,
                                       agent:        CliVersion,
                                       dateCreated:  DateCreated,
                                       maybeCreator: Option[Person],
@@ -105,6 +107,7 @@ final case class ProjectWithoutParent(path:         Path,
 
 final case class ProjectWithParent(path:         Path,
                                    name:         Name,
+                                   description:  Description,
                                    agent:        CliVersion,
                                    dateCreated:  DateCreated,
                                    maybeCreator: Option[Person],
@@ -166,6 +169,7 @@ object Project {
           projects.ResourceId(project.asEntityId),
           project.path,
           project.name,
+          project.description,
           project.agent,
           project.dateCreated,
           project.maybeCreator.map(_.to[entities.Person]),
@@ -186,6 +190,7 @@ object Project {
           projects.ResourceId(project.asEntityId),
           project.path,
           project.name,
+          project.description,
           project.agent,
           project.dateCreated,
           project.maybeCreator.map(_.to[entities.Person]),

@@ -25,7 +25,7 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{fixed, nonNegativeInts, positiveInts}
-import io.renku.graph.model.GraphModelGenerators.{cliVersions, projectCreatedDates, projectNames, projectPaths, projectSchemaVersions, projectVisibilities, userGitLabIds, userNames, usernames}
+import io.renku.graph.model.GraphModelGenerators.{cliVersions, projectCreatedDates, projectDescriptions, projectNames, projectPaths, projectSchemaVersions, projectVisibilities, userGitLabIds, userNames, usernames}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import io.renku.graph.model.projects.{ForksCount, Visibility}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{ActivityGenFactory, DatasetGenFactory}
@@ -65,6 +65,7 @@ trait ProjectEntitiesGenerators {
   ): Gen[ProjectWithoutParent] = for {
     path         <- projectPaths
     name         <- Gen.const(path.toName)
+    description  <- projectDescriptions
     agent        <- cliVersions
     dateCreated  <- projectCreatedDates(minDateCreated.value)
     maybeCreator <- personEntities(withGitLabId).toGeneratorOfOptions
@@ -76,6 +77,7 @@ trait ProjectEntitiesGenerators {
     datasets     <- datasetsFactories.map(_.apply(dateCreated)).sequence
   } yield ProjectWithoutParent(path,
                                name,
+                               description,
                                agent,
                                dateCreated,
                                maybeCreator,
@@ -100,12 +102,13 @@ trait ProjectEntitiesGenerators {
   implicit lazy val gitLabProjectInfos: Gen[GitLabProjectInfo] = for {
     name            <- projectNames
     path            <- projectPaths
+    description     <- projectDescriptions
     dateCreated     <- projectCreatedDates()
     maybeCreator    <- projectMemberObjects.toGeneratorOfOptions
     members         <- projectMemberObjects.toGeneratorOfSet()
     visibility      <- projectVisibilities
     maybeParentPath <- projectPaths.toGeneratorOfOptions
-  } yield GitLabProjectInfo(name, path, dateCreated, maybeCreator, members, visibility, maybeParentPath)
+  } yield GitLabProjectInfo(name, path, dateCreated, description, maybeCreator, members, visibility, maybeParentPath)
 
   implicit lazy val projectMemberObjects: Gen[ProjectMember] = for {
     name     <- userNames

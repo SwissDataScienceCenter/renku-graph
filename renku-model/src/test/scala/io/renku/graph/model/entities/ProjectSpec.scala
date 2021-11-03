@@ -28,7 +28,7 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Project.ProjectMember
-import io.renku.graph.model.projects.DateCreated
+import io.renku.graph.model.projects.{DateCreated, Description}
 import io.renku.graph.model.testentities._
 import io.renku.jsonld.JsonLDDecoder._
 import io.renku.jsonld.JsonLDEncoder.encodeOption
@@ -65,6 +65,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
               project.resourceId,
               project.path,
               project.name,
+              project.description,
               project.agent,
               project.dateCreated,
               Some(creator),
@@ -81,6 +82,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
               project.resourceId,
               project.path,
               project.name,
+              project.description,
               project.agent,
               project.dateCreated,
               Some(creator),
@@ -121,6 +123,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           val jsonLD = cliLikeJsonLD(resourceId,
                                      cliVersion,
                                      schemaVersion,
+                                     projectInfo.description,
                                      projectInfo.dateCreated,
                                      activities,
                                      datasets,
@@ -132,6 +135,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
               resourceId,
               projectInfo.path,
               projectInfo.name,
+              projectInfo.description,
               cliVersion,
               projectInfo.dateCreated,
               maybeCreator.map(copyGitLabId(from = projectInfo.maybeCreator)),
@@ -163,6 +167,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         val jsonLD = cliLikeJsonLD(resourceId,
                                    cliVersion,
                                    schemaVersion,
+                                   projectInfo.description,
                                    projectInfo.dateCreated,
                                    activities,
                                    datasets,
@@ -174,6 +179,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
             resourceId,
             projectInfo.path,
             projectInfo.name,
+            projectInfo.description,
             cliVersion,
             projectInfo.dateCreated,
             maybeCreator.map(copyGitLabId(from = projectInfo.maybeCreator)),
@@ -200,6 +206,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
             val jsonLD = cliLikeJsonLD(resourceId,
                                        cliVersion,
                                        schemaVersion,
+                                       projectInfo.description,
                                        projectInfo.dateCreated,
                                        activities = Nil,
                                        datasets = Nil,
@@ -211,6 +218,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
                 resourceId,
                 projectInfo.path,
                 projectInfo.name,
+                projectInfo.description,
                 cliVersion,
                 projectInfo.dateCreated,
                 projectInfo.maybeCreator.map(toPerson(tryMatchFrom = potentialMembers)),
@@ -227,13 +235,15 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     "return a DecodingFailure when there's a Person entity that cannot be decoded" in {
       val projectInfo = gitLabProjectInfos.map(_.copy(maybeParentPath = None)).generateOne
       val resourceId  = projects.ResourceId(projectInfo.path)
-      val jsonLD = cliLikeJsonLD(resourceId,
-                                 cliVersions.generateOne,
-                                 projectSchemaVersions.generateOne,
-                                 projectInfo.dateCreated,
-                                 activities = Nil,
-                                 datasets = Nil,
-                                 persons = Set.empty
+      val jsonLD = cliLikeJsonLD(
+        resourceId,
+        cliVersions.generateOne,
+        projectSchemaVersions.generateOne,
+        projectInfo.description,
+        projectInfo.dateCreated,
+        activities = Nil,
+        datasets = Nil,
+        persons = Set.empty
       )
 
       val Left(error) = JsonLD
@@ -255,13 +265,15 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     "return a DecodingFailure when there's an Activity entity that cannot be decoded" in {
       val projectInfo = gitLabProjectInfos.map(_.copy(maybeParentPath = None)).generateOne
       val resourceId  = projects.ResourceId(projectInfo.path)
-      val jsonLD = cliLikeJsonLD(resourceId,
-                                 cliVersions.generateOne,
-                                 projectSchemaVersions.generateOne,
-                                 projectInfo.dateCreated,
-                                 activities = Nil,
-                                 datasets = Nil,
-                                 persons = Set.empty
+      val jsonLD = cliLikeJsonLD(
+        resourceId,
+        cliVersions.generateOne,
+        projectSchemaVersions.generateOne,
+        projectInfo.description,
+        projectInfo.dateCreated,
+        activities = Nil,
+        datasets = Nil,
+        persons = Set.empty
       )
 
       val Left(error) = JsonLD
@@ -278,13 +290,15 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     "return a DecodingFailure when there's a Dataset entity that cannot be decoded" in {
       val projectInfo = gitLabProjectInfos.map(_.copy(maybeParentPath = None)).generateOne
       val resourceId  = projects.ResourceId(projectInfo.path)
-      val jsonLD = cliLikeJsonLD(resourceId,
-                                 cliVersions.generateOne,
-                                 projectSchemaVersions.generateOne,
-                                 projectInfo.dateCreated,
-                                 activities = Nil,
-                                 datasets = Nil,
-                                 persons = Set.empty
+      val jsonLD = cliLikeJsonLD(
+        resourceId,
+        cliVersions.generateOne,
+        projectSchemaVersions.generateOne,
+        projectInfo.description,
+        projectInfo.dateCreated,
+        activities = Nil,
+        datasets = Nil,
+        persons = Set.empty
       )
 
       val Left(error) = JsonLD
@@ -306,6 +320,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         resourceId,
         cliVersions.generateOne,
         projectSchemaVersions.generateOne,
+        projectInfo.description,
         projectInfo.dateCreated,
         activities = List(activity),
         datasets = Nil,
@@ -327,6 +342,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         resourceId,
         cliVersions.generateOne,
         projectSchemaVersions.generateOne,
+        projectInfo.description,
         projectInfo.dateCreated,
         activities = Nil,
         datasets = List(dataset),
@@ -364,6 +380,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         resourceId,
         cliVersion,
         schemaVersion,
+        projectInfo.description,
         projectInfo.dateCreated,
         activities = Nil,
         datasets = List(dataset1, dataset2, dateset2Modified),
@@ -375,6 +392,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           resourceId,
           projectInfo.path,
           projectInfo.name,
+          projectInfo.description,
           cliVersion,
           projectInfo.dateCreated,
           maybeCreator.map(copyGitLabId(from = projectInfo.maybeCreator)),
@@ -407,6 +425,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         resourceId,
         cliVersions.generateOne,
         projectSchemaVersions.generateOne,
+        projectInfo.description,
         projectInfo.dateCreated,
         activities = Nil,
         datasets = List(dataset, datesetModified),
@@ -437,6 +456,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         resourceId,
         cliVersion,
         schemaVersion,
+        projectInfo.description,
         projectInfo.dateCreated,
         activities = Nil,
         datasets = List(dataset1, dataset2, dataset3),
@@ -448,6 +468,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           resourceId,
           projectInfo.path,
           projectInfo.name,
+          projectInfo.description,
           cliVersion,
           projectInfo.dateCreated,
           maybeCreator.map(copyGitLabId(from = projectInfo.maybeCreator)),
@@ -473,6 +494,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           resourceId,
           cliVersions.generateOne,
           projectSchemaVersions.generateOne,
+          projectInfo.description,
           projectInfo.dateCreated,
           activities = Nil,
           datasets = List(original, modified, broken),
@@ -487,7 +509,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       }
     }
 
-    "decode project should pick the earliest from dateCreated found in gitlabProjectInfo and the CLI" in {
+    "pick the earliest from dateCreated found in gitlabProjectInfo and the CLI" in {
       val gitlabDate    = projectCreatedDates().generateOne
       val cliDate       = projectCreatedDates().generateOne
       val earliestDate  = List(gitlabDate, cliDate).min
@@ -502,6 +524,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         resourceId,
         cliVersion,
         schemaVersion,
+        projectInfo.description,
         cliDate,
         activities = Nil,
         datasets = Nil,
@@ -513,6 +536,48 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           resourceId,
           projectInfo.path,
           projectInfo.name,
+          projectInfo.description,
+          cliVersion,
+          earliestDate,
+          maybeCreator.map(copyGitLabId(from = projectInfo.maybeCreator)),
+          projectInfo.visibility,
+          members.map(copyGitLabId(fromMatching = projectInfo.members)),
+          schemaVersion,
+          Nil,
+          Nil
+        )
+      ).asRight
+    }
+
+    "favor the project description from the CLI over the gitlab description" in {
+      val gitlabDate   = projectCreatedDates().generateOne
+      val cliDate      = projectCreatedDates().generateOne
+      val earliestDate = List(gitlabDate, cliDate).min
+      val projectInfo  = gitLabProjectInfos.map(_.copy(maybeParentPath = None, dateCreated = gitlabDate)).generateOne
+      val projectDescription = projectDescriptions.generateOne
+      val cliVersion         = cliVersions.generateOne
+      val schemaVersion      = projectSchemaVersions.generateOne
+      val resourceId         = projects.ResourceId(projectInfo.path)
+      val maybeCreator       = projectInfo.maybeCreator.map(_.toPayloadPerson)
+      val members            = projectInfo.members.map(_.toPayloadPerson)
+
+      val jsonLD = cliLikeJsonLD(
+        resourceId,
+        cliVersion,
+        schemaVersion,
+        projectDescription,
+        cliDate,
+        activities = Nil,
+        datasets = Nil,
+        persons = (maybeCreator ++ members).toSet
+      )
+
+      jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo))) shouldBe List(
+        entities.ProjectWithoutParent(
+          resourceId,
+          projectInfo.path,
+          projectInfo.name,
+          projectDescription,
           cliVersion,
           earliestDate,
           maybeCreator.map(copyGitLabId(from = projectInfo.maybeCreator)),
@@ -543,6 +608,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
               schema / "name"             -> project.name.asJsonLD,
               renku / "projectPath"       -> project.path.asJsonLD,
               renku / "projectNamespaces" -> project.namespaces.asJsonLD,
+              schema / "description"      -> project.description.asJsonLD,
               schema / "agent"            -> project.agent.asJsonLD,
               schema / "dateCreated"      -> project.dateCreated.asJsonLD,
               schema / "creator"          -> project.maybeCreator.asJsonLD,
@@ -560,13 +626,14 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     }
   }
 
-  private def cliLikeJsonLD(resourceId:    projects.ResourceId,
-                            cliVersion:    CliVersion,
-                            schemaVersion: SchemaVersion,
-                            dateCreated:   DateCreated,
-                            activities:    List[Activity],
-                            datasets:      List[Dataset[Dataset.Provenance]],
-                            persons:       Set[entities.Person]
+  private def cliLikeJsonLD(resourceId:         projects.ResourceId,
+                            cliVersion:         CliVersion,
+                            schemaVersion:      SchemaVersion,
+                            projectDescription: Description,
+                            dateCreated:        DateCreated,
+                            activities:         List[Activity],
+                            datasets:           List[Dataset[Dataset.Provenance]],
+                            persons:            Set[entities.Person]
   ) = JsonLD
     .arr(
       JsonLD.entity(
@@ -574,6 +641,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         EntityTypes.of(prov / "Location", schema / "Project"),
         schema / "agent"         -> cliVersion.asJsonLD,
         schema / "schemaVersion" -> schemaVersion.asJsonLD,
+        schema / "description"   -> projectDescription.asJsonLD,
         schema / "dateCreated"   -> dateCreated.asJsonLD,
         renku / "hasActivity"    -> activities.asJsonLD,
         renku / "hasPlan"        -> activities.map(_.plan).distinct.asJsonLD,
