@@ -49,6 +49,49 @@ class ReProvisioningStatusSpec
     with MockFactory
     with InMemoryRdfStore {
 
+  "underReProvisioning" should {
+
+    "reflect the state of the re-provisioning info in the DB" in new TestCase {
+      val controller = controllers.generateOne
+
+      reProvisioningStatus.setRunning(on = controller).unsafeRunSync() shouldBe ()
+
+      reProvisioningStatus.underReProvisioning().unsafeRunSync() shouldBe true
+    }
+
+    "cache the value of the flag in the DB once it's set to false" in new TestCase {
+      val controller = controllers.generateOne
+      reProvisioningStatus.setRunning(on = controller).unsafeRunSync() shouldBe ()
+
+      reProvisioningStatus.underReProvisioning().unsafeRunSync() shouldBe true
+      reProvisioningStatus.underReProvisioning().unsafeRunSync() shouldBe true
+
+      clearStatus()
+      reProvisioningStatus.underReProvisioning().unsafeRunSync() shouldBe false
+
+      reProvisioningStatus.setRunning(on = controller).unsafeRunSync() shouldBe ()
+      sleep(cacheRefreshInterval.toMillis - cacheRefreshInterval.toMillis * 2 / 3)
+      reProvisioningStatus.underReProvisioning().unsafeRunSync() shouldBe false
+
+      sleep(cacheRefreshInterval.toMillis * 2 / 3 + 100)
+      reProvisioningStatus.underReProvisioning().unsafeRunSync() shouldBe true
+    }
+
+    "check if re-provisioning is done and notify availability to event-log" in new TestCase {
+      val controller = controllers.generateOne
+      reProvisioningStatus.setRunning(on = controller).unsafeRunSync() shouldBe ()
+      reProvisioningStatus.underReProvisioning().unsafeRunSync()       shouldBe true
+
+      expectNotificationSent
+
+      clearStatus()
+
+      sleep((statusRefreshInterval + (500 millis)).toMillis)
+
+      reProvisioningStatus.underReProvisioning().unsafeRunSync() shouldBe false
+    }
+  }
+
   "setRunning" should {
 
     "insert the ReProvisioningJsonLD object" in new TestCase {
@@ -90,46 +133,17 @@ class ReProvisioningStatusSpec
     }
   }
 
-  "isReProvisioning" should {
+  "findReProvisioningController" should {
 
-    "reflect the state of the re-provisioning info in the DB" in new TestCase {
+    "return Controller if exists in the KG" in new TestCase {
       val controller = controllers.generateOne
-
       reProvisioningStatus.setRunning(on = controller).unsafeRunSync() shouldBe ()
 
-      reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe true
+      reProvisioningStatus.findReProvisioningController().unsafeRunSync() shouldBe controller.some
     }
 
-    "cache the value of the flag in the DB once it's set to false" in new TestCase {
-      val controller = controllers.generateOne
-      reProvisioningStatus.setRunning(on = controller).unsafeRunSync() shouldBe ()
-
-      reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe true
-      reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe true
-
-      clearStatus()
-      reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe false
-
-      reProvisioningStatus.setRunning(on = controller).unsafeRunSync() shouldBe ()
-      sleep(cacheRefreshInterval.toMillis - cacheRefreshInterval.toMillis * 2 / 3)
-      reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe false
-
-      sleep(cacheRefreshInterval.toMillis * 2 / 3 + 100)
-      reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe true
-    }
-
-    "check if re-provisioning is done and notify availability to event-log" in new TestCase {
-      val controller = controllers.generateOne
-      reProvisioningStatus.setRunning(on = controller).unsafeRunSync() shouldBe ()
-      reProvisioningStatus.isReProvisioning().unsafeRunSync()          shouldBe true
-
-      expectNotificationSent
-
-      clearStatus()
-
-      sleep((statusRefreshInterval + (500 millis)).toMillis)
-
-      reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe false
+    "return nothing if there's no Controller info in the KG" in new TestCase {
+      reProvisioningStatus.findReProvisioningController().unsafeRunSync() shouldBe None
     }
   }
 

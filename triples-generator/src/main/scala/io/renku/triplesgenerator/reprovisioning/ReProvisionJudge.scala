@@ -23,6 +23,8 @@ import cats.data.NonEmptyList
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.model.{CliVersion, RenkuBaseUrl, RenkuVersionPair, SchemaVersion}
+import io.renku.http.client.ServiceHealthChecker
+import io.renku.microservices.MicroserviceUrlFinder
 import io.renku.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
@@ -32,19 +34,32 @@ private trait ReProvisionJudge[F[_]] {
 
 private object ReProvisionJudge {
   def apply[F[_]: Async: Logger](rdfStoreConfig: RdfStoreConfig,
+                                 reProvisioningStatus:      ReProvisioningStatus[F],
+                                 microserviceUrlFinder:     MicroserviceUrlFinder[F],
                                  versionCompatibilityPairs: NonEmptyList[RenkuVersionPair],
                                  timeRecorder:              SparqlQueryTimeRecorder[F]
   )(implicit renkuBaseUrl:                                  RenkuBaseUrl) = for {
     renkuVersionPairFinder <- RenkuVersionPairFinder(rdfStoreConfig, timeRecorder)
-  } yield new ReProvisionJudgeImpl[F](renkuVersionPairFinder, versionCompatibilityPairs)
+    serviceHealthChecker   <- ServiceHealthChecker[F]
+  } yield new ReProvisionJudgeImpl[F](renkuVersionPairFinder,
+                                      reProvisioningStatus,
+                                      microserviceUrlFinder,
+                                      serviceHealthChecker,
+                                      versionCompatibilityPairs
+  )
 }
 
 private class ReProvisionJudgeImpl[F[_]: MonadThrow](renkuVersionPairFinder: RenkuVersionPairFinder[F],
+                                                     reProvisioningStatus:      ReProvisioningStatus[F],
+                                                     microserviceUrlFinder:     MicroserviceUrlFinder[F],
+                                                     serviceHealthChecker:      ServiceHealthChecker[F],
                                                      versionCompatibilityPairs: NonEmptyList[RenkuVersionPair]
 ) extends ReProvisionJudge[F] {
 
+  import serviceHealthChecker._
+
   override def reProvisioningNeeded(): F[Boolean] =
-    renkuVersionPairFinder.find() map decide
+    renkuVersionPairFinder.find() map decide >>= checkForZombieReProvisioning
 
   private def decide(maybeCurrentVersionPair: Option[RenkuVersionPair]): Boolean =
     `is current schema version different from latest`(
@@ -61,4 +76,21 @@ private class ReProvisionJudgeImpl[F[_]: MonadThrow](renkuVersionPairFinder: Ren
         !(maybeCurrentCliVersion contains latestCliVersion)
       case _ => false
     }
+
+  private lazy val checkForZombieReProvisioning: Boolean => F[Boolean] = {
+    case true => true.pure[F]
+    case false =>
+      reProvisioningStatus.underReProvisioning() >>= {
+        case false => false.pure[F]
+        case true =>
+          reProvisioningStatus.findReProvisioningController() >>= {
+            case None => true.pure[F]
+            case Some(controller) =>
+              microserviceUrlFinder.findBaseUrl() >>= {
+                case controller.url => true.pure[F]
+                case _              => ping(controller.url).map(!_)
+              }
+          }
+      }
+  }
 }

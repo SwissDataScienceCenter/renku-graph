@@ -77,11 +77,13 @@ class ReProvisioningImpl[F[_]: Temporal: Logger](
     } yield ()
   } >>= logSummary
 
-  private def setRunningStatusInTS() = findController >>= { controller =>
-    reProvisioningStatus.setRunning(on = controller) recoverWith tryAgain(reProvisioningStatus.setRunning(controller))
+  private def setRunningStatusInTS() = findControllerInfo >>= { controllerInfo =>
+    reProvisioningStatus.setRunning(on = controllerInfo) recoverWith tryAgain(
+      reProvisioningStatus.setRunning(controllerInfo)
+    )
   }
 
-  private lazy val findController = microserviceUrlFinder
+  private lazy val findControllerInfo = microserviceUrlFinder
     .findBaseUrl()
     .recoverWith(tryAgain(microserviceUrlFinder.findBaseUrl()))
     .map(Controller(_, microserviceIdentifier))
@@ -103,20 +105,25 @@ object ReProvisioning {
   private val SleepWhenBusy = 10 minutes
 
   def apply[F[_]: Async: Logger](
-      reProvisioningStatus:      ReProvisioningStatus[F],
-      versionCompatibilityPairs: NonEmptyList[RenkuVersionPair],
-      timeRecorder:              SparqlQueryTimeRecorder[F],
-      configuration:             Config = ConfigFactory.load()
+      reProvisioningStatus: ReProvisioningStatus[F],
+      compatibilityMatrix:  NonEmptyList[RenkuVersionPair],
+      timeRecorder:         SparqlQueryTimeRecorder[F],
+      configuration:        Config = ConfigFactory.load()
   ): F[ReProvisioning[F]] = RenkuBaseUrlLoader[F]() flatMap { implicit renkuBaseUrl =>
     for {
       rdfStoreConfig        <- RdfStoreConfig[F](configuration)
       eventsReScheduler     <- EventsReScheduler[F]
-      reProvisioningJudge   <- ReProvisionJudge[F](rdfStoreConfig, versionCompatibilityPairs, timeRecorder)
       microserviceUrlFinder <- MicroserviceUrlFinder[F](Microservice.ServicePort)
       executionTimeRecorder <- ExecutionTimeRecorder[F]()
       triplesRemover        <- TriplesRemoverImpl(rdfStoreConfig, timeRecorder)
+      reProvisioningJudge <- ReProvisionJudge[F](rdfStoreConfig,
+                                                 reProvisioningStatus,
+                                                 microserviceUrlFinder,
+                                                 compatibilityMatrix,
+                                                 timeRecorder
+                             )
     } yield new ReProvisioningImpl[F](
-      versionCompatibilityPairs,
+      compatibilityMatrix,
       reProvisioningJudge,
       triplesRemover,
       eventsReScheduler,

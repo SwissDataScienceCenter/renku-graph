@@ -25,6 +25,7 @@ import cats.effect.Async
 import io.circe.Json
 import io.renku.events.EventRequestContent
 import io.renku.events.EventRequestContent.WithPayload
+import io.renku.events.consumers.EventSchedulingResult.SchedulingError
 import io.renku.events.consumers.{EventConsumersRegistry, EventSchedulingResult}
 import io.renku.graph.model.events.ZippedEventPayload
 import io.renku.http.ErrorMessage
@@ -52,7 +53,7 @@ class EventEndpointImpl[F[_]: Async](
   import io.renku.http.InfoMessage._
   import org.http4s._
 
-  override def processEvent(request: Request[F]): F[Response[F]] = reProvisioningStatus.isReProvisioning() >>= {
+  override def processEvent(request: Request[F]): F[Response[F]] = reProvisioningStatus.underReProvisioning() >>= {
     case true => ServiceUnavailable(InfoMessage("Temporarily unavailable: currently re-provisioning"))
     case false =>
       {
@@ -62,9 +63,7 @@ class EventEndpointImpl[F[_]: Async](
           requestContent <- getRequestContent(multipart, eventJson)
           result         <- right[Response[F]](eventConsumersRegistry.handle(requestContent) >>= toHttpResult)
         } yield result
-      }.merge recoverWith { case NonFatal(error) =>
-        toHttpResult(EventSchedulingResult.SchedulingError(error))
-      }
+      }.merge recoverWith { case NonFatal(error) => toHttpResult(SchedulingError(error)) }
   }
 
   private def toMultipart(

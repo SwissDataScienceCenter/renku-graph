@@ -27,7 +27,7 @@ import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.renku.triplesgenerator.reprovisioning.ReProvisioningInfo.Status.Running
 
 private final case class ReProvisioningInfo(status: ReProvisioningInfo.Status.Running, controller: Controller)
-private final case class Controller(url: MicroserviceBaseUrl, identifier: MicroserviceIdentifier)
+final case class Controller(url: MicroserviceBaseUrl, identifier: MicroserviceIdentifier)
 
 private object ReProvisioningInfo {
 

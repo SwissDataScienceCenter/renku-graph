@@ -18,8 +18,10 @@
 
 package io.renku.microservices
 
+import io.circe.Decoder
 import io.renku.graph.model.views.TinyTypeJsonLDOps
 import io.renku.tinytypes.constraints.NonBlank
+import io.renku.tinytypes.json.TinyTypeDecoders.stringDecoder
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 
 import java.time.LocalDateTime
@@ -36,4 +38,6 @@ object MicroserviceIdentifier
 
   private[microservices] def generate(now: () => LocalDateTime): MicroserviceIdentifier =
     MicroserviceIdentifier(s"${now().format(ofPattern("yyyyMMddHHmmss"))}-${Random.between(1000, 9999)}")
+
+  implicit val decoder: Decoder[MicroserviceIdentifier] = stringDecoder(MicroserviceIdentifier)
 }
