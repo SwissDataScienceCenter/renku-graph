@@ -45,7 +45,7 @@ private class RenkuVersionPairFinderImpl[F[_]: Async: Logger](
       Prefixes of renku -> "renku",
       s"""|SELECT DISTINCT ?schemaVersion ?cliVersion 
           |WHERE {
-          |  ?entityId a <${renkuVersionPairEntityType.show}>;
+          |  ?entityId a renku:VersionPair;
           |            renku:schemaVersion ?schemaVersion;
           |            renku:cliVersion ?cliVersion.
           |}

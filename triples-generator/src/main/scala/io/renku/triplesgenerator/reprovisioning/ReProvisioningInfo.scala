@@ -47,8 +47,6 @@ private object ReProvisioningInfo {
     }
   }
 
-  val reProvisioningInfoEntityType: EntityType = EntityType of renku / "ReProvisioning"
-
   import io.renku.jsonld.syntax._
 
   implicit def jsonLDEncoder(implicit
@@ -56,7 +54,7 @@ private object ReProvisioningInfo {
   ): JsonLDEncoder[ReProvisioningInfo] = JsonLDEncoder.instance { entity =>
     JsonLD.entity(
       EntityId.of((renkuBaseUrl / "re-provisioning").toString),
-      EntityTypes of reProvisioningInfoEntityType,
+      EntityTypes of renku / "ReProvisioning",
       renku / "status"        -> entity.status.asInstanceOf[Status].asJsonLD,
       renku / "controllerUrl" -> entity.controllerUrl.asJsonLD
     )

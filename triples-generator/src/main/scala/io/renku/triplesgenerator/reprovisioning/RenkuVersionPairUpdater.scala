@@ -23,6 +23,7 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.{RenkuBaseUrl, RenkuVersionPair}
+import io.renku.jsonld.syntax._
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
@@ -38,29 +39,19 @@ private class RenkuVersionPairUpdaterImpl[F[_]: Async: Logger](
     extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
     with RenkuVersionPairUpdater[F] {
 
-  override def update(versionPair: RenkuVersionPair): F[Unit] = extractEntityId(versionPair) >>= { entityId =>
-    updateWithNoResult {
-      SparqlQuery.of(
-        name = "re-provisioning - cli and schema version create",
-        Prefixes of renku -> "renku",
-        s"""|DELETE {
-            |  <$entityId> renku:cliVersion ?o .
-            |  <$entityId> renku:schemaVersion ?q .
-            |}
-            |
-            |INSERT{ 
-            |  <$entityId> a <${renkuVersionPairEntityType.show}> ;
-            |                renku:cliVersion '${versionPair.cliVersion}' ;
-            |                renku:schemaVersion '${versionPair.schemaVersion}'
-            |}
-            |WHERE {
-            |  OPTIONAL {
-            |    <$entityId> ?p ?o;
-            |                ?r ?q.
-            |  }
-            |}
-            |""".stripMargin
-      )
-    }
+  override def update(versionPair: RenkuVersionPair): F[Unit] =
+    deleteFromDb() >> upload(versionPair.asJsonLD)
+
+  private def deleteFromDb() = updateWithNoResult {
+    SparqlQuery.of(
+      name = "re-provisioning - cli and schema version remove",
+      Prefixes of renku -> "renku",
+      s"""|DELETE { ?s ?p ?o }
+          |WHERE {
+          | ?s ?p ?o;
+          |    a renku:VersionPair.
+          |}
+          |""".stripMargin
+    )
   }
 }

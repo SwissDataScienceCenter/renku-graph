@@ -26,7 +26,6 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
-import io.renku.triplesgenerator.reprovisioning.ReProvisioningInfo.reProvisioningInfoEntityType
 import org.typelevel.log4cats.Logger
 
 private trait TriplesRemover[F[_]] {
@@ -61,7 +60,7 @@ private class TriplesRemoverImpl[F[_]: Async: Logger](
         |WHERE { ?subject ?p ?o 
         |  MINUS {
         |    ?subject a ?type
-        |    FILTER (?type IN (<${renkuVersionPairEntityType.show}>, <${reProvisioningInfoEntityType.show}>)) 
+        |    FILTER (?type IN (renku:VersionPair, renku:ReProvisioning)) 
         |  }
         |}
         |LIMIT 1
@@ -77,7 +76,7 @@ private class TriplesRemoverImpl[F[_]: Async: Logger](
         |  WHERE { ?s ?p ?o 
         |    MINUS {
         |      ?s a ?type
-        |      FILTER (?type IN (<${renkuVersionPairEntityType.show}>, <${reProvisioningInfoEntityType.show}>)) 
+        |      FILTER (?type IN (renku:VersionPair, renku:ReProvisioning)) 
         |    }
         |  }
         |  LIMIT ${removalBatchSize.value}

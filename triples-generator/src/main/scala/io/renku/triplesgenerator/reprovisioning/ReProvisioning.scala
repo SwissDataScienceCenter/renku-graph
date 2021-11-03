@@ -78,7 +78,7 @@ class ReProvisioningImpl[F[_]: Temporal: Logger](
 
   private def setRunningStatusInTS() = findControllerUrl >>= { controllerUrl =>
     reProvisioningStatus.setRunning(on = controllerUrl) recoverWith tryAgain(
-      reProvisioningStatus.setRunning(controllerUrl)
+      reProvisioningStatus.setRunning(on = controllerUrl)
     )
   }
 
