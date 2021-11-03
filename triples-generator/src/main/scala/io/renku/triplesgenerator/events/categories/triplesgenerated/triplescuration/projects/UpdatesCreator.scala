@@ -83,7 +83,7 @@ private object UpdatesCreator extends UpdatesCreator {
   }
 
   private def descriptionDeletion(project: Project, kgProjectInfo: KGProjectInfo) = Option.when(
-    project.description != kgProjectInfo._4
+    kgProjectInfo._4.exists(description => description != project.description)
   ) {
     val resource = project.resourceId.showAs[RdfResource]
     SparqlQuery.of(

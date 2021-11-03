@@ -35,7 +35,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
   "prepareUpdates" should {
     "generate queries which deletes the project name when changed" in {
       val project       = anyProjectEntities.generateOne.to[entities.Project]
-      val kgProjectInfo = (projectNames.generateOne, project.maybeParent, project.visibility, project.description)
+      val kgProjectInfo = (projectNames.generateOne, project.maybeParent, project.visibility, project.description.some)
 
       loadToStore(project)
 
@@ -50,7 +50,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
 
     "generate queries which deletes the project's derivedFrom when changed" in {
       val project       = projectWithParentEntities(anyVisibility).generateOne.to[entities.ProjectWithParent]
-      val kgProjectInfo = (project.name, projectResourceIds.generateSome, project.visibility, project.description)
+      val kgProjectInfo = (project.name, projectResourceIds.generateSome, project.visibility, project.description.some)
 
       loadToStore(project)
 
@@ -65,7 +65,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
 
     "generate queries which deletes the project's derivedFrom when removed" in {
       val project       = projectWithParentEntities(anyVisibility).generateOne.to[entities.ProjectWithParent]
-      val kgProjectInfo = (project.name, None, project.visibility, project.description)
+      val kgProjectInfo = (project.name, None, project.visibility, project.description.some)
 
       loadToStore(project)
 
@@ -80,7 +80,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
 
     "not generate queries which deletes the project's derivedFrom when NOT changed" in {
       val project       = projectWithParentEntities(anyVisibility).generateOne.to[entities.ProjectWithParent]
-      val kgProjectInfo = (project.name, project.maybeParent, project.visibility, project.description)
+      val kgProjectInfo = (project.name, project.maybeParent, project.visibility, project.description.some)
 
       loadToStore(project)
 
@@ -102,7 +102,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
       val kgProjectInfo = (project.name,
                            project.maybeParent,
                            Gen.oneOf(projects.Visibility.all.filterNot(_ == project.visibility)).generateOne,
-                           project.description
+                           project.description.some
       )
 
       loadToStore(project)
@@ -118,7 +118,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
 
     "generate queries which deletes the project description when changed" in {
       val project       = anyProjectEntities.generateOne.to[entities.Project]
-      val kgProjectInfo = (project.name, project.maybeParent, project.visibility, projectDescriptions.generateOne)
+      val kgProjectInfo = (project.name, project.maybeParent, project.visibility, projectDescriptions.generateOption)
 
       loadToStore(project)
 
@@ -133,7 +133,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
 
     "not generate a queries when nothing changed" in {
       val project       = anyProjectEntities.generateOne.to[entities.Project]
-      val kgProjectInfo = (project.name, project.maybeParent, project.visibility, project.description)
+      val kgProjectInfo = (project.name, project.maybeParent, project.visibility, project.description.some)
 
       loadToStore(project)
 
