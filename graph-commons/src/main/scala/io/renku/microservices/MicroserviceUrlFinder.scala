@@ -22,6 +22,7 @@ import cats.MonadThrow
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
 import io.circe.Decoder
+import io.renku.graph.model.views.TinyTypeJsonLDOps
 import io.renku.tinytypes.constraints.{Url, UrlOps}
 import io.renku.tinytypes.json.TinyTypeDecoders.urlDecoder
 import io.renku.tinytypes.{TinyTypeFactory, UrlTinyType}
@@ -30,25 +31,21 @@ trait MicroserviceUrlFinder[F[_]] {
   def findBaseUrl(): F[MicroserviceBaseUrl]
 }
 
-class MicroserviceUrlFinderImpl[F[_]: MonadThrow](
-    microservicePort: Int Refined Positive
-) extends MicroserviceUrlFinder[F] {
+class MicroserviceUrlFinderImpl[F[_]: MonadThrow](microservicePort: Int Refined Positive)
+    extends MicroserviceUrlFinder[F] {
 
   import cats.syntax.all._
 
   import java.net.NetworkInterface
   import scala.jdk.CollectionConverters._
 
-  override def findBaseUrl(): F[MicroserviceBaseUrl] =
-    findAddress flatMap {
-      case Some(address) =>
-        MicroserviceBaseUrl(s"http://${address.getHostAddress}:$microservicePort").pure[F]
-      case None =>
-        new Exception("Cannot find service IP").raiseError[F, MicroserviceBaseUrl]
-    }
+  override def findBaseUrl(): F[MicroserviceBaseUrl] = findAddress >>= {
+    case Some(address) => MicroserviceBaseUrl(s"http://${address.getHostAddress}:$microservicePort").pure[F]
+    case None          => new Exception("Cannot find service IP").raiseError[F, MicroserviceBaseUrl]
+  }
 
   private def findAddress = MonadThrow[F].catchNonFatal {
-    val ipAddresses = NetworkInterface.getNetworkInterfaces.asScala.toSeq.flatMap(p => p.getInetAddresses.asScala.toSeq)
+    val ipAddresses = NetworkInterface.getNetworkInterfaces.asScala.toSeq.flatMap(_.getInetAddresses.asScala.toSeq)
     ipAddresses
       .find { address =>
         address.getHostAddress.contains(".") &&
@@ -71,6 +68,7 @@ final class MicroserviceBaseUrl private (val value: String) extends AnyVal with 
 object MicroserviceBaseUrl
     extends TinyTypeFactory[MicroserviceBaseUrl](new MicroserviceBaseUrl(_))
     with Url
-    with UrlOps[MicroserviceBaseUrl] {
+    with UrlOps[MicroserviceBaseUrl]
+    with TinyTypeJsonLDOps[MicroserviceBaseUrl] {
   implicit val decoder: Decoder[MicroserviceBaseUrl] = urlDecoder(MicroserviceBaseUrl)
 }
