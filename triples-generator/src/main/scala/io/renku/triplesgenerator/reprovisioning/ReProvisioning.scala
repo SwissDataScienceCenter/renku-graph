@@ -32,7 +32,6 @@ import io.renku.triplesgenerator.Microservice
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.FiniteDuration
-import scala.language.postfixOps
 import scala.util.control.NonFatal
 
 trait ReProvisioning[F[_]] {
@@ -48,7 +47,7 @@ class ReProvisioningImpl[F[_]: Temporal: Logger](
     microserviceUrlFinder:     MicroserviceUrlFinder[F],
     reProvisioningStatus:      ReProvisioningStatus[F],
     executionTimeRecorder:     ExecutionTimeRecorder[F],
-    sleepWhenBusy:             FiniteDuration
+    retryDelay:                FiniteDuration
 ) extends ReProvisioning[F] {
 
   import eventsReScheduler._
@@ -92,15 +91,15 @@ class ReProvisioningImpl[F[_]: Temporal: Logger](
 
   private def tryAgain[T](step: => F[T]): PartialFunction[Throwable, F[T]] = { case NonFatal(exception) =>
     Logger[F].error(exception)("Re-provisioning failure") >>
-      Temporal[F].delayBy(step, sleepWhenBusy) recoverWith tryAgain(step)
+      Temporal[F].delayBy(step, retryDelay) recoverWith tryAgain(step)
   }
 }
 
 object ReProvisioning {
 
-  import scala.concurrent.duration._
+  import io.renku.config.ConfigLoader.find
 
-  private val SleepWhenBusy = 10 minutes
+  import scala.concurrent.duration._
 
   def apply[F[_]: Async: Logger](
       reProvisioningStatus: ReProvisioningStatus[F],
@@ -109,6 +108,7 @@ object ReProvisioning {
       configuration:        Config = ConfigFactory.load()
   ): F[ReProvisioning[F]] = RenkuBaseUrlLoader[F]() flatMap { implicit renkuBaseUrl =>
     for {
+      retryDelay            <- find[F, FiniteDuration]("re-provisioning-retry-delay", configuration)
       rdfStoreConfig        <- RdfStoreConfig[F](configuration)
       eventsReScheduler     <- EventsReScheduler[F]
       microserviceUrlFinder <- MicroserviceUrlFinder[F](Microservice.ServicePort)
@@ -129,7 +129,7 @@ object ReProvisioning {
       microserviceUrlFinder,
       reProvisioningStatus,
       executionTimeRecorder,
-      SleepWhenBusy
+      retryDelay
     )
   }
 }
