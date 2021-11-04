@@ -21,19 +21,16 @@
   "editable": true,
   "gnetId": null,
   "graphTooltip": 0,
-  "id": 20,
-  "iteration": 1636045302833,
+  "id": 38,
+  "iteration": 1636044984458,
   "links": [],
   "panels": [
     {
-      "aliasColors": {
-        "Generation Failure Rate": "dark-red"
-      },
+      "aliasColors": {},
       "bars": false,
       "dashLength": 10,
       "dashes": false,
       "datasource": null,
-      "decimals": 2,
       "fieldConfig": {
         "defaults": {
           "links": []
@@ -43,74 +40,56 @@
       "fill": 0,
       "fillGradient": 0,
       "gridPos": {
-        "h": 7,
+        "h": 5,
         "w": 24,
         "x": 0,
         "y": 0
       },
       "hiddenSeries": false,
-      "id": 2,
+      "id": 3,
       "legend": {
         "alignAsTable": true,
         "avg": false,
         "current": true,
-        "hideZero": true,
         "max": false,
         "min": false,
         "rightSide": true,
         "show": true,
-        "sideWidth": 430,
+        "sideWidth": 310,
         "total": false,
         "values": true
       },
       "lines": true,
       "linewidth": 1,
-      "links": [],
       "nullPointMode": "null",
       "options": {
         "alertThreshold": true
       },
-      "paceLength": 10,
       "percentage": false,
       "pluginVersion": "8.1.6",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
-      "seriesOverrides": [
-        {
-          "$$hashKey": "object:84",
-          "alias": "Failure Rate",
-          "yaxis": 2
-        }
-      ],
+      "seriesOverrides": [],
       "spaceLength": 10,
       "stack": false,
       "steppedLine": false,
       "targets": [
         {
-          "expr": "label_replace(avg by (status)(events_statuses_count{kubernetes_name=\"[[kube_env_name]]-event-log\", kubernetes_namespace=\"[[kube_env_name]]\"}), \"status\", \"$1\", \"status\", \"(.*)\")",
-          "format": "time_series",
-          "hide": false,
-          "interval": "",
-          "intervalFactor": 1,
-          "legendFormat": "{{status}}",
+          "expr": "label_replace(jvm_memory_bytes_used{area='heap', kubernetes_name='[[kube_env_name]]-knowledge-graph'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "legendFormat": "Heap used {{instance_label}}",
           "refId": "A"
         },
         {
-          "expr": "avg(events_count{kubernetes_name=\"[[kube_env_name]]-event-log\", kubernetes_namespace=\"[[kube_env_name]]\"})",
-          "format": "time_series",
-          "hide": false,
-          "interval": "",
-          "intervalFactor": 1,
-          "legendFormat": "All",
+          "expr": "label_replace(jvm_memory_bytes_max{area='heap', kubernetes_name='[[kube_env_name]]-knowledge-graph'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "legendFormat": "Heap max {{instance_label}}",
           "refId": "B"
         },
         {
           "exemplar": true,
-          "expr": "(scalar(avg by (status)(events_statuses_count{kubernetes_name=\"[[kube_env_name]]-event-log\", kubernetes_namespace=\"[[kube_env_name]]\", status=\"GENERATION_NON_RECOVERABLE_FAILURE\"})) + scalar(avg by (status)(events_statuses_count{kubernetes_name=\"[[kube_env_name]]-event-log\", kubernetes_namespace=\"[[kube_env_name]]\", status=\"TRANSFORMATION_NON_RECOVERABLE_FAILURE\"}))) / scalar(avg(events_count{kubernetes_name=\"[[kube_env_name]]-event-log\", kubernetes_namespace=\"[[kube_env_name]]\"}))",
-          "hide": false,
+          "expr": "container_memory_working_set_bytes{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"knowledge-graph\"}",
           "interval": "",
-          "legendFormat": "Failure Rate",
+          "legendFormat": "Container",
           "refId": "C"
         }
       ],
@@ -118,7 +97,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Event Log events",
+      "title": "Knowledge Graph memory",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -134,562 +113,23 @@
       },
       "yaxes": [
         {
-          "$$hashKey": "object:91",
+          "$$hashKey": "object:79",
+          "format": "decbytes",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "$$hashKey": "object:80",
           "decimals": null,
           "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        },
-        {
-          "$$hashKey": "object:92",
-          "decimals": 3,
-          "format": "percentunit",
           "label": "",
           "logBase": 1,
           "max": null,
           "min": null,
           "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": true,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": null,
-      "decimals": null,
-      "fieldConfig": {
-        "defaults": {
-          "links": []
-        },
-        "overrides": []
-      },
-      "fill": 1,
-      "fillGradient": 0,
-      "gridPos": {
-        "h": 5,
-        "w": 24,
-        "x": 0,
-        "y": 7
-      },
-      "hiddenSeries": false,
-      "id": 7,
-      "legend": {
-        "alignAsTable": true,
-        "avg": false,
-        "current": true,
-        "hideZero": true,
-        "max": false,
-        "min": false,
-        "rightSide": true,
-        "show": true,
-        "sideWidth": 430,
-        "sort": "current",
-        "sortDesc": true,
-        "total": false,
-        "values": true
-      },
-      "lines": false,
-      "linewidth": 1,
-      "links": [],
-      "nullPointMode": "null as zero",
-      "options": {
-        "alertThreshold": true
-      },
-      "paceLength": 10,
-      "percentage": false,
-      "pluginVersion": "8.1.6",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": true,
-      "steppedLine": false,
-      "targets": [
-        {
-          "expr": "label_replace(ceil(max by(project) (events_awaiting_generation_count{kubernetes_name=\"[[kube_env_name]]-event-log\"})), \"project\", \"$1\", \"project\", \"(.*)\")",
-          "format": "time_series",
-          "interval": "",
-          "intervalFactor": 1,
-          "legendFormat": "{{project}}",
-          "refId": "A"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "Top priority events for triples generation",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "$$hashKey": "object:282",
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        },
-        {
-          "$$hashKey": "object:283",
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": true,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": null,
-      "decimals": null,
-      "fieldConfig": {
-        "defaults": {
-          "links": []
-        },
-        "overrides": []
-      },
-      "fill": 1,
-      "fillGradient": 0,
-      "gridPos": {
-        "h": 5,
-        "w": 24,
-        "x": 0,
-        "y": 12
-      },
-      "hiddenSeries": false,
-      "id": 8,
-      "legend": {
-        "alignAsTable": true,
-        "avg": false,
-        "current": true,
-        "hideZero": true,
-        "max": false,
-        "min": false,
-        "rightSide": true,
-        "show": true,
-        "sideWidth": 430,
-        "sort": "current",
-        "sortDesc": true,
-        "total": false,
-        "values": true
-      },
-      "lines": false,
-      "linewidth": 1,
-      "links": [],
-      "nullPointMode": "null as zero",
-      "options": {
-        "alertThreshold": true
-      },
-      "paceLength": 10,
-      "percentage": false,
-      "pluginVersion": "8.1.6",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": true,
-      "steppedLine": false,
-      "targets": [
-        {
-          "expr": "label_replace(ceil(max by(project)(events_under_triples_generation_count{kubernetes_name=\"[[kube_env_name]]-event-log\"})), \"project\", \"$1\", \"project\", \"(.*)\")",
-          "format": "time_series",
-          "interval": "",
-          "intervalFactor": 1,
-          "legendFormat": "{{project}}",
-          "refId": "A"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "Events under triples generation",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        },
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": true,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": null,
-      "decimals": null,
-      "fieldConfig": {
-        "defaults": {
-          "links": []
-        },
-        "overrides": []
-      },
-      "fill": 1,
-      "fillGradient": 0,
-      "gridPos": {
-        "h": 5,
-        "w": 24,
-        "x": 0,
-        "y": 17
-      },
-      "hiddenSeries": false,
-      "id": 20,
-      "legend": {
-        "alignAsTable": true,
-        "avg": false,
-        "current": true,
-        "hideZero": true,
-        "max": false,
-        "min": false,
-        "rightSide": true,
-        "show": true,
-        "sideWidth": 430,
-        "sort": "current",
-        "sortDesc": true,
-        "total": false,
-        "values": true
-      },
-      "lines": false,
-      "linewidth": 1,
-      "links": [],
-      "nullPointMode": "null as zero",
-      "options": {
-        "alertThreshold": true
-      },
-      "paceLength": 10,
-      "percentage": false,
-      "pluginVersion": "8.1.6",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": true,
-      "steppedLine": false,
-      "targets": [
-        {
-          "expr": "label_replace(ceil(max by(project) (events_awaiting_transformation_count{kubernetes_name=\"[[kube_env_name]]-event-log\"})), \"project\", \"$1\", \"project\", \"(.*)\")",
-          "format": "time_series",
-          "interval": "",
-          "intervalFactor": 1,
-          "legendFormat": "{{project}}",
-          "refId": "A"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "Events awaiting transformation",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "$$hashKey": "object:282",
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        },
-        {
-          "$$hashKey": "object:283",
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": true,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": null,
-      "decimals": null,
-      "fieldConfig": {
-        "defaults": {
-          "links": []
-        },
-        "overrides": []
-      },
-      "fill": 1,
-      "fillGradient": 0,
-      "gridPos": {
-        "h": 5,
-        "w": 24,
-        "x": 0,
-        "y": 22
-      },
-      "hiddenSeries": false,
-      "id": 21,
-      "legend": {
-        "alignAsTable": true,
-        "avg": false,
-        "current": true,
-        "hideZero": true,
-        "max": false,
-        "min": false,
-        "rightSide": true,
-        "show": true,
-        "sideWidth": 430,
-        "sort": "current",
-        "sortDesc": true,
-        "total": false,
-        "values": true
-      },
-      "lines": false,
-      "linewidth": 1,
-      "links": [],
-      "nullPointMode": "null as zero",
-      "options": {
-        "alertThreshold": true
-      },
-      "paceLength": 10,
-      "percentage": false,
-      "pluginVersion": "8.1.6",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": true,
-      "steppedLine": false,
-      "targets": [
-        {
-          "expr": "label_replace(ceil(max by(project) (events_under_transformation_count{kubernetes_name=\"[[kube_env_name]]-event-log\"})), \"project\", \"$1\", \"project\", \"(.*)\")",
-          "format": "time_series",
-          "interval": "",
-          "intervalFactor": 1,
-          "legendFormat": "{{project}}",
-          "refId": "A"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "Events under transformation",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "$$hashKey": "object:282",
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        },
-        {
-          "$$hashKey": "object:283",
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "aliasColors": {
-        "Generation Failure Rate": "dark-red"
-      },
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": null,
-      "decimals": null,
-      "fieldConfig": {
-        "defaults": {
-          "links": []
-        },
-        "overrides": []
-      },
-      "fill": 0,
-      "fillGradient": 0,
-      "gridPos": {
-        "h": 5,
-        "w": 24,
-        "x": 0,
-        "y": 27
-      },
-      "hiddenSeries": false,
-      "id": 19,
-      "legend": {
-        "alignAsTable": true,
-        "avg": false,
-        "current": true,
-        "hideZero": true,
-        "max": false,
-        "min": false,
-        "rightSide": true,
-        "show": true,
-        "sideWidth": 430,
-        "total": false,
-        "values": true
-      },
-      "lines": true,
-      "linewidth": 1,
-      "links": [],
-      "nullPointMode": "null",
-      "options": {
-        "alertThreshold": true
-      },
-      "paceLength": 10,
-      "percentage": false,
-      "pluginVersion": "8.1.6",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "expr": "label_replace(avg by (category_name)(category_name_events_count{kubernetes_name=\"[[kube_env_name]]-event-log\", kubernetes_namespace=\"[[kube_env_name]]\"}), \"category_name\", \"$1\", \"category_name\", \"(.*)\")",
-          "format": "time_series",
-          "interval": "",
-          "intervalFactor": 1,
-          "legendFormat": "{{status}}",
-          "refId": "A"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "Synchronization events queue",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "decimals": null,
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        },
-        {
-          "decimals": 3,
-          "format": "percentunit",
-          "label": "",
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": false
         }
       ],
       "yaxis": {
@@ -712,154 +152,10 @@
       "fill": 0,
       "fillGradient": 0,
       "gridPos": {
-        "h": 6,
-        "w": 24,
-        "x": 0,
-        "y": 32
-      },
-      "hiddenSeries": false,
-      "id": 6,
-      "legend": {
-        "alignAsTable": true,
-        "avg": false,
-        "current": true,
-        "max": false,
-        "min": false,
-        "rightSide": true,
-        "show": true,
-        "sideWidth": 430,
-        "total": false,
-        "values": true
-      },
-      "lines": true,
-      "linewidth": 1,
-      "links": [],
-      "nullPointMode": "null",
-      "options": {
-        "alertThreshold": true
-      },
-      "paceLength": 10,
-      "percentage": false,
-      "pluginVersion": "8.1.6",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [
-        {
-          "$$hashKey": "object:121",
-          "alias": "rate (events/second)",
-          "yaxis": 2
-        }
-      ],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "expr": "histogram_quantile(0.95, sum(rate(triples_generation_processing_times_bucket{kubernetes_name=\"[[kube_env_name]]-triples-generator\"}[15m])) by (le))",
-          "format": "time_series",
-          "interval": "",
-          "intervalFactor": 1,
-          "legendFormat": "Triples generation - 95th percentile",
-          "refId": "A"
-        },
-        {
-          "expr": "histogram_quantile(0.50, sum(rate(triples_generation_processing_times_bucket{kubernetes_name=\"[[kube_env_name]]-triples-generator\"}[15m])) by (le))",
-          "format": "time_series",
-          "interval": "",
-          "intervalFactor": 1,
-          "legendFormat": "Triples generation - 50th percentile",
-          "refId": "B"
-        },
-        {
-          "expr": "sum(rate(events_statuses_count{kubernetes_name=\"[[kube_env_name]]-event-log\", status=\"TRIPLES_STORE\"}[15m]))",
-          "format": "time_series",
-          "interval": "",
-          "intervalFactor": 1,
-          "legendFormat": "rate (events/second)",
-          "refId": "C"
-        },
-        {
-          "expr": "histogram_quantile(0.95, sum(rate(triples_transformation_processing_times_bucket{kubernetes_name=\"[[kube_env_name]]-triples-generator\"}[15m])) by (le))",
-          "format": "time_series",
-          "interval": "",
-          "intervalFactor": 1,
-          "legendFormat": "Triples transformation - 95th percentile",
-          "refId": "D"
-        },
-        {
-          "expr": "histogram_quantile(0.5, sum(rate(triples_transformation_processing_times_bucket{kubernetes_name=\"[[kube_env_name]]-triples-generator\"}[15m])) by (le))",
-          "format": "time_series",
-          "interval": "",
-          "intervalFactor": 1,
-          "legendFormat": "Triples transformation - 50th percentile",
-          "refId": "E"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "Events processing times",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "$$hashKey": "object:128",
-          "format": "s",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        },
-        {
-          "$$hashKey": "object:129",
-          "decimals": 2,
-          "format": "short",
-          "label": "",
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": null,
-      "decimals": null,
-      "fieldConfig": {
-        "defaults": {
-          "links": []
-        },
-        "overrides": []
-      },
-      "fill": 0,
-      "fillGradient": 0,
-      "gridPos": {
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 38
+        "y": 5
       },
       "hiddenSeries": false,
       "id": 9,
@@ -867,25 +163,20 @@
         "alignAsTable": true,
         "avg": false,
         "current": true,
-        "hideZero": true,
-        "max": true,
+        "max": false,
         "min": false,
         "rightSide": true,
         "show": true,
-        "sideWidth": 430,
-        "sort": "current",
-        "sortDesc": true,
+        "sideWidth": 310,
         "total": false,
         "values": true
       },
       "lines": true,
       "linewidth": 1,
-      "links": [],
-      "nullPointMode": "null as zero",
+      "nullPointMode": "null",
       "options": {
         "alertThreshold": true
       },
-      "paceLength": 10,
       "percentage": false,
       "pluginVersion": "8.1.6",
       "pointradius": 2,
@@ -897,19 +188,34 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "max(histogram_quantile(0.95, rate(event_log_queries_execution_times_bucket{kubernetes_name=\"[[kube_env_name]]-event-log\"}[5m]))) by (query_id)",
-          "format": "time_series",
+          "exemplar": true,
+          "expr": "rate(container_cpu_user_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"knowledge-graph\"}[5m])",
           "interval": "",
-          "intervalFactor": 1,
-          "legendFormat": "{{query_id}}",
+          "legendFormat": "User",
+          "refId": "C"
+        },
+        {
+          "exemplar": true,
+          "expr": "rate(container_cpu_system_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"knowledge-graph\"}[5m])",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "System",
           "refId": "A"
+        },
+        {
+          "exemplar": true,
+          "expr": "rate(container_cpu_usage_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"knowledge-graph\"}[5m])",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "Total",
+          "refId": "B"
         }
       ],
       "thresholds": [],
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "SQL queries times (95th percentile)",
+      "title": "Knowledge Graph cpu",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -925,7 +231,8 @@
       },
       "yaxes": [
         {
-          "format": "s",
+          "$$hashKey": "object:79",
+          "format": "short",
           "label": null,
           "logBase": 1,
           "max": null,
@@ -933,8 +240,10 @@
           "show": true
         },
         {
+          "$$hashKey": "object:80",
+          "decimals": null,
           "format": "short",
-          "label": null,
+          "label": "",
           "logBase": 1,
           "max": null,
           "min": null,
@@ -952,7 +261,6 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": null,
-      "decimals": null,
       "fieldConfig": {
         "defaults": {
           "links": []
@@ -965,111 +273,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 43
-      },
-      "hiddenSeries": false,
-      "id": 10,
-      "legend": {
-        "alignAsTable": true,
-        "avg": false,
-        "current": true,
-        "hideZero": true,
-        "max": true,
-        "min": false,
-        "rightSide": true,
-        "show": true,
-        "sideWidth": 430,
-        "sort": "current",
-        "sortDesc": true,
-        "total": false,
-        "values": true
-      },
-      "lines": true,
-      "linewidth": 1,
-      "links": [],
-      "nullPointMode": "null as zero",
-      "options": {
-        "alertThreshold": true
-      },
-      "paceLength": 10,
-      "percentage": false,
-      "pluginVersion": "8.1.6",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "expr": "max(histogram_quantile(0.5, rate(event_log_queries_execution_times_bucket{kubernetes_name=\"[[kube_env_name]]-event-log\"}[5m]))) by (query_id)",
-          "format": "time_series",
-          "intervalFactor": 1,
-          "legendFormat": "{{query_id}}",
-          "refId": "A"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "SQL queries times (50th percentile)",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "format": "s",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        },
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": null,
-      "fieldConfig": {
-        "defaults": {
-          "links": []
-        },
-        "overrides": []
-      },
-      "fill": 0,
-      "fillGradient": 0,
-      "gridPos": {
-        "h": 6,
-        "w": 24,
-        "x": 0,
-        "y": 48
+        "y": 10
       },
       "hiddenSeries": false,
       "id": 4,
@@ -1081,18 +285,16 @@
         "min": false,
         "rightSide": true,
         "show": true,
-        "sideWidth": 430,
+        "sideWidth": 310,
         "total": false,
         "values": true
       },
       "lines": true,
       "linewidth": 1,
-      "links": [],
       "nullPointMode": "null",
       "options": {
         "alertThreshold": true
       },
-      "paceLength": 10,
       "percentage": false,
       "pluginVersion": "8.1.6",
       "pointradius": 2,
@@ -1104,34 +306,27 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "label_replace(jvm_memory_bytes_used{area='heap', kubernetes_name='[[kube_env_name]]-event-log', kubernetes_namespace=\"[[kube_env_name]]\"}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
-          "format": "time_series",
-          "instant": false,
-          "interval": "",
-          "intervalFactor": 1,
+          "expr": "label_replace(jvm_memory_bytes_used{area='heap', kubernetes_name='[[kube_env_name]]-webhook-service'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
           "legendFormat": "Heap used {{instance_label}}",
-          "refId": "C"
+          "refId": "A"
         },
         {
-          "expr": "label_replace(jvm_memory_bytes_max{area='heap', kubernetes_name='[[kube_env_name]]-event-log', kubernetes_namespace=\"[[kube_env_name]]\"}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
-          "format": "time_series",
-          "interval": "",
-          "intervalFactor": 1,
+          "expr": "label_replace(jvm_memory_bytes_max{area='heap', kubernetes_name='[[kube_env_name]]-webhook-service'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
           "legendFormat": "Heap max {{instance_label}}",
-          "refId": "D"
+          "refId": "B"
         },
         {
-          "expr": "container_memory_working_set_bytes{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"event-log\"}",
+          "expr": "container_memory_working_set_bytes{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"webhook-service\"}",
           "interval": "",
           "legendFormat": "Container",
-          "refId": "A"
+          "refId": "C"
         }
       ],
       "thresholds": [],
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Event Log Heap usage",
+      "title": "Webhook Service memory",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -1147,7 +342,6 @@
       },
       "yaxes": [
         {
-          "$$hashKey": "object:170",
           "format": "decbytes",
           "label": null,
           "logBase": 1,
@@ -1156,9 +350,9 @@
           "show": true
         },
         {
-          "$$hashKey": "object:171",
+          "decimals": null,
           "format": "short",
-          "label": null,
+          "label": "",
           "logBase": 1,
           "max": null,
           "min": null,
@@ -1188,10 +382,10 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 54
+        "y": 15
       },
       "hiddenSeries": false,
-      "id": 23,
+      "id": 10,
       "legend": {
         "alignAsTable": true,
         "avg": false,
@@ -1200,7 +394,464 @@
         "min": false,
         "rightSide": true,
         "show": true,
-        "sideWidth": 430,
+        "sideWidth": 310,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "8.1.6",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "rate(container_cpu_user_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"webhook-service\"}[5m])",
+          "interval": "",
+          "legendFormat": "User",
+          "refId": "C"
+        },
+        {
+          "exemplar": true,
+          "expr": "rate(container_cpu_system_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"webhook-service\"}[5m])",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "System",
+          "refId": "A"
+        },
+        {
+          "exemplar": true,
+          "expr": "rate(container_cpu_usage_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"webhook-service\"}[5m])",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "Total",
+          "refId": "B"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Webhook Service cpu",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "$$hashKey": "object:79",
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "$$hashKey": "object:80",
+          "decimals": null,
+          "format": "short",
+          "label": "",
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
+      "fill": 0,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "hiddenSeries": false,
+      "id": 7,
+      "legend": {
+        "alignAsTable": true,
+        "avg": false,
+        "current": true,
+        "max": false,
+        "min": false,
+        "rightSide": true,
+        "show": true,
+        "sideWidth": 310,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "8.1.6",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "label_replace(jvm_memory_bytes_used{area='heap', kubernetes_name='[[kube_env_name]]-commit-event-service'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "interval": "",
+          "legendFormat": "Heap used {{instance_label}}",
+          "refId": "A"
+        },
+        {
+          "expr": "label_replace(jvm_memory_bytes_max{area='heap', kubernetes_name='[[kube_env_name]]-commit-event-service'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "interval": "",
+          "legendFormat": "Heap max {{instance_label}}",
+          "refId": "B"
+        },
+        {
+          "expr": "container_memory_working_set_bytes{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"commit-event-service\"}",
+          "interval": "",
+          "legendFormat": "Container",
+          "refId": "C"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Commit Event Service memory",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "decbytes",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "decimals": null,
+          "format": "short",
+          "label": "",
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
+      "fill": 0,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 25
+      },
+      "hiddenSeries": false,
+      "id": 11,
+      "legend": {
+        "alignAsTable": true,
+        "avg": false,
+        "current": true,
+        "max": false,
+        "min": false,
+        "rightSide": true,
+        "show": true,
+        "sideWidth": 310,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "8.1.6",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "rate(container_cpu_user_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"commit-event-service\"}[5m])",
+          "interval": "",
+          "legendFormat": "User",
+          "refId": "C"
+        },
+        {
+          "exemplar": true,
+          "expr": "rate(container_cpu_system_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"commit-event-service\"}[5m])",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "System",
+          "refId": "A"
+        },
+        {
+          "exemplar": true,
+          "expr": "rate(container_cpu_usage_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"commit-event-service\"}[5m])",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "Total",
+          "refId": "B"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Commit Event Service cpu",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "$$hashKey": "object:79",
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "$$hashKey": "object:80",
+          "decimals": null,
+          "format": "short",
+          "label": "",
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
+      "fill": 0,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 30
+      },
+      "hiddenSeries": false,
+      "id": 6,
+      "legend": {
+        "alignAsTable": true,
+        "avg": false,
+        "current": true,
+        "max": false,
+        "min": false,
+        "rightSide": true,
+        "show": true,
+        "sideWidth": 310,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "8.1.6",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "label_replace(jvm_memory_bytes_used{area='heap', kubernetes_name='[[kube_env_name]]-event-log'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "legendFormat": "Heap used {{instance_label}}",
+          "refId": "A"
+        },
+        {
+          "expr": "label_replace(jvm_memory_bytes_max{area='heap', kubernetes_name='[[kube_env_name]]-event-log'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "interval": "",
+          "legendFormat": "Heap max {{instance_label}}",
+          "refId": "B"
+        },
+        {
+          "expr": "container_memory_working_set_bytes{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"event-log\"}",
+          "interval": "",
+          "legendFormat": "Container",
+          "refId": "C"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Event Log memory",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "decbytes",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "decimals": null,
+          "format": "short",
+          "label": "",
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
+      "fill": 0,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 36
+      },
+      "hiddenSeries": false,
+      "id": 12,
+      "legend": {
+        "alignAsTable": true,
+        "avg": false,
+        "current": true,
+        "max": false,
+        "min": false,
+        "rightSide": true,
+        "show": true,
+        "sideWidth": 310,
         "total": false,
         "values": true
       },
@@ -1287,22 +938,693 @@
         "align": false,
         "alignLevel": null
       }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
+      "fill": 0,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 41
+      },
+      "hiddenSeries": false,
+      "id": 2,
+      "legend": {
+        "alignAsTable": true,
+        "avg": false,
+        "current": true,
+        "max": false,
+        "min": false,
+        "rightSide": true,
+        "show": true,
+        "sideWidth": 310,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "8.1.6",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "label_replace(jvm_memory_bytes_used{area='heap', kubernetes_name='[[kube_env_name]]-triples-generator'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "legendFormat": "Heap used {{instance_label}}",
+          "refId": "A"
+        },
+        {
+          "expr": "label_replace(jvm_memory_bytes_max{area='heap', kubernetes_name='[[kube_env_name]]-triples-generator'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "legendFormat": "Heap max {{instance_label}}",
+          "refId": "B"
+        },
+        {
+          "expr": "container_memory_working_set_bytes{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"triples-generator\"}",
+          "interval": "",
+          "legendFormat": "Container {{pod}}",
+          "refId": "C"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Triples Generator memory",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "decbytes",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "decimals": null,
+          "format": "short",
+          "label": "",
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
+      "fill": 0,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 46
+      },
+      "hiddenSeries": false,
+      "id": 13,
+      "legend": {
+        "alignAsTable": true,
+        "avg": false,
+        "current": true,
+        "max": false,
+        "min": false,
+        "rightSide": true,
+        "show": true,
+        "sideWidth": 310,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "8.1.6",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "rate(container_cpu_user_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"triples-generator\"}[5m])",
+          "interval": "",
+          "legendFormat": "User",
+          "refId": "C"
+        },
+        {
+          "exemplar": true,
+          "expr": "rate(container_cpu_system_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"triples-generator\"}[5m])",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "System",
+          "refId": "A"
+        },
+        {
+          "exemplar": true,
+          "expr": "rate(container_cpu_usage_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"triples-generator\"}[5m])",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "Total",
+          "refId": "B"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Triples Generator cpu",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "$$hashKey": "object:79",
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "$$hashKey": "object:80",
+          "decimals": null,
+          "format": "short",
+          "label": "",
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
+      "fill": 0,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 51
+      },
+      "hiddenSeries": false,
+      "id": 5,
+      "legend": {
+        "alignAsTable": true,
+        "avg": false,
+        "current": true,
+        "max": false,
+        "min": false,
+        "rightSide": true,
+        "show": true,
+        "sideWidth": 310,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "8.1.6",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "label_replace(jvm_memory_bytes_used{area='heap', kubernetes_name='[[kube_env_name]]-token-repository'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "legendFormat": "Heap used {{instance_label}}",
+          "refId": "A"
+        },
+        {
+          "expr": "label_replace(jvm_memory_bytes_max{area='heap', kubernetes_name='[[kube_env_name]]-token-repository'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "legendFormat": "Heap max {{instance_label}}",
+          "refId": "B"
+        },
+        {
+          "expr": "container_memory_working_set_bytes{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"token-repository\"}",
+          "interval": "",
+          "legendFormat": "Container",
+          "refId": "C"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Token Repository memory",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "decbytes",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "decimals": null,
+          "format": "short",
+          "label": "",
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
+      "fill": 0,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 56
+      },
+      "hiddenSeries": false,
+      "id": 14,
+      "legend": {
+        "alignAsTable": true,
+        "avg": false,
+        "current": true,
+        "max": false,
+        "min": false,
+        "rightSide": true,
+        "show": true,
+        "sideWidth": 310,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "8.1.6",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "rate(container_cpu_user_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"token-repository\"}[5m])",
+          "interval": "",
+          "legendFormat": "User",
+          "refId": "C"
+        },
+        {
+          "exemplar": true,
+          "expr": "rate(container_cpu_system_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"token-repository\"}[5m])",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "System",
+          "refId": "A"
+        },
+        {
+          "exemplar": true,
+          "expr": "rate(container_cpu_usage_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"token-repository\"}[5m])",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "Total",
+          "refId": "B"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Token Repository cpu",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "$$hashKey": "object:79",
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "$$hashKey": "object:80",
+          "decimals": null,
+          "format": "short",
+          "label": "",
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
+      "fill": 0,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 61
+      },
+      "hiddenSeries": false,
+      "id": 8,
+      "legend": {
+        "alignAsTable": true,
+        "avg": false,
+        "current": true,
+        "max": false,
+        "min": false,
+        "rightSide": true,
+        "show": true,
+        "sideWidth": 310,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "8.1.6",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "container_memory_working_set_bytes{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"jena\"}",
+          "interval": "",
+          "legendFormat": "Container",
+          "refId": "C"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Jena memory",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "$$hashKey": "object:797",
+          "format": "decbytes",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "$$hashKey": "object:798",
+          "decimals": null,
+          "format": "short",
+          "label": "",
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
+      "fill": 0,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 66
+      },
+      "hiddenSeries": false,
+      "id": 15,
+      "legend": {
+        "alignAsTable": true,
+        "avg": false,
+        "current": true,
+        "max": false,
+        "min": false,
+        "rightSide": true,
+        "show": true,
+        "sideWidth": 310,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "8.1.6",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "rate(container_cpu_user_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"jena\"}[5m])",
+          "interval": "",
+          "legendFormat": "User",
+          "refId": "C"
+        },
+        {
+          "exemplar": true,
+          "expr": "rate(container_cpu_system_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"jena\"}[5m])",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "System",
+          "refId": "A"
+        },
+        {
+          "exemplar": true,
+          "expr": "rate(container_cpu_usage_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"jena\"}[5m])",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "Total",
+          "refId": "B"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Jena cpu",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "$$hashKey": "object:79",
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "$$hashKey": "object:80",
+          "decimals": null,
+          "format": "short",
+          "label": "",
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
     }
   ],
   "refresh": "1m",
   "schemaVersion": 30,
   "style": "dark",
-  "tags": [
-    "renku"
-  ],
+  "tags": [],
   "templating": {
     "list": [
       {
         "allValue": null,
         "current": {
           "selected": false,
-          "text": "renku-kg-dev",
-          "value": "renku-kg-dev"
+          "text": "tasko-renku",
+          "value": "tasko-renku"
         },
         "datasource": "Prometheus",
         "definition": "server_request_count",
@@ -1318,7 +1640,7 @@
           "query": "server_request_count",
           "refId": "Prometheus-kube_env_name-Variable-Query"
         },
-        "refresh": 2,
+        "refresh": 1,
         "regex": "/.*kubernetes_name=\"([\\w-]*)-knowledge-graph\".*/",
         "skipUrlSync": false,
         "sort": 2,
@@ -1330,7 +1652,7 @@
     ]
   },
   "time": {
-    "from": "now-3h",
+    "from": "now-12h",
     "to": "now"
   },
   "timepicker": {
@@ -1344,21 +1666,10 @@
       "1h",
       "2h",
       "1d"
-    ],
-    "time_options": [
-      "5m",
-      "15m",
-      "1h",
-      "6h",
-      "12h",
-      "24h",
-      "2d",
-      "7d",
-      "30d"
     ]
   },
   "timezone": "",
-  "title": "Renku Event Log",
-  "uid": "cb9J1WBZz",
-  "version": 26
+  "title": "Graph Services memory & cpu",
+  "uid": "GrUiB8K7z",
+  "version": 3
 }
