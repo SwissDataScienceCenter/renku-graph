@@ -19,11 +19,11 @@
 package io.renku.triplesgenerator.reprovisioning
 
 import cats.effect.Async
+import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas._
-import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.{RenkuBaseUrl, RenkuVersionPair}
-import io.renku.jsonld.EntityId
+import io.renku.jsonld.syntax._
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
@@ -32,42 +32,24 @@ trait RenkuVersionPairUpdater[F[_]] {
   def update(versionPair: RenkuVersionPair): F[Unit]
 }
 
-private case object RenkuVersionPairJsonLD {
-
-  def id(implicit renkuBaseUrl: RenkuBaseUrl) = EntityId.of((renkuBaseUrl / "version-pair").toString)
-  val objectType                              = renku / "VersionPair"
-  val cliVersion                              = renku / "cliVersion"
-  val schemaVersion                           = renku / "schemaVersion"
-}
-
-private class RenkuVersionPairUpdaterImpl[F[_]: Async: Logger](rdfStoreConfig: RdfStoreConfig,
-                                                               renkuBaseUrl: RenkuBaseUrl,
-                                                               timeRecorder: SparqlQueryTimeRecorder[F]
-) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
+private class RenkuVersionPairUpdaterImpl[F[_]: Async: Logger](
+    rdfStoreConfig:      RdfStoreConfig,
+    timeRecorder:        SparqlQueryTimeRecorder[F]
+)(implicit renkuBaseUrl: RenkuBaseUrl)
+    extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
     with RenkuVersionPairUpdater[F] {
 
-  override def update(versionPair: RenkuVersionPair): F[Unit] = updateWithNoResult {
-    val entityId = (renkuBaseUrl / "version-pair").showAs[RdfResource]
+  override def update(versionPair: RenkuVersionPair): F[Unit] =
+    deleteFromDb() >> upload(versionPair.asJsonLD)
+
+  private def deleteFromDb() = updateWithNoResult {
     SparqlQuery.of(
-      name = "ReProvisioning - cli and schema version create",
-      Prefixes.of(
-        rdf   -> "rdf",
-        renku -> "renku"
-      ),
-      s"""|DELETE {$entityId <${RenkuVersionPairJsonLD.cliVersion}> ?o .
-          |        $entityId <${RenkuVersionPairJsonLD.schemaVersion}> ?q .
-          |}
-          |
-          |INSERT{ 
-          |  <${RenkuVersionPairJsonLD.id(renkuBaseUrl)}> rdf:type <${RenkuVersionPairJsonLD.objectType}> ;
-          |                                         <${RenkuVersionPairJsonLD.cliVersion}> '${versionPair.cliVersion}' ;
-          |                                          <${RenkuVersionPairJsonLD.schemaVersion}> '${versionPair.schemaVersion}'
-          |}
+      name = "re-provisioning - cli and schema version remove",
+      Prefixes of renku -> "renku",
+      s"""|DELETE { ?s ?p ?o }
           |WHERE {
-          |  OPTIONAL {
-          |    $entityId ?p ?o;
-          |              ?r ?q.
-          |  }
+          | ?s ?p ?o;
+          |    a renku:VersionPair.
           |}
           |""".stripMargin
     )

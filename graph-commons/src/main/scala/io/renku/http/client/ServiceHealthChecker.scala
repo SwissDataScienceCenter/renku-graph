@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.zombieevents
+package io.renku.http.client
 
 import cats.MonadThrow
 import cats.effect.Async
@@ -24,7 +24,6 @@ import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.control.Throttler
-import io.renku.http.client.RestClient
 import io.renku.http.client.RestClient.MaxRetriesAfterConnectionTimeout
 import io.renku.microservices.MicroserviceBaseUrl
 import org.http4s.Status.Ok
@@ -34,17 +33,17 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
-private trait ServiceHealthChecker[F[_]] {
+trait ServiceHealthChecker[F[_]] {
   def ping(microserviceBaseUrl: MicroserviceBaseUrl): F[Boolean]
 }
 
-private object ServiceHealthChecker {
+object ServiceHealthChecker {
   def apply[F[_]: Async: Logger]: F[ServiceHealthChecker[F]] = MonadThrow[F].catchNonFatal {
     new ServiceHealthCheckerImpl()
   }
 }
 
-private class ServiceHealthCheckerImpl[F[_]: Async: Logger](
+class ServiceHealthCheckerImpl[F[_]: Async: Logger](
     retryInterval: FiniteDuration = 1 second,
     maxRetries:    Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
 ) extends RestClient(Throttler.noThrottling, retryInterval = retryInterval, maxRetries = maxRetries)

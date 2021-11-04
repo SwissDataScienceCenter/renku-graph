@@ -27,6 +27,7 @@ import io.renku.db.implicits._
 import io.renku.db.{DbClient, SessionResource, SqlStatement}
 import io.renku.eventlog.{EventLogDB, Microservice, TypeSerializers}
 import io.renku.events.consumers.subscriptions.SubscriberUrl
+import io.renku.http.client.ServiceHealthChecker
 import io.renku.metrics.LabeledHistogram
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
 import org.typelevel.log4cats.Logger

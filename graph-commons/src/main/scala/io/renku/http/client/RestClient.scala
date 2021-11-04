@@ -193,7 +193,7 @@ abstract class RestClient[F[_]: Async: Logger, ThrottlingTarget](
       throttler.release() >> ClientException(LogMessage(request.request, exception), exception).raiseError[F, T]
   }
 
-  private type ResponseMapping[ResultType] =
+  protected type ResponseMapping[ResultType] =
     PartialFunction[(Status, Request[F], Response[F]), F[ResultType]]
 
   private implicit class HttpRequestOps(request: HttpRequest[F]) {
