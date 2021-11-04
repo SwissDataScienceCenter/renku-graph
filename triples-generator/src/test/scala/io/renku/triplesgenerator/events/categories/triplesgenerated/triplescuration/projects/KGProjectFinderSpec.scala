@@ -41,7 +41,7 @@ class KGProjectFinderSpec
 
   "find" should {
 
-    "return name, derivedFrom and visibility for a given project ResourceId" in new TestCase {
+    "return name, derivedFrom, visibility and description for a given project ResourceId" in new TestCase {
       forAll(anyProjectEntities.map(_.to[entities.Project])) { project =>
         val maybeParent = project match {
           case projectWithParent: entities.ProjectWithParent    => Some(projectWithParent.parentResourceId)
@@ -50,7 +50,11 @@ class KGProjectFinderSpec
 
         loadToStore(project)
 
-        finder.find(project.resourceId).unsafeRunSync() shouldBe (project.name, maybeParent, project.visibility).some
+        finder.find(project.resourceId).unsafeRunSync() shouldBe (project.name,
+                                                                  maybeParent,
+                                                                  project.visibility,
+                                                                  project.maybeDescription
+        ).some
       }
     }
 

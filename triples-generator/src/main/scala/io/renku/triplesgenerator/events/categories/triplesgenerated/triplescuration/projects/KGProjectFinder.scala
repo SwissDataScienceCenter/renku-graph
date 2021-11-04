@@ -48,11 +48,12 @@ private class KGProjectFinderImpl[F[_]: Async: Logger](rdfStoreConfig: RdfStoreC
   private def query(resourceId: projects.ResourceId) = SparqlQuery.of(
     name = "transformation - find project",
     Prefixes.of(schema -> "schema", renku -> "renku", prov -> "prov"),
-    s"""|SELECT DISTINCT ?name ?maybeParent ?visibility
+    s"""|SELECT DISTINCT ?name ?maybeParent ?visibility ?maybeDescription
         |WHERE {
         |  <$resourceId> a schema:Project;
         |                schema:name ?name;
-        |                renku:projectVisibility ?visibility.
+        |                renku:projectVisibility ?visibility. 
+        |  OPTIONAL { <$resourceId> schema:description ?maybeDescription . }
         |  OPTIONAL { <$resourceId> prov:wasDerivedFrom ?maybeParent }            
         |}
         |""".stripMargin
@@ -61,10 +62,11 @@ private class KGProjectFinderImpl[F[_]: Async: Logger](rdfStoreConfig: RdfStoreC
   private implicit lazy val recordsDecoder: Decoder[List[KGProjectInfo]] = {
     val rowDecoder = Decoder.instance(cursor =>
       for {
-        name        <- cursor.downField("name").downField("value").as[projects.Name]
-        maybeParent <- cursor.downField("maybeParent").downField("value").as[Option[projects.ResourceId]]
-        visibility  <- cursor.downField("visibility").downField("value").as[projects.Visibility]
-      } yield (name, maybeParent, visibility)
+        name             <- cursor.downField("name").downField("value").as[projects.Name]
+        maybeParent      <- cursor.downField("maybeParent").downField("value").as[Option[projects.ResourceId]]
+        visibility       <- cursor.downField("visibility").downField("value").as[projects.Visibility]
+        maybeDescription <- cursor.downField("maybeDescription").downField("value").as[Option[projects.Description]]
+      } yield (name, maybeParent, visibility, maybeDescription)
     )
     _.downField("results").downField("bindings").as(decodeList(rowDecoder))
   }
@@ -82,5 +84,5 @@ private object KGProjectFinder {
     config <- RdfStoreConfig[F]()
   } yield new KGProjectFinderImpl(config, timeRecorder)
 
-  type KGProjectInfo = (projects.Name, Option[projects.ResourceId], projects.Visibility)
+  type KGProjectInfo = (projects.Name, Option[projects.ResourceId], projects.Visibility, Option[projects.Description])
 }

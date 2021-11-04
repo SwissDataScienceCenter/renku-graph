@@ -150,10 +150,8 @@ object ProjectsResources {
       Link(Rel("datasets") -> Href(renkuResourcesUrl / "projects" / project.path / "datasets"))
     )
   } deepMerge {
-    project.maybeDescription
-      .map { description =>
-        json"""{"description": ${description.value} }"""
-      }
+    project.entitiesProject.maybeDescription
+      .map(description => json"""{"description": ${description.value} }""")
       .getOrElse(Json.obj())
   }
 

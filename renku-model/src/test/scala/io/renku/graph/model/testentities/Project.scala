@@ -23,38 +23,40 @@ import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model
 import io.renku.graph.model._
-import io.renku.graph.model.projects.{DateCreated, ForksCount, Name, Path, Visibility}
+import io.renku.graph.model.projects.{DateCreated, Description, ForksCount, Name, Path, Visibility}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
 
 sealed trait Project extends Project.ProjectOps with Product with Serializable {
-  val path:         Path
-  val name:         Name
-  val agent:        CliVersion
-  val dateCreated:  DateCreated
-  val maybeCreator: Option[Person]
-  val visibility:   Visibility
-  val forksCount:   ForksCount
-  val members:      Set[Person]
-  val version:      SchemaVersion
-  val activities:   List[Activity]
-  val datasets:     List[Dataset[Dataset.Provenance]]
+  val path:             Path
+  val name:             Name
+  val maybeDescription: Option[Description]
+  val agent:            CliVersion
+  val dateCreated:      DateCreated
+  val maybeCreator:     Option[Person]
+  val visibility:       Visibility
+  val forksCount:       ForksCount
+  val members:          Set[Person]
+  val version:          SchemaVersion
+  val activities:       List[Activity]
+  val datasets:         List[Dataset[Dataset.Provenance]]
 
   type ProjectType <: Project
 
   lazy val plans: Set[Plan] = activities.map(_.association.plan).toSet
 }
 
-final case class ProjectWithoutParent(path:         Path,
-                                      name:         Name,
-                                      agent:        CliVersion,
-                                      dateCreated:  DateCreated,
-                                      maybeCreator: Option[Person],
-                                      visibility:   Visibility,
-                                      forksCount:   ForksCount,
-                                      members:      Set[Person],
-                                      version:      SchemaVersion,
-                                      activities:   List[Activity],
-                                      datasets:     List[Dataset[Dataset.Provenance]]
+final case class ProjectWithoutParent(path:             Path,
+                                      name:             Name,
+                                      maybeDescription: Option[Description],
+                                      agent:            CliVersion,
+                                      dateCreated:      DateCreated,
+                                      maybeCreator:     Option[Person],
+                                      visibility:       Visibility,
+                                      forksCount:       ForksCount,
+                                      members:          Set[Person],
+                                      version:          SchemaVersion,
+                                      activities:       List[Activity],
+                                      datasets:         List[Dataset[Dataset.Provenance]]
 ) extends Project {
 
   validateDates(dateCreated, activities, datasets)
@@ -103,18 +105,19 @@ final case class ProjectWithoutParent(path:         Path,
     .void
 }
 
-final case class ProjectWithParent(path:         Path,
-                                   name:         Name,
-                                   agent:        CliVersion,
-                                   dateCreated:  DateCreated,
-                                   maybeCreator: Option[Person],
-                                   visibility:   Visibility,
-                                   forksCount:   ForksCount,
-                                   members:      Set[Person],
-                                   version:      SchemaVersion,
-                                   activities:   List[Activity],
-                                   datasets:     List[Dataset[Dataset.Provenance]],
-                                   parent:       Project
+final case class ProjectWithParent(path:             Path,
+                                   name:             Name,
+                                   maybeDescription: Option[Description],
+                                   agent:            CliVersion,
+                                   dateCreated:      DateCreated,
+                                   maybeCreator:     Option[Person],
+                                   visibility:       Visibility,
+                                   forksCount:       ForksCount,
+                                   members:          Set[Person],
+                                   version:          SchemaVersion,
+                                   activities:       List[Activity],
+                                   datasets:         List[Dataset[Dataset.Provenance]],
+                                   parent:           Project
 ) extends Project {
   override type ProjectType = ProjectWithParent
 
@@ -166,6 +169,7 @@ object Project {
           projects.ResourceId(project.asEntityId),
           project.path,
           project.name,
+          project.maybeDescription,
           project.agent,
           project.dateCreated,
           project.maybeCreator.map(_.to[entities.Person]),
@@ -186,6 +190,7 @@ object Project {
           projects.ResourceId(project.asEntityId),
           project.path,
           project.name,
+          project.maybeDescription,
           project.agent,
           project.dateCreated,
           project.maybeCreator.map(_.to[entities.Person]),

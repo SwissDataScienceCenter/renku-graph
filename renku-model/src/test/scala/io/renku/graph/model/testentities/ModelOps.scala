@@ -88,6 +88,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
         ProjectWithParent(
           child.path,
           child.name,
+          child.maybeDescription,
           parentProject.agent,
           child.dateCreated,
           child.maybeCreator,

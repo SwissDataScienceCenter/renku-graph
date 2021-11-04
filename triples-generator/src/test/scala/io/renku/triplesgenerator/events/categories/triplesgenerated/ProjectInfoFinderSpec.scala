@@ -241,6 +241,7 @@ class ProjectInfoFinderSpec
     }"""
       .addIfDefined("forked_from_project" -> project.maybeParentPath)(parentPathEncoder)
       .addIfDefined("creator_id" -> project.maybeCreator.map(_.gitLabId))
+      .addIfDefined("description" -> project.maybeDescription.map(_.value))
   }
 
   private implicit lazy val memberEncoder: Encoder[ProjectMember] = Encoder.instance { member =>
