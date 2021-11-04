@@ -48,7 +48,7 @@ package object data extends RdfStoreData {
     starsCount  <- starsCounts
     permissions <- permissionsObjects
     statistics  <- statisticsObjects.map(_.copy(commitsCount = commitsCount))
-  } yield Project(project, id, project.maybeDescription, updatedAt, urls, tags, starsCount, permissions, statistics)
+  } yield Project(project, id, updatedAt, urls, tags, starsCount, permissions, statistics)
 
   def dataProjects(project: testentities.Project): Gen[Project] = dataProjects(fixed(project))
 

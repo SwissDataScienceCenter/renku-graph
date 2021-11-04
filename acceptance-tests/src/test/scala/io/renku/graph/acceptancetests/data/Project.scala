@@ -25,7 +25,7 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.Positive
 import io.renku.graph.acceptancetests.data.Project._
-import io.renku.graph.model.projects.{Description, Id, Name, Path}
+import io.renku.graph.model.projects.{Id, Name, Path}
 import io.renku.graph.model.testentities
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints._
@@ -33,15 +33,14 @@ import io.renku.tinytypes.constraints._
 import java.net.{MalformedURLException, URL}
 import java.time.Instant
 
-final case class Project(entitiesProject:  testentities.Project,
-                         id:               Id,
-                         maybeDescription: Option[Description],
-                         updatedAt:        DateUpdated,
-                         urls:             Urls,
-                         tags:             Set[Tag],
-                         starsCount:       StarsCount,
-                         permissions:      Permissions,
-                         statistics:       Statistics
+final case class Project(entitiesProject: testentities.Project,
+                         id:              Id,
+                         updatedAt:       DateUpdated,
+                         urls:            Urls,
+                         tags:            Set[Tag],
+                         starsCount:      StarsCount,
+                         permissions:     Permissions,
+                         statistics:      Statistics
 ) {
   val path: Path = entitiesProject.path
   val name: Name = entitiesProject.name
@@ -49,7 +48,7 @@ final case class Project(entitiesProject:  testentities.Project,
 
 object Project {
   final class Tag private (val value: String) extends AnyVal with StringTinyType
-  implicit object Tag extends TinyTypeFactory[Tag](new Tag(_)) with NonBlank
+  implicit object Tag                         extends TinyTypeFactory[Tag](new Tag(_)) with NonBlank
 
   final class StarsCount private (val value: Int) extends AnyVal with IntTinyType
   implicit object StarsCount extends TinyTypeFactory[StarsCount](new StarsCount(_)) with NonNegativeInt
@@ -62,13 +61,13 @@ object Project {
   object Permissions {
 
     final case class ProjectPermissions(projectAccessLevel: ProjectAccessLevel) extends Permissions
-    final case class GroupPermissions(groupAccessLevel: GroupAccessLevel) extends Permissions
+    final case class GroupPermissions(groupAccessLevel: GroupAccessLevel)       extends Permissions
     final case class ProjectAndGroupPermissions(projectAccessLevel: ProjectAccessLevel,
                                                 groupAccessLevel:   GroupAccessLevel
     ) extends Permissions
 
-    def apply(accessLevel:        ProjectAccessLevel): Permissions = ProjectPermissions(accessLevel)
-    def apply(accessLevel:        GroupAccessLevel): Permissions = GroupPermissions(accessLevel)
+    def apply(accessLevel: ProjectAccessLevel): Permissions = ProjectPermissions(accessLevel)
+    def apply(accessLevel: GroupAccessLevel):   Permissions = GroupPermissions(accessLevel)
     def apply(projectAccessLevel: ProjectAccessLevel, groupAccessLevel: GroupAccessLevel): Permissions =
       ProjectAndGroupPermissions(projectAccessLevel, groupAccessLevel)
 
@@ -133,10 +132,10 @@ object Project {
     }
 
     final class WebUrl private (val value: String) extends AnyVal with StringTinyType
-    implicit object WebUrl extends TinyTypeFactory[WebUrl](new WebUrl(_)) with Url
+    implicit object WebUrl                         extends TinyTypeFactory[WebUrl](new WebUrl(_)) with Url
 
     final class ReadmeUrl private (val value: String) extends AnyVal with StringTinyType
-    implicit object ReadmeUrl extends TinyTypeFactory[ReadmeUrl](new ReadmeUrl(_)) with Url
+    implicit object ReadmeUrl                         extends TinyTypeFactory[ReadmeUrl](new ReadmeUrl(_)) with Url
   }
 
   import Statistics._
