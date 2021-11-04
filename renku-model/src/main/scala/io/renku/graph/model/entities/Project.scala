@@ -28,51 +28,51 @@ import io.renku.jsonld.JsonLDDecoder
 import monocle.{Lens, Traversal}
 
 sealed trait Project extends Product with Serializable {
-  val resourceId:   ResourceId
-  val path:         Path
-  val name:         Name
-  val description:  Description
-  val agent:        CliVersion
-  val dateCreated:  DateCreated
-  val maybeCreator: Option[Person]
-  val visibility:   Visibility
-  val members:      Set[Person]
-  val version:      SchemaVersion
-  val activities:   List[Activity]
-  val datasets:     List[Dataset[Dataset.Provenance]]
+  val resourceId:       ResourceId
+  val path:             Path
+  val name:             Name
+  val maybeDescription: Option[Description]
+  val agent:            CliVersion
+  val dateCreated:      DateCreated
+  val maybeCreator:     Option[Person]
+  val visibility:       Visibility
+  val members:          Set[Person]
+  val version:          SchemaVersion
+  val activities:       List[Activity]
+  val datasets:         List[Dataset[Dataset.Provenance]]
 
   lazy val plans:      Set[Plan]       = activities.map(_.association.plan).toSet
   lazy val namespaces: List[Namespace] = path.toNamespaces
 }
 
-final case class ProjectWithoutParent(resourceId:   ResourceId,
-                                      path:         Path,
-                                      name:         Name,
-                                      description:  Description,
-                                      agent:        CliVersion,
-                                      dateCreated:  DateCreated,
-                                      maybeCreator: Option[Person],
-                                      visibility:   Visibility,
-                                      members:      Set[Person],
-                                      version:      SchemaVersion,
-                                      activities:   List[Activity],
-                                      datasets:     List[Dataset[Dataset.Provenance]]
+final case class ProjectWithoutParent(resourceId:       ResourceId,
+                                      path:             Path,
+                                      name:             Name,
+                                      maybeDescription: Option[Description],
+                                      agent:            CliVersion,
+                                      dateCreated:      DateCreated,
+                                      maybeCreator:     Option[Person],
+                                      visibility:       Visibility,
+                                      members:          Set[Person],
+                                      version:          SchemaVersion,
+                                      activities:       List[Activity],
+                                      datasets:         List[Dataset[Dataset.Provenance]]
 ) extends Project
 
 object ProjectWithoutParent extends ProjectFactory {
 
-  def from(resourceId:   ResourceId,
-           path:         Path,
-           name:         Name,
-           description:  Description,
-           agent:        CliVersion,
-           dateCreated:  DateCreated,
-           maybeCreator: Option[Person],
-           visibility:   Visibility,
-           members:      Set[Person],
-           version:      SchemaVersion,
-           activities:   List[Activity],
-           datasets:     List[Dataset[Dataset.Provenance]]
+  def from(resourceId:       ResourceId,
+           path:             Path,
+           name:             Name,
+           maybeDescription: Option[Description],
+           agent:            CliVersion,
+           dateCreated:      DateCreated,
+           maybeCreator:     Option[Person],
+           visibility:       Visibility,
+           members:          Set[Person],
+           version:          SchemaVersion,
+           activities:       List[Activity],
+           datasets:         List[Dataset[Dataset.Provenance]]
   ): ValidatedNel[String, ProjectWithoutParent] =
     (validateDates(dateCreated, activities, datasets), validateDatasets(datasets))
       .mapN { (_, _) =>
@@ -81,7 +81,7 @@ object ProjectWithoutParent extends ProjectFactory {
         ProjectWithoutParent(resourceId,
                              path,
                              name,
-                             description,
+                             maybeDescription,
                              agent,
                              dateCreated,
                              maybeCreator,
@@ -125,7 +125,7 @@ object ProjectWithoutParent extends ProjectFactory {
 final case class ProjectWithParent(resourceId:       ResourceId,
                                    path:             Path,
                                    name:             Name,
-                                   description:      Description,
+                                   maybeDescription: Option[Description],
                                    agent:            CliVersion,
                                    dateCreated:      DateCreated,
                                    maybeCreator:     Option[Person],
@@ -142,7 +142,7 @@ object ProjectWithParent extends ProjectFactory {
   def from(resourceId:       ResourceId,
            path:             Path,
            name:             Name,
-           description:      Description,
+           maybeDescription: Option[Description],
            agent:            CliVersion,
            dateCreated:      DateCreated,
            maybeCreator:     Option[Person],
@@ -158,7 +158,7 @@ object ProjectWithParent extends ProjectFactory {
     ProjectWithParent(resourceId,
                       path,
                       name,
-                      description,
+                      maybeDescription,
                       agent,
                       dateCreated,
                       maybeCreator,
@@ -266,7 +266,7 @@ object Project {
         schema / "name"             -> project.name.asJsonLD,
         renku / "projectPath"       -> project.path.asJsonLD,
         renku / "projectNamespaces" -> project.namespaces.asJsonLD,
-        schema / "description"      -> project.description.asJsonLD,
+        schema / "description"      -> project.maybeDescription.asJsonLD,
         schema / "agent"            -> project.agent.asJsonLD,
         schema / "dateCreated"      -> project.dateCreated.asJsonLD,
         schema / "creator"          -> project.maybeCreator.asJsonLD,
@@ -284,14 +284,14 @@ object Project {
   def decoder(gitLabInfo: GitLabProjectInfo)(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDDecoder[Project] =
     ProjectJsonLDDecoder(gitLabInfo)
 
-  final case class GitLabProjectInfo(name:            Name,
-                                     path:            Path,
-                                     dateCreated:     DateCreated,
-                                     description:     Description,
-                                     maybeCreator:    Option[ProjectMember],
-                                     members:         Set[ProjectMember],
-                                     visibility:      Visibility,
-                                     maybeParentPath: Option[Path]
+  final case class GitLabProjectInfo(name:             Name,
+                                     path:             Path,
+                                     dateCreated:      DateCreated,
+                                     maybeDescription: Option[Description],
+                                     maybeCreator:     Option[ProjectMember],
+                                     members:          Set[ProjectMember],
+                                     visibility:       Visibility,
+                                     maybeParentPath:  Option[Path]
   )
 
   final case class ProjectMember(name: users.Name, username: users.Username, gitLabId: users.GitLabId)

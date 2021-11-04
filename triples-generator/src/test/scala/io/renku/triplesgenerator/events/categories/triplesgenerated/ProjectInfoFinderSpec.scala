@@ -236,12 +236,12 @@ class ProjectInfoFinderSpec
     json"""{
       "path_with_namespace": ${project.path.value},
       "name":                ${project.name.value},
-      "description": ${project.description.value},
       "created_at":          ${project.dateCreated.value},
       "visibility":          ${project.visibility.value}
     }"""
       .addIfDefined("forked_from_project" -> project.maybeParentPath)(parentPathEncoder)
       .addIfDefined("creator_id" -> project.maybeCreator.map(_.gitLabId))
+      .addIfDefined("description" -> project.maybeDescription.map(_.value))
   }
 
   private implicit lazy val memberEncoder: Encoder[ProjectMember] = Encoder.instance { member =>

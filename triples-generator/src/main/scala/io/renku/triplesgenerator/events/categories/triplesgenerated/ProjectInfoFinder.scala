@@ -108,19 +108,19 @@ private class ProjectInfoFinderImpl[F[_]: Async: Logger](
 
     implicit val decoder: Decoder[ProjectAndCreator] = cursor =>
       for {
-        path           <- cursor.downField("path_with_namespace").as[projects.Path]
-        name           <- cursor.downField("name").as[projects.Name]
-        visibility     <- cursor.downField("visibility").as[projects.Visibility]
-        dateCreated    <- cursor.downField("created_at").as[projects.DateCreated]
-        description    <- cursor.downField("description").as[projects.Description]
-        maybeCreatorId <- cursor.downField("creator_id").as[Option[users.GitLabId]]
+        path             <- cursor.downField("path_with_namespace").as[projects.Path]
+        name             <- cursor.downField("name").as[projects.Name]
+        visibility       <- cursor.downField("visibility").as[projects.Visibility]
+        dateCreated      <- cursor.downField("created_at").as[projects.DateCreated]
+        maybeDescription <- cursor.downField("description").as[Option[projects.Description]]
+        maybeCreatorId   <- cursor.downField("creator_id").as[Option[users.GitLabId]]
         maybeParentPath <- cursor
                              .downField("forked_from_project")
                              .as[Option[projects.Path]](decodeOption(parentPathDecoder))
       } yield GitLabProjectInfo(name,
                                 path,
                                 dateCreated,
-                                description,
+                                maybeDescription,
                                 maybeCreator = None,
                                 members = Set.empty,
                                 visibility,

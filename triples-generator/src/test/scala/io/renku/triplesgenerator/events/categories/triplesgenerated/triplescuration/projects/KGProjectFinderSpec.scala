@@ -53,7 +53,7 @@ class KGProjectFinderSpec
         finder.find(project.resourceId).unsafeRunSync() shouldBe (project.name,
                                                                   maybeParent,
                                                                   project.visibility,
-                                                                  project.description.some
+                                                                  project.maybeDescription
         ).some
       }
     }

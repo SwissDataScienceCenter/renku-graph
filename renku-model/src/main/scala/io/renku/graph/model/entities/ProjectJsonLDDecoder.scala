@@ -34,12 +34,8 @@ object ProjectJsonLDDecoder {
         agent         <- cursor.downField(schema / "agent").as[CliVersion]
         schemaVersion <- cursor.downField(schema / "schemaVersion").as[SchemaVersion]
         dateCreated   <- cursor.downField(schema / "dateCreated").as[DateCreated]
-        description <-
-          cursor
-            .downField(schema / "description")
-            .as[Description]
-            .fold(_ => gitLabInfo.description, identity)
-            .asRight
+        maybeDescription <-
+          cursor.downField(schema / "description").as[Option[Description]].map(_ orElse gitLabInfo.maybeDescription)
         allPersons <- findAllPersons(gitLabInfo)
         activities <- findAllActivities(gitLabInfo)
         datasets   <- findAllDatasets(gitLabInfo)
@@ -49,7 +45,7 @@ object ProjectJsonLDDecoder {
           newProject(gitLabInfo,
                      resourceId,
                      earliestDate,
-                     description,
+                     maybeDescription,
                      agent,
                      schemaVersion,
                      allPersons,
@@ -113,7 +109,7 @@ object ProjectJsonLDDecoder {
   private def newProject(gitLabInfo:       GitLabProjectInfo,
                          resourceId:       ResourceId,
                          dateCreated:      DateCreated,
-                         description:      Description,
+                         maybeDescription: Option[Description],
                          agent:            CliVersion,
                          schemaVersion:    SchemaVersion,
                          allJsonLdPersons: Set[Person],
@@ -127,7 +123,7 @@ object ProjectJsonLDDecoder {
             resourceId,
             gitLabInfo.path,
             gitLabInfo.name,
-            description,
+            maybeDescription,
             agent,
             dateCreated,
             maybeCreator(allJsonLdPersons)(gitLabInfo),
@@ -144,7 +140,7 @@ object ProjectJsonLDDecoder {
             resourceId,
             gitLabInfo.path,
             gitLabInfo.name,
-            description,
+            maybeDescription,
             agent,
             dateCreated,
             maybeCreator(allJsonLdPersons)(gitLabInfo),
