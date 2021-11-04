@@ -34,7 +34,7 @@ class EndpointSecurityExceptionSpec extends AnyWordSpec with IOSpec with should.
 
   "AuthenticationFailure.toHttpResponse" should {
 
-    s"return an $Unauthorized response with a relavant error message" in {
+    s"return an $Unauthorized response with a relevant error message" in {
       val response = AuthenticationFailure.toHttpResponse[IO]
 
       response.status                           shouldBe Unauthorized
@@ -50,7 +50,7 @@ class EndpointSecurityExceptionSpec extends AnyWordSpec with IOSpec with should.
 
       response.status                           shouldBe NotFound
       response.contentType                      shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("User not authorized failure")
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Resource not found")
     }
   }
 }

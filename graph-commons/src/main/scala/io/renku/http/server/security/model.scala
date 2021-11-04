@@ -47,7 +47,7 @@ object EndpointSecurityException {
 
   final case object AuthorizationFailure extends EndpointSecurityException {
 
-    override lazy val getMessage: String = "User not authorized failure"
+    override lazy val getMessage: String = "Resource not found"
 
     override def toHttpResponse[F[_]]: Response[F] =
       Response[F](Status.NotFound).withEntity(ErrorMessage(getMessage))

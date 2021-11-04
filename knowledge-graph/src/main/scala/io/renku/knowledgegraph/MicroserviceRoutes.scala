@@ -25,7 +25,7 @@ import cats.effect.{IO, Resource}
 import cats.syntax.all._
 import io.renku.config.GitLab
 import io.renku.control.{RateLimit, Throttler}
-import io.renku.graph.http.server.security.GitLabAuthenticator
+import io.renku.graph.http.server.security.{GitLabAuthenticator, ProjectAuthorizer}
 import io.renku.graph.model
 import io.renku.http.rest.SortBy.Direction
 import io.renku.http.rest.paging.PagingRequest
@@ -54,6 +54,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     datasetEndpoint:         DatasetEndpoint[F],
     datasetsSearchEndpoint:  DatasetsSearchEndpoint[F],
     authMiddleware:          AuthMiddleware[F, Option[AuthUser]],
+    projectAuthorizer:       ProjectAuthorizer[F],
     routesMetrics:           RoutesMetrics[F]
 ) extends Http4sDsl[F] {
 
@@ -66,12 +67,14 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   import projectEndpoint._
   import queryEndpoint._
   import routesMetrics._
+  import projectAuthorizer._
 
   // format: off
   private lazy val authorizedRoutes: HttpRoutes[F] = authMiddleware {
     AuthedRoutes.of {
-      case GET  -> Root / "knowledge-graph" /  "datasets" :? query(maybePhrase) +& sort(maybeSortBy) +& page(page) +& perPage(perPage) as maybeUser => searchForDatasets(maybePhrase, maybeSortBy,page, perPage, maybeUser)
-    case authedRequest@POST -> Root / "knowledge-graph" /  "graphql" as maybeUser                                                                         => handleQuery(authedRequest.req, maybeUser)
+      case GET                -> Root / "knowledge-graph" /  "datasets" :? query(maybePhrase) +& sort(maybeSortBy) +& page(page) +& perPage(perPage) as maybeUser => searchForDatasets(maybePhrase, maybeSortBy,page, perPage, maybeUser)
+      case authRequest @ POST -> Root / "knowledge-graph" /  "graphql"                                                                               as maybeUser => handleQuery(authRequest.req, maybeUser)
+      case GET ->                       "knowledge-graph" /: "projects" /: path                                                                      as maybeUser => routeToProjectsEndpoints(path, maybeUser)
     }
   }
 
@@ -79,7 +82,6 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     case         GET  -> Root / "ping"                                                                                                       => Ok("pong")
     case         GET ->  Root / "knowledge-graph" /  "datasets" / DatasetId(id)                                                              => getDataset(id)
     case         GET ->  Root / "knowledge-graph" /  "graphql"                                                                               => schema()
-    case         GET ->         "knowledge-graph" /: "projects" /: path => routeToProjectsEndpoints(path, maybeAuthUser = None)
   }
   // format: on
 
@@ -95,11 +97,9 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     (maybePhrase.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Phrase])),
      maybeSort getOrElse Validated.validNel(Sort.By(TitleProperty, Direction.Asc)),
      PagingRequest(maybePage, maybePerPage)
-    )
-      .mapN { case (maybePhrase, sort, paging) =>
-        datasetsSearchEndpoint.searchForDatasets(maybePhrase, sort, paging, maybeAuthUser)
-      }
-      .fold(toBadRequest, identity)
+    ).mapN { case (maybePhrase, sort, paging) =>
+      datasetsSearchEndpoint.searchForDatasets(maybePhrase, sort, paging, maybeAuthUser)
+    }.fold(toBadRequest, identity)
 
   private def routeToProjectsEndpoints(
       path:          Path,
@@ -108,7 +108,8 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     case projectPathParts :+ "datasets" => projectPathParts.toProjectPath.fold(identity, getProjectDatasets)
     case projectPathParts =>
       projectPathParts.toProjectPath.map { projectPath =>
-        EitherT.right[Response[F]](getProject(projectPath, maybeAuthUser)).merge
+        (authorize(projectPath, maybeAuthUser).leftMap(_.toHttpResponse[F]) >>
+          EitherT(getProject(projectPath, maybeAuthUser).map(_.asRight[Response[F]]))).merge
       }.merge
   }
 
@@ -140,13 +141,14 @@ private object MicroserviceRoutes {
       datasetsSearchEndpoint  <- DatasetsSearchEndpoint[IO](sparqlTimeRecorder)
       authenticator           <- GitLabAuthenticator(gitLabThrottler)
       authMiddleware          <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
-      routesMetrics = new RoutesMetrics[IO](metricsRegistry)
+      projectAuthorizer       <- ProjectAuthorizer[IO](sparqlTimeRecorder)
     } yield new MicroserviceRoutes(queryEndpoint,
                                    projectEndpoint,
                                    projectDatasetsEndpoint,
                                    datasetEndpoint,
                                    datasetsSearchEndpoint,
                                    authMiddleware,
-                                   routesMetrics
+                                   projectAuthorizer,
+                                   new RoutesMetrics[IO](metricsRegistry)
     )
 }

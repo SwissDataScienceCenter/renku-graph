@@ -20,8 +20,7 @@ package io.renku.graph.http.server.security
 
 import cats.data.EitherT
 import cats.data.EitherT.{leftT, rightT}
-import cats.effect.kernel.Temporal
-import cats.effect.{Async, IO}
+import cats.effect.Async
 import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.graph.config.RenkuBaseUrlLoader
@@ -42,17 +41,13 @@ trait ProjectAuthorizer[F[_]] {
 }
 
 object ProjectAuthorizer {
-  def apply(
-      timeRecorder:   SparqlQueryTimeRecorder[IO],
-      renkuBaseUrl:   IO[RenkuBaseUrl] = RenkuBaseUrlLoader[IO](),
-      rdfStoreConfig: IO[RdfStoreConfig] = RdfStoreConfig[IO]()
-  )(implicit logger:  Logger[IO]): IO[ProjectAuthorizer[IO]] = for {
-    config   <- rdfStoreConfig
-    renkuUrl <- renkuBaseUrl
-  } yield new ProjectAuthorizerImpl(config, renkuUrl, timeRecorder)
+  def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[ProjectAuthorizer[F]] = for {
+    config       <- RdfStoreConfig[F]()
+    renkuBaseUrl <- RenkuBaseUrlLoader[F]()
+  } yield new ProjectAuthorizerImpl(config, renkuBaseUrl, timeRecorder)
 }
 
-class ProjectAuthorizerImpl[F[_]: Async: Temporal: Logger](
+class ProjectAuthorizerImpl[F[_]: Async: Logger](
     rdfStoreConfig: RdfStoreConfig,
     renkuBaseUrl:   RenkuBaseUrl,
     timeRecorder:   SparqlQueryTimeRecorder[F]
