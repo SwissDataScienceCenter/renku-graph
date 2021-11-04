@@ -18,7 +18,7 @@
 
 package io.renku.commiteventservice
 
-import cats.effect.{ExitCode, FiberIO, IO}
+import cats.effect.{ExitCode, IO}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
@@ -33,8 +33,6 @@ import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.microservices.IOMicroservice
 import org.typelevel.log4cats.Logger
-
-import java.util.concurrent.ConcurrentHashMap
 
 object Microservice extends IOMicroservice {
 
@@ -59,29 +57,23 @@ object Microservice extends IOMicroservice {
                     certificateLoader,
                     sentryInitializer,
                     eventConsumersRegistry,
-                    HttpServer[IO](serverPort = ServicePort.value, routes),
-                    subProcessesCancelTokens
+                    HttpServer[IO](serverPort = ServicePort.value, routes)
                   ).run()
                 }
   } yield exitcode
 }
 
-class MicroserviceRunner(certificateLoader:        CertificateLoader[IO],
-                         sentryInitializer:        SentryInitializer[IO],
-                         eventConsumersRegistry:   EventConsumersRegistry[IO],
-                         httpServer:               HttpServer[IO],
-                         subProcessesCancelTokens: ConcurrentHashMap[IO[Unit], Unit]
+class MicroserviceRunner(certificateLoader:      CertificateLoader[IO],
+                         sentryInitializer:      SentryInitializer[IO],
+                         eventConsumersRegistry: EventConsumersRegistry[IO],
+                         httpServer:             HttpServer[IO]
 ) {
 
   def run(): IO[ExitCode] = for {
     _      <- certificateLoader.run()
     _      <- sentryInitializer.run()
-    _      <- eventConsumersRegistry.run().start map gatherCancelToken
+    _      <- eventConsumersRegistry.run().start
     result <- httpServer.run()
   } yield result
 
-  private def gatherCancelToken(fiber: FiberIO[Unit]): FiberIO[Unit] = {
-    subProcessesCancelTokens.put(fiber.cancel, ())
-    fiber
-  }
 }

@@ -67,7 +67,7 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
           (updatesUploader.send _).expects(query).returning(DeliverySuccess.pure[Try])
         }
 
-        (triplesUploader.upload _)
+        (triplesUploader.uploadTriples _)
           .expects(step2Project.asJsonLD.flatten.fold(fail(_), identity))
           .returning(DeliverySuccess.pure[Try])
       }
@@ -213,7 +213,7 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
             (updatesUploader.send _).expects(query).returning(DeliverySuccess.pure[Try])
           }
 
-          (triplesUploader.upload _)
+          (triplesUploader.uploadTriples _)
             .expects(*)
             .returning(failure.pure[Try])
         }

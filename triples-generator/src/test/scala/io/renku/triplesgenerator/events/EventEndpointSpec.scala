@@ -246,7 +246,7 @@ class EventEndpointSpec
     val endpoint             = new EventEndpointImpl[IO](subscriptionsRegistry, reProvisioningStatus)
 
     def givenReProvisioningStatusSet(flag: Boolean) =
-      (reProvisioningStatus.isReProvisioning _)
+      (reProvisioningStatus.underReProvisioning _)
         .expects()
         .returning(flag.pure[IO])
   }

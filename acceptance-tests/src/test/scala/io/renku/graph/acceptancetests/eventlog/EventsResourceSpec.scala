@@ -27,7 +27,6 @@ import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
 import io.renku.graph.acceptancetests.data.{RdfStoreData, dataProjects}
 import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
 import io.renku.graph.acceptancetests.tooling.GraphServices
-import io.renku.graph.acceptancetests.tooling.ResponseTools._
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events
 import io.renku.graph.model.events.{EventId, EventProcessingTime, EventStatus}
@@ -56,15 +55,15 @@ class EventsResourceSpec
       When("there are no events for the given project in EL")
       Then("the resource should return OK with an empty array")
       val noEventsResponse = eventLogClient.GET(s"events?project-path=${urlEncode(project.path.show)}")
-      noEventsResponse.status                    shouldBe Ok
-      noEventsResponse.bodyAsJson.as[List[Json]] shouldBe Nil.asRight
+      noEventsResponse.status                  shouldBe Ok
+      noEventsResponse.jsonBody.as[List[Json]] shouldBe Nil.asRight
 
       commits foreach { commitId => `data in the RDF store`(project, project.entitiesProject.asJsonLD, commitId) }
 
       eventually {
         val eventsResponse = eventLogClient.GET(s"events?project-path=${urlEncode(project.path.show)}")
         eventsResponse.status shouldBe Ok
-        val Right(events) = eventsResponse.bodyAsJson.as[List[EventInfo]]
+        val Right(events) = eventsResponse.jsonBody.as[List[EventInfo]]
         events.size               shouldBe commits.size
         events.map(_.eventId.value) should contain theSameElementsAs commits.map(_.value)
       }

@@ -54,7 +54,7 @@ class TriplesUploaderSpec
 
       givenUploader(returning = ok())
 
-      triplesUploader.upload(triples).unsafeRunSync() shouldBe DeliverySuccess
+      triplesUploader.uploadTriples(triples).unsafeRunSync() shouldBe DeliverySuccess
     }
 
     (BadRequest +: InternalServerError +: Nil) foreach { status =>
@@ -63,7 +63,7 @@ class TriplesUploaderSpec
 
         givenUploader(returning = aResponse().withStatus(status.code).withBody(errorMessage))
 
-        triplesUploader.upload(triples).unsafeRunSync() shouldBe InvalidTriplesFailure(errorMessage)
+        triplesUploader.uploadTriples(triples).unsafeRunSync() shouldBe InvalidTriplesFailure(errorMessage)
       }
     }
 
@@ -73,14 +73,16 @@ class TriplesUploaderSpec
 
       givenUploader(returning = unauthorized().withBody(errorMessage))
 
-      triplesUploader.upload(triples).unsafeRunSync() shouldBe RecoverableFailure(s"$Unauthorized: $errorMessage")
+      triplesUploader.uploadTriples(triples).unsafeRunSync() shouldBe RecoverableFailure(
+        s"$Unauthorized: $errorMessage"
+      )
     }
 
     s"return $RecoverableFailure for connectivity issues" in new TestCase {
 
       givenUploader(returning = aResponse.withFault(CONNECTION_RESET_BY_PEER))
 
-      val failure = triplesUploader.upload(triples).unsafeRunSync()
+      val failure = triplesUploader.uploadTriples(triples).unsafeRunSync()
 
       failure       shouldBe a[RecoverableFailure]
       failure.message should startWith(s"POST $externalServiceBaseUrl/${rdfStoreConfig.datasetName}/data error")

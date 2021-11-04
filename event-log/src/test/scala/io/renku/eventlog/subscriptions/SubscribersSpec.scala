@@ -45,7 +45,7 @@ class SubscribersSpec extends AnyWordSpec with IOSpec with MockFactory with shou
 
       subscribers.add(subscriptionInfo).unsafeRunSync() shouldBe ((): Unit)
 
-      logger.loggedOnly(Info(s"$categoryName: $subscriptionInfo added"))
+      logger.loggedOnly(Info(show"$categoryName: $subscriptionInfo added"))
     }
 
     "adds the given subscriber to the registry and do not log info message when it was already added" in new TestCase {
@@ -115,7 +115,7 @@ class SubscribersSpec extends AnyWordSpec with IOSpec with MockFactory with shou
 
       subscribers.delete(subscriberUrl).unsafeRunSync()
 
-      logger.loggedOnly(Info(s"$categoryName: $subscriberUrl gone - deleting"))
+      logger.loggedOnly(Info(show"$categoryName: $subscriberUrl gone - deleting"))
     }
 
     "not log if nothing was deleted" in new TestCase {

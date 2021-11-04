@@ -16,11 +16,25 @@
  * limitations under the License.
  */
 
-package io.renku.microservices
+package io.renku.triplesgenerator
 
-import cats.effect.IOApp
+import io.renku.graph.model.Schemas.renku
+import io.renku.graph.model.{RenkuBaseUrl, RenkuVersionPair}
+import io.renku.jsonld.syntax._
+import io.renku.jsonld.{EntityId, EntityTypes}
 
-trait IOMicroservice extends IOApp {
+package object reprovisioning {
 
-  lazy val Identifier: MicroserviceIdentifier = MicroserviceIdentifier.generate
+  import io.renku.jsonld.{JsonLD, JsonLDEncoder}
+
+  private[reprovisioning] implicit def jsonLDEncoder(implicit
+      renkuBaseUrl: RenkuBaseUrl
+  ): JsonLDEncoder[RenkuVersionPair] = JsonLDEncoder.instance { entity =>
+    JsonLD.entity(
+      EntityId.of((renkuBaseUrl / "version-pair").toString),
+      EntityTypes of renku / "VersionPair",
+      renku / "schemaVersion" -> entity.schemaVersion.asJsonLD,
+      renku / "cliVersion"    -> entity.cliVersion.asJsonLD
+    )
+  }
 }

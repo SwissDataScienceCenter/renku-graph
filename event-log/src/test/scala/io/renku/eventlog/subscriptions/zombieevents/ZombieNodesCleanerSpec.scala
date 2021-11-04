@@ -27,6 +27,7 @@ import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.events.consumers.subscriptions._
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
+import io.renku.http.client.ServiceHealthChecker
 import io.renku.metrics.TestLabeledHistogram
 import io.renku.microservices.MicroserviceBaseUrl
 import io.renku.testtools.IOSpec
