@@ -204,7 +204,7 @@ trait GitLab {
       json"""{
       "id":                   ${project.id.value},
       "name":                 ${project.name.value},
-      "description":          ${project.maybeDescription.map(_.value)},
+      "description":          ${project.entitiesProject.maybeDescription.map(_.value)},
       "visibility":           ${project.entitiesProject.visibility.value},
       "path_with_namespace":  ${project.path.value},
       "ssh_url_to_repo":      ${project.urls.ssh.value},
