@@ -26,7 +26,6 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.http.server.security.ProjectAuthorizer
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.projects.Path
 import io.renku.http.ErrorMessage.ErrorMessage
 import io.renku.http.InfoMessage._
 import io.renku.http.rest.SortBy
@@ -320,19 +319,17 @@ class MicroserviceRoutesSpec
 
     s"define a GET /knowledge-graph/projects/:namespace/../:name endpoint returning $Ok for valid path parameters" in new TestCase {
       val maybeAuthUser = authUsers.generateOption
-
-      val projectPath = projectPaths.generateOne
-      (projectEndpoint.getProject _).expects(projectPath, maybeAuthUser).returning(IO.pure(Response[IO](Ok)))
+      val projectPath   = projectPaths.generateOne
 
       (projectAuthorizer.authorize _)
         .expects(projectPath, maybeAuthUser)
         .returning(EitherT.rightT[IO, EndpointSecurityException](()))
 
-      val response = routes(maybeAuthUser).call(
-        Request(Method.GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath"))
-      )
+      (projectEndpoint.getProject _).expects(projectPath, maybeAuthUser).returning(Response[IO](Ok).pure[IO])
 
-      response.status shouldBe Ok
+      routes(maybeAuthUser)
+        .call(Request(Method.GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath")))
+        .status shouldBe Ok
 
       routesMetrics.clearRegistry()
     }
@@ -351,7 +348,6 @@ class MicroserviceRoutesSpec
     }
 
     s"define a GET /knowledge-graph/projects/:namespace/../:name endpoint returning $Unauthorized when user is not authorized" in new TestCase {
-
       routes(givenAuthIfNeededMiddleware(returning = OptionT.none[IO, Option[AuthUser]]))
         .call(Request(Method.GET, Uri.unsafeFromString(s"knowledge-graph/projects/${projectPaths.generateOne}")))
         .status shouldBe Unauthorized
@@ -375,19 +371,46 @@ class MicroserviceRoutesSpec
     }
 
     s"define a GET /knowledge-graph/projects/:namespace/../:name/datasets endpoint returning $Ok for valid path parameters" in new TestCase {
-      forAll { projectPath: Path =>
-        val maybeAuthUser = authUsers.generateOption
+      val projectPath   = projectPaths.generateOne
+      val maybeAuthUser = authUsers.generateOption
 
-        (projectDatasetsEndpoint.getProjectDatasets _).expects(projectPath).returning(IO.pure(Response[IO](Ok)))
+      (projectAuthorizer.authorize _)
+        .expects(projectPath, maybeAuthUser)
+        .returning(EitherT.rightT[IO, EndpointSecurityException](()))
 
-        val response = routes(maybeAuthUser).call(
-          Request(Method.GET, Uri.unsafeFromString(s"/knowledge-graph/projects/$projectPath/datasets"))
+      (projectDatasetsEndpoint.getProjectDatasets _).expects(projectPath).returning(IO.pure(Response[IO](Ok)))
+
+      routes(maybeAuthUser)
+        .call(Request(Method.GET, Uri.unsafeFromString(s"/knowledge-graph/projects/$projectPath/datasets")))
+        .status shouldBe Ok
+
+      routesMetrics.clearRegistry()
+    }
+
+    s"define a GET /knowledge-graph/projects/:namespace/../:name/datasets endpoint returning $Unauthorized when user is not authorized" in new TestCase {
+      routes(givenAuthIfNeededMiddleware(returning = OptionT.none[IO, Option[AuthUser]]))
+        .call(
+          Request(Method.GET, Uri.unsafeFromString(s"knowledge-graph/projects/${projectPaths.generateOne}/datasets"))
+        )
+        .status shouldBe Unauthorized
+    }
+
+    s"define a GET /knowledge-graph/projects/:namespace/../:name/datasets endpoint returning $NotFound when user has no rights for the project" in new TestCase {
+      val projectPath   = projectPaths.generateOne
+      val maybeAuthUser = authUsers.generateOption
+
+      (projectAuthorizer.authorize _)
+        .expects(projectPath, maybeAuthUser)
+        .returning(EitherT.leftT[IO, Unit](AuthorizationFailure))
+
+      val response = routes(maybeAuthUser)
+        .call(
+          Request(Method.GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath/datasets"))
         )
 
-        response.status shouldBe Ok
-
-        routesMetrics.clearRegistry()
-      }
+      response.status             shouldBe NotFound
+      response.contentType        shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.body[ErrorMessage] shouldBe InfoMessage(AuthorizationFailure.getMessage)
     }
   }
 

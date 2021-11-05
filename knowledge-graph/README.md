@@ -451,6 +451,8 @@ Finds list of datasets of the project with the given `namespace/name`.
 | Status                     | Description                                                       |
 |----------------------------|-------------------------------------------------------------------|
 | OK (200)                   | If there are datasets for the project or `[]` if nothing is found |
+| UNAUTHORIZED (401)         | If given auth header cannot be authenticated                      |
+| NOT_FOUND (404)            | If there is no project with the given `namespace/name` or user is not authorised to access this project |
 | INTERNAL SERVER ERROR (500)| Otherwise                                                         |
 
 Response body example:

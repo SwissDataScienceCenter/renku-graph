@@ -140,6 +140,29 @@ class DatasetsResourcesSpec
       getInitialVersionResponse._1                 shouldBe Ok
       findIdentifier(getInitialVersionResponse._2) shouldBe dataset2.identifier
     }
+
+    Scenario("As a user I should not to be able to see project's datasets if I don't have rights to the project") {
+
+      val (_, testEntitiesNonPublicProject) = projectEntities(visibilityNonPublic)
+        .addDataset(datasetEntities(provenanceInternal))
+        .generateOne
+      val nonPublicProject = dataProjects(testEntitiesNonPublicProject).generateOne
+
+      Given("there's a non-public project in KG")
+      `data in the RDF store`(nonPublicProject, testEntitiesNonPublicProject.asJsonLD)
+      `wait for events to be processed`(nonPublicProject.id)
+
+      When("there's an authenticated user who is not a member of the project")
+      val nonMemberAccessToken = accessTokens.generateOne
+      `GET <gitlabApi>/user returning OK`()(nonMemberAccessToken)
+
+      And("he fetches project's details")
+      val projectDatasetsResponseForNonMember =
+        knowledgeGraphClient.GET(s"knowledge-graph/projects/${nonPublicProject.path}/datasets", nonMemberAccessToken)
+
+      Then("he should get NOT_FOUND response")
+      projectDatasetsResponseForNonMember.status shouldBe NotFound
+    }
   }
 
   Feature("GET knowledge-graph/datasets?query=<text> to find datasets with a free-text search") {

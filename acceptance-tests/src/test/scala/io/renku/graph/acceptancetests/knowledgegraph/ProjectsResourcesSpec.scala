@@ -99,7 +99,8 @@ class ProjectsResourcesSpec
       val datasetsLink = projectDetails._links.fold(throw _, identity).get(Rel("datasets")) getOrElse fail(
         "No link with rel 'datasets'"
       )
-      val datasetsResponse = (restClient GET datasetsLink.href.toString)
+      val datasetsResponse = restClient
+        .GET(datasetsLink.href.toString, accessToken)
         .flatMap(response => response.as[Json].map(json => response.status -> json))
         .unsafeRunSync()
 

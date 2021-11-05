@@ -105,12 +105,16 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
       path:          Path,
       maybeAuthUser: Option[AuthUser]
   ): F[Response[F]] = path.segments.toList.map(_.toString) match {
-    case projectPathParts :+ "datasets" => projectPathParts.toProjectPath.fold(identity, getProjectDatasets)
+    case projectPathParts :+ "datasets" =>
+      projectPathParts.toProjectPath
+        .flatTap(authorize(_, maybeAuthUser).leftMap(_.toHttpResponse))
+        .semiflatMap(getProjectDatasets)
+        .merge
     case projectPathParts =>
-      projectPathParts.toProjectPath.map { projectPath =>
-        (authorize(projectPath, maybeAuthUser).leftMap(_.toHttpResponse[F]) >>
-          EitherT(getProject(projectPath, maybeAuthUser).map(_.asRight[Response[F]]))).merge
-      }.merge
+      projectPathParts.toProjectPath
+        .flatTap(authorize(_, maybeAuthUser).leftMap(_.toHttpResponse))
+        .semiflatMap(getProject(_, maybeAuthUser))
+        .merge
   }
 
   private implicit class PathPartsOps(parts: List[String]) {
@@ -118,10 +122,11 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     import io.renku.http.InfoMessage._
     import org.http4s.{Response, Status}
 
-    lazy val toProjectPath: Either[F[Response[F]], model.projects.Path] =
+    lazy val toProjectPath: EitherT[F, Response[F], model.projects.Path] = EitherT.fromEither[F] {
       model.projects.Path
-        .from(parts.mkString("/"))
-        .leftMap(_ => Response[F](Status.NotFound).withEntity(InfoMessage("Resource not found")).pure[F])
+        .from(parts mkString "/")
+        .leftMap(_ => Response[F](Status.NotFound).withEntity(InfoMessage("Resource not found")))
+    }
   }
 }
 
