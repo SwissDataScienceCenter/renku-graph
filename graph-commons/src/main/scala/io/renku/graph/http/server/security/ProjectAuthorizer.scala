@@ -23,12 +23,10 @@ import cats.data.EitherT.{leftT, rightT}
 import cats.effect.Async
 import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
-import io.renku.graph.config.RenkuBaseUrlLoader
+import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Visibility._
-import io.renku.graph.model.projects.{Path, ResourceId, Visibility}
+import io.renku.graph.model.projects.{Path, Visibility}
 import io.renku.graph.model.users.GitLabId
-import io.renku.graph.model.views.RdfResource
-import io.renku.graph.model.{RenkuBaseUrl, projects}
 import io.renku.http.server.security.EndpointSecurityException
 import io.renku.http.server.security.EndpointSecurityException.AuthorizationFailure
 import io.renku.http.server.security.model.AuthUser
@@ -42,14 +40,12 @@ trait ProjectAuthorizer[F[_]] {
 
 object ProjectAuthorizer {
   def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[ProjectAuthorizer[F]] = for {
-    config       <- RdfStoreConfig[F]()
-    renkuBaseUrl <- RenkuBaseUrlLoader[F]()
-  } yield new ProjectAuthorizerImpl(config, renkuBaseUrl, timeRecorder)
+    config <- RdfStoreConfig[F]()
+  } yield new ProjectAuthorizerImpl(config, timeRecorder)
 }
 
 class ProjectAuthorizerImpl[F[_]: Async: Logger](
     rdfStoreConfig: RdfStoreConfig,
-    renkuBaseUrl:   RenkuBaseUrl,
     timeRecorder:   SparqlQueryTimeRecorder[F]
 ) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
     with ProjectAuthorizer[F] {
@@ -66,19 +62,19 @@ class ProjectAuthorizerImpl[F[_]: Async: Logger](
 
   private def query(path: Path) = SparqlQuery.of(
     name = "project by id",
-    Prefixes.of(rdf -> "rdf", schema -> "schema", renku -> "renku"),
-    s"""|SELECT DISTINCT ?projectId ?maybeVisibility (GROUP_CONCAT(?maybeMemberGitLabId; separator=',') AS ?memberGitLabIds)
+    Prefixes.of(schema -> "schema", renku -> "renku"),
+    s"""|SELECT DISTINCT ?projectId ?visibility (GROUP_CONCAT(?maybeMemberGitLabId; separator=',') AS ?memberGitLabIds)
         |WHERE {
-        |  BIND (${ResourceId(path)(renkuBaseUrl).showAs[RdfResource]} AS ?projectId)
-        |  ?projectId rdf:type schema:Project.
-        |  OPTIONAL { ?projectId renku:projectVisibility ?maybeVisibility. }
+        |  ?projectId a schema:Project;
+        |             renku:projectPath '$path';
+        |             renku:projectVisibility ?visibility.
         |  OPTIONAL {
         |    ?projectId schema:member/schema:sameAs ?sameAsId.
         |    ?sameAsId schema:additionalType 'GitLab';
         |              schema:identifier ?maybeMemberGitLabId.
         |  }
         |}
-        |GROUP BY ?projectId ?maybeVisibility
+        |GROUP BY ?projectId ?visibility
         |""".stripMargin
   )
 
@@ -89,15 +85,7 @@ class ProjectAuthorizerImpl[F[_]: Async: Logger](
 
     val recordDecoder: Decoder[Record] = { cursor =>
       for {
-        maybeVisibility <-
-          cursor
-            .downField("maybeVisibility")
-            .downField("value")
-            .as[Option[String]]
-            .flatMap {
-              case None        => Right(Public)
-              case Some(value) => Visibility.from(value).leftMap(ex => DecodingFailure(ex.getMessage, Nil))
-            }
+        visibility <- cursor.downField("visibility").downField("value").as[Visibility]
         maybeUserId <- cursor
                          .downField("memberGitLabIds")
                          .downField("value")
@@ -105,15 +93,14 @@ class ProjectAuthorizerImpl[F[_]: Async: Logger](
                          .map(_.map(_.split(",").toList).getOrElse(List.empty))
                          .flatMap(_.map(GitLabId.parse).sequence.leftMap(ex => DecodingFailure(ex.getMessage, Nil)))
                          .map(_.toSet)
-      } yield maybeVisibility -> maybeUserId
+      } yield visibility -> maybeUserId
     }
 
     _.downField("results").downField("bindings").as(decodeList(recordDecoder))
   }
 
-  private def validate(
-      maybeAuthUser: Option[AuthUser],
-      records:       List[Record]
+  private def validate(maybeAuthUser: Option[AuthUser],
+                       records:       List[Record]
   ): EitherT[F, EndpointSecurityException, Unit] = records -> maybeAuthUser match {
     case (Nil, _)                                                                            => rightT(())
     case ((Public, _) :: Nil, _)                                                             => rightT(())

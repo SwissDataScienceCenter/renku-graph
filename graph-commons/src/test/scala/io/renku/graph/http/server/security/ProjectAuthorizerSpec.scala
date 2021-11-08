@@ -22,10 +22,10 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.GitLabApiUrl
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects.Visibility._
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{GitLabApiUrl, RenkuBaseUrl}
 import io.renku.http.server.security.EndpointSecurityException.AuthorizationFailure
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestExecutionTimeRecorder
@@ -110,12 +110,11 @@ class ProjectAuthorizerSpec extends AnyWordSpec with IOSpec with InMemoryRdfStor
     }
   }
 
-  private implicit lazy val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
   private implicit lazy val gitLabApiUrl: GitLabApiUrl = gitLabUrls.generateOne.apiV4
 
   private trait TestCase {
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
     private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO]())
-    val authorizer           = new ProjectAuthorizerImpl(rdfStoreConfig, renkuBaseUrl, timeRecorder)
+    val authorizer           = new ProjectAuthorizerImpl(rdfStoreConfig, timeRecorder)
   }
 }
