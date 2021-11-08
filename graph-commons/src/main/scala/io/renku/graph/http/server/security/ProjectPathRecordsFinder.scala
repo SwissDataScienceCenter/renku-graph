@@ -23,8 +23,8 @@ import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.graph.http.server.security.Authorizer.{SecurityRecord, SecurityRecordFinder}
 import io.renku.graph.model.projects
+import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.projects.Visibility._
-import io.renku.graph.model.projects.{Path, Visibility}
 import io.renku.graph.model.users.GitLabId
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
@@ -44,12 +44,12 @@ class ProjectPathRecordsFinderImpl[F[_]: Async: Logger](
     with SecurityRecordFinder[F, projects.Path] {
 
   override def apply(path: projects.Path): F[List[SecurityRecord]] =
-    queryExpecting[List[SecurityRecord]](using = query(path))(recordsDecoder)
+    queryExpecting[List[SecurityRecord]](using = query(path))(recordsDecoder(path))
 
   import eu.timepit.refined.auto._
   import io.renku.graph.model.Schemas._
 
-  private def query(path: Path) = SparqlQuery.of(
+  private def query(path: projects.Path) = SparqlQuery.of(
     name = "authorise - project path",
     Prefixes.of(schema -> "schema", renku -> "renku"),
     s"""|SELECT DISTINCT ?projectId ?visibility (GROUP_CONCAT(?maybeMemberGitLabId; separator=',') AS ?memberGitLabIds)
@@ -67,7 +67,7 @@ class ProjectPathRecordsFinderImpl[F[_]: Async: Logger](
         |""".stripMargin
   )
 
-  private lazy val recordsDecoder: Decoder[List[SecurityRecord]] = {
+  private def recordsDecoder(path: projects.Path): Decoder[List[SecurityRecord]] = {
     import Decoder._
 
     val recordDecoder: Decoder[SecurityRecord] = { cursor =>
@@ -80,7 +80,7 @@ class ProjectPathRecordsFinderImpl[F[_]: Async: Logger](
                          .map(_.map(_.split(",").toList).getOrElse(List.empty))
                          .flatMap(_.map(GitLabId.parse).sequence.leftMap(ex => DecodingFailure(ex.getMessage, Nil)))
                          .map(_.toSet)
-      } yield visibility -> maybeUserId
+      } yield (visibility, path, maybeUserId)
     }
 
     _.downField("results").downField("bindings").as(decodeList(recordDecoder))

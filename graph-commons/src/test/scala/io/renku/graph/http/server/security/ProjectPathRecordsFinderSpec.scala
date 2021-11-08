@@ -40,7 +40,7 @@ class ProjectPathRecordsFinderSpec extends AnyWordSpec with IOSpec with InMemory
       loadToStore(project)
 
       recordsFinder(project.path).unsafeRunSync() shouldBe List(
-        project.visibility -> project.members.flatMap(_.maybeGitLabId)
+        (project.visibility, project.path, project.members.flatMap(_.maybeGitLabId))
       )
     }
 
@@ -49,7 +49,9 @@ class ProjectPathRecordsFinderSpec extends AnyWordSpec with IOSpec with InMemory
 
       loadToStore(project)
 
-      recordsFinder(project.path).unsafeRunSync() shouldBe List(project.visibility -> Set.empty)
+      recordsFinder(project.path).unsafeRunSync() shouldBe List(
+        (project.visibility, project.path, Set.empty)
+      )
     }
 
     "nothing if there's no project with the given path" in new TestCase {
