@@ -212,7 +212,7 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
       id = gitLabProject.id,
       path = kgProject.path,
       name = kgProject.name,
-      maybeDescription = gitLabProject.maybeDescription,
+      maybeDescription = kgProject.maybeDescription orElse gitLabProject.maybeDescription,
       visibility = kgProject.visibility,
       created = model.Creation(
         date = kgProject.created.date,

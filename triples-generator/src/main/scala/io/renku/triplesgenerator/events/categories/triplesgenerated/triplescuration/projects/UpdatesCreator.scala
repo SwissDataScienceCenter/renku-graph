@@ -35,9 +35,11 @@ private object UpdatesCreator extends UpdatesCreator {
   override def prepareUpdates(
       project:       Project,
       kgProjectInfo: KGProjectInfo
-  ): List[SparqlQuery] = List(nameDeletion(project, kgProjectInfo),
-                              maybeParentDeletion(project, kgProjectInfo),
-                              visibilityDeletion(project, kgProjectInfo)
+  ): List[SparqlQuery] = List(
+    nameDeletion(project, kgProjectInfo),
+    maybeParentDeletion(project, kgProjectInfo),
+    visibilityDeletion(project, kgProjectInfo),
+    descriptionDeletion(project, kgProjectInfo)
   ).flatten
 
   private def nameDeletion(project: Project, kgProjectInfo: KGProjectInfo) =
@@ -76,6 +78,22 @@ private object UpdatesCreator extends UpdatesCreator {
       Prefixes.of(renku -> "renku"),
       s"""|DELETE { $resource renku:projectVisibility ?visibility }
           |WHERE  { $resource renku:projectVisibility ?visibility }
+          |""".stripMargin
+    )
+  }
+
+  private def descriptionDeletion(project: Project, kgProjectInfo: KGProjectInfo) = Option.when(
+    (kgProjectInfo._4, project.maybeDescription) match {
+      case (Some(kgDescription), Some(cliDescription)) if kgDescription != cliDescription => true
+      case _                                                                              => false
+    }
+  ) {
+    val resource = project.resourceId.showAs[RdfResource]
+    SparqlQuery.of(
+      name = "transformation - project description delete",
+      Prefixes.of(schema -> "schema"),
+      s"""|DELETE { $resource schema:description ?description }
+          |WHERE  { $resource schema:description ?description }
           |""".stripMargin
     )
   }

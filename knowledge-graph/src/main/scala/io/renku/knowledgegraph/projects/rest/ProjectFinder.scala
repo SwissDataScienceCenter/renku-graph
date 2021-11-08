@@ -62,7 +62,7 @@ private class ProjectFinderImpl[F[_]: MonadThrow: Parallel](
       id = gitLabProject.id,
       path = path,
       name = kgProject.name,
-      maybeDescription = gitLabProject.maybeDescription,
+      maybeDescription = kgProject.maybeDescription orElse gitLabProject.maybeDescription,
       visibility = kgProject.visibility,
       created = Creation(
         date = kgProject.created.date,

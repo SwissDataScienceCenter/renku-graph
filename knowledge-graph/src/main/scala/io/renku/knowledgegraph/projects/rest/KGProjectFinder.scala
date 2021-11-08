@@ -53,7 +53,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger](
   private def query(path: Path) = SparqlQuery.of(
     name = "project by id",
     Prefixes.of(schema -> "schema", prov -> "prov", renku -> "renku"),
-    s"""|SELECT DISTINCT ?name ?visibility ?dateCreated ?maybeCreatorName ?maybeCreatorEmail ?maybeParentId ?maybeParentName ?maybeParentDateCreated ?maybeParentCreatorName ?maybeParentCreatorEmail ?schemaVersion
+    s"""|SELECT DISTINCT ?name ?visibility ?maybeDescription ?dateCreated ?maybeCreatorName ?maybeCreatorEmail ?maybeParentId ?maybeParentName ?maybeParentDateCreated ?maybeParentCreatorName ?maybeParentCreatorEmail ?schemaVersion
         |WHERE {
         |  BIND (${ResourceId(path)(renkuBaseUrl).showAs[RdfResource]} AS ?projectId)
         |  ?projectId a schema:Project;
@@ -61,6 +61,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger](
         |             renku:projectVisibility ?visibility;
         |             schema:schemaVersion ?schemaVersion;
         |             schema:dateCreated ?dateCreated.
+        |  OPTIONAL {?projectId schema:description ?maybeDescription . }
         |  OPTIONAL {
         |    ?projectId schema:creator ?maybeCreatorId.
         |    ?maybeCreatorId a schema:Person;
@@ -94,6 +95,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger](
         name                   <- cursor.downField("name").downField("value").as[Name]
         visibility             <- cursor.downField("visibility").downField("value").as[Visibility]
         dateCreated            <- cursor.downField("dateCreated").downField("value").as[DateCreated]
+        maybeDescription       <- cursor.downField("maybeDescription").downField("value").as[Option[Description]]
         maybeCreatorName       <- cursor.downField("maybeCreatorName").downField("value").as[Option[users.Name]]
         maybeCreatorEmail      <- cursor.downField("maybeCreatorEmail").downField("value").as[Option[users.Email]]
         maybeParentId          <- cursor.downField("maybeParentId").downField("value").as[Option[ResourceId]]
@@ -119,7 +121,8 @@ private class KGProjectFinderImpl[F[_]: Async: Logger](
                    )
             )
           },
-        version
+        version,
+        maybeDescription
       )
     }
 
@@ -137,12 +140,13 @@ private class KGProjectFinderImpl[F[_]: Async: Logger](
 
 private object KGProjectFinder {
 
-  final case class KGProject(path:        Path,
-                             name:        Name,
-                             created:     ProjectCreation,
-                             visibility:  Visibility,
-                             maybeParent: Option[Parent],
-                             version:     SchemaVersion
+  final case class KGProject(path:             Path,
+                             name:             Name,
+                             created:          ProjectCreation,
+                             visibility:       Visibility,
+                             maybeParent:      Option[Parent],
+                             version:          SchemaVersion,
+                             maybeDescription: Option[Description]
   )
 
   final case class ProjectCreation(date: DateCreated, maybeCreator: Option[ProjectCreator])
