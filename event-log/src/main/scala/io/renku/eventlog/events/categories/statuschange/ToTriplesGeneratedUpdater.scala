@@ -39,7 +39,7 @@ import skunk.{Session, ~}
 
 import java.time.Instant
 
-private class ToTriplesGeneratedUpdater[F[_]: Async: MonadCancelThrow](
+private class ToTriplesGeneratedUpdater[F[_]: Async](
     deliveryInfoRemover: DeliveryInfoRemover[F],
     queriesExecTimes:    LabeledHistogram[F, SqlStatement.Name],
     now:                 () => Instant = () => Instant.now

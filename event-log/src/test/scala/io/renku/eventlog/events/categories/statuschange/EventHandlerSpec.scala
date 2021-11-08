@@ -79,6 +79,9 @@ class EventHandlerSpec
           .map(event => EventRequestContent.NoPayload(event._1.asJson) -> event._2),
         toAwaitingDeletionEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
+          .map(event => EventRequestContent.NoPayload(event._1.asJson) -> event._2),
+        projectEventToNewEvents
+          .map(stubUpdateStatuses(updateResult = ().pure[IO]))
           .map(event => EventRequestContent.NoPayload(event._1.asJson) -> event._2)
       ).map(_.generateOne) foreach { case (eventRequestContent, eventAsString) =>
         handler
@@ -219,6 +222,15 @@ class EventHandlerSpec
         "path":       ${path.value}
       },
       "newStatus":    "AWAITING_DELETION"
+    }"""
+    case StatusChangeEvent.ProjectEventsToNew(project) =>
+      json"""{
+      "categoryName": "EVENTS_STATUS_CHANGE",
+      "project": {
+        "id":         ${project.id.value},
+        "path":       ${project.path.value}
+      },
+      "newStatus":    "NEW"
     }"""
   }
 
