@@ -29,6 +29,7 @@ import io.renku.graph.http.server.security.Authorizer
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model
 import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.datasets
 import io.renku.http.ErrorMessage.ErrorMessage
 import io.renku.http.InfoMessage._
 import io.renku.http.rest.SortBy
@@ -255,11 +256,17 @@ class MicroserviceRoutesSpec
       }
 
     s"define a GET /knowledge-graph/datasets/:id endpoint returning $Ok when valid :id path parameter given" in new TestCase {
-      val id = datasetIdentifiers.generateOne
+      val id            = datasetIdentifiers.generateOne
+      val maybeAuthUser = authUsers.generateOption
 
-      (datasetsEndpoint.getDataset _).expects(id).returning(IO.pure(Response[IO](Ok)))
+      val authContext: AuthContext[datasets.Identifier] = AuthContext(maybeAuthUser, id, projectPaths.generateSet())
+      (datasetIdAuthorizer.authorize _)
+        .expects(id, maybeAuthUser)
+        .returning(rightT[IO, EndpointSecurityException](authContext))
 
-      routes()
+      (datasetsEndpoint.getDataset _).expects(id, authContext).returning(IO.pure(Response[IO](Ok)))
+
+      routes(maybeAuthUser)
         .call(Request(Method.GET, uri"/knowledge-graph/datasets" / id.value))
         .status shouldBe Ok
     }
@@ -274,6 +281,21 @@ class MicroserviceRoutesSpec
       routes(givenAuthIfNeededMiddleware(returning = OptionT.none[IO, Option[AuthUser]]))
         .call(Request(Method.GET, uri"/knowledge-graph/datasets" / datasetIdentifiers.generateOne.value))
         .status shouldBe Unauthorized
+    }
+
+    s"define a GET /knowledge-graph/datasets/:id endpoint returning $NotFound when user has no rights for the project the dataset belongs to" in new TestCase {
+      val id            = datasetIdentifiers.generateOne
+      val maybeAuthUser = authUsers.generateOption
+
+      (datasetIdAuthorizer.authorize _)
+        .expects(id, maybeAuthUser)
+        .returning(leftT[IO, AuthContext[model.datasets.Identifier]](AuthorizationFailure))
+
+      val response = routes(maybeAuthUser).call(Request(Method.GET, uri"/knowledge-graph/datasets" / id.show))
+
+      response.status             shouldBe NotFound
+      response.contentType        shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.body[ErrorMessage] shouldBe InfoMessage(AuthorizationFailure.getMessage)
     }
 
     "define a GET /knowledge-graph/graphql endpoint" in new TestCase {
@@ -410,6 +432,7 @@ class MicroserviceRoutesSpec
     val datasetsEndpoint        = mock[DatasetEndpoint[IO]]
     val datasetsSearchEndpoint  = mock[DatasetsSearchEndpoint[IO]]
     val projectPathAuthorizer   = mock[Authorizer[IO, model.projects.Path]]
+    val datasetIdAuthorizer     = mock[Authorizer[IO, model.datasets.Identifier]]
     val routesMetrics           = TestRoutesMetrics()
 
     def routes(maybeAuthUser: Option[AuthUser] = None): Resource[IO, Kleisli[IO, Request[IO], Response[IO]]] = routes(
@@ -425,6 +448,7 @@ class MicroserviceRoutesSpec
         datasetsSearchEndpoint,
         middleware,
         projectPathAuthorizer,
+        datasetIdAuthorizer,
         routesMetrics
       ).routes.map(_.or(notAvailableResponse))
   }

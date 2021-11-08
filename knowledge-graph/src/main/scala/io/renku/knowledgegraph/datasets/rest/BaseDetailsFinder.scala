@@ -23,6 +23,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.{DecodingFailure, HCursor}
+import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.datasets.{Identifier, ImageUri, Keyword}
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Path
@@ -32,7 +33,7 @@ import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
 private trait BaseDetailsFinder[F[_]] {
-  def findBaseDetails(identifier: Identifier): F[Option[Dataset]]
+  def findBaseDetails(identifier: Identifier, authContext: AuthContext[Identifier]): F[Option[Dataset]]
   def findKeywords(identifier:    Identifier): F[List[Keyword]]
   def findImages(identifier:      Identifier): F[List[ImageUri]]
 }
@@ -46,10 +47,10 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger](
   import BaseDetailsFinderImpl._
   import io.renku.graph.model.Schemas._
 
-  def findBaseDetails(identifier: Identifier): F[Option[Dataset]] =
-    queryExpecting[List[Dataset]](using = queryForDatasetDetails(identifier)) >>= toSingleDataset
+  def findBaseDetails(identifier: Identifier, authContext: AuthContext[Identifier]): F[Option[Dataset]] =
+    queryExpecting[List[Dataset]](using = queryForDatasetDetails(identifier, authContext)) >>= toSingleDataset
 
-  private def queryForDatasetDetails(identifier: Identifier) = SparqlQuery.of(
+  private def queryForDatasetDetails(identifier: Identifier, authContext: AuthContext[Identifier]) = SparqlQuery.of(
     name = "ds by id - details",
     Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema"),
     s"""|SELECT DISTINCT ?datasetId ?identifier ?name ?maybeDateCreated ?slug ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?maybeDatePublished ?projectPath ?projectName
@@ -63,6 +64,7 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger](
         |      ?projectId schema:dateCreated ?dateCreated ;
         |                 schema:name ?projectName;
         |                 renku:projectPath ?projectPath.
+        |      FILTER (?projectPath IN (${authContext.allowedProjects.map(p => s"'$p'").mkString(", ")})) 
         |      FILTER NOT EXISTS {
         |        ?datasetId prov:invalidatedAtTime ?invalidationTime.
         |      }

@@ -21,13 +21,14 @@ package io.renku.knowledgegraph.datasets.rest
 import cats.MonadThrow
 import cats.effect.{Async, Spawn}
 import cats.syntax.all._
+import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.datasets.{Identifier, ImageUri, Keyword}
 import io.renku.knowledgegraph.datasets.model._
 import io.renku.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 private trait DatasetFinder[F[_]] {
-  def findDataset(identifier: Identifier): F[Option[Dataset]]
+  def findDataset(identifier: Identifier, authContext: AuthContext[Identifier]): F[Option[Dataset]]
 }
 
 private class DatasetFinderImpl[F[_]: Spawn](
@@ -42,9 +43,9 @@ private class DatasetFinderImpl[F[_]: Spawn](
   import partsFinder._
   import projectsFinder._
 
-  def findDataset(identifier: Identifier): F[Option[Dataset]] = for {
+  def findDataset(identifier: Identifier, authContext: AuthContext[Identifier]): F[Option[Dataset]] = for {
     usedInFiber       <- Spawn[F].start(findUsedIn(identifier))
-    maybeDetailsFiber <- Spawn[F].start(findBaseDetails(identifier))
+    maybeDetailsFiber <- Spawn[F].start(findBaseDetails(identifier, authContext))
     keywordsFiber     <- Spawn[F].start(findKeywords(identifier))
     imagesFiber       <- Spawn[F].start(findImages(identifier))
     creatorsFiber     <- Spawn[F].start(findCreators(identifier))

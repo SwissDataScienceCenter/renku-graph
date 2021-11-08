@@ -21,6 +21,7 @@ package io.renku.knowledgegraph.datasets.rest
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.RenkuBaseUrl
 import io.renku.graph.model.datasets.SameAs
@@ -54,7 +55,7 @@ class DatasetFinderSpec
           loadToStore(project, otherProject)
 
           datasetFinder
-            .findDataset(dataset.identifier)
+            .findDataset(dataset.identifier, AuthContext(None, dataset.identifier, Set(project.path)))
             .unsafeRunSync() shouldBe internalToNonModified(dataset, project).some
         }
       }
@@ -72,15 +73,19 @@ class DatasetFinderSpec
                     anyProjectEntities.addDataset(datasetEntities(provenanceNonModified)).generateOne._2
         )
 
-        datasetFinder.findDataset(dataset1.identifier).unsafeRunSync() shouldBe Some(
+        datasetFinder
+          .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
+          .unsafeRunSync() shouldBe
           importedExternalToNonModified(dataset1, project1)
             .copy(usedIn = List(project1.to[DatasetProject], project2.to[DatasetProject]).sorted)
-        )
+            .some
 
-        datasetFinder.findDataset(dataset2.identifier).unsafeRunSync() shouldBe Some(
+        datasetFinder
+          .findDataset(dataset2.identifier, AuthContext(None, dataset2.identifier, Set(project2.path)))
+          .unsafeRunSync() shouldBe
           importedExternalToNonModified(dataset2, project2)
             .copy(usedIn = List(project1.to[DatasetProject], project2.to[DatasetProject]).sorted)
-        )
+            .some
       }
 
     "return details of the dataset with the given id " +
@@ -96,11 +101,11 @@ class DatasetFinderSpec
         loadToStore(project1, project2)
 
         datasetFinder
-          .findDataset(dataset2.identifier)
+          .findDataset(dataset2.identifier, AuthContext(None, dataset2.identifier, Set(project2.path)))
           .unsafeRunSync() shouldBe importedExternalToNonModified(dataset2, project2).some
 
         datasetFinder
-          .findDataset(dataset1Modified.identifier)
+          .findDataset(dataset1Modified.identifier, AuthContext(None, dataset1Modified.identifier, Set(project1.path)))
           .unsafeRunSync() shouldBe modifiedToModified(dataset1Modified, project1).some
       }
 
@@ -113,7 +118,11 @@ class DatasetFinderSpec
 
             loadToStore(sourceProject, project1, project2)
 
-            datasetFinder.findDataset(sourceDataset.identifier).unsafeRunSync() shouldBe
+            datasetFinder
+              .findDataset(sourceDataset.identifier,
+                           AuthContext(None, sourceDataset.identifier, Set(sourceProject.path))
+              )
+              .unsafeRunSync() shouldBe
               internalToNonModified(sourceDataset, sourceProject)
                 .copy(
                   usedIn = List(sourceProject.to[DatasetProject],
@@ -123,7 +132,9 @@ class DatasetFinderSpec
                 )
                 .some
 
-            datasetFinder.findDataset(dataset2.identifier).unsafeRunSync() shouldBe
+            datasetFinder
+              .findDataset(dataset2.identifier, AuthContext(None, dataset2.identifier, Set(project2.path)))
+              .unsafeRunSync() shouldBe
               importedInternalToNonModified(dataset2, project2)
                 .copy(
                   usedIn = List(sourceProject.to[DatasetProject],
@@ -136,7 +147,8 @@ class DatasetFinderSpec
       }
 
     "return None if there are no datasets with the given id" in new TestCase {
-      datasetFinder.findDataset(datasetIdentifiers.generateOne).unsafeRunSync() shouldBe None
+      val id = datasetIdentifiers.generateOne
+      datasetFinder.findDataset(id, AuthContext(None, id, Set.empty)).unsafeRunSync() shouldBe None
     }
 
     "return None if dataset was invalidated" in new TestCase {
@@ -146,8 +158,12 @@ class DatasetFinderSpec
 
       loadToStore(project)
 
-      datasetFinder.findDataset(original.identifier).unsafeRunSync()     shouldBe None
-      datasetFinder.findDataset(invalidation.identifier).unsafeRunSync() shouldBe None
+      datasetFinder
+        .findDataset(original.identifier, AuthContext(None, original.identifier, Set(project.path)))
+        .unsafeRunSync() shouldBe None
+      datasetFinder
+        .findDataset(invalidation.identifier, AuthContext(None, invalidation.identifier, Set(project.path)))
+        .unsafeRunSync() shouldBe None
     }
 
     "return a dataset without invalidated part" in new TestCase {
@@ -165,11 +181,27 @@ class DatasetFinderSpec
 
       loadToStore(projectBothDatasets)
 
-      datasetFinder.findDataset(dataset.identifier).unsafeRunSync() shouldBe
+      datasetFinder
+        .findDataset(dataset.identifier, AuthContext(None, dataset.identifier, Set(project.path)))
+        .unsafeRunSync() shouldBe
         internalToNonModified(dataset, project).copy(usedIn = Nil).some
 
-      datasetFinder.findDataset(datasetWithInvalidatedPart.identifier).unsafeRunSync() shouldBe
+      datasetFinder
+        .findDataset(datasetWithInvalidatedPart.identifier,
+                     AuthContext(None, datasetWithInvalidatedPart.identifier, Set(projectBothDatasets.path))
+        )
+        .unsafeRunSync() shouldBe
         modifiedToModified(datasetWithInvalidatedPart, projectBothDatasets).some
+    }
+
+    "not return dataset if user is not authorised to the project where the DS belongs to" in new TestCase {
+      val (dataset, project) = (anyProjectEntities addDataset datasetEntities(provenanceInternal)).generateOne
+
+      loadToStore(project)
+
+      datasetFinder
+        .findDataset(dataset.identifier, AuthContext(None, dataset.identifier, Set(projectPaths.generateOne)))
+        .unsafeRunSync() shouldBe None
     }
   }
 
@@ -188,7 +220,11 @@ class DatasetFinderSpec
                "Datasets on original project and its fork should be the same"
         )
 
-        datasetFinder.findDataset(originalDataset.identifier).unsafeRunSync() shouldBe
+        datasetFinder
+          .findDataset(originalDataset.identifier,
+                       AuthContext(None, originalDataset.identifier, Set(originalProject.path))
+          )
+          .unsafeRunSync() shouldBe
           internalToNonModified(originalDataset, originalProject)
             .copy(usedIn = List(originalProject.to[DatasetProject], fork.to[DatasetProject]).sorted)
             .some
@@ -207,7 +243,9 @@ class DatasetFinderSpec
 
         loadToStore(project1, project2, project2Fork)
 
-        datasetFinder.findDataset(dataset1.identifier).unsafeRunSync() shouldBe
+        datasetFinder
+          .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
+          .unsafeRunSync() shouldBe
           importedExternalToNonModified(dataset1, project1)
             .copy(usedIn =
               List(project1.to[DatasetProject], project2.to[DatasetProject], project2Fork.to[DatasetProject]).sorted
@@ -216,7 +254,9 @@ class DatasetFinderSpec
 
         assume(project2.datasets === project2Fork.datasets, "Datasets on original project and fork should be the same")
 
-        datasetFinder.findDataset(dataset2.identifier).unsafeRunSync() shouldBe
+        datasetFinder
+          .findDataset(dataset2.identifier, AuthContext(None, dataset2.identifier, Set(project2.path)))
+          .unsafeRunSync() shouldBe
           importedExternalToNonModified(dataset2, project2)
             .copy(usedIn =
               List(project1.to[DatasetProject], project2.to[DatasetProject], project2Fork.to[DatasetProject]).sorted
@@ -237,7 +277,9 @@ class DatasetFinderSpec
             "Datasets on original project and forks have to be the same"
           )
 
-          datasetFinder.findDataset(dataset.identifier).unsafeRunSync() shouldBe
+          datasetFinder
+            .findDataset(dataset.identifier, AuthContext(None, dataset.identifier, Set(grandparentForked.path)))
+            .unsafeRunSync() shouldBe
             internalToNonModified(dataset, grandparentForked)
               .copy(usedIn =
                 List(grandparentForked.to[DatasetProject],
@@ -255,10 +297,14 @@ class DatasetFinderSpec
           case (original ::~ modified, project ::~ fork) =>
             loadToStore(project, fork)
 
-            datasetFinder.findDataset(original.identifier).unsafeRunSync() shouldBe
+            datasetFinder
+              .findDataset(original.identifier, AuthContext(None, original.identifier, Set(project.path)))
+              .unsafeRunSync() shouldBe
               internalToNonModified(original, project).copy(usedIn = Nil).some
 
-            datasetFinder.findDataset(modified.identifier).unsafeRunSync() shouldBe
+            datasetFinder
+              .findDataset(modified.identifier, AuthContext(None, modified.identifier, Set(project.path)))
+              .unsafeRunSync() shouldBe
               modifiedToModified(modified, project)
                 .copy(usedIn = List(project.to[DatasetProject], fork.to[DatasetProject]).sorted)
                 .some
@@ -275,13 +321,19 @@ class DatasetFinderSpec
 
         loadToStore(projectUpdated, fork)
 
-        datasetFinder.findDataset(original.identifier).unsafeRunSync() shouldBe
+        datasetFinder
+          .findDataset(original.identifier, AuthContext(None, original.identifier, Set(projectUpdated.path)))
+          .unsafeRunSync() shouldBe
           internalToNonModified(original, projectUpdated).copy(usedIn = Nil).some
 
-        datasetFinder.findDataset(modified.identifier).unsafeRunSync() shouldBe
+        datasetFinder
+          .findDataset(modified.identifier, AuthContext(None, modified.identifier, Set(projectUpdated.path)))
+          .unsafeRunSync() shouldBe
           modifiedToModified(modified, projectUpdated).copy(usedIn = List(fork.to[DatasetProject])).some
 
-        datasetFinder.findDataset(modifiedAgain.identifier).unsafeRunSync() shouldBe
+        datasetFinder
+          .findDataset(modifiedAgain.identifier, AuthContext(None, modifiedAgain.identifier, Set(projectUpdated.path)))
+          .unsafeRunSync() shouldBe
           modifiedToModified(modifiedAgain, projectUpdated).some
       }
 
@@ -293,10 +345,16 @@ class DatasetFinderSpec
 
             loadToStore(project, forkUpdated)
 
-            datasetFinder.findDataset(original.identifier).unsafeRunSync() shouldBe
+            datasetFinder
+              .findDataset(original.identifier, AuthContext(None, original.identifier, Set(project.path)))
+              .unsafeRunSync() shouldBe
               internalToNonModified(original, project).some
 
-            datasetFinder.findDataset(modifiedOnFork.identifier).unsafeRunSync() shouldBe
+            datasetFinder
+              .findDataset(modifiedOnFork.identifier,
+                           AuthContext(None, modifiedOnFork.identifier, Set(forkUpdated.path))
+              )
+              .unsafeRunSync() shouldBe
               modifiedToModified(modifiedOnFork, forkUpdated).some
         }
       }
@@ -310,10 +368,14 @@ class DatasetFinderSpec
 
             loadToStore(project, forkWithInvalidation)
 
-            datasetFinder.findDataset(original.identifier).unsafeRunSync() shouldBe
+            datasetFinder
+              .findDataset(original.identifier, AuthContext(None, original.identifier, Set(project.path)))
+              .unsafeRunSync() shouldBe
               internalToNonModified(original, project).some
 
-            datasetFinder.findDataset(invalidation.identifier).unsafeRunSync() shouldBe None
+            datasetFinder
+              .findDataset(invalidation.identifier, AuthContext(None, invalidation.identifier, Set(project.path)))
+              .unsafeRunSync() shouldBe None
         }
       }
 
@@ -326,10 +388,35 @@ class DatasetFinderSpec
 
         loadToStore(projectWithInvalidation, fork)
 
-        datasetFinder.findDataset(original.identifier).unsafeRunSync() shouldBe
+        datasetFinder
+          .findDataset(original.identifier, AuthContext(None, original.identifier, Set(fork.path)))
+          .unsafeRunSync() shouldBe
           internalToNonModified(original, fork).some
 
-        datasetFinder.findDataset(invalidation.identifier).unsafeRunSync() shouldBe None
+        datasetFinder
+          .findDataset(invalidation.identifier, AuthContext(None, invalidation.identifier, Set(fork.path)))
+          .unsafeRunSync() shouldBe None
+      }
+
+    "return details of the dataset with the given id " +
+      "- a case when the user has no access to the original project" in new TestCase {
+        val (originalDataset, originalProject ::~ fork) = projectEntities(visibilityPublic)
+          .addDataset(datasetEntities(provenanceInternal))
+          .forkOnce()
+          .generateOne
+
+        loadToStore(originalProject, fork)
+
+        assume(originalProject.datasets === fork.datasets,
+               "Datasets on original project and its fork should be the same"
+        )
+
+        datasetFinder
+          .findDataset(originalDataset.identifier, AuthContext(None, originalDataset.identifier, Set(fork.path)))
+          .unsafeRunSync() shouldBe
+          internalToNonModified(originalDataset, fork)
+            .copy(usedIn = List(originalProject.to[DatasetProject], fork.to[DatasetProject]).sorted)
+            .some
       }
   }
 
@@ -347,18 +434,22 @@ class DatasetFinderSpec
 
         loadToStore(project1, project2, project3)
 
-        datasetFinder.findDataset(dataset1.identifier).unsafeRunSync() shouldBe Some(
+        datasetFinder
+          .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
+          .unsafeRunSync() shouldBe
           importedExternalToNonModified(dataset1, project1)
             .copy(usedIn = List(project1, project2, project3).map(_.to[DatasetProject]).sorted)
-        )
+            .some
 
-        datasetFinder.findDataset(dataset3.identifier).unsafeRunSync() shouldBe Some(
+        datasetFinder
+          .findDataset(dataset3.identifier, AuthContext(None, dataset3.identifier, Set(project3.path)))
+          .unsafeRunSync() shouldBe
           importedInternalToNonModified(dataset3, project3)
             .copy(
               sameAs = dataset2.provenance.sameAs,
               usedIn = List(project1, project2, project3).map(_.to[DatasetProject]).sorted
             )
-        )
+            .some
       }
 
     "return details of the dataset with the given id " +
@@ -371,21 +462,21 @@ class DatasetFinderSpec
         loadToStore(project1, project2, project3)
 
         datasetFinder
-          .findDataset(dataset1.identifier)
-          .unsafeRunSync() shouldBe Some(
+          .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
+          .unsafeRunSync() shouldBe
           internalToNonModified(dataset1, project1)
             .copy(usedIn = List(project1, project2, project3).map(_.to[DatasetProject]).sorted)
-        )
+            .some
 
         datasetFinder
-          .findDataset(dataset3.identifier)
-          .unsafeRunSync() shouldBe Some(
+          .findDataset(dataset3.identifier, AuthContext(None, dataset3.identifier, Set(project3.path)))
+          .unsafeRunSync() shouldBe
           importedInternalToNonModified(dataset3, project3)
             .copy(
               sameAs = SameAs(dataset1.provenance.entityId),
               usedIn = List(project1, project2, project3).map(_.to[DatasetProject]).sorted
             )
-        )
+            .some
       }
 
     "return details of the dataset with the given id " +
@@ -398,13 +489,18 @@ class DatasetFinderSpec
 
         loadToStore(project1, project2Updated, project3)
 
-        datasetFinder.findDataset(dataset1.identifier).unsafeRunSync() shouldBe Some(
-          internalToNonModified(dataset1, project1)
-        )
-        datasetFinder.findDataset(dataset2Modified.identifier).unsafeRunSync() shouldBe Some(
+        datasetFinder
+          .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
+          .unsafeRunSync() shouldBe
+          internalToNonModified(dataset1, project1).some
+        datasetFinder
+          .findDataset(dataset2Modified.identifier,
+                       AuthContext(None, dataset2Modified.identifier, Set(project2Updated.path))
+          )
+          .unsafeRunSync() shouldBe
           modifiedToModified(dataset2Modified, project2Updated)
             .copy(usedIn = List(project2Updated.to[DatasetProject], project3.to[DatasetProject]).sorted)
-        )
+            .some
       }
 
     "not return the details of a dataset" +
@@ -417,11 +513,18 @@ class DatasetFinderSpec
 
         loadToStore(project1, project2Updated)
 
-        datasetFinder.findDataset(dataset1.identifier).unsafeRunSync() shouldBe Some(
-          internalToNonModified(dataset1, project1)
-        )
-        datasetFinder.findDataset(dataset2.identifier).unsafeRunSync()             shouldBe None
-        datasetFinder.findDataset(dataset2Invalidation.identifier).unsafeRunSync() shouldBe None
+        datasetFinder
+          .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
+          .unsafeRunSync() shouldBe
+          internalToNonModified(dataset1, project1).some
+        datasetFinder
+          .findDataset(dataset2.identifier, AuthContext(None, dataset2.identifier, Set(project2.path)))
+          .unsafeRunSync() shouldBe None
+        datasetFinder
+          .findDataset(dataset2Invalidation.identifier,
+                       AuthContext(None, dataset2Invalidation.identifier, Set(project2.path))
+          )
+          .unsafeRunSync() shouldBe None
       }
 
     "not return the details of a dataset" +
@@ -435,11 +538,17 @@ class DatasetFinderSpec
 
         loadToStore(project1Updated, project2)
 
-        datasetFinder.findDataset(dataset1.identifier).unsafeRunSync()             shouldBe None
-        datasetFinder.findDataset(dataset1Invalidation.identifier).unsafeRunSync() shouldBe None
-        datasetFinder.findDataset(dataset2.identifier).unsafeRunSync() shouldBe Some(
-          importedInternalToNonModified(dataset2, project2)
-        )
+        datasetFinder
+          .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
+          .unsafeRunSync() shouldBe None
+        datasetFinder
+          .findDataset(dataset1Invalidation.identifier,
+                       AuthContext(None, dataset1Invalidation.identifier, Set(project1.path))
+          )
+          .unsafeRunSync() shouldBe None
+        datasetFinder
+          .findDataset(dataset2.identifier, AuthContext(None, dataset2.identifier, Set(project2.path)))
+          .unsafeRunSync() shouldBe importedInternalToNonModified(dataset2, project2).some
       }
 
     "not return the details of a dataset" +
@@ -451,18 +560,24 @@ class DatasetFinderSpec
 
         loadToStore(projectUpdated)
 
-        datasetFinder.findDataset(dataset.identifier).unsafeRunSync() shouldBe Some(
-          internalToNonModified(dataset, projectUpdated).copy(usedIn = Nil)
-        )
-        datasetFinder.findDataset(datasetModified.identifier).unsafeRunSync()     shouldBe None
-        datasetFinder.findDataset(datasetInvalidation.identifier).unsafeRunSync() shouldBe None
+        datasetFinder
+          .findDataset(dataset.identifier, AuthContext(None, dataset.identifier, Set(project.path)))
+          .unsafeRunSync() shouldBe internalToNonModified(dataset, projectUpdated).copy(usedIn = Nil).some
+        datasetFinder
+          .findDataset(datasetModified.identifier, AuthContext(None, datasetModified.identifier, Set(project.path)))
+          .unsafeRunSync() shouldBe None
+        datasetFinder
+          .findDataset(datasetInvalidation.identifier,
+                       AuthContext(None, datasetInvalidation.identifier, Set(projectUpdated.path))
+          )
+          .unsafeRunSync() shouldBe None
       }
   }
 
   private trait TestCase {
-    implicit val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
-    private implicit val logger = TestLogger[IO]()
-    private val timeRecorder    = new SparqlQueryTimeRecorder[IO](TestExecutionTimeRecorder[IO]())
+    implicit val renkuBaseUrl:   RenkuBaseUrl   = renkuBaseUrls.generateOne
+    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    private val timeRecorder = new SparqlQueryTimeRecorder[IO](TestExecutionTimeRecorder[IO]())
     val datasetFinder = new DatasetFinderImpl[IO](
       new BaseDetailsFinderImpl[IO](rdfStoreConfig, timeRecorder),
       new CreatorsFinderImpl[IO](rdfStoreConfig, timeRecorder),
