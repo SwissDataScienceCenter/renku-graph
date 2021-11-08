@@ -24,7 +24,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.config.renku
-import io.renku.graph.config.{GitLabUrlLoader, RenkuBaseUrlLoader}
+import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.datasets.{DerivedFrom, ImageUri, SameAs}
 import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.http.ErrorMessage
@@ -124,20 +124,16 @@ class ProjectDatasetsEndpointImpl[F[_]: MonadCancelThrow: Logger](
 
 object ProjectDatasetsEndpoint {
 
-  def apply[F[_]: Async: Logger](
-      timeRecorder: SparqlQueryTimeRecorder[F]
-  ): F[ProjectDatasetsEndpoint[F]] =
-    for {
-      rdfStoreConfig        <- RdfStoreConfig[F]()
-      renkuBaseUrl          <- RenkuBaseUrlLoader[F]()
-      gitLabUrl             <- GitLabUrlLoader[F]()
-      renkuResourceUrl      <- renku.ResourcesUrl[F]()
-      executionTimeRecorder <- ExecutionTimeRecorder[F]()
-      projectDatasetFinder  <- ProjectDatasetsFinder(rdfStoreConfig, renkuBaseUrl, timeRecorder)
-    } yield new ProjectDatasetsEndpointImpl[F](
-      projectDatasetFinder,
-      renkuResourceUrl,
-      gitLabUrl,
-      executionTimeRecorder
-    )
+  def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[ProjectDatasetsEndpoint[F]] = for {
+    rdfStoreConfig        <- RdfStoreConfig[F]()
+    gitLabUrl             <- GitLabUrlLoader[F]()
+    renkuResourceUrl      <- renku.ResourcesUrl[F]()
+    executionTimeRecorder <- ExecutionTimeRecorder[F]()
+    projectDatasetFinder  <- ProjectDatasetsFinder(rdfStoreConfig, timeRecorder)
+  } yield new ProjectDatasetsEndpointImpl[F](
+    projectDatasetFinder,
+    renkuResourceUrl,
+    gitLabUrl,
+    executionTimeRecorder
+  )
 }
