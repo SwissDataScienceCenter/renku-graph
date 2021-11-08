@@ -142,11 +142,12 @@ Finds details of the dataset with the given `id`.
 
 **Response**
 
-| Status                     | Description                   |
-|----------------------------|-------------------------------|
-| OK (200)                   | If dataset details are found  |
-| NOT_FOUND (404)            | If dataset is not found       |
-| INTERNAL SERVER ERROR (500)| Otherwise                     |
+| Status                     | Description                                                                                       |
+|----------------------------|---------------------------------------------------------------------------------------------------|
+| OK (200)                   | If dataset details are found                                                                      |
+| UNAUTHORIZED (401)         | If given auth header cannot be authenticated                                                      |
+| NOT_FOUND (404)            | If dataset is not found or user is not authorised to access project where this dataset belongs to |
+| INTERNAL SERVER ERROR (500)| Otherwise                                                                                         |
 
 Response body example:
 
@@ -204,28 +205,6 @@ Response body example:
     "path" : "namespace1/project1-name",
     "name" : "project1 name"
   },
-  "isPartOf" : [
-    {
-      "_links" : [
-        {
-          "rel" : "project-details",
-          "href" : "https://zemdgsw:9540/projects/namespace1/project1-name"
-        }
-      ],
-      "path" : "namespace1/project1-name",
-      "name" : "project1 name"
-    },
-    {
-      "_links" : [
-        {
-          "rel" : "project-details",
-          "href" : "https://zemdgsw:9540/projects/namespace2/project2-name"
-        }
-      ],
-      "path" : "namespace2/project2-name",
-      "name" : "project2 name"
-    }
-  ],
   "usedIn" : [
     {
       "_links" : [
@@ -248,10 +227,7 @@ Response body example:
       "name" : "project2 name"
     }
   ],
-  "keywords": [
-    "rldzpwo",
-    "gfioui"
-  ],
+  "keywords": [ "rldzpwo", "gfioui" ],
   "images": [
     {
       "location": "image.png",

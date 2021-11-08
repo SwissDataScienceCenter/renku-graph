@@ -18,13 +18,15 @@
 
 package io.renku.knowledgegraph
 
-import cats.data.{EitherT, Kleisli, OptionT}
+import cats.data.EitherT.{leftT, rightT}
+import cats.data.{Kleisli, OptionT}
 import cats.effect.{IO, Resource}
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.http.server.security.Authorizer
+import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.http.ErrorMessage.ErrorMessage
@@ -69,19 +71,14 @@ class MicroserviceRoutesSpec
   "routes" should {
 
     "define a GET /ping endpoint returning OK with 'pong' body" in new TestCase {
-
-      val response = routes().call(
-        Request(Method.GET, uri"/ping")
-      )
+      val response = routes().call(Request(Method.GET, uri"/ping"))
 
       response.status       shouldBe Ok
       response.body[String] shouldBe "pong"
     }
 
     "define a GET /metrics endpoint returning OK with some prometheus metrics" in new TestCase {
-      val response = routes().call(
-        Request(Method.GET, uri"/metrics")
-      )
+      val response = routes().call(Request(Method.GET, uri"/metrics"))
 
       response.status     shouldBe Ok
       response.body[String] should include("server_response_duration_seconds")
@@ -92,8 +89,6 @@ class MicroserviceRoutesSpec
 
         val maybeAuthUser = authUsers.generateOption
         val phrase        = nonEmptyStrings().generateOne
-        val request =
-          Request[IO](Method.GET, uri"/knowledge-graph/datasets".withQueryParam(query.parameterName, phrase))
         (datasetsSearchEndpoint
           .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest, _: Option[AuthUser]))
           .expects(Phrase(phrase).some,
@@ -103,19 +98,17 @@ class MicroserviceRoutesSpec
           )
           .returning(IO.pure(Response[IO](Ok)))
 
-        val response = routes(maybeAuthUser).call(request)
-
-        response.status shouldBe Ok
+        routes(maybeAuthUser)
+          .call(Request[IO](Method.GET, uri"/knowledge-graph/datasets".withQueryParam(query.parameterName, phrase)))
+          .status shouldBe Ok
       }
 
     s"define a GET /knowledge-graph/datasets?query=<phrase> endpoint returning $Unauthorized when user authentication failed " +
       "when a valid 'query' and no 'sort', `page` and `per_page` parameters given" in new TestCase {
         val phrase = nonEmptyStrings().generateOne
-        val request =
-          Request[IO](Method.GET, uri"/knowledge-graph/datasets".withQueryParam(query.parameterName, phrase))
 
         routes(givenAuthFailing())
-          .call(request)
+          .call(Request[IO](Method.GET, uri"/knowledge-graph/datasets".withQueryParam(query.parameterName, phrase)))
           .status shouldBe Unauthorized
       }
 
@@ -123,7 +116,6 @@ class MicroserviceRoutesSpec
       s"when no ${query.parameterName} parameter given" in new TestCase {
 
         val maybeAuthUser = authUsers.generateOption
-        val request       = Request[IO](Method.GET, uri"/knowledge-graph/datasets")
 
         (datasetsSearchEndpoint
           .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest, _: Option[AuthUser]))
@@ -134,9 +126,7 @@ class MicroserviceRoutesSpec
           )
           .returning(IO.pure(Response[IO](Ok)))
 
-        val response = routes(maybeAuthUser).call(request)
-
-        response.status shouldBe Ok
+        routes(maybeAuthUser).call(Request[IO](Method.GET, uri"/knowledge-graph/datasets")).status shouldBe Ok
       }
 
     s"define a GET /knowledge-graph/datasets?query=<phrase> endpoint returning $Unauthorized when user authentication failed " +
@@ -208,9 +198,7 @@ class MicroserviceRoutesSpec
             .expects(phrase.some, Sort.By(TitleProperty, Direction.Asc), PagingRequest(page, perPage), maybeAuthUser)
             .returning(IO.pure(Response[IO](Ok)))
 
-          val response = routes(maybeAuthUser).call(request)
-
-          response.status shouldBe Ok
+          routes(maybeAuthUser).call(request).status shouldBe Ok
 
           routesMetrics.clearRegistry()
         }
@@ -271,29 +259,30 @@ class MicroserviceRoutesSpec
 
       (datasetsEndpoint.getDataset _).expects(id).returning(IO.pure(Response[IO](Ok)))
 
-      val response = routes().call(
-        Request(Method.GET, uri"/knowledge-graph/datasets" / id.value)
-      )
-
-      response.status shouldBe Ok
+      routes()
+        .call(Request(Method.GET, uri"/knowledge-graph/datasets" / id.value))
+        .status shouldBe Ok
     }
 
     s"define a GET /knowledge-graph/datasets/:id endpoint returning $NotFound when no :id path parameter given" in new TestCase {
-
       routes()
         .call(Request(Method.GET, uri"/knowledge-graph/datasets/"))
         .status shouldBe NotFound
+    }
+
+    s"define a GET /knowledge-graph/datasets/:id endpoint returning $Unauthorized when user is not authorized" in new TestCase {
+      routes(givenAuthIfNeededMiddleware(returning = OptionT.none[IO, Option[AuthUser]]))
+        .call(Request(Method.GET, uri"/knowledge-graph/datasets" / datasetIdentifiers.generateOne.value))
+        .status shouldBe Unauthorized
     }
 
     "define a GET /knowledge-graph/graphql endpoint" in new TestCase {
 
       (queryEndpoint.schema _).expects().returning(IO.pure(Response[IO](Ok)))
 
-      val response = routes().call(
-        Request(Method.GET, uri"/knowledge-graph/graphql")
-      )
-
-      response.status shouldBe Ok
+      routes()
+        .call(Request(Method.GET, uri"/knowledge-graph/graphql"))
+        .status shouldBe Ok
     }
 
     "define a POST /knowledge-graph/graphql endpoint" in new TestCase {
@@ -305,9 +294,7 @@ class MicroserviceRoutesSpec
         .expects(request, maybeAuthUser)
         .returning(IO.pure(Response[IO](Ok)))
 
-      val response = routes(maybeAuthUser).call(request)
-
-      response.status shouldBe Ok
+      routes(maybeAuthUser).call(request).status shouldBe Ok
     }
 
     s"define a POST /knowledge-graph/graphql endpoint endpoint returning $Unauthorized when user authentication failed" in new TestCase {
@@ -324,7 +311,7 @@ class MicroserviceRoutesSpec
 
       (projectPathAuthorizer.authorize _)
         .expects(projectPath, maybeAuthUser)
-        .returning(EitherT.rightT[IO, EndpointSecurityException](()))
+        .returning(rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser, projectPath, Set(projectPath))))
 
       (projectEndpoint.getProject _).expects(projectPath, maybeAuthUser).returning(Response[IO](Ok).pure[IO])
 
@@ -360,7 +347,7 @@ class MicroserviceRoutesSpec
 
       (projectPathAuthorizer.authorize _)
         .expects(projectPath, maybeAuthUser)
-        .returning(EitherT.leftT[IO, Unit](AuthorizationFailure))
+        .returning(leftT[IO, AuthContext[model.projects.Path]](AuthorizationFailure))
 
       val response = routes(maybeAuthUser).call(
         Request(Method.GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath"))
@@ -377,7 +364,7 @@ class MicroserviceRoutesSpec
 
       (projectPathAuthorizer.authorize _)
         .expects(projectPath, maybeAuthUser)
-        .returning(EitherT.rightT[IO, EndpointSecurityException](()))
+        .returning(rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser, projectPath, Set(projectPath))))
 
       (projectDatasetsEndpoint.getProjectDatasets _).expects(projectPath).returning(IO.pure(Response[IO](Ok)))
 
@@ -402,7 +389,7 @@ class MicroserviceRoutesSpec
 
       (projectPathAuthorizer.authorize _)
         .expects(projectPath, maybeAuthUser)
-        .returning(EitherT.leftT[IO, Unit](AuthorizationFailure))
+        .returning(leftT[IO, AuthContext[model.projects.Path]](AuthorizationFailure))
 
       val response = routes(maybeAuthUser)
         .call(

@@ -73,6 +73,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   private lazy val authorizedRoutes: HttpRoutes[F] = authMiddleware {
     AuthedRoutes.of {
       case GET                -> Root / "knowledge-graph" /  "datasets" :? query(maybePhrase) +& sort(maybeSortBy) +& page(page) +& perPage(perPage) as maybeUser => searchForDatasets(maybePhrase, maybeSortBy,page, perPage, maybeUser)
+      case GET                -> Root / "knowledge-graph" /  "datasets" / DatasetId(id)                                                             as _         => getDataset(id)
       case authRequest @ POST -> Root / "knowledge-graph" /  "graphql"                                                                               as maybeUser => handleQuery(authRequest.req, maybeUser)
       case GET ->                       "knowledge-graph" /: "projects" /: path                                                                      as maybeUser => routeToProjectsEndpoints(path, maybeUser)
     }
@@ -80,7 +81,6 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
 
   private lazy val nonAuthorizedRoutes: HttpRoutes[F] = HttpRoutes.of[F] {
     case         GET  -> Root / "ping"                                                                                                       => Ok("pong")
-    case         GET ->  Root / "knowledge-graph" /  "datasets" / DatasetId(id)                                                              => getDataset(id)
     case         GET ->  Root / "knowledge-graph" /  "graphql"                                                                               => schema()
   }
   // format: on

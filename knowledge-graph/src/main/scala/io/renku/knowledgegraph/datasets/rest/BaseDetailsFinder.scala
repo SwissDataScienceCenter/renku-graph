@@ -33,10 +33,8 @@ import org.typelevel.log4cats.Logger
 
 private trait BaseDetailsFinder[F[_]] {
   def findBaseDetails(identifier: Identifier): F[Option[Dataset]]
-
-  def findKeywords(identifier: Identifier): F[List[Keyword]]
-
-  def findImages(identifier: Identifier): F[List[ImageUri]]
+  def findKeywords(identifier:    Identifier): F[List[Keyword]]
+  def findImages(identifier:      Identifier): F[List[ImageUri]]
 }
 
 private class BaseDetailsFinderImpl[F[_]: Async: Logger](
