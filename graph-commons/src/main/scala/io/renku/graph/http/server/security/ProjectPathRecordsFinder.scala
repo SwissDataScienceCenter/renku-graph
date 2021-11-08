@@ -18,50 +18,39 @@
 
 package io.renku.graph.http.server.security
 
-import cats.data.EitherT
-import cats.data.EitherT.{leftT, rightT}
 import cats.effect.Async
 import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
+import io.renku.graph.http.server.security.Authorizer.{SecurityRecord, SecurityRecordFinder}
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Visibility._
 import io.renku.graph.model.projects.{Path, Visibility}
 import io.renku.graph.model.users.GitLabId
-import io.renku.http.server.security.EndpointSecurityException
-import io.renku.http.server.security.EndpointSecurityException.AuthorizationFailure
-import io.renku.http.server.security.model.AuthUser
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
-trait ProjectAuthorizer[F[_]] {
-  def authorize(path: projects.Path, maybeAuthUser: Option[AuthUser]): EitherT[F, EndpointSecurityException, Unit]
+object ProjectPathRecordsFinder {
+  def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[SecurityRecordFinder[F, projects.Path]] =
+    for {
+      config <- RdfStoreConfig[F]()
+    } yield new ProjectPathRecordsFinderImpl(config, timeRecorder)
 }
 
-object ProjectAuthorizer {
-  def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[ProjectAuthorizer[F]] = for {
-    config <- RdfStoreConfig[F]()
-  } yield new ProjectAuthorizerImpl(config, timeRecorder)
-}
-
-class ProjectAuthorizerImpl[F[_]: Async: Logger](
+class ProjectPathRecordsFinderImpl[F[_]: Async: Logger](
     rdfStoreConfig: RdfStoreConfig,
     timeRecorder:   SparqlQueryTimeRecorder[F]
 ) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
-    with ProjectAuthorizer[F] {
+    with SecurityRecordFinder[F, projects.Path] {
 
-  override def authorize(path:          projects.Path,
-                         maybeAuthUser: Option[AuthUser]
-  ): EitherT[F, EndpointSecurityException, Unit] = for {
-    records <- EitherT.right(queryExpecting[List[Record]](using = query(path))(recordsDecoder))
-    _       <- validate(maybeAuthUser, records)
-  } yield ()
+  override def apply(path: projects.Path): F[List[SecurityRecord]] =
+    queryExpecting[List[SecurityRecord]](using = query(path))(recordsDecoder)
 
   import eu.timepit.refined.auto._
   import io.renku.graph.model.Schemas._
 
   private def query(path: Path) = SparqlQuery.of(
-    name = "project by id",
+    name = "authorise - project path",
     Prefixes.of(schema -> "schema", renku -> "renku"),
     s"""|SELECT DISTINCT ?projectId ?visibility (GROUP_CONCAT(?maybeMemberGitLabId; separator=',') AS ?memberGitLabIds)
         |WHERE {
@@ -78,12 +67,10 @@ class ProjectAuthorizerImpl[F[_]: Async: Logger](
         |""".stripMargin
   )
 
-  private type Record = (Visibility, Set[GitLabId])
-
-  private lazy val recordsDecoder: Decoder[List[Record]] = {
+  private lazy val recordsDecoder: Decoder[List[SecurityRecord]] = {
     import Decoder._
 
-    val recordDecoder: Decoder[Record] = { cursor =>
+    val recordDecoder: Decoder[SecurityRecord] = { cursor =>
       for {
         visibility <- cursor.downField("visibility").downField("value").as[Visibility]
         maybeUserId <- cursor
@@ -97,14 +84,5 @@ class ProjectAuthorizerImpl[F[_]: Async: Logger](
     }
 
     _.downField("results").downField("bindings").as(decodeList(recordDecoder))
-  }
-
-  private def validate(maybeAuthUser: Option[AuthUser],
-                       records:       List[Record]
-  ): EitherT[F, EndpointSecurityException, Unit] = records -> maybeAuthUser match {
-    case (Nil, _)                                                                            => rightT(())
-    case ((Public, _) :: Nil, _)                                                             => rightT(())
-    case ((_, projectMembers) :: Nil, Some(authUser)) if projectMembers contains authUser.id => rightT(())
-    case _ => leftT(AuthorizationFailure)
   }
 }

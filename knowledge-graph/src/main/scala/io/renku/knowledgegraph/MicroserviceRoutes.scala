@@ -25,7 +25,7 @@ import cats.effect.{IO, Resource}
 import cats.syntax.all._
 import io.renku.config.GitLab
 import io.renku.control.{RateLimit, Throttler}
-import io.renku.graph.http.server.security.{GitLabAuthenticator, ProjectAuthorizer}
+import io.renku.graph.http.server.security.{Authorizer, GitLabAuthenticator, ProjectPathRecordsFinder}
 import io.renku.graph.model
 import io.renku.http.rest.SortBy.Direction
 import io.renku.http.rest.paging.PagingRequest
@@ -54,7 +54,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     datasetEndpoint:         DatasetEndpoint[F],
     datasetsSearchEndpoint:  DatasetsSearchEndpoint[F],
     authMiddleware:          AuthMiddleware[F, Option[AuthUser]],
-    projectAuthorizer:       ProjectAuthorizer[F],
+    projectPathAuthorizer:   Authorizer[F, model.projects.Path],
     routesMetrics:           RoutesMetrics[F]
 ) extends Http4sDsl[F] {
 
@@ -65,9 +65,9 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   import org.http4s.HttpRoutes
   import projectDatasetsEndpoint._
   import projectEndpoint._
+  import projectPathAuthorizer.{authorize => authorizePath}
   import queryEndpoint._
   import routesMetrics._
-  import projectAuthorizer._
 
   // format: off
   private lazy val authorizedRoutes: HttpRoutes[F] = authMiddleware {
@@ -107,12 +107,12 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   ): F[Response[F]] = path.segments.toList.map(_.toString) match {
     case projectPathParts :+ "datasets" =>
       projectPathParts.toProjectPath
-        .flatTap(authorize(_, maybeAuthUser).leftMap(_.toHttpResponse))
+        .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
         .semiflatMap(getProjectDatasets)
         .merge
     case projectPathParts =>
       projectPathParts.toProjectPath
-        .flatTap(authorize(_, maybeAuthUser).leftMap(_.toHttpResponse))
+        .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
         .semiflatMap(getProject(_, maybeAuthUser))
         .merge
   }
@@ -146,14 +146,14 @@ private object MicroserviceRoutes {
       datasetsSearchEndpoint  <- DatasetsSearchEndpoint[IO](sparqlTimeRecorder)
       authenticator           <- GitLabAuthenticator(gitLabThrottler)
       authMiddleware          <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
-      projectAuthorizer       <- ProjectAuthorizer[IO](sparqlTimeRecorder)
+      projectPathAuthorizer   <- Authorizer.using(ProjectPathRecordsFinder[IO](sparqlTimeRecorder))
     } yield new MicroserviceRoutes(queryEndpoint,
                                    projectEndpoint,
                                    projectDatasetsEndpoint,
                                    datasetEndpoint,
                                    datasetsSearchEndpoint,
                                    authMiddleware,
-                                   projectAuthorizer,
+                                   projectPathAuthorizer,
                                    new RoutesMetrics[IO](metricsRegistry)
     )
 }

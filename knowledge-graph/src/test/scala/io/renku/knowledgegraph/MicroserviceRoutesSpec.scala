@@ -24,7 +24,8 @@ import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.http.server.security.ProjectAuthorizer
+import io.renku.graph.http.server.security.Authorizer
+import io.renku.graph.model
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.http.ErrorMessage.ErrorMessage
 import io.renku.http.InfoMessage._
@@ -321,7 +322,7 @@ class MicroserviceRoutesSpec
       val maybeAuthUser = authUsers.generateOption
       val projectPath   = projectPaths.generateOne
 
-      (projectAuthorizer.authorize _)
+      (projectPathAuthorizer.authorize _)
         .expects(projectPath, maybeAuthUser)
         .returning(EitherT.rightT[IO, EndpointSecurityException](()))
 
@@ -357,7 +358,7 @@ class MicroserviceRoutesSpec
       val maybeAuthUser = authUsers.generateOption
       val projectPath   = projectPaths.generateOne
 
-      (projectAuthorizer.authorize _)
+      (projectPathAuthorizer.authorize _)
         .expects(projectPath, maybeAuthUser)
         .returning(EitherT.leftT[IO, Unit](AuthorizationFailure))
 
@@ -374,7 +375,7 @@ class MicroserviceRoutesSpec
       val projectPath   = projectPaths.generateOne
       val maybeAuthUser = authUsers.generateOption
 
-      (projectAuthorizer.authorize _)
+      (projectPathAuthorizer.authorize _)
         .expects(projectPath, maybeAuthUser)
         .returning(EitherT.rightT[IO, EndpointSecurityException](()))
 
@@ -399,7 +400,7 @@ class MicroserviceRoutesSpec
       val projectPath   = projectPaths.generateOne
       val maybeAuthUser = authUsers.generateOption
 
-      (projectAuthorizer.authorize _)
+      (projectPathAuthorizer.authorize _)
         .expects(projectPath, maybeAuthUser)
         .returning(EitherT.leftT[IO, Unit](AuthorizationFailure))
 
@@ -421,7 +422,7 @@ class MicroserviceRoutesSpec
     val projectDatasetsEndpoint = mock[ProjectDatasetsEndpoint[IO]]
     val datasetsEndpoint        = mock[DatasetEndpoint[IO]]
     val datasetsSearchEndpoint  = mock[DatasetsSearchEndpoint[IO]]
-    val projectAuthorizer       = mock[ProjectAuthorizer[IO]]
+    val projectPathAuthorizer   = mock[Authorizer[IO, model.projects.Path]]
     val routesMetrics           = TestRoutesMetrics()
 
     def routes(maybeAuthUser: Option[AuthUser] = None): Resource[IO, Kleisli[IO, Request[IO], Response[IO]]] = routes(
@@ -436,7 +437,7 @@ class MicroserviceRoutesSpec
         datasetsEndpoint,
         datasetsSearchEndpoint,
         middleware,
-        projectAuthorizer,
+        projectPathAuthorizer,
         routesMetrics
       ).routes.map(_.or(notAvailableResponse))
   }

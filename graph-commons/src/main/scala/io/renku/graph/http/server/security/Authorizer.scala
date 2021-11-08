@@ -22,7 +22,8 @@ import cats.MonadThrow
 import cats.data.EitherT
 import cats.data.EitherT.{leftT, rightT}
 import cats.effect.Async
-import io.renku.graph.http.server.security.Authorizer.SecurityRecord
+import cats.syntax.all._
+import io.renku.graph.http.server.security.Authorizer.{SecurityRecord, SecurityRecordFinder}
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.projects.Visibility.Public
 import io.renku.graph.model.users.GitLabId
@@ -36,16 +37,21 @@ trait Authorizer[F[_], Key] {
 }
 
 object Authorizer {
-  type SecurityRecord = (Visibility, Set[GitLabId])
+  type SecurityRecord                  = (Visibility, Set[GitLabId])
+  type SecurityRecordFinder[F[_], Key] = Key => F[List[SecurityRecord]]
+
+  def using[F[_]: Async: Logger, Key](
+      securityRecordsFinderFactory: F[SecurityRecordFinder[F, Key]]
+  ): F[Authorizer[F, Key]] = securityRecordsFinderFactory.map(new AuthorizerImpl[F, Key](_))
 }
 
-class AuthorizerImpl[F[_]: MonadThrow, Key](
-    findSecurityRecord: Key => F[List[SecurityRecord]]
+private class AuthorizerImpl[F[_]: MonadThrow, Key](
+    securityRecordsFinder: SecurityRecordFinder[F, Key]
 ) extends Authorizer[F, Key] {
 
-  override def authorize(path: Key, maybeAuthUser: Option[AuthUser]): EitherT[F, EndpointSecurityException, Unit] =
+  override def authorize(key: Key, maybeAuthUser: Option[AuthUser]): EitherT[F, EndpointSecurityException, Unit] =
     for {
-      records <- EitherT.right(findSecurityRecord(path))
+      records <- EitherT.right(securityRecordsFinder(key))
       _       <- validate(maybeAuthUser, records)
     } yield ()
 

@@ -41,7 +41,7 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
   "authorize" should {
 
     "succeed if found SecurityRecord is for a public project and there's no auth user" in new TestCase {
-      findSecurityRecord
+      securityRecordsFinder
         .expects(key)
         .returning(List(Visibility.Public -> Set.empty[GitLabId]).pure[Try])
 
@@ -51,7 +51,7 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
     "succeed if found SecurityRecord is for a public project and the user has rights to the project" in new TestCase {
       val authUser = authUsers.generateOne
 
-      findSecurityRecord
+      securityRecordsFinder
         .expects(key)
         .returning(List(Visibility.Public -> (userGitLabIds.generateSet() + authUser.id)).pure[Try])
 
@@ -61,7 +61,7 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
     "succeed if found SecurityRecord is for a non-public project but the user has rights to the project" in new TestCase {
       val authUser = authUsers.generateOne
 
-      findSecurityRecord
+      securityRecordsFinder
         .expects(key)
         .returning(List(visibilityNonPublic.generateOne -> (userGitLabIds.generateSet() + authUser.id)).pure[Try])
 
@@ -69,14 +69,14 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
     }
 
     "succeed if there's no project with the given id" in new TestCase {
-      findSecurityRecord.expects(key).returning(Nil.pure[Try])
+      securityRecordsFinder.expects(key).returning(Nil.pure[Try])
 
       authorizer.authorize(key, authUsers.generateOption) shouldBe EitherT.rightT[Try, EndpointSecurityException](())
     }
 
     "fail if the given project is non-public and the user does not have rights for it" in new TestCase {
 
-      findSecurityRecord
+      securityRecordsFinder
         .expects(key)
         .returning(List(visibilityNonPublic.generateOne -> userGitLabIds.generateSet()).pure[Try])
 
@@ -84,7 +84,7 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
     }
 
     "fail if the given project is non-public and there's no authorized user" in new TestCase {
-      findSecurityRecord
+      securityRecordsFinder
         .expects(key)
         .returning(List(visibilityNonPublic.generateOne -> userGitLabIds.generateSet()).pure[Try])
 
@@ -95,8 +95,8 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
   private case class Key(value: Int)
 
   private trait TestCase {
-    val key                = Arbitrary.arbInt.arbitrary.map(Key).generateOne
-    val findSecurityRecord = mockFunction[Key, Try[List[SecurityRecord]]]
-    val authorizer         = new AuthorizerImpl[Try, Key](findSecurityRecord)
+    val key                   = Arbitrary.arbInt.arbitrary.map(Key).generateOne
+    val securityRecordsFinder = mockFunction[Key, Try[List[SecurityRecord]]]
+    val authorizer            = new AuthorizerImpl[Try, Key](securityRecordsFinder)
   }
 }
