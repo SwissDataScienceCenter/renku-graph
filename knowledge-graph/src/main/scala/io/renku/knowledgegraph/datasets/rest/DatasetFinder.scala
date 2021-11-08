@@ -44,7 +44,7 @@ private class DatasetFinderImpl[F[_]: Spawn](
   import projectsFinder._
 
   def findDataset(identifier: Identifier, authContext: AuthContext[Identifier]): F[Option[Dataset]] = for {
-    usedInFiber       <- Spawn[F].start(findUsedIn(identifier))
+    usedInFiber       <- Spawn[F].start(findUsedIn(identifier, authContext))
     maybeDetailsFiber <- Spawn[F].start(findBaseDetails(identifier, authContext))
     keywordsFiber     <- Spawn[F].start(findKeywords(identifier))
     imagesFiber       <- Spawn[F].start(findImages(identifier))

@@ -24,10 +24,12 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder.decodeList
 import io.circe.DecodingFailure
+import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.datasets.Identifier
 import io.renku.graph.model.projects
-import io.renku.graph.model.projects.{Path, ResourceId}
+import io.renku.graph.model.projects.{Path, ResourceId, Visibility}
+import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.datasets.model.DatasetProject
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
@@ -36,7 +38,7 @@ import org.typelevel.log4cats.Logger
 import scala.util.Try
 
 private trait ProjectsFinder[F[_]] {
-  def findUsedIn(identifier: Identifier): F[List[DatasetProject]]
+  def findUsedIn(identifier: Identifier, authContext: AuthContext[Identifier]): F[List[DatasetProject]]
 }
 
 private class ProjectsFinderImpl[F[_]: Async: Logger](
@@ -47,10 +49,10 @@ private class ProjectsFinderImpl[F[_]: Async: Logger](
 
   import ProjectsFinderImpl._
 
-  def findUsedIn(identifier: Identifier): F[List[DatasetProject]] =
-    queryExpecting[List[DatasetProject]](using = query(identifier))
+  def findUsedIn(identifier: Identifier, authContext: AuthContext[Identifier]): F[List[DatasetProject]] =
+    queryExpecting[List[DatasetProject]](using = query(identifier, authContext.maybeAuthUser))
 
-  private def query(identifier: Identifier) = SparqlQuery.of(
+  private def query(identifier: Identifier, maybeAuthUser: Option[AuthUser]) = SparqlQuery.of(
     name = "ds by id - projects",
     Prefixes.of(schema -> "schema", prov -> "prov", renku -> "renku"),
     s"""|SELECT DISTINCT ?projectId ?projectName
@@ -62,6 +64,7 @@ private class ProjectsFinderImpl[F[_]: Async: Logger](
         |  ?allDsId a schema:Dataset;
         |           renku:topmostSameAs ?topmostSameAs;
         |           ^renku:hasDataset ?projectId.
+        |  ${allowedProjectFilterQuery(maybeAuthUser)}
         |  FILTER NOT EXISTS {
         |    ?projectDatasets prov:wasDerivedFrom / schema:url ?allDsId;
         |                     ^renku:hasDataset ?projectId. 
@@ -74,6 +77,22 @@ private class ProjectsFinderImpl[F[_]: Async: Logger](
         |ORDER BY ASC(?projectName)
         |""".stripMargin
   )
+
+  private lazy val allowedProjectFilterQuery: Option[AuthUser] => String = {
+    case Some(user) =>
+      s"""|?projectId renku:projectVisibility ?parentVisibility .
+          |OPTIONAL {
+          |  ?projectId schema:member/schema:sameAs ?memberId.
+          |  ?memberId schema:additionalType 'GitLab';
+          |            schema:identifier ?userGitlabId .
+          |}
+          |FILTER ( ?parentVisibility = '${Visibility.Public.value}' || ?userGitlabId = ${user.id.value} )
+          |""".stripMargin
+    case _ =>
+      s"""|?projectId renku:projectVisibility ?parentVisibility .
+          |FILTER(?parentVisibility = '${Visibility.Public.value}')
+          |""".stripMargin
+  }
 }
 
 private object ProjectsFinderImpl {
