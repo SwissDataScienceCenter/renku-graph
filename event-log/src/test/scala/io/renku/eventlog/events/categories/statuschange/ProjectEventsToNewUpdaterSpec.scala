@@ -23,7 +23,8 @@ import eu.timepit.refined.auto._
 import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators.eventMessages
 import io.renku.eventlog._
-import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.AllEventsToNew
+import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.ProjectEventsToNew
+import io.renku.events.consumers.Project
 import io.renku.events.consumers.subscriptions.{subscriberIds, subscriberUrls}
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
@@ -42,7 +43,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import java.time.Instant
 import scala.util.Random
 
-class AllEventsToNewUpdaterSpec
+class ProjectEventsToNewUpdaterSpec
     extends AnyWordSpec
     with IOSpec
     with InMemoryEventLogDbSpec
@@ -52,38 +53,52 @@ class AllEventsToNewUpdaterSpec
 
   "updateDB" should {
 
-    "change the status of all events to NEW except SKIPPED events" in new TestCase {
+    "change the status of all events of a specific project to NEW except SKIPPED events" in new TestCase {
 
-      val eventIds = projectIdentifiers
+      val (projectId, projectPath) = projectIdentifiers.generateOne
+      val eventsStatuses = Gen
+        .oneOf(EventStatus.all.diff(Set(EventStatus.Skipped, EventStatus.AwaitingDeletion)))
         .generateNonEmptyList(2)
-        .flatMap { case (projectId, projectPath) =>
-          Gen
-            .oneOf(EventStatus.all.diff(Set(EventStatus.Skipped, EventStatus.AwaitingDeletion)))
-            .generateNonEmptyList(2)
-            .map(addEvent(_, projectId, projectPath))
-            .map(CompoundEventId(_, projectId))
-        }
+
+      val events = eventsStatuses
+        .map(addEvent(_, projectId, projectPath))
+        .map(CompoundEventId(_, projectId))
         .toList
 
-      val skippedEventProjectId = projectIds.generateOne
-      val skippedEvent          = addEvent(EventStatus.Skipped, skippedEventProjectId)
+      val skippedEvent          = addEvent(EventStatus.Skipped, projectId)
+      val awaitingDeletionEvent = addEvent(EventStatus.AwaitingDeletion, projectId)
 
-      val awaitingDeletionEventProjectId = projectIds.generateOne
-      val awaitingDeletionEvent          = addEvent(EventStatus.AwaitingDeletion, awaitingDeletionEventProjectId)
+      val (otherProjectId, otherProjectPath) = projectIdentifiers.generateOne
+      val eventStatus = Gen
+        .oneOf(EventStatus.all.diff(Set(EventStatus.Skipped, EventStatus.AwaitingDeletion)))
+        .generateOne
 
-      eventIds.foreach(upsertEventDelivery(_, subscriberId))
+      val otherProjectEventId = CompoundEventId(addEvent(eventStatus, otherProjectId, otherProjectPath), otherProjectId)
+
+      events.foreach(upsertEventDelivery(_, subscriberId))
+      upsertEventDelivery(otherProjectEventId, subscriberId)
+
+      val counts: Map[EventStatus, Int] =
+        eventsStatuses.toList
+          .groupBy(identity)
+          .map { case (eventStatus, statuses) => (eventStatus, -1 * statuses.length) }
+          .updatedWith(EventStatus.New) { maybeNewEvents =>
+            maybeNewEvents.map(_ + events.size).orElse(Some(events.size))
+          }
 
       sessionResource
-        .useK(dbUpdater.updateDB(AllEventsToNew))
-        .unsafeRunSync() shouldBe DBUpdateResults.ForAllProjects
+        .useK(dbUpdater.updateDB(ProjectEventsToNew(Project(projectId, projectPath))))
+        .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(projectPath, counts)
 
-      eventIds.flatMap(findFullEvent) shouldBe eventIds.map { eventId =>
+      events.flatMap(findFullEvent) shouldBe events.map { eventId =>
         (eventId.id, EventStatus.New, None, None, List())
       }
 
-      findEvent(CompoundEventId(skippedEvent, skippedEventProjectId)).map(_._2) shouldBe Some(EventStatus.Skipped)
-      findEvent(CompoundEventId(awaitingDeletionEvent, awaitingDeletionEventProjectId)).map(_._2) shouldBe None
-      findAllDeliveries                                                                           shouldBe Nil
+      findEvent(CompoundEventId(skippedEvent, projectId)).map(_._2)          shouldBe Some(EventStatus.Skipped)
+      findEvent(CompoundEventId(awaitingDeletionEvent, projectId)).map(_._2) shouldBe None
+      findAllDeliveries shouldBe List(otherProjectEventId -> subscriberId)
+
+      findEvent(otherProjectEventId).map(_._2) shouldBe Some(eventStatus)
     }
   }
 
@@ -96,7 +111,7 @@ class AllEventsToNewUpdaterSpec
 
     val currentTime      = mockFunction[Instant]
     val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val dbUpdater        = new AllEventsToNewUpdater[IO](queriesExecTimes, currentTime)
+    val dbUpdater        = new ProjectEventsToNewUpdater[IO](queriesExecTimes, currentTime)
 
     val now = Instant.now()
     currentTime.expects().returning(now)

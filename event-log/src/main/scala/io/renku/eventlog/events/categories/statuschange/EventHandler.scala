@@ -29,7 +29,7 @@ import io.renku.eventlog.events.categories.statuschange.DBUpdater.EventUpdaterFa
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent._
 import io.renku.eventlog.{EventLogDB, EventMessage}
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
-import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
+import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult, Project}
 import io.renku.events.{EventRequestContent, consumers}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{CategoryName, CompoundEventId, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
@@ -58,6 +58,7 @@ private class EventHandler[F[_]: MonadThrow: Async: Spawn: Concurrent: Logger](
       requestAs[RollbackToNew],
       requestAs[RollbackToTriplesGenerated],
       requestAs[ToAwaitingDeletion],
+      requestAs[ProjectEventsToNew],
       requestAs[AllEventsToNew]
     )(request)
   }
@@ -216,6 +217,18 @@ private object EventHandler {
              case status           => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
            }
     } yield ToAwaitingDeletion(CompoundEventId(id, projectId), projectPath)
+  }
+
+  private implicit lazy val eventToProjectEventToNewDecoder
+      : EventRequestContent => Either[DecodingFailure, ProjectEventsToNew] = { request =>
+    for {
+      projectId   <- request.event.hcursor.downField("project").downField("id").as[projects.Id]
+      projectPath <- request.event.hcursor.downField("project").downField("path").as[projects.Path]
+      _ <- request.event.hcursor.downField("newStatus").as[EventStatus].flatMap {
+             case New    => Right(())
+             case status => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
+           }
+    } yield ProjectEventsToNew(Project(projectId, projectPath))
   }
 
   private implicit lazy val allEventNewDecoder: EventRequestContent => Either[DecodingFailure, AllEventsToNew] =
