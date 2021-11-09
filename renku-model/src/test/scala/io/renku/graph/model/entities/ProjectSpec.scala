@@ -365,17 +365,18 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       val resourceId    = projects.ResourceId(projectInfo.path)
       val maybeCreator  = projectInfo.maybeCreator.map(_.toPayloadPerson)
       val members       = projectInfo.members.map(_.toPayloadPerson)
-      val dataset1      = datasetEntities(provenanceInternal).withDateBefore(projectInfo.dateCreated).generateOne
-      val (dataset2, dateset2Modified) =
-        datasetAndModificationEntities(provenanceInternal).map { case (orig, modified) =>
+      val dataset1 =
+        datasetEntities(provenanceInternal).withDateBefore(projectInfo.dateCreated).generateOne.copy(parts = Nil)
+      val (dataset2, dateset2Modified) = datasetAndModificationEntities(provenanceInternal).map {
+        case (orig, modified) =>
           val newOrigDate = timestamps(max = projectInfo.dateCreated.value).generateAs[datasets.DateCreated]
           val newModificationDate =
             timestamps(min = newOrigDate.instant, max = projectInfo.dateCreated.value).generateAs[datasets.DateCreated]
           (
-            orig.copy(provenance = orig.provenance.copy(date = newOrigDate)),
-            modified.copy(provenance = modified.provenance.copy(date = newModificationDate))
+            orig.copy(provenance = orig.provenance.copy(date = newOrigDate), parts = Nil),
+            modified.copy(provenance = modified.provenance.copy(date = newModificationDate), parts = Nil)
           )
-        }.generateOne
+      }.generateOne
       val jsonLD = cliLikeJsonLD(
         resourceId,
         cliVersion,
