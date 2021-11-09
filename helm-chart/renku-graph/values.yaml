@@ -60,7 +60,7 @@ triplesGenerator:
       cpu: "1"
     limits:
       memory: 5000Mi
-      cpu: "15"
+      cpu: "10"
   jvmXmx: 2g
   renkuLogTimeout: 180 minutes
   reProvisioningRemovalBatchSize: 1000
