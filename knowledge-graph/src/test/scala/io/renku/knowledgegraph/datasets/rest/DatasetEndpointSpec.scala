@@ -23,9 +23,10 @@ import cats.syntax.all._
 import io.circe.Decoder._
 import io.circe.syntax._
 import io.circe.{Decoder, DecodingFailure, Json}
-import io.renku.generators.CommonGraphGenerators.renkuResourcesUrls
+import io.renku.generators.CommonGraphGenerators.{authContexts, renkuResourcesUrls}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.projects.Path
@@ -76,12 +77,14 @@ class DatasetEndpointSpec
             .map((modifiedToModified _).tupled)
         )
       ) { dataset =>
+        val authContext = authContexts(fixed(dataset.id)).generateOne
+
         (datasetsFinder
-          .findDataset(_: Identifier))
-          .expects(dataset.id)
+          .findDataset(_: Identifier, _: AuthContext[Identifier]))
+          .expects(dataset.id, authContext)
           .returning(dataset.some.pure[IO])
 
-        val response = endpoint.getDataset(dataset.id).unsafeRunSync()
+        val response = endpoint.getDataset(dataset.id, authContext).unsafeRunSync()
 
         response.status                            shouldBe Ok
         response.contentType                       shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -133,14 +136,15 @@ class DatasetEndpointSpec
 
     "respond with NOT_FOUND if there is no dataset with the given id" in new TestCase {
 
-      val identifier = datasetIdentifiers.generateOne
+      val identifier  = datasetIdentifiers.generateOne
+      val authContext = authContexts(fixed(identifier)).generateOne
 
       (datasetsFinder
-        .findDataset(_: Identifier))
-        .expects(identifier)
+        .findDataset(_: Identifier, _: AuthContext[Identifier]))
+        .expects(identifier, authContext)
         .returning(Option.empty[model.Dataset].pure[IO])
 
-      val response = endpoint.getDataset(identifier).unsafeRunSync()
+      val response = endpoint.getDataset(identifier, authContext).unsafeRunSync()
 
       response.status      shouldBe NotFound
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -152,15 +156,16 @@ class DatasetEndpointSpec
 
     "respond with INTERNAL_SERVER_ERROR if finding the dataset fails" in new TestCase {
 
-      val identifier = datasetIdentifiers.generateOne
+      val identifier  = datasetIdentifiers.generateOne
+      val authContext = authContexts(fixed(identifier)).generateOne
 
       val exception = exceptions.generateOne
       (datasetsFinder
-        .findDataset(_: Identifier))
-        .expects(identifier)
+        .findDataset(_: Identifier, _: AuthContext[Identifier]))
+        .expects(identifier, authContext)
         .returning(exception.raiseError[IO, Option[model.Dataset]])
 
-      val response = endpoint.getDataset(identifier).unsafeRunSync()
+      val response = endpoint.getDataset(identifier, authContext).unsafeRunSync()
 
       response.status      shouldBe InternalServerError
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -175,9 +180,9 @@ class DatasetEndpointSpec
     implicit val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
     val gitLabUrl = gitLabUrls.generateOne
 
-    val datasetsFinder    = mock[DatasetFinder[IO]]
-    val renkuResourcesUrl = renkuResourcesUrls.generateOne
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val datasetsFinder        = mock[DatasetFinder[IO]]
+    val renkuResourcesUrl     = renkuResourcesUrls.generateOne
     val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
     val endpoint = new DatasetEndpointImpl[IO](datasetsFinder, renkuResourcesUrl, gitLabUrl, executionTimeRecorder)
   }
