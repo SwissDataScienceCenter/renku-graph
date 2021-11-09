@@ -47,6 +47,11 @@ trait ProjectEntitiesGenerators {
     projectWithParentEntities(anyVisibility)
   )
 
+  def anyProjectEntities(visibilityGen: Gen[Visibility]): Gen[Project] = Gen.oneOf(
+    projectEntities(visibilityGen),
+    projectWithParentEntities(visibilityGen)
+  )
+
   lazy val projectEntitiesWithDatasetsAndActivities: Gen[Project] =
     projectEntities(anyVisibility)
       .withActivities(

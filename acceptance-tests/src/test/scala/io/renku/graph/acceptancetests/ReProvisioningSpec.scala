@@ -18,8 +18,9 @@
 
 package io.renku.graph.acceptancetests
 
+import cats.syntax.all._
 import io.circe.Json
-import io.renku.generators.CommonGraphGenerators.accessTokens
+import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.acceptancetests.data._
@@ -56,6 +57,8 @@ class ReProvisioningSpec
       val project  = dataProjects(testEntitiesProject).generateOne
       val commitId = commitIds.generateOne
 
+      `GET <gitlabApi>/user returning OK`(user)
+
       `data in the RDF store`(project, project.entitiesProject.asJsonLD, commitId)
 
       `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
@@ -86,7 +89,6 @@ class ReProvisioningSpec
         val updatedProjectDetailsResponse =
           knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)
         projectDetailsResponseIsValid(updatedProjectDetailsResponse, newSchemaVersion)
-
       }(PatienceConfig(timeout = Span(20, Minutes), interval = Span(10, Seconds)),
         Retrying.retryingNatureOfT,
         Position.here
@@ -96,13 +98,15 @@ class ReProvisioningSpec
 
   private object TestData {
 
-    implicit val accessToken: AccessToken = accessTokens.generateOne
+    val user = authUsers.generateOne
+    implicit val accessToken: AccessToken = user.accessToken
     val initialProjectSchemaVersion = SchemaVersion("8")
 
     val testEntitiesProject = projectEntities(visibilityPublic)
       .map(_.copy(version = initialProjectSchemaVersion))
       .withActivities(activityEntities(planEntities()))
       .generateOne
+      .copy(members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some)))
   }
 
   private def projectDetailsResponseIsValid(projectDetailsResponse:       ServiceClient.ClientResponse,

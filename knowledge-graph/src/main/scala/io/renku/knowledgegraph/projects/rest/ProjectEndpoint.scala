@@ -55,13 +55,12 @@ class ProjectEndpointImpl[F[_]: MonadThrow: Logger](
   import io.circe.{Encoder, Json}
   import org.http4s.circe._
 
-  def getProject(path: projects.Path, maybeAuthUser: Option[AuthUser]): F[Response[F]] =
-    measureExecutionTime {
-      projectFinder
-        .findProject(path, maybeAuthUser)
-        .flatMap(toHttpResult(path))
-        .recoverWith(httpResult(path))
-    } map logExecutionTimeWhen(finishedSuccessfully(path))
+  def getProject(path: projects.Path, maybeAuthUser: Option[AuthUser]): F[Response[F]] = measureExecutionTime {
+    projectFinder
+      .findProject(path, maybeAuthUser)
+      .flatMap(toHttpResult(path))
+      .recoverWith(httpResult(path))
+  } map logExecutionTimeWhen(finishedSuccessfully(path))
 
   private def toHttpResult(
       path: projects.Path
