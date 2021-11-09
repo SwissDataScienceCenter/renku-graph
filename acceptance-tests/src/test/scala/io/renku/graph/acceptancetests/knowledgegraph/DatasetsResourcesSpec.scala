@@ -327,6 +327,79 @@ class DatasetsResourcesSpec
       ()
     }
   }
+
+  Feature("GET knowledge-graph/datasets/:id to find dataset details") {
+
+    Scenario(
+      "As an unauthenticated and unauthorised user I should be able to see details of dataset on a public project"
+    ) {
+      implicit val accessToken: AccessToken = accessTokens.generateOne
+
+      val (dataset, testEntitiesProject) = projectEntities(visibilityPublic)
+        .addDataset(datasetEntities(provenanceInternal))
+        .generateOne
+
+      val project = dataProjects(testEntitiesProject).generateOne
+
+      Given("some data in the RDF Store")
+      `data in the RDF store`(project, testEntitiesProject.asJsonLD)
+      `wait for events to be processed`(project.id)
+
+      When("user fetches dataset details with GET knowledge-graph/datasets/:id")
+      val detailsResponse = knowledgeGraphClient GET s"knowledge-graph/datasets/${dataset.identifier}"
+
+      Then("he should get OK response with dataset's details")
+      detailsResponse.status            shouldBe Ok
+      detailsResponse.jsonBody.as[Json] shouldBe a[Right[_, _]]
+    }
+
+    Scenario(
+      "As an authenticated and authorised user I should be able to see details of a dataset on a non-public project " +
+        "and not see them if either not authorised or not authenticated"
+    ) {
+      val user = authUsers.generateOne
+      implicit val accessToken: AccessToken = user.accessToken
+
+      val (dataset, testEntitiesProject) = projectEntities(visibilityNonPublic)
+        .map(_.copy(members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some))))
+        .addDataset(datasetEntities(provenanceInternal))
+        .generateOne
+
+      val project = dataProjects(testEntitiesProject).generateOne
+
+      Given("I am authenticated")
+      `GET <gitlabApi>/user returning OK`(user)
+
+      Given("some data in the RDF Store")
+      `data in the RDF store`(project, testEntitiesProject.asJsonLD)
+      `wait for events to be processed`(project.id)
+
+      When("an authenticated and authorised user fetches dataset details through GET knowledge-graph/datasets/:id")
+      val detailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/datasets/${dataset.identifier}", accessToken)
+
+      Then("he should get OK response with the dataset details")
+      detailsResponse.status            shouldBe Ok
+      detailsResponse.jsonBody.as[Json] shouldBe a[Right[_, _]]
+
+      When("unauthenticated user tries to fetch details of the same dataset")
+      val unauthenticatedUser = authUsers.generateOne
+      `GET <gitlabApi>/user returning NOT_FOUND`(unauthenticatedUser)
+      val unauthenticatedResponse =
+        knowledgeGraphClient.GET(s"knowledge-graph/datasets/${dataset.identifier}", unauthenticatedUser.accessToken)
+
+      Then("he should get Unauthorized response")
+      unauthenticatedResponse.status shouldBe Unauthorized
+
+      When("authenticated but unauthorised user tries to do the same")
+      val unauthorisedUser = authUsers.generateOne
+      `GET <gitlabApi>/user returning OK`(unauthorisedUser)
+      val unauthorisedResponse =
+        knowledgeGraphClient.GET(s"knowledge-graph/datasets/${dataset.identifier}", unauthorisedUser.accessToken)
+
+      Then("he get NOT_FOUND response")
+      unauthorisedResponse.status shouldBe NotFound
+    }
+  }
 }
 
 trait DatasetsResources {

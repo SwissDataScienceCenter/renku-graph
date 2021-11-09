@@ -61,6 +61,15 @@ trait GitLab {
   def `GET <gitlabApi>/user returning OK`(user: AuthUser): Unit =
     `GET <gitlabApi>/user returning OK`(user.id)(user.accessToken)
 
+  def `GET <gitlabApi>/user returning NOT_FOUND`(user: AuthUser): Unit = {
+    stubFor {
+      get("/api/v4/user")
+        .withAccessTokenInHeader(user.accessToken)
+        .willReturn(notFound())
+    }
+    ()
+  }
+
   def `GET <gitlabApi>/user returning OK`(
       userGitLabId:       users.GitLabId = userGitLabIds.generateOne
   )(implicit accessToken: AccessToken): Unit = {
