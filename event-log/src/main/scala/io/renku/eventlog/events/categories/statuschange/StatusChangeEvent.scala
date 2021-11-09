@@ -19,7 +19,9 @@
 package io.renku.eventlog.events.categories.statuschange
 
 import cats.Show
+import cats.implicits.showInterpolator
 import io.renku.eventlog.EventMessage
+import io.renku.events.consumers.Project
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{CompoundEventId, EventProcessingTime, ZippedEventPayload}
 import io.renku.graph.model.projects
@@ -101,6 +103,13 @@ private object StatusChangeEvent {
   type AllEventsToNew = AllEventsToNew.type
   final case object AllEventsToNew extends StatusChangeEvent {
     implicit lazy val show: Show[AllEventsToNew] = Show.show(_ => s"status = $New")
+  }
+
+  final case class ProjectEventsToNew(project: Project) extends StatusChangeEvent
+  object ProjectEventsToNew {
+    implicit lazy val show: Show[ProjectEventsToNew] = Show.show { case ProjectEventsToNew(project) =>
+      show"$project, status = $New"
+    }
   }
 
   implicit def show[E <: StatusChangeEvent](implicit concreteShow: Show[E]): Show[E] = concreteShow
