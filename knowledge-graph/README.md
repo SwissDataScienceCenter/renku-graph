@@ -268,10 +268,11 @@ Endpoint to perform GraphQL queries on the Knowledge Graph data.
 
 **Response**
 
-| Status                     | Description                    |
-|----------------------------|--------------------------------|
-| OK (200)                   | Body containing queried data   |
-| INTERNAL SERVER ERROR (500)| Otherwise                      |
+| Status                     | Description                                  |
+|----------------------------|----------------------------------------------|
+| OK (200)                   | Body containing queried data                 |
+| UNAUTHORIZED (401)         | If given auth header cannot be authenticated |
+| INTERNAL SERVER ERROR (500)| Otherwise                                    |
 
 **Available queries**
 
