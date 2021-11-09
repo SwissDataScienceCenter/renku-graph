@@ -596,13 +596,13 @@ or
 {
   "categoryName": "GLOBAL_COMMIT_SYNC",
   "project": {
-    "id": 12,
+    "id":   12,
     "path": "project/path"
   },
-  "commits": [
-    "commitId1",
-    "commitId2"
-  ]
+  "commits": {
+    "count":  100,
+    "latest": "121435453edf"
+  }
 }
 ```
 

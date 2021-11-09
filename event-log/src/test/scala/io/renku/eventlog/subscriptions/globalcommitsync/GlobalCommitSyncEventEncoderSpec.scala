@@ -37,9 +37,11 @@ class GlobalCommitSyncEventEncoderSpec extends AnyWordSpec with should.Matchers 
           "id":         ${event.project.id.value},
           "path":       ${event.project.path.value}
         },
-        "commits":      ${event.commits.map(_.value)}
+        "commits": {
+          "count":  ${event.commits.count.value},
+          "latest": ${event.commits.latest.value}
+        }
       }"""
     }
-
   }
 }
