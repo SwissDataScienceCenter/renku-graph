@@ -24,7 +24,7 @@ import eu.timepit.refined.auto._
 import io.renku.db.implicits.PreparedQueryOps
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.ExecutionDate
-import io.renku.eventlog.TypeSerializers.{eventStatusDecoder, executionDateEncoder, projectIdEncoder}
+import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.ProjectEventsToNew
 import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.projects
@@ -42,10 +42,10 @@ private class ProjectEventsToNewUpdater[F[_]: Async](
 
   override def updateDB(event: ProjectEventsToNew): UpdateResult[F] = for {
     statuses <- updateStatuses(event)
-//    _ <- removeProjectProcessingTimes(event)
-//    _ <- removeProjectPayloads(event)
-//    _ <- removeProjectDeliveryInfos(event)
-//    _ <- removeAwaitingDeletionEvents(event)
+    _        <- removeProjectProcessingTimes(event)
+    _        <- removeProjectPayloads(event)
+    _        <- removeProjectDeliveryInfos(event)
+    _        <- removeAwaitingDeletionEvents(event)
     counts = statuses
                .groupBy(identity)
                .map { case (eventStatus, eventStatuses) => (eventStatus, -1 * eventStatuses.length) }
@@ -79,49 +79,49 @@ private class ProjectEventsToNewUpdater[F[_]: Async](
       .build(_.toList)
 
   }
-//
-//  private def removeProjectProcessingTimes(event: ProjectEventsToNew) = measureExecutionTime {
-//    SqlStatement(name = "project_to_new - processing_times removal")
-//      .command[skunk.Void](
-//        sql"""TRUNCATE TABLE status_processing_time""".command
-//      )
-//      .arguments(skunk.Void)
-//      .build
-//      .void
-//  }
-//
-//  private def removeProjectPayloads(event: ProjectEventsToNew) = measureExecutionTime {
-//    SqlStatement(name = "project_to_new - payloads removal")
-//      .command[skunk.Void](
-//        sql"""TRUNCATE TABLE event_payload""".command
-//      )
-//      .arguments(skunk.Void)
-//      .build
-//      .void
-//  }
-//
-//  private def removeAwaitingDeletionEvents(event: ProjectEventsToNew) = measureExecutionTime {
-//    SqlStatement(name = "project_to_new - awaiting_deletions removal")
-//      .command[skunk.Void](
-//        sql"""DELETE FROM event
-//              WHERE event_id = '#${EventStatus.AwaitingDeletion.value}'
-//        """.command
-//      )
-//      .arguments(skunk.Void)
-//      .build
-//      .void
-//  }
-//
-//  private def removeProjectDeliveryInfos(event: ProjectEventsToNew) = measureExecutionTime {
-//    SqlStatement(name = "project_to_new - delivery removal")
-//      .command[skunk.Void](
-//        sql"""TRUNCATE TABLE event_delivery""".command
-//      )
-//      .arguments(skunk.Void)
-//      .build
-//      .void
-//  }
-//
+
+  private def removeProjectProcessingTimes(event: ProjectEventsToNew) = measureExecutionTime {
+    SqlStatement(name = "project_to_new - processing_times removal")
+      .command[projects.Id](
+        sql"""DELETE FROM status_processing_time WHERE project_id = $projectIdEncoder""".command
+      )
+      .arguments(event.project.id)
+      .build
+      .void
+  }
+
+  private def removeProjectPayloads(event: ProjectEventsToNew) = measureExecutionTime {
+    SqlStatement(name = "project_to_new - payloads removal")
+      .command[projects.Id](
+        sql"""DELETE FROM event_payload WHERE project_id = $projectIdEncoder""".command
+      )
+      .arguments(event.project.id)
+      .build
+      .void
+  }
+
+  private def removeAwaitingDeletionEvents(event: ProjectEventsToNew) = measureExecutionTime {
+    SqlStatement(name = "project_to_new - awaiting_deletions removal")
+      .command[EventStatus ~ projects.Id](
+        sql"""DELETE FROM event
+              WHERE status = $eventStatusEncoder AND project_id = $projectIdEncoder
+        """.command
+      )
+      .arguments(EventStatus.AwaitingDeletion ~ event.project.id)
+      .build
+      .void
+  }
+
+  private def removeProjectDeliveryInfos(event: ProjectEventsToNew) = measureExecutionTime {
+    SqlStatement(name = "project_to_new - delivery removal")
+      .command[projects.Id](
+        sql"""DELETE FROM event_delivery WHERE project_id = $projectIdEncoder""".command
+      )
+      .arguments(event.project.id)
+      .build
+      .void
+  }
+
   private def `status IN`(statuses: Set[EventStatus]) =
     s"status IN (${statuses.map(s => s"'$s'").toList.mkString(",")})"
 }

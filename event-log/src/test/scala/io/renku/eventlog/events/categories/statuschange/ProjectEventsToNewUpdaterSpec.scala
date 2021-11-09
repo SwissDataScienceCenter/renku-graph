@@ -56,9 +56,11 @@ class ProjectEventsToNewUpdaterSpec
     "change the status of all events of a specific project to NEW except SKIPPED events" in new TestCase {
 
       val (projectId, projectPath) = projectIdentifiers.generateOne
-      val events = Gen
+      val eventsStatuses = Gen
         .oneOf(EventStatus.all.diff(Set(EventStatus.Skipped, EventStatus.AwaitingDeletion)))
         .generateNonEmptyList(2)
+
+      val events = eventsStatuses
         .map(addEvent(_, projectId, projectPath))
         .map(CompoundEventId(_, projectId))
         .toList
@@ -76,9 +78,17 @@ class ProjectEventsToNewUpdaterSpec
       events.foreach(upsertEventDelivery(_, subscriberId))
       upsertEventDelivery(otherProjectEventId, subscriberId)
 
+      val counts: Map[EventStatus, Int] =
+        eventsStatuses.toList
+          .groupBy(identity)
+          .map { case (eventStatus, statuses) => (eventStatus, -1 * statuses.length) }
+          .updatedWith(EventStatus.New) { maybeNewEvents =>
+            maybeNewEvents.map(_ + events.size).orElse(Some(events.size))
+          }
+
       sessionResource
         .useK(dbUpdater.updateDB(ProjectEventsToNew(Project(projectId, projectPath))))
-        .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(projectPath, Map(EventStatus.New -> events.size))
+        .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(projectPath, counts)
 
       events.flatMap(findFullEvent) shouldBe events.map { eventId =>
         (eventId.id, EventStatus.New, None, None, List())
@@ -86,7 +96,7 @@ class ProjectEventsToNewUpdaterSpec
 
       findEvent(CompoundEventId(skippedEvent, projectId)).map(_._2)          shouldBe Some(EventStatus.Skipped)
       findEvent(CompoundEventId(awaitingDeletionEvent, projectId)).map(_._2) shouldBe None
-      findAllDeliveries.filter { case (CompoundEventId(_, projectId), _) => projectId == projectId } shouldBe Nil
+      findAllDeliveries shouldBe List(otherProjectEventId -> subscriberId)
 
       findEvent(otherProjectEventId).map(_._2) shouldBe Some(eventStatus)
     }

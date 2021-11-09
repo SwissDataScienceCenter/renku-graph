@@ -19,7 +19,6 @@
 package io.renku.eventlog.events.categories.statuschange
 
 import cats.data.Kleisli
-import cats.effect.MonadCancelThrow
 import cats.effect.kernel.Async
 import cats.kernel.Monoid
 import cats.syntax.all._
