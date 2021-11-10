@@ -18,11 +18,11 @@
 
 package io.renku.triplesgenerator.events.categories.awaitinggeneration
 
+import cats.Show
 import cats.data.EitherT
 import cats.effect.kernel.Deferred
 import cats.effect.{Async, Concurrent}
 import cats.syntax.all._
-import cats.{MonadThrow, Show}
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
 import io.renku.events.consumers.EventSchedulingResult._
@@ -33,7 +33,7 @@ import io.renku.graph.model.events.{CategoryName, EventBody}
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
-private[events] class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
+private[events] class EventHandler[F[_]: Concurrent: Logger](
     override val categoryName:  CategoryName,
     eventProcessor:             EventProcessor[F],
     eventBodyDeserializer:      EventBodyDeserializer[F],

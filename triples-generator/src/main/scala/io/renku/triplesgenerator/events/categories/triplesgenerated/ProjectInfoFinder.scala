@@ -28,7 +28,7 @@ import io.renku.config.GitLab
 import io.renku.control.Throttler
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
-import io.renku.graph.model.projects.Description
+import io.renku.graph.model.projects.{Description, Visibility}
 import io.renku.graph.model.{GitLabApiUrl, projects, users}
 import io.renku.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
 import io.renku.http.client.UrlEncoder.urlEncode
@@ -108,9 +108,10 @@ private class ProjectInfoFinderImpl[F[_]: Async: Logger](
 
     implicit val decoder: Decoder[ProjectAndCreator] = cursor =>
       for {
-        path             <- cursor.downField("path_with_namespace").as[projects.Path]
-        name             <- cursor.downField("name").as[projects.Name]
-        visibility       <- cursor.downField("visibility").as[projects.Visibility]
+        path <- cursor.downField("path_with_namespace").as[projects.Path]
+        name <- cursor.downField("name").as[projects.Name]
+        visibility <-
+          cursor.downField("visibility").as[projects.Visibility].orElse(Either.right(Visibility.Public))
         dateCreated      <- cursor.downField("created_at").as[projects.DateCreated]
         maybeDescription <- cursor.downField("description").as[Option[projects.Description]]
         maybeCreatorId   <- cursor.downField("creator_id").as[Option[users.GitLabId]]
