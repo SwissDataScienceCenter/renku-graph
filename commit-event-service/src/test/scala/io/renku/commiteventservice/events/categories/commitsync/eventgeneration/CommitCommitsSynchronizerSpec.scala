@@ -46,7 +46,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import java.time.{Clock, ZoneId, ZoneOffset}
 import scala.util.{Failure, Success, Try}
 
-class CommitEventSynchronizerSpec extends AnyWordSpec with should.Matchers with MockFactory {
+class CommitCommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with MockFactory {
 
   "synchronizeEvents" should {
 

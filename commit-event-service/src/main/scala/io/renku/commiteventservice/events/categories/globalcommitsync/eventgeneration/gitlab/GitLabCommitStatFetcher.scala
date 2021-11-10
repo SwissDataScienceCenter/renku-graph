@@ -19,13 +19,13 @@
 package io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.gitlab
 
 import cats.data.OptionT
-import cats.effect.{Async, Temporal}
+import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.circe.Decoder
+import io.renku.commiteventservice.events.categories.globalcommitsync.CommitsCount
 import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.ProjectCommitStats
-import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.ProjectCommitStats.CommitCount
 import io.renku.config.GitLab
 import io.renku.control.Throttler
 import io.renku.graph.config.GitLabUrlLoader
@@ -46,7 +46,7 @@ private[globalcommitsync] trait GitLabCommitStatFetcher[F[_]] {
   ): F[Option[ProjectCommitStats]]
 }
 
-private[globalcommitsync] class GitLabCommitStatFetcherImpl[F[_]: Async: Temporal: Logger](
+private[globalcommitsync] class GitLabCommitStatFetcherImpl[F[_]: Async: Logger](
     gitLabCommitFetcher:    GitLabCommitFetcher[F],
     gitLabApiUrl:           GitLabApiUrl,
     gitLabThrottler:        Throttler[F, GitLab],
@@ -64,10 +64,12 @@ private[globalcommitsync] class GitLabCommitStatFetcherImpl[F[_]: Async: Tempora
 
   override def fetchCommitStats(projectId: projects.Id)(implicit
       maybeAccessToken:                    Option[AccessToken]
-  ): F[Option[ProjectCommitStats]] = (for {
-    maybeLatestCommitId <- OptionT.liftF(fetchLatestGitLabCommit(projectId))
-    commitCount         <- OptionT(fetchCommitCount(projectId))
-  } yield ProjectCommitStats(maybeLatestCommitId, commitCount)).value
+  ): F[Option[ProjectCommitStats]] = {
+    for {
+      maybeLatestCommitId <- OptionT.liftF(fetchLatestGitLabCommit(projectId))
+      commitCount         <- OptionT(fetchCommitCount(projectId))
+    } yield ProjectCommitStats(maybeLatestCommitId, commitCount)
+  }.value
 
   private def fetchCommitCount(projectId: projects.Id)(implicit maybeAccessToken: Option[AccessToken]) = for {
     uri         <- validateUri(s"$gitLabApiUrl/projects/$projectId?statistics=true")
@@ -75,24 +77,22 @@ private[globalcommitsync] class GitLabCommitStatFetcherImpl[F[_]: Async: Tempora
   } yield commitCount
 
   private implicit lazy val mapCountResponse: PartialFunction[(Status, Request[F], Response[F]), F[
-    Option[CommitCount]
+    Option[CommitsCount]
   ]] = {
-    case (Ok, _, response)    => response.as[CommitCount].map(_.some)
-    case (NotFound, _, _)     => Option.empty[CommitCount].pure[F]
+    case (Ok, _, response)    => response.as[CommitsCount].map(_.some)
+    case (NotFound, _, _)     => Option.empty[CommitsCount].pure[F]
     case (Unauthorized, _, _) => UnauthorizedException.raiseError
   }
 
-  private implicit val commitCountDecoder: EntityDecoder[F, CommitCount] = {
-    implicit val commitDecoder: Decoder[CommitCount] =
-      _.downField("statistics").downField("commit_count").as[Int].map(CommitCount(_))
-    jsonOf[F, CommitCount]
+  private implicit val commitCountDecoder: EntityDecoder[F, CommitsCount] = {
+    implicit val commitDecoder: Decoder[CommitsCount] =
+      _.downField("statistics").downField("commit_count").as(CommitsCount.decoder)
+    jsonOf[F, CommitsCount]
   }
 }
 
 private[globalcommitsync] object GitLabCommitStatFetcher {
-  def apply[F[_]: Async: Temporal: Logger](
-      gitLabThrottler: Throttler[F, GitLab]
-  ): F[GitLabCommitStatFetcher[F]] = for {
+  def apply[F[_]: Async: Logger](gitLabThrottler: Throttler[F, GitLab]): F[GitLabCommitStatFetcher[F]] = for {
     gitLabCommitFetcher <- GitLabCommitFetcher(gitLabThrottler)
     gitLabUrl           <- GitLabUrlLoader[F]()
   } yield new GitLabCommitStatFetcherImpl[F](gitLabCommitFetcher, gitLabUrl.apiV4, gitLabThrottler)

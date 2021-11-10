@@ -58,8 +58,10 @@ private[categories] object SynchronizationSummary {
   }
 
   implicit lazy val show: Show[SynchronizationSummary] = Show.show { summary =>
-    import summary._
-    s"${get("Created")} created, ${get("Existed")} existed, ${get("Skipped")} skipped, ${get("Deleted")} deleted, ${get("Failed")} failed"
+    summary.summary.toList
+      .sortBy(_._1)
+      .map { case (key, count) => s"$count ${key.toLowerCase}" }
+      .mkString(", ")
   }
 
   implicit val semigroup: Semigroup[SynchronizationSummary] =
