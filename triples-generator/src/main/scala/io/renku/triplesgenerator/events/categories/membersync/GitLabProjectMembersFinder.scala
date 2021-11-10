@@ -31,6 +31,7 @@ import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.http.client.{AccessToken, RestClient}
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.Method.GET
+import org.http4s.Status.Unauthorized
 import org.http4s._
 import org.http4s.circe.jsonOf
 import org.http4s.dsl.io.{NotFound, Ok}
@@ -79,6 +80,7 @@ private class GitLabProjectMembersFinderImpl[F[_]: Async: Logger](
       response
         .as[List[GitLabProjectMember]]
         .map(members => members.toSet -> maybeNextPage(response))
+    case (Unauthorized, _, _) => (Set.empty[GitLabProjectMember] -> Option.empty[Int]).pure[F]
     case (NotFound, _, _) =>
       (Set.empty[GitLabProjectMember] -> Option.empty[Int]).pure[F]
 

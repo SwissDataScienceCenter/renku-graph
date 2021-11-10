@@ -175,7 +175,8 @@ private class ProjectInfoFinderImpl[F[_]: Async: Logger](
     case (Ok, _, response) =>
       lazy val maybeNextPage: Option[Int] = response.headers.get(ci"X-Next-Page").flatMap(_.head.value.toIntOption)
       response.as[List[ProjectMember]].map(_.toSet -> maybeNextPage)
-    case (NotFound, _, _) => (Set.empty[ProjectMember] -> Option.empty[Int]).pure[F]
+    case (Unauthorized, _, _) => (Set.empty[ProjectMember] -> Option.empty[Int]).pure[F]
+    case (NotFound, _, _)     => (Set.empty[ProjectMember] -> Option.empty[Int]).pure[F]
   }
 
   private def addNextPage(
