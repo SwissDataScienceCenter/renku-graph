@@ -118,7 +118,7 @@ private class GitLabProjectFinderImpl[F[_]: Async: Logger](
     implicit val decoder: Decoder[GitLabProject] = cursor =>
       for {
         id               <- cursor.downField("id").as[Id]
-        visibility       <- cursor.downField("visibility").as[Visibility]
+        visibility       <- cursor.downField("visibility").as[Visibility] orElse Either.right(Visibility.Public)
         sshUrl           <- cursor.downField("ssh_url_to_repo").as[SshUrl]
         httpUrl          <- cursor.downField("http_url_to_repo").as[HttpUrl]
         webUrl           <- cursor.downField("web_url").as[WebUrl]

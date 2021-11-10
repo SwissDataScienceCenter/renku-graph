@@ -111,7 +111,7 @@ private class ProjectInfoFinderImpl[F[_]: Async: Logger](
         path <- cursor.downField("path_with_namespace").as[projects.Path]
         name <- cursor.downField("name").as[projects.Name]
         visibility <-
-          cursor.downField("visibility").as[projects.Visibility].orElse(Either.right(Visibility.Public))
+          cursor.downField("visibility").as[projects.Visibility] orElse Either.right(Visibility.Public)
         dateCreated      <- cursor.downField("created_at").as[projects.DateCreated]
         maybeDescription <- cursor.downField("description").as[Option[projects.Description]]
         maybeCreatorId   <- cursor.downField("creator_id").as[Option[users.GitLabId]]
