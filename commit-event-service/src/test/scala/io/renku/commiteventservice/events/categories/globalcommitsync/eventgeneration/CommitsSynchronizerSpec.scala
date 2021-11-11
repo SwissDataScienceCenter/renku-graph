@@ -20,6 +20,7 @@ package io.renku.commiteventservice.events.categories.globalcommitsync
 package eventgeneration
 
 import Generators.{commitsInfos, globalCommitSyncEvents}
+import cats.effect.IO
 import cats.syntax.all._
 import io.renku.commiteventservice.events.categories.common.SynchronizationSummary
 import io.renku.commiteventservice.events.categories.common.UpdateResult._
@@ -42,14 +43,20 @@ import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import scala.util._
+import scala.util.Random
 
-class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with MockFactory with ScalaCheckPropertyChecks {
+class CommitsSynchronizerSpec
+    extends AnyWordSpec
+    with IOSpec
+    with should.Matchers
+    with MockFactory
+    with ScalaCheckPropertyChecks {
 
   "synchronizeEvents" should {
 
@@ -60,7 +67,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
         givenAccessTokenIsFound(event.project.id)
         givenCommitStatsInGL(event.project.id, event.commits)
 
-        commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
+        commitsSynchronizer.synchronizeEvents(event).unsafeRunSync() shouldBe ()
 
         logger.loggedOnly(
           logSummary(event.project, SynchronizationSummary(Skipped.name -> event.commits.count.value.toInt))
@@ -84,7 +91,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
         expectEventsToBeCreated(event.project, glOnlyIds)
         expectEventsToBeDeleted(event.project, elOnlyIds)
 
-        commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
+        commitsSynchronizer.synchronizeEvents(event).unsafeRunSync() shouldBe ()
 
         logger.loggedOnly(
           logSummary(
@@ -109,7 +116,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
           expectEventsToBeCreated(event.project, glOnlyIds)
           expectEventsToBeDeleted(event.project, elOnlyIds)
 
-          commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
+          commitsSynchronizer.synchronizeEvents(event).unsafeRunSync() shouldBe ()
 
           logger.loggedOnly(
             logSummary(
@@ -129,9 +136,11 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
       (accessTokenFinder
         .findAccessToken(_: Id)(_: Id => String))
         .expects(event.project.id, projectIdToPath)
-        .returning(Failure(exception))
+        .returning(exception.raiseError[IO, Option[AccessToken]])
 
-      commitsSynchronizer.synchronizeEvents(event) shouldBe Failure(exception)
+      intercept[Exception] {
+        commitsSynchronizer.synchronizeEvents(event).unsafeRunSync()
+      } shouldBe exception
 
       logger.loggedOnly(Error(s"$categoryName - failed to sync commits for project ${event.project}", exception))
     }
@@ -150,7 +159,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
       expectEventsToBeCreated(event.project, Nil)
       expectEventsToBeDeleted(event.project, elOnlyIds)
 
-      commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
+      commitsSynchronizer.synchronizeEvents(event).unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(
         logSummary(
@@ -166,39 +175,39 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
 
     val maybeAccessToken = personalAccessTokens.generateOption
 
-    implicit val logger: TestLogger[Try] = TestLogger()
-    val accessTokenFinder         = mock[AccessTokenFinder[Try]]
-    val gitLabCommitStatFetcher   = mock[GitLabCommitStatFetcher[Try]]
-    val gitLabCommitFetcher       = mock[GitLabCommitFetcher[Try]]
-    val eventLogCommitFetcher     = mock[ELCommitFetcher[Try]]
-    val commitEventDeleter        = mock[CommitEventDeleter[Try]]
-    val missingCommitEventCreator = mock[MissingCommitEventCreator[Try]]
-    val executionTimeRecorder     = TestExecutionTimeRecorder[Try]()
-    val commitsSynchronizer = new CommitsSynchronizerImpl[Try](accessTokenFinder,
-                                                               gitLabCommitStatFetcher,
-                                                               gitLabCommitFetcher,
-                                                               eventLogCommitFetcher,
-                                                               commitEventDeleter,
-                                                               missingCommitEventCreator,
-                                                               executionTimeRecorder
+    implicit val logger: TestLogger[IO] = TestLogger()
+    val accessTokenFinder         = mock[AccessTokenFinder[IO]]
+    val gitLabCommitStatFetcher   = mock[GitLabCommitStatFetcher[IO]]
+    val gitLabCommitFetcher       = mock[GitLabCommitFetcher[IO]]
+    val eventLogCommitFetcher     = mock[ELCommitFetcher[IO]]
+    val commitEventDeleter        = mock[CommitEventDeleter[IO]]
+    val missingCommitEventCreator = mock[MissingCommitEventCreator[IO]]
+    val executionTimeRecorder     = TestExecutionTimeRecorder[IO]()
+    val commitsSynchronizer = new CommitsSynchronizerImpl[IO](accessTokenFinder,
+                                                              gitLabCommitStatFetcher,
+                                                              gitLabCommitFetcher,
+                                                              eventLogCommitFetcher,
+                                                              commitEventDeleter,
+                                                              missingCommitEventCreator,
+                                                              executionTimeRecorder
     )
 
     def givenAccessTokenIsFound(projectId: Id) = (accessTokenFinder
       .findAccessToken(_: Id)(_: Id => String))
       .expects(projectId, projectIdToPath)
-      .returning(maybeAccessToken.pure[Try])
+      .returning(maybeAccessToken.pure[IO])
 
     def givenProjectDoesntExistInGL(projectId: Id) =
       (gitLabCommitStatFetcher
         .fetchCommitStats(_: projects.Id)(_: Option[AccessToken]))
         .expects(projectId, maybeAccessToken)
-        .returning(None.pure[Try])
+        .returning(None.pure[IO])
 
     def givenCommitStatsInGL(projectId: Id, commitsInfo: CommitsInfo) =
       (gitLabCommitStatFetcher
         .fetchCommitStats(_: projects.Id)(_: Option[AccessToken]))
         .expects(projectId, maybeAccessToken)
-        .returning(Some(ProjectCommitStats(Some(commitsInfo.latest), commitsInfo.count)).pure[Try])
+        .returning(Some(ProjectCommitStats(Some(commitsInfo.latest), commitsInfo.count)).pure[IO])
 
     def givenCommitsInGL(projectId: Id, pageResults: PageResult*) = {
       val lastPage =
@@ -209,14 +218,14 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
         (gitLabCommitFetcher
           .fetchGitLabCommits(_: projects.Id, _: PagingRequest)(_: Option[AccessToken]))
           .expects(projectId, pageRequest(Page.first), maybeAccessToken)
-          .returning(PageResult.empty.pure[Try])
+          .returning(PageResult.empty.pure[IO])
       } else
         pageResults foreach { pageResult =>
           val previousPage = pageResult.maybeNextPage.map(p => Page(p.value - 1)).getOrElse(lastPage)
           (gitLabCommitFetcher
             .fetchGitLabCommits(_: projects.Id, _: PagingRequest)(_: Option[AccessToken]))
             .expects(projectId, pageRequest(previousPage), maybeAccessToken)
-            .returning(pageResult.pure[Try])
+            .returning(pageResult.pure[IO])
         }
     }
 
@@ -229,14 +238,14 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
         (eventLogCommitFetcher
           .fetchELCommits(_: projects.Path, _: PagingRequest))
           .expects(projectPath, pageRequest(Page.first))
-          .returning(PageResult.empty.pure[Try])
+          .returning(PageResult.empty.pure[IO])
       } else
         pageResults foreach { pageResult =>
           val previousPage = pageResult.maybeNextPage.map(p => Page(p.value - 1)).getOrElse(lastPage)
           (eventLogCommitFetcher
             .fetchELCommits(_: projects.Path, _: PagingRequest))
             .expects(projectPath, pageRequest(previousPage))
-            .returning(pageResult.pure[Try])
+            .returning(pageResult.pure[IO])
         }
     }
 
@@ -246,7 +255,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
         .expects(where { (p: Project, c: List[CommitId], at: Option[AccessToken]) =>
           (p == project) && (c.toSet == commits.toSet) && (at == maybeAccessToken)
         })
-        .returning(SynchronizationSummary().updated(Deleted, commits.length).pure[Try])
+        .returning(SynchronizationSummary().updated(Deleted, commits.length).pure[IO])
 
     def expectEventsToBeCreated(project: Project, commits: List[CommitId]) =
       (missingCommitEventCreator
@@ -254,7 +263,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
         .expects(where { (p: Project, c: List[CommitId], at: Option[AccessToken]) =>
           (p == project) && (c.toSet == commits.toSet) && (at == maybeAccessToken)
         })
-        .returning(SynchronizationSummary().updated(Created, commits.length).pure[Try])
+        .returning(SynchronizationSummary().updated(Created, commits.length).pure[IO])
   }
 
   private def logSummary(project:          Project,

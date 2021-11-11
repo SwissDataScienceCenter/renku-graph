@@ -19,11 +19,10 @@
 package io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration
 
 import cats.effect.Async
-import cats.effect.kernel.Temporal
 import cats.syntax.all._
-import cats.{MonadThrow, Show}
-import io.renku.commiteventservice.events.categories.common.{SynchronizationSummary, UpdateResult}
+import cats.{NonEmptyParallel, Show}
 import io.renku.commiteventservice.events.categories.common.SynchronizationSummary.semigroup
+import io.renku.commiteventservice.events.categories.common.{SynchronizationSummary, UpdateResult}
 import io.renku.commiteventservice.events.categories.globalcommitsync._
 import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.gitlab.{GitLabCommitFetcher, GitLabCommitStatFetcher}
 import io.renku.config.GitLab
@@ -45,7 +44,7 @@ private[globalcommitsync] trait CommitsSynchronizer[F[_]] {
   def synchronizeEvents(event: GlobalCommitSyncEvent): F[Unit]
 }
 
-private[globalcommitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger](
+private[globalcommitsync] class CommitsSynchronizerImpl[F[_]: Async: NonEmptyParallel: Logger](
     accessTokenFinder:         AccessTokenFinder[F],
     gitLabCommitStatFetcher:   GitLabCommitStatFetcher[F],
     gitLabCommitFetcher:       GitLabCommitFetcher[F],
@@ -99,15 +98,18 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger
       maybeNextGLPage:         Option[Page] = Some(Page.first),
       maybeNextELPage:         Option[Page] = Some(Page.first),
       actions:                 Map[Action, List[CommitId]] = Map(Create -> Nil, Delete -> Nil)
-  )(implicit maybeAccessToken: Option[AccessToken]): F[Map[Action, List[CommitId]]] = for {
-    glCommitsPage <- maybeNextGLPage
-                       .map(page => fetchGitLabCommits(event.project.id, pageRequest(page)))
-                       .getOrElse(PageResult.empty.pure[F])
-    elCommitsPage <- maybeNextELPage
-                       .map(page => fetchELCommits(event.project.path, pageRequest(page)))
-                       .getOrElse(PageResult.empty.pure[F])
-    updatedActions <- addNextPage(update(actions, glCommitsPage, elCommitsPage), glCommitsPage, elCommitsPage, event)
-  } yield updatedActions
+  )(implicit maybeAccessToken: Option[AccessToken]): F[Map[Action, List[CommitId]]] =
+    (
+      fetch(maybeNextGLPage, fetchGitLabCommits(event.project.id, _)),
+      fetch(maybeNextELPage, fetchELCommits(event.project.path, _))
+    ).parMapN { case (glCommitsPage, elCommitsPage) =>
+      addNextPage(update(actions, glCommitsPage, elCommitsPage), glCommitsPage, elCommitsPage, event)
+    }.flatten
+
+  private def fetch(maybeNextPage: Option[Page], fetcher: PagingRequest => F[PageResult]) =
+    maybeNextPage
+      .map(page => fetcher(PagingRequest(page, commitsPerPage)))
+      .getOrElse(PageResult.empty.pure[F])
 
   private def update(actions: Map[Action, List[CommitId]], glCommitsPage: PageResult, elCommitsPage: PageResult) = {
     val deletions = elCommitsPage.commits diff glCommitsPage.commits
@@ -165,13 +167,11 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger
     case Some(time) => show" in ${time}ms"
     case _          => ""
   }
-
-  private lazy val pageRequest: Page => PagingRequest = PagingRequest(_, commitsPerPage)
 }
 
 private[globalcommitsync] object CommitsSynchronizer {
-  def apply[F[_]: Async: Temporal: Logger](gitLabThrottler: Throttler[F, GitLab],
-                                           executionTimeRecorder: ExecutionTimeRecorder[F]
+  def apply[F[_]: Async: NonEmptyParallel: Logger](gitLabThrottler: Throttler[F, GitLab],
+                                                   executionTimeRecorder: ExecutionTimeRecorder[F]
   ): F[CommitsSynchronizer[F]] = for {
     accessTokenFinder         <- AccessTokenFinder[F]
     gitLabCommitStatFetcher   <- GitLabCommitStatFetcher(gitLabThrottler)

@@ -18,9 +18,10 @@
 
 package io.renku.commiteventservice.events.categories.globalcommitsync
 
+import cats.NonEmptyParallel
 import cats.data.EitherT.fromEither
-import cats.effect.kernel.Deferred
 import cats.effect._
+import cats.effect.kernel.Deferred
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
@@ -97,7 +98,7 @@ private[events] object EventHandler {
   import eu.timepit.refined.auto._
   val processesLimit: Int Refined Positive = 1
 
-  def apply[F[_]: Async: Spawn: Concurrent: Temporal: Logger](
+  def apply[F[_]: Async: NonEmptyParallel: Logger](
       subscriptionMechanism: SubscriptionMechanism[F],
       gitLabThrottler:       Throttler[F, GitLab],
       executionTimeRecorder: ExecutionTimeRecorder[F]
