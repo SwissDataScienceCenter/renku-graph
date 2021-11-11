@@ -279,5 +279,5 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
     }
   }
 
-  private lazy val pageRequest: Page => PagingRequest = PagingRequest(_, PerPage(20))
+  private lazy val pageRequest: Page => PagingRequest = PagingRequest(_, PerPage(50))
 }

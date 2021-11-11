@@ -55,7 +55,7 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger
     executionTimeRecorder:     ExecutionTimeRecorder[F]
 ) extends CommitsSynchronizer[F] {
 
-  val commitsPerPage = PerPage(20)
+  val commitsPerPage = PerPage(50)
 
   import accessTokenFinder._
   import commitEventDeleter._
