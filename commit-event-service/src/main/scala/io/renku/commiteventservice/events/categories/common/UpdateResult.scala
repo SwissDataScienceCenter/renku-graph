@@ -27,5 +27,6 @@ object UpdateResult {
   final case object Created                                      extends UpdateResult { val name: String = "Created" }
   final case object Existed                                      extends UpdateResult { val name: String = "Existed" }
   final case object Deleted                                      extends UpdateResult { val name: String = "Deleted" }
-  final case class Failed(message: String, exception: Throwable) extends UpdateResult { val name: String = "Failed" }
+  final case class Failed(message: String, exception: Throwable) extends UpdateResult { val name: String = Failed.name }
+  final object Failed { val name: String = "Failed" }
 }

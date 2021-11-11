@@ -21,8 +21,8 @@ package eventgeneration
 
 import Generators.{commitsInfos, globalCommitSyncEvents}
 import cats.syntax.all._
-import io.renku.commiteventservice.events.categories.common.UpdateResult.{Created, Deleted}
-import io.renku.commiteventservice.events.categories.common.{SynchronizationSummary, UpdateResult}
+import io.renku.commiteventservice.events.categories.common.SynchronizationSummary
+import io.renku.commiteventservice.events.categories.common.UpdateResult._
 import io.renku.commiteventservice.events.categories.globalcommitsync.GlobalCommitSyncEvent.CommitsInfo
 import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.gitlab.{GitLabCommitFetcher, GitLabCommitStatFetcher}
 import io.renku.events.consumers.Project
@@ -62,9 +62,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
         commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
 
         logger.loggedOnly(
-          logSummary(event.project,
-                     SynchronizationSummary().updated(UpdateResult.Skipped, event.commits.count.value.toInt)
-          )
+          logSummary(event.project, SynchronizationSummary(Skipped.name -> event.commits.count.value.toInt))
         )
       }
 
@@ -90,9 +88,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
         logger.loggedOnly(
           logSummary(
             event.project,
-            SynchronizationSummary()
-              .updated(UpdateResult.Created, glOnlyIds.size)
-              .updated(UpdateResult.Deleted, elOnlyIds.size),
+            SynchronizationSummary(Created.name -> glOnlyIds.size, Deleted.name -> elOnlyIds.size),
             executionTimeRecorder.elapsedTime.some
           )
         )
@@ -117,9 +113,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
           logger.loggedOnly(
             logSummary(
               event.project,
-              SynchronizationSummary()
-                .updated(UpdateResult.Created, glOnlyIds.size)
-                .updated(UpdateResult.Deleted, elOnlyIds.size),
+              SynchronizationSummary(Created.name -> glOnlyIds.size, Deleted.name -> elOnlyIds.size),
               executionTimeRecorder.elapsedTime.some
             )
           )
@@ -160,7 +154,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
       logger.loggedOnly(
         logSummary(
           event.project,
-          SynchronizationSummary().updated(UpdateResult.Created, 0).updated(UpdateResult.Deleted, elOnlyIds.size),
+          SynchronizationSummary(Created.name -> 0, Deleted.name -> elOnlyIds.size),
           executionTimeRecorder.elapsedTime.some
         )
       )
