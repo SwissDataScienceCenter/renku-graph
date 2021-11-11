@@ -173,6 +173,18 @@ lazy val acceptanceTests = Project(
   AutomateHeaderPlugin
 )
 
+lazy val tooling = Project(
+  id = "tooling",
+  base = file("tooling")
+).settings(
+  commonSettings
+).dependsOn(
+  webhookService,
+  graphCommons
+).enablePlugins(
+  AutomateHeaderPlugin
+)
+
 lazy val commonSettings = Seq(
   organization := "io.renku",
   scalaVersion := "2.13.6",
