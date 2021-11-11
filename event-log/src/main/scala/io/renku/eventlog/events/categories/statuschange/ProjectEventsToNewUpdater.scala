@@ -30,7 +30,7 @@ import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
 import skunk.implicits._
-import skunk.~
+import skunk.{Session, ~}
 
 import java.time.Instant
 
@@ -44,8 +44,8 @@ private class ProjectEventsToNewUpdater[F[_]: Async](
     statuses <- updateStatuses(event)
     _        <- removeProjectProcessingTimes(event)
     _        <- removeProjectPayloads(event)
-    _        <- removeProjectDeliveryInfos(event)
-    _        <- removeAwaitingDeletionEvents(event)
+    _        <- removeProjectDeliveryInfo(event)
+    _        <- removeProjectDeletingEvents(event)
     counts = statuses
                .groupBy(identity)
                .map { case (eventStatus, eventStatuses) => (eventStatus, -1 * eventStatuses.length) }
@@ -54,7 +54,7 @@ private class ProjectEventsToNewUpdater[F[_]: Async](
                }
   } yield DBUpdateResults.ForProjects(event.project.path, counts)
 
-  override def onRollback(event: ProjectEventsToNew) = Kleisli.pure(())
+  override def onRollback(event: ProjectEventsToNew): Kleisli[F, Session[F], Unit] = Kleisli.pure(())
 
   private def updateStatuses(event: ProjectEventsToNew) = measureExecutionTime {
     SqlStatement(name = "project_to_new - status update")
@@ -67,7 +67,7 @@ private class ProjectEventsToNewUpdater[F[_]: Async](
                 SELECT event_id, project_id, status 
                 FROM event
                 WHERE project_id = $projectIdEncoder AND #${`status IN`(
-          EventStatus.all.diff(Set(EventStatus.Skipped, EventStatus.AwaitingDeletion))
+          EventStatus.all.diff(Set(EventStatus.Skipped, EventStatus.AwaitingDeletion, EventStatus.Deleting))
         )}
                 FOR UPDATE
               ) old_evt
@@ -100,19 +100,19 @@ private class ProjectEventsToNewUpdater[F[_]: Async](
       .void
   }
 
-  private def removeAwaitingDeletionEvents(event: ProjectEventsToNew) = measureExecutionTime {
+  private def removeProjectDeletingEvents(event: ProjectEventsToNew) = measureExecutionTime {
     SqlStatement(name = "project_to_new - awaiting_deletions removal")
       .command[EventStatus ~ projects.Id](
         sql"""DELETE FROM event
               WHERE status = $eventStatusEncoder AND project_id = $projectIdEncoder
         """.command
       )
-      .arguments(EventStatus.AwaitingDeletion ~ event.project.id)
+      .arguments(EventStatus.Deleting ~ event.project.id)
       .build
       .void
   }
 
-  private def removeProjectDeliveryInfos(event: ProjectEventsToNew) = measureExecutionTime {
+  private def removeProjectDeliveryInfo(event: ProjectEventsToNew) = measureExecutionTime {
     SqlStatement(name = "project_to_new - delivery removal")
       .command[projects.Id](
         sql"""DELETE FROM event_delivery WHERE project_id = $projectIdEncoder""".command

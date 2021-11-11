@@ -67,6 +67,7 @@ class ProjectEventsToNewUpdaterSpec
 
       val skippedEvent          = addEvent(EventStatus.Skipped, projectId)
       val awaitingDeletionEvent = addEvent(EventStatus.AwaitingDeletion, projectId)
+      val deletingEvent         = addEvent(EventStatus.Deleting, projectId)
 
       val (otherProjectId, otherProjectPath) = projectIdentifiers.generateOne
       val eventStatus = Gen
@@ -95,7 +96,8 @@ class ProjectEventsToNewUpdaterSpec
       }
 
       findEvent(CompoundEventId(skippedEvent, projectId)).map(_._2)          shouldBe Some(EventStatus.Skipped)
-      findEvent(CompoundEventId(awaitingDeletionEvent, projectId)).map(_._2) shouldBe None
+      findEvent(CompoundEventId(awaitingDeletionEvent, projectId)).map(_._2) shouldBe Some(EventStatus.AwaitingDeletion)
+      findEvent(CompoundEventId(deletingEvent, projectId)).map(_._2)         shouldBe None
       findAllDeliveries shouldBe List(otherProjectEventId -> subscriberId)
 
       findEvent(otherProjectEventId).map(_._2) shouldBe Some(eventStatus)
