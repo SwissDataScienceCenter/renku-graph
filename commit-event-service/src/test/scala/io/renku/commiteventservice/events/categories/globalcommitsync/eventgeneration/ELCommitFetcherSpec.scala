@@ -7,7 +7,7 @@ import io.circe.Encoder
 import io.circe.Encoder._
 import io.circe.literal._
 import io.circe.syntax._
-import io.renku.generators.CommonGraphGenerators.pages
+import io.renku.generators.CommonGraphGenerators.{pages, pagingRequests}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.config.EventLogUrl
@@ -29,7 +29,7 @@ class ELCommitFetcherSpec extends AnyWordSpec with IOSpec with ExternalServiceSt
 
       val maybeNextPage = pages.generateOption
       stubFor {
-        get(s"/events?project-path=$projectPath&page=$page")
+        get(s"/events?project-path=$projectPath&page=${pageRequest.page}&per_page=${pageRequest.perPage}")
           .willReturn(
             okJson(commitIdsList.asJson.noSpaces)
               .withHeader("Next-Page", maybeNextPage.map(_.show).getOrElse(""))
@@ -37,60 +37,60 @@ class ELCommitFetcherSpec extends AnyWordSpec with IOSpec with ExternalServiceSt
       }
 
       elCommitFetcher
-        .fetchELCommits(projectPath, page)
+        .fetchELCommits(projectPath, pageRequest)
         .unsafeRunSync() shouldBe PageResult(commitIdsList, maybeNextPage)
     }
 
     "return no commits if there aren't any" in new TestCase {
 
       stubFor {
-        get(s"/events?project-path=$projectPath&page=$page")
+        get(s"/events?project-path=$projectPath&page=${pageRequest.page}&per_page=${pageRequest.perPage}")
           .willReturn(okJson("[]"))
       }
 
-      elCommitFetcher.fetchELCommits(projectPath, page).unsafeRunSync() shouldBe PageResult.empty
+      elCommitFetcher.fetchELCommits(projectPath, pageRequest).unsafeRunSync() shouldBe PageResult.empty
     }
 
     "return an empty list if project for NOT_FOUND" in new TestCase {
 
       stubFor {
-        get(s"/events?project-path=$projectPath&page=$page")
+        get(s"/events?project-path=$projectPath&page=${pageRequest.page}&per_page=${pageRequest.perPage}")
           .willReturn(notFound())
       }
 
-      elCommitFetcher.fetchELCommits(projectPath, page).unsafeRunSync() shouldBe PageResult.empty
+      elCommitFetcher.fetchELCommits(projectPath, pageRequest).unsafeRunSync() shouldBe PageResult.empty
     }
 
     "return an Exception if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
 
       stubFor {
-        get(s"/events?project-path=$projectPath&page=$page")
+        get(s"/events?project-path=$projectPath&page=${pageRequest.page}&per_page=${pageRequest.perPage}")
           .willReturn(badRequest().withBody("some error"))
       }
 
       intercept[Exception] {
-        elCommitFetcher.fetchELCommits(projectPath, page).unsafeRunSync()
-      }.getMessage shouldBe s"GET $eventLogUrl/events?project-path=$projectPath&page=$page returned ${Status.BadRequest}; body: some error"
+        elCommitFetcher.fetchELCommits(projectPath, pageRequest).unsafeRunSync()
+      }.getMessage shouldBe s"GET $eventLogUrl/events?project-path=$projectPath&page=${pageRequest.page}&per_page=${pageRequest.perPage} returned ${Status.BadRequest}; body: some error"
     }
 
     "return an Exception if remote client responds with unexpected body" in new TestCase {
 
       stubFor {
-        get(s"/events?project-path=$projectPath&page=$page")
+        get(s"/events?project-path=$projectPath&page=${pageRequest.page}&per_page=${pageRequest.perPage}")
           .willReturn(okJson("{}"))
       }
 
       intercept[Exception] {
-        elCommitFetcher.fetchELCommits(projectPath, page).unsafeRunSync()
+        elCommitFetcher.fetchELCommits(projectPath, pageRequest).unsafeRunSync()
       }.getMessage should startWith(
-        s"GET $eventLogUrl/events?project-path=$projectPath&page=$page returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+        s"GET $eventLogUrl/events?project-path=$projectPath&page=${pageRequest.page}&per_page=${pageRequest.perPage} returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
       )
     }
   }
 
   private trait TestCase {
     val projectPath   = projectPaths.generateOne
-    val page          = pages.generateOne
+    val pageRequest   = pagingRequests.generateOne
     val commitIdsList = commitIds.generateNonEmptyList().toList
 
     val eventLogUrl = EventLogUrl(externalServiceBaseUrl)

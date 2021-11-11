@@ -36,7 +36,8 @@ import io.renku.graph.model.projects.Id
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.graph.tokenrepository.AccessTokenFinder.projectIdToPath
 import io.renku.http.client.AccessToken
-import io.renku.http.rest.paging.model.Page
+import io.renku.http.rest.paging.PagingRequest
+import io.renku.http.rest.paging.model.{Page, PerPage}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
@@ -206,15 +207,15 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
 
       if (pageResults.isEmpty) {
         (gitLabCommitFetcher
-          .fetchGitLabCommits(_: projects.Id, _: Page)(_: Option[AccessToken]))
-          .expects(projectId, Page.first, maybeAccessToken)
+          .fetchGitLabCommits(_: projects.Id, _: PagingRequest)(_: Option[AccessToken]))
+          .expects(projectId, pageRequest(Page.first), maybeAccessToken)
           .returning(PageResult.empty.pure[Try])
       } else
         pageResults foreach { pageResult =>
           val previousPage = pageResult.maybeNextPage.map(p => Page(p.value - 1)).getOrElse(lastPage)
           (gitLabCommitFetcher
-            .fetchGitLabCommits(_: projects.Id, _: Page)(_: Option[AccessToken]))
-            .expects(projectId, previousPage, maybeAccessToken)
+            .fetchGitLabCommits(_: projects.Id, _: PagingRequest)(_: Option[AccessToken]))
+            .expects(projectId, pageRequest(previousPage), maybeAccessToken)
             .returning(pageResult.pure[Try])
         }
     }
@@ -226,15 +227,15 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
 
       if (pageResults.isEmpty) {
         (eventLogCommitFetcher
-          .fetchELCommits(_: projects.Path, _: Page))
-          .expects(projectPath, Page.first)
+          .fetchELCommits(_: projects.Path, _: PagingRequest))
+          .expects(projectPath, pageRequest(Page.first))
           .returning(PageResult.empty.pure[Try])
       } else
         pageResults foreach { pageResult =>
           val previousPage = pageResult.maybeNextPage.map(p => Page(p.value - 1)).getOrElse(lastPage)
           (eventLogCommitFetcher
-            .fetchELCommits(_: projects.Path, _: Page))
-            .expects(projectPath, previousPage)
+            .fetchELCommits(_: projects.Path, _: PagingRequest))
+            .expects(projectPath, pageRequest(previousPage))
             .returning(pageResult.pure[Try])
         }
     }
@@ -277,4 +278,6 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
       }
     }
   }
+
+  private lazy val pageRequest: Page => PagingRequest = PagingRequest(_, PerPage(20))
 }

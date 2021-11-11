@@ -12,6 +12,7 @@ import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects
 import io.renku.http.client.RestClient
 import io.renku.http.client.RestClientError.UnauthorizedException
+import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model.Page
 import org.http4s.Method.GET
 import org.http4s.Status.{NotFound, Ok, Unauthorized}
@@ -23,7 +24,7 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
 private trait ELCommitFetcher[F[_]] {
-  def fetchELCommits(projectPath: projects.Path, page: Page): F[PageResult]
+  def fetchELCommits(projectPath: projects.Path, pageRequest: PagingRequest): F[PageResult]
 }
 
 private object ELCommitFetcher {
@@ -44,15 +45,16 @@ private class ELCommitFetcherImpl[F[_]: Async: Logger](
     )
     with ELCommitFetcher[F] {
 
-  override def fetchELCommits(projectPath: projects.Path, page: Page): F[PageResult] = for {
-    uri        <- createUrl(projectPath, page)
+  override def fetchELCommits(projectPath: projects.Path, pageRequest: PagingRequest): F[PageResult] = for {
+    uri        <- createUrl(projectPath, pageRequest)
     pageResult <- send(request(GET, uri))(mapResponse)
   } yield pageResult
 
-  private def createUrl(projectPath: projects.Path, page: Page) =
+  private def createUrl(projectPath: projects.Path, pageRequest: PagingRequest) =
     validateUri(s"$eventLogUrl/events").map(
       _.withQueryParam("project-path", projectPath.show)
-        .withQueryParam("page", page.show)
+        .withQueryParam("page", pageRequest.page.show)
+        .withQueryParam("per_page", pageRequest.perPage.show)
     )
 
   private implicit lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[PageResult]] = {

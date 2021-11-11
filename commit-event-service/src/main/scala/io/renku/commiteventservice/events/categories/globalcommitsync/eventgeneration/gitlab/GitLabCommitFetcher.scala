@@ -32,6 +32,7 @@ import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.{GitLabApiUrl, projects}
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.client.{AccessToken, RestClient}
+import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model.Page
 import org.http4s.Method.GET
 import org.http4s.Status.{NotFound, Ok, Unauthorized}
@@ -48,7 +49,7 @@ private[globalcommitsync] trait GitLabCommitFetcher[F[_]] {
       maybeAccessToken:                  Option[AccessToken]
   ): F[Option[CommitId]]
 
-  def fetchGitLabCommits(projectId: projects.Id, page: Page)(implicit
+  def fetchGitLabCommits(projectId: projects.Id, pageRequest: PagingRequest)(implicit
       maybeAccessToken:             Option[AccessToken]
   ): F[PageResult]
 }
@@ -76,14 +77,16 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[F[_]: Async: Logger](
 
   override def fetchGitLabCommits(
       projectId:               projects.Id,
-      page:                    Page
+      pageRequest:             PagingRequest
   )(implicit maybeAccessToken: Option[AccessToken]): F[PageResult] = for {
-    uri        <- createUrl(projectId, page)
+    uri        <- createUrl(projectId, pageRequest)
     pageResult <- send(request(GET, uri, maybeAccessToken))(mapCommitResponse)
   } yield pageResult
 
-  private def createUrl(projectId: projects.Id, page: Page) =
-    validateUri(s"$gitLabApiUrl/projects/$projectId/repository/commits").map(_.withQueryParam("page", page.show))
+  private def createUrl(projectId: projects.Id, pageRequest: PagingRequest) =
+    validateUri(s"$gitLabApiUrl/projects/$projectId/repository/commits").map(
+      _.withQueryParam("page", pageRequest.page.show).withQueryParam("per_page", pageRequest.perPage.show)
+    )
 
   private implicit lazy val mapCommitResponse: PartialFunction[(Status, Request[F], Response[F]), F[PageResult]] = {
     case (Ok, _, response)    => (response.as[List[CommitId]] -> maybeNextPage(response)).mapN(PageResult(_, _))

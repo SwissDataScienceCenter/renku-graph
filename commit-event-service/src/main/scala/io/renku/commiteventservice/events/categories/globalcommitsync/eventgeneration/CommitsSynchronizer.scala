@@ -33,7 +33,8 @@ import io.renku.graph.model.events.CommitId
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.graph.tokenrepository.AccessTokenFinder._
 import io.renku.http.client.AccessToken
-import io.renku.http.rest.paging.model.Page
+import io.renku.http.rest.paging.PagingRequest
+import io.renku.http.rest.paging.model.{Page, PerPage}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import org.typelevel.log4cats.Logger
@@ -53,6 +54,8 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger
     missingCommitEventCreator: MissingCommitEventCreator[F],
     executionTimeRecorder:     ExecutionTimeRecorder[F]
 ) extends CommitsSynchronizer[F] {
+
+  val commitsPerPage = PerPage(20)
 
   import accessTokenFinder._
   import commitEventDeleter._
@@ -97,8 +100,12 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger
       maybeNextELPage:         Option[Page] = Some(Page.first),
       actions:                 Map[Action, List[CommitId]] = Map(Create -> Nil, Delete -> Nil)
   )(implicit maybeAccessToken: Option[AccessToken]): F[Map[Action, List[CommitId]]] = for {
-    glCommitsPage  <- maybeNextGLPage.map(fetchGitLabCommits(event.project.id, _)).getOrElse(PageResult.empty.pure[F])
-    elCommitsPage  <- maybeNextELPage.map(fetchELCommits(event.project.path, _)).getOrElse(PageResult.empty.pure[F])
+    glCommitsPage <- maybeNextGLPage
+                       .map(page => fetchGitLabCommits(event.project.id, pageRequest(page)))
+                       .getOrElse(PageResult.empty.pure[F])
+    elCommitsPage <- maybeNextELPage
+                       .map(page => fetchELCommits(event.project.path, pageRequest(page)))
+                       .getOrElse(PageResult.empty.pure[F])
     updatedActions <- addNextPage(update(actions, glCommitsPage, elCommitsPage), glCommitsPage, elCommitsPage, event)
   } yield updatedActions
 
@@ -158,6 +165,8 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger
     case Some(time) => show" in ${time}ms"
     case _          => ""
   }
+
+  private lazy val pageRequest: Page => PagingRequest = PagingRequest(_, commitsPerPage)
 }
 
 private[globalcommitsync] object CommitsSynchronizer {
