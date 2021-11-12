@@ -163,8 +163,8 @@ When the `query` parameter is given, the match is done on the following fields:
 * ~~readme~~ (KG does not keep content of README files, yet)
 
 Sorting:
+* `name` - to sort by entity name - **default when no `query` parameter is given**
 * `score` - to sort by match score (lucene text-matching score, see https://jena.apache.org/documentation/query/text-query.html)
-* `name` - to sort by entity name
 * `date` - to sort by entity creation date
 * ~~by entity modify date~~ (there's no info about modification date in KG)
 
