@@ -25,7 +25,7 @@ import cats.effect.kernel.Temporal
 import cats.effect.{Async, Concurrent, Spawn}
 import cats.syntax.all._
 import io.circe.Decoder
-import io.renku.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer
+import io.renku.commiteventservice.events.categories.commitsync.eventgeneration.CommitsSynchronizer
 import io.renku.config.GitLab
 import io.renku.control.Throttler
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
@@ -39,26 +39,19 @@ import scala.util.control.NonFatal
 
 private[events] class EventHandler[F[_]: MonadThrow: Spawn: Concurrent: Logger](
     override val categoryName: CategoryName,
-    commitEventSynchronizer:   CommitEventSynchronizer[F]
+    commitsSynchronizer:       CommitsSynchronizer[F]
 ) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
 
-  import commitEventSynchronizer._
+  import commitsSynchronizer._
   import io.renku.graph.model.projects
   import io.renku.tinytypes.json.TinyTypeDecoders._
 
-  override def createHandlingProcess(
-      request: EventRequestContent
-  ): F[EventHandlingProcess[F]] =
+  override def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]] =
     EventHandlingProcess[F](startSynchronizingEvents(request))
 
-  private def startSynchronizingEvents(
-      request: EventRequestContent
-  ): EitherT[F, EventSchedulingResult, Accepted] =
+  private def startSynchronizingEvents(request: EventRequestContent): EitherT[F, EventSchedulingResult, Accepted] =
     for {
-      event <-
-        fromEither[F](
-          request.event.as[CommitSyncEvent].leftMap(_ => BadRequest)
-        )
+      event <- fromEither[F](request.event.as[CommitSyncEvent].leftMap(_ => BadRequest))
       result <- Spawn[F]
                   .start(synchronizeEvents(event) recoverWith logError(event))
                   .toRightT
@@ -97,6 +90,6 @@ private[events] object EventHandler {
       gitLabThrottler:       Throttler[F, GitLab],
       executionTimeRecorder: ExecutionTimeRecorder[F]
   ): F[EventHandler[F]] = for {
-    commitEventSynchronizer <- CommitEventSynchronizer(gitLabThrottler, executionTimeRecorder)
+    commitEventSynchronizer <- CommitsSynchronizer(gitLabThrottler, executionTimeRecorder)
   } yield new EventHandler[F](categoryName, commitEventSynchronizer)
 }

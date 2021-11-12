@@ -24,6 +24,7 @@ import eu.timepit.refined.auto._
 import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.subscriptions.SubscriptionDataProvisioning
+import io.renku.eventlog.subscriptions.globalcommitsync.GlobalCommitSyncEvent.{CommitsCount, CommitsInfo}
 import io.renku.eventlog.{CreatedDate, EventDate, InMemoryEventLogDbSpec}
 import io.renku.events.consumers.ConsumersModelGenerators.projectsGen
 import io.renku.events.consumers.Project
@@ -37,7 +38,6 @@ import io.renku.graph.model.projects
 import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
-import org.scalamock.handlers.CallHandler2
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -59,23 +59,26 @@ class GlobalCommitSyncEventFinderSpec
   "popEvent" should {
 
     "return the event with the latest eventDate" +
-      s"when the subscription_category_sync_times table does not have rows for the $categoryName " in new TestCase {
+      s"when the subscription_category_sync_times table does not have rows for the $categoryName" in new TestCase {
         currentTime.expects().returning(now)
+
         finder.popEvent().unsafeRunSync() shouldBe None
 
         val project0                 = projectsGen.generateOne
         val (eventId0, oldEventDate) = genCommitIdAndDate(olderThanAWeek = true, project0.id)
         addEvent(eventId0, oldEventDate, project0.path)
 
-        val project1                     = projectsGen.generateOne
-        val (eventId1, lastestEventDate) = genCommitIdAndDate(olderThanAWeek = false, project1.id)
-        addEvent(eventId1, lastestEventDate, project1.path)
+        val project1                    = projectsGen.generateOne
+        val (eventId1, latestEventDate) = genCommitIdAndDate(olderThanAWeek = false, project1.id)
+        addEvent(eventId1, latestEventDate, project1.path)
 
         givenTheLastSyncedDateIsUpdated(project1)
 
         currentTime.expects().returning(now)
         finder.popEvent().unsafeRunSync() shouldBe GlobalCommitSyncEvent(project1,
-                                                                         List(CommitId(eventId1.id.value)),
+                                                                         CommitsInfo(CommitsCount(1),
+                                                                                     CommitId(eventId1.id.value)
+                                                                         ),
                                                                          None
         ).some
       }
@@ -86,6 +89,7 @@ class GlobalCommitSyncEventFinderSpec
       "and the project's latest event is the most recent of all ready-to-sync projects" in new TestCase {
 
         currentTime.expects().returning(now)
+
         finder.popEvent().unsafeRunSync() shouldBe None
 
         val project0                               = projectsGen.generateOne
@@ -103,18 +107,16 @@ class GlobalCommitSyncEventFinderSpec
         givenTheLastSyncedDateIsUpdated(project0)
 
         currentTime.expects().returning(now)
-        val Some(GlobalCommitSyncEvent(actualProject, commits, None)) = finder.popEvent().unsafeRunSync()
 
-        actualProject shouldBe project0
-        commits         should contain theSameElementsAs List(CommitId(project0Event0Id.id.value),
-                                                      CommitId(project0Event1Id.id.value)
+        finder.popEvent().unsafeRunSync() shouldBe Some(
+          GlobalCommitSyncEvent(project0, CommitsInfo(CommitsCount(2), CommitId(project0Event1Id.id.value)), None)
         )
-
       }
 
     "return None " +
       s"when all projects were synced less than a week ago" in new TestCase {
         currentTime.expects().returning(now)
+
         finder.popEvent().unsafeRunSync() shouldBe None
 
         val project0           = projectsGen.generateOne
@@ -127,6 +129,7 @@ class GlobalCommitSyncEventFinderSpec
         upsertLastSynced(project0.id, categoryName, project0LastSynced)
 
         currentTime.expects().returning(now)
+
         finder.popEvent().unsafeRunSync() shouldBe None
       }
 
@@ -134,13 +137,14 @@ class GlobalCommitSyncEventFinderSpec
       s"where the project hasn't been synced in the past week" +
       s"and the project's latest event is the most recent of all ready-to-sync projects" in new TestCase {
         currentTime.expects().returning(now)
+
         finder.popEvent().unsafeRunSync() shouldBe None
 
         val project0           = projectsGen.generateOne
         val project0LastSynced = genLastSynced(true)
 
-        val (project0Event0Id, project0Event0Date) = genCommitIdAndDate(projectId = project0.id)
-        val (project0Event1Id, project0Event1Date) = genCommitIdAndDate(projectId = project0.id)
+        val (project0Event0Id, project0Event0Date) = genCommitIdAndDate(olderThanAWeek = true, projectId = project0.id)
+        val (project0Event1Id, project0Event1Date) = genCommitIdAndDate(olderThanAWeek = false, projectId = project0.id)
         addEvent(project0Event0Id, project0Event0Date, project0.path)
         addEvent(project0Event1Id, project0Event1Date, project0.path)
         upsertLastSynced(project0.id, categoryName, project0LastSynced)
@@ -156,9 +160,10 @@ class GlobalCommitSyncEventFinderSpec
         givenTheLastSyncedDateIsUpdated(project0)
 
         currentTime.expects().returning(now)
+
         finder.popEvent().unsafeRunSync() shouldBe Some(
           GlobalCommitSyncEvent(project0,
-                                List(CommitId(project0Event0Id.id.value), CommitId(project0Event1Id.id.value)),
+                                CommitsInfo(CommitsCount(2), CommitId(project0Event1Id.id.value)),
                                 project0LastSynced.some
           )
         )
@@ -174,8 +179,8 @@ class GlobalCommitSyncEventFinderSpec
         val project0           = projectsGen.generateOne
         val project0LastSynced = genLastSynced(true)
 
-        val (project0Event0Id, project0Event0Date) = genCommitIdAndDate(projectId = project0.id)
-        val (project0Event1Id, project0Event1Date) = genCommitIdAndDate(projectId = project0.id)
+        val (project0Event0Id, project0Event0Date) = genCommitIdAndDate(olderThanAWeek = true, projectId = project0.id)
+        val (project0Event1Id, project0Event1Date) = genCommitIdAndDate(olderThanAWeek = false, projectId = project0.id)
         addEvent(project0Event0Id, project0Event0Date, project0.path)
         addEvent(project0Event1Id, project0Event1Date, project0.path, eventStatus = AwaitingDeletion)
         upsertLastSynced(project0.id, categoryName, project0LastSynced)
@@ -183,9 +188,12 @@ class GlobalCommitSyncEventFinderSpec
         givenTheLastSyncedDateIsUpdated(project0)
 
         currentTime.expects().returning(now)
-        finder.popEvent().unsafeRunSync() shouldBe Some(
-          GlobalCommitSyncEvent(project0, List(CommitId(project0Event0Id.id.value)), project0LastSynced.some)
-        )
+        finder.popEvent().unsafeRunSync() shouldBe GlobalCommitSyncEvent(project0,
+                                                                         CommitsInfo(CommitsCount(1),
+                                                                                     CommitId(project0Event0Id.id.value)
+                                                                         ),
+                                                                         project0LastSynced.some
+        ).some
       }
 
     "return None " +
@@ -213,16 +221,13 @@ class GlobalCommitSyncEventFinderSpec
     val lastSyncedDateUpdater = mock[LastSyncedDateUpdater[IO]]
     val currentTime           = mockFunction[Instant]
     val now                   = Instant.now()
-    val finder =
-      new GlobalCommitSyncEventFinderImpl(sessionResource,
-                                          lastSyncedDateUpdater,
-                                          TestLabeledHistogram[SqlStatement.Name]("query_id"),
-                                          currentTime
-      )
+    val finder = new GlobalCommitSyncEventFinderImpl(sessionResource,
+                                                     lastSyncedDateUpdater,
+                                                     TestLabeledHistogram[SqlStatement.Name]("query_id"),
+                                                     currentTime
+    )
 
-    def givenTheLastSyncedDateIsUpdated(
-        project: Project
-    ): CallHandler2[projects.Id, Option[LastSyncedDate], IO[Completion]] = {
+    def givenTheLastSyncedDateIsUpdated(project: Project) = {
       currentTime.expects().returning(now)
       (lastSyncedDateUpdater.run _)
         .expects(project.id, LastSyncedDate(now).some)
@@ -251,15 +256,13 @@ class GlobalCommitSyncEventFinderSpec
       projectPath: projects.Path,
       createdDate: CreatedDate = createdDates.generateOne,
       eventStatus: EventStatus = Gen.oneOf(EventStatus.all.filterNot(_ == AwaitingDeletion)).generateOne
-  ): Unit =
-    storeEvent(
-      eventId,
-      eventStatus,
-      executionDates.generateOne,
-      eventDate,
-      eventBodies.generateOne,
-      createdDate,
-      projectPath = projectPath
-    )
-
+  ): Unit = storeEvent(
+    eventId,
+    eventStatus,
+    executionDates.generateOne,
+    eventDate,
+    eventBodies.generateOne,
+    createdDate,
+    projectPath = projectPath
+  )
 }
