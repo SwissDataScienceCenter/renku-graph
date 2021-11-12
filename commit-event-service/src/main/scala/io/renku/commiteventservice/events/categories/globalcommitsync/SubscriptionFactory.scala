@@ -18,6 +18,7 @@
 
 package io.renku.commiteventservice.events.categories.globalcommitsync
 
+import cats.NonEmptyParallel
 import cats.effect._
 import cats.syntax.all._
 import io.renku.commiteventservice.Microservice
@@ -30,7 +31,7 @@ import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
 
-  def apply[F[_]: Async: Spawn: Concurrent: Temporal: Logger](
+  def apply[F[_]: Async: NonEmptyParallel: Logger](
       gitLabThrottler:       Throttler[F, GitLab],
       executionTimeRecorder: ExecutionTimeRecorder[F]
   ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {

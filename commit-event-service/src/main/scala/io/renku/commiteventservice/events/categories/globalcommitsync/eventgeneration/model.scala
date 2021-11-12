@@ -18,13 +18,10 @@
 
 package io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration
 
-import io.circe.{Decoder, HCursor}
-import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.ProjectCommitStats.CommitCount
+import io.renku.commiteventservice.events.categories.globalcommitsync.CommitsCount
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects
-import io.renku.tinytypes.constraints.NonNegativeInt
-import io.renku.tinytypes.json.TinyTypeDecoders._
-import io.renku.tinytypes.{IntTinyType, TinyTypeFactory}
+import io.renku.http.rest.paging.model.Page
 
 private[globalcommitsync] final case class CommitWithParents(id:        CommitId,
                                                              projectId: projects.Id,
@@ -32,15 +29,10 @@ private[globalcommitsync] final case class CommitWithParents(id:        CommitId
 )
 
 private[globalcommitsync] final case class ProjectCommitStats(maybeLatestCommit: Option[CommitId],
-                                                              commitCount:       CommitCount
+                                                              commitsCount:      CommitsCount
 )
 
-private[globalcommitsync] object ProjectCommitStats {
-  implicit val commitCountDecoder: Decoder[CommitCount] = (cursor: HCursor) =>
-    cursor.downField("statistics").downField("commit_count").as[CommitCount]
-
-  private[globalcommitsync] final class CommitCount private (val value: Int) extends AnyVal with IntTinyType
-  private[globalcommitsync] implicit object CommitCount
-      extends TinyTypeFactory[CommitCount](new CommitCount(_))
-      with NonNegativeInt
+private[globalcommitsync] final case class PageResult(commits: List[CommitId], maybeNextPage: Option[Page])
+private[globalcommitsync] object PageResult {
+  val empty: PageResult = PageResult(commits = Nil, maybeNextPage = None)
 }
