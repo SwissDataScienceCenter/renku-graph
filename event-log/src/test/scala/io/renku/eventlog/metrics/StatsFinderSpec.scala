@@ -165,6 +165,7 @@ class StatsFinderSpec
         GenerationNonRecoverableFailure     -> statuses.count(_ == GenerationNonRecoverableFailure),
         TransformationRecoverableFailure    -> statuses.count(_ == TransformationRecoverableFailure),
         TransformationNonRecoverableFailure -> statuses.count(_ == TransformationNonRecoverableFailure),
+        Deleting                            -> statuses.count(_ == Deleting),
         AwaitingDeletion                    -> statuses.count(_ == AwaitingDeletion)
       )
 
