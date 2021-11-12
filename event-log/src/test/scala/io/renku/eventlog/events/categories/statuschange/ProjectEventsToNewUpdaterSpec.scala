@@ -57,17 +57,25 @@ class ProjectEventsToNewUpdaterSpec
 
       val (projectId, projectPath) = projectIdentifiers.generateOne
       val eventsStatuses = Gen
-        .oneOf(EventStatus.all.diff(Set(EventStatus.Skipped, EventStatus.AwaitingDeletion)))
+        .oneOf(EventStatus.all.diff(Set(EventStatus.Skipped, EventStatus.AwaitingDeletion, EventStatus.Deleting)))
         .generateNonEmptyList(2)
 
-      val events = eventsStatuses
-        .map(addEvent(_, projectId, projectPath))
-        .map(CompoundEventId(_, projectId))
+      val eventsAndDates = eventsStatuses
+        .map { status =>
+          val eventDate = timestampsNotInTheFuture.generateAs(EventDate)
+          addEvent(status, projectId, projectPath, eventDate) -> eventDate
+        }
+        .map { case (id, eventDate) => CompoundEventId(id, projectId) -> eventDate }
         .toList
 
-      val skippedEvent          = addEvent(EventStatus.Skipped, projectId)
-      val awaitingDeletionEvent = addEvent(EventStatus.AwaitingDeletion, projectId)
-      val deletingEvent         = addEvent(EventStatus.Deleting, projectId)
+      val events = eventsAndDates.map(_._1)
+
+      val skippedEventDate          = timestampsNotInTheFuture.generateAs(EventDate)
+      val awaitingDeletionEventDate = timestampsNotInTheFuture.generateAs(EventDate)
+      val skippedEvent              = addEvent(EventStatus.Skipped, projectId, projectPath, skippedEventDate)
+      val awaitingDeletionEvent =
+        addEvent(EventStatus.AwaitingDeletion, projectId, projectPath, awaitingDeletionEventDate)
+      val deletingEvent = addEvent(EventStatus.Deleting, projectId, projectPath)
 
       val (otherProjectId, otherProjectPath) = projectIdentifiers.generateOne
       val eventStatus = Gen
@@ -100,6 +108,11 @@ class ProjectEventsToNewUpdaterSpec
       findEvent(CompoundEventId(deletingEvent, projectId)).map(_._2)         shouldBe None
       findAllDeliveries shouldBe List(otherProjectEventId -> subscriberId)
 
+      val latestEventDate: EventDate =
+        (List(skippedEventDate, awaitingDeletionEventDate) ::: eventsAndDates.map(_._2)).max
+
+      findProjects.find { case (id, _, _) => id == projectId }.map(_._3) shouldBe Some(latestEventDate)
+
       findEvent(otherProjectEventId).map(_._2) shouldBe Some(eventStatus)
     }
   }
@@ -120,14 +133,15 @@ class ProjectEventsToNewUpdaterSpec
 
     def addEvent(status:      EventStatus,
                  projectId:   projects.Id = projectIds.generateOne,
-                 projectPath: projects.Path = projectPaths.generateOne
+                 projectPath: projects.Path = projectPaths.generateOne,
+                 eventDate:   EventDate = timestampsNotInTheFuture.generateAs(EventDate)
     ): EventId = {
       val eventId = compoundEventIds.generateOne.copy(projectId = projectId)
       storeEvent(
         eventId,
         status,
         timestamps.generateAs(ExecutionDate),
-        timestampsNotInTheFuture.generateAs(EventDate),
+        eventDate,
         eventBodies.generateOne,
         maybeMessage = status match {
           case _: EventStatus.FailureStatus => eventMessages.generateSome

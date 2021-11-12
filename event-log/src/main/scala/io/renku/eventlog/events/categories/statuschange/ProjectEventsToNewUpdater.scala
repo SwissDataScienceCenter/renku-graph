@@ -23,9 +23,10 @@ import cats.effect.Async
 import eu.timepit.refined.auto._
 import io.renku.db.implicits.PreparedQueryOps
 import io.renku.db.{DbClient, SqlStatement}
-import io.renku.eventlog.ExecutionDate
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.ProjectEventsToNew
+import io.renku.eventlog.{EventDate, ExecutionDate}
+import io.renku.events.consumers.Project
 import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
@@ -41,11 +42,16 @@ private class ProjectEventsToNewUpdater[F[_]: Async](
     with DBUpdater[F, ProjectEventsToNew] {
 
   override def updateDB(event: ProjectEventsToNew): UpdateResult[F] = for {
-    statuses <- updateStatuses(event)
-    _        <- removeProjectProcessingTimes(event)
-    _        <- removeProjectPayloads(event)
-    _        <- removeProjectDeliveryInfo(event)
-    _        <- removeProjectDeletingEvents(event)
+    statuses             <- updateStatuses(event.project)
+    _                    <- removeProjectProcessingTimes(event.project)
+    _                    <- removeProjectPayloads(event.project)
+    _                    <- removeProjectDeliveryInfo(event.project)
+    _                    <- removeProjectDeletingEvents(event.project)
+    maybeLatestEventDate <- getLatestEventDate(event.project)
+    _ <- maybeLatestEventDate match {
+           case Some(latestEventDate) => updateLatestEventDate(event.project, latestEventDate)
+           case None                  => Kleisli.pure(())
+         }
     counts = statuses
                .groupBy(identity)
                .map { case (eventStatus, eventStatuses) => (eventStatus, -1 * eventStatuses.length) }
@@ -56,7 +62,7 @@ private class ProjectEventsToNewUpdater[F[_]: Async](
 
   override def onRollback(event: ProjectEventsToNew): Kleisli[F, Session[F], Unit] = Kleisli.pure(())
 
-  private def updateStatuses(event: ProjectEventsToNew) = measureExecutionTime {
+  private def updateStatuses(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - status update")
       .select[ExecutionDate ~ projects.Id, EventStatus](
         sql"""UPDATE event evt
@@ -75,49 +81,73 @@ private class ProjectEventsToNewUpdater[F[_]: Async](
               RETURNING old_evt.status
            """.query(eventStatusDecoder)
       )
-      .arguments(ExecutionDate(now()) ~ event.project.id)
+      .arguments(ExecutionDate(now()) ~ project.id)
       .build(_.toList)
-
   }
 
-  private def removeProjectProcessingTimes(event: ProjectEventsToNew) = measureExecutionTime {
+  private def removeProjectProcessingTimes(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - processing_times removal")
       .command[projects.Id](
         sql"""DELETE FROM status_processing_time WHERE project_id = $projectIdEncoder""".command
       )
-      .arguments(event.project.id)
+      .arguments(project.id)
       .build
       .void
   }
 
-  private def removeProjectPayloads(event: ProjectEventsToNew) = measureExecutionTime {
+  private def removeProjectPayloads(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - payloads removal")
       .command[projects.Id](
         sql"""DELETE FROM event_payload WHERE project_id = $projectIdEncoder""".command
       )
-      .arguments(event.project.id)
+      .arguments(project.id)
       .build
       .void
   }
 
-  private def removeProjectDeletingEvents(event: ProjectEventsToNew) = measureExecutionTime {
+  private def removeProjectDeletingEvents(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - awaiting_deletions removal")
       .command[EventStatus ~ projects.Id](
         sql"""DELETE FROM event
               WHERE status = $eventStatusEncoder AND project_id = $projectIdEncoder
         """.command
       )
-      .arguments(EventStatus.Deleting ~ event.project.id)
+      .arguments(EventStatus.Deleting ~ project.id)
       .build
       .void
   }
 
-  private def removeProjectDeliveryInfo(event: ProjectEventsToNew) = measureExecutionTime {
+  private def removeProjectDeliveryInfo(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - delivery removal")
       .command[projects.Id](
         sql"""DELETE FROM event_delivery WHERE project_id = $projectIdEncoder""".command
       )
-      .arguments(event.project.id)
+      .arguments(project.id)
+      .build
+      .void
+  }
+
+  private def getLatestEventDate(project: Project) = measureExecutionTime {
+    SqlStatement(name = "project_to_new - get latest event date")
+      .select[projects.Id, EventDate](
+        sql"""SELECT event_date FROM event 
+              WHERE project_id = $projectIdEncoder 
+              ORDER BY event_date DESC
+              LIMIT 1""".query(eventDateDecoder)
+      )
+      .arguments(project.id)
+      .build(_.option)
+  }
+
+  private def updateLatestEventDate(project: Project, eventDate: EventDate) = measureExecutionTime {
+    SqlStatement(name = "project_to_new - set latest event date")
+      .command[EventDate ~ projects.Id](
+        sql"""UPDATE project
+              SET latest_event_date = $eventDateEncoder
+              WHERE project_id = $projectIdEncoder
+              """.command
+      )
+      .arguments(eventDate ~ project.id)
       .build
       .void
   }
