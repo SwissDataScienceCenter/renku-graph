@@ -6,15 +6,16 @@ This is a microservice which provides API for the Graph DB.
 
 | Method  | Path                                                                    | Description                                                    |
 |---------|-------------------------------------------------------------------------|----------------------------------------------------------------|
-|  GET    | ```/knowledge-graph/datasets```                                         | Returns datasets.                                              |
+|  GET    | ```/knowledge-graph/datasets```                                         | Returns datasets filtered by the given predicates.             |
 |  GET    | ```/knowledge-graph/datasets/:id```                                     | Returns details of the dataset with the given `id`             |
+|  GET    | ```/knowledge-graph/entities```                                         | Returns entities filtered by the given predicates`             |
 |  GET    | ```/knowledge-graph/graphql```                                          | Returns GraphQL endpoint schema                                |
 |  POST   | ```/knowledge-graph/graphql```                                          | GraphQL query endpoint                                         |
 |  GET    | ```/knowledge-graph/projects/:namespace/:name```                        | Returns details of the project with the given `namespace/name` |
 |  GET    | ```/knowledge-graph/projects/:namespace/:name/datasets```               | Returns datasets of the project with the given `path`          |
 |  GET    | ```/ping```                                                             | To check if service is healthy                                 |
 
-#### GET /knowledge-graph/datasets?query=\<phrase\>&sort=\<property\>:asc|desc&page=\<page\>&per_page=\<per_page\>
+#### GET /knowledge-graph/datasets
 
 Finds datasets which `title`, `description`, `keywords`, or creator `name` matches the given `phrase` or returns all the
 datasets if no `query` parameter is given.
@@ -133,6 +134,131 @@ Response body example:
          }
       ]
    }
+]
+```
+
+#### GET /knowledge-graph/entities
+
+Allows finding `projects`, `datasets`, `workflows`, and `users`.
+
+Filtering:
+* `query` - to filter by matching field (e.g., title, keyword, description, etc. as specified below)
+* `type` - to filter by entity type; allowed values: `project`, `dataset`, `workflow`, and `user`
+* `user` - to filter by user (creator for projects and datasets); the filter would require user's name
+* `visibility` - to filter by visibility (restricted vs. public); allowed values: `public`, `internal`, `private`
+* `date` - to filter by entity's creation date
+* `projectTemplate` no info in KG yet
+* ~~group~~ no info in KG yet
+* ~~modifyDate~~ no info in KG yet
+
+**NOTE:** at least one filter must be specified
+
+When the `query` parameter is given, the match is done on the following fields:
+* entity type
+* name/title
+* namespace (for the project entity)
+* creator (note: workflows has no creator for now)
+* keyword/~~tag~~ (keywords for datasets, at the moment we don't have info about project's tags in KG)
+* description
+* ~~readme~~ (KG does not keep content of README files, yet)
+
+Sorting:
+* `score` - to sort by match score (lucene text-matching score, see https://jena.apache.org/documentation/query/text-query.html)
+* `name` - to sort by entity name
+* `date` - to sort by entity creation date
+* ~~by entity modify date~~ (there's no info about modification date in KG)
+
+**NOTE:** the sorting has to be requested by giving the `sort` query parameter with the property name and sorting order (`asc` or `desc`). The default order is ascending so `sort`=`name` means the same as `sort`=`name:asc`.
+
+**Paging:**
+* the `page` query parameter is optional and defaults to `1`.
+* the `per_page` query parameter is optional and defaults to `20`.
+
+**Response**
+
+| Status                     | Description                                                       |
+|----------------------------|-------------------------------------------------------------------|
+| OK (200)                   | If there are datasets for the project or `[]` if nothing is found |
+| BAD_REQUEST (400)          | If there are no filters or filters with illegal values            |
+| INTERNAL SERVER ERROR (500)| Otherwise                                                         |
+
+Response headers:
+
+| Header        | Description                                                                           |
+|---------------|---------------------------------------------------------------------------------------|
+| `Total`       | The total number of items                                                             |
+| `Total-Pages` | The total number of pages                                                             |
+| `Per-Page`    | The number of items per page                                                          |
+| `Page`        | The index of the current page (starting at 1)                                         |
+| `Next-Page`   | The index of the next page (optional)                                                 |
+| `Prev-Page`   | The index of the previous page (optional)                                             |
+| `Link`        | The set of `prev`/`next`/`first`/`last` link headers (`prev` and `next` are optional) |
+
+Assuming the total is `30` and the URL is `https://renku/knowledge-graph/entities?query=phrase&sort=name:asc&page=2&per_page=10` the following links will be added to the response:
+
+```
+Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="prev"
+Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="next"
+Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="first"
+Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="last"
+```
+
+Response body example:
+
+```json
+[
+  {
+    "type": "project",
+    "name": "name",
+    "namespace": "group/subgroup",
+    "visibility": "public",
+    "date": "2012-11-15T10:00:00.000Z",
+    "creator": "Jan Kowalski",
+    "description": "desc",
+    "_links": [
+      {
+        "rel": "details",
+        "href": "http://t:5511/projects/group/subgroup/name"
+      }
+    ]
+  },
+  {
+    "type": "dataset",
+    "name": "name",
+    "visibility": "public",
+    "date": "2012-11-15T10:00:00.000Z", // either datePublished or dateCreated
+    "creators": [
+      "Jan Kowalski",
+      "Zoe"
+    ],
+    "keywords": [
+      "keyword1",
+      "keyword2"
+    ],
+    "description": "desc",
+    "_links": [
+      {
+        "rel": "details",
+        "href": "http://t:5511/datasets/122334344"
+      }
+    ]
+  },
+  {
+    "type": "workflow",
+    "name": "name",
+    "visibility": "public",
+    "keywords": [
+      "keyword1",
+      "keyword2"
+    ],
+    "description": "desc",
+    "_links": []
+  },
+  {
+    "type": "user",
+    "name": "name",
+    "_links": []
+  }
 ]
 ```
 
