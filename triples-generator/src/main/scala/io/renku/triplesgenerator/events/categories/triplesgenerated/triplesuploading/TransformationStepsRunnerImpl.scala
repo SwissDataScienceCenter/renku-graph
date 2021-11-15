@@ -56,24 +56,24 @@ private[triplesgenerated] class TransformationStepsRunnerImpl[F[_]: MonadThrow](
     }
 
   private def runAllSteps(project: Project, steps: List[TransformationStep[F]]): F[(Project, TriplesUploadResult)] =
-    steps.foldLeft((project, DeliverySuccess: TriplesUploadResult).pure[F])((lastStepResults, nextStep) =>
-      lastStepResults >>= {
-        case (_, _: TriplesUploadFailure) => lastStepResults
-        case (previousMetadata, _)        => runSingleStep(nextStep, previousMetadata)
+    steps.foldLeft((project, DeliverySuccess: TriplesUploadResult).pure[F])((previousStepResults, nextStep) =>
+      previousStepResults >>= {
+        case (_, _: TriplesUploadFailure) => previousStepResults
+        case (previousProjectState, _)    => runSingleStep(nextStep, previousProjectState)
       }
     )
 
-  private def runSingleStep(nextStep: TransformationStep[F], previousProject: Project) = {
+  private def runSingleStep(step: TransformationStep[F], previousProjectState: Project) = {
     for {
-      stepResults    <- nextStep run previousProject
+      stepResults    <- step run previousProjectState
       sendingResults <- EitherT.right[ProcessingRecoverableError](execute(stepResults.queries))
     } yield stepResults.project -> sendingResults
   }
     .leftMap(recoverableFailure =>
-      previousProject -> (RecoverableFailure(recoverableFailure.getMessage): TriplesUploadResult)
+      previousProjectState -> (RecoverableFailure(recoverableFailure.getMessage): TriplesUploadResult)
     )
     .merge
-    .recoverWith(transformationFailure(previousProject, nextStep))
+    .recoverWith(transformationFailure(previousProjectState, step))
 
   private def execute(queries: List[SparqlQuery]) =
     queries

@@ -48,9 +48,9 @@ private[triplescuration] class DatasetTransformerImpl[F[_]: MonadThrow](
   override def createTransformationStep: TransformationStep[F] =
     TransformationStep("Dataset Details Updates", createTransformation)
 
-  private def createTransformation: Transformation[F] = projectMetadata =>
+  private def createTransformation: Transformation[F] = project =>
     EitherT {
-      (updateTopmostSameAs(ResultData(projectMetadata)) >>= updateTopmostDerivedFrom >>= updateHierarchyOnInvalidation)
+      (updateTopmostSameAs(ResultData(project)) >>= updateTopmostDerivedFrom >>= updateHierarchyOnInvalidation)
         .map(_.asRight[ProcessingRecoverableError])
         .recoverWith(maybeToRecoverableError)
     }

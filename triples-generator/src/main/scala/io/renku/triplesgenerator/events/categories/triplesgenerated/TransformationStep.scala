@@ -35,8 +35,7 @@ private[triplesgenerated] final case class TransformationStep[F[_]](
 
 private object TransformationStep {
 
-  private[triplesgenerated] type Transformation[F[_]] =
-    Project => TransformationStepResult[F]
+  private[triplesgenerated] type Transformation[F[_]] = Project => TransformationStepResult[F]
 
   private[triplesgenerated] type TransformationStepResult[F[_]] =
     EitherT[F, ProcessingRecoverableError, ResultData]

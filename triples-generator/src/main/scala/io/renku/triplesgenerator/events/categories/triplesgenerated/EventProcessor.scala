@@ -48,7 +48,7 @@ private trait EventProcessor[F[_]] {
 
 private class EventProcessorImpl[F[_]: MonadThrow: Logger](
     accessTokenFinder:     AccessTokenFinder[F],
-    triplesCurator:        TransformationStepsCreator[F],
+    stepsCreator:          TransformationStepsCreator[F],
     uploader:              TransformationStepsRunner[F],
     statusUpdater:         EventStatusUpdater[F],
     jsonLDDeserializer:    JsonLDDeserializer[F],
@@ -60,7 +60,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
   import accessTokenFinder._
   import executionTimeRecorder._
   import jsonLDDeserializer._
-  import triplesCurator._
+  import stepsCreator._
   import uploader._
 
   def process(event: TriplesGeneratedEvent): F[Unit] = {
@@ -83,8 +83,8 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
       event:                   TriplesGeneratedEvent
   )(implicit maybeAccessToken: Option[AccessToken]): F[UploadingResult] = {
     for {
-      projectMetadata <- deserializeToModel(event) leftSemiflatMap toUploadingError(event)
-      result          <- right[UploadingResult](run(createSteps, projectMetadata) >>= (toUploadingResult(event, _)))
+      project <- deserializeToModel(event) leftSemiflatMap toUploadingError(event)
+      result  <- right[UploadingResult](run(createSteps, project) >>= (toUploadingResult(event, _)))
     } yield result
   }.merge recoverWith nonRecoverableFailure(event)
 
