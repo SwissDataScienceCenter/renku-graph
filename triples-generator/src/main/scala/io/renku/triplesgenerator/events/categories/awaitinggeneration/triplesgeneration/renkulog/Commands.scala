@@ -120,7 +120,7 @@ private object Commands {
 
   class GitImpl[F[_]: MonadThrow](
       doClone: (ServiceUrl, RepositoryPath, Path) => CommandResult = (url, destinationDir, workDir) =>
-        %%("git", "clone", url.toString, destinationDir.toString)(workDir)
+        %%("git", "clone", "--no-checkout", url.toString, destinationDir.toString)(workDir)
   ) extends Git[F] {
     import cats.data.EitherT
     import cats.syntax.all._
