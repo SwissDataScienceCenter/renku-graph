@@ -26,7 +26,7 @@ import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep
-import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{ResultData, TransformationStepResult}
+import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{ProjectWithQueries, ResultData}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -38,7 +38,7 @@ class TransformationStepSpec extends AnyWordSpec with MockFactory with should.Ma
   "run" should {
 
     "executes step's transformation" in {
-      val stepTransformation = mockFunction[entities.Project, TransformationStepResult[Try]]
+      val stepTransformation = mockFunction[entities.Project, ProjectWithQueries[Try]]
       val step               = TransformationStep(nonBlankStrings().generateOne, stepTransformation)
 
       val project = projectEntitiesWithDatasetsAndActivities.generateOne.to[entities.Project]
@@ -51,6 +51,15 @@ class TransformationStepSpec extends AnyWordSpec with MockFactory with should.Ma
       stepTransformation.expects(project).returning(result)
 
       step.run(project) shouldBe result
+    }
+  }
+}
+
+class QueriesSpec extends AnyWordSpec with should.Matchers {
+
+  "combine" should {
+    "put pre and post queries of one Queries object after the pre and post queries of other Queries" in {
+      fail("boom!")
     }
   }
 }
