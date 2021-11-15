@@ -50,7 +50,7 @@ private class ProjectEventsToNewUpdater[F[_]: Async](
     maybeLatestEventDate <- getLatestEventDate(event.project)
     _ <- maybeLatestEventDate match {
            case Some(latestEventDate) => updateLatestEventDate(event.project, latestEventDate)
-           case None                  => Kleisli.pure(())
+           case None                  => cleanUpProject(event.project)
          }
     counts = statuses
                .groupBy(identity)
@@ -60,7 +60,26 @@ private class ProjectEventsToNewUpdater[F[_]: Async](
                }
   } yield DBUpdateResults.ForProjects(event.project.path, counts)
 
-  override def onRollback(event: ProjectEventsToNew): Kleisli[F, Session[F], Unit] = Kleisli.pure(())
+  private def cleanUpProject(project: Project): Kleisli[F, Session[F], Unit] = for {
+    _ <- removeProjectSubscriptionSyncTimes(project)
+    _ <- removeProject(project)
+    _ <- removeProjectWebhook(project)
+    _ <- removeProjectTokens(project)
+  } yield ()
+
+  private def removeProjectWebhook(project: Project): Kleisli[F, Session[F], Unit] = ???
+
+  private def removeProjectTokens(project: Project): Kleisli[F, Session[F], Unit] = ???
+
+  private def removeProjectSubscriptionSyncTimes(project: Project) = measureExecutionTime {
+    SqlStatement(name = "project_to_new - subscription_time removal")
+      .command[projects.Id](
+        sql"""DELETE FROM subscription_category_sync_time WHERE project_id = $projectIdEncoder""".command
+      )
+      .arguments(project.id)
+      .build
+      .void
+  }
 
   private def updateStatuses(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - status update")
@@ -84,6 +103,9 @@ private class ProjectEventsToNewUpdater[F[_]: Async](
       .arguments(ExecutionDate(now()) ~ project.id)
       .build(_.toList)
   }
+
+  private def `status IN`(statuses: Set[EventStatus]) =
+    s"status IN (${statuses.map(s => s"'$s'").toList.mkString(",")})"
 
   private def removeProjectProcessingTimes(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - processing_times removal")
@@ -152,6 +174,15 @@ private class ProjectEventsToNewUpdater[F[_]: Async](
       .void
   }
 
-  private def `status IN`(statuses: Set[EventStatus]) =
-    s"status IN (${statuses.map(s => s"'$s'").toList.mkString(",")})"
+  override def onRollback(event: ProjectEventsToNew): Kleisli[F, Session[F], Unit] = Kleisli.pure(())
+
+  private def removeProject(project: Project) = measureExecutionTime {
+    SqlStatement(name = "project_to_new - remove project")
+      .command[projects.Id](
+        sql"""DELETE FROM project WHERE project_id = $projectIdEncoder""".command
+      )
+      .argument(project.id)
+      .build
+      .void
+  }
 }

@@ -29,7 +29,7 @@ import io.renku.events.consumers.subscriptions.{subscriberIds, subscriberUrls}
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
-import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventProcessingTimes, zippedEventPayloads}
+import io.renku.graph.model.EventsGenerators.{categoryNames, compoundEventIds, eventBodies, eventProcessingTimes, lastSyncedDates, zippedEventPayloads}
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus}
 import io.renku.graph.model.projects
@@ -52,7 +52,6 @@ class ProjectEventsToNewUpdaterSpec
     with MockFactory {
 
   "updateDB" should {
-
     "change the status of all events of a specific project to NEW except SKIPPED events" in new TestCase {
 
       val (projectId, projectPath) = projectIdentifiers.generateOne
@@ -87,6 +86,8 @@ class ProjectEventsToNewUpdaterSpec
       events.foreach(upsertEventDelivery(_, subscriberId))
       upsertEventDelivery(otherProjectEventId, subscriberId)
 
+      upsertCategorySyncTime(projectId, categoryNames.generateOne, lastSyncedDates.generateOne)
+
       val counts: Map[EventStatus, Int] =
         eventsStatuses.toList
           .groupBy(identity)
@@ -106,7 +107,8 @@ class ProjectEventsToNewUpdaterSpec
       findEvent(CompoundEventId(skippedEvent, projectId)).map(_._2)          shouldBe Some(EventStatus.Skipped)
       findEvent(CompoundEventId(awaitingDeletionEvent, projectId)).map(_._2) shouldBe Some(EventStatus.AwaitingDeletion)
       findEvent(CompoundEventId(deletingEvent, projectId)).map(_._2)         shouldBe None
-      findAllDeliveries shouldBe List(otherProjectEventId -> subscriberId)
+      findAllDeliveries                               shouldBe List(otherProjectEventId -> subscriberId)
+      findProjectCategorySyncTimes(projectId).isEmpty shouldBe false
 
       val latestEventDate: EventDate =
         (List(skippedEventDate, awaitingDeletionEventDate) ::: eventsAndDates.map(_._2)).max
@@ -115,21 +117,43 @@ class ProjectEventsToNewUpdaterSpec
 
       findEvent(otherProjectEventId).map(_._2) shouldBe Some(eventStatus)
     }
+    "change the status of all events of a specific project to NEW except SKIPPED events - case when there are no events left in the project" in new TestCase {
+
+      val (projectId, projectPath) = projectIdentifiers.generateOne
+
+      val event1 = addEvent(EventStatus.Deleting, projectId, projectPath)
+      val event2 = addEvent(EventStatus.Deleting, projectId, projectPath)
+
+      upsertCategorySyncTime(projectId, categoryNames.generateOne, lastSyncedDates.generateOne)
+
+      sessionResource
+        .useK(dbUpdater.updateDB(ProjectEventsToNew(Project(projectId, projectPath))))
+        .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(projectPath, Map.empty)
+
+      findEvent(CompoundEventId(event1, projectId)) shouldBe None
+      findEvent(CompoundEventId(event2, projectId)) shouldBe None
+
+      findProjectCategorySyncTimes(projectId).isEmpty shouldBe true
+      findProjects.find(p => p._1 == projectId)       shouldBe None
+
+    }
   }
 
   private trait TestCase {
 
-    val subscriberId          = subscriberIds.generateOne
-    private val subscriberUrl = subscriberUrls.generateOne
-    private val sourceUrl     = microserviceBaseUrls.generateOne
+    lazy val projectIdentifiers = for {
+      id   <- projectIds
+      path <- projectPaths
+    } yield (id, path)
+    val subscriberId = subscriberIds.generateOne
+    val currentTime  = mockFunction[Instant]
     upsertSubscriber(subscriberId, subscriberUrl, sourceUrl)
-
-    val currentTime      = mockFunction[Instant]
-    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val dbUpdater        = new ProjectEventsToNewUpdater[IO](queriesExecTimes, currentTime)
-
-    val now = Instant.now()
+    val queriesExecTimes      = TestLabeledHistogram[SqlStatement.Name]("query_id")
+    val dbUpdater             = new ProjectEventsToNewUpdater[IO](queriesExecTimes, currentTime)
+    val now                   = Instant.now()
+    private val subscriberUrl = subscriberUrls.generateOne
     currentTime.expects().returning(now)
+    private val sourceUrl = microserviceBaseUrls.generateOne
 
     def addEvent(status:      EventStatus,
                  projectId:   projects.Id = projectIds.generateOne,
@@ -176,11 +200,6 @@ class ProjectEventsToNewUpdaterSpec
         (eventId.id, status, maybeMessage, maybePayload, processingTime.map(_._2))
       }
     }
-
-    lazy val projectIdentifiers = for {
-      id   <- projectIds
-      path <- projectPaths
-    } yield (id, path)
 
   }
 }
