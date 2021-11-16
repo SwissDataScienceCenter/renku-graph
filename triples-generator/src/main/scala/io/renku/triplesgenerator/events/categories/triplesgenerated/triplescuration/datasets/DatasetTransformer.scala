@@ -23,11 +23,11 @@ import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.graph.model.entities.Dataset
+import io.renku.graph.model.entities.{Dataset, Project}
 import io.renku.http.client.RestClientError._
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{ResultData, Transformation}
+import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{Queries, Transformation}
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.{ProjectFunctions, TransformationStep}
 import org.typelevel.log4cats.Logger
@@ -50,69 +50,76 @@ private[triplescuration] class DatasetTransformerImpl[F[_]: MonadThrow](
 
   private def createTransformation: Transformation[F] = project =>
     EitherT {
-      (updateTopmostSameAs(ResultData(project)) >>= updateTopmostDerivedFrom >>= updateHierarchyOnInvalidation)
+      (updateTopmostSameAs((project, Queries.empty)) >>= updateTopmostDerivedFrom >>= updateHierarchyOnInvalidation)
         .map(_.asRight[ProcessingRecoverableError])
         .recoverWith(maybeToRecoverableError)
     }
 
-  private def updateTopmostSameAs(resultData: ResultData) = findInternallyImportedDatasets(resultData.project)
-    .foldLeft(resultData.pure[F]) { (resultDataF, dataset) =>
-      for {
-        resultData               <- resultDataF
-        maybeParentTopmostSameAs <- findParentTopmostSameAs(dataset.provenance.sameAs)
-        maybeKGTopmostSameAs     <- findTopmostSameAs(dataset.identification.resourceId)
-        updatedDataset = maybeParentTopmostSameAs.map(dataset.update) getOrElse dataset
-      } yield ResultData(
-        project = update(dataset, updatedDataset)(resultData.project),
-        queries = resultData.queries ::: updatesCreator.prepareUpdates(dataset, maybeKGTopmostSameAs)
-      )
-    }
-
-  private def updateTopmostDerivedFrom(resultData: ResultData) =
-    findModifiedDatasets(resultData.project)
-      .foldLeft(resultData.pure[F]) { (resultDataF, dataset) =>
+  private lazy val updateTopmostSameAs: ((Project, Queries)) => F[(Project, Queries)] = { case (project, queries) =>
+    findInternallyImportedDatasets(project)
+      .foldLeft((project -> queries).pure[F]) { (projectAndQueriesF, dataset) =>
         for {
-          resultData                    <- resultDataF
-          maybeParentTopmostDerivedFrom <- findParentTopmostDerivedFrom(dataset.provenance.derivedFrom)
-          maybeKGTopmostDerivedFrom     <- findTopmostDerivedFrom(dataset.identification.resourceId)
-          updatedDataset = maybeParentTopmostDerivedFrom.map(dataset.update) getOrElse dataset
-        } yield ResultData(
-          project = update(dataset, updatedDataset)(resultData.project),
-          queries = resultData.queries ::: updatesCreator.prepareUpdates(dataset, maybeKGTopmostDerivedFrom)
+          projectAndQueries        <- projectAndQueriesF
+          maybeParentTopmostSameAs <- findParentTopmostSameAs(dataset.provenance.sameAs)
+          maybeKGTopmostSameAs     <- findTopmostSameAs(dataset.identification.resourceId)
+          updatedDataset = maybeParentTopmostSameAs.map(dataset.update) getOrElse dataset
+        } yield (
+          update(dataset, updatedDataset)(projectAndQueries._1),
+          projectAndQueries._2 |+| Queries(updatesCreator.prepareUpdates(dataset, maybeKGTopmostSameAs), List.empty)
         )
       }
+  }
 
-  private def updateHierarchyOnInvalidation(resultData: ResultData) = findInvalidatedDatasets(resultData.project)
-    .foldLeft(resultData.pure[F]) { (resultDataF, dataset) =>
-      for {
-        resultData <- resultDataF
-        queries = dataset.provenance match {
-                    case _: Dataset.Provenance.Internal =>
-                      updatesCreator.prepareUpdatesWhenInvalidated(
-                        dataset.asInstanceOf[Dataset[Dataset.Provenance.Internal]]
-                      )
-                    case _: Dataset.Provenance.ImportedExternal =>
-                      updatesCreator.prepareUpdatesWhenInvalidated(
-                        dataset.asInstanceOf[Dataset[Dataset.Provenance.ImportedExternal]]
-                      )
-                    case _: Dataset.Provenance.ImportedInternal =>
-                      updatesCreator.prepareUpdatesWhenInvalidated(
-                        dataset.asInstanceOf[Dataset[Dataset.Provenance.ImportedInternal]]
-                      )
-                    case _ => Nil
-                  }
-      } yield ResultData(
-        project = resultData.project,
-        queries = resultData.queries ::: queries
-      )
-    }
+  private lazy val updateTopmostDerivedFrom: ((Project, Queries)) => F[(Project, Queries)] = {
+    case (project, queries) =>
+      findModifiedDatasets(project)
+        .foldLeft((project -> queries).pure[F]) { (resultDataF, dataset) =>
+          for {
+            resultData                    <- resultDataF
+            maybeParentTopmostDerivedFrom <- findParentTopmostDerivedFrom(dataset.provenance.derivedFrom)
+            maybeKGTopmostDerivedFrom     <- findTopmostDerivedFrom(dataset.identification.resourceId)
+            updatedDataset = maybeParentTopmostDerivedFrom.map(dataset.update) getOrElse dataset
+          } yield (
+            update(dataset, updatedDataset)(resultData._1),
+            resultData._2 |+| Queries(updatesCreator.prepareUpdates(dataset, maybeKGTopmostDerivedFrom), List.empty)
+          )
+        }
+  }
+
+  private lazy val updateHierarchyOnInvalidation: ((Project, Queries)) => F[(Project, Queries)] = {
+    case (project, queries) =>
+      findInvalidatedDatasets(project)
+        .foldLeft((project -> queries).pure[F]) { (projectAndQueriesF, dataset) =>
+          for {
+            projectAndQueries <- projectAndQueriesF
+            preDataUploadQueries = dataset.provenance match {
+                                     case _: Dataset.Provenance.Internal =>
+                                       updatesCreator.prepareUpdatesWhenInvalidated(
+                                         dataset.asInstanceOf[Dataset[Dataset.Provenance.Internal]]
+                                       )
+                                     case _: Dataset.Provenance.ImportedExternal =>
+                                       updatesCreator.prepareUpdatesWhenInvalidated(
+                                         dataset.asInstanceOf[Dataset[Dataset.Provenance.ImportedExternal]]
+                                       )
+                                     case _: Dataset.Provenance.ImportedInternal =>
+                                       updatesCreator.prepareUpdatesWhenInvalidated(
+                                         dataset.asInstanceOf[Dataset[Dataset.Provenance.ImportedInternal]]
+                                       )
+                                     case _ => Nil
+                                   }
+          } yield (
+            projectAndQueries._1,
+            projectAndQueries._2 |+| Queries(preDataUploadQueries, List.empty)
+          )
+        }
+  }
 
   private lazy val maybeToRecoverableError
-      : PartialFunction[Throwable, F[Either[ProcessingRecoverableError, ResultData]]] = {
+      : PartialFunction[Throwable, F[Either[ProcessingRecoverableError, (Project, Queries)]]] = {
     case e @ (_: UnexpectedResponseException | _: ConnectivityException | _: ClientException |
         _: UnauthorizedException) =>
       TransformationRecoverableError("Problem finding dataset details in KG", e)
-        .asLeft[ResultData]
+        .asLeft[(Project, Queries)]
         .leftWiden[ProcessingRecoverableError]
         .pure[F]
   }

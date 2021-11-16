@@ -19,14 +19,15 @@
 package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration
 
 import cats.data.EitherT
-import io.renku.generators.CommonGraphGenerators.sparqlQueries
+import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep
-import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{ProjectWithQueries, ResultData}
+import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{ProjectWithQueries, Queries}
+import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.Generators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -44,9 +45,7 @@ class TransformationStepSpec extends AnyWordSpec with MockFactory with should.Ma
       val project = projectEntitiesWithDatasetsAndActivities.generateOne.to[entities.Project]
 
       val result = EitherT.rightT[Try, ProcessingRecoverableError](
-        ResultData(projectEntitiesWithDatasetsAndActivities.generateOne.to[entities.Project],
-                   sparqlQueries.generateList()
-        )
+        (projectEntitiesWithDatasetsAndActivities.generateOne.to[entities.Project], queriesGen.generateOne)
       )
       stepTransformation.expects(project).returning(result)
 
@@ -59,7 +58,13 @@ class QueriesSpec extends AnyWordSpec with should.Matchers {
 
   "combine" should {
     "put pre and post queries of one Queries object after the pre and post queries of other Queries" in {
-      fail("boom!")
+
+      val queries0 = queriesGen.generateOne
+      val queries1 = queriesGen.generateOne
+
+      (queries0 |+| queries1) shouldBe Queries(queries0.preDataUploadQueries ::: queries1.preDataUploadQueries,
+                                               queries0.postDataUploadQueries ::: queries1.postDataUploadQueries
+      )
     }
   }
 }

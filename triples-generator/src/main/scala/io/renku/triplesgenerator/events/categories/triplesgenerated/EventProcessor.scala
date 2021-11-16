@@ -100,16 +100,10 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
           s"${logMessageCommon(triplesGeneratedEvent)} $message"
         )
         .map(_ => RecoverableError(triplesGeneratedEvent, error))
-    case error @ InvalidTriplesFailure(message) =>
+    case error: NonRecoverableFailure =>
       Logger[F]
         .error(error)(
-          s"${logMessageCommon(triplesGeneratedEvent)} $message"
-        )
-        .map(_ => NonRecoverableError(triplesGeneratedEvent, error: Throwable))
-    case error @ InvalidUpdatesFailure(message) =>
-      Logger[F]
-        .error(error)(
-          s"${logMessageCommon(triplesGeneratedEvent)} $message"
+          s"${logMessageCommon(triplesGeneratedEvent)} ${error.message}"
         )
         .map(_ => NonRecoverableError(triplesGeneratedEvent, error: Throwable))
   }

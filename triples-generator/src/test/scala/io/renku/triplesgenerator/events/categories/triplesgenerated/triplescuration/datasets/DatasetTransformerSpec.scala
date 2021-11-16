@@ -30,6 +30,7 @@ import io.renku.http.client.RestClientError
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.rdfstore.SparqlQuery
 import io.renku.triplesgenerator.events.categories.triplesgenerated.ProjectFunctions
+import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.Queries
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -73,9 +74,9 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         val step = transformer.createTransformationStep
 
         step.name.value shouldBe "Dataset Details Updates"
-        val Success(Right(updateResult)) = step.run(project).value
-        updateResult.project shouldBe ProjectFunctions.update(dataset1, dataset1.update(kgTopmostSameAs))(project)
-        updateResult.queries shouldBe (dataset1Queries ::: dataset2Queries)
+        val Success(Right((updatedProject, queries))) = step.run(project).value
+        updatedProject shouldBe ProjectFunctions.update(dataset1, dataset1.update(kgTopmostSameAs))(project)
+        queries        shouldBe Queries(dataset1Queries ::: dataset2Queries, Nil)
       }
 
     "find all modified datasets, " +
@@ -133,9 +134,10 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         val step = transformer.createTransformationStep
 
         step.name.value shouldBe "Dataset Details Updates"
-        val Success(Right(updateResult)) = step.run(project).value
-        updateResult.project shouldBe ProjectFunctions.update(dataset1, dataset1.update(kgTopmostDerivedFrom))(project)
-        updateResult.queries should contain theSameElementsAs (dataset1Queries ::: dataset2Queries ::: importedDatasetQueries ::: dataset3Queries)
+        val Success(Right((updatedProject, queries))) = step.run(project).value
+        updatedProject shouldBe ProjectFunctions.update(dataset1, dataset1.update(kgTopmostDerivedFrom))(project)
+        queries.preDataUploadQueries should contain theSameElementsAs (dataset1Queries ::: dataset2Queries ::: importedDatasetQueries ::: dataset3Queries)
+        queries.postDataUploadQueries shouldBe List.empty[SparqlQuery]
       }
 
     "prepare updates for deleted datasets" in new TestCase {
@@ -190,10 +192,11 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
 
       val step = transformer.createTransformationStep
 
-      val Success(Right(updateResult)) = step.run(entitiesProjectWithAllDatasets).value
+      val Success(Right((updatedProject, queries))) = step.run(entitiesProjectWithAllDatasets).value
 
-      updateResult.project shouldBe entitiesProjectWithAllDatasets
-      updateResult.queries should contain theSameElementsAs (internalDsQueries ::: importedExternalDsQueries ::: ancestorInternalDsQueries ::: ancestorExternalDsQueries)
+      updatedProject shouldBe entitiesProjectWithAllDatasets
+      queries.preDataUploadQueries should contain theSameElementsAs (internalDsQueries ::: importedExternalDsQueries ::: ancestorInternalDsQueries ::: ancestorExternalDsQueries)
+      queries.postDataUploadQueries shouldBe List.empty[SparqlQuery]
     }
 
     "return the ProcessingRecoverableFailure if calls to KG fails with a network or HTTP error" in new TestCase {

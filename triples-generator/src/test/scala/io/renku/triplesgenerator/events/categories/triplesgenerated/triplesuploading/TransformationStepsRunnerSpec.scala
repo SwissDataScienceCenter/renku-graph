@@ -30,12 +30,13 @@ import io.renku.graph.model.testentities._
 import io.renku.jsonld.syntax._
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep
-import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{ProjectWithQueries, ResultData}
+import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{ProjectWithQueries, Queries}
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.Generators._
 
 import scala.util.{Success, Try}
 
@@ -47,29 +48,36 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
       val originalProject     = anyProjectEntities.generateOne.to[entities.Project]
       val step1Transformation = mockFunction[entities.Project, ProjectWithQueries[Try]]
       val step1Project        = anyProjectEntities.generateOne.to[entities.Project]
-      val step1Queries        = sparqlQueries.generateList()
+      val step1Queries        = queriesGen.generateOne
       step1Transformation
         .expects(originalProject)
-        .returning(EitherT.rightT[Try, ProcessingRecoverableError](ResultData(step1Project, step1Queries)))
+        .returning(EitherT.rightT[Try, ProcessingRecoverableError]((step1Project, step1Queries)))
 
       val step2Project        = anyProjectEntities.generateOne.to[entities.Project]
-      val step2Queries        = sparqlQueries.generateList()
+      val step2Queries        = queriesGen.generateOne
       val step2Transformation = mockFunction[entities.Project, ProjectWithQueries[Try]]
       step2Transformation
         .expects(step1Project)
-        .returning(EitherT.rightT[Try, ProcessingRecoverableError](ResultData(step2Project, step2Queries)))
+        .returning(EitherT.rightT[Try, ProcessingRecoverableError]((step2Project, step2Queries)))
 
       inSequence {
-        step1Queries.foreach { query =>
-          (updatesUploader.send _).expects(query).returning(DeliverySuccess.pure[Try])
+        step1Queries.preDataUploadQueries.foreach { query =>
+          (updatesUploader.send _).expects(query).returning(EitherT.rightT(DeliverySuccess))
         }
-        step2Queries.foreach { query =>
-          (updatesUploader.send _).expects(query).returning(DeliverySuccess.pure[Try])
+        step2Queries.preDataUploadQueries.foreach { query =>
+          (updatesUploader.send _).expects(query).returning(EitherT.rightT(DeliverySuccess))
         }
 
         (triplesUploader.uploadTriples _)
           .expects(step2Project.asJsonLD.flatten.fold(fail(_), identity))
-          .returning(DeliverySuccess.pure[Try])
+          .returning(EitherT.rightT(DeliverySuccess))
+
+        step1Queries.postDataUploadQueries.foreach { query =>
+          (updatesUploader.send _).expects(query).returning(EitherT.rightT(DeliverySuccess))
+        }
+        step2Queries.postDataUploadQueries.foreach { query =>
+          (updatesUploader.send _).expects(query).returning(EitherT.rightT(DeliverySuccess))
+        }
       }
 
       uploader.run(
@@ -87,14 +95,14 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
       val recoverableError = transformationRecoverableErrors.generateOne
       step1Transformation
         .expects(originalProject)
-        .returning(EitherT.leftT[Try, ResultData](recoverableError))
+        .returning(EitherT.leftT[Try, (entities.Project, Queries)](recoverableError))
 
       uploader.run(List(TransformationStep(nonBlankStrings().generateOne, step1Transformation)),
                    originalProject
       ) shouldBe RecoverableFailure(recoverableError.getMessage).pure[Try]
     }
 
-    s"return $InvalidUpdatesFailure if a transformation step fails to run" in new TestCase {
+    s"return $NonRecoverableFailure if a transformation step fails to run" in new TestCase {
       val originalProject = anyProjectEntities.generateOne.to[entities.Project]
 
       val step1Name           = nonBlankStrings().generateOne
@@ -103,66 +111,60 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
       val exception = exceptions.generateOne
       step1Transformation
         .expects(originalProject)
-        .returning(EitherT.right[ProcessingRecoverableError](exception.raiseError[Try, ResultData]))
+        .returning(EitherT(exception.raiseError[Try, Either[ProcessingRecoverableError, (entities.Project, Queries)]]))
 
       uploader.run(List(TransformationStep(step1Name, step1Transformation)),
                    originalProject
-      ) shouldBe InvalidUpdatesFailure(s"$step1Name transformation step failed: $exception").pure[Try]
+      ) shouldBe NonRecoverableFailure(s"Transformation of ${originalProject.path} failed: $exception", exception)
+        .pure[Try]
     }
 
-    s"return $RecoverableFailure if executing transformation step queries fails with a RecoverableFailure" in new TestCase {
+    s"return $RecoverableFailure if executing the transformation step preDataUploadQueries fails with a RecoverableFailure" in new TestCase {
       val originalProject = anyProjectEntities.generateOne.to[entities.Project]
 
       val step1Transformation = mockFunction[entities.Project, ProjectWithQueries[Try]]
 
       val step1Project = anyProjectEntities.generateOne.to[entities.Project]
-      val step1Queries = sparqlQueries.generateFixedSizeList(1)
+      val step1Queries = queriesGen.generateOne.copy(preDataUploadQueries = sparqlQueries.generateNonEmptyList().toList)
       step1Transformation
         .expects(originalProject)
-        .returning(EitherT.rightT[Try, ProcessingRecoverableError](ResultData(step1Project, step1Queries)))
+        .returning(EitherT.rightT[Try, ProcessingRecoverableError]((step1Project, step1Queries)))
 
       val recoverableError = RecoverableFailure(nonEmptyStrings().generateOne)
-      step1Queries.foreach { query =>
-        (updatesUploader.send _).expects(query).returning(recoverableError.pure[Try])
-      }
-
-      val step2Transformation = mockFunction[entities.Project, ProjectWithQueries[Try]]
+      (updatesUploader.send _)
+        .expects(step1Queries.preDataUploadQueries.head)
+        .returning(EitherT.leftT(recoverableError))
 
       uploader.run(
-        List(TransformationStep(nonBlankStrings().generateOne, step1Transformation),
-             TransformationStep(nonBlankStrings().generateOne, step2Transformation)
-        ),
+        List(TransformationStep(nonBlankStrings().generateOne, step1Transformation)),
         originalProject
-      ) shouldBe recoverableError.pure[Try]
+      ) shouldBe RecoverableFailure(s"Failed to execute pre-data-upload queries: ${recoverableError.message}").pure[Try]
     }
 
-    s"return $InvalidUpdatesFailure if executing transformation step queries fails with a InvalidUpdatesFailure" in new TestCase {
+    s"return $NonRecoverableFailure if executing transformation step preDataUploadQueries fails with a NonRecoverableFailure" in new TestCase {
       val originalProject = anyProjectEntities.generateOne.to[entities.Project]
 
       val step1Transformation = mockFunction[entities.Project, ProjectWithQueries[Try]]
 
-      val step1Metadata = anyProjectEntities.generateOne.to[entities.Project]
-      val step1Queries  = sparqlQueries.generateFixedSizeList(1)
+      val step1Project = anyProjectEntities.generateOne.to[entities.Project]
+      val step1Queries = Queries(sparqlQueries.generateNonEmptyList().toList, Nil)
       step1Transformation
         .expects(originalProject)
-        .returning(EitherT.rightT[Try, ProcessingRecoverableError](ResultData(step1Metadata, step1Queries)))
+        .returning(EitherT.rightT[Try, ProcessingRecoverableError]((step1Project, step1Queries)))
 
-      val nonRecoverableError = InvalidUpdatesFailure(nonEmptyStrings().generateOne)
-      step1Queries.foreach { query =>
-        (updatesUploader.send _).expects(query).returning(nonRecoverableError.pure[Try])
-      }
+      val nonRecoverableError = exceptions.generateOne
+      (updatesUploader.send _)
+        .expects(step1Queries.preDataUploadQueries.head)
+        .returning(EitherT(nonRecoverableError.raiseError[Try, Either[RecoverableFailure, DeliverySuccess]]))
 
-      val step2Transformation = mockFunction[entities.Project, ProjectWithQueries[Try]]
-
-      uploader.run(
-        List(TransformationStep(nonBlankStrings().generateOne, step1Transformation),
-             TransformationStep(nonBlankStrings().generateOne, step2Transformation)
-        ),
-        originalProject
-      ) shouldBe nonRecoverableError.pure[Try]
+      uploader.run(List(TransformationStep(nonBlankStrings().generateOne, step1Transformation)),
+                   originalProject
+      ) shouldBe NonRecoverableFailure(s"Transformation of ${originalProject.path} failed: $nonRecoverableError",
+                                       nonRecoverableError
+      ).pure[Try]
     }
 
-    "return InvalidTriplesFailure if triples encoding failed with such failure" in new TestCase {
+    "return NonRecoverableFailure if triples encoding failed with such failure" in new TestCase {
       val originalProject = anyProjectEntities.generateOne.to[entities.Project]
 
       val step1Transformation = mockFunction[entities.Project, ProjectWithQueries[Try]]
@@ -175,53 +177,112 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
           maybeCreator = person.some,
           members = Set(person.copy(name = userNames.generateOne))
         )
-      val step1Queries = sparqlQueries.generateList()
       step1Transformation
         .expects(originalProject)
-        .returning(EitherT.rightT[Try, ProcessingRecoverableError](ResultData(step1Project, step1Queries)))
-
-      inSequence {
-        step1Queries foreach { query =>
-          (updatesUploader.send _).expects(query).returning(DeliverySuccess.pure[Try])
-        }
-      }
+        .returning(EitherT.rightT[Try, ProcessingRecoverableError]((step1Project, Queries.empty)))
 
       val Success(result) = uploader.run(
         List(TransformationStep(nonBlankStrings().generateOne, step1Transformation)),
         originalProject
       )
 
-      result shouldBe a[InvalidTriplesFailure]
+      result shouldBe a[NonRecoverableFailure]
     }
 
-    Set(RecoverableFailure(nonEmptyStrings().generateOne),
-        InvalidTriplesFailure(nonEmptyStrings().generateOne)
-    ) foreach { failure =>
-      s"return ${failure.getClass.getSimpleName} if triples uploading failed with such failure" in new TestCase {
-        val originalProject = anyProjectEntities.generateOne.to[entities.Project]
+    s"return $RecoverableFailure if triples uploading failed with RecoverableFailure" in new TestCase {
 
-        val step1Transformation = mockFunction[entities.Project, ProjectWithQueries[Try]]
+      val originalProject = anyProjectEntities.generateOne.to[entities.Project]
 
-        val step1Project = anyProjectEntities.generateOne.to[entities.Project]
-        val step1Queries = sparqlQueries.generateList()
-        step1Transformation
-          .expects(originalProject)
-          .returning(EitherT.rightT[Try, ProcessingRecoverableError](ResultData(step1Project, step1Queries)))
+      val step1Transformation = mockFunction[entities.Project, ProjectWithQueries[Try]]
 
-        inSequence {
-          step1Queries foreach { query =>
-            (updatesUploader.send _).expects(query).returning(DeliverySuccess.pure[Try])
-          }
+      step1Transformation
+        .expects(originalProject)
+        .returning(EitherT.rightT[Try, ProcessingRecoverableError]((originalProject, Queries.empty)))
 
-          (triplesUploader.uploadTriples _)
-            .expects(*)
-            .returning(failure.pure[Try])
-        }
+      val failure = RecoverableFailure(nonEmptyStrings().generateOne)
 
-        uploader.run(List(TransformationStep(nonBlankStrings().generateOne, step1Transformation)),
-                     originalProject
-        ) shouldBe failure.pure[Try]
-      }
+      (triplesUploader.uploadTriples _)
+        .expects(*)
+        .returning(EitherT.leftT(failure))
+
+      uploader.run(List(TransformationStep(nonBlankStrings().generateOne, step1Transformation)),
+                   originalProject
+      ) shouldBe RecoverableFailure(s"Failed to upload json-ld: ${failure.getMessage}").pure[Try]
+    }
+
+    s"return $NonRecoverableFailure if triples uploading failed with NonRecoverableFailure" in new TestCase {
+
+      val originalProject = anyProjectEntities.generateOne.to[entities.Project]
+
+      val step1Transformation = mockFunction[entities.Project, ProjectWithQueries[Try]]
+
+      step1Transformation
+        .expects(originalProject)
+        .returning(EitherT.rightT[Try, ProcessingRecoverableError]((originalProject, Queries.empty)))
+
+      val failure = exceptions.generateOne
+
+      (triplesUploader.uploadTriples _)
+        .expects(*)
+        .returning(EitherT(failure.raiseError[Try, Either[RecoverableFailure, DeliverySuccess]]))
+
+      uploader.run(List(TransformationStep(nonBlankStrings().generateOne, step1Transformation)),
+                   originalProject
+      ) shouldBe NonRecoverableFailure(s"Transformation of ${originalProject.path} failed: $failure", failure).pure[Try]
+    }
+
+    s"return $RecoverableFailure if executing postDataUploadQueries failed with RecoverableFailure" in new TestCase {
+
+      val originalProject = anyProjectEntities.generateOne.to[entities.Project]
+
+      val step1Transformation = mockFunction[entities.Project, ProjectWithQueries[Try]]
+
+      val step1Queries = Queries(Nil, sparqlQueries.generateNonEmptyList().toList)
+      step1Transformation
+        .expects(originalProject)
+        .returning(EitherT.rightT[Try, ProcessingRecoverableError]((originalProject, step1Queries)))
+
+      (triplesUploader.uploadTriples _)
+        .expects(*)
+        .returning(EitherT.rightT(DeliverySuccess))
+
+      val recoverableError = RecoverableFailure(nonEmptyStrings().generateOne)
+      (updatesUploader.send _)
+        .expects(step1Queries.postDataUploadQueries.head)
+        .returning(EitherT.leftT(recoverableError))
+
+      uploader.run(List(TransformationStep(nonBlankStrings().generateOne, step1Transformation)),
+                   originalProject
+      ) shouldBe RecoverableFailure(s"Failed to execute post-data-upload queries: ${recoverableError.getMessage}")
+        .pure[Try]
+    }
+
+    s"return $NonRecoverableFailure if executing postDataUploadQueries failed with NonRecoverableFailure" in new TestCase {
+
+      val originalProject = anyProjectEntities.generateOne.to[entities.Project]
+
+      val step1Transformation = mockFunction[entities.Project, ProjectWithQueries[Try]]
+
+      val step1Queries = Queries(Nil, sparqlQueries.generateNonEmptyList().toList)
+      step1Transformation
+        .expects(originalProject)
+        .returning(EitherT.rightT[Try, ProcessingRecoverableError]((originalProject, step1Queries)))
+
+      (triplesUploader.uploadTriples _)
+        .expects(*)
+        .returning(EitherT.rightT(DeliverySuccess))
+
+      val nonRecoverableError = exceptions.generateOne
+      (updatesUploader.send _)
+        .expects(step1Queries.postDataUploadQueries.head)
+        .returning(EitherT(nonRecoverableError.raiseError[Try, Either[RecoverableFailure, DeliverySuccess]]))
+
+      uploader.run(List(TransformationStep(nonBlankStrings().generateOne, step1Transformation)),
+                   originalProject
+      ) shouldBe NonRecoverableFailure(s"Transformation of ${originalProject.path} failed: $nonRecoverableError",
+                                       nonRecoverableError
+      )
+        .pure[Try]
     }
   }
 

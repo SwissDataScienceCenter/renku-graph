@@ -29,7 +29,7 @@ import io.renku.http.client.RestClientError
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.triplesgenerator.events.categories.triplesgenerated.ProjectFunctions
 import io.renku.triplesgenerator.events.categories.triplesgenerated.ProjectFunctions._
-import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.ResultData
+import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.Queries
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -53,7 +53,7 @@ class PersonTransformerSpec extends AnyWordSpec with should.Matchers with MockFa
           .to[entities.Project]
 
         val expectedResultData =
-          persons.map(_.to[entities.Person]).foldLeft(ResultData(project, List.empty)) { (resultData, person) =>
+          persons.map(_.to[entities.Person]).foldLeft((project, Queries.empty)) { (resultData, person) =>
             val maybeKGPerson = personEntities.generateOption.map(_.to[entities.Person])
             (kgPersonFinder.find _).expects(person).returning(maybeKGPerson.pure[Try])
             maybeKGPerson match {
@@ -65,7 +65,9 @@ class PersonTransformerSpec extends AnyWordSpec with should.Matchers with MockFa
                   .returning(mergedPerson.pure[Try])
                 val queries = sparqlQueries.generateList()
                 (updatesCreator.prepareUpdates _).expects(kgPerson, mergedPerson).returning(queries)
-                ResultData(update(person, mergedPerson)(resultData.project), resultData.queries ::: queries)
+                (update(person, mergedPerson)(resultData._1),
+                 resultData._2 |+| Queries(queries, Nil)
+                ) // TODO: is this pre or post???
               case None => resultData
             }
           }

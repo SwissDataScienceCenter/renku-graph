@@ -46,11 +46,7 @@ private object TransformationStep {
   private[triplesgenerated] object Queries {
     val empty: Queries = Queries(Nil, Nil)
 
-    implicit val queriesSemigroup: Semigroup[Queries] = (x: Queries, y: Queries) => ???
-  }
-
-  object ResultData {
-    def apply(project: Project): (Project, Queries) =
-      project -> Queries(preDataUploadQueries = Nil, postDataUploadQueries = Nil)
+    implicit val queriesSemigroup: Semigroup[Queries] = (x: Queries, y: Queries) =>
+      Queries(x.preDataUploadQueries ::: y.preDataUploadQueries, x.postDataUploadQueries ::: y.postDataUploadQueries)
   }
 }
