@@ -28,6 +28,7 @@ import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.http.client.{AccessToken, RestClient}
 import io.renku.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import io.renku.webhookservice.hookdeletion.HookDeletor.DeletionResult
+import io.renku.webhookservice.hookvalidation.ProjectHookVerifier.HookIdentifier
 import io.renku.webhookservice.model.ProjectHookUrl
 import org.http4s.Status
 import org.http4s.Status.{NotFound, Ok}
@@ -35,8 +36,9 @@ import org.typelevel.log4cats.Logger
 
 private trait ProjectHookDeletor[F[_]] {
   def delete(
-      projectId:   projects.Id,
-      accessToken: AccessToken
+      projectHookId: HookIdentifier,
+      projectId:     projects.Id,
+      accessToken:   AccessToken
   ): F[DeletionResult]
 }
 
@@ -52,28 +54,28 @@ private class ProjectHookDeletorImpl[F[_]: Async: Logger](
   import org.http4s.Status.Unauthorized
   import org.http4s.{Request, Response}
 
-  def delete(projectId: projects.Id, accessToken: AccessToken): F[DeletionResult] =
-    for {
-      uri    <- validateUri(s"$gitLabUrl/api/v4/projects/$projectId/hooks")
-      result <- send(request(DELETE, uri, accessToken))(mapResponse)
-    } yield result
-
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[DeletionResult]] = {
     case (Ok, _, _)           => DeletionResult.HookDeleted.pure[F].widen[DeletionResult]
     case (NotFound, _, _)     => DeletionResult.HookNotFound.pure[F].widen[DeletionResult]
     case (Unauthorized, _, _) => MonadCancelThrow[F].raiseError(UnauthorizedException)
   }
+
+  def delete(projectHookId: HookIdentifier, projectId: projects.Id, accessToken: AccessToken): F[DeletionResult] =
+    for {
+      uri    <- validateUri(s"$gitLabUrl/api/v4/projects/$projectId/hooks/$projectHookId")
+      result <- send(request(DELETE, uri, accessToken))(mapResponse)
+    } yield result
 }
 
 private object ProjectHookDeletor {
+  def apply[F[_]: Async: Logger](gitLabThrottler: Throttler[F, GitLab]): F[ProjectHookDeletor[F]] =
+    for {
+      gitLabUrl <- GitLabUrlLoader[F]()
+    } yield new ProjectHookDeletorImpl(gitLabUrl, gitLabThrottler)
+
   final case class ProjectHook(
       projectId:           Id,
       projectHookUrl:      ProjectHookUrl,
       serializedHookToken: SerializedHookToken
   )
-
-  def apply[F[_]: Async: Logger](gitLabThrottler: Throttler[F, GitLab]): F[ProjectHookDeletor[F]] =
-    for {
-      gitLabUrl <- GitLabUrlLoader[F]()
-    } yield new ProjectHookDeletorImpl(gitLabUrl, gitLabThrottler)
 }
