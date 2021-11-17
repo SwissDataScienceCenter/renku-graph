@@ -32,10 +32,7 @@ private trait UpdatesCreator {
 
 private object UpdatesCreator extends UpdatesCreator {
 
-  override def prepareUpdates(
-      project:       Project,
-      kgProjectInfo: KGProjectInfo
-  ): List[SparqlQuery] = List(
+  override def prepareUpdates(project: Project, kgProjectInfo: KGProjectInfo): List[SparqlQuery] = List(
     nameDeletion(project, kgProjectInfo),
     maybeParentDeletion(project, kgProjectInfo),
     visibilityDeletion(project, kgProjectInfo),

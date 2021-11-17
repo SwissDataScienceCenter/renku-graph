@@ -51,7 +51,7 @@ class ProjectTransformerImpl[F[_]: MonadThrow](
         .map {
           case None => (project, Queries.empty).asRight[ProcessingRecoverableError]
           case Some(kgProjectInfo) =>
-            (project, Queries(updatesCreator.prepareUpdates(project, kgProjectInfo), Nil))
+            (project, Queries.preDataQueriesOnly(updatesCreator.prepareUpdates(project, kgProjectInfo)))
               .asRight[ProcessingRecoverableError]
         }
         .recoverWith(maybeToRecoverableError)

@@ -60,7 +60,7 @@ private class PersonTransformerImpl[F[_]: MonadThrow](
             .mapN { (kgPerson, mergedPerson) =>
               val updatedProject = update(person, mergedPerson)(previousResults._1)
               val queries        = updatesCreator.prepareUpdates(kgPerson, mergedPerson)
-              (updatedProject, previousResults._2 |+| Queries(queries, List.empty))
+              (updatedProject, previousResults._2 |+| Queries.preDataQueriesOnly(queries))
             }
             .getOrElse(previousResults)
         }
