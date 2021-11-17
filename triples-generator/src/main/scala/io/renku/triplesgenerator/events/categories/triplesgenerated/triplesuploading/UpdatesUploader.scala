@@ -18,18 +18,20 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading
 
+import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
 import io.renku.rdfstore._
+import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult.{DeliverySuccess, RecoverableFailure}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
 
 private trait UpdatesUploader[F[_]] {
-  def send(updateQuery: SparqlQuery): F[TriplesUploadResult]
+  def send(updateQuery: SparqlQuery): EitherT[F, RecoverableFailure, DeliverySuccess]
 }
 
 private class UpdatesUploaderImpl[F[_]: Async: Logger](
@@ -55,26 +57,34 @@ private class UpdatesUploaderImpl[F[_]: Async: Logger](
 
   import scala.util.control.NonFatal
 
-  override def send(updateQuery: SparqlQuery): F[TriplesUploadResult] =
+  override def send(updateQuery: SparqlQuery): EitherT[F, RecoverableFailure, DeliverySuccess] = EitherT {
     updateWitMapping(updateQuery, responseMapper(updateQuery)) recoverWith deliveryFailure
+  }.leftSemiflatMap(leftOrFail)
 
   private def responseMapper(
       updateQuery: SparqlQuery
-  ): PartialFunction[(Status, Request[F], Response[F]), F[TriplesUploadResult]] = {
-    case (Ok, _, _) => DeliverySuccess.pure[F].widen[TriplesUploadResult]
-    case (BadRequest, _, response) =>
-      response.as[String] map toSingleLine map toInvalidUpdatesFailure(updateQuery)
-    case (other, _, response) =>
-      response.as[String] map toSingleLine map toDeliveryFailure(other)
+  ): PartialFunction[(Status, Request[F], Response[F]), F[Either[TriplesUploadFailure, DeliverySuccess]]] = {
+    case (Ok, _, _)                => DeliverySuccess.asRight[TriplesUploadFailure].pure[F]
+    case (BadRequest, _, response) => (response.as[String] map toSingleLine) map toNonRecoverableFailure(updateQuery)
+    case (other, _, response)      => response.as[String] map toSingleLine map toDeliveryFailure(other)
   }
 
-  private def toInvalidUpdatesFailure(updateQuery: SparqlQuery)(responseMessage: String): TriplesUploadResult =
-    InvalidUpdatesFailure(s"Triples curation update '${updateQuery.name}' failed: $responseMessage")
+  private def toNonRecoverableFailure(
+      updateQuery:   SparqlQuery
+  )(responseMessage: String): Either[TriplesUploadFailure, DeliverySuccess] =
+    NonRecoverableFailure(s"Triples transformation update '${updateQuery.name}' failed: $responseMessage")
+      .asLeft[DeliverySuccess]
 
-  private def toDeliveryFailure(status: Status)(message: String): TriplesUploadResult =
-    RecoverableFailure(s"Triples curation update failed: $status: $message")
+  private def toDeliveryFailure(status: Status)(message: String): Either[TriplesUploadFailure, DeliverySuccess] =
+    RecoverableFailure(s"Triples transformation update failed: $status: $message").asLeft[DeliverySuccess]
 
-  private def deliveryFailure: PartialFunction[Throwable, F[TriplesUploadResult]] = { case NonFatal(exception) =>
-    RecoverableFailure(exception.getMessage).pure[F].widen[TriplesUploadResult]
+  private def deliveryFailure: PartialFunction[Throwable, F[Either[TriplesUploadFailure, DeliverySuccess]]] = {
+    case NonFatal(exception) =>
+      RecoverableFailure(exception.getMessage).asLeft[DeliverySuccess].leftWiden[TriplesUploadFailure].pure[F]
+  }
+
+  private lazy val leftOrFail: TriplesUploadFailure => F[RecoverableFailure] = {
+    case failure: NonRecoverableFailure => failure.raiseError[F, RecoverableFailure]
+    case failure: RecoverableFailure    => failure.pure[F]
   }
 }
