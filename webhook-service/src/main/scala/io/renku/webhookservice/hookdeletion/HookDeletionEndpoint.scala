@@ -30,6 +30,7 @@ import io.renku.http.server.security.model.AuthUser
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.webhookservice.hookdeletion.HookDeletor.DeletionResult
 import io.renku.webhookservice.hookdeletion.HookDeletor.DeletionResult.{HookDeleted, HookNotFound}
+import io.renku.webhookservice.model.{HookIdentifier, ProjectHookUrl}
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Response, Status}
 import org.typelevel.log4cats.Logger
@@ -41,7 +42,8 @@ trait HookDeletionEndpoint[F[_]] {
 }
 
 class HookDeletionEndpointImpl[F[_]: MonadThrow: Logger](
-    hookDeletor: HookDeletor[F]
+    projectHookUrl: ProjectHookUrl,
+    hookDeletor:    HookDeletor[F]
 ) extends Http4sDsl[F]
     with HookDeletionEndpoint[F] {
 
@@ -60,14 +62,17 @@ class HookDeletionEndpointImpl[F[_]: MonadThrow: Logger](
 
   def deleteHook(projectId: Id, authUser: AuthUser): F[Response[F]] = {
     for {
-      creationResult <- hookDeletor.deleteHook(projectId, authUser.accessToken)
+      creationResult <- hookDeletor.deleteHook(HookIdentifier(projectId, projectHookUrl), authUser.accessToken)
       response       <- toHttpResponse(creationResult)
     } yield response
   } recoverWith httpResponse
 }
 
 object HookDeletionEndpoint {
-  def apply[F[_]: Async: Logger](gitLabThrottler: Throttler[F, GitLab]): F[HookDeletionEndpoint[F]] = for {
+  def apply[F[_]: Async: Logger](
+      projectHookUrl:  ProjectHookUrl,
+      gitLabThrottler: Throttler[F, GitLab]
+  ): F[HookDeletionEndpoint[F]] = for {
     hookDeletor <- HookDeletor(gitLabThrottler)
-  } yield new HookDeletionEndpointImpl[F](hookDeletor)
+  } yield new HookDeletionEndpointImpl[F](projectHookUrl, hookDeletor)
 }

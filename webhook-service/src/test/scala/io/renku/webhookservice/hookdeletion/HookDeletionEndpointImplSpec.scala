@@ -7,8 +7,6 @@ import io.circe.literal.JsonStringContext
 import io.circe.syntax.EncoderOps
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits.GenOps
-import io.renku.graph.model.GraphModelGenerators.projectIds
-import io.renku.graph.model.projects.Id
 import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
 import io.renku.http.client.AccessToken
@@ -17,7 +15,9 @@ import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.testtools.IOSpec
+import io.renku.webhookservice.WebhookServiceGenerators.projectHookIds
 import io.renku.webhookservice.hookdeletion.HookDeletor.DeletionResult.{HookDeleted, HookNotFound}
+import io.renku.webhookservice.model.HookIdentifier
 import org.http4s.MediaType
 import org.http4s.Status.{InternalServerError, NotFound, Ok, Unauthorized}
 import org.http4s.headers.`Content-Type`
@@ -31,11 +31,11 @@ class HookDeletionEndpointImplSpec extends AnyWordSpec with MockFactory with sho
     "return OK when webhook is successfully deleted for project with the given id in GitLab" in new TestCase {
 
       (hookDeletor
-        .deleteHook(_: Id, _: AccessToken))
-        .expects(projectId, authUser.accessToken)
+        .deleteHook(_: HookIdentifier, _: AccessToken))
+        .expects(projectHookId, authUser.accessToken)
         .returning(HookDeleted.pure[IO])
 
-      val response = deleteHook(projectId, authUser).unsafeRunSync()
+      val response = deleteHook(projectHookId.projectId, authUser).unsafeRunSync()
 
       response.status                   shouldBe Ok
       response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -46,11 +46,11 @@ class HookDeletionEndpointImplSpec extends AnyWordSpec with MockFactory with sho
     "return NOT_FOUND when hook was already deleted" in new TestCase {
 
       (hookDeletor
-        .deleteHook(_: Id, _: AccessToken))
-        .expects(projectId, authUser.accessToken)
+        .deleteHook(_: HookIdentifier, _: AccessToken))
+        .expects(projectHookId, authUser.accessToken)
         .returning(HookNotFound.pure[IO])
 
-      val response = deleteHook(projectId, authUser).unsafeRunSync()
+      val response = deleteHook(projectHookId.projectId, authUser).unsafeRunSync()
 
       response.status                   shouldBe NotFound
       response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -62,11 +62,11 @@ class HookDeletionEndpointImplSpec extends AnyWordSpec with MockFactory with sho
       val errorMessage = ErrorMessage("some error")
       val exception    = new Exception(errorMessage.toString())
       (hookDeletor
-        .deleteHook(_: Id, _: AccessToken))
-        .expects(projectId, authUser.accessToken)
+        .deleteHook(_: HookIdentifier, _: AccessToken))
+        .expects(projectHookId, authUser.accessToken)
         .returning(IO.raiseError(exception))
 
-      val response = deleteHook(projectId, authUser).unsafeRunSync()
+      val response = deleteHook(projectHookId.projectId, authUser).unsafeRunSync()
 
       response.status                   shouldBe InternalServerError
       response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -78,11 +78,11 @@ class HookDeletionEndpointImplSpec extends AnyWordSpec with MockFactory with sho
     "return UNAUTHORIZED when there was an UnauthorizedException thrown during hook creation" in new TestCase {
 
       (hookDeletor
-        .deleteHook(_: Id, _: AccessToken))
-        .expects(projectId, authUser.accessToken)
+        .deleteHook(_: HookIdentifier, _: AccessToken))
+        .expects(projectHookId, authUser.accessToken)
         .returning(IO.raiseError(UnauthorizedException))
 
-      val response = deleteHook(projectId, authUser).unsafeRunSync()
+      val response = deleteHook(projectHookId.projectId, authUser).unsafeRunSync()
 
       response.status                   shouldBe Unauthorized
       response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -92,13 +92,12 @@ class HookDeletionEndpointImplSpec extends AnyWordSpec with MockFactory with sho
 
   private trait TestCase {
 
-    val projectId = projectIds.generateOne
-    val authUser  = authUsers.generateOne
+    val projectHookId = projectHookIds.generateOne
+    val authUser      = authUsers.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-
     val hookDeletor = mock[HookDeletor[IO]]
 
-    val deleteHook = new HookDeletionEndpointImpl[IO](hookDeletor).deleteHook _
+    val deleteHook = new HookDeletionEndpointImpl[IO](projectHookId.projectHookUrl, hookDeletor).deleteHook _
   }
 }

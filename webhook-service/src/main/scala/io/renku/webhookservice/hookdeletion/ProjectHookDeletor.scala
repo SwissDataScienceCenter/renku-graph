@@ -28,7 +28,7 @@ import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.http.client.{AccessToken, RestClient}
 import io.renku.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import io.renku.webhookservice.hookdeletion.HookDeletor.DeletionResult
-import io.renku.webhookservice.hookvalidation.ProjectHookVerifier.HookIdentifier
+import io.renku.webhookservice.hookfetcher.ProjectHookFetcher.HookIdAndUrl
 import io.renku.webhookservice.model.ProjectHookUrl
 import org.http4s.Status
 import org.http4s.Status.{NotFound, Ok}
@@ -36,8 +36,8 @@ import org.typelevel.log4cats.Logger
 
 private trait ProjectHookDeletor[F[_]] {
   def delete(
-      projectHookId: HookIdentifier,
       projectId:     projects.Id,
+      projectHookId: HookIdAndUrl,
       accessToken:   AccessToken
   ): F[DeletionResult]
 }
@@ -60,9 +60,9 @@ private class ProjectHookDeletorImpl[F[_]: Async: Logger](
     case (Unauthorized, _, _) => MonadCancelThrow[F].raiseError(UnauthorizedException)
   }
 
-  def delete(projectHookId: HookIdentifier, projectId: projects.Id, accessToken: AccessToken): F[DeletionResult] =
+  def delete(projectId: projects.Id, projectHookId: HookIdAndUrl, accessToken: AccessToken): F[DeletionResult] =
     for {
-      uri    <- validateUri(s"$gitLabUrl/api/v4/projects/$projectId/hooks/$projectHookId")
+      uri    <- validateUri(s"$gitLabUrl/api/v4/projects/$projectId/hooks/${projectHookId.id}")
       result <- send(request(DELETE, uri, accessToken))(mapResponse)
     } yield result
 }

@@ -85,7 +85,11 @@ private object MicroserviceRoutes {
     hookEventEndpoint   <- HookEventEndpoint(hookTokenCrypto)
     hookCreatorEndpoint <- HookCreationEndpoint(projectHookUrl, gitLabThrottler, hookTokenCrypto)
     processingStatusEndpoint <-
-      eventprocessing.ProcessingStatusEndpoint(projectHookUrl, gitLabThrottler, executionTimeRecorder)
+      eventprocessing.ProcessingStatusEndpoint(
+        projectHookUrl,
+        gitLabThrottler,
+        executionTimeRecorder
+      )
     hookValidationEndpoint <- HookValidationEndpoint(projectHookUrl, gitLabThrottler)
     authenticator          <- GitLabAuthenticator(gitLabThrottler)
     authMiddleware         <- Authentication.middleware(authenticator)

@@ -11,7 +11,7 @@ import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
-import io.renku.webhookservice.WebhookServiceGenerators.{projectHookUrls, serializedHookTokens}
+import io.renku.webhookservice.WebhookServiceGenerators.{hookIdAndUrls, projectHookUrls, serializedHookTokens}
 import io.renku.webhookservice.hookdeletion.HookDeletor.DeletionResult
 import io.renku.webhookservice.hookdeletion.ProjectHookDeletor.ProjectHook
 import org.http4s.Status
@@ -35,12 +35,14 @@ class ProjectHookDeletorSpec
         val personalAccessToken = personalAccessTokens.generateOne
 
         stubFor {
-          delete(s"/api/v4/projects/$projectId/hooks")
+          delete(s"/api/v4/projects/$projectId/hooks/${hookIdAndUrl.id}")
             .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
             .willReturn(ok())
         }
 
-        hookDeletor.delete(projectId, personalAccessToken).unsafeRunSync() shouldBe DeletionResult.HookDeleted
+        hookDeletor
+          .delete(projectId, hookIdAndUrl, personalAccessToken)
+          .unsafeRunSync() shouldBe DeletionResult.HookDeleted
       }
 
     "send relevant header (when Personal Access Token is given) " +
@@ -49,12 +51,14 @@ class ProjectHookDeletorSpec
         val personalAccessToken = personalAccessTokens.generateOne
 
         stubFor {
-          delete(s"/api/v4/projects/$projectId/hooks")
+          delete(s"/api/v4/projects/$projectId/hooks/${hookIdAndUrl.id}")
             .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
             .willReturn(notFound())
         }
 
-        hookDeletor.delete(projectId, personalAccessToken).unsafeRunSync() shouldBe DeletionResult.HookNotFound
+        hookDeletor
+          .delete(projectId, hookIdAndUrl, personalAccessToken)
+          .unsafeRunSync() shouldBe DeletionResult.HookNotFound
       }
 
     "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
@@ -62,12 +66,12 @@ class ProjectHookDeletorSpec
       val accessToken = accessTokens.generateOne
 
       stubFor {
-        delete(s"/api/v4/projects/$projectId/hooks")
+        delete(s"/api/v4/projects/$projectId/hooks/${hookIdAndUrl.id}")
           .willReturn(unauthorized())
       }
 
       intercept[Exception] {
-        hookDeletor.delete(projectId, accessToken).unsafeRunSync()
+        hookDeletor.delete(projectId, hookIdAndUrl, accessToken).unsafeRunSync()
       } shouldBe UnauthorizedException
     }
 
@@ -76,19 +80,20 @@ class ProjectHookDeletorSpec
       val accessToken = accessTokens.generateOne
 
       stubFor {
-        delete(s"/api/v4/projects/$projectId/hooks")
+        delete(s"/api/v4/projects/$projectId/hooks/${hookIdAndUrl.id}")
           .willReturn(badRequest().withBody("some message"))
       }
 
       intercept[Exception] {
-        hookDeletor.delete(projectId, accessToken).unsafeRunSync()
-      }.getMessage shouldBe s"DELETE $gitLabUrl/api/v4/projects/$projectId/hooks returned ${Status.BadRequest}; body: some message"
+        hookDeletor.delete(projectId, hookIdAndUrl, accessToken).unsafeRunSync()
+      }.getMessage shouldBe s"DELETE $gitLabUrl/api/v4/projects/$projectId/hooks/${hookIdAndUrl.id} returned ${Status.BadRequest}; body: some message"
     }
   }
 
   private trait TestCase {
-    val projectId = projectIds.generateOne
-    val gitLabUrl = GitLabUrl(externalServiceBaseUrl)
+    val hookIdAndUrl = hookIdAndUrls.generateOne
+    val projectId    = projectIds.generateOne
+    val gitLabUrl    = GitLabUrl(externalServiceBaseUrl)
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
 

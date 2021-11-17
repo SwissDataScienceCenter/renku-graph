@@ -18,32 +18,34 @@
 
 package io.renku.webhookservice.hookfetcher
 
-import cats.Applicative
 import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
 import io.circe.Decoder.decodeList
 import io.renku.config.GitLab
 import io.renku.control.Throttler
+import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.http.client.{AccessToken, RestClient}
-import io.renku.webhookservice.hookfetcher.ProjectHookFetcherImpl.HookIdAndUrl
+import io.renku.webhookservice.hookfetcher.ProjectHookFetcher.HookIdAndUrl
+import io.renku.webhookservice.model.ProjectHookUrl
 import org.typelevel.log4cats.Logger
 
-private trait ProjectHookFetcher[F[_]] {
+private[webhookservice] trait ProjectHookFetcher[F[_]] {
   def fetchProjectHooks(
       projectId:   projects.Id,
       accessToken: AccessToken
   ): F[List[HookIdAndUrl]]
 }
 
-private object ProjectHookFetcherImpl {
-  def apply[F[_]: Async: Logger](gitLabUrl: GitLabUrl, gitlabThrottler: Throttler[F, GitLab]) =
-    Applicative[F].pure(new ProjectHookFetcherImpl[F](gitLabUrl, gitlabThrottler))
+private[webhookservice] object ProjectHookFetcher {
+  def apply[F[_]: Async: Logger](gitlabThrottler: Throttler[F, GitLab]) = for {
+    gitLabUrl <- GitLabUrlLoader[F]()
+  } yield new ProjectHookFetcherImpl[F](gitLabUrl, gitlabThrottler)
 
-  final case class HookIdAndUrl(id: String, url: String)
+  final case class HookIdAndUrl(id: String, url: ProjectHookUrl)
 }
 
-private class ProjectHookFetcherImpl[F[_]: Async: Logger](
+private[webhookservice] class ProjectHookFetcherImpl[F[_]: Async: Logger](
     gitLabUrl:       GitLabUrl,
     gitLabThrottler: Throttler[F, GitLab]
 ) extends RestClient(gitLabThrottler)
@@ -70,7 +72,7 @@ private class ProjectHookFetcherImpl[F[_]: Async: Logger](
   private implicit lazy val hooksIdsAndUrlsDecoder: EntityDecoder[F, List[HookIdAndUrl]] = {
     implicit val hookIdAndUrlDecoder: Decoder[List[HookIdAndUrl]] = decodeList { cursor =>
       for {
-        url <- cursor.downField("url").as[String]
+        url <- cursor.downField("url").as[String].map(ProjectHookUrl.fromGitlab)
         id  <- cursor.downField("id").as[String]
       } yield HookIdAndUrl(id, url)
     }

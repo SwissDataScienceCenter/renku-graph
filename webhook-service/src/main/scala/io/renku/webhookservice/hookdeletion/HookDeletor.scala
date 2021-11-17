@@ -25,20 +25,33 @@ import io.renku.control.Throttler
 import io.renku.graph.model.projects.Id
 import io.renku.http.client.AccessToken
 import io.renku.webhookservice.hookdeletion.HookDeletor.DeletionResult
+import io.renku.webhookservice.hookfetcher.ProjectHookFetcher
+import io.renku.webhookservice.hookfetcher.ProjectHookFetcher.HookIdAndUrl
+import io.renku.webhookservice.model.HookIdentifier
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
 private trait HookDeletor[F[_]] {
-  def deleteHook(projectId: Id, accessToken: AccessToken): F[DeletionResult]
+  def deleteHook(hookIdentifier: HookIdentifier, accessToken: AccessToken): F[DeletionResult]
 }
 
-private class HookDeletorImpl[F[_]: Spawn: Logger](projectHookDeletor: ProjectHookDeletor[F]) extends HookDeletor[F] {
+private class HookDeletorImpl[F[_]: Spawn: Logger](projectHookFetcher: ProjectHookFetcher[F],
+                                                   projectHookDeletor: ProjectHookDeletor[F]
+) extends HookDeletor[F] {
   import HookDeletor.DeletionResult
   import projectHookDeletor._
 
-  override def deleteHook(projectId: Id, accessToken: AccessToken): F[DeletionResult] =
-    delete(projectId, accessToken) recoverWith loggingError(projectId)
+  override def deleteHook(projectHookIdentifier: HookIdentifier, accessToken: AccessToken): F[DeletionResult] = (for {
+    gitlabProjectHooks <- projectHookFetcher.fetchProjectHooks(projectHookIdentifier.projectId, accessToken)
+    result <- findProjectHook(projectHookIdentifier, gitlabProjectHooks) match {
+                case Some(hookToDelete) => delete(projectHookIdentifier.projectId, hookToDelete, accessToken)
+                case None               => DeletionResult.HookNotFound.pure[F].widen[DeletionResult]
+              }
+  } yield result) recoverWith loggingError(projectHookIdentifier.projectId)
+
+  private def findProjectHook(projectHook: HookIdentifier, gitlabHooks: List[HookIdAndUrl]): Option[HookIdAndUrl] =
+    gitlabHooks.find(_.url == projectHook.projectHookUrl)
 
   private def loggingError(projectId: Id): PartialFunction[Throwable, F[DeletionResult]] = { case NonFatal(exception) =>
     Logger[F].error(exception)(s"Hook deletion failed for project with id $projectId") >>
@@ -52,8 +65,9 @@ private object HookDeletor {
   def apply[F[_]: Async: Logger](
       gitLabThrottler: Throttler[F, GitLab]
   ): F[HookDeletor[F]] = for {
-    hookDeletor <- ProjectHookDeletor[F](gitLabThrottler)
-  } yield new HookDeletorImpl[F](hookDeletor)
+    hookDeletor        <- ProjectHookDeletor[F](gitLabThrottler)
+    projectHookFetcher <- ProjectHookFetcher(gitLabThrottler)
+  } yield new HookDeletorImpl[F](projectHookFetcher, hookDeletor)
 
   sealed trait DeletionResult extends Product with Serializable
 
