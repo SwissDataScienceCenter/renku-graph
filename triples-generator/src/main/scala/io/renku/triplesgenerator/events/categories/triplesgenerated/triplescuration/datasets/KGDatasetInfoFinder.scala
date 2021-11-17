@@ -22,7 +22,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
-import io.renku.graph.model.datasets.{DerivedFrom, InternalSameAs, ResourceId, SameAs, TopmostDerivedFrom, TopmostSameAs}
+import io.renku.graph.model.datasets.{InternalSameAs, ResourceId, SameAs, TopmostSameAs}
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
@@ -30,10 +30,6 @@ import org.typelevel.log4cats.Logger
 private trait KGDatasetInfoFinder[F[_]] {
   def findParentTopmostSameAs(idSameAs: InternalSameAs)(implicit ev: InternalSameAs.type): F[Option[TopmostSameAs]]
   def findTopmostSameAs(resourceId:     ResourceId)(implicit ev:     ResourceId.type):     F[Option[TopmostSameAs]]
-  def findParentTopmostDerivedFrom(derivedFrom: DerivedFrom)(implicit
-      ev:                                       DerivedFrom.type
-  ): F[Option[TopmostDerivedFrom]]
-  def findTopmostDerivedFrom(resourceId: ResourceId)(implicit ev: ResourceId.type): F[Option[TopmostDerivedFrom]]
 }
 
 private class KGDatasetInfoFinderImpl[F[_]: Async: Logger](
@@ -76,35 +72,6 @@ private class KGDatasetInfoFinderImpl[F[_]: Async: Logger](
     _.downField("results").downField("bindings").as(decodeList(topmostSameAs)).map(_.flatten.toSet)
   }
 
-  override def findParentTopmostDerivedFrom(
-      derivedFrom: DerivedFrom
-  )(implicit ev:   DerivedFrom.type): F[Option[TopmostDerivedFrom]] =
-    queryExpecting[Set[TopmostDerivedFrom]](using = queryFindingDerivedFrom(derivedFrom.value))
-      .flatMap(toOption[TopmostDerivedFrom, DerivedFrom](derivedFrom))
-
-  private def queryFindingDerivedFrom(resourceIdAsString: String) = SparqlQuery.of(
-    name = "transformation - ds topmostDerivedFrom",
-    Prefixes.of(renku -> "renku", schema -> "schema"),
-    s"""|SELECT ?topmostDerivedFrom
-        |WHERE {
-        |  <$resourceIdAsString> a schema:Dataset;
-        |                        renku:topmostDerivedFrom ?topmostDerivedFrom.
-        |}
-        |""".stripMargin
-  )
-
-  def findTopmostDerivedFrom(resourceId: ResourceId)(implicit
-      ev:                                ResourceId.type
-  ): F[Option[TopmostDerivedFrom]] =
-    queryExpecting[Set[TopmostDerivedFrom]](using = queryFindingDerivedFrom(resourceId.value))
-      .flatMap(toOption[TopmostDerivedFrom, ResourceId](resourceId))
-
-  private implicit val topmostDerivedDecoder: Decoder[Set[TopmostDerivedFrom]] = {
-    val topmostDerivedFrom: Decoder[Option[TopmostDerivedFrom]] =
-      _.downField("topmostDerivedFrom").downField("value").as[Option[TopmostDerivedFrom]]
-    _.downField("results").downField("bindings").as(decodeList(topmostDerivedFrom)).map(_.flatten.toSet)
-  }
-
   private def toOption[T, ID](id: ID)(implicit entityTypeInfo: ID => String): Set[T] => F[Option[T]] = {
     case set if set.isEmpty   => Option.empty[T].pure[F]
     case set if set.size == 1 => set.headOption.pure[F]
@@ -114,9 +81,8 @@ private class KGDatasetInfoFinderImpl[F[_]: Async: Logger](
       ).raiseError[F, Option[T]]
   }
 
-  private implicit val topmostSameAsInfo:      SameAs => String      = _ => "topmostSameAs"
-  private implicit val resourceIdInfo:         ResourceId => String  = _ => "resourceId"
-  private implicit val topmostDerivedFromInfo: DerivedFrom => String = _ => "topmostDerivedFrom"
+  private implicit val topmostSameAsInfo: SameAs => String     = _ => "topmostSameAs"
+  private implicit val resourceIdInfo:    ResourceId => String = _ => "resourceId"
 }
 
 private object KGDatasetInfoFinder {
