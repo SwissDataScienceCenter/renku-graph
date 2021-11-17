@@ -65,7 +65,10 @@ private[triplescuration] class DatasetTransformerImpl[F[_]: MonadThrow](
           updatedDataset = maybeParentTopmostSameAs.map(dataset.update) getOrElse dataset
         } yield (
           update(dataset, updatedDataset)(projectAndQueries._1),
-          projectAndQueries._2 |+| Queries(updatesCreator.prepareUpdates(dataset, maybeKGTopmostSameAs), List.empty)
+          projectAndQueries._2 |+| Queries.postDataQueriesOnly(
+            updatesCreator.prepareUpdates(dataset, maybeKGTopmostSameAs) :::
+              updatesCreator.prepareTopmostSameAsCleanup(updatedDataset, maybeParentTopmostSameAs)
+          )
         )
       }
   }
@@ -74,27 +77,24 @@ private[triplescuration] class DatasetTransformerImpl[F[_]: MonadThrow](
     case (project, queries) =>
       findInvalidatedDatasets(project)
         .foldLeft((project -> queries).pure[F]) { (projectAndQueriesF, dataset) =>
-          for {
-            projectAndQueries <- projectAndQueriesF
-            preDataUploadQueries = dataset.provenance match {
-                                     case _: Dataset.Provenance.Internal =>
-                                       updatesCreator.prepareUpdatesWhenInvalidated(
-                                         dataset.asInstanceOf[Dataset[Dataset.Provenance.Internal]]
-                                       )
-                                     case _: Dataset.Provenance.ImportedExternal =>
-                                       updatesCreator.prepareUpdatesWhenInvalidated(
-                                         dataset.asInstanceOf[Dataset[Dataset.Provenance.ImportedExternal]]
-                                       )
-                                     case _: Dataset.Provenance.ImportedInternal =>
-                                       updatesCreator.prepareUpdatesWhenInvalidated(
-                                         dataset.asInstanceOf[Dataset[Dataset.Provenance.ImportedInternal]]
-                                       )
-                                     case _ => Nil
-                                   }
-          } yield (
-            projectAndQueries._1,
-            projectAndQueries._2 |+| Queries(preDataUploadQueries, List.empty)
-          )
+          projectAndQueriesF map { case (project, queries) =>
+            val preDataUploadQueries = dataset.provenance match {
+              case _: Dataset.Provenance.Internal =>
+                updatesCreator.prepareUpdatesWhenInvalidated(
+                  dataset.asInstanceOf[Dataset[Dataset.Provenance.Internal]]
+                )
+              case _: Dataset.Provenance.ImportedExternal =>
+                updatesCreator.prepareUpdatesWhenInvalidated(
+                  dataset.asInstanceOf[Dataset[Dataset.Provenance.ImportedExternal]]
+                )
+              case _: Dataset.Provenance.ImportedInternal =>
+                updatesCreator.prepareUpdatesWhenInvalidated(
+                  dataset.asInstanceOf[Dataset[Dataset.Provenance.ImportedInternal]]
+                )
+              case _ => Nil
+            }
+            project -> (queries |+| Queries.postDataQueriesOnly(preDataUploadQueries))
+          }
         }
   }
 

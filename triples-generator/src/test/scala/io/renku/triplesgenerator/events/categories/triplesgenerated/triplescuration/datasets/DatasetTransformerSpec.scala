@@ -59,24 +59,33 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
             _.to[entities.Project]
           )
 
-        val kgTopmostSameAs = datasetTopmostSameAs.generateOne
-        findingParentTopmostSameAsFor(dataset1.provenance.sameAs, returning = kgTopmostSameAs.some.pure[Try])
+        val parentTopmostSameAs = datasetTopmostSameAs.generateOne
+        findingParentTopmostSameAsFor(dataset1.provenance.sameAs, returning = parentTopmostSameAs.some.pure[Try])
         findingTopmostSameAsFor(dataset1.identification.resourceId, returning = Option.empty[TopmostSameAs].pure[Try])
         val dataset1Queries = sparqlQueries.generateList()
-        prepareQueriesForSameAs(dataset1 -> Option.empty[TopmostSameAs], returning = dataset1Queries)
+        prepareQueriesForSameAs(dataset1 -> None, returning = dataset1Queries)
+        val updatedDataset1        = dataset1.update(parentTopmostSameAs)
+        val dataset1CleanUpQueries = sparqlQueries.generateList()
+        prepareQueriesForTopmostSameAsCleanup(updatedDataset1 -> parentTopmostSameAs.some,
+                                              returning = dataset1CleanUpQueries
+        )
 
         findingParentTopmostSameAsFor(dataset2.provenance.sameAs, returning = None.pure[Try])
         val dataset2KgTopmostSameAs = datasetTopmostSameAs.generateSome
         findingTopmostSameAsFor(dataset2.identification.resourceId, returning = dataset2KgTopmostSameAs.pure[Try])
         val dataset2Queries = sparqlQueries.generateList()
         prepareQueriesForSameAs(dataset2 -> dataset2KgTopmostSameAs, returning = dataset2Queries)
+        val dataset2CleanUpQueries = sparqlQueries.generateList()
+        prepareQueriesForTopmostSameAsCleanup(dataset2 -> None, returning = dataset2CleanUpQueries)
 
         val step = transformer.createTransformationStep
-
         step.name.value shouldBe "Dataset Details Updates"
-        val Success(Right((updatedProject, queries))) = step.run(project).value
-        updatedProject shouldBe ProjectFunctions.update(dataset1, dataset1.update(kgTopmostSameAs))(project)
-        queries        shouldBe Queries(dataset1Queries ::: dataset2Queries, Nil)
+
+        val Success(Right((updatedProject, queries))) = (step run project).value
+        updatedProject shouldBe ProjectFunctions.update(dataset1, updatedDataset1)(project)
+        queries shouldBe Queries.postDataQueriesOnly(
+          dataset1Queries ::: dataset1CleanUpQueries ::: dataset2Queries ::: dataset2CleanUpQueries
+        )
       }
 
     "prepare updates for deleted datasets" in new TestCase {
@@ -134,8 +143,8 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       val Success(Right((updatedProject, queries))) = step.run(entitiesProjectWithAllDatasets).value
 
       updatedProject shouldBe entitiesProjectWithAllDatasets
-      queries.preDataUploadQueries should contain theSameElementsAs (internalDsQueries ::: importedExternalDsQueries ::: ancestorInternalDsQueries ::: ancestorExternalDsQueries)
-      queries.postDataUploadQueries shouldBe List.empty[SparqlQuery]
+      queries.postDataUploadQueries should contain theSameElementsAs (internalDsQueries ::: importedExternalDsQueries ::: ancestorInternalDsQueries ::: ancestorExternalDsQueries)
+      queries.preDataUploadQueries shouldBe List.empty[SparqlQuery]
     }
 
     "return the ProcessingRecoverableFailure if calls to KG fails with a network or HTTP error" in new TestCase {
@@ -199,10 +208,20 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         ),
         returning: List[SparqlQuery]
     ) = (updatesCreator
-      .prepareUpdates(_: entities.Dataset[entities.Dataset.Provenance.ImportedInternal], _: Option[TopmostSameAs])(
-        _: TopmostSameAs.type
+      .prepareUpdates(_: entities.Dataset[entities.Dataset.Provenance.ImportedInternal], _: Option[TopmostSameAs]))
+      .expects(dsAndMaybeTopmostSameAs._1, dsAndMaybeTopmostSameAs._2)
+      .returning(returning)
+
+    def prepareQueriesForTopmostSameAsCleanup(
+        dsAndMaybeTopmostSameAs: (entities.Dataset[entities.Dataset.Provenance.ImportedInternal],
+                                  Option[TopmostSameAs]
+        ),
+        returning: List[SparqlQuery]
+    ) = (updatesCreator
+      .prepareTopmostSameAsCleanup(_: entities.Dataset[entities.Dataset.Provenance.ImportedInternal],
+                                   _: Option[TopmostSameAs]
       ))
-      .expects(dsAndMaybeTopmostSameAs._1, dsAndMaybeTopmostSameAs._2, *)
+      .expects(dsAndMaybeTopmostSameAs._1, dsAndMaybeTopmostSameAs._2)
       .returning(returning)
   }
 
