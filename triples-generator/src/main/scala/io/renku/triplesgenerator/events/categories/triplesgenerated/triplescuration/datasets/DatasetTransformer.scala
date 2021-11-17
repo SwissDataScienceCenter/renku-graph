@@ -50,7 +50,7 @@ private[triplescuration] class DatasetTransformerImpl[F[_]: MonadThrow](
 
   private def createTransformation: Transformation[F] = project =>
     EitherT {
-      (updateTopmostSameAs((project, Queries.empty)) >>= updateTopmostDerivedFrom >>= updateHierarchyOnInvalidation)
+      (updateTopmostSameAs((project, Queries.empty)) >>= updateHierarchyOnInvalidation)
         .map(_.asRight[ProcessingRecoverableError])
         .recoverWith(maybeToRecoverableError)
     }
@@ -68,22 +68,6 @@ private[triplescuration] class DatasetTransformerImpl[F[_]: MonadThrow](
           projectAndQueries._2 |+| Queries(updatesCreator.prepareUpdates(dataset, maybeKGTopmostSameAs), List.empty)
         )
       }
-  }
-
-  private lazy val updateTopmostDerivedFrom: ((Project, Queries)) => F[(Project, Queries)] = {
-    case (project, queries) =>
-      findModifiedDatasets(project)
-        .foldLeft((project -> queries).pure[F]) { (resultDataF, dataset) =>
-          for {
-            resultData                    <- resultDataF
-            maybeParentTopmostDerivedFrom <- findParentTopmostDerivedFrom(dataset.provenance.derivedFrom)
-            maybeKGTopmostDerivedFrom     <- findTopmostDerivedFrom(dataset.identification.resourceId)
-            updatedDataset = maybeParentTopmostDerivedFrom.map(dataset.update) getOrElse dataset
-          } yield (
-            update(dataset, updatedDataset)(resultData._1),
-            resultData._2 |+| Queries(updatesCreator.prepareUpdates(dataset, maybeKGTopmostDerivedFrom), List.empty)
-          )
-        }
   }
 
   private lazy val updateHierarchyOnInvalidation: ((Project, Queries)) => F[(Project, Queries)] = {

@@ -20,11 +20,10 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescura
 
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.datasets.{SameAs, TopmostDerivedFrom, TopmostSameAs}
+import io.renku.graph.model.datasets.{SameAs, TopmostSameAs}
+import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{entities, projects}
 import io.renku.rdfstore.InMemoryRdfStore
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
@@ -66,35 +65,6 @@ class UpdatesCreatorSpec
 
         findDatasets.map(onlyTopmostSameAs) shouldBe Set(
           (dataset2.resourceId.value, dataset0AsTopmostSameAs.value.some)
-        )
-      }
-
-    "generate queries which " +
-      "updates topmostDerivedFrom for all datasets which topmostDerivedFrom points to the current dataset " +
-      "when the topmostDerivedFrom on the current dataset is different than the value in KG" in {
-        val (topmost, modification1) = datasetAndModificationEntities(provenanceInternal).generateOne
-        val modification1Entities    = modification1.to[entities.Dataset[entities.Dataset.Provenance.Modified]]
-        val modification2 = {
-          val ds = modifiedDatasetEntities(
-            modification1,
-            timestamps(max = modification1.provenance.date.instant).generateAs[projects.DateCreated]
-          ).generateOne
-            .to[entities.Dataset[entities.Dataset.Provenance.Modified]]
-          ds.copy(provenance =
-            ds.provenance.copy(topmostDerivedFrom = TopmostDerivedFrom(modification1Entities.resourceId.value))
-          )
-        }
-
-        loadToStore(modification2)
-
-        findDatasets.map(onlyTopmostDerivedFrom) shouldBe Set(
-          (modification2.resourceId.value, modification1Entities.resourceId.value.some)
-        )
-
-        UpdatesCreator.prepareUpdates(modification1Entities, None).runAll.unsafeRunSync()
-
-        findDatasets.map(onlyTopmostDerivedFrom) shouldBe Set(
-          (modification2.resourceId.value, topmost.provenance.topmostDerivedFrom.value.some)
         )
       }
 

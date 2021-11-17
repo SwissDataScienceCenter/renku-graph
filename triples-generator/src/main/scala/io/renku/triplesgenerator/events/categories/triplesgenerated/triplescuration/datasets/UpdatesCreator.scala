@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescura
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas.{renku, schema}
 import io.renku.graph.model.datasets
-import io.renku.graph.model.datasets.{ResourceId, TopmostDerivedFrom, TopmostSameAs}
+import io.renku.graph.model.datasets.{ResourceId, TopmostSameAs}
 import io.renku.graph.model.entities.Dataset
 import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.rdfstore.SparqlQuery
@@ -44,10 +44,6 @@ private trait UpdatesCreator {
   def prepareUpdates(dataset:              Dataset[Dataset.Provenance.ImportedInternal],
                      maybeKGTopmostSameAs: Option[TopmostSameAs]
   )(implicit ev:                           TopmostSameAs.type): List[SparqlQuery]
-
-  def prepareUpdates(dataset:                   Dataset[Dataset.Provenance.Modified],
-                     maybeKGTopmostDerivedFrom: Option[TopmostDerivedFrom]
-  )(implicit ev:                                TopmostDerivedFrom.type): List[SparqlQuery]
 }
 
 private object UpdatesCreator extends UpdatesCreator {
@@ -74,16 +70,6 @@ private object UpdatesCreator extends UpdatesCreator {
       .when(!(maybeKGTopmostSameAs contains dataset.provenance.topmostSameAs))(
         prepareSameAsUpdate(dataset.resourceId, dataset.provenance.topmostSameAs)
       )
-      .toList
-
-  override def prepareUpdates(dataset:                   Dataset[Provenance.Modified],
-                              maybeKGTopmostDerivedFrom: Option[TopmostDerivedFrom]
-  )(implicit ev:                                         datasets.TopmostDerivedFrom.type): List[SparqlQuery] =
-    Option
-      .when(
-        !(maybeKGTopmostDerivedFrom contains dataset.provenance.topmostDerivedFrom) &&
-          dataset.provenance.maybeInvalidationTime.isEmpty
-      )(prepareDerivedFromUpdate(dataset.resourceId, dataset.provenance.topmostDerivedFrom))
       .toList
 
   private def deleteSameAs(dataset: Dataset[Provenance.Internal]) = SparqlQuery.of(
@@ -165,17 +151,4 @@ private object UpdatesCreator extends UpdatesCreator {
         |}
         |""".stripMargin
   )
-
-  private def prepareDerivedFromUpdate(oldTopmostDerivedFrom: ResourceId, newTopmostDerivedFrom: TopmostDerivedFrom) =
-    SparqlQuery.of(
-      name = "transformation - topmostDerivedFrom update",
-      Prefixes.of(renku -> "renku", schema -> "schema"),
-      s"""|DELETE { ?dsId renku:topmostDerivedFrom <$oldTopmostDerivedFrom> }
-          |INSERT { ?dsId renku:topmostDerivedFrom <$newTopmostDerivedFrom> }
-          |WHERE {
-          |  ?dsId a schema:Dataset;
-          |        renku:topmostDerivedFrom <$oldTopmostDerivedFrom>
-          |}
-          |""".stripMargin
-    )
 }
