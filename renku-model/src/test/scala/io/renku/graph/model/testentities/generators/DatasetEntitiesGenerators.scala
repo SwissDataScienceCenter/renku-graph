@@ -20,15 +20,15 @@ package io.renku.graph.model.testentities
 package generators
 
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{nonEmptyStrings, sentences, timestamps}
+import io.renku.generators.Generators.{nonBlankStrings, sentences, timestamps}
 import io.renku.graph.model.GraphModelGenerators.{datasetCreatedDates, datasetDescriptions, datasetExternalSameAs, datasetIdentifiers, datasetImageUris, datasetInitialVersions, datasetInternalSameAs, datasetKeywords, datasetLicenses, datasetNames, datasetPartExternals, datasetPartSources, datasetPublishedDates, datasetTitles, datasetVersions, projectCreatedDates}
+import io.renku.graph.model._
 import io.renku.graph.model.datasets.{DerivedFrom, ExternalSameAs, Identifier, InitialVersion, PartId, TopmostSameAs}
 import io.renku.graph.model.testentities.Dataset.{AdditionalInfo, Identification, Provenance}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
-import io.renku.graph.model._
 import io.renku.tinytypes.InstantTinyType
-import eu.timepit.refined.auto._
 import monocle.Lens
 import org.scalacheck.Gen
 
@@ -206,7 +206,7 @@ trait DatasetEntitiesGenerators {
 
   def publicationEventFactories(minDateCreated: Instant): Gen[Dataset[Provenance] => PublicationEvent] = for {
     maybeDescription <- sentences().map(_.value).map(publicationEvents.Description.apply).toGeneratorOfOptions
-    name             <- nonEmptyStrings() map publicationEvents.Name.apply
+    name             <- nonBlankStrings(minLength = 5).map(_.value).map(publicationEvents.Name.apply)
     startDate        <- timestamps(minDateCreated, max = Instant.now()) map publicationEvents.StartDate.apply
   } yield PublicationEvent(_, maybeDescription, name, startDate)
 
