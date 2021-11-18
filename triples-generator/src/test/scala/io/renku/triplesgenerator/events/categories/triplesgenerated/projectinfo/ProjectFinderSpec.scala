@@ -59,48 +59,40 @@ class ProjectFinderSpec
     with ScalaCheckPropertyChecks
     with TinyTypeEncoders {
 
-  "findProjectInfo" should {
+  "findProject" should {
 
-    "return info about a project with the given path" in new TestCase {
+    "fetch info about the project with the given path from GitLab" in new TestCase {
       forAll { (projectInfoRaw: GitLabProjectInfo, creator: ProjectMember) =>
         val projectInfo = projectInfoRaw.copy(maybeCreator = creator.some)
 
         `/api/v4/projects`(projectInfo.path) returning okJson(projectInfo.asJson.noSpaces)
         `/api/v4/users`(creator.gitLabId) returning okJson(creator.asJson.noSpaces)
-        val (users, members) = projectInfo.members.splitAt(projectInfo.members.size / 2)
-        `/api/v4/project/users`(projectInfo.path) returning okJson(users.asJson.noSpaces)
-        `/api/v4/project/members`(projectInfo.path) returning okJson(members.asJson.noSpaces)
 
-        finder.findProjectInfo(projectInfo.path).value.unsafeRunSync() shouldBe Some(projectInfo).asRight
+        finder.findProject(projectInfo.path).value.unsafeRunSync() shouldBe
+          projectInfo.copy(members = Set.empty).some.asRight
       }
     }
 
-    "return info without creator if it does not exist in GitLab" in new TestCase {
+    "fetch info about the project without creator if it does not exist" in new TestCase {
       forAll { (projectInfoRaw: GitLabProjectInfo, creator: ProjectMember) =>
         val projectInfo = projectInfoRaw.copy(maybeCreator = creator.some)
 
         `/api/v4/projects`(projectInfo.path) returning okJson(projectInfo.asJson.noSpaces)
         `/api/v4/users`(creator.gitLabId) returning notFound()
-        val (users, members) = projectInfo.members.splitAt(projectInfo.members.size / 2)
-        `/api/v4/project/users`(projectInfo.path) returning okJson(users.asJson.noSpaces)
-        `/api/v4/project/members`(projectInfo.path) returning okJson(members.asJson.noSpaces)
 
-        finder.findProjectInfo(projectInfo.path).value.unsafeRunSync() shouldBe Some(
-          projectInfo.copy(maybeCreator = None)
-        ).asRight
+        finder.findProject(projectInfo.path).value.unsafeRunSync() shouldBe
+          projectInfo.copy(maybeCreator = None, members = Set.empty).some.asRight
       }
     }
 
-    "return info without creator if it's not returned in project info" in new TestCase {
+    "return info without creator if it's not returned from the GET projects/:id" in new TestCase {
       forAll { projectInfoRaw: GitLabProjectInfo =>
         val projectInfo = projectInfoRaw.copy(maybeCreator = None)
 
         `/api/v4/projects`(projectInfo.path) returning okJson(projectInfo.asJson.noSpaces)
-        val (users, members) = projectInfo.members.splitAt(projectInfo.members.size / 2)
-        `/api/v4/project/users`(projectInfo.path) returning okJson(users.asJson.noSpaces)
-        `/api/v4/project/members`(projectInfo.path) returning okJson(members.asJson.noSpaces)
 
-        finder.findProjectInfo(projectInfo.path).value.unsafeRunSync() shouldBe Some(projectInfo).asRight
+        finder.findProject(projectInfo.path).value.unsafeRunSync() shouldBe
+          projectInfo.copy(maybeCreator = None, members = Set.empty).some.asRight
       }
     }
 
@@ -108,54 +100,7 @@ class ProjectFinderSpec
       val path = projectPaths.generateOne
       `/api/v4/projects`(path) returning notFound()
 
-      finder.findProjectInfo(path).value.unsafeRunSync() shouldBe None.asRight
-    }
-
-    "return info without members if they do not exist in GitLab" in new TestCase {
-      val projectInfo = gitLabProjectInfos.generateOne
-
-      `/api/v4/projects`(projectInfo.path) returning okJson(projectInfo.asJson.noSpaces)
-      projectInfo.maybeCreator.foreach(creator =>
-        `/api/v4/users`(creator.gitLabId) returning okJson(creator.asJson.noSpaces)
-      )
-      `/api/v4/project/users`(projectInfo.path) returning okJson(projectInfo.members.asJson.noSpaces)
-      `/api/v4/project/members`(projectInfo.path) returning notFound()
-
-      finder.findProjectInfo(projectInfo.path).value.unsafeRunSync() shouldBe Some(projectInfo).asRight
-    }
-
-    "return info without users if they do not exist in GitLab" in new TestCase {
-      val projectInfo = gitLabProjectInfos.generateOne
-
-      `/api/v4/projects`(projectInfo.path) returning okJson(projectInfo.asJson.noSpaces)
-      projectInfo.maybeCreator.foreach(creator =>
-        `/api/v4/users`(creator.gitLabId) returning okJson(creator.asJson.noSpaces)
-      )
-      `/api/v4/project/users`(projectInfo.path) returning notFound()
-      `/api/v4/project/members`(projectInfo.path) returning okJson(projectInfo.members.asJson.noSpaces)
-
-      finder.findProjectInfo(projectInfo.path).value.unsafeRunSync() shouldBe Some(projectInfo).asRight
-    }
-
-    "collect members from all the pages" in new TestCase {
-      val allMembers  = projectMemberObjects.generateFixedSizeList(4)
-      val projectInfo = gitLabProjectInfos.generateOne.copy(members = allMembers.toSet)
-
-      `/api/v4/projects`(projectInfo.path) returning okJson(projectInfo.asJson.noSpaces)
-      projectInfo.maybeCreator.foreach(creator =>
-        `/api/v4/users`(creator.gitLabId) returning okJson(creator.asJson.noSpaces)
-      )
-      val (users, members) = projectInfo.members.splitAt(allMembers.size / 2)
-      `/api/v4/project/users`(projectInfo.path) returning okJson(List(users.head).asJson.noSpaces)
-        .withHeader("X-Next-Page", "2")
-      `/api/v4/project/users`(projectInfo.path, maybePage = Some(2)) returning okJson(users.tail.asJson.noSpaces)
-        .withHeader("X-Next-Page", "")
-      `/api/v4/project/members`(projectInfo.path) returning okJson(List(members.head).asJson.noSpaces)
-        .withHeader("X-Next-Page", "2")
-      `/api/v4/project/members`(projectInfo.path, maybePage = Some(2)) returning okJson(members.tail.asJson.noSpaces)
-        .withHeader("X-Next-Page", "")
-
-      finder.findProjectInfo(projectInfo.path).value.unsafeRunSync() shouldBe Some(projectInfo).asRight
+      finder.findProject(path).value.unsafeRunSync() shouldBe None.asRight
     }
 
     Set(
@@ -169,7 +114,7 @@ class ProjectFinderSpec
         val path = projectPaths.generateOne
         `/api/v4/projects`(path) returning response
 
-        val Left(failure) = finder.findProjectInfo(path).value.unsafeRunSync()
+        val Left(failure) = finder.findProject(path).value.unsafeRunSync()
         failure shouldBe a[ProcessingRecoverableError]
       }
 
@@ -180,34 +125,7 @@ class ProjectFinderSpec
         `/api/v4/projects`(projectInfo.path) returning okJson(projectInfo.asJson.noSpaces)
         `/api/v4/users`(creator.gitLabId) returning response
 
-        val Left(failure) = finder.findProjectInfo(projectInfo.path).value.unsafeRunSync()
-        failure shouldBe a[ProcessingRecoverableError]
-      }
-
-      s"return a Recoverable Failure for $problemName when fetching members" in new TestCase {
-        val projectInfo = gitLabProjectInfos.generateOne
-
-        `/api/v4/projects`(projectInfo.path) returning okJson(projectInfo.asJson.noSpaces)
-        projectInfo.maybeCreator.foreach(creator =>
-          `/api/v4/users`(creator.gitLabId) returning okJson(creator.asJson.noSpaces)
-        )
-        `/api/v4/project/members`(projectInfo.path) returning response
-
-        val Left(failure) = finder.findProjectInfo(projectInfo.path).value.unsafeRunSync()
-        failure shouldBe a[ProcessingRecoverableError]
-      }
-
-      s"return a Recoverable Failure for $problemName when fetching users" in new TestCase {
-        val projectInfo = gitLabProjectInfos.generateOne
-
-        `/api/v4/projects`(projectInfo.path) returning okJson(projectInfo.asJson.noSpaces)
-        projectInfo.maybeCreator.foreach(creator =>
-          `/api/v4/users`(creator.gitLabId) returning okJson(creator.asJson.noSpaces)
-        )
-        `/api/v4/project/users`(projectInfo.path) returning okJson(projectInfo.members.asJson.noSpaces)
-        `/api/v4/project/members`(projectInfo.path) returning response
-
-        val Left(failure) = finder.findProjectInfo(projectInfo.path).value.unsafeRunSync()
+        val Left(failure) = finder.findProject(projectInfo.path).value.unsafeRunSync()
         failure shouldBe a[ProcessingRecoverableError]
       }
     }
@@ -220,11 +138,11 @@ class ProjectFinderSpec
 
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val gitLabUrl = GitLabUrl(externalServiceBaseUrl).apiV4
-    val finder = new ProjectInfoFinderImpl[IO](gitLabUrl,
-                                               Throttler.noThrottling,
-                                               retryInterval = 100 millis,
-                                               maxRetries = 1,
-                                               requestTimeoutOverride = Some(requestTimeout)
+    val finder = new ProjectFinderImpl[IO](gitLabUrl,
+                                           Throttler.noThrottling,
+                                           retryInterval = 100 millis,
+                                           maxRetries = 1,
+                                           requestTimeoutOverride = Some(requestTimeout)
     )
   }
 
@@ -255,20 +173,6 @@ class ProjectFinderSpec
   private def `/api/v4/projects`(path: Path) = new {
     def returning(response: ResponseDefinitionBuilder) = stubFor {
       get(s"/api/v4/projects/${urlEncode(path.toString)}")
-        .willReturn(response)
-    }
-  }
-
-  private def `/api/v4/project/users`(path: Path, maybePage: Option[Int] = None) = new {
-    def returning(response: ResponseDefinitionBuilder) = stubFor {
-      get(s"/api/v4/projects/${urlEncode(path.value)}/users${maybePage.map(p => s"?page=$p").getOrElse("")}")
-        .willReturn(response)
-    }
-  }
-
-  private def `/api/v4/project/members`(path: Path, maybePage: Option[Int] = None) = new {
-    def returning(response: ResponseDefinitionBuilder) = stubFor {
-      get(s"/api/v4/projects/${urlEncode(path.value)}/members${maybePage.map(p => s"?page=$p").getOrElse("")}")
         .willReturn(response)
     }
   }
