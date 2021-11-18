@@ -35,6 +35,7 @@ import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, JsonLD, Property}
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
+import io.renku.triplesgenerator.events.categories.triplesgenerated.projectinfo.ProjectInfoFinder
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

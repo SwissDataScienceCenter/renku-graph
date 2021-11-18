@@ -32,6 +32,7 @@ import io.renku.graph.model.entities._
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.JsonLDDecoder.decodeList
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.triplesgenerated.projectinfo.ProjectInfoFinder
 import org.typelevel.log4cats.Logger
 
 private trait JsonLDDeserializer[F[_]] {

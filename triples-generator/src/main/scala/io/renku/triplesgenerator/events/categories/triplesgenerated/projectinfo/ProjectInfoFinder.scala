@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.categories.triplesgenerated
+package io.renku.triplesgenerator.events.categories.triplesgenerated.projectinfo
 
 import cats.data.{EitherT, OptionT}
 import cats.effect.Async
@@ -45,19 +45,19 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
-private trait ProjectInfoFinder[F[_]] {
+private[triplesgenerated] trait ProjectInfoFinder[F[_]] {
   def findProjectInfo(path: projects.Path)(implicit
       maybeAccessToken:     Option[AccessToken]
   ): EitherT[F, ProcessingRecoverableError, Option[GitLabProjectInfo]]
 }
 
-private object ProjectInfoFinder {
+private[triplesgenerated] object ProjectInfoFinder {
   def apply[F[_]: Async: Logger](gitLabThrottler: Throttler[F, GitLab]): F[ProjectInfoFinder[F]] = for {
     gitLabUrl <- GitLabUrlLoader[F]()
   } yield new ProjectInfoFinderImpl(gitLabUrl.apiV4, gitLabThrottler)
 }
 
-private class ProjectInfoFinderImpl[F[_]: Async: Logger](
+private[triplesgenerated] class ProjectInfoFinderImpl[F[_]: Async: Logger](
     gitLabApiUrl:           GitLabApiUrl,
     gitLabThrottler:        Throttler[F, GitLab],
     retryInterval:          FiniteDuration = RestClient.SleepAfterConnectionIssue,

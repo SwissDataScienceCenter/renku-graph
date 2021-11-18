@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.categories.triplesgenerated
+package io.renku.triplesgenerator.events.categories.triplesgenerated.projectinfo
 
 import cats.effect.IO
 import cats.syntax.all._
