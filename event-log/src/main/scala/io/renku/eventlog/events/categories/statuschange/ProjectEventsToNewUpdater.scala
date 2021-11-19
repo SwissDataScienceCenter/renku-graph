@@ -20,22 +20,27 @@ package io.renku.eventlog.events.categories.statuschange
 
 import cats.data.Kleisli
 import cats.effect.Async
+import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.implicits.PreparedQueryOps
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.ProjectEventsToNew
+import io.renku.eventlog.events.categories.statuschange.projectCleaner.ProjectCleaner
 import io.renku.eventlog.{EventDate, ExecutionDate}
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
+import org.typelevel.log4cats.Logger
 import skunk.implicits._
 import skunk.{Session, ~}
 
 import java.time.Instant
+import scala.util.control.NonFatal
 
-private class ProjectEventsToNewUpdater[F[_]: Async](
+private class ProjectEventsToNewUpdater[F[_]: Async: Logger](
+    projectCleaner:   ProjectCleaner[F],
     queriesExecTimes: LabeledHistogram[F, SqlStatement.Name],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
@@ -50,36 +55,17 @@ private class ProjectEventsToNewUpdater[F[_]: Async](
     maybeLatestEventDate <- getLatestEventDate(event.project)
     _ <- maybeLatestEventDate match {
            case Some(latestEventDate) => updateLatestEventDate(event.project, latestEventDate)
-           case None                  => cleanUpProject(event.project)
+           case None                  => projectCleaner.cleanUp(event.project) recoverWith logError(event.project)
          }
     counts = statuses
                .groupBy(identity)
                .map { case (eventStatus, eventStatuses) => (eventStatus, -1 * eventStatuses.length) }
                .updatedWith(EventStatus.New) { maybeNewEventsCount =>
-                 maybeNewEventsCount.map(_ + statuses.length).orElse(Some(statuses.length))
+                 maybeNewEventsCount
+                   .map(_ + statuses.length)
+                   .orElse(if (statuses.nonEmpty) Some(statuses.length) else None)
                }
   } yield DBUpdateResults.ForProjects(event.project.path, counts)
-
-  private def cleanUpProject(project: Project): Kleisli[F, Session[F], Unit] = for {
-    _ <- removeProjectSubscriptionSyncTimes(project)
-    _ <- removeProject(project)
-    _ <- removeProjectWebhook(project)
-    _ <- removeProjectTokens(project)
-  } yield ()
-
-  private def removeProjectWebhook(project: Project): Kleisli[F, Session[F], Unit] = ???
-
-  private def removeProjectTokens(project: Project): Kleisli[F, Session[F], Unit] = ???
-
-  private def removeProjectSubscriptionSyncTimes(project: Project) = measureExecutionTime {
-    SqlStatement(name = "project_to_new - subscription_time removal")
-      .command[projects.Id](
-        sql"""DELETE FROM subscription_category_sync_time WHERE project_id = $projectIdEncoder""".command
-      )
-      .arguments(project.id)
-      .build
-      .void
-  }
 
   private def updateStatuses(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - status update")
@@ -173,16 +159,9 @@ private class ProjectEventsToNewUpdater[F[_]: Async](
       .build
       .void
   }
-
-  override def onRollback(event: ProjectEventsToNew): Kleisli[F, Session[F], Unit] = Kleisli.pure(())
-
-  private def removeProject(project: Project) = measureExecutionTime {
-    SqlStatement(name = "project_to_new - remove project")
-      .command[projects.Id](
-        sql"""DELETE FROM project WHERE project_id = $projectIdEncoder""".command
-      )
-      .argument(project.id)
-      .build
-      .void
+  private def logError(project: Project): PartialFunction[Throwable, Kleisli[F, Session[F], Unit]] = {
+    case NonFatal(error) =>
+      Kleisli.liftF(Logger[F].error(error)(s"Clean up project failed: ${project.show}"))
   }
+  override def onRollback(event: ProjectEventsToNew): Kleisli[F, Session[F], Unit] = Kleisli.pure(())
 }
