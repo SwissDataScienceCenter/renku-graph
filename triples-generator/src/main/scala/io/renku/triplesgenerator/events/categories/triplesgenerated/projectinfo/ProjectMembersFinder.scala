@@ -30,13 +30,10 @@ import io.renku.control.Throttler
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import io.renku.graph.model.{GitLabApiUrl, projects, users}
-import io.renku.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.http.client.{AccessToken, RestClient}
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
 import org.http4s.Method.GET
-import org.http4s.Status.{Forbidden, ServiceUnavailable, Unauthorized}
 import org.http4s._
 import org.http4s.circe.jsonOf
 import org.http4s.dsl.io.{NotFound, Ok}
@@ -59,6 +56,7 @@ private object ProjectMembersFinder {
 private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
     gitLabApiUrl:           GitLabApiUrl,
     gitLabThrottler:        Throttler[F, GitLab],
+    recoveryStrategy:       RecoverableErrorsRecovery = RecoverableErrorsRecovery,
     retryInterval:          FiniteDuration = RestClient.SleepAfterConnectionIssue,
     maxRetries:             Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
     requestTimeoutOverride: Option[Duration] = None
@@ -81,14 +79,7 @@ private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
       fetchMembers(s"$gitLabApiUrl/projects/${urlEncode(path.value)}/users")
     ).parMapN(_ ++ _)
       .map(_.asRight[ProcessingRecoverableError])
-      .recoverWith(maybeRecoverableError)
-  }
-
-  private def mapTo[OUT](implicit
-      decoder: EntityDecoder[F, OUT]
-  ): PartialFunction[(Status, Request[F], Response[F]), F[Option[OUT]]] = {
-    case (Ok, _, response) => response.as[OUT].map(Option.apply)
-    case (NotFound, _, _)  => Option.empty[OUT].pure[F]
+      .recoverWith(recoveryStrategy.maybeRecoverableError)
   }
 
   private implicit val memberDecoder: Decoder[ProjectMember] = cursor =>
@@ -131,18 +122,4 @@ private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
       case (fetchedUsers, maybeNextPage @ Some(_)) => fetchMembers(url, maybeNextPage, allMembers ++ fetchedUsers)
       case (fetchedUsers, None)                    => (allMembers ++ fetchedUsers).pure[F]
     }
-
-  private lazy val maybeRecoverableError
-      : PartialFunction[Throwable, F[Either[ProcessingRecoverableError, Set[ProjectMember]]]] = {
-    case exception @ (_: ConnectivityException | _: ClientException) =>
-      TransformationRecoverableError(exception.getMessage, exception.getCause)
-        .asLeft[Set[ProjectMember]]
-        .leftWiden[ProcessingRecoverableError]
-        .pure[F]
-    case exception @ UnexpectedResponseException(ServiceUnavailable | Forbidden | Unauthorized, _) =>
-      TransformationRecoverableError(exception.getMessage, exception.getCause)
-        .asLeft[Set[ProjectMember]]
-        .leftWiden[ProcessingRecoverableError]
-        .pure[F]
-  }
 }

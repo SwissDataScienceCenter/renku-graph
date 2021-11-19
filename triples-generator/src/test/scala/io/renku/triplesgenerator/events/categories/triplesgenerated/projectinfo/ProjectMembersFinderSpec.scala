@@ -126,17 +126,14 @@ class ProjectMembersFinderSpec
       "Forbidden"          -> aResponse().withStatus(Forbidden.code),
       "Unauthorized"       -> aResponse().withStatus(Unauthorized.code)
     ) foreach { case (problemName, response) =>
-      s"return a Recoverable Failure for $problemName when fetching project members" in new TestCase {
-        `/api/v4/project/users`(projectPath) returning okJson(Json.arr().noSpaces)
-        `/api/v4/project/members`(projectPath) returning response
-
-        val Left(failure) = finder.findProjectMembers(projectPath).value.unsafeRunSync()
-        failure shouldBe a[ProcessingRecoverableError]
-      }
-
-      s"return a Recoverable Failure for $problemName when fetching project users" in new TestCase {
-        `/api/v4/project/users`(projectPath) returning response
-        `/api/v4/project/members`(projectPath) returning okJson(Json.arr().noSpaces)
+      s"return a Recoverable Failure for $problemName when fetching project members or users" in new TestCase {
+        if (Random.nextBoolean()) {
+          `/api/v4/project/users`(projectPath) returning okJson(Json.arr().noSpaces)
+          `/api/v4/project/members`(projectPath) returning response
+        } else {
+          `/api/v4/project/users`(projectPath) returning response
+          `/api/v4/project/members`(projectPath) returning okJson(Json.arr().noSpaces)
+        }
 
         val Left(failure) = finder.findProjectMembers(projectPath).value.unsafeRunSync()
         failure shouldBe a[ProcessingRecoverableError]

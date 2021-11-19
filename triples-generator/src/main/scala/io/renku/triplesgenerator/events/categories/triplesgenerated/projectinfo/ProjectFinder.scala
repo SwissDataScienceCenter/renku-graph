@@ -29,13 +29,10 @@ import io.renku.control.Throttler
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import io.renku.graph.model.{GitLabApiUrl, projects, users}
-import io.renku.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.http.client.{AccessToken, RestClient}
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
 import org.http4s.Method.GET
-import org.http4s.Status.{Forbidden, ServiceUnavailable, Unauthorized}
 import org.http4s.dsl.io.{NotFound, Ok}
 import org.http4s.{EntityDecoder, Request, Response, Status}
 import org.typelevel.log4cats.Logger
@@ -57,6 +54,7 @@ private object ProjectFinder {
 private class ProjectFinderImpl[F[_]: Async: Logger](
     gitLabApiUrl:           GitLabApiUrl,
     gitLabThrottler:        Throttler[F, GitLab],
+    recoveryStrategy:       RecoverableErrorsRecovery = RecoverableErrorsRecovery,
     retryInterval:          FiniteDuration = RestClient.SleepAfterConnectionIssue,
     maxRetries:             Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
     requestTimeoutOverride: Option[Duration] = None
@@ -81,7 +79,7 @@ private class ProjectFinderImpl[F[_]: Async: Logger](
         projectAndCreator <- fetchProject(path)
         maybeCreator      <- fetchCreator(projectAndCreator._2)
       } yield projectAndCreator._1.copy(maybeCreator = maybeCreator)
-    }.value.map(_.asRight[ProcessingRecoverableError]).recoverWith(maybeRecoverableError)
+    }.value.map(_.asRight[ProcessingRecoverableError]).recoverWith(recoveryStrategy.maybeRecoverableError)
   }
 
   private def fetchProject(path: projects.Path)(implicit maybeAccessToken: Option[AccessToken]) = OptionT {
@@ -149,18 +147,4 @@ private class ProjectFinderImpl[F[_]: Async: Logger](
 
   private implicit lazy val memberEntityDecoder: EntityDecoder[F, ProjectMember]       = jsonOf[F, ProjectMember]
   private implicit lazy val membersDecoder:      EntityDecoder[F, List[ProjectMember]] = jsonOf[F, List[ProjectMember]]
-
-  private lazy val maybeRecoverableError
-      : PartialFunction[Throwable, F[Either[ProcessingRecoverableError, Option[GitLabProjectInfo]]]] = {
-    case exception @ (_: ConnectivityException | _: ClientException) =>
-      TransformationRecoverableError(exception.getMessage, exception.getCause)
-        .asLeft[Option[GitLabProjectInfo]]
-        .leftWiden[ProcessingRecoverableError]
-        .pure[F]
-    case exception @ UnexpectedResponseException(ServiceUnavailable | Forbidden | Unauthorized, _) =>
-      TransformationRecoverableError(exception.getMessage, exception.getCause)
-        .asLeft[Option[GitLabProjectInfo]]
-        .leftWiden[ProcessingRecoverableError]
-        .pure[F]
-  }
 }
