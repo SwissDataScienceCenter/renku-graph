@@ -58,5 +58,6 @@ private[triplesgenerated] class ProjectInfoFinderImpl[F[_]: MonadThrow: Logger](
     findProject(path) >>= {
       case None          => EitherT.rightT[F, ProcessingRecoverableError](Option.empty[GitLabProjectInfo])
       case Some(project) => findProjectMembers(path).map(members => project.copy(members = members).some)
+      // find emails for members and creator
     }
 }

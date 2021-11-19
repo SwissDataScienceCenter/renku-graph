@@ -170,16 +170,18 @@ class ProjectFinderSpec
     }"""
   }
 
-  private def `/api/v4/projects`(path: Path) = new {
+  private def `/api/v4/projects`(path: Path)(implicit maybeAccessToken: Option[AccessToken]) = new {
     def returning(response: ResponseDefinitionBuilder) = stubFor {
       get(s"/api/v4/projects/${urlEncode(path.toString)}")
+        .withAccessToken(maybeAccessToken)
         .willReturn(response)
     }
   }
 
-  private def `/api/v4/users`(creatorId: users.GitLabId) = new {
+  private def `/api/v4/users`(creatorId: users.GitLabId)(implicit maybeAccessToken: Option[AccessToken]) = new {
     def returning(response: ResponseDefinitionBuilder) = stubFor {
       get(s"/api/v4/users/$creatorId")
+        .withAccessToken(maybeAccessToken)
         .willReturn(response)
     }
   }

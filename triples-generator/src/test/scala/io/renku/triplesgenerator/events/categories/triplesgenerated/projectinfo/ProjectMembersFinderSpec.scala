@@ -165,16 +165,22 @@ class ProjectMembersFinderSpec
     }"""
   }
 
-  private def `/api/v4/project/users`(path: Path, maybePage: Option[Int] = None) = new {
+  private def `/api/v4/project/users`(path: Path, maybePage: Option[Int] = None)(implicit
+      maybeAccessToken:                     Option[AccessToken]
+  ) = new {
     def returning(response: ResponseDefinitionBuilder) = stubFor {
       get(s"/api/v4/projects/${urlEncode(path.value)}/users${maybePage.map(p => s"?page=$p").getOrElse("")}")
+        .withAccessToken(maybeAccessToken)
         .willReturn(response)
     }
   }
 
-  private def `/api/v4/project/members`(path: Path, maybePage: Option[Int] = None) = new {
+  private def `/api/v4/project/members`(path: Path, maybePage: Option[Int] = None)(implicit
+      maybeAccessToken:                       Option[AccessToken]
+  ) = new {
     def returning(response: ResponseDefinitionBuilder) = stubFor {
       get(s"/api/v4/projects/${urlEncode(path.value)}/members${maybePage.map(p => s"?page=$p").getOrElse("")}")
+        .withAccessToken(maybeAccessToken)
         .willReturn(response)
     }
   }
