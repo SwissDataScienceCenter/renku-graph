@@ -93,13 +93,12 @@ private class EventHandler[F[_]: MonadThrow: Async: Spawn: Concurrent: Logger](
 
   private def executeUpdate[E <: StatusChangeEvent](
       event:                 E
-  )(implicit updaterFactory: EventUpdaterFactory[F, E], show: Show[E]) =
-    updaterFactory(deliveryInfoRemover, queriesExecTimes).flatMap { factory =>
-      statusChanger
-        .updateStatuses(event)(factory)
-        .recoverWith { case NonFatal(e) => Logger[F].logError(event, e) >> e.raiseError[F, Unit] }
-        .flatTap(_ => Logger[F].logInfo(event, "Processed"))
-    }
+  )(implicit updaterFactory: EventUpdaterFactory[F, E], show: Show[E]) = (for {
+    factory <- updaterFactory(deliveryInfoRemover, queriesExecTimes)
+    result <- statusChanger
+                .updateStatuses(event)(factory)
+                .flatTap(_ => Logger[F].logInfo(event, "Processed"))
+  } yield result) recoverWith { case NonFatal(e) => Logger[F].logError(event, e) >> e.raiseError[F, Unit] }
 }
 
 private object EventHandler {
