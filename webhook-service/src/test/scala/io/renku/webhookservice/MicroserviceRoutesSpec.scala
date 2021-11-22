@@ -86,11 +86,12 @@ class MicroserviceRoutesSpec
     }
     "define a DELETE webhooks/events endpoint returning response from the endpoint" in new TestCase {
 
+      val projectId      = projectIds.generateOne
       val responseStatus = Gen.oneOf(Ok, BadRequest).generateOne
-      val request        = Request[IO](Method.DELETE, uri"/webhooks/events")
-      (hookEventEndpoint
-        .processPushEvent(_: Request[IO]))
-        .expects(request)
+      val request        = Request[IO](Method.DELETE, uri"/projects" / projectId.toString / "webhooks")
+      (hookDeletionEndpoint
+        .deleteHook(_: projects.Id, _: AuthUser))
+        .expects(projectId, authUser)
         .returning(IO.pure(Response[IO](responseStatus)))
 
       val response = routes.call(request)
@@ -128,7 +129,6 @@ class MicroserviceRoutesSpec
         .returning(IO.pure(Response[IO](responseStatus)))
 
       val response = routes.call(request)
-
       response.status shouldBe responseStatus
     }
 
