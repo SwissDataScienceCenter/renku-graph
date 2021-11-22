@@ -97,7 +97,7 @@ the endpoint requires an authorization token passed in the request header as:
 
 | status                     | description                                                                                     |
 |----------------------------|-------------------------------------------------------------------------------------------------|
-| ok (200)                   | when hook already exists for the project                                                        |
+| ok (200)                   | when hook is successfully deleted                                                               |
 | not found (404)            | when the project does not exists                                                                | 
 | unauthorized (401)         | when there is neither `private-token` nor `authorization: bearer` in the header or it's invalid |
 | internal server error (500)| when there are problems with webhook creation                                                   |
