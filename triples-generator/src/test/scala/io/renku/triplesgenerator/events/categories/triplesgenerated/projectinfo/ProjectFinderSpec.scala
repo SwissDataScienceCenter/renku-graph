@@ -31,7 +31,8 @@ import io.renku.control.Throttler
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectPaths
-import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
+import io.renku.graph.model.entities.Project.GitLabProjectInfo
+import io.renku.graph.model.entities.Project.ProjectMember.ProjectMemberNoEmail
 import io.renku.graph.model.projects.Path
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.graph.model.{GitLabUrl, users}
@@ -62,19 +63,19 @@ class ProjectFinderSpec
   "findProject" should {
 
     "fetch info about the project with the given path from GitLab" in new TestCase {
-      forAll { (projectInfoRaw: GitLabProjectInfo, creator: ProjectMember) =>
+      forAll { (projectInfoRaw: GitLabProjectInfo, creator: ProjectMemberNoEmail) =>
         val projectInfo = projectInfoRaw.copy(maybeCreator = creator.some)
 
         `/api/v4/projects`(projectInfo.path) returning okJson(projectInfo.asJson.noSpaces)
         `/api/v4/users`(creator.gitLabId) returning okJson(creator.asJson.noSpaces)
 
         finder.findProject(projectInfo.path).value.unsafeRunSync() shouldBe
-          projectInfo.copy(members = Set.empty, maybeCreator = creator.copy(maybeEmail = None).some).some.asRight
+          projectInfo.copy(members = Set.empty, maybeCreator = creator.some).some.asRight
       }
     }
 
     "fetch info about the project without creator if it does not exist" in new TestCase {
-      forAll { (projectInfoRaw: GitLabProjectInfo, creator: ProjectMember) =>
+      forAll { (projectInfoRaw: GitLabProjectInfo, creator: ProjectMemberNoEmail) =>
         val projectInfo = projectInfoRaw.copy(maybeCreator = creator.some)
 
         `/api/v4/projects`(projectInfo.path) returning okJson(projectInfo.asJson.noSpaces)
@@ -119,7 +120,7 @@ class ProjectFinderSpec
       }
 
       s"return a Recoverable Failure for $problemName when fetching creator" in new TestCase {
-        val creator     = projectMemberObjects.generateOne
+        val creator     = projectMembersNoEmail.generateOne
         val projectInfo = gitLabProjectInfos.generateOne.copy(maybeCreator = creator.some)
 
         `/api/v4/projects`(projectInfo.path) returning okJson(projectInfo.asJson.noSpaces)
@@ -163,7 +164,7 @@ class ProjectFinderSpec
       .addIfDefined("description" -> project.maybeDescription.map(_.value))
   }
 
-  private implicit lazy val memberEncoder: Encoder[ProjectMember] = Encoder.instance { member =>
+  private implicit lazy val memberEncoder: Encoder[ProjectMemberNoEmail] = Encoder.instance { member =>
     json"""{
       "id":       ${member.gitLabId},     
       "name":     ${member.name},

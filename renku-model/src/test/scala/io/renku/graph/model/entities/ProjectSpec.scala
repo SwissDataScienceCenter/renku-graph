@@ -105,6 +105,19 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     }
   }
 
+  "ProjectMember.add" should {
+    "add the given email to the Project without an email" in {
+      val member = projectMembersNoEmail.generateOne
+      val email  = userEmails.generateOne
+
+      (member add email) shouldBe ProjectMember.ProjectMemberWithEmail(member.name,
+                                                                       member.username,
+                                                                       member.gitLabId,
+                                                                       email
+      )
+    }
+  }
+
   "decode" should {
 
     "turn JsonLD Project entity without parent into the Project object" in {

@@ -87,7 +87,7 @@ private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
       gitLabId <- cursor.downField("id").as[users.GitLabId]
       name     <- cursor.downField("name").as[users.Name]
       username <- cursor.downField("username").as[users.Username]
-    } yield ProjectMember(name, username, gitLabId, maybeEmail = None)
+    } yield ProjectMember(name, username, gitLabId)
 
   private implicit lazy val memberEntityDecoder: EntityDecoder[F, ProjectMember]       = jsonOf[F, ProjectMember]
   private implicit lazy val membersDecoder:      EntityDecoder[F, List[ProjectMember]] = jsonOf[F, List[ProjectMember]]

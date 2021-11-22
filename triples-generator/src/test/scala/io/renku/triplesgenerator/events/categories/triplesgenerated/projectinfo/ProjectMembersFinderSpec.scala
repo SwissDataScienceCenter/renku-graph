@@ -32,7 +32,7 @@ import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.GraphModelGenerators.projectPaths
-import io.renku.graph.model.entities.Project.ProjectMember
+import io.renku.graph.model.entities.Project.ProjectMember.ProjectMemberNoEmail
 import io.renku.graph.model.projects.Path
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.http.client.AccessToken
@@ -62,7 +62,7 @@ class ProjectMembersFinderSpec
   "findProject" should {
 
     "fetch and merge project users and members" in new TestCase {
-      forAll { (members: Set[ProjectMember], users: Set[ProjectMember]) =>
+      forAll { (members: Set[ProjectMemberNoEmail], users: Set[ProjectMemberNoEmail]) =>
         `/api/v4/project/users`(projectPath) returning okJson(users.asJson.noSpaces)
         `/api/v4/project/members`(projectPath) returning okJson(members.asJson.noSpaces)
 
@@ -71,7 +71,7 @@ class ProjectMembersFinderSpec
     }
 
     "collect members from all the pages" in new TestCase {
-      val allMembers = projectMemberObjects.generateFixedSizeList(4)
+      val allMembers = projectMembersNoEmail.generateFixedSizeList(4)
 
       val (users, members) = allMembers.splitAt(allMembers.size / 2)
       `/api/v4/project/users`(projectPath) returning okJson(List(users.head).asJson.noSpaces)
@@ -87,7 +87,7 @@ class ProjectMembersFinderSpec
     }
 
     "return an empty list if one of the endpoints responds with NOT_FOUND" in new TestCase {
-      val members = projectMemberObjects.generateSet()
+      val members = projectMembersNoEmail.generateSet()
       if (Random.nextBoolean()) {
         `/api/v4/project/users`(projectPath) returning notFound()
         `/api/v4/project/members`(projectPath) returning okJson(members.asJson.noSpaces)
@@ -100,7 +100,7 @@ class ProjectMembersFinderSpec
     }
 
     "return an empty list if one of the endpoints returns an empty list" in new TestCase {
-      val members = projectMemberObjects.generateSet()
+      val members = projectMembersNoEmail.generateSet()
       if (Random.nextBoolean()) {
         `/api/v4/project/users`(projectPath) returning okJson(Json.arr().noSpaces)
         `/api/v4/project/members`(projectPath) returning okJson(members.asJson.noSpaces)
@@ -157,7 +157,7 @@ class ProjectMembersFinderSpec
     )
   }
 
-  private implicit lazy val memberEncoder: Encoder[ProjectMember] = Encoder.instance { member =>
+  private implicit lazy val memberEncoder: Encoder[ProjectMemberNoEmail] = Encoder.instance { member =>
     json"""{
       "id":       ${member.gitLabId},     
       "name":     ${member.name},

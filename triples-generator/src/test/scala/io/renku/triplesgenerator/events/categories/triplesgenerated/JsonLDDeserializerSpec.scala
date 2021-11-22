@@ -217,12 +217,16 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
     val projectInfoFinder = mock[ProjectInfoFinder[Try]]
     val deserializer      = new JsonLDDeserializerImpl[Try](projectInfoFinder, renkuBaseUrl)
 
-    private implicit lazy val toProjectMember: Person => ProjectMember = person =>
-      ProjectMember(person.name,
-                    users.Username(person.name.value),
-                    person.maybeGitLabId.getOrElse(fail("Project person without GitLabId")),
-                    person.maybeEmail
+    private implicit lazy val toProjectMember: Person => ProjectMember = person => {
+      val member = ProjectMember(person.name,
+                                 users.Username(person.name.value),
+                                 person.maybeGitLabId.getOrElse(fail("Project person without GitLabId"))
       )
+      person.maybeEmail match {
+        case Some(email) => member.add(email)
+        case None        => member
+      }
+    }
 
     def givenFindProjectInfo(projectPath: projects.Path) = new {
       def returning(result: EitherT[Try, ProcessingRecoverableError, Option[GitLabProjectInfo]]) =

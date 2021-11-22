@@ -295,11 +295,26 @@ object Project {
                                      maybeParentPath:  Option[Path]
   )
 
-  final case class ProjectMember(name:       users.Name,
-                                 username:   users.Username,
-                                 gitLabId:   users.GitLabId,
-                                 maybeEmail: Option[users.Email]
-  ) {
-    def add(email: users.Email): ProjectMember = copy(maybeEmail = Some(email))
+  sealed trait ProjectMember {
+    val name:     users.Name
+    val username: users.Username
+    val gitLabId: users.GitLabId
+  }
+  object ProjectMember {
+
+    def apply(name: users.Name, username: users.Username, gitLabId: users.GitLabId): ProjectMemberNoEmail =
+      ProjectMemberNoEmail(name, username, gitLabId)
+
+    final case class ProjectMemberNoEmail(name: users.Name, username: users.Username, gitLabId: users.GitLabId)
+        extends ProjectMember {
+
+      def add(email: users.Email): ProjectMemberWithEmail = ProjectMemberWithEmail(name, username, gitLabId, email)
+    }
+
+    final case class ProjectMemberWithEmail(name:     users.Name,
+                                            username: users.Username,
+                                            gitLabId: users.GitLabId,
+                                            email:    users.Email
+    ) extends ProjectMember
   }
 }

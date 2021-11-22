@@ -85,13 +85,11 @@ class MemberEmailFinderSpec
           )
           .returning(EitherT.rightT[IO, ProcessingRecoverableError]((member.name -> authorEmail).some))
 
-        finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe member
-          .copy(maybeEmail = authorEmail.some)
-          .asRight
+        finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe (member add authorEmail).asRight
       }
 
     "do nothing if email is already set on the given member" in new TestCase {
-      val memberWithEmail = member.copy(maybeEmail = userEmails.generateSome)
+      val memberWithEmail = member add userEmails.generateOne
       finder.findMemberEmail(memberWithEmail, project).value.unsafeRunSync() shouldBe memberWithEmail.asRight
     }
 
@@ -116,9 +114,7 @@ class MemberEmailFinderSpec
         .expects(project.path, commitTo, maybeAccessToken)
         .returning(EitherT.rightT[IO, ProcessingRecoverableError]((member.name -> authorEmail).some))
 
-      finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe member
-        .copy(maybeEmail = authorEmail.some)
-        .asRight
+      finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe (member add authorEmail).asRight
     }
 
     "take the email from commitTo if commitFrom has author with a different name" in new TestCase {
@@ -144,9 +140,7 @@ class MemberEmailFinderSpec
         .expects(project.path, commitTo, maybeAccessToken)
         .returning(EitherT.rightT[IO, ProcessingRecoverableError]((member.name -> authorEmail).some))
 
-      finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe member
-        .copy(maybeEmail = authorEmail.some)
-        .asRight
+      finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe (member add authorEmail).asRight
     }
 
     "find the email if a matching commit exists on the second page" in new TestCase {
@@ -168,9 +162,7 @@ class MemberEmailFinderSpec
         )
         .returning(EitherT.rightT[IO, ProcessingRecoverableError]((member.name -> authorEmail).some))
 
-      finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe member
-        .copy(maybeEmail = authorEmail.some)
-        .asRight
+      finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe (member add authorEmail).asRight
     }
 
     "find the email if a matching commits exist on both pages, " +
@@ -213,9 +205,7 @@ class MemberEmailFinderSpec
           )
           .returning(EitherT.rightT[IO, ProcessingRecoverableError]((member.name -> authorEmail).some))
 
-        finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe member
-          .copy(maybeEmail = authorEmail.some)
-          .asRight
+        finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe (member add authorEmail).asRight
       }
 
     "return the given member back if a matching commit author cannot be found on any events page" in new TestCase {
@@ -318,7 +308,7 @@ class MemberEmailFinderSpec
   private trait TestCase {
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
     val project = Project(projectIds.generateOne, projectPaths.generateOne)
-    val member  = projectMemberObjects.generateOne.copy(maybeEmail = None)
+    val member  = projectMembersNoEmail.generateOne
 
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val gitLabUrl          = GitLabUrl(externalServiceBaseUrl).apiV4

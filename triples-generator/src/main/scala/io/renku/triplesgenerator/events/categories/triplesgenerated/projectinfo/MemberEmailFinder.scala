@@ -1,3 +1,21 @@
+/*
+ * Copyright 2021 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.renku.triplesgenerator.events.categories.triplesgenerated.projectinfo
 
 import cats.data.EitherT
@@ -12,6 +30,7 @@ import io.renku.config.GitLab
 import io.renku.control.Throttler
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.entities.Project.ProjectMember
+import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.{GitLabApiUrl, projects, users}
 import io.renku.http.client.{AccessToken, RestClient}
@@ -57,33 +76,37 @@ private class MemberEmailFinderImpl[F[_]: Async: Logger](
   override def findMemberEmail(member: ProjectMember, project: Project)(implicit
       maybeAccessToken:                Option[AccessToken]
   ): EitherT[F, ProcessingRecoverableError, ProjectMember] = EitherT {
-    member.maybeEmail match {
-      case Some(_) => member.asRight[ProcessingRecoverableError].pure[F]
-      case _ =>
+    member match {
+      case member: ProjectMemberWithEmail =>
+        member.asRight[ProcessingRecoverableError].widen[ProjectMember].pure[F]
+      case member: ProjectMemberNoEmail =>
         findInCommitsAndEvents(member, project).value
           .recoverWith(recoveryStrategy.maybeRecoverableError[F, ProjectMember])
     }
   }
 
-  private def findInCommitsAndEvents(member: ProjectMember, project: Project, maybeNextPage: Option[Int] = Some(1))(
-      implicit maybeAccessToken:             Option[AccessToken]
-  ): EitherT[F, ProcessingRecoverableError, ProjectMember] = maybeNextPage match {
-    case None => EitherT.rightT[F, ProcessingRecoverableError](member)
-    case Some(nextPage) =>
-      for {
-        eventsAndNextPage <- fetchUserEvents(member, nextPage).map(filterEventsFor(member, project))
-        maybeEmail        <- matchEmailFromCommits(eventsAndNextPage, project)
-        updatedMember     <- addEmailOrCheckNextPage(member, maybeEmail, project, eventsAndNextPage._2)
-      } yield updatedMember
-  }
+  private def findInCommitsAndEvents(member:        ProjectMemberNoEmail,
+                                     project:       Project,
+                                     maybeNextPage: Option[Int] = Some(1)
+  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[F, ProcessingRecoverableError, ProjectMember] =
+    maybeNextPage match {
+      case None => EitherT.rightT[F, ProcessingRecoverableError](member)
+      case Some(nextPage) =>
+        for {
+          eventsAndNextPage <- fetchUserEvents(member, nextPage).map(filterEventsFor(member, project))
+          maybeEmail        <- matchEmailFromCommits(eventsAndNextPage, project)
+          updatedMember     <- addEmailOrCheckNextPage(member, maybeEmail, project, eventsAndNextPage._2)
+        } yield updatedMember
+    }
 
-  private def addEmailOrCheckNextPage(member:        ProjectMember,
+  private def addEmailOrCheckNextPage(member:        ProjectMemberNoEmail,
                                       maybeEmail:    Option[users.Email],
                                       project:       Project,
                                       maybeNextPage: Option[Int]
-  )(implicit maybeAccessToken:                       Option[AccessToken]) =
-    if (maybeEmail.isEmpty) findInCommitsAndEvents(member, project, maybeNextPage)
-    else EitherT.rightT[F, ProcessingRecoverableError](member.copy(maybeEmail = maybeEmail))
+  )(implicit maybeAccessToken:                       Option[AccessToken]) = maybeEmail match {
+    case None        => findInCommitsAndEvents(member, project, maybeNextPage)
+    case Some(email) => EitherT.rightT[F, ProcessingRecoverableError](member add email)
+  }
 
   private def fetchUserEvents(member: ProjectMember, nextPage: Int)(implicit maybeAccessToken: Option[AccessToken]) =
     EitherT {
