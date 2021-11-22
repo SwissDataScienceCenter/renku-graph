@@ -20,66 +20,119 @@ package io.renku.eventlog.events.categories.statuschange.projectCleaner
 
 import cats.effect.IO
 import cats.implicits.toShow
-import com.github.tomakehurst.wiremock.client.WireMock.{aResponse, delete, stubFor}
+import cats.syntax.all._
+import com.github.tomakehurst.wiremock.client.MappingBuilder
+import com.github.tomakehurst.wiremock.client.WireMock._
 import io.renku.eventlog.events.categories.statuschange.Generators.consumerProjects
+import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.httpUrls
-import io.renku.graph.tokenrepository.TokenRepositoryUrl
+import io.renku.generators.Generators.exceptions
+import io.renku.graph.model.projects
+import io.renku.graph.tokenrepository.{AccessTokenFinder, TokenRepositoryUrl}
 import io.renku.graph.webhookservice.WebhookServiceUrl
+import io.renku.http.client.AccessToken
+import io.renku.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
-import org.http4s.Status.{InternalServerError, NoContent, Ok, Unauthorized}
+import org.http4s.Status
+import org.http4s.Status.{InternalServerError, Unauthorized}
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-
 class ProjectWebhookAndTokenRemoverSpec
     extends AnyWordSpec
     with ExternalServiceStubbing
     with IOSpec
+    with MockFactory
     with should.Matchers {
   "removeWebhookAndToken" should {
+
     "remove the token and the web hook of the specified project" in new TestCase {
+      (accesTokenFinder
+        .findAccessToken[projects.Id](_: projects.Id)(_: projects.Id => String))
+        .expects(project.id, AccessTokenFinder.projectIdToPath)
+        .returns(accessToken.some.pure[IO])
       stubFor {
-        delete(s"$webhookServiceUrl/projects/${project.id}/webhooks")
-          .willReturn(aResponse().withStatus(Ok.code))
+        delete(s"/projects/${project.id}/webhooks").withAccessTokenInHeader
+          .willReturn(ok())
       }
       stubFor {
-        delete(s"$tokenRepositoryUrl/projects/${project.id}/tokens")
-          .willReturn(aResponse().withStatus(NoContent.code))
+        delete(s"/projects/${project.id}/tokens")
+          .willReturn(noContent())
       }
 
       webhookAndTokenRemover.removeWebhookAndToken(project).unsafeRunSync() shouldBe ()
     }
-    "fail when the webhook deletion fails" in new TestCase {
-      stubFor {
-        delete(s"$webhookServiceUrl/projects/${project.id}/webhooks")
-          .willReturn(aResponse().withStatus(Unauthorized.code))
-      }
+
+    "fail when the tokenFinder returns no token for the project" in new TestCase {
+      (accesTokenFinder
+        .findAccessToken[projects.Id](_: projects.Id)(_: projects.Id => String))
+        .expects(project.id, AccessTokenFinder.projectIdToPath)
+        .returns(None.pure[IO])
       intercept[Exception] {
         webhookAndTokenRemover.removeWebhookAndToken(project).unsafeRunSync()
-      }.getMessage shouldBe s"Removing project webhook failed with status: $Unauthorized for project: ${project.show}"
+      }.getMessage shouldBe s"No token found for project: ${project.show}"
     }
-    "fail when the token deletion fails" in new TestCase {
+
+    "fail when the tokenFinder fails" in new TestCase {
+      val exception = exceptions.generateOne
+      (accesTokenFinder
+        .findAccessToken[projects.Id](_: projects.Id)(_: projects.Id => String))
+        .expects(project.id, AccessTokenFinder.projectIdToPath)
+        .returns(exception.raiseError[IO, Option[AccessToken]])
+      intercept[Exception] {
+        webhookAndTokenRemover.removeWebhookAndToken(project).unsafeRunSync()
+      }.getMessage shouldBe exception.getMessage
+    }
+
+    "fail when the webhook deletion fails" in new TestCase {
+      (accesTokenFinder
+        .findAccessToken[projects.Id](_: projects.Id)(_: projects.Id => String))
+        .expects(project.id, AccessTokenFinder.projectIdToPath)
+        .returns(accessToken.some.pure[IO])
       stubFor {
-        delete(s"$webhookServiceUrl/projects/${project.id}/webhooks")
-          .willReturn(aResponse().withStatus(Ok.code))
-      }
-      stubFor {
-        delete(s"$tokenRepositoryUrl/projects/${project.id}/tokens")
-          .willReturn(aResponse().withStatus(InternalServerError.code))
+        delete(s"/projects/${project.id}/webhooks").withAccessTokenInHeader
+          .willReturn(unauthorized())
       }
       intercept[Exception] {
         webhookAndTokenRemover.removeWebhookAndToken(project).unsafeRunSync()
-      }.getMessage shouldBe s"Removing project token failed with status: $Unauthorized for project: ${project.show}"
+      }.getMessage shouldBe s"DELETE $webhookServiceUrl/projects/${project.id}/webhooks returned ${Status.Unauthorized}; error: Removing project webhook failed with status: $Unauthorized for project: ${project.show}"
+    }
+
+    "fail when the token deletion fails" in new TestCase {
+      (accesTokenFinder
+        .findAccessToken[projects.Id](_: projects.Id)(_: projects.Id => String))
+        .expects(project.id, AccessTokenFinder.projectIdToPath)
+        .returns(accessToken.some.pure[IO])
+      stubFor {
+        delete(s"/projects/${project.id}/webhooks").withAccessTokenInHeader
+          .willReturn(ok())
+      }
+      stubFor {
+        delete(s"/projects/${project.id}/tokens")
+          .willReturn(serverError())
+      }
+      intercept[Exception] {
+        webhookAndTokenRemover.removeWebhookAndToken(project).unsafeRunSync()
+      }.getMessage shouldBe s"DELETE $tokenRepositoryUrl/projects/${project.id}/tokens returned ${Status.InternalServerError}; error: Removing project token failed with status: $InternalServerError for project: ${project.show}"
     }
   }
 
   private trait TestCase {
-    val project                = consumerProjects.generateOne
-    implicit val logger        = TestLogger[IO]()
-    val tokenRepositoryUrl     = httpUrls().generateAs(TokenRepositoryUrl)
-    val webhookServiceUrl      = httpUrls().generateAs(WebhookServiceUrl)
-    val webhookAndTokenRemover = new ProjectWebhookAndTokenRemoverImpl[IO](webhookServiceUrl, tokenRepositoryUrl)
+    implicit val accessToken: AccessToken = accessTokens.generateOne
+    val project = consumerProjects.generateOne
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val accesTokenFinder   = mock[AccessTokenFinder[IO]]
+    val tokenRepositoryUrl = TokenRepositoryUrl(externalServiceBaseUrl)
+    val webhookServiceUrl  = WebhookServiceUrl(externalServiceBaseUrl)
+    val webhookAndTokenRemover =
+      new ProjectWebhookAndTokenRemoverImpl[IO](accesTokenFinder, webhookServiceUrl, tokenRepositoryUrl)
+  }
+  private implicit class MappingBuilderOps(builder: MappingBuilder) {
+    def withAccessTokenInHeader(implicit accessToken: AccessToken): MappingBuilder = accessToken match {
+      case PersonalAccessToken(token) => builder.withHeader("PRIVATE-TOKEN", equalTo(token))
+      case OAuthAccessToken(token)    => builder.withHeader("Authorization", equalTo(s"Bearer $token"))
+    }
   }
 }

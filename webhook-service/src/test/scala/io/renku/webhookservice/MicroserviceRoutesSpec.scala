@@ -30,6 +30,7 @@ import io.renku.interpreters.TestRoutesMetrics
 import io.renku.testtools.IOSpec
 import io.renku.webhookservice.eventprocessing.{HookEventEndpoint, ProcessingStatusEndpoint}
 import io.renku.webhookservice.hookcreation.HookCreationEndpoint
+import io.renku.webhookservice.hookdeletion.HookDeletionEndpoint
 import io.renku.webhookservice.hookvalidation.HookValidationEndpoint
 import org.http4s.Status._
 import org.http4s._
@@ -74,6 +75,19 @@ class MicroserviceRoutesSpec
 
       val responseStatus = Gen.oneOf(Ok, BadRequest).generateOne
       val request        = Request[IO](Method.POST, uri"/webhooks/events")
+      (hookEventEndpoint
+        .processPushEvent(_: Request[IO]))
+        .expects(request)
+        .returning(IO.pure(Response[IO](responseStatus)))
+
+      val response = routes.call(request)
+
+      response.status shouldBe responseStatus
+    }
+    "define a DELETE webhooks/events endpoint returning response from the endpoint" in new TestCase {
+
+      val responseStatus = Gen.oneOf(Ok, BadRequest).generateOne
+      val request        = Request[IO](Method.DELETE, uri"/webhooks/events")
       (hookEventEndpoint
         .processPushEvent(_: Request[IO]))
         .expects(request)
@@ -158,6 +172,7 @@ class MicroserviceRoutesSpec
     val authenticationResponse   = OptionT.some[IO](authUser)
     val hookEventEndpoint        = mock[HookEventEndpoint[IO]]
     val hookCreationEndpoint     = mock[HookCreationEndpoint[IO]]
+    val hookDeletionEndpoint     = mock[HookDeletionEndpoint[IO]]
     val hookValidationEndpoint   = mock[HookValidationEndpoint[IO]]
     val processingStatusEndpoint = mock[ProcessingStatusEndpoint[IO]]
     val routesMetrics            = TestRoutesMetrics()
@@ -165,6 +180,7 @@ class MicroserviceRoutesSpec
       hookEventEndpoint,
       hookCreationEndpoint,
       hookValidationEndpoint,
+      hookDeletionEndpoint,
       processingStatusEndpoint,
       givenAuthMiddleware(returning = authenticationResponse),
       routesMetrics

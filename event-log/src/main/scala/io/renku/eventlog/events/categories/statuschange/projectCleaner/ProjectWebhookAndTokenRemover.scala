@@ -22,11 +22,13 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.control.Throttler
 import io.renku.events.consumers.Project
-import io.renku.graph.tokenrepository.TokenRepositoryUrl
+import io.renku.graph.tokenrepository.{AccessTokenFinder, TokenRepositoryUrl}
 import io.renku.graph.webhookservice.WebhookServiceUrl
-import io.renku.http.client.RestClient
+import io.renku.http.client.{AccessToken, RestClient}
+import org.http4s.EntityDecoder
 import org.http4s.Method.DELETE
 import org.http4s.Status.{NoContent, NotFound, Ok}
+import org.http4s.circe.jsonOf
 import org.typelevel.log4cats.Logger
 
 private trait ProjectWebhookAndTokenRemover[F[_]] {
@@ -35,35 +37,28 @@ private trait ProjectWebhookAndTokenRemover[F[_]] {
 
 private object ProjectWebhookAndTokenRemover {
   def apply[F[_]: Async: Logger](): F[ProjectWebhookAndTokenRemover[F]] = for {
+    accessTokenFinder  <- AccessTokenFinder[F]
     webhookUrl         <- WebhookServiceUrl()
     tokenRepositoryUrl <- TokenRepositoryUrl()
-  } yield new ProjectWebhookAndTokenRemoverImpl[F](webhookUrl, tokenRepositoryUrl)
+  } yield new ProjectWebhookAndTokenRemoverImpl[F](accessTokenFinder, webhookUrl, tokenRepositoryUrl)
 }
 
-private class ProjectWebhookAndTokenRemoverImpl[F[_]: Async: Logger](webhookUrl: WebhookServiceUrl,
+private class ProjectWebhookAndTokenRemoverImpl[F[_]: Async: Logger](accessTokenFinder: AccessTokenFinder[F],
+                                                                     webhookUrl:         WebhookServiceUrl,
                                                                      tokenRepositoryUrl: TokenRepositoryUrl
 ) extends RestClient[F, ProjectWebhookAndTokenRemover[F]](Throttler.noThrottling[F])
     with ProjectWebhookAndTokenRemover[F] {
-  private def mapWebhookResponse(project: Project): ResponseMapping[Unit] = {
-    case (Ok | NotFound, _, _) => ().pure[F]
-    case (status, _, _) =>
-      new Exception(s"Removing project webhook failed with status: $status for project: ${project.show}")
-        .raiseError[F, Unit]
-  }
-  private def mapTokenRepoResponse(project: Project): ResponseMapping[Unit] = {
-    case (NoContent | NotFound, _, _) => ().pure[F]
-    case (status, _, _) =>
-      new Exception(s"Removing project token failed with status: $status for project: ${project.show}")
-        .raiseError[F, Unit]
-  }
   override def removeWebhookAndToken(project: Project): F[Unit] = for {
-    _ <- removeProjectWebhook(project)
+    accessToken <- accessTokenFinder
+                     .findAccessToken(project.id)(AccessTokenFinder.projectIdToPath)
+                     .flatMap(mapResponseToAccessToken(project))
+    _ <- removeProjectWebhook(project, accessToken)
     _ <- removeProjectTokens(project)
   } yield ()
 
-  private def removeProjectWebhook(project: Project): F[Unit] = for {
+  private def removeProjectWebhook(project: Project, accessToken: AccessToken): F[Unit] = for {
     validatedUrl <- validateUri(s"$webhookUrl/projects/${project.id}/webhooks")
-    _            <- send(request(DELETE, validatedUrl))(mapWebhookResponse(project))
+    _            <- send(request(DELETE, validatedUrl, accessToken))(mapWebhookResponse(project))
   } yield ()
 
   private def removeProjectTokens(project: Project): F[Unit] = for {
@@ -71,4 +66,26 @@ private class ProjectWebhookAndTokenRemoverImpl[F[_]: Async: Logger](webhookUrl:
     _            <- send(request(DELETE, validatedUrl))(mapTokenRepoResponse(project))
   } yield ()
 
+  private def mapResponseToAccessToken(project: Project): Option[AccessToken] => F[AccessToken] = {
+    case Some(token) => token.pure[F]
+    case None =>
+      new Exception(s"No token found for project: ${project.show}")
+        .raiseError[F, AccessToken]
+  }
+
+  private implicit val tokenEntityDecoder: EntityDecoder[F, AccessToken] = jsonOf[F, AccessToken]
+
+  private def mapWebhookResponse(project: Project): ResponseMapping[Unit] = {
+    case (Ok | NotFound, _, _) => ().pure[F]
+    case (status, _, _) =>
+      new Exception(s"Removing project webhook failed with status: $status for project: ${project.show}")
+        .raiseError[F, Unit]
+  }
+
+  private def mapTokenRepoResponse(project: Project): ResponseMapping[Unit] = {
+    case (NoContent | NotFound, _, _) => ().pure[F]
+    case (status, _, _) =>
+      new Exception(s"Removing project token failed with status: $status for project: ${project.show}")
+        .raiseError[F, Unit]
+  }
 }
