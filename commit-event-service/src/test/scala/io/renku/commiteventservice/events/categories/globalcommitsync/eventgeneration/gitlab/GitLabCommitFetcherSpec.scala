@@ -19,17 +19,18 @@
 package io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.gitlab
 
 import cats.effect.IO
+import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Json
 import io.circe.literal._
 import io.renku.commiteventservice.events.categories.common.CommitInfo
 import io.renku.commiteventservice.events.categories.common.Generators.commitInfos
+import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.PageResult
 import io.renku.control.Throttler
-import io.renku.generators.CommonGraphGenerators.{oauthAccessTokens, personalAccessTokens}
+import io.renku.generators.CommonGraphGenerators.{oauthAccessTokens, pages, pagingRequests, personalAccessTokens}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.GraphModelGenerators.projectIds
-import io.renku.graph.model.events.CommitId
 import io.renku.http.client.AccessToken
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.interpreters.TestLogger
@@ -49,135 +50,113 @@ class GitLabCommitFetcherSpec
 
   "fetchGitLabCommits" should {
 
-    "handle a paged request" in new TestCase {
-      stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits")
-          .willReturn(okJson(commitsJson(from = List(commitInfoList.head))).withHeader("X-Next-Page", "2"))
-      }
+    "fetch commits from the given page" in new TestCase {
 
+      val maybeNextPage = pages.generateOption
       stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits?page=2")
-          .willReturn(okJson(commitsJson(from = commitInfoList.tail)).withHeader("X-Next-Page", ""))
+        get(s"/api/v4/projects/$projectId/repository/commits?page=${pageRequest.page}&per_page=${pageRequest.perPage}")
+          .willReturn(
+            okJson(commitsJson(from = commitInfoList))
+              .withHeader("X-Next-Page", maybeNextPage.map(_.show).getOrElse(""))
+          )
       }
 
       gitLabCommitFetcher
-        .fetchGitLabCommits(projectId)(None)
-        .unsafeRunSync() shouldBe commitInfoList.map(
-        _.id
-      )
+        .fetchGitLabCommits(projectId, pageRequest)(None)
+        .unsafeRunSync() shouldBe PageResult(commitInfoList.map(_.id), maybeNextPage)
     }
 
-    "fetch commits from GitLab - personal access token case " in new TestCase {
+    "fetch commits using the given personal access token" in new TestCase {
       val personalAccessToken = personalAccessTokens.generateOne
 
       stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits")
+        get(s"/api/v4/projects/$projectId/repository/commits?page=${pageRequest.page}&per_page=${pageRequest.perPage}")
           .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
           .willReturn(okJson(commitsJson(from = commitInfoList)))
       }
 
       gitLabCommitFetcher
-        .fetchGitLabCommits(projectId)(Some(personalAccessToken))
-        .unsafeRunSync() shouldBe commitInfoList.map(
-        _.id
-      )
+        .fetchGitLabCommits(projectId, pageRequest)(Some(personalAccessToken))
+        .unsafeRunSync() shouldBe PageResult(commitInfoList.map(_.id), maybeNextPage = None)
     }
 
-    "fetch commits from GitLab - oauth token case " in new TestCase {
+    "fetch commits using the given oauth token" in new TestCase {
       val authAccessToken = oauthAccessTokens.generateOne
 
       stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits")
+        get(s"/api/v4/projects/$projectId/repository/commits?page=${pageRequest.page}&per_page=${pageRequest.perPage}")
           .withHeader("Authorization", equalTo(s"Bearer ${authAccessToken.value}"))
           .willReturn(okJson(commitsJson(from = commitInfoList)))
       }
 
       gitLabCommitFetcher
-        .fetchGitLabCommits(projectId)(Some(authAccessToken))
-        .unsafeRunSync() shouldBe commitInfoList.map(
-        _.id
-      )
+        .fetchGitLabCommits(projectId, pageRequest)(Some(authAccessToken))
+        .unsafeRunSync() shouldBe PageResult(commitInfoList.map(_.id), maybeNextPage = None)
     }
 
-    "fetch commits from GitLab - no token case " in new TestCase {
+    "return no commits if there aren't any" in new TestCase {
 
       stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits")
-          .willReturn(okJson(commitsJson(from = commitInfoList)))
-      }
-
-      gitLabCommitFetcher
-        .fetchGitLabCommits(projectId)(maybeAccessToken = None)
-        .unsafeRunSync() shouldBe commitInfoList.map(
-        _.id
-      )
-    }
-
-    "fetch no commits from GitLab if there aren't any" in new TestCase {
-
-      stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits")
+        get(s"/api/v4/projects/$projectId/repository/commits?page=${pageRequest.page}&per_page=${pageRequest.perPage}")
           .willReturn(okJson("[]"))
       }
 
       gitLabCommitFetcher
-        .fetchGitLabCommits(projectId)(maybeAccessToken = None)
-        .unsafeRunSync() shouldBe List.empty[CommitId]
+        .fetchGitLabCommits(projectId, pageRequest)(maybeAccessToken = None)
+        .unsafeRunSync() shouldBe PageResult(commits = Nil, maybeNextPage = None)
     }
 
-    "return an empty list if project not found" in new TestCase {
+    "return an empty list if project for NOT_FOUND" in new TestCase {
 
       stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits")
+        get(s"/api/v4/projects/$projectId/repository/commits?page=${pageRequest.page}&per_page=${pageRequest.perPage}")
           .willReturn(notFound())
       }
 
       gitLabCommitFetcher
-        .fetchGitLabCommits(projectId)(maybeAccessToken = None)
-        .unsafeRunSync() shouldBe List.empty[CommitId]
+        .fetchGitLabCommits(projectId, pageRequest)(maybeAccessToken = None)
+        .unsafeRunSync() shouldBe PageResult(commits = Nil, maybeNextPage = None)
     }
 
     "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
 
       stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits")
+        get(s"/api/v4/projects/$projectId/repository/commits?page=${pageRequest.page}&per_page=${pageRequest.perPage}")
           .willReturn(unauthorized())
       }
 
       intercept[Exception] {
-        gitLabCommitFetcher
-          .fetchGitLabCommits(projectId)(maybeAccessToken = None)
-          .unsafeRunSync()
+        gitLabCommitFetcher.fetchGitLabCommits(projectId, pageRequest)(maybeAccessToken = None).unsafeRunSync()
       } shouldBe UnauthorizedException
     }
 
     "return an Exception if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
 
       stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits")
+        get(s"/api/v4/projects/$projectId/repository/commits?page=${pageRequest.page}&per_page=${pageRequest.perPage}")
           .willReturn(badRequest().withBody("some error"))
       }
 
       intercept[Exception] {
         gitLabCommitFetcher
-          .fetchGitLabCommits(projectId)(maybeAccessToken = None)
+          .fetchGitLabCommits(projectId, pageRequest)(maybeAccessToken = None)
           .unsafeRunSync()
-      }.getMessage shouldBe s"GET $gitLabApiUrl/projects/$projectId/repository/commits returned ${Status.BadRequest}; body: some error"
+      }.getMessage shouldBe s"GET $gitLabApiUrl/projects/$projectId/repository/commits?page=${pageRequest.page}&per_page=${pageRequest.perPage} returned ${Status.BadRequest}; body: some error"
     }
 
     "return an Exception if remote client responds with unexpected body" in new TestCase {
 
       stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits")
+        get(s"/api/v4/projects/$projectId/repository/commits?page=${pageRequest.page}&per_page=${pageRequest.perPage}")
           .willReturn(okJson("{}"))
       }
 
       intercept[Exception] {
         gitLabCommitFetcher
-          .fetchGitLabCommits(projectId)(maybeAccessToken = None)
+          .fetchGitLabCommits(projectId, pageRequest)(maybeAccessToken = None)
           .unsafeRunSync()
       }.getMessage should startWith(
-        s"GET $gitLabApiUrl/projects/$projectId/repository/commits returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+        s"GET $gitLabApiUrl/projects/$projectId/repository/commits?page=${pageRequest.page}&per_page=${pageRequest.perPage} returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
       )
     }
   }
@@ -196,6 +175,7 @@ class GitLabCommitFetcherSpec
   private trait TestCase {
     implicit val maybeAccessToken: Option[AccessToken] = personalAccessTokens.generateSome
     val projectId      = projectIds.generateOne
+    val pageRequest    = pagingRequests.generateOne
     val commitInfoList = commitInfos.generateNonEmptyList().toList
 
     val gitLabApiUrl = GitLabUrl(externalServiceBaseUrl).apiV4

@@ -19,31 +19,36 @@
 package io.renku.triplesgenerator.events.categories.triplesgenerated
 
 import cats.data.EitherT
+import cats.kernel.Semigroup
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import io.renku.graph.model.entities.Project
 import io.renku.rdfstore.SparqlQuery
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{Transformation, TransformationStepResult}
+import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{ProjectWithQueries, Transformation}
 
 private[triplesgenerated] final case class TransformationStep[F[_]](
     name:           String Refined NonEmpty,
     transformation: Transformation[F]
 ) {
-  def run(project: Project): TransformationStepResult[F] = transformation(project)
+  def run(project: Project): ProjectWithQueries[F] = transformation(project)
 }
 
 private object TransformationStep {
 
-  private[triplesgenerated] type Transformation[F[_]] =
-    Project => TransformationStepResult[F]
+  private[triplesgenerated] type Transformation[F[_]]     = Project => ProjectWithQueries[F]
+  private[triplesgenerated] type ProjectWithQueries[F[_]] = EitherT[F, ProcessingRecoverableError, (Project, Queries)]
 
-  private[triplesgenerated] type TransformationStepResult[F[_]] =
-    EitherT[F, ProcessingRecoverableError, ResultData]
+  private[triplesgenerated] final case class Queries(preDataUploadQueries:  List[SparqlQuery],
+                                                     postDataUploadQueries: List[SparqlQuery]
+  )
 
-  private[triplesgenerated] final case class ResultData(project: Project, queries: List[SparqlQuery])
+  private[triplesgenerated] object Queries {
+    val empty:                                           Queries = Queries(Nil, Nil)
+    def preDataQueriesOnly(queries: List[SparqlQuery]):  Queries = Queries(queries, Nil)
+    def postDataQueriesOnly(queries: List[SparqlQuery]): Queries = Queries(Nil, queries)
 
-  object ResultData {
-    def apply(project: Project): ResultData = ResultData(project, queries = Nil)
+    implicit val queriesSemigroup: Semigroup[Queries] = (x: Queries, y: Queries) =>
+      Queries(x.preDataUploadQueries ::: y.preDataUploadQueries, x.postDataUploadQueries ::: y.postDataUploadQueries)
   }
 }

@@ -18,14 +18,13 @@
 
 package io.renku.commiteventservice.events.categories
 
+import cats.syntax.all._
 import io.renku.graph.model.events.CategoryName
 
 package object globalcommitsync {
   val categoryName: CategoryName = CategoryName("GLOBAL_COMMIT_SYNC")
 
-  private[globalcommitsync] val logMessageCommon: GlobalCommitSyncEvent => String = {
-    case GlobalCommitSyncEvent(project, commits) =>
-      s"$categoryName: projectId = ${project.id}, projectPath = ${project.path}, numberOfCommits = ${commits.length}"
+  private[globalcommitsync] val logMessageCommon: GlobalCommitSyncEvent => String = { event =>
+    show"$categoryName: $event"
   }
-
 }

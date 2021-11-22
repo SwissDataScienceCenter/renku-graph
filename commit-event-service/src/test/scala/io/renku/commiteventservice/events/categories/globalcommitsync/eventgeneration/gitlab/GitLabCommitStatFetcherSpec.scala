@@ -16,15 +16,17 @@
  * limitations under the License.
  */
 
-package io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.gitlab
+package io.renku.commiteventservice.events.categories.globalcommitsync
+package eventgeneration.gitlab
 
+import Generators.commitsCounts
 import cats.effect.IO
 import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.WireMock._
+import io.circe.Encoder
 import io.circe.literal.JsonStringContext
-import io.renku.commiteventservice.events.categories.globalcommitsync.Generators.commitCounts
+import io.circe.syntax._
 import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.ProjectCommitStats
-import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.ProjectCommitStats.CommitCount
 import io.renku.control.Throttler
 import io.renku.generators.CommonGraphGenerators.personalAccessTokens
 import io.renku.generators.Generators.Implicits._
@@ -51,7 +53,7 @@ class GitLabCommitStatFetcherSpec
 
   "fetchCommitStats" should {
     "return a ProjectCommitStats with count of commits " in new TestCase {
-      forAll(commitIds.toGeneratorOfOptions, commitCounts) { (maybeLatestCommit, commitCount) =>
+      forAll(commitIds.toGeneratorOfOptions, commitsCounts) { (maybeLatestCommit, commitCount) =>
         (gitLabCommitFetcher
           .fetchLatestGitLabCommit(_: projects.Id)(_: Option[AccessToken]))
           .expects(projectId, maybeAccessToken)
@@ -59,15 +61,13 @@ class GitLabCommitStatFetcherSpec
 
         stubFor {
           get(s"/api/v4/projects/$projectId?statistics=true")
-            .willReturn(okJson(jsonCommitCount(commitCount)))
+            .willReturn(okJson(commitCount.asJson.noSpaces))
         }
 
-        gitLabCommitStatFetcher.fetchCommitStats(projectId).unsafeRunSync() shouldBe Some(
-          ProjectCommitStats(
-            maybeLatestCommit,
-            commitCount
-          )
-        )
+        gitLabCommitStatFetcher.fetchCommitStats(projectId).unsafeRunSync() shouldBe ProjectCommitStats(
+          maybeLatestCommit,
+          commitCount
+        ).some
       }
     }
 
@@ -102,9 +102,9 @@ class GitLabCommitStatFetcherSpec
   }
 
   private trait TestCase {
-    val projectId: projects.Id = projectIds.generateOne
 
     implicit val maybeAccessToken: Option[AccessToken] = personalAccessTokens.generateSome
+    val projectId = projectIds.generateOne
 
     val gitLabUrl           = GitLabUrl(externalServiceBaseUrl)
     val gitLabCommitFetcher = mock[GitLabCommitFetcher[IO]]
@@ -113,9 +113,11 @@ class GitLabCommitStatFetcherSpec
       new GitLabCommitStatFetcherImpl[IO](gitLabCommitFetcher, gitLabUrl.apiV4, Throttler.noThrottling)
   }
 
-  private def jsonCommitCount(count: CommitCount) = json"""{
-    "statistics": {
-      "commit_count": ${count.value}
-    }
-  }""".noSpaces
+  private implicit lazy val commitsCountEncoder: Encoder[CommitsCount] = Encoder.instance { count =>
+    json"""{
+      "statistics": {
+        "commit_count": ${count.value}
+      }
+    }"""
+  }
 }

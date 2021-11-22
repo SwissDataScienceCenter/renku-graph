@@ -25,16 +25,21 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep
-import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.ResultData
+import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.Queries
 import org.scalacheck.Gen
 
 private[triplesgenerated] object Generators {
 
   implicit def transformationSteps[F[_]: MonadThrow]: Gen[TransformationStep[F]] = for {
-    name          <- nonBlankStrings(minLength = 5)
-    sparqlQueries <- sparqlQueries.toGeneratorOfList()
+    name    <- nonBlankStrings(minLength = 5)
+    queries <- queriesGen
   } yield TransformationStep[F](
     name,
-    projectMetadata => EitherT.rightT(ResultData(projectMetadata, sparqlQueries))
+    project => EitherT.rightT((project, queries))
   )
+
+  implicit lazy val queriesGen: Gen[Queries] = for {
+    pre  <- sparqlQueries.toGeneratorOfList()
+    post <- sparqlQueries.toGeneratorOfList()
+  } yield Queries(pre, post)
 }

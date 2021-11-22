@@ -128,6 +128,11 @@ trait GitLab {
         .willReturn(okJson(Json.arr(commitAsJson(commitIds.last, theMostRecentEventDate)).noSpaces))
         .withAccessTokenInHeader
     }
+    stubFor {
+      get(s"/api/v4/projects/$projectId/repository/commits?page=1&per_page=50")
+        .willReturn(okJson(commitIds.map(commitAsJson(_, theMostRecentEventDate)).asJson.noSpaces))
+        .withAccessTokenInHeader
+    }
     ()
   }
 

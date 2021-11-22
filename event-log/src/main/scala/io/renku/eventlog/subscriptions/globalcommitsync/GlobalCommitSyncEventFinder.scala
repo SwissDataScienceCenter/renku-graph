@@ -18,14 +18,14 @@
 
 package io.renku.eventlog.subscriptions.globalcommitsync
 
-import cats.MonadThrow
 import cats.data.Kleisli
 import cats.effect.Async
 import cats.syntax.all._
+import cats.{Id, MonadThrow}
 import eu.timepit.refined.api.Refined
-import io.renku.db.implicits._
 import io.renku.db.{DbClient, SessionResource, SqlStatement}
 import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.subscriptions.globalcommitsync.GlobalCommitSyncEvent.{CommitsCount, CommitsInfo}
 import io.renku.eventlog.subscriptions.globalcommitsync.GlobalCommitSyncEventFinder.syncInterval
 import io.renku.eventlog.subscriptions.{EventFinder, SubscriptionTypeSerializers}
 import io.renku.events.consumers.Project
@@ -48,10 +48,12 @@ private class GlobalCommitSyncEventFinderImpl[F[_]: Async](
     with EventFinder[F, GlobalCommitSyncEvent]
     with SubscriptionTypeSerializers {
 
+  import skunk.codec.all.int8
+
   override def popEvent(): F[Option[GlobalCommitSyncEvent]] = sessionResource.useK(findEventAndMarkTaken)
 
   private def findEventAndMarkTaken =
-    findProject >>= updateLastSyncDate >>= findCommits
+    findProject >>= updateLastSyncDate >>= findCommitsInfo
 
   private def updateLastSyncDate(
       maybeProject: Option[(Project, Option[LastSyncedDate])]
@@ -89,27 +91,32 @@ private class GlobalCommitSyncEventFinderImpl[F[_]: Async](
       .build(_.option)
   }
 
-  private def findCommits(maybeProjectAndLastSyncedDate: Option[(Project, Option[LastSyncedDate])]) =
+  private def findCommitsInfo(maybeProjectAndLastSyncedDate: Option[(Project, Option[LastSyncedDate])]) =
     maybeProjectAndLastSyncedDate match {
       case Some((project, maybeLastSyncedDate)) =>
         measureExecutionTime {
           SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find commits"))
-            .select[projects.Id ~ EventStatus, CommitId](
+            .select[projects.Id ~ EventStatus ~ projects.Id ~ EventStatus, (Long, Option[CommitId])](
               sql"""
-                   SELECT evt.event_id
-                   FROM event evt
-                   WHERE evt.project_id = $projectIdEncoder AND evt.status <> $eventStatusEncoder
-                 """.query(commitIdDecoder)
+                   SELECT
+                     (SELECT COUNT(event_id) FROM event WHERE project_id = $projectIdEncoder AND status <> $eventStatusEncoder) AS count,
+                     (SELECT event_id FROM event WHERE project_id = $projectIdEncoder AND status <> $eventStatusEncoder ORDER BY event_date DESC LIMIT 1) AS latest
+                 """.query(int8 ~ commitIdDecoder.opt)
             )
-            .arguments(project.id ~ AwaitingDeletion)
-            .build(_.toList)
-            .mapResult {
-              case Nil     => Option.empty[GlobalCommitSyncEvent]
-              case commits => Some(GlobalCommitSyncEvent(project, commits, maybeLastSyncedDate))
-            }
+            .arguments(project.id ~ AwaitingDeletion ~ project.id ~ AwaitingDeletion)
+            .build[Id](_.unique)
+            .mapResult(toEvent(project, maybeLastSyncedDate))
         }
       case None => Kleisli.pure(Option.empty[GlobalCommitSyncEvent])
     }
+
+  private def toEvent(project:             Project,
+                      maybeLastSyncedDate: Option[LastSyncedDate]
+  ): Id[(Long, Option[CommitId])] => Option[GlobalCommitSyncEvent] = {
+    case (commitsCount, Some(latestCommitId)) =>
+      GlobalCommitSyncEvent(project, CommitsInfo(CommitsCount(commitsCount), latestCommitId), maybeLastSyncedDate).some
+    case _ => Option.empty[GlobalCommitSyncEvent]
+  }
 
   private def toNoneIfEventAlreadyTaken(
       projectAndMaybeLastSync: (Project, Option[LastSyncedDate])
