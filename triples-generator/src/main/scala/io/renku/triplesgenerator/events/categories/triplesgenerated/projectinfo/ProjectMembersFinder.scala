@@ -87,7 +87,7 @@ private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
       gitLabId <- cursor.downField("id").as[users.GitLabId]
       name     <- cursor.downField("name").as[users.Name]
       username <- cursor.downField("username").as[users.Username]
-    } yield ProjectMember(name, username, gitLabId)
+    } yield ProjectMember(name, username, gitLabId, maybeEmail = None)
 
   private implicit lazy val memberEntityDecoder: EntityDecoder[F, ProjectMember]       = jsonOf[F, ProjectMember]
   private implicit lazy val membersDecoder:      EntityDecoder[F, List[ProjectMember]] = jsonOf[F, List[ProjectMember]]
@@ -98,14 +98,14 @@ private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
       allMembers:              Set[ProjectMember] = Set.empty
   )(implicit maybeAccessToken: Option[AccessToken]): F[Set[ProjectMember]] = for {
     uri                     <- validateUri(merge(url, maybePage))
-    fetchedUsersAndNextPage <- send(secureRequest(GET, uri))(mapMembersResponse)
+    fetchedUsersAndNextPage <- send(secureRequest(GET, uri))(mapResponse)
     allMembers              <- addNextPage(url, allMembers, fetchedUsersAndNextPage)
   } yield allMembers
 
   private def merge(url: String, maybePage: Option[Int] = None) =
     maybePage map (page => s"$url?page=$page") getOrElse url
 
-  private lazy val mapMembersResponse
+  private lazy val mapResponse
       : PartialFunction[(Status, Request[F], Response[F]), F[(Set[ProjectMember], Option[Int])]] = {
     case (Ok, _, response) =>
       lazy val maybeNextPage: Option[Int] = response.headers.get(ci"X-Next-Page").flatMap(_.head.value.toIntOption)

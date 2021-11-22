@@ -69,7 +69,7 @@ class ProjectFinderSpec
         `/api/v4/users`(creator.gitLabId) returning okJson(creator.asJson.noSpaces)
 
         finder.findProject(projectInfo.path).value.unsafeRunSync() shouldBe
-          projectInfo.copy(members = Set.empty).some.asRight
+          projectInfo.copy(members = Set.empty, maybeCreator = creator.copy(maybeEmail = None).some).some.asRight
       }
     }
 
@@ -152,10 +152,11 @@ class ProjectFinderSpec
     }""")
 
     json"""{
-      "path_with_namespace": ${project.path.value},
-      "name":                ${project.name.value},
-      "created_at":          ${project.dateCreated.value},
-      "visibility":          ${project.visibility.value}
+      "id":                  ${project.id},
+      "path_with_namespace": ${project.path},
+      "name":                ${project.name},
+      "created_at":          ${project.dateCreated},
+      "visibility":          ${project.visibility}
     }"""
       .addIfDefined("forked_from_project" -> project.maybeParentPath)(parentPathEncoder)
       .addIfDefined("creator_id" -> project.maybeCreator.map(_.gitLabId))

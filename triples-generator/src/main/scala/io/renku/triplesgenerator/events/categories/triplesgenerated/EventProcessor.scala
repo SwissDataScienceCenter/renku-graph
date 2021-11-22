@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated
 
-import cats.{MonadThrow, NonEmptyParallel}
+import cats.{MonadThrow, NonEmptyParallel, Parallel}
 import cats.data.EitherT.right
 import cats.effect.Async
 import cats.syntax.all._
@@ -202,7 +202,7 @@ private object EventProcessor {
       .buckets(.1, .5, 1, 5, 10, 50, 100, 500, 1000, 5000, 10000, 50000, 100000, 500000, 1000000, 5000000, 10000000,
                50000000, 100000000, 500000000)
 
-  def apply[F[_]: Async: NonEmptyParallel: Logger](
+  def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger](
       metricsRegistry: MetricsRegistry,
       gitLabThrottler: Throttler[F, GitLab],
       timeRecorder:    SparqlQueryTimeRecorder[F]

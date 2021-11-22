@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated
 
-import cats.NonEmptyParallel
+import cats.{NonEmptyParallel, Parallel}
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.config.GitLab
@@ -31,7 +31,7 @@ import io.renku.triplesgenerator.Microservice
 import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
-  def apply[F[_]: Async: NonEmptyParallel: Logger](
+  def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger](
       metricsRegistry: MetricsRegistry,
       gitLabThrottler: Throttler[F, GitLab],
       timeRecorder:    SparqlQueryTimeRecorder[F]

@@ -284,7 +284,8 @@ object Project {
   def decoder(gitLabInfo: GitLabProjectInfo)(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDDecoder[Project] =
     ProjectJsonLDDecoder(gitLabInfo)
 
-  final case class GitLabProjectInfo(name:             Name,
+  final case class GitLabProjectInfo(id:               Id,
+                                     name:             Name,
                                      path:             Path,
                                      dateCreated:      DateCreated,
                                      maybeDescription: Option[Description],
@@ -294,5 +295,11 @@ object Project {
                                      maybeParentPath:  Option[Path]
   )
 
-  final case class ProjectMember(name: users.Name, username: users.Username, gitLabId: users.GitLabId)
+  final case class ProjectMember(name:       users.Name,
+                                 username:   users.Username,
+                                 gitLabId:   users.GitLabId,
+                                 maybeEmail: Option[users.Email]
+  ) {
+    def add(email: users.Email): ProjectMember = copy(maybeEmail = Some(email))
+  }
 }

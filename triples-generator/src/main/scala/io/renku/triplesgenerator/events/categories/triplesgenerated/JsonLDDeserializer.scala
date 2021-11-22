@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
-import cats.{Applicative, MonadThrow, NonEmptyParallel}
+import cats.{Applicative, MonadThrow, NonEmptyParallel, Parallel}
 import io.circe.DecodingFailure
 import io.renku.config.GitLab
 import io.renku.control.Throttler
@@ -95,9 +95,10 @@ private class JsonLDDeserializerImpl[F[_]: MonadThrow](
 }
 
 private object JsonLDDeserializer {
-  def apply[F[_]: Async: NonEmptyParallel: Logger](gitLabThrottler: Throttler[F, GitLab]): F[JsonLDDeserializer[F]] =
-    for {
-      renkuBaseUrl      <- RenkuBaseUrlLoader[F]()
-      projectInfoFinder <- ProjectInfoFinder(gitLabThrottler)
-    } yield new JsonLDDeserializerImpl[F](projectInfoFinder, renkuBaseUrl)
+  def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger](
+      gitLabThrottler: Throttler[F, GitLab]
+  ): F[JsonLDDeserializer[F]] = for {
+    renkuBaseUrl      <- RenkuBaseUrlLoader[F]()
+    projectInfoFinder <- ProjectInfoFinder(gitLabThrottler)
+  } yield new JsonLDDeserializerImpl[F](projectInfoFinder, renkuBaseUrl)
 }

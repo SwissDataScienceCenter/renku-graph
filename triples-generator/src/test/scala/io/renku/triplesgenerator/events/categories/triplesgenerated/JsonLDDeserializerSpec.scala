@@ -200,6 +200,7 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
 
     def gitLabProjectInfo(project: Project) = GitLabProjectInfo(
+      projectIds.generateOne,
       project.name,
       project.path,
       project.dateCreated,
@@ -219,7 +220,8 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
     private implicit lazy val toProjectMember: Person => ProjectMember = person =>
       ProjectMember(person.name,
                     users.Username(person.name.value),
-                    person.maybeGitLabId.getOrElse(fail("Project person without GitLabId"))
+                    person.maybeGitLabId.getOrElse(fail("Project person without GitLabId")),
+                    person.maybeEmail
       )
 
     def givenFindProjectInfo(projectPath: projects.Path) = new {

@@ -102,6 +102,7 @@ private class ProjectFinderImpl[F[_]: Async: Logger](
 
     implicit val decoder: Decoder[ProjectAndCreator] = cursor =>
       for {
+        id               <- cursor.downField("id").as[projects.Id]
         path             <- cursor.downField("path_with_namespace").as[projects.Path]
         name             <- cursor.downField("name").as[projects.Name]
         visibility       <- cursor.downField("visibility").as[projects.Visibility]
@@ -111,7 +112,8 @@ private class ProjectFinderImpl[F[_]: Async: Logger](
         maybeParentPath <- cursor
                              .downField("forked_from_project")
                              .as[Option[projects.Path]](decodeOption(parentPathDecoder))
-      } yield GitLabProjectInfo(name,
+      } yield GitLabProjectInfo(id,
+                                name,
                                 path,
                                 dateCreated,
                                 maybeDescription,
@@ -143,7 +145,7 @@ private class ProjectFinderImpl[F[_]: Async: Logger](
       gitLabId <- cursor.downField("id").as[users.GitLabId]
       name     <- cursor.downField("name").as[users.Name]
       username <- cursor.downField("username").as[users.Username]
-    } yield ProjectMember(name, username, gitLabId)
+    } yield ProjectMember(name, username, gitLabId, maybeEmail = None)
 
   private implicit lazy val memberEntityDecoder: EntityDecoder[F, ProjectMember]       = jsonOf[F, ProjectMember]
   private implicit lazy val membersDecoder:      EntityDecoder[F, List[ProjectMember]] = jsonOf[F, List[ProjectMember]]

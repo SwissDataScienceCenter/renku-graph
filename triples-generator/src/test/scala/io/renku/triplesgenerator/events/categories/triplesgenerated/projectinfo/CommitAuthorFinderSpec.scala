@@ -141,8 +141,8 @@ class CommitAuthorFinderSpec
 
   private implicit lazy val authorEncoder: Encoder[(users.Name, users.Email)] = Encoder.instance {
     case (authorName, authorEmail) => json"""{
-      "author_name":  ${authorName.value},
-      "author_email": ${authorEmail.value}
+      "author_name":  $authorName,
+      "author_email": $authorEmail
     }"""
   }
 
