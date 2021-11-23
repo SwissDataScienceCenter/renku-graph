@@ -197,6 +197,41 @@ class NodeDetailsFinderSpec
         .unsafeRunSync() shouldBe Set(NodeDef(activity).toNode)
     }
 
+    "find details of a Plan with no command" in new TestCase {
+      val input +: output +: errOutput +: Nil =
+        entityLocations.generateNonEmptyList(minElements = 3, maxElements = 3).toList
+
+      val project: Project = anyProjectEntities
+        .addActivity(project =>
+          executionPlanners(
+            planEntities(
+              CommandInput.streamedFromLocation(input),
+              CommandOutput.streamedFromLocation(output, CommandOutput.stdOut),
+              CommandOutput.streamedFromLocation(errOutput, CommandOutput.stdErr)
+            ).map(_.copy(maybeCommand = None)),
+            project
+          ).map(
+            _.planInputParameterValuesFromChecksum(input -> entityChecksums.generateOne) // add some override values
+              .buildProvenanceUnsafe()
+          )
+        )
+        .generateOne
+
+      loadToStore(project)
+
+      val activity = project.activities.head
+      val ids = Set(
+        ExecutionInfo(activity.asEntityId.show, activity.startTime.value)
+      )
+
+      nodeDetailsFinder
+        .findDetails( // returns a set of nodes. A node as a location, a label, and set of types
+          ids, // execution info has entityId and date
+          project.path
+        )
+        .unsafeRunSync() shouldBe Set(NodeDef(activity).toNode) // a node def is the same as a node
+    }
+
     "return no results if no ids given" in new TestCase {
       nodeDetailsFinder
         .findDetails(Set.empty[ExecutionInfo], projectPaths.generateOne)
