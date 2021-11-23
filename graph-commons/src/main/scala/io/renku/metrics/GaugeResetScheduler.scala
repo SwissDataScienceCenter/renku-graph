@@ -37,6 +37,7 @@ class GaugeResetSchedulerImpl[F[_]: MonadThrow: Temporal: Logger, LabelValue](
 ) extends GaugeResetScheduler[F] {
 
   override def run(): F[Unit] = for {
+    _        <- Logger[F].info(s"GaugeResetSchedulerImpl.run")
     interval <- metricsSchedulerConfig.getInterval()
     _        <- resetGauges
     _        <- resetGaugesEvery(interval).foreverM[Unit]
