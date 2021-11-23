@@ -51,7 +51,7 @@ private class PersonTransformerImpl[F[_]: MonadThrow](
   private def createTransformation: Transformation[F] = project =>
     EitherT {
       findAllPersons(project)
-        .foldLeft((project, Queries.empty).pure[F]) { (previousResultsF, person) =>
+        .foldLeft((project -> Queries.empty).pure[F]) { (previousResultsF, person) =>
           for {
             previousResults   <- previousResultsF
             maybeKGPerson     <- kgPersonFinder find person

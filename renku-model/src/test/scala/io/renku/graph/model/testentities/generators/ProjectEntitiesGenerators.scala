@@ -111,8 +111,8 @@ trait ProjectEntitiesGenerators {
     path             <- projectPaths
     maybeDescription <- projectDescriptions.toGeneratorOfOptions
     dateCreated      <- projectCreatedDates()
-    maybeCreator     <- projectMembersNoEmail.toGeneratorOfOptions
-    members          <- projectMembersNoEmail.toGeneratorOfSet().map(_.map(_.asInstanceOf[ProjectMember]))
+    maybeCreator     <- projectMembers.toGeneratorOfOptions
+    members          <- projectMembers.toGeneratorOfList(minElements = 1).map(_.toSet)
     visibility       <- projectVisibilities
     maybeParentPath  <- projectPaths.toGeneratorOfOptions
   } yield GitLabProjectInfo(id,

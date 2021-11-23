@@ -208,7 +208,7 @@ trait ProjectFactory {
     def updateAuthors(from: Set[Person]): List[Activity] =
       activitiesLens.modify { activity =>
         from
-          .find(_.resourceId == activity.author.resourceId)
+          .find(byEmail(activity.author))
           .map(person => activityAuthorLens.modify(_ => person)(activity))
           .getOrElse(activity)
       }(activities)
@@ -217,13 +217,17 @@ trait ProjectFactory {
   private implicit class DatasetsOps(datasets: List[Dataset[Provenance]]) {
 
     def updateCreators(from: Set[Person]): List[Dataset[Provenance]] = {
-      val creatorsUpdate = creatorsLens.modify { person =>
-        from.find(_.resourceId == person.resourceId).getOrElse(person)
+      val creatorsUpdate = creatorsLens.modify { creator =>
+        from.find(byEmail(creator)).getOrElse(creator)
       }
       datasetsLens.modify(
         provenanceLens.modify(provCreatorsLens.modify(creatorsUpdate))
       )(datasets)
     }
+  }
+
+  private lazy val byEmail: Person => Person => Boolean = { person1 => person2 =>
+    (person1.maybeEmail -> person2.maybeEmail).mapN(_ == _).getOrElse(false)
   }
 
   private val activitiesLens: Traversal[List[Activity], Activity] = Traversal.fromTraverse[List, Activity]

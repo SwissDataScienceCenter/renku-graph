@@ -29,7 +29,6 @@ private trait PersonMerger {
       Person(
         kgPerson.resourceId,
         modelPerson.name,
-        modelPerson.alternativeNames + kgPerson.name,
         modelPerson.maybeEmail orElse kgPerson.maybeEmail,
         modelPerson.maybeAffiliation orElse kgPerson.maybeAffiliation,
         modelPerson.maybeGitLabId orElse kgPerson.maybeGitLabId
