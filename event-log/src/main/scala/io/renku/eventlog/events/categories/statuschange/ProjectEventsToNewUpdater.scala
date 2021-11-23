@@ -57,15 +57,17 @@ private class ProjectEventsToNewUpdater[F[_]: Async: Logger](
            case Some(latestEventDate) => updateLatestEventDate(event.project, latestEventDate)
            case None                  => projectCleaner.cleanUp(event.project) recoverWith logError(event.project)
          }
-    counts = statuses
-               .groupBy(identity)
-               .map { case (eventStatus, eventStatuses) => (eventStatus, -1 * eventStatuses.length) }
-               .updatedWith(EventStatus.New) { maybeNewEventsCount =>
-                 maybeNewEventsCount
-                   .map(_ + statuses.length)
-                   .orElse(if (statuses.nonEmpty) Some(statuses.length) else None)
-               }
-  } yield DBUpdateResults.ForProjects(event.project.path, counts)
+  } yield DBUpdateResults.ForProjects(event.project.path, eventCountsByStatus(statuses))
+
+  private def eventCountsByStatus(statuses: List[EventStatus]) =
+    statuses
+      .groupBy(identity)
+      .map { case (eventStatus, eventStatuses) => (eventStatus, -1 * eventStatuses.length) }
+      .updatedWith(EventStatus.New) { maybeNewEventsCount =>
+        maybeNewEventsCount
+          .map(_ + statuses.length)
+          .orElse(if (statuses.nonEmpty) Some(statuses.length) else None)
+      }
 
   private def updateStatuses(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - status update")
