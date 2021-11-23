@@ -28,6 +28,7 @@ import io.renku.graph.model._
 import io.renku.graph.model.commandParameters.ParameterDefaultValue
 import io.renku.graph.model.entityModel.{Checksum, Location}
 import io.renku.graph.model.parameterValues.ValueOverride
+import io.renku.graph.model.plans.Command
 import io.renku.graph.model.testentities.Entity.{InputEntity, OutputEntity}
 import io.renku.graph.model.testentities.Plan.CommandParameters
 import io.renku.graph.model.testentities.Plan.CommandParameters.CommandParameterFactory
@@ -89,10 +90,13 @@ trait ActivityGenerators {
   def activityEntities(planGen: Gen[Plan]): ActivityGenFactory =
     executionPlanners(planGen, _: projects.DateCreated).map(_.buildProvenanceUnsafe())
 
-  def planEntities(parameterFactories: CommandParameterFactory*): Gen[Plan] = for {
-    name    <- planNames
-    command <- planCommands
-  } yield Plan(name, command, CommandParameters.of(parameterFactories: _*))
+  def planEntities(
+      parameterFactories:     CommandParameterFactory*
+  )(implicit planCommandsGen: Gen[Command]): Gen[Plan] =
+    for {
+      name         <- planNames
+      maybeCommand <- planCommandsGen.toGeneratorOfOptions
+    } yield Plan(name, maybeCommand, CommandParameters.of(parameterFactories: _*))
 
   def executionPlanners(planGen: Gen[Plan], project: Project): Gen[ExecutionPlanner] =
     executionPlanners(planGen, project.topAncestorDateCreated)
