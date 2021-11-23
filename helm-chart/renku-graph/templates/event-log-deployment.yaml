@@ -62,7 +62,7 @@ spec:
               value: "http://{{ template "webhookService.fullname" . }}:{{ .Values.webhookService.service.port }}"
             - name: TOKEN_REPOSITORY_BASE_URL
               value: "http://{{ template "tokenRepository.fullname" . }}:{{ .Values.tokenRepository.service.port }}"
-           - name: JAVA_OPTS
+            - name: JAVA_OPTS
               value: -Xmx{{ .Values.eventLog.jvmXmx }} -XX:+UseG1GC
           ports:
             - name: http-event-log

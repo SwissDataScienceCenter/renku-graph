@@ -55,7 +55,7 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
 
   private lazy val planObjects: Gen[Plan] = for {
     name                     <- planNames
-    command                  <- planCommands
+    maybeCommand             <- planCommands.toGeneratorOfOptions
     maybeDescription         <- planDescriptions.toGeneratorOfOptions
     maybeProgrammingLanguage <- planProgrammingLanguages.toGeneratorOfOptions
     keywords                 <- nonEmptyStrings().map(plans.Keyword).toGeneratorOfList()
@@ -65,7 +65,7 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
     Plan.Id.generate,
     name,
     maybeDescription,
-    command,
+    maybeCommand,
     maybeProgrammingLanguage,
     keywords,
     commandParameterFactories = paramFactories.zipWithIndex.map { case (factory, idx) =>
