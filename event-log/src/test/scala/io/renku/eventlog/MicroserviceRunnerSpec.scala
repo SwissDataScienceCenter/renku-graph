@@ -55,57 +55,23 @@ class MicroserviceRunnerSpec
       "if Sentry, Events Distributor and metrics initialisation are fine " +
       "and http server starts up" in new TestCase {
 
+        override val metrics        = new Metrics()
+        override val gaugeScheduler = new Gauge()
+
         given(certificateLoader).succeeds(returning = ())
         given(sentryInitializer).succeeds(returning = ())
         given(dbInitializer).succeeds(returning = ())
-        given(metrics).succeeds(returning = ())
-        given(gaugeScheduler).succeeds(returning = ())
         given(eventProducersRegistry).succeeds(returning = ())
         given(eventConsumersRegistry).succeeds(returning = ())
         given(httpServer).succeeds(returning = ExitCode.Success)
 
-        runner.run().unsafeRunSync() shouldBe ExitCode.Success
+        runner.run().unsafeRunAndForget()
 
-        // waiting for the internal processes to call run() on metrics and gaugeScheduler
-        sleep(1000)
+        eventually {
+          metrics.counter.get.unsafeRunSync()        should be > 1
+          gaugeScheduler.counter.get.unsafeRunSync() should be > 1
+        }
       }
-
-    "return Success Exit Code even if metrics returns something else" in new TestCase {
-      class Metrics extends EventLogMetrics[IO] {
-        val counter = Ref.unsafe[IO, Int](0)
-
-        override def run(): IO[Unit] = keepGoing.foreverM
-
-        private def keepGoing =
-          Temporal[IO].delayBy(counter.update(_ + 1), 1000 millis)
-      }
-
-      class Gauge extends GaugeResetScheduler[IO] {
-        val counter = Ref.unsafe[IO, Int](0)
-
-        override def run(): IO[Unit] = keepGoing.foreverM
-
-        private def keepGoing =
-          Temporal[IO].delayBy(counter.update(_ + 1), 1000 millis)
-      }
-
-      override val metrics        = new Metrics()
-      override val gaugeScheduler = new Gauge()
-
-      given(certificateLoader).succeeds(returning = ())
-      given(sentryInitializer).succeeds(returning = ())
-      given(dbInitializer).succeeds(returning = ())
-      given(eventProducersRegistry).succeeds(returning = ())
-      given(eventConsumersRegistry).succeeds(returning = ())
-      given(httpServer).succeeds(returning = ExitCode.Success)
-
-      runner.run().unsafeRunAndForget()
-
-      eventually {
-        metrics.counter.get.unsafeRunSync()        should be > 1
-        gaugeScheduler.counter.get.unsafeRunSync() should be > 1
-      }
-    }
 
     "fail if Certificate loading fails" in new TestCase {
 
@@ -157,45 +123,52 @@ class MicroserviceRunnerSpec
         runner.run().unsafeRunSync()
       } shouldBe exception
 
-      // waiting for the internal processes to call run() on metrics and gaugeScheduler
       sleep(1000)
     }
 
     "return Success ExitCode even if Event Producers Registry initialisation fails" in new TestCase {
 
+      override val metrics        = new Metrics()
+      override val gaugeScheduler = new Gauge()
+
       given(certificateLoader).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
       given(dbInitializer).succeeds(returning = ())
-      given(metrics).succeeds(returning = ())
-      given(gaugeScheduler).succeeds(returning = ())
       given(eventProducersRegistry).fails(becauseOf = exceptions.generateOne)
       given(eventConsumersRegistry).succeeds(returning = ())
       given(httpServer).succeeds(returning = ExitCode.Success)
 
       runner.run().unsafeRunSync() shouldBe ExitCode.Success
 
-      // waiting for the internal processes to call run() on metrics and gaugeScheduler
-      sleep(1000)
+      eventually {
+        metrics.counter.get.unsafeRunSync()        should be > 1
+        gaugeScheduler.counter.get.unsafeRunSync() should be > 1
+      }
     }
 
     "return Success ExitCode even if Event Consumers Registry initialisation fails" in new TestCase {
 
+      override val metrics        = new Metrics()
+      override val gaugeScheduler = new Gauge()
+
       given(certificateLoader).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
       given(dbInitializer).succeeds(returning = ())
-      given(metrics).succeeds(returning = ())
-      given(gaugeScheduler).succeeds(returning = ())
       given(eventProducersRegistry).succeeds(returning = ())
       given(eventConsumersRegistry).fails(becauseOf = exceptions.generateOne)
       given(httpServer).succeeds(returning = ExitCode.Success)
 
       runner.run().unsafeRunSync() shouldBe ExitCode.Success
 
-      // waiting for the internal processes to call run() on metrics and gaugeScheduler
-      sleep(1000)
+      eventually {
+        metrics.counter.get.unsafeRunSync()        should be > 1
+        gaugeScheduler.counter.get.unsafeRunSync() should be > 1
+      }
     }
 
     "return Success ExitCode even if Event Log Metrics initialisation fails" in new TestCase {
+
+      override val gaugeScheduler = new Gauge()
 
       given(certificateLoader).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
@@ -203,30 +176,32 @@ class MicroserviceRunnerSpec
       given(metrics).fails(becauseOf = exceptions.generateOne)
       given(eventProducersRegistry).succeeds(returning = ())
       given(eventConsumersRegistry).succeeds(returning = ())
-      given(gaugeScheduler).succeeds(returning = ())
       given(httpServer).succeeds(returning = ExitCode.Success)
 
-      runner.run().unsafeRunSync() shouldBe ExitCode.Success
+      runner.run().unsafeRunAndForget() shouldBe ()
 
-      // waiting for the internal processes to call run() on metrics and gaugeScheduler
-      sleep(1000)
+      eventually {
+        gaugeScheduler.counter.get.unsafeRunSync() should be > 1
+      }
     }
 
     "return Success ExitCode even if Event Log Metrics scheduler initialisation fails" in new TestCase {
 
+      override val metrics = new Metrics()
+
       given(certificateLoader).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
       given(dbInitializer).succeeds(returning = ())
-      given(metrics).succeeds(returning = ())
       given(eventProducersRegistry).succeeds(returning = ())
       given(eventConsumersRegistry).succeeds(returning = ())
       given(gaugeScheduler).fails(becauseOf = exceptions.generateOne)
       given(httpServer).succeeds(returning = ExitCode.Success)
 
-      runner.run().unsafeRunSync() shouldBe ExitCode.Success
+      runner.run().unsafeRunAndForget()
 
-      // waiting for the internal processes to call run() on metrics and gaugeScheduler
-      sleep(1000)
+      eventually {
+        metrics.counter.get.unsafeRunSync() should be > 1
+      }
     }
   }
 
@@ -249,5 +224,23 @@ class MicroserviceRunnerSpec
       gaugeScheduler,
       httpServer
     )
+  }
+
+  private class Metrics extends EventLogMetrics[IO] {
+    val counter = Ref.unsafe[IO, Int](0)
+
+    override def run(): IO[Unit] = keepGoing.foreverM
+
+    private def keepGoing =
+      Temporal[IO].delayBy(counter.update(_ + 1), 1000 millis)
+  }
+
+  private class Gauge extends GaugeResetScheduler[IO] {
+    val counter = Ref.unsafe[IO, Int](0)
+
+    override def run(): IO[Unit] = keepGoing.foreverM
+
+    private def keepGoing =
+      Temporal[IO].delayBy(counter.update(_ + 1), 1000 millis)
   }
 }
