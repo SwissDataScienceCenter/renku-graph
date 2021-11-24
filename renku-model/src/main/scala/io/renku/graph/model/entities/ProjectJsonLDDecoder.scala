@@ -24,6 +24,7 @@ import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember, entityTypes}
 import io.renku.graph.model.projects.{DateCreated, Description, ResourceId}
+import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders.decodeBlankStringToNone
 import io.renku.jsonld.{Cursor, JsonLDDecoder}
 
 object ProjectJsonLDDecoder {

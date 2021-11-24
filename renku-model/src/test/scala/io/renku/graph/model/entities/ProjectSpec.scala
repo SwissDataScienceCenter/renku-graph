@@ -590,6 +590,45 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         )
       ).asRight
     }
+
+    "use the gitlab description if an empty string is passed from the CLI" in {
+      val gitlabDate    = projectCreatedDates().generateOne
+      val cliDate       = projectCreatedDates().generateOne
+      val earliestDate  = List(gitlabDate, cliDate).min
+      val projectInfo   = gitLabProjectInfos.map(_.copy(maybeParentPath = None, dateCreated = gitlabDate)).generateOne
+      val cliVersion    = cliVersions.generateOne
+      val schemaVersion = projectSchemaVersions.generateOne
+      val resourceId    = projects.ResourceId(projectInfo.path)
+      val maybeCreator  = projectInfo.maybeCreator.map(_.toPayloadPerson)
+      val members       = projectInfo.members.map(_.toPayloadPerson)
+
+      val jsonLD = cliLikeJsonLDWithEmptyDescription(
+        resourceId,
+        cliVersion,
+        schemaVersion,
+        cliDate,
+        activities = Nil,
+        datasets = Nil,
+        persons = (maybeCreator ++ members).toSet
+      )
+
+      jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo))) shouldBe List(
+        entities.ProjectWithoutParent(
+          resourceId,
+          projectInfo.path,
+          projectInfo.name,
+          projectInfo.maybeDescription,
+          cliVersion,
+          earliestDate,
+          maybeCreator.map(copyGitLabId(from = projectInfo.maybeCreator)),
+          projectInfo.visibility,
+          members.map(copyGitLabId(fromMatching = projectInfo.members)),
+          schemaVersion,
+          Nil,
+          Nil
+        )
+      ).asRight
+    }
   }
 
   "encode" should {
@@ -643,6 +682,32 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         schema / "agent"         -> cliVersion.asJsonLD,
         schema / "schemaVersion" -> schemaVersion.asJsonLD,
         schema / "description"   -> maybeProjectDescription.asJsonLD,
+        schema / "dateCreated"   -> dateCreated.asJsonLD,
+        renku / "hasActivity"    -> activities.asJsonLD,
+        renku / "hasPlan"        -> activities.map(_.plan).distinct.asJsonLD,
+        renku / "hasDataset"     -> datasets.asJsonLD
+      ) ::
+        datasets.flatMap(_.publicationEvents.map(_.asJsonLD)) :::
+        persons.toList.map(_.asJsonLD(personWithMultipleNamesEncoder)): _*
+    )
+    .flatten
+    .fold(throw _, identity)
+
+  private def cliLikeJsonLDWithEmptyDescription(resourceId:    projects.ResourceId,
+                                                cliVersion:    CliVersion,
+                                                schemaVersion: SchemaVersion,
+                                                dateCreated:   DateCreated,
+                                                activities:    List[Activity],
+                                                datasets:      List[Dataset[Dataset.Provenance]],
+                                                persons:       Set[entities.Person]
+  ) = JsonLD
+    .arr(
+      JsonLD.entity(
+        resourceId.asEntityId,
+        EntityTypes.of(prov / "Location", schema / "Project"),
+        schema / "agent"         -> cliVersion.asJsonLD,
+        schema / "schemaVersion" -> schemaVersion.asJsonLD,
+        schema / "description"   -> JsonLD.fromString(""),
         schema / "dateCreated"   -> dateCreated.asJsonLD,
         renku / "hasActivity"    -> activities.asJsonLD,
         renku / "hasPlan"        -> activities.map(_.plan).distinct.asJsonLD,
