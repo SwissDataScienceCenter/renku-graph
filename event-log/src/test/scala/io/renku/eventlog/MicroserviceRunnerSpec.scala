@@ -19,6 +19,8 @@
 package io.renku.eventlog
 
 import cats.effect._
+
+import scala.language.postfixOps
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.eventlog.init.DbInitializer
@@ -34,6 +36,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import scala.concurrent.duration._
 
 import java.lang.Thread.sleep
 
@@ -66,6 +69,43 @@ class MicroserviceRunnerSpec
         // waiting for the internal processes to call run() on metrics and gaugeScheduler
         sleep(1000)
       }
+
+    "return Success Exit Code even if metrics returns something else" in new TestCase {
+      class Metrics extends EventLogMetrics[IO] {
+        val counter = Ref.unsafe[IO, Int](0)
+
+        override def run(): IO[Unit] = keepGoing.foreverM
+
+        private def keepGoing =
+          Temporal[IO].delayBy(counter.update(_ + 1), 1000 millis)
+      }
+
+      class Gauge extends GaugeResetScheduler[IO] {
+        val counter = Ref.unsafe[IO, Int](0)
+
+        override def run(): IO[Unit] = keepGoing.foreverM
+
+        private def keepGoing =
+          Temporal[IO].delayBy(counter.update(_ + 1), 1000 millis)
+      }
+
+      override val metrics        = new Metrics()
+      override val gaugeScheduler = new Gauge()
+
+      given(certificateLoader).succeeds(returning = ())
+      given(sentryInitializer).succeeds(returning = ())
+      given(dbInitializer).succeeds(returning = ())
+      given(eventProducersRegistry).succeeds(returning = ())
+      given(eventConsumersRegistry).succeeds(returning = ())
+      given(httpServer).succeeds(returning = ExitCode.Success)
+
+      runner.run().unsafeRunAndForget()
+
+      eventually {
+        metrics.counter.get.unsafeRunSync()        should be > 1
+        gaugeScheduler.counter.get.unsafeRunSync() should be > 1
+      }
+    }
 
     "fail if Certificate loading fails" in new TestCase {
 
@@ -199,7 +239,7 @@ class MicroserviceRunnerSpec
     val metrics                = mock[EventLogMetrics[IO]]
     val httpServer             = mock[HttpServer[IO]]
     val gaugeScheduler         = mock[GaugeResetScheduler[IO]]
-    val runner = new MicroserviceRunner(
+    lazy val runner = new MicroserviceRunner(
       certificateLoader,
       sentryInitializer,
       dbInitializer,

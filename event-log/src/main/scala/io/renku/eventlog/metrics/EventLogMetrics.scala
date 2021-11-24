@@ -44,7 +44,6 @@ class EventLogMetricsImpl[F[_]: Temporal: Logger](
 
   private def updateStatuses(): F[Unit] = for {
     _ <- Temporal[F] sleep interval
-    _ <- Logger[F].info(s"EventLogMetricsImpl.updateStatuses")
     _ <- provisionCategoryNames recoverWith logError(categoryNameEventsGauge.name)
     _ <- provisionStatuses recoverWith logError(statusesGauge.name)
   } yield ()
