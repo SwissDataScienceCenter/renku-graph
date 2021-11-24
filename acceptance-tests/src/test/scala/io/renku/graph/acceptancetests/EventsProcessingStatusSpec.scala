@@ -111,10 +111,15 @@ class EventsProcessingStatusSpec
     val theMostRecentEventDate = Instant.now()
     allCommitIds.foldLeft(Option.empty[CommitId]) { (maybePreviousCommitId, commitId) =>
       // GitLab to return commit info about all the parent commits
-      `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project.id,
+      `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project,
                                                                                           commitId,
                                                                                           maybePreviousCommitId.toSet,
                                                                                           theMostRecentEventDate
+      )
+
+      `GET <gitlabApi>/users/:id/events/?action=pushed&page=1 returning OK`(project.entitiesProject.maybeCreator,
+                                                                            project,
+                                                                            commitId
       )
 
       // making the triples generation process happy and not throwing exceptions to the logs

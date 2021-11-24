@@ -20,7 +20,6 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.projectinfo
 
 import cats.data.EitherT
 import cats.effect.Async
-import cats.effect.kernel.Concurrent
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
@@ -170,7 +169,7 @@ private class MemberEmailFinderImpl[F[_]: Async: Logger](
         PushEvent(projectId, commitId, authorId, authorName)
       )
 
-    jsonOf(implicitly[Concurrent[F]], decodeList(events)).map(_.flatten)
+    jsonOf[F, List[List[PushEvent]]].map(_.flatten)
   }
 
   private case class PushEvent(projectId:  projects.Id,
