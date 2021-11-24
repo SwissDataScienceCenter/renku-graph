@@ -548,22 +548,30 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
                             dateCreated:             DateCreated,
                             activities:              List[entities.Activity],
                             datasets:                List[entities.Dataset[entities.Dataset.Provenance]]
-  ) = JsonLD
-    .arr(
-      JsonLD.entity(
-        resourceId.asEntityId,
-        EntityTypes.of(prov / "Location", schema / "Project"),
-        schema / "agent"         -> cliVersion.asJsonLD,
-        schema / "schemaVersion" -> schemaVersion.asJsonLD,
-        schema / "description"   -> maybeProjectDescription.asJsonLD,
-        schema / "dateCreated"   -> dateCreated.asJsonLD,
-        renku / "hasActivity"    -> activities.asJsonLD,
-        renku / "hasPlan"        -> activities.map(_.association.plan).distinct.asJsonLD,
-        renku / "hasDataset"     -> datasets.asJsonLD
-      ) :: datasets.flatMap(_.publicationEvents.map(_.asJsonLD)): _*
-    )
-    .flatten
-    .fold(throw _, identity)
+  ) = {
+    val descriptionJsonLD = maybeProjectDescription match {
+      case Some(desc) => desc.asJsonLD
+      case None =>
+        if (Random.nextBoolean()) blankStrings().generateOne.asJsonLD
+        else maybeProjectDescription.asJsonLD
+    }
+    JsonLD
+      .arr(
+        JsonLD.entity(
+          resourceId.asEntityId,
+          EntityTypes.of(prov / "Location", schema / "Project"),
+          schema / "agent"         -> cliVersion.asJsonLD,
+          schema / "schemaVersion" -> schemaVersion.asJsonLD,
+          schema / "description"   -> descriptionJsonLD,
+          schema / "dateCreated"   -> dateCreated.asJsonLD,
+          renku / "hasActivity"    -> activities.asJsonLD,
+          renku / "hasPlan"        -> activities.map(_.association.plan).distinct.asJsonLD,
+          renku / "hasDataset"     -> datasets.asJsonLD
+        ) :: datasets.flatMap(_.publicationEvents.map(_.asJsonLD)): _*
+      )
+      .flatten
+      .fold(throw _, identity)
+  }
 
   private implicit class ProjectMemberOps(gitLabPerson: ProjectMember) {
 
