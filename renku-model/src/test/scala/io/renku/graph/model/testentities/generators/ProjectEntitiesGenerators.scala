@@ -25,9 +25,9 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{fixed, nonNegativeInts, positiveInts}
-import io.renku.graph.model.GraphModelGenerators.{cliVersions, projectCreatedDates, projectDescriptions, projectIds, projectNames, projectPaths, projectSchemaVersions, projectVisibilities, userEmails, userGitLabIds, userNames, usernames}
-import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
+import io.renku.graph.model.GraphModelGenerators.{cliVersions, projectCreatedDates, projectDescriptions, projectIds, projectKeywords, projectNames, projectPaths, projectSchemaVersions, projectVisibilities, userEmails, userGitLabIds, userNames, usernames}
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
+import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import io.renku.graph.model.projects.{ForksCount, Visibility}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{ActivityGenFactory, DatasetGenFactory}
 import io.renku.graph.model.{RenkuBaseUrl, projects, users}
@@ -76,9 +76,10 @@ trait ProjectEntitiesGenerators {
     dateCreated      <- projectCreatedDates(minDateCreated.value)
     maybeCreator     <- personEntities(withGitLabId).toGeneratorOfOptions
     visibility       <- visibilityGen
+    forksCount       <- forksCountGen
+    keywords         <- projectKeywords.toGeneratorOfSet(minElements = 0)
     members          <- personEntities(withGitLabId).toGeneratorOfSet(minElements = 0)
     version          <- projectSchemaVersions
-    forksCount       <- forksCountGen
     activities       <- activitiesFactories.map(_.apply(dateCreated)).sequence
     datasets         <- datasetsFactories.map(_.apply(dateCreated)).sequence
   } yield ProjectWithoutParent(path,
@@ -89,6 +90,7 @@ trait ProjectEntitiesGenerators {
                                maybeCreator,
                                visibility,
                                forksCount,
+                               keywords,
                                members ++ maybeCreator,
                                version,
                                activities,
@@ -112,6 +114,7 @@ trait ProjectEntitiesGenerators {
     maybeDescription <- projectDescriptions.toGeneratorOfOptions
     dateCreated      <- projectCreatedDates()
     maybeCreator     <- projectMembers.toGeneratorOfOptions
+    keywords         <- projectKeywords.toGeneratorOfSet(minElements = 0)
     members          <- projectMembers.toGeneratorOfList(minElements = 1).map(_.toSet)
     visibility       <- projectVisibilities
     maybeParentPath  <- projectPaths.toGeneratorOfOptions
@@ -121,6 +124,7 @@ trait ProjectEntitiesGenerators {
                             dateCreated,
                             maybeDescription,
                             maybeCreator,
+                            keywords,
                             members,
                             visibility,
                             maybeParentPath

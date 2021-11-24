@@ -118,12 +118,12 @@ private class GitLabProjectFinderImpl[F[_]: Async: Logger](
     implicit val decoder: Decoder[GitLabProject] = cursor =>
       for {
         id               <- cursor.downField("id").as[Id]
-        visibility       <- cursor.downField("visibility").as[Visibility]
         sshUrl           <- cursor.downField("ssh_url_to_repo").as[SshUrl]
         httpUrl          <- cursor.downField("http_url_to_repo").as[HttpUrl]
         webUrl           <- cursor.downField("web_url").as[WebUrl]
         maybeReadmeUrl   <- cursor.downField("readme_url").as[Option[ReadmeUrl]]
         forksCount       <- cursor.downField("forks_count").as[ForksCount]
+        visibility       <- cursor.downField("visibility").as[Visibility]
         tags             <- cursor.downField("tag_list").as[List[Tag]]
         starsCount       <- cursor.downField("star_count").as[StarsCount]
         updatedAt        <- cursor.downField("last_activity_at").as[DateUpdated]
