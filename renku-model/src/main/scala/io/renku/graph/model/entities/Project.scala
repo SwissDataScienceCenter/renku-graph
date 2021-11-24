@@ -283,6 +283,7 @@ object Project {
         schema / "dateCreated"      -> project.dateCreated.asJsonLD,
         schema / "creator"          -> project.maybeCreator.asJsonLD,
         renku / "projectVisibility" -> project.visibility.asJsonLD,
+        schema / "keywords"         -> project.keywords.asJsonLD,
         schema / "member"           -> project.members.toList.asJsonLD,
         schema / "schemaVersion"    -> project.version.asJsonLD,
         renku / "hasActivity"       -> project.activities.asJsonLD,
