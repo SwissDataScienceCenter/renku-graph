@@ -34,7 +34,7 @@ import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater._
-import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.{TransformationStepsCreator, TriplesCurator}
+import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TransformationStepsCreator
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.{TransformationStepsRunner, TriplesUploadResult}
 import org.typelevel.log4cats.Logger
@@ -209,7 +209,7 @@ private object EventProcessor {
   ): F[EventProcessor[F]] = for {
     uploader              <- TransformationStepsRunner(timeRecorder)
     accessTokenFinder     <- AccessTokenFinder[F]
-    triplesCurator        <- TriplesCurator(timeRecorder)
+    triplesCurator        <- TransformationStepsCreator(timeRecorder)
     eventStatusUpdater    <- EventStatusUpdater(categoryName)
     eventsProcessingTimes <- metricsRegistry.register[F, Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
     executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = Some(eventsProcessingTimes))

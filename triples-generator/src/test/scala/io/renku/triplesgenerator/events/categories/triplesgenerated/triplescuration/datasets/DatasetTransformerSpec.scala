@@ -31,7 +31,7 @@ import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.rdfstore.SparqlQuery
 import io.renku.triplesgenerator.events.categories.triplesgenerated.ProjectFunctions
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.Queries
-import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
+import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TransformationStepsCreator.TransformationRecoverableError
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

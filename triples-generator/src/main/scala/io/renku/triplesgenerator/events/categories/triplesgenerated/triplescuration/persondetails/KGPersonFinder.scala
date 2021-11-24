@@ -50,13 +50,13 @@ private class KGPersonFinderImpl[F[_]: Async: Logger](rdfStoreConfig: RdfStoreCo
   import io.circe.Decoder
 
   override def find(person: Person): F[Option[Person]] =
-    findQueries(person)
+    personFindingQueries(person)
       .foldLeft(OptionT.none[F, Person]) { (maybePerson, query) =>
         maybePerson.orElseF(queryExpecting(using = query)(recordsDecoder(person)))
       }
       .value
 
-  private def findQueries(person: Person) = List(
+  private def personFindingQueries(person: Person) = List(
     person.maybeGitLabId.map(findByGitlabId),
     person.maybeEmail.map(findByEmail),
     findByResourceId(person.resourceId).some

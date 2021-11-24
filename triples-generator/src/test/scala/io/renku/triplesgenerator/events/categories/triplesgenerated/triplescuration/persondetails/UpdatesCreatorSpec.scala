@@ -18,10 +18,15 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails
 
+import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.generators.jsonld.JsonLDGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
+import io.renku.jsonld.syntax._
+import io.renku.jsonld.{EntityId, JsonLD, Property}
 import io.renku.rdfstore.InMemoryRdfStore
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
@@ -31,7 +36,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
 
   import UpdatesCreator._
 
-  "prepareUpdates" should {
+  "preparePreDataUpdates" should {
 
     "generate queries which delete person's name, email, affiliation and gitLabId " +
       "in case all of them were changed" in {
@@ -57,7 +62,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
           )
         )
 
-        val queries = prepareUpdates(kgPerson, mergedPerson)
+        val queries = preparePreDataUpdates(kgPerson, mergedPerson)
 
         queries.runAll.unsafeRunSync()
 
@@ -84,7 +89,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
           )
         )
 
-        val queries = prepareUpdates(kgPerson, mergedPerson)
+        val queries = preparePreDataUpdates(kgPerson, mergedPerson)
 
         queries.runAll.unsafeRunSync()
 
@@ -98,8 +103,102 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
         .generateOne
         .to[entities.Person]
 
-      prepareUpdates(kgPerson, kgPerson).isEmpty shouldBe true
+      preparePreDataUpdates(kgPerson, kgPerson).isEmpty shouldBe true
     }
+  }
+
+  "preparePostDataUpdates" should {
+
+    "return no queries when the given person has no email" in {
+      val person = personEntities(maybeEmails = withoutEmail).generateOne.to[entities.Person]
+      preparePostDataUpdates(person).isEmpty shouldBe true
+    }
+
+    "return queries doing nothing when there's no person with the given email in KG " in {
+      val person = personEntities(maybeEmails = withEmail).generateOne.to[entities.Person]
+
+      loadToStore(person)
+
+      findPersons shouldBe Set(toResultRow(person))
+
+      val queries = preparePostDataUpdates(personEntities(maybeEmails = withEmail).generateOne.to[entities.Person])
+
+      queries.runAll.unsafeRunSync()
+
+      findPersons shouldBe Set(toResultRow(person))
+    }
+
+    "return queries doing nothing when there's only one person with the given email in KG" in {
+      val person = personEntities(maybeEmails = withEmail).generateOne.to[entities.Person]
+
+      loadToStore(person)
+
+      findPersons shouldBe Set(toResultRow(person))
+
+      val queries = preparePostDataUpdates(person)
+
+      queries.runAll.unsafeRunSync()
+
+      findPersons shouldBe Set(toResultRow(person))
+    }
+
+    "return queries removing person with the same email but no gitLabId " +
+      "and relinking edges to the removed person to the person having gitLabId " +
+      "- case when person without GitLabId is passed in" in {
+        val email            = userEmails.generateOne
+        val personNoGitLab   = personEntities(withoutGitLabId, fixed(email.some)).generateOne.to[entities.Person]
+        val personWithGitLab = personEntities(withGitLabId, fixed(email.some)).generateOne.to[entities.Person]
+
+        loadToStore(personNoGitLab, personWithGitLab)
+
+        val entityId = EntityId.of(httpUrls().generateOne)
+        val property = properties.generateOne
+        loadToStore(
+          JsonLD.entity(entityId,
+                        entityTypesObject.generateOne,
+                        Map(property -> personNoGitLab.resourceId.asEntityId.asJsonLD)
+          )
+        )
+
+        findPersons                     shouldBe Set(toResultRow(personNoGitLab), toResultRow(personWithGitLab))
+        findObjects(entityId, property) shouldBe Set(personNoGitLab.resourceId.asEntityId.show)
+
+        val queries = preparePostDataUpdates(personNoGitLab)
+
+        queries.runAll.unsafeRunSync()
+
+        findPersons                     shouldBe Set(toResultRow(personWithGitLab))
+        findObjects(entityId, property) shouldBe Set(personWithGitLab.resourceId.asEntityId.show)
+      }
+
+    "return queries removing person with the same email but no gitLabId " +
+      "and relinking edges to the removed person to the person having gitLabId " +
+      "- case when person with GitLabId is passed in" in {
+        val email            = userEmails.generateOne
+        val personNoGitLab   = personEntities(withoutGitLabId, fixed(email.some)).generateOne.to[entities.Person]
+        val personWithGitLab = personEntities(withGitLabId, fixed(email.some)).generateOne.to[entities.Person]
+
+        loadToStore(personNoGitLab, personWithGitLab)
+
+        val entityId = EntityId.of(httpUrls().generateOne)
+        val property = properties.generateOne
+        loadToStore(
+          JsonLD.entity(entityId,
+                        entityTypesObject.generateOne,
+                        Map(property -> personNoGitLab.resourceId.asEntityId.asJsonLD)
+          )
+        )
+
+        findPersons                     shouldBe Set(toResultRow(personNoGitLab), toResultRow(personWithGitLab))
+        findObjects(entityId, property) shouldBe Set(personNoGitLab.resourceId.asEntityId.show)
+
+        val queries = preparePostDataUpdates(personWithGitLab)
+
+        queries.runAll.unsafeRunSync()
+
+        findPersons                     shouldBe Set(toResultRow(personWithGitLab))
+        findObjects(entityId, property) shouldBe Set(personWithGitLab.resourceId.asEntityId.show)
+      }
   }
 
   private def findPersons: Set[(String, Option[String], Option[String], Option[String], Option[Int])] =
@@ -109,10 +208,10 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
                  |  OPTIONAL { ?id schema:name ?name } .
                  |  OPTIONAL { ?id schema:email ?email } .
                  |  OPTIONAL { ?id schema:affiliation ?affiliation } .
-                 |  OPTIONAL { ?id schema:sameAs ?sameAsId } .
-                 |  OPTIONAL { ?sameAsId schema:identifier ?gitlabId;
-                 |                       a schema:URL;
-                 |                       schema:additionalType 'GitLab'
+                 |  OPTIONAL { ?id schema:sameAs ?sameAsId.
+                 |             ?sameAsId a schema:URL;
+                 |                       schema:additionalType 'GitLab';
+                 |                       schema:identifier ?gitlabId.
                  |  }
                  |}
                  |""".stripMargin)
@@ -121,4 +220,24 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
         (row("id"), row.get("name"), row.get("email"), row.get("affiliation"), row.get("gitlabId").map(_.toInt))
       )
       .toSet
+
+  private def findObjects(entityId: EntityId, property: Property): Set[String] =
+    runQuery(s"""|SELECT ?object
+                 |WHERE { OPTIONAL { <${entityId.show}> <${property.show}> ?object } }
+                 |""".stripMargin)
+      .unsafeRunSync()
+      .map(_.get("object"))
+      .toSet
+      .flatten
+
+  private lazy val toResultRow
+      : entities.Person => (String, Option[String], Option[String], Option[String], Option[Int]) = {
+    case entities.Person(resourceId, name, maybeEmail, maybeAffiliation, maybeGitLabId) =>
+      (resourceId.value,
+       Some(name.value),
+       maybeEmail.map(_.value),
+       maybeAffiliation.map(_.value),
+       maybeGitLabId.map(_.value)
+      )
+  }
 }
