@@ -269,6 +269,23 @@ the new status.
 }
 ```
 
+#### Changing status of the all events of a specific project to `NEW`
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "EVENTS_STATUS_CHANGE",
+  "project": {
+    "id": 12,
+    "path": "namespace/project-name"
+  },
+  "newStatus": "NEW"
+}
+```
+
 #### Changing status of all events to `NEW`
 
 **Multipart Request**
@@ -579,13 +596,13 @@ or
 {
   "categoryName": "GLOBAL_COMMIT_SYNC",
   "project": {
-    "id": 12,
+    "id":   12,
     "path": "project/path"
   },
-  "commits": [
-    "commitId1",
-    "commitId2"
-  ]
+  "commits": {
+    "count":  100,
+    "latest": "121435453edf"
+  }
 }
 ```
 

@@ -20,17 +20,25 @@ package io.renku.eventlog.subscriptions.globalcommitsync
 
 import cats.Show
 import cats.implicits.showInterpolator
+import io.renku.eventlog.subscriptions.globalcommitsync.GlobalCommitSyncEvent.CommitsInfo
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events.{CommitId, LastSyncedDate}
+import io.renku.tinytypes.constraints.NonNegativeLong
+import io.renku.tinytypes.{LongTinyType, TinyTypeFactory}
 
 private final case class GlobalCommitSyncEvent(project:             Project,
-                                               commits:             List[CommitId],
+                                               commits:             CommitsInfo,
                                                maybeLastSyncedDate: Option[LastSyncedDate]
 )
-
 private object GlobalCommitSyncEvent {
-  implicit lazy val show: Show[GlobalCommitSyncEvent] =
-    Show.show(event => show"GlobalCommitSyncEvent ${event.project}, numberOfCommits = ${event.commits.length}")
+  final class CommitsCount private (val value: Long) extends AnyVal with LongTinyType
+  implicit object CommitsCount extends TinyTypeFactory[CommitsCount](new CommitsCount(_)) with NonNegativeLong
+
+  final case class CommitsInfo(count: CommitsCount, latest: CommitId)
+
+  implicit lazy val show: Show[GlobalCommitSyncEvent] = Show.show(event =>
+    show"GlobalCommitSyncEvent ${event.project}, numberOfCommits = ${event.commits.count}, latestCommit = ${event.commits.latest}"
+  )
 }
 
 private object GlobalCommitSyncEventEncoder {
@@ -38,14 +46,15 @@ private object GlobalCommitSyncEventEncoder {
   import io.circe.Json
   import io.circe.literal._
 
-  def encodeEvent(event: GlobalCommitSyncEvent): Json =
-    json"""{
-        "categoryName": ${categoryName.value},
-        "project": {
-          "id":         ${event.project.id.value},
-          "path":       ${event.project.path.value}
-        },
-        "commits":      ${event.commits.map(_.value)}
-      }"""
-
+  def encodeEvent(event: GlobalCommitSyncEvent): Json = json"""{
+    "categoryName": ${categoryName.value},
+    "project": {
+      "id":         ${event.project.id.value},
+      "path":       ${event.project.path.value}
+    },
+    "commits": {
+      "count":  ${event.commits.count.value},
+      "latest": ${event.commits.latest.value}
+    }
+  }"""
 }

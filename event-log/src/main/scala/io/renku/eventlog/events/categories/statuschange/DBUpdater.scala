@@ -37,13 +37,13 @@ private object DBUpdater {
   type EventUpdaterFactory[F[_], E <: StatusChangeEvent] =
     (DeliveryInfoRemover[F], LabeledHistogram[F, SqlStatement.Name]) => DBUpdater[F, E]
 
-  implicit def factoryToTriplesGeneratorUpdater[F[_]: MonadCancelThrow: Async]
-      : EventUpdaterFactory[F, ToTriplesGenerated] = new ToTriplesGeneratedUpdater(_, _)
+  implicit def factoryToTriplesGeneratorUpdater[F[_]: Async]: EventUpdaterFactory[F, ToTriplesGenerated] =
+    new ToTriplesGeneratedUpdater(_, _)
 
-  implicit def factoryToTriplesStoreUpdater[F[_]: MonadCancelThrow: Async]: EventUpdaterFactory[F, ToTriplesStore] =
+  implicit def factoryToTriplesStoreUpdater[F[_]: Async]: EventUpdaterFactory[F, ToTriplesStore] =
     new ToTriplesStoreUpdater(_, _)
 
-  implicit def factoryToFailureUpdater[F[_]: MonadCancelThrow: Async]
+  implicit def factoryToFailureUpdater[F[_]: Async]
       : EventUpdaterFactory[F, ToFailure[ProcessingStatus, FailureStatus]] = new ToFailureUpdater(_, _)
 
   implicit def factoryRollbackToNewUpdater[F[_]: MonadCancelThrow]: EventUpdaterFactory[F, RollbackToNew] =
@@ -58,4 +58,7 @@ private object DBUpdater {
 
   implicit def factoryToAllEventsNewUpdater[F[_]: MonadCancelThrow]: EventUpdaterFactory[F, AllEventsToNew] =
     (_, execTimes) => new AllEventsToNewUpdater[F](execTimes)
+
+  implicit def factoryToProjectEventsNewUpdater[F[_]: Async]: EventUpdaterFactory[F, ProjectEventsToNew] =
+    (_, execTimes) => new ProjectEventsToNewUpdater[F](execTimes)
 }

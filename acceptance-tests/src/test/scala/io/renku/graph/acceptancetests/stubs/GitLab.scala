@@ -61,6 +61,15 @@ trait GitLab {
   def `GET <gitlabApi>/user returning OK`(user: AuthUser): Unit =
     `GET <gitlabApi>/user returning OK`(user.id)(user.accessToken)
 
+  def `GET <gitlabApi>/user returning NOT_FOUND`(user: AuthUser): Unit = {
+    stubFor {
+      get("/api/v4/user")
+        .withAccessTokenInHeader(user.accessToken)
+        .willReturn(notFound())
+    }
+    ()
+  }
+
   def `GET <gitlabApi>/user returning OK`(
       userGitLabId:       users.GitLabId = userGitLabIds.generateOne
   )(implicit accessToken: AccessToken): Unit = {
@@ -117,6 +126,11 @@ trait GitLab {
     stubFor {
       get(s"/api/v4/projects/$projectId/repository/commits?per_page=1")
         .willReturn(okJson(Json.arr(commitAsJson(commitIds.last, theMostRecentEventDate)).noSpaces))
+        .withAccessTokenInHeader
+    }
+    stubFor {
+      get(s"/api/v4/projects/$projectId/repository/commits?page=1&per_page=50")
+        .willReturn(okJson(commitIds.map(commitAsJson(_, theMostRecentEventDate)).asJson.noSpaces))
         .withAccessTokenInHeader
     }
     ()

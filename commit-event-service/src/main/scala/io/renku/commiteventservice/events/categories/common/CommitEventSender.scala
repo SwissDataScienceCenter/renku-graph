@@ -19,7 +19,7 @@
 package io.renku.commiteventservice.events.categories.common
 
 import cats.MonadThrow
-import cats.effect.{Async, Temporal}
+import cats.effect.Async
 import cats.syntax.all._
 import io.renku.commiteventservice.events.categories.common.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
 import io.renku.control.Throttler
@@ -34,7 +34,7 @@ private[categories] trait CommitEventSender[F[_]] {
   def send(commitEvent: CommitEvent): F[Unit]
 }
 
-private[categories] class CommitEventSenderImpl[F[_]: Async: Temporal: Logger](
+private[categories] class CommitEventSenderImpl[F[_]: Async: Logger](
     eventLogUrl:           EventLogUrl,
     commitEventSerializer: CommitEventSerializer[F]
 ) extends RestClient[F, CommitEventSender[F]](Throttler.noThrottling)
@@ -95,7 +95,7 @@ private[categories] class CommitEventSenderImpl[F[_]: Async: Temporal: Logger](
 }
 
 private[categories] object CommitEventSender {
-  def apply[F[_]: Async: Temporal: Logger]: F[CommitEventSender[F]] = for {
+  def apply[F[_]: Async: Logger]: F[CommitEventSender[F]] = for {
     eventLogUrl <- EventLogUrl[F]()
   } yield new CommitEventSenderImpl(eventLogUrl, new CommitEventSerializer[F])
 }

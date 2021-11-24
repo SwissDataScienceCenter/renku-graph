@@ -81,8 +81,7 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       ) foreach { datasetGen =>
         val dataset = datasetGen.generateOne.to[entities.Dataset[entities.Dataset.Provenance]]
         val olderPart = updatePartDateAfter(
-          datasetPartEntities(timestampsNotInTheFuture.generateOne).generateOne
-            .to[entities.DatasetPart]
+          datasetPartEntities(timestampsNotInTheFuture.generateOne).generateOne.to[entities.DatasetPart]
         )(dataset.provenance)
         val validDataset = dataset.copy(parts = olderPart :: dataset.parts)
 

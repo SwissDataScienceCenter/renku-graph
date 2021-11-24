@@ -24,7 +24,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.commiteventservice.events.categories.commitsync.Generators._
-import io.renku.commiteventservice.events.categories.commitsync.eventgeneration.CommitEventSynchronizer
+import io.renku.commiteventservice.events.categories.commitsync.eventgeneration.CommitsSynchronizer
 import io.renku.events
 import io.renku.events.EventRequestContent
 import io.renku.events.consumers.EventSchedulingResult._
@@ -54,7 +54,7 @@ class EventHandlerSpec
 
         val event = fullCommitSyncEvents.generateOne
 
-        (commitEventSynchronizer.synchronizeEvents _)
+        (commitsSynchronizer.synchronizeEvents _)
           .expects(event)
           .returning(().pure[IO])
 
@@ -76,7 +76,7 @@ class EventHandlerSpec
 
         val event = minimalCommitSyncEvents.generateOne
 
-        (commitEventSynchronizer.synchronizeEvents _)
+        (commitsSynchronizer.synchronizeEvents _)
           .expects(event)
           .returning(().pure[IO])
 
@@ -96,7 +96,7 @@ class EventHandlerSpec
 
       val event = commitSyncEvents.generateOne
 
-      (commitEventSynchronizer.synchronizeEvents _)
+      (commitsSynchronizer.synchronizeEvents _)
         .expects(event)
         .returning(exceptions.generateOne.raiseError[IO, Unit])
 
@@ -130,8 +130,8 @@ class EventHandlerSpec
 
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger()
-    val commitEventSynchronizer = mock[CommitEventSynchronizer[IO]]
-    val handler                 = new EventHandler[IO](categoryName, commitEventSynchronizer)
+    val commitsSynchronizer = mock[CommitsSynchronizer[IO]]
+    val handler             = new EventHandler[IO](categoryName, commitsSynchronizer)
 
     def requestContent(event: Json): EventRequestContent = events.EventRequestContent.NoPayload(event)
   }
@@ -154,5 +154,4 @@ class EventHandlerSpec
         }
       }"""
   }
-
 }

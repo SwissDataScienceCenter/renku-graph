@@ -20,11 +20,10 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescura
 
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.datasets.{SameAs, TopmostDerivedFrom, TopmostSameAs}
+import io.renku.graph.model.datasets.{SameAs, TopmostSameAs}
+import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{entities, projects}
 import io.renku.rdfstore.InMemoryRdfStore
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
@@ -38,65 +37,7 @@ class UpdatesCreatorSpec
     with should.Matchers
     with TableDrivenPropertyChecks {
 
-  "prepareUpdates" should {
-
-    "generate queries which " +
-      "updates topmostSameAs for all datasets whose topmostSameAs points to the current dataset" +
-      "when the topmostSameAs on the current dataset is different than the value in KG" in {
-        val dataset0AsTopmostSameAs = TopmostSameAs(datasetResourceIds.generateOne.value)
-
-        val dataset1 = {
-          val ds = datasetEntities(provenanceImportedInternal).decoupledFromProject.generateOne
-            .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]]
-          setTopmostSameAs(ds, dataset0AsTopmostSameAs)
-        }
-        val dataset2 = {
-          val ds = datasetEntities(provenanceImportedInternal).decoupledFromProject.generateOne
-            .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]]
-          setTopmostSameAs(ds, TopmostSameAs(dataset1.resourceId.value))
-        }
-
-        loadToStore(dataset2)
-
-        findDatasets.map(onlyTopmostSameAs) shouldBe Set(
-          (dataset2.resourceId.value, TopmostSameAs(dataset1.resourceId.value).value.some)
-        )
-
-        UpdatesCreator.prepareUpdates(dataset1, None).runAll.unsafeRunSync()
-
-        findDatasets.map(onlyTopmostSameAs) shouldBe Set(
-          (dataset2.resourceId.value, dataset0AsTopmostSameAs.value.some)
-        )
-      }
-
-    "generate queries which " +
-      "updates topmostDerivedFrom for all datasets which topmostDerivedFrom points to the current dataset " +
-      "when the topmostDerivedFrom on the current dataset is different than the value in KG" in {
-        val (topmost, modification1) = datasetAndModificationEntities(provenanceInternal).generateOne
-        val modification1Entities    = modification1.to[entities.Dataset[entities.Dataset.Provenance.Modified]]
-        val modification2 = {
-          val ds = modifiedDatasetEntities(
-            modification1,
-            timestamps(max = modification1.provenance.date.instant).generateAs[projects.DateCreated]
-          ).generateOne
-            .to[entities.Dataset[entities.Dataset.Provenance.Modified]]
-          ds.copy(provenance =
-            ds.provenance.copy(topmostDerivedFrom = TopmostDerivedFrom(modification1Entities.resourceId.value))
-          )
-        }
-
-        loadToStore(modification2)
-
-        findDatasets.map(onlyTopmostDerivedFrom) shouldBe Set(
-          (modification2.resourceId.value, modification1Entities.resourceId.value.some)
-        )
-
-        UpdatesCreator.prepareUpdates(modification1Entities, None).runAll.unsafeRunSync()
-
-        findDatasets.map(onlyTopmostDerivedFrom) shouldBe Set(
-          (modification2.resourceId.value, topmost.provenance.topmostDerivedFrom.value.some)
-        )
-      }
+  "prepareUpdatesWhenInvalidated" should {
 
     "generate queries for deleted dataset which, " +
       "in case of internal dataset, " +
@@ -288,6 +229,97 @@ class UpdatesCreatorSpec
     }
   }
 
+  "prepareUpdates" should {
+
+    "generate queries which " +
+      "updates topmostSameAs for all datasets whose topmostSameAs points to the current dataset" +
+      "when the topmostSameAs on the current dataset is different than the value in KG" in {
+        val dataset0AsTopmostSameAs = TopmostSameAs(datasetResourceIds.generateOne.value)
+
+        val dataset1 = {
+          val ds = datasetEntities(provenanceImportedInternal).decoupledFromProject.generateOne
+            .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]]
+          setTopmostSameAs(ds, dataset0AsTopmostSameAs)
+        }
+        val dataset2 = {
+          val ds = datasetEntities(provenanceImportedInternal).decoupledFromProject.generateOne
+            .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]]
+          setTopmostSameAs(ds, TopmostSameAs(dataset1.resourceId.value))
+        }
+
+        loadToStore(dataset2)
+
+        findDatasets.map(onlyTopmostSameAs) shouldBe Set(
+          (dataset2.resourceId.value, TopmostSameAs(dataset1.resourceId.value).value.some)
+        )
+
+        UpdatesCreator.prepareUpdates(dataset1, None).runAll.unsafeRunSync()
+
+        findDatasets.map(onlyTopmostSameAs) shouldBe Set(
+          (dataset2.resourceId.value, dataset0AsTopmostSameAs.value.some)
+        )
+      }
+  }
+
+  "prepareTopmostSameAsCleanup" should {
+
+    "return no updates if there is no parent TopmostSameAs given" in {
+      UpdatesCreator
+        .prepareTopmostSameAsCleanup(
+          datasetEntities(provenanceImportedInternal).decoupledFromProject.generateOne
+            .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]],
+          maybeParentTopmostSameAs = None
+        ) shouldBe Nil
+    }
+
+    "return updates deleting additional TopmostSameAs if there is parent TopmostSameAs given" in {
+      val dataset = datasetEntities(provenanceImportedInternal).decoupledFromProject.generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]]
+
+      loadToStore(dataset)
+
+      // simulate DS having two topmostSameAs
+      val parentTopmostSameAs = TopmostSameAs(datasetResourceIds.generateOne.value)
+      loadToStore(setTopmostSameAs(dataset, parentTopmostSameAs))
+
+      findDatasets.map(onlyTopmostSameAs) shouldBe Set(
+        (dataset.resourceId.value, dataset.provenance.topmostSameAs.value.some),
+        (dataset.resourceId.value, parentTopmostSameAs.value.some)
+      )
+
+      UpdatesCreator
+        .prepareTopmostSameAsCleanup(dataset, maybeParentTopmostSameAs = parentTopmostSameAs.some)
+        .runAll
+        .unsafeRunSync()
+
+      findDatasets.map(onlyTopmostSameAs) shouldBe Set(
+        (dataset.resourceId.value, parentTopmostSameAs.value.some)
+      )
+    }
+
+    "return updates not deleting sole TopmostSameAs if there is parent TopmostSameAs given" in {
+      val dataset = datasetEntities(provenanceImportedInternal).decoupledFromProject.generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]]
+
+      loadToStore(dataset)
+
+      findDatasets.map(onlyTopmostSameAs) shouldBe Set(
+        (dataset.resourceId.value, dataset.provenance.topmostSameAs.value.some)
+      )
+
+      UpdatesCreator
+        .prepareTopmostSameAsCleanup(dataset,
+                                     maybeParentTopmostSameAs = TopmostSameAs(datasetResourceIds.generateOne.value).some
+        )
+        .runAll
+        .unsafeRunSync()
+
+      findDatasets.map(onlyTopmostSameAs) shouldBe Set(
+        (dataset.resourceId.value, dataset.provenance.topmostSameAs.value.some)
+      )
+    }
+  }
+
   private def setTopmostSameAs[P <: entities.Dataset.Provenance.ImportedInternal](dataset:       entities.Dataset[P],
                                                                                   topmostSameAs: TopmostSameAs
   ) = {
@@ -322,11 +354,6 @@ class UpdatesCreatorSpec
   private lazy val onlyTopmostSameAs
       : ((String, Option[String], Option[String], Option[String], Option[String])) => (String, Option[String]) = {
     case (resourceId, _, maybeTopmostSameAs, _, _) => resourceId -> maybeTopmostSameAs
-  }
-
-  private lazy val onlyTopmostDerivedFrom
-      : ((String, Option[String], Option[String], Option[String], Option[String])) => (String, Option[String]) = {
-    case (resourceId, _, _, _, maybeTopmostDerivedFrom) => resourceId -> maybeTopmostDerivedFrom
   }
 
   private lazy val onlySameAsAndTop: (

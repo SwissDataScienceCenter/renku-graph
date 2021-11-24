@@ -31,8 +31,8 @@ import org.typelevel.log4cats.Logger
 import scala.util.control.NonFatal
 
 private[eventgeneration] trait CommitEventDeleter[F[_]] {
-  def deleteExtraneousCommits(project: Project, commitsToDelete: List[CommitId])(implicit
-      maybeAccessToken:                Option[AccessToken]
+  def deleteCommits(project: Project, commitsToDelete: List[CommitId])(implicit
+      maybeAccessToken:      Option[AccessToken]
   ): F[SynchronizationSummary]
 }
 private[eventgeneration] class CommitEventDeleterImpl[F[_]: MonadThrow](
@@ -41,8 +41,8 @@ private[eventgeneration] class CommitEventDeleterImpl[F[_]: MonadThrow](
 
   import commitEventsRemover._
 
-  override def deleteExtraneousCommits(project: Project, commitsToDelete: List[CommitId])(implicit
-      maybeAccessToken:                         Option[AccessToken]
+  override def deleteCommits(project: Project, commitsToDelete: List[CommitId])(implicit
+      maybeAccessToken:               Option[AccessToken]
   ): F[SynchronizationSummary] = commitsToDelete.foldLeftM(SynchronizationSummary()) { (summary, commit) =>
     removeDeletedEvent(project, commit)
       .map(summary.incrementCount)

@@ -68,11 +68,11 @@ object GraphModelGenerators {
   implicit val userNames: Gen[users.Name] = for {
     first <- nonBlankStrings(
                minLength = 3,
-               charsGenerator = frequency(9 -> alphaChar, 1 -> oneOf('-', '_', '\\', '/', '`'))
+               charsGenerator = frequency(9 -> alphaChar, 1 -> oneOf('-', '_', '\\', '`'))
              )
     second <- nonBlankStrings(
                 minLength = 3,
-                charsGenerator = frequency(9 -> alphaChar, 1 -> oneOf('-', '_', '\\', '/', '`'))
+                charsGenerator = frequency(9 -> alphaChar, 1 -> oneOf('-', '_', '\\', '`'))
               )
   } yield Name(s"$first $second")
 

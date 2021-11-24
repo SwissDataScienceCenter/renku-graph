@@ -18,15 +18,29 @@
 
 package io.renku.commiteventservice.events.categories.globalcommitsync
 
+import GlobalCommitSyncEvent.CommitsInfo
 import cats.Show
+import cats.syntax.all._
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events.CommitId
+import io.renku.tinytypes.constraints.NonNegativeLong
+import io.renku.tinytypes.{LongTinyType, TinyTypeFactory}
 
-private final case class GlobalCommitSyncEvent(project: Project, commits: List[CommitId]) {
-  override lazy val toString: String =
-    s"projectId = ${project.id}, projectPath = ${project.path}, numberOfCommits = ${commits.length}"
-}
+private final case class GlobalCommitSyncEvent(project: Project, commits: CommitsInfo)
 
 private object GlobalCommitSyncEvent {
-  implicit lazy val show: Show[GlobalCommitSyncEvent] = Show.show(_.toString)
+  final case class CommitsInfo(count: CommitsCount, latest: CommitId)
+
+  implicit lazy val show: Show[GlobalCommitSyncEvent] = Show.show { event =>
+    show"projectId = ${event.project.id}, projectPath = ${event.project.path}, " +
+      show"numberOfCommits = ${event.commits.count}, latestCommit = ${event.commits.latest}"
+  }
+}
+
+final class CommitsCount private (val value: Long) extends AnyVal with LongTinyType
+object CommitsCount extends TinyTypeFactory[CommitsCount](new CommitsCount(_)) with NonNegativeLong {
+  import io.circe.Decoder
+  import io.renku.tinytypes.json.TinyTypeDecoders.longDecoder
+
+  implicit val decoder: Decoder[CommitsCount] = longDecoder(CommitsCount)
 }
