@@ -114,7 +114,8 @@ object events {
       TransformationRecoverableFailure,
       TransformationNonRecoverableFailure,
       TriplesStore,
-      AwaitingDeletion
+      AwaitingDeletion,
+      Deleting
     )
 
     val statusesOrdered = List(
@@ -128,7 +129,8 @@ object events {
       TransformationRecoverableFailure,
       TransformationNonRecoverableFailure,
       TriplesStore,
-      AwaitingDeletion
+      AwaitingDeletion,
+      Deleting
     )
 
     implicit val ordering: Ordering[EventStatus] = Ordering.by(statusesOrdered.indexOf)
@@ -153,6 +155,11 @@ object events {
     type TransformingTriples = TransformingTriples.type
     final case object TransformingTriples extends EventStatus with ProcessingStatus {
       override val value: String = "TRANSFORMING_TRIPLES"
+    }
+
+    type Deleting = Deleting.type
+    final case object Deleting extends EventStatus with ProcessingStatus {
+      override val value: String = "DELETING"
     }
 
     sealed trait FinalStatus extends EventStatus
