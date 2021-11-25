@@ -92,7 +92,7 @@ class ProjectEndpointImpl[F[_]: MonadThrow: Logger](
       "updatedAt":  ${project.updatedAt.value},
       "urls":       ${project.urls},
       "forking":    ${project.forking},
-      "tags":       ${project.tags.map(_.value).toList},
+      "keywords":   ${project.keywords.map(_.value)},
       "starsCount": ${project.starsCount.value},
       "permissions":${project.permissions},
       "statistics": ${project.statistics},

@@ -388,7 +388,7 @@ Response body example:
       }
     }
   },
-  "tags": ["tag1", "tag2"],
+  "keywords": ["keyword1", "keyword2"],
   "starsCount": 0,
   "permissions": {
     "projectAccess": { // optional
