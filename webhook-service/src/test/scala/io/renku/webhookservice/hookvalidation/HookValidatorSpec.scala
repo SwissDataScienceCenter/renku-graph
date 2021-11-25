@@ -31,7 +31,7 @@ import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.webhookservice.WebhookServiceGenerators._
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
 import io.renku.webhookservice.hookvalidation.HookValidator.NoAccessTokenException
-import io.renku.webhookservice.hookvalidation.ProjectHookVerifier.HookIdentifier
+import io.renku.webhookservice.model.HookIdentifier
 import io.renku.webhookservice.tokenrepository.{AccessTokenAssociator, AccessTokenRemover}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

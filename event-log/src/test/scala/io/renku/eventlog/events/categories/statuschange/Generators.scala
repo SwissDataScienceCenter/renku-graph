@@ -68,8 +68,12 @@ private object Generators {
     projectPath <- projectPaths
   } yield ToAwaitingDeletion(eventId, projectPath)
 
+  lazy val consumerProjects = for {
+    id   <- projectIds
+    path <- projectPaths
+  } yield Project(id, path)
+
   lazy val projectEventToNewEvents = for {
-    projectId   <- projectIds
-    projectPath <- projectPaths
-  } yield ProjectEventsToNew(Project(projectId, projectPath))
+    project <- consumerProjects
+  } yield ProjectEventsToNew(project)
 }

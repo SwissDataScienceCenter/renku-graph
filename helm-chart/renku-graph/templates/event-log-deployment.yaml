@@ -58,6 +58,10 @@ spec:
             - name: SENTRY_ENVIRONMENT_NAME
               value: {{ .Values.sentry.environmentName }}
               {{- end }}
+            - name: WEBHOOK_SERVICE_BASE_URL
+              value: "http://{{ template "webhookService.fullname" . }}:{{ .Values.webhookService.service.port }}"
+            - name: TOKEN_REPOSITORY_BASE_URL
+              value: "http://{{ template "tokenRepository.fullname" . }}:{{ .Values.tokenRepository.service.port }}"
             - name: JAVA_OPTS
               value: -Xmx{{ .Values.eventLog.jvmXmx }} -XX:+UseG1GC
           ports:
