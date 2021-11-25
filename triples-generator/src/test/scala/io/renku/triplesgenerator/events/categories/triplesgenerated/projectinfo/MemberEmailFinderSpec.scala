@@ -80,7 +80,7 @@ class MemberEmailFinderSpec
           .findCommitAuthor(_: projects.Path, _: CommitId)(_: Option[AccessToken]))
           .expects(
             project.path,
-            (event.maybeCommitFrom orElse event.maybeCommitTo).getOrElse(fail("At least one commit expected on Event")),
+            (event.maybeCommitTo orElse event.maybeCommitFrom).getOrElse(fail("At least one commit expected on Event")),
             maybeAccessToken
           )
           .returning(EitherT.rightT[IO, ProcessingRecoverableError]((member.name -> authorEmail).some))
@@ -93,7 +93,7 @@ class MemberEmailFinderSpec
       finder.findMemberEmail(memberWithEmail, project).value.unsafeRunSync() shouldBe memberWithEmail.asRight
     }
 
-    "take the email from commitFrom and skip commitTo if both commitIds exist on the event" in new TestCase {
+    "take the email from commitTo and skip commitFrom if both commitIds exist on the event" in new TestCase {
       val commitFrom = commitIds.generateOne
       val commitTo   = commitIds.generateOne
       val event = pushEvents.generateOne
@@ -107,18 +107,18 @@ class MemberEmailFinderSpec
       val authorEmail = userEmails.generateOne
       (commitAuthorFinder
         .findCommitAuthor(_: projects.Path, _: CommitId)(_: Option[AccessToken]))
-        .expects(project.path, commitFrom, maybeAccessToken)
+        .expects(project.path, commitTo, maybeAccessToken)
         .returning(EitherT.rightT[IO, ProcessingRecoverableError]((member.name -> authorEmail).some))
 
       finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe (member add authorEmail).asRight
     }
 
-    "take the email from commitTo if commitFrom does not exist" in new TestCase {
-      val commitTo = commitIds.generateOne
+    "take the email from commitFrom if commitTo does not exist" in new TestCase {
+      val commitFrom = commitIds.generateOne
       val event = pushEvents.generateOne
         .forMember(member)
         .forProject(project)
-        .copy(maybeCommitFrom = None, maybeCommitTo = Some(commitTo))
+        .copy(maybeCommitFrom = Some(commitFrom), maybeCommitTo = None)
       val events = Random.shuffle(event :: pushEvents.generateNonEmptyList().toList)
 
       `/api/v4/users/:id/events?action=pushed`(member.gitLabId) returning okJson(events.asJson.noSpaces)
@@ -126,7 +126,7 @@ class MemberEmailFinderSpec
       val authorEmail = userEmails.generateOne
       (commitAuthorFinder
         .findCommitAuthor(_: projects.Path, _: CommitId)(_: Option[AccessToken]))
-        .expects(project.path, commitTo, maybeAccessToken)
+        .expects(project.path, commitFrom, maybeAccessToken)
         .returning(EitherT.rightT[IO, ProcessingRecoverableError]((member.name -> authorEmail).some))
 
       finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe (member add authorEmail).asRight
@@ -146,7 +146,7 @@ class MemberEmailFinderSpec
         .findCommitAuthor(_: projects.Path, _: CommitId)(_: Option[AccessToken]))
         .expects(
           project.path,
-          (event.maybeCommitFrom orElse event.maybeCommitTo).getOrElse(fail("At least one commit expected on Event")),
+          (event.maybeCommitTo orElse event.maybeCommitFrom).getOrElse(fail("At least one commit expected on Event")),
           maybeAccessToken
         )
         .returning(EitherT.rightT[IO, ProcessingRecoverableError]((member.name -> authorEmail).some))
@@ -282,7 +282,7 @@ class MemberEmailFinderSpec
         .findCommitAuthor(_: projects.Path, _: CommitId)(_: Option[AccessToken]))
         .expects(
           project.path,
-          (event.maybeCommitFrom orElse event.maybeCommitTo).getOrElse(fail("At least one commit expected on Event")),
+          (event.maybeCommitTo orElse event.maybeCommitFrom).getOrElse(fail("At least one commit expected on Event")),
           maybeAccessToken
         )
         .returning(EitherT.leftT[IO, Option[(users.Name, users.Email)]](error))

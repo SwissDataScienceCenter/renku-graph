@@ -165,7 +165,7 @@ private class MemberEmailFinderImpl[F[_]: Async: Logger](
         commitTo   <- cursor.downField("push_data").downField("commit_to").as[Option[CommitId]]
         authorId   <- cursor.downField("author").downField("id").as[users.GitLabId]
         authorName <- cursor.downField("author").downField("name").as[users.Name]
-      } yield (commitFrom orElse commitTo).map(PushEvent(projectId, _, authorId, authorName))
+      } yield (commitTo orElse commitFrom).map(PushEvent(projectId, _, authorId, authorName))
 
     jsonOf[F, List[Option[PushEvent]]].map(_.flatten)
   }
