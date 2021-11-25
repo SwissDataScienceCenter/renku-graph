@@ -124,10 +124,11 @@ trait GitLab {
   def `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(
       projectId:          Id
   )(implicit accessToken: AccessToken): Unit = {
+    val webhookId  = "1"
     val webhookUrl = s"${webhookServiceClient.baseUrl}/webhooks/events"
     stubFor {
       get(s"/api/v4/projects/$projectId/hooks").withAccessTokenInHeader
-        .willReturn(okJson(json"""[{"url": $webhookUrl}]""".noSpaces))
+        .willReturn(okJson(json"""[{"id": $webhookId, "url": $webhookUrl}]""".noSpaces))
     }
     ()
   }

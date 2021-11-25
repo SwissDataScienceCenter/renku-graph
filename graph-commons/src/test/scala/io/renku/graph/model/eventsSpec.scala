@@ -48,7 +48,8 @@ class EventStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
       "GENERATION_NON_RECOVERABLE_FAILURE"     -> GenerationNonRecoverableFailure,
       "TRANSFORMATION_RECOVERABLE_FAILURE"     -> TransformationRecoverableFailure,
       "TRANSFORMATION_NON_RECOVERABLE_FAILURE" -> TransformationNonRecoverableFailure,
-      "AWAITING_DELETION"                      -> AwaitingDeletion
+      "AWAITING_DELETION"                      -> AwaitingDeletion,
+      "DELETING"                               -> Deleting
     )
 
     forAll(scenarios) { (stringValue, expectedStatus) =>
@@ -89,7 +90,8 @@ class EventStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
         TransformationRecoverableFailure,
         TransformationNonRecoverableFailure,
         TriplesStore,
-        AwaitingDeletion
+        AwaitingDeletion,
+        Deleting
       )
     }
   }
