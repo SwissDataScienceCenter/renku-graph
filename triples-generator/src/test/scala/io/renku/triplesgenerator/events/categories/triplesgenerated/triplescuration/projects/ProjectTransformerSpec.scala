@@ -46,7 +46,8 @@ class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       val kgProjectInfo = (projectNames.generateOne,
                            projectResourceIds.generateOption,
                            projectVisibilities.generateOne,
-                           projectDescriptions.generateOption
+                           projectDescriptions.generateOption,
+                           projectKeywords.generateSet()
       )
 
       (kgProjectFinder.find _)
