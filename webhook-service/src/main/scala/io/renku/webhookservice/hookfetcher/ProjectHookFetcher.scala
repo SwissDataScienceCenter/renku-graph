@@ -73,7 +73,7 @@ private[webhookservice] class ProjectHookFetcherImpl[F[_]: Async: Logger](
     implicit val hookIdAndUrlDecoder: Decoder[List[HookIdAndUrl]] = decodeList { cursor =>
       for {
         url <- cursor.downField("url").as[String].map(ProjectHookUrl.fromGitlab)
-        id  <- cursor.downField("id").as[String]
+        id  <- cursor.downField("id").as[String] orElse cursor.downField("id").as[Long].map(_.toString)
       } yield HookIdAndUrl(id, url)
     }
 

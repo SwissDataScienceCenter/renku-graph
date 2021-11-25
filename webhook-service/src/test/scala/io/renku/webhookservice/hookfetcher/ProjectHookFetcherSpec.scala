@@ -32,7 +32,7 @@ import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
-import io.renku.webhookservice.WebhookServiceGenerators.hookIdAndUrls
+import io.renku.webhookservice.WebhookServiceGenerators.{hookIdAndUrls, projectHookUrls}
 import io.renku.webhookservice.hookfetcher.ProjectHookFetcher.HookIdAndUrl
 import org.http4s.Status
 import org.scalamock.scalatest.MockFactory
@@ -72,6 +72,20 @@ class ProjectHookFetcherSpec
       }
 
       fetcher.fetchProjectHooks(projectId, oauthAccessToken).unsafeRunSync() shouldBe idAndUrls.toList
+    }
+    "decode the list of hooks if the id is sent as a number" in new TestCase {
+
+      val oauthAccessToken = oauthAccessTokens.generateOne
+      val id               = 123
+      val url              = projectHookUrls.generateOne
+      val result           = HookIdAndUrl(id.toString, url)
+      stubFor {
+        get(s"/api/v4/projects/$projectId/hooks")
+          .withHeader("Authorization", equalTo(s"Bearer ${oauthAccessToken.value}"))
+          .willReturn(okJson(s"""[{"id":$id, "url":"${url.value}" }]"""))
+      }
+
+      fetcher.fetchProjectHooks(projectId, oauthAccessToken).unsafeRunSync() shouldBe List(result)
     }
 
     "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
