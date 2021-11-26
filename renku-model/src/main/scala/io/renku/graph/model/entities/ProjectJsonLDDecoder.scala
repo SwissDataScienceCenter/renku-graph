@@ -24,7 +24,7 @@ import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember, entityTypes}
-import io.renku.graph.model.projects.{DateCreated, Description, ResourceId}
+import io.renku.graph.model.projects.{DateCreated, Description, Keyword, ResourceId}
 import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders.decodeBlankStringToNone
 import io.renku.jsonld.{Cursor, JsonLDDecoder}
 
@@ -32,28 +32,37 @@ object ProjectJsonLDDecoder {
 
   def apply(gitLabInfo: GitLabProjectInfo)(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDDecoder[Project] =
     JsonLDDecoder.entity(entityTypes) { implicit cursor =>
+      val maybeDescriptionR = cursor
+        .downField(schema / "description")
+        .as[Option[Description]]
+        .map(_ orElse gitLabInfo.maybeDescription)
+      val keywordsR = cursor.downField(schema / "keywords").as[List[Option[Keyword]]].map(_.flatten.toSet).map {
+        case kwrds if kwrds.isEmpty => gitLabInfo.keywords
+        case kwrds                  => kwrds
+      }
+
       for {
-        agent         <- cursor.downField(schema / "agent").as[CliVersion]
-        schemaVersion <- cursor.downField(schema / "schemaVersion").as[SchemaVersion]
-        dateCreated   <- cursor.downField(schema / "dateCreated").as[DateCreated]
-        maybeDescription <-
-          cursor.downField(schema / "description").as[Option[Description]].map(_ orElse gitLabInfo.maybeDescription)
-        allPersons <- findAllPersons(gitLabInfo)
-        activities <- findAllActivities(gitLabInfo)
-        datasets   <- findAllDatasets(gitLabInfo)
-        resourceId <- ResourceId(gitLabInfo.path).asRight
+        agent            <- cursor.downField(schema / "agent").as[CliVersion]
+        version          <- cursor.downField(schema / "schemaVersion").as[SchemaVersion]
+        dateCreated      <- cursor.downField(schema / "dateCreated").as[DateCreated]
+        maybeDescription <- maybeDescriptionR
+        keywords         <- keywordsR
+        allPersons       <- findAllPersons(gitLabInfo)
+        activities       <- findAllActivities(gitLabInfo)
+        datasets         <- findAllDatasets(gitLabInfo)
+        resourceId       <- ResourceId(gitLabInfo.path).asRight
         earliestDate = List(dateCreated, gitLabInfo.dateCreated).min
-        project <-
-          newProject(gitLabInfo,
-                     resourceId,
-                     earliestDate,
-                     maybeDescription,
-                     agent,
-                     schemaVersion,
-                     allPersons,
-                     activities,
-                     datasets
-          )
+        project <- newProject(gitLabInfo,
+                              resourceId,
+                              earliestDate,
+                              maybeDescription,
+                              agent,
+                              keywords,
+                              version,
+                              allPersons,
+                              activities,
+                              datasets
+                   )
       } yield project
     }
 
@@ -97,7 +106,8 @@ object ProjectJsonLDDecoder {
                          dateCreated:      DateCreated,
                          maybeDescription: Option[Description],
                          agent:            CliVersion,
-                         schemaVersion:    SchemaVersion,
+                         keywords:         Set[Keyword],
+                         version:          SchemaVersion,
                          allJsonLdPersons: Set[Person],
                          activities:       List[Activity],
                          datasets:         List[Dataset[Dataset.Provenance]]
@@ -114,8 +124,9 @@ object ProjectJsonLDDecoder {
             dateCreated,
             maybeCreator(allJsonLdPersons)(gitLabInfo),
             gitLabInfo.visibility,
+            keywords,
             members(allJsonLdPersons)(gitLabInfo),
-            schemaVersion,
+            version,
             activities,
             datasets,
             parentResourceId = ResourceId(parentPath)
@@ -131,8 +142,9 @@ object ProjectJsonLDDecoder {
             dateCreated,
             maybeCreator(allJsonLdPersons)(gitLabInfo),
             gitLabInfo.visibility,
+            keywords,
             members(allJsonLdPersons)(gitLabInfo),
-            schemaVersion,
+            version,
             activities,
             datasets
           )

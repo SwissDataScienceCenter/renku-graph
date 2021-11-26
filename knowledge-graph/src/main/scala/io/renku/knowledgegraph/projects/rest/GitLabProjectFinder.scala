@@ -24,11 +24,11 @@ import cats.syntax.all._
 import io.renku.config.GitLab
 import io.renku.control.Throttler
 import io.renku.graph.config.GitLabUrlLoader
-import io.renku.graph.model.projects.{Description, Id, Visibility}
+import io.renku.graph.model.projects.{Id, Visibility}
 import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.http.client.{AccessToken, RestClient}
 import io.renku.knowledgegraph.projects.model.Forking.ForksCount
-import io.renku.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount, Tag}
+import io.renku.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount}
 import io.renku.knowledgegraph.projects.model._
 import io.renku.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
 import org.typelevel.log4cats.Logger
@@ -117,26 +117,22 @@ private class GitLabProjectFinderImpl[F[_]: Async: Logger](
 
     implicit val decoder: Decoder[GitLabProject] = cursor =>
       for {
-        id               <- cursor.downField("id").as[Id]
-        visibility       <- cursor.downField("visibility").as[Visibility]
-        sshUrl           <- cursor.downField("ssh_url_to_repo").as[SshUrl]
-        httpUrl          <- cursor.downField("http_url_to_repo").as[HttpUrl]
-        webUrl           <- cursor.downField("web_url").as[WebUrl]
-        maybeReadmeUrl   <- cursor.downField("readme_url").as[Option[ReadmeUrl]]
-        forksCount       <- cursor.downField("forks_count").as[ForksCount]
-        tags             <- cursor.downField("tag_list").as[List[Tag]]
-        starsCount       <- cursor.downField("star_count").as[StarsCount]
-        updatedAt        <- cursor.downField("last_activity_at").as[DateUpdated]
-        statistics       <- cursor.downField("statistics").as[Statistics]
-        permissions      <- cursor.downField("permissions").as[Permissions]
-        maybeDescription <- cursor.downField("description").as[Option[Description]]
+        id             <- cursor.downField("id").as[Id]
+        sshUrl         <- cursor.downField("ssh_url_to_repo").as[SshUrl]
+        httpUrl        <- cursor.downField("http_url_to_repo").as[HttpUrl]
+        webUrl         <- cursor.downField("web_url").as[WebUrl]
+        maybeReadmeUrl <- cursor.downField("readme_url").as[Option[ReadmeUrl]]
+        forksCount     <- cursor.downField("forks_count").as[ForksCount]
+        visibility     <- cursor.downField("visibility").as[Visibility]
+        starsCount     <- cursor.downField("star_count").as[StarsCount]
+        updatedAt      <- cursor.downField("last_activity_at").as[DateUpdated]
+        statistics     <- cursor.downField("statistics").as[Statistics]
+        permissions    <- cursor.downField("permissions").as[Permissions]
       } yield GitLabProject(
         id,
-        maybeDescription,
         visibility,
         Urls(sshUrl, httpUrl, webUrl, maybeReadmeUrl),
         forksCount,
-        tags.toSet,
         starsCount,
         updatedAt,
         permissions,
@@ -149,21 +145,17 @@ private class GitLabProjectFinderImpl[F[_]: Async: Logger](
 
 private object GitLabProjectFinder {
 
-  final case class GitLabProject(id:               Id,
-                                 maybeDescription: Option[Description],
-                                 visibility:       Visibility,
-                                 urls:             Urls,
-                                 forksCount:       ForksCount,
-                                 tags:             Set[Tag],
-                                 starsCount:       StarsCount,
-                                 updatedAt:        DateUpdated,
-                                 permissions:      Permissions,
-                                 statistics:       Statistics
+  final case class GitLabProject(id:          Id,
+                                 visibility:  Visibility,
+                                 urls:        Urls,
+                                 forksCount:  ForksCount,
+                                 starsCount:  StarsCount,
+                                 updatedAt:   DateUpdated,
+                                 permissions: Permissions,
+                                 statistics:  Statistics
   )
 
-  def apply[F[_]: Async: Logger](
-      gitLabThrottler: Throttler[F, GitLab]
-  ): F[GitLabProjectFinder[F]] = for {
+  def apply[F[_]: Async: Logger](gitLabThrottler: Throttler[F, GitLab]): F[GitLabProjectFinder[F]] = for {
     gitLabUrl <- GitLabUrlLoader[F]()
   } yield new GitLabProjectFinderImpl(gitLabUrl, gitLabThrottler)
 }

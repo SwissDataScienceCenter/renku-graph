@@ -134,7 +134,7 @@ object ProjectsResources {
     "updatedAt":   ${project.updatedAt.value},
     "urls":        ${project.urls.toJson},
     "forking":     ${project.entitiesProject.forksCount -> project.entitiesProject},
-    "tags":        ${project.tags.map(_.value).toList},
+    "keywords":    ${project.entitiesProject.keywords.map(_.value).toList.sorted},
     "starsCount":  ${project.starsCount.value},
     "permissions": ${toJson(project.permissions)},
     "statistics": {

@@ -285,7 +285,7 @@ trait GitLab {
       "web_url":              ${project.urls.web.value},
       "readme_url":           ${project.urls.maybeReadme.map(_.value)},
       "forks_count":          ${project.entitiesProject.forksCount.value},
-      "tag_list":             ${project.tags.map(_.value).toList},
+      "tag_list":             ${project.entitiesProject.keywords.map(_.value).toList},
       "star_count":           ${project.starsCount.value},
       "created_at":           ${project.entitiesProject.dateCreated.value},
       "creator_id":           ${project.entitiesProject.maybeCreator.flatMap(_.maybeGitLabId.map(_.value))},

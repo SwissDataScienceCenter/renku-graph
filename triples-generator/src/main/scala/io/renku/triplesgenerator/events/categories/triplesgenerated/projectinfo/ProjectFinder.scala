@@ -108,6 +108,7 @@ private class ProjectFinderImpl[F[_]: Async: Logger](
         visibility       <- cursor.downField("visibility").as[projects.Visibility]
         dateCreated      <- cursor.downField("created_at").as[projects.DateCreated]
         maybeDescription <- cursor.downField("description").as[Option[projects.Description]]
+        keywords         <- cursor.downField("tag_list").as[Set[Option[projects.Keyword]]].map(_.flatten)
         maybeCreatorId   <- cursor.downField("creator_id").as[Option[users.GitLabId]]
         maybeParentPath <- cursor
                              .downField("forked_from_project")
@@ -118,6 +119,7 @@ private class ProjectFinderImpl[F[_]: Async: Logger](
                                 dateCreated,
                                 maybeDescription,
                                 maybeCreator = None,
+                                keywords,
                                 members = Set.empty,
                                 visibility,
                                 maybeParentPath
