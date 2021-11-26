@@ -21,7 +21,6 @@ package io.renku.eventlog.events.categories.statuschange.projectCleaner
 import cats.effect.IO
 import cats.implicits.toShow
 import cats.syntax.all._
-import com.github.tomakehurst.wiremock.client.MappingBuilder
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.renku.eventlog.events.categories.statuschange.Generators.consumerProjects
 import io.renku.generators.CommonGraphGenerators.accessTokens
@@ -31,7 +30,6 @@ import io.renku.graph.model.projects
 import io.renku.graph.tokenrepository.{AccessTokenFinder, TokenRepositoryUrl}
 import io.renku.graph.webhookservice.WebhookServiceUrl
 import io.renku.http.client.AccessToken
-import io.renku.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
@@ -40,12 +38,14 @@ import org.http4s.Status.{InternalServerError, Unauthorized}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+
 class ProjectWebhookAndTokenRemoverSpec
     extends AnyWordSpec
     with ExternalServiceStubbing
     with IOSpec
     with MockFactory
     with should.Matchers {
+
   "removeWebhookAndToken" should {
 
     "remove the token and the web hook of the specified project" in new TestCase {
@@ -54,7 +54,8 @@ class ProjectWebhookAndTokenRemoverSpec
         .expects(project.id, AccessTokenFinder.projectIdToPath)
         .returns(accessToken.some.pure[IO])
       stubFor {
-        delete(s"/projects/${project.id}/webhooks").withAccessTokenInHeader
+        delete(s"/projects/${project.id}/webhooks")
+          .withAccessToken(accessToken.some)
           .willReturn(ok())
       }
       stubFor {
@@ -92,7 +93,8 @@ class ProjectWebhookAndTokenRemoverSpec
         .expects(project.id, AccessTokenFinder.projectIdToPath)
         .returns(accessToken.some.pure[IO])
       stubFor {
-        delete(s"/projects/${project.id}/webhooks").withAccessTokenInHeader
+        delete(s"/projects/${project.id}/webhooks")
+          .withAccessToken(accessToken.some)
           .willReturn(unauthorized())
       }
       intercept[Exception] {
@@ -106,7 +108,8 @@ class ProjectWebhookAndTokenRemoverSpec
         .expects(project.id, AccessTokenFinder.projectIdToPath)
         .returns(accessToken.some.pure[IO])
       stubFor {
-        delete(s"/projects/${project.id}/webhooks").withAccessTokenInHeader
+        delete(s"/projects/${project.id}/webhooks")
+          .withAccessToken(accessToken.some)
           .willReturn(ok())
       }
       stubFor {
@@ -122,17 +125,12 @@ class ProjectWebhookAndTokenRemoverSpec
   private trait TestCase {
     implicit val accessToken: AccessToken = accessTokens.generateOne
     val project = consumerProjects.generateOne
+
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val accesTokenFinder   = mock[AccessTokenFinder[IO]]
     val tokenRepositoryUrl = TokenRepositoryUrl(externalServiceBaseUrl)
     val webhookServiceUrl  = WebhookServiceUrl(externalServiceBaseUrl)
     val webhookAndTokenRemover =
       new ProjectWebhookAndTokenRemoverImpl[IO](accesTokenFinder, webhookServiceUrl, tokenRepositoryUrl)
-  }
-  private implicit class MappingBuilderOps(builder: MappingBuilder) {
-    def withAccessTokenInHeader(implicit accessToken: AccessToken): MappingBuilder = accessToken match {
-      case PersonalAccessToken(token) => builder.withHeader("PRIVATE-TOKEN", equalTo(token))
-      case OAuthAccessToken(token)    => builder.withHeader("Authorization", equalTo(s"Bearer $token"))
-    }
   }
 }

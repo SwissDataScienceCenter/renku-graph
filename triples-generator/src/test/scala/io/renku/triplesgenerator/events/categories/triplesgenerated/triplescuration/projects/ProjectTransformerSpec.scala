@@ -29,7 +29,7 @@ import io.renku.http.client.RestClientError
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.Queries
-import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
+import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TransformationStepsCreator.TransformationRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects.KGProjectFinder.KGProjectInfo
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory

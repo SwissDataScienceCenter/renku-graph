@@ -69,8 +69,7 @@ class PersonMergerSpec extends AnyWordSpec with should.Matchers with ScalaCheckP
           .copy(
             maybeGitLabId = model.maybeGitLabId orElse kg.maybeGitLabId,
             maybeEmail = model.maybeEmail orElse kg.maybeEmail,
-            maybeAffiliation = model.maybeAffiliation orElse kg.maybeAffiliation,
-            alternativeNames = model.alternativeNames + kg.name
+            maybeAffiliation = model.maybeAffiliation orElse kg.maybeAffiliation
           )
           .pure[Try]
       }
@@ -85,9 +84,7 @@ class PersonMergerSpec extends AnyWordSpec with should.Matchers with ScalaCheckP
         maybeGitLabId = if (emailDifferent) model.maybeGitLabId else userGitLabIds.generateSome
       )
 
-      merge[Try](model, kg) shouldBe model
-        .copy(resourceId = kg.resourceId, alternativeNames = model.alternativeNames + kg.name)
-        .pure[Try]
+      merge[Try](model, kg) shouldBe model.copy(resourceId = kg.resourceId).pure[Try]
     }
 
     "fail for is all gitLabId, email or resourceId are different" in {

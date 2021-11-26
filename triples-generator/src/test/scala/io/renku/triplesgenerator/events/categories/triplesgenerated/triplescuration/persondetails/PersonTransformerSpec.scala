@@ -30,7 +30,7 @@ import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.triplesgenerator.events.categories.triplesgenerated.ProjectFunctions
 import io.renku.triplesgenerator.events.categories.triplesgenerated.ProjectFunctions._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.Queries
-import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
+import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TransformationStepsCreator.TransformationRecoverableError
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -42,10 +42,10 @@ class PersonTransformerSpec extends AnyWordSpec with should.Matchers with MockFa
 
   "createTransformationStep" should {
 
-    "go through all the Person entities found in Metadata, " +
+    "go through all the Person entities found in the project, " +
       "try to find matching Person in KG, " +
-      "merge the data and update the model " +
-      "and generate relevant delete queries" in new TestCase {
+      "merge the data and update the project " +
+      "and generate relevant pre and post data upload queries" in new TestCase {
         val persons = personEntities.generateSet()
         val project = anyProjectEntities
           .modify(membersLens.modify(_ => persons) andThen creatorLens.modify(_ => None))
@@ -63,20 +63,24 @@ class PersonTransformerSpec extends AnyWordSpec with should.Matchers with MockFa
                   .merge(_: entities.Person, _: entities.Person)(_: MonadThrow[Try]))
                   .expects(person, kgPerson, *)
                   .returning(mergedPerson.pure[Try])
-                val queries = sparqlQueries.generateList()
-                (updatesCreator.prepareUpdates _).expects(kgPerson, mergedPerson).returning(queries)
+                val preDataQueries = sparqlQueries.generateList()
+                (updatesCreator.preparePreDataUpdates _).expects(kgPerson, mergedPerson).returning(preDataQueries)
+                val postDataQueries = sparqlQueries.generateList()
+                (updatesCreator.preparePostDataUpdates _).expects(person).returning(postDataQueries)
                 (update(person, mergedPerson)(resultData._1),
-                 resultData._2 |+| Queries(queries, Nil)
-                ) // TODO: is this pre or post???
-              case None => resultData
+                 resultData._2 |+| Queries(preDataQueries, postDataQueries)
+                )
+              case None =>
+                val postDataQueries = sparqlQueries.generateList()
+                (updatesCreator.preparePostDataUpdates _).expects(person).returning(postDataQueries)
+                resultData._1 -> (resultData._2 |+| Queries.postDataQueriesOnly(postDataQueries))
             }
           }
 
         val step = transformer.createTransformationStep
 
-        step.name.value shouldBe "Person Details Updates"
-        val Success(Right(updateResult)) = step.run(project).value
-        updateResult shouldBe expectedResultData
+        step.name.value         shouldBe "Person Details Updates"
+        step.run(project).value shouldBe expectedResultData.asRight.pure[Try]
       }
 
     "fail with RecoverableFailure if finding matching Person in KG fails with a network or HTTP error" in new TestCase {
