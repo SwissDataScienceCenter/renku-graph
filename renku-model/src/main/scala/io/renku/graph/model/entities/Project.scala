@@ -208,7 +208,7 @@ trait ProjectFactory {
     def updateAuthors(from: Set[Person]): List[Activity] =
       activitiesLens.modify { activity =>
         from
-          .find(_.resourceId == activity.author.resourceId)
+          .find(byEmail(activity.author))
           .map(person => activityAuthorLens.modify(_ => person)(activity))
           .getOrElse(activity)
       }(activities)
@@ -217,13 +217,17 @@ trait ProjectFactory {
   private implicit class DatasetsOps(datasets: List[Dataset[Provenance]]) {
 
     def updateCreators(from: Set[Person]): List[Dataset[Provenance]] = {
-      val creatorsUpdate = creatorsLens.modify { person =>
-        from.find(_.resourceId == person.resourceId).getOrElse(person)
+      val creatorsUpdate = creatorsLens.modify { creator =>
+        from.find(byEmail(creator)).getOrElse(creator)
       }
       datasetsLens.modify(
         provenanceLens.modify(provCreatorsLens.modify(creatorsUpdate))
       )(datasets)
     }
+  }
+
+  private lazy val byEmail: Person => Person => Boolean = { person1 => person2 =>
+    (person1.maybeEmail -> person2.maybeEmail).mapN(_ == _).getOrElse(false)
   }
 
   private val activitiesLens: Traversal[List[Activity], Activity] = Traversal.fromTraverse[List, Activity]
@@ -284,7 +288,8 @@ object Project {
   def decoder(gitLabInfo: GitLabProjectInfo)(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDDecoder[Project] =
     ProjectJsonLDDecoder(gitLabInfo)
 
-  final case class GitLabProjectInfo(name:             Name,
+  final case class GitLabProjectInfo(id:               Id,
+                                     name:             Name,
                                      path:             Path,
                                      dateCreated:      DateCreated,
                                      maybeDescription: Option[Description],
@@ -294,5 +299,26 @@ object Project {
                                      maybeParentPath:  Option[Path]
   )
 
-  final case class ProjectMember(name: users.Name, username: users.Username, gitLabId: users.GitLabId)
+  sealed trait ProjectMember {
+    val name:     users.Name
+    val username: users.Username
+    val gitLabId: users.GitLabId
+  }
+  object ProjectMember {
+
+    def apply(name: users.Name, username: users.Username, gitLabId: users.GitLabId): ProjectMemberNoEmail =
+      ProjectMemberNoEmail(name, username, gitLabId)
+
+    final case class ProjectMemberNoEmail(name: users.Name, username: users.Username, gitLabId: users.GitLabId)
+        extends ProjectMember {
+
+      def add(email: users.Email): ProjectMemberWithEmail = ProjectMemberWithEmail(name, username, gitLabId, email)
+    }
+
+    final case class ProjectMemberWithEmail(name:     users.Name,
+                                            username: users.Username,
+                                            gitLabId: users.GitLabId,
+                                            email:    users.Email
+    ) extends ProjectMember
+  }
 }

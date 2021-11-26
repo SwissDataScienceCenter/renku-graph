@@ -29,7 +29,7 @@ import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{Queries, Transformation}
-import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
+import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TransformationStepsCreator.TransformationRecoverableError
 import org.typelevel.log4cats.Logger
 
 trait ProjectTransformer[F[_]] {

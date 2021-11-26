@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
-import cats.{Applicative, MonadThrow}
+import cats.{Applicative, MonadThrow, NonEmptyParallel, Parallel}
 import io.circe.DecodingFailure
 import io.renku.config.GitLab
 import io.renku.control.Throttler
@@ -32,6 +32,7 @@ import io.renku.graph.model.entities._
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.JsonLDDecoder.decodeList
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.triplesgenerated.projectinfo.ProjectInfoFinder
 import org.typelevel.log4cats.Logger
 
 private trait JsonLDDeserializer[F[_]] {
@@ -88,14 +89,15 @@ private class JsonLDDeserializerImpl[F[_]: MonadThrow](
       } yield project
     }
 
-  private def raiseError[T](event: TriplesGeneratedEvent): DecodingFailure => F[T] =
-    err =>
-      new IllegalStateException(s"Finding Project entity in the JsonLD for ${event.project.show} failed", err)
-        .raiseError[F, T]
+  private def raiseError[T](event: TriplesGeneratedEvent): DecodingFailure => F[T] = err =>
+    new IllegalStateException(s"Finding Project entity in the JsonLD for ${event.project.show} failed", err)
+      .raiseError[F, T]
 }
 
 private object JsonLDDeserializer {
-  def apply[F[_]: Async: Logger](gitLabThrottler: Throttler[F, GitLab]): F[JsonLDDeserializer[F]] = for {
+  def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger](
+      gitLabThrottler: Throttler[F, GitLab]
+  ): F[JsonLDDeserializer[F]] = for {
     renkuBaseUrl      <- RenkuBaseUrlLoader[F]()
     projectInfoFinder <- ProjectInfoFinder(gitLabThrottler)
   } yield new JsonLDDeserializerImpl[F](projectInfoFinder, renkuBaseUrl)

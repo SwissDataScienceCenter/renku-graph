@@ -35,6 +35,7 @@ import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, JsonLD, Property}
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
+import io.renku.triplesgenerator.events.categories.triplesgenerated.projectinfo.ProjectInfoFinder
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -199,6 +200,7 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
 
     def gitLabProjectInfo(project: Project) = GitLabProjectInfo(
+      projectIds.generateOne,
       project.name,
       project.path,
       project.dateCreated,
@@ -215,11 +217,16 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
     val projectInfoFinder = mock[ProjectInfoFinder[Try]]
     val deserializer      = new JsonLDDeserializerImpl[Try](projectInfoFinder, renkuBaseUrl)
 
-    private implicit lazy val toProjectMember: Person => ProjectMember = person =>
-      ProjectMember(person.name,
-                    users.Username(person.name.value),
-                    person.maybeGitLabId.getOrElse(fail("Project person without GitLabId"))
+    private implicit lazy val toProjectMember: Person => ProjectMember = person => {
+      val member = ProjectMember(person.name,
+                                 users.Username(person.name.value),
+                                 person.maybeGitLabId.getOrElse(fail("Project person without GitLabId"))
       )
+      person.maybeEmail match {
+        case Some(email) => member.add(email)
+        case None        => member
+      }
+    }
 
     def givenFindProjectInfo(projectPath: projects.Path) = new {
       def returning(result: EitherT[Try, ProcessingRecoverableError, Option[GitLabProjectInfo]]) =

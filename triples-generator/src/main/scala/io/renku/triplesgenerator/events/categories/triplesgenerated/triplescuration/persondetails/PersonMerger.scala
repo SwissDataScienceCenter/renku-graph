@@ -29,7 +29,6 @@ private trait PersonMerger {
       Person(
         kgPerson.resourceId,
         modelPerson.name,
-        modelPerson.alternativeNames + kgPerson.name,
         modelPerson.maybeEmail orElse kgPerson.maybeEmail,
         modelPerson.maybeAffiliation orElse kgPerson.maybeAffiliation,
         modelPerson.maybeGitLabId orElse kgPerson.maybeGitLabId
@@ -46,7 +45,6 @@ private trait PersonMerger {
       new IllegalArgumentException(
         s"Persons ${modelPerson.resourceId} and ${kgPerson.resourceId} do not have matching identifiers"
       ).raiseError[F, Unit]
-
 }
 
 private object PersonMerger extends PersonMerger
