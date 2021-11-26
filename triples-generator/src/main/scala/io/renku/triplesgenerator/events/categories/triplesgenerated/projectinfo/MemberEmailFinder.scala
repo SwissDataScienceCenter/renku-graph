@@ -158,18 +158,16 @@ private class MemberEmailFinderImpl[F[_]: Async: Logger](
     import io.renku.tinytypes.json.TinyTypeDecoders._
     import org.http4s.circe.jsonOf
 
-    implicit val events: Decoder[List[PushEvent]] = cursor =>
+    implicit val events: Decoder[Option[PushEvent]] = cursor =>
       for {
         projectId  <- cursor.downField("project_id").as[projects.Id]
         commitFrom <- cursor.downField("push_data").downField("commit_from").as[Option[CommitId]]
         commitTo   <- cursor.downField("push_data").downField("commit_to").as[Option[CommitId]]
         authorId   <- cursor.downField("author").downField("id").as[users.GitLabId]
         authorName <- cursor.downField("author").downField("name").as[users.Name]
-      } yield List(commitFrom, commitTo).flatten.map((commitId: CommitId) =>
-        PushEvent(projectId, commitId, authorId, authorName)
-      )
+      } yield (commitTo orElse commitFrom).map(PushEvent(projectId, _, authorId, authorName))
 
-    jsonOf[F, List[List[PushEvent]]].map(_.flatten)
+    jsonOf[F, List[Option[PushEvent]]].map(_.flatten)
   }
 
   private case class PushEvent(projectId:  projects.Id,
