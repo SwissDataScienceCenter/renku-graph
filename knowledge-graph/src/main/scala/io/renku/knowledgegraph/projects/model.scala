@@ -24,7 +24,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.Positive
-import io.renku.graph.model.projects.{DateCreated, Description, Id, Name, Path, Visibility}
+import io.renku.graph.model.projects.{DateCreated, Description, Id, Keyword, Name, Path, Visibility}
 import io.renku.graph.model.{SchemaVersion, users}
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints._
@@ -47,7 +47,7 @@ private object model {
                            updatedAt:        DateUpdated,
                            urls:             Urls,
                            forking:          Forking,
-                           tags:             Set[Tag],
+                           keywords:         Set[Keyword],
                            starsCount:       StarsCount,
                            permissions:      Permissions,
                            statistics:       Statistics,
@@ -55,8 +55,6 @@ private object model {
   )
 
   object Project {
-    final class Tag private (val value: String) extends AnyVal with StringTinyType
-    implicit object Tag                         extends TinyTypeFactory[Tag](new Tag(_)) with NonBlank
 
     final class StarsCount private (val value: Int) extends AnyVal with IntTinyType
     implicit object StarsCount extends TinyTypeFactory[StarsCount](new StarsCount(_)) with NonNegativeInt

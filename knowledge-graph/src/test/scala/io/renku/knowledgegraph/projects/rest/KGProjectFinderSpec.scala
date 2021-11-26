@@ -47,7 +47,7 @@ class KGProjectFinderSpec
       forAll(projectEntities(anyVisibility)) { project =>
         loadToStore(anyProjectEntities.generateOne, project)
 
-        metadataFinder.findProject(project.path, authUsers.generateOption).unsafeRunSync() shouldBe
+        kgProjectFinder.findProject(project.path, authUsers.generateOption).unsafeRunSync() shouldBe
           project.to[KGProject].some
       }
     }
@@ -56,7 +56,7 @@ class KGProjectFinderSpec
       forAll(projectWithParentEntities(visibilityPublic)) { project =>
         loadToStore(project, project.parent)
 
-        metadataFinder.findProject(project.path, authUsers.generateOption).unsafeRunSync() shouldBe
+        kgProjectFinder.findProject(project.path, authUsers.generateOption).unsafeRunSync() shouldBe
           project.to[KGProject].some
       }
     }
@@ -73,7 +73,7 @@ class KGProjectFinderSpec
 
       loadToStore(project, parent)
 
-      metadataFinder.findProject(project.path, user.some).unsafeRunSync() shouldBe
+      kgProjectFinder.findProject(project.path, user.some).unsafeRunSync() shouldBe
         project.to[KGProject].some
     }
 
@@ -91,19 +91,19 @@ class KGProjectFinderSpec
 
         loadToStore(project, parent)
 
-        metadataFinder.findProject(project.path, Some(user)).unsafeRunSync() shouldBe Some {
+        kgProjectFinder.findProject(project.path, Some(user)).unsafeRunSync() shouldBe Some {
           project.to[KGProject].copy(maybeParent = None)
         }
       }
 
     "return None if there's no project with the given path" in new TestCase {
-      metadataFinder.findProject(projectPaths.generateOne, authUsers.generateOption).unsafeRunSync() shouldBe None
+      kgProjectFinder.findProject(projectPaths.generateOne, authUsers.generateOption).unsafeRunSync() shouldBe None
     }
   }
 
   private trait TestCase {
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
     private val timeRecorder = new SparqlQueryTimeRecorder[IO](TestExecutionTimeRecorder[IO]())
-    val metadataFinder       = new KGProjectFinderImpl[IO](rdfStoreConfig, timeRecorder)
+    val kgProjectFinder      = new KGProjectFinderImpl[IO](rdfStoreConfig, timeRecorder)
   }
 }

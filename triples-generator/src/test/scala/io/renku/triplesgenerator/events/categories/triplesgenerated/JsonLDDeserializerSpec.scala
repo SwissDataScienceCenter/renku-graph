@@ -206,6 +206,7 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
       project.dateCreated,
       project.maybeDescription,
       project.maybeCreator.map(_.to[ProjectMember]),
+      project.keywords,
       project.members.map(_.to[ProjectMember]),
       project.visibility,
       maybeParentPath = project match {

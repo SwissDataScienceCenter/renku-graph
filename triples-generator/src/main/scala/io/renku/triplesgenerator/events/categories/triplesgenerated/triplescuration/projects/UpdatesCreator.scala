@@ -18,13 +18,13 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects
 
+import KGProjectFinder.KGProjectInfo
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.entities.{Project, ProjectWithParent, ProjectWithoutParent}
 import io.renku.graph.model.views.RdfResource
 import io.renku.rdfstore.SparqlQuery
 import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects.KGProjectFinder.KGProjectInfo
 
 private trait UpdatesCreator {
   def prepareUpdates(project: Project, kgProjectInfo: KGProjectInfo): List[SparqlQuery]
@@ -36,7 +36,8 @@ private object UpdatesCreator extends UpdatesCreator {
     nameDeletion(project, kgProjectInfo),
     maybeParentDeletion(project, kgProjectInfo),
     visibilityDeletion(project, kgProjectInfo),
-    descriptionDeletion(project, kgProjectInfo)
+    descriptionDeletion(project, kgProjectInfo),
+    keywordsDeletion(project, kgProjectInfo)
   ).flatten
 
   private def nameDeletion(project: Project, kgProjectInfo: KGProjectInfo) =
@@ -94,4 +95,16 @@ private object UpdatesCreator extends UpdatesCreator {
           |""".stripMargin
     )
   }
+
+  private def keywordsDeletion(project: Project, kgProjectInfo: KGProjectInfo) =
+    Option.when(kgProjectInfo._5 != project.keywords) {
+      val resource = project.resourceId.showAs[RdfResource]
+      SparqlQuery.of(
+        name = "transformation - project keywords delete",
+        Prefixes.of(schema -> "schema"),
+        s"""|DELETE { $resource schema:keywords ?keyword }
+            |WHERE  { $resource schema:keywords ?keyword }
+            |""".stripMargin
+      )
+    }
 }

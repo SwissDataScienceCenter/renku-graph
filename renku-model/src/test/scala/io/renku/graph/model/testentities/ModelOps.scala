@@ -94,6 +94,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
           child.maybeCreator,
           child.visibility,
           ForksCount.Zero,
+          child.keywords,
           child.members,
           parentProject.version,
           parentProject.activities,

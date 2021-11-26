@@ -36,6 +36,7 @@ sealed trait Project extends Product with Serializable {
   val dateCreated:      DateCreated
   val maybeCreator:     Option[Person]
   val visibility:       Visibility
+  val keywords:         Set[Keyword]
   val members:          Set[Person]
   val version:          SchemaVersion
   val activities:       List[Activity]
@@ -53,6 +54,7 @@ final case class ProjectWithoutParent(resourceId:       ResourceId,
                                       dateCreated:      DateCreated,
                                       maybeCreator:     Option[Person],
                                       visibility:       Visibility,
+                                      keywords:         Set[Keyword],
                                       members:          Set[Person],
                                       version:          SchemaVersion,
                                       activities:       List[Activity],
@@ -69,6 +71,7 @@ object ProjectWithoutParent extends ProjectFactory {
            dateCreated:      DateCreated,
            maybeCreator:     Option[Person],
            visibility:       Visibility,
+           keywords:         Set[Keyword],
            members:          Set[Person],
            version:          SchemaVersion,
            activities:       List[Activity],
@@ -86,6 +89,7 @@ object ProjectWithoutParent extends ProjectFactory {
                              dateCreated,
                              maybeCreator,
                              visibility,
+                             keywords,
                              members,
                              version,
                              syncedActivities,
@@ -130,6 +134,7 @@ final case class ProjectWithParent(resourceId:       ResourceId,
                                    dateCreated:      DateCreated,
                                    maybeCreator:     Option[Person],
                                    visibility:       Visibility,
+                                   keywords:         Set[Keyword],
                                    members:          Set[Person],
                                    version:          SchemaVersion,
                                    activities:       List[Activity],
@@ -147,6 +152,7 @@ object ProjectWithParent extends ProjectFactory {
            dateCreated:      DateCreated,
            maybeCreator:     Option[Person],
            visibility:       Visibility,
+           keywords:         Set[Keyword],
            members:          Set[Person],
            version:          SchemaVersion,
            activities:       List[Activity],
@@ -155,19 +161,21 @@ object ProjectWithParent extends ProjectFactory {
   ): ValidatedNel[String, ProjectWithParent] = validateDatasets(datasets) map { _ =>
     val (syncedActivities, syncedDatasets) =
       syncPersons(projectPersons = members ++ maybeCreator, activities, datasets)
-    ProjectWithParent(resourceId,
-                      path,
-                      name,
-                      maybeDescription,
-                      agent,
-                      dateCreated,
-                      maybeCreator,
-                      visibility,
-                      members,
-                      version,
-                      syncedActivities,
-                      syncedDatasets,
-                      parentResourceId
+    ProjectWithParent(
+      resourceId,
+      path,
+      name,
+      maybeDescription,
+      agent,
+      dateCreated,
+      maybeCreator,
+      visibility,
+      keywords,
+      members,
+      version,
+      syncedActivities,
+      syncedDatasets,
+      parentResourceId
     )
   }
 }
@@ -275,6 +283,7 @@ object Project {
         schema / "dateCreated"      -> project.dateCreated.asJsonLD,
         schema / "creator"          -> project.maybeCreator.asJsonLD,
         renku / "projectVisibility" -> project.visibility.asJsonLD,
+        schema / "keywords"         -> project.keywords.asJsonLD,
         schema / "member"           -> project.members.toList.asJsonLD,
         schema / "schemaVersion"    -> project.version.asJsonLD,
         renku / "hasActivity"       -> project.activities.asJsonLD,
@@ -294,6 +303,7 @@ object Project {
                                      dateCreated:      DateCreated,
                                      maybeDescription: Option[Description],
                                      maybeCreator:     Option[ProjectMember],
+                                     keywords:         Set[Keyword],
                                      members:          Set[ProjectMember],
                                      visibility:       Visibility,
                                      maybeParentPath:  Option[Path]

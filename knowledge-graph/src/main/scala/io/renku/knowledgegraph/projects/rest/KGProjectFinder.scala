@@ -51,7 +51,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger](
   private def query(path: Path, maybeAuthUser: Option[AuthUser]) = SparqlQuery.of(
     name = "project by id",
     Prefixes.of(schema -> "schema", prov -> "prov", renku -> "renku"),
-    s"""|SELECT DISTINCT ?name ?visibility ?maybeDescription ?dateCreated ?maybeCreatorName ?maybeCreatorEmail ?maybeParentId ?maybeParentName ?maybeParentDateCreated ?maybeParentCreatorName ?maybeParentCreatorEmail ?schemaVersion
+    s"""|SELECT ?name ?visibility ?maybeDescription ?dateCreated ?maybeCreatorName ?maybeCreatorEmail ?maybeParentId ?maybeParentName ?maybeParentDateCreated ?maybeParentCreatorName ?maybeParentCreatorEmail ?schemaVersion (GROUP_CONCAT(?keyword; separator=',') AS ?keywords)
         |WHERE {
         |  ?projectId a schema:Project;
         |             renku:projectPath '$path';
@@ -59,7 +59,8 @@ private class KGProjectFinderImpl[F[_]: Async: Logger](
         |             renku:projectVisibility ?visibility;
         |             schema:schemaVersion ?schemaVersion;
         |             schema:dateCreated ?dateCreated.
-        |  OPTIONAL {?projectId schema:description ?maybeDescription . }
+        |  OPTIONAL { ?projectId schema:description ?maybeDescription . }
+        |  OPTIONAL { ?projectId schema:keywords ?keyword }
         |  OPTIONAL {
         |    ?projectId schema:creator ?maybeCreatorId.
         |    ?maybeCreatorId a schema:Person;
@@ -80,6 +81,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger](
         |    }
         |  }
         |}
+        |GROUP BY ?name ?visibility ?maybeDescription ?dateCreated ?maybeCreatorName ?maybeCreatorEmail ?maybeParentId ?maybeParentName ?maybeParentDateCreated ?maybeParentCreatorName ?maybeParentCreatorEmail ?schemaVersion
         |""".stripMargin
   )
 
@@ -101,20 +103,27 @@ private class KGProjectFinderImpl[F[_]: Async: Logger](
 
   private def recordsDecoder(path: Path): Decoder[List[KGProject]] = {
     import Decoder._
+    import io.circe.DecodingFailure
     import io.renku.graph.model.projects._
     import io.renku.graph.model.users
     import io.renku.tinytypes.json.TinyTypeDecoders._
 
+    val toSetOfKeywords: Option[String] => Decoder.Result[Set[Keyword]] =
+      _.map(_.split(',').toList.map(Keyword.from).sequence.map(_.toSet)).sequence
+        .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
+        .map(_.getOrElse(Set.empty))
+
     val project: Decoder[KGProject] = { cursor =>
       for {
-        name                   <- cursor.downField("name").downField("value").as[Name]
-        visibility             <- cursor.downField("visibility").downField("value").as[Visibility]
-        dateCreated            <- cursor.downField("dateCreated").downField("value").as[DateCreated]
-        maybeDescription       <- cursor.downField("maybeDescription").downField("value").as[Option[Description]]
-        maybeCreatorName       <- cursor.downField("maybeCreatorName").downField("value").as[Option[users.Name]]
-        maybeCreatorEmail      <- cursor.downField("maybeCreatorEmail").downField("value").as[Option[users.Email]]
-        maybeParentId          <- cursor.downField("maybeParentId").downField("value").as[Option[ResourceId]]
-        maybeParentName        <- cursor.downField("maybeParentName").downField("value").as[Option[Name]]
+        name              <- cursor.downField("name").downField("value").as[Name]
+        visibility        <- cursor.downField("visibility").downField("value").as[Visibility]
+        dateCreated       <- cursor.downField("dateCreated").downField("value").as[DateCreated]
+        maybeDescription  <- cursor.downField("maybeDescription").downField("value").as[Option[Description]]
+        keywords          <- cursor.downField("keywords").downField("value").as[Option[String]].flatMap(toSetOfKeywords)
+        maybeCreatorName  <- cursor.downField("maybeCreatorName").downField("value").as[Option[users.Name]]
+        maybeCreatorEmail <- cursor.downField("maybeCreatorEmail").downField("value").as[Option[users.Email]]
+        maybeParentId     <- cursor.downField("maybeParentId").downField("value").as[Option[ResourceId]]
+        maybeParentName   <- cursor.downField("maybeParentName").downField("value").as[Option[Name]]
         maybeParentDateCreated <- cursor.downField("maybeParentDateCreated").downField("value").as[Option[DateCreated]]
         maybeParentCreatorName <- cursor.downField("maybeParentCreatorName").downField("value").as[Option[users.Name]]
         maybeParentCreatorEmail <- cursor
@@ -137,7 +146,8 @@ private class KGProjectFinderImpl[F[_]: Async: Logger](
             )
           },
         version,
-        maybeDescription
+        maybeDescription,
+        keywords
       )
     }
 
@@ -161,7 +171,8 @@ private object KGProjectFinder {
                              visibility:       Visibility,
                              maybeParent:      Option[Parent],
                              version:          SchemaVersion,
-                             maybeDescription: Option[Description]
+                             maybeDescription: Option[Description],
+                             keywords:         Set[Keyword]
   )
 
   final case class ProjectCreation(date: DateCreated, maybeCreator: Option[ProjectCreator])

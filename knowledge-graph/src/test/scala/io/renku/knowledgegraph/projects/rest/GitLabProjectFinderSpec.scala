@@ -25,7 +25,6 @@ import io.circe.literal._
 import io.renku.control.Throttler
 import io.renku.generators.CommonGraphGenerators.{oauthAccessTokens, personalAccessTokens}
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.blankStrings
 import io.renku.graph.model
 import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.GraphModelGenerators.projectPaths
@@ -74,23 +73,6 @@ class GitLabProjectFinderSpec
 
         projectFinder.findProject(path, Some(accessToken)).value.unsafeRunSync() shouldBe Some(project)
       }
-    }
-
-    "return fetched project info with no description if description in remote is blank" in new TestCase {
-      val path    = projectPaths.generateOne
-      val project = gitLabProjects.generateOne.copy(maybeDescription = None)
-      stubFor {
-        get(s"/api/v4/projects/${urlEncode(path.toString)}?statistics=true")
-          .willReturn(
-            okJson(
-              projectJson(project)
-                .deepMerge(json"""{"description": ${blankStrings().generateOne}}""")
-                .noSpaces
-            )
-          )
-      }
-
-      projectFinder.findProject(path, maybeAccessToken = None).value.unsafeRunSync() shouldBe Some(project)
     }
 
     "return fetched project info with no readme if readme_url in remote is blank" in new TestCase {
@@ -151,21 +133,19 @@ class GitLabProjectFinderSpec
   }
 
   private trait TestCase {
-    implicit val logger = TestLogger[IO]()
-    val gitLabUrl       = GitLabUrl(externalServiceBaseUrl)
-    val projectFinder   = new GitLabProjectFinderImpl[IO](gitLabUrl, Throttler.noThrottling)
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val gitLabUrl     = GitLabUrl(externalServiceBaseUrl)
+    val projectFinder = new GitLabProjectFinderImpl[IO](gitLabUrl, Throttler.noThrottling)
   }
 
   private def projectJson(project: GitLabProject): Json = json"""{
     "id":               ${project.id.value},
-    "description":      ${project.maybeDescription.map(_.value)},
     "visibility":       ${project.visibility.value},
     "ssh_url_to_repo":  ${project.urls.ssh.value},
     "http_url_to_repo": ${project.urls.http.value},
     "web_url":          ${project.urls.web.value},
     "readme_url":       ${project.urls.maybeReadme.map(_.value)},
     "forks_count":      ${project.forksCount.value},
-    "tag_list":         ${project.tags.map(_.value).toList},
     "star_count":       ${project.starsCount.value},
     "last_activity_at": ${project.updatedAt.value},
     "permissions":      ${toJson(project.permissions)},

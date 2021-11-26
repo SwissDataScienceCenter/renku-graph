@@ -30,6 +30,7 @@ import io.circe.syntax._
 import io.renku.control.Throttler
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.blankStrings
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.entities.Project.GitLabProjectInfo
 import io.renku.graph.model.entities.Project.ProjectMember.ProjectMemberNoEmail
@@ -157,7 +158,8 @@ class ProjectFinderSpec
       "path_with_namespace": ${project.path},
       "name":                ${project.name},
       "created_at":          ${project.dateCreated},
-      "visibility":          ${project.visibility}
+      "visibility":          ${project.visibility},
+      "tag_list":            ${project.keywords.map(_.value) + blankStrings().generateOne}
     }"""
       .addIfDefined("forked_from_project" -> project.maybeParentPath)(parentPathEncoder)
       .addIfDefined("creator_id" -> project.maybeCreator.map(_.gitLabId))
