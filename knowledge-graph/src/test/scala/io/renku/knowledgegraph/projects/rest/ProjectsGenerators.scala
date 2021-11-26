@@ -26,7 +26,7 @@ import io.renku.graph.model.projects.ResourceId._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.knowledgegraph.projects.model.Forking.ForksCount
 import io.renku.knowledgegraph.projects.model.Permissions.{apply => _, _}
-import io.renku.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount, Tag}
+import io.renku.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount}
 import io.renku.knowledgegraph.projects.model.Statistics._
 import io.renku.knowledgegraph.projects.model.Urls.{HttpUrl, ReadmeUrl, SshUrl, WebUrl}
 import io.renku.knowledgegraph.projects.model._
@@ -47,7 +47,7 @@ private object ProjectsGenerators {
     id = gitLabProject.id,
     path = kgProject.path,
     name = kgProject.name,
-    maybeDescription = gitLabProject.maybeDescription,
+    maybeDescription = kgProject.maybeDescription,
     visibility = kgProject.visibility,
     created = Creation(
       date = kgProject.created.date,
@@ -67,7 +67,7 @@ private object ProjectsGenerators {
         )
       }
     ),
-    tags = gitLabProject.tags,
+    keywords = kgProject.keywords,
     starsCount = gitLabProject.starsCount,
     permissions = gitLabProject.permissions,
     statistics = gitLabProject.statistics,
@@ -75,27 +75,15 @@ private object ProjectsGenerators {
   )
 
   implicit lazy val gitLabProjects: Gen[GitLabProject] = for {
-    id               <- projectIds
-    maybeDescription <- projectDescriptions.toGeneratorOfOptions
-    visibility       <- projectVisibilities
-    urls             <- urlsObjects
-    forksCount       <- forksCounts
-    tags             <- setOf(tagsObjects)
-    starsCount       <- starsCounts
-    updatedAt        <- updatedAts
-    permissions      <- permissionsObjects
-    statistics       <- statisticsObjects
-  } yield GitLabProject(id,
-                        maybeDescription,
-                        visibility,
-                        urls,
-                        forksCount,
-                        tags,
-                        starsCount,
-                        updatedAt,
-                        permissions,
-                        statistics
-  )
+    id          <- projectIds
+    visibility  <- projectVisibilities
+    urls        <- urlsObjects
+    forksCount  <- forksCounts
+    starsCount  <- starsCounts
+    updatedAt   <- updatedAts
+    permissions <- permissionsObjects
+    statistics  <- statisticsObjects
+  } yield GitLabProject(id, visibility, urls, forksCount, starsCount, updatedAt, permissions, statistics)
 
   implicit lazy val urlsObjects: Gen[Urls] = for {
     sshUrl         <- sshUrls
@@ -106,7 +94,6 @@ private object ProjectsGenerators {
 
   private implicit lazy val forksCounts: Gen[ForksCount] = nonNegativeInts() map (v => ForksCount(v.value))
   implicit lazy val starsCounts:         Gen[StarsCount] = nonNegativeInts() map (v => StarsCount(v.value))
-  implicit lazy val tagsObjects:         Gen[Tag]        = nonBlankStrings() map (v => Tag(v.value))
 
   private implicit lazy val sshUrls: Gen[SshUrl] = for {
     hostParts   <- nonEmptyList(nonBlankStrings())

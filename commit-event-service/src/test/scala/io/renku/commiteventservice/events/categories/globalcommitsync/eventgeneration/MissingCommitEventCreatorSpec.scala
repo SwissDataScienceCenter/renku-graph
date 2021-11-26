@@ -53,7 +53,7 @@ class MissingCommitEventCreatorSpec extends AnyWordSpec with should.Matchers wit
       givenStoringCommitSucceedsWithCreated(event.project, commitInfos)
 
       missingCommitEventCreator
-        .createMissingCommits(event.project, newCommitsInGL)(maybeAccessToken) shouldBe SynchronizationSummary()
+        .createCommits(event.project, newCommitsInGL)(maybeAccessToken) shouldBe SynchronizationSummary()
         .updated(Created, newCommitsInGL.length)
         .pure[Try]
     }
@@ -71,7 +71,7 @@ class MissingCommitEventCreatorSpec extends AnyWordSpec with should.Matchers wit
         .expects(event.project, commitInfos.head, batchDate)
         .returning(Success(Skipped))
 
-      missingCommitEventCreator.createMissingCommits(event.project, newCommitsInGL)(
+      missingCommitEventCreator.createCommits(event.project, newCommitsInGL)(
         maybeAccessToken
       ) shouldBe SynchronizationSummary().updated(Created, newCommitsInGL.length - 1).updated(Skipped, 1).pure[Try]
     }
@@ -90,7 +90,7 @@ class MissingCommitEventCreatorSpec extends AnyWordSpec with should.Matchers wit
           .returning(Failure(exception))
       }
 
-      missingCommitEventCreator.createMissingCommits(event.project, newCommitsInGL)(
+      missingCommitEventCreator.createCommits(event.project, newCommitsInGL)(
         maybeAccessToken
       ) shouldBe Failure(exception)
     }

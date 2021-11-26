@@ -23,7 +23,7 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.datasets.{DerivedFrom, SameAs, TopmostDerivedFrom}
+import io.renku.graph.model.datasets.SameAs
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
@@ -51,23 +51,6 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
       kgDatasetInfoFinder
         .findTopmostSameAs(dataset.resourceId)
         .unsafeRunSync() shouldBe dataset.provenance.topmostSameAs.some
-    }
-  }
-
-  "findTopmostDerivedFrom" should {
-    "return None if there is no dataset with that id" in new TestCase {
-      kgDatasetInfoFinder.findTopmostDerivedFrom(datasetResourceIds.generateOne).unsafeRunSync() shouldBe None
-    }
-
-    "return topmostSameAs for the given id" in new TestCase {
-      val dataset = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
-        .to[entities.Dataset[entities.Dataset.Provenance]]
-
-      loadToStore(dataset)
-
-      kgDatasetInfoFinder
-        .findTopmostDerivedFrom(dataset.resourceId)
-        .unsafeRunSync() shouldBe dataset.provenance.topmostDerivedFrom.some
     }
   }
 
@@ -103,39 +86,6 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
     }
   }
 
-  "findParentTopmostDerivedFrom" should {
-
-    "return None if there's no dataset with the given id" in new TestCase {
-      val derivedFrom = datasetDerivedFroms.generateOne
-      kgDatasetInfoFinder.findParentTopmostDerivedFrom(derivedFrom).unsafeRunSync() shouldBe Option
-        .empty[TopmostDerivedFrom]
-    }
-
-    "return the dataset's topmostDerivedFrom if this dataset has one" in new TestCase {
-      val dataset = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
-
-      loadToStore(dataset)
-
-      val derivedFrom = DerivedFrom(dataset.entityId)
-
-      kgDatasetInfoFinder.findParentTopmostDerivedFrom(derivedFrom).unsafeRunSync() shouldBe Some(
-        dataset.provenance.topmostDerivedFrom
-      )
-    }
-
-    "return None if there's a dataset with the given id but it has no topmostDerivedFrom" in new TestCase {
-      val dataset = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
-
-      loadToStore(dataset)
-
-      removeTopmostDerivedFrom(dataset.entityId)
-
-      val derivedFrom = DerivedFrom(dataset.entityId)
-
-      kgDatasetInfoFinder.findParentTopmostDerivedFrom(derivedFrom).unsafeRunSync() shouldBe None
-    }
-  }
-
   private trait TestCase {
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
     private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO]())
@@ -150,19 +100,6 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
                  |WHERE {
                  |  <$datasetId> a schema:Dataset;
                  |               renku:topmostSameAs ?sameAs.
-                 |}
-                 |""".stripMargin
-    )
-  }.unsafeRunSync()
-
-  private def removeTopmostDerivedFrom(datasetId: EntityId): Unit = runUpdate {
-    SparqlQuery.of(
-      name = "topmostDerivedFrom removal",
-      Prefixes.of(renku -> "renku", schema -> "schema"),
-      body = s"""|DELETE { <$datasetId> renku:topmostDerivedFrom ?derivedFrom }
-                 |WHERE {
-                 |  <$datasetId> a schema:Dataset;
-                 |               renku:topmostDerivedFrom ?derivedFrom.
                  |}
                  |""".stripMargin
     )

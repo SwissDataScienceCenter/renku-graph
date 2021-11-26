@@ -44,11 +44,10 @@ package object data extends RdfStoreData {
     id          <- projectIds
     updatedAt   <- timestamps(min = project.dateCreated.value, max = now).toGeneratorOf[DateUpdated]
     urls        <- urlsObjects
-    tags        <- tagsObjects.toGeneratorOfSet()
     starsCount  <- starsCounts
     permissions <- permissionsObjects
     statistics  <- statisticsObjects.map(_.copy(commitsCount = commitsCount))
-  } yield Project(project, id, updatedAt, urls, tags, starsCount, permissions, statistics)
+  } yield Project(project, id, updatedAt, urls, starsCount, permissions, statistics)
 
   def dataProjects(project: testentities.Project): Gen[Project] = dataProjects(fixed(project))
 
@@ -60,7 +59,6 @@ package object data extends RdfStoreData {
   } yield Urls(sshUrl, httpUrl, webUrl, maybeReadmeUrl)
 
   private lazy val starsCounts: Gen[StarsCount] = nonNegativeInts() map (v => StarsCount(v.value))
-  private lazy val tagsObjects: Gen[Tag]        = nonBlankStrings() map (v => Tag(v.value))
   private lazy val sshUrls: Gen[SshUrl] = for {
     hostParts   <- nonEmptyList(nonBlankStrings())
     projectPath <- projectPaths

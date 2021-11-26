@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated
 
-import cats.MonadThrow
+import cats.{MonadThrow, NonEmptyParallel, Parallel}
 import cats.data.EitherT.right
 import cats.effect.Async
 import cats.syntax.all._
@@ -34,7 +34,7 @@ import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater._
-import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.{TransformationStepsCreator, TriplesCurator}
+import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TransformationStepsCreator
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.{TransformationStepsRunner, TriplesUploadResult}
 import org.typelevel.log4cats.Logger
@@ -48,7 +48,7 @@ private trait EventProcessor[F[_]] {
 
 private class EventProcessorImpl[F[_]: MonadThrow: Logger](
     accessTokenFinder:     AccessTokenFinder[F],
-    triplesCurator:        TransformationStepsCreator[F],
+    stepsCreator:          TransformationStepsCreator[F],
     uploader:              TransformationStepsRunner[F],
     statusUpdater:         EventStatusUpdater[F],
     jsonLDDeserializer:    JsonLDDeserializer[F],
@@ -60,7 +60,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
   import accessTokenFinder._
   import executionTimeRecorder._
   import jsonLDDeserializer._
-  import triplesCurator._
+  import stepsCreator._
   import uploader._
 
   def process(event: TriplesGeneratedEvent): F[Unit] = {
@@ -83,8 +83,8 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
       event:                   TriplesGeneratedEvent
   )(implicit maybeAccessToken: Option[AccessToken]): F[UploadingResult] = {
     for {
-      projectMetadata <- deserializeToModel(event) leftSemiflatMap toUploadingError(event)
-      result          <- right[UploadingResult](run(createSteps, projectMetadata) >>= (toUploadingResult(event, _)))
+      project <- deserializeToModel(event) leftSemiflatMap toUploadingError(event)
+      result  <- right[UploadingResult](run(createSteps, project) >>= (toUploadingResult(event, _)))
     } yield result
   }.merge recoverWith nonRecoverableFailure(event)
 
@@ -100,16 +100,10 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
           s"${logMessageCommon(triplesGeneratedEvent)} $message"
         )
         .map(_ => RecoverableError(triplesGeneratedEvent, error))
-    case error @ InvalidTriplesFailure(message) =>
+    case error: NonRecoverableFailure =>
       Logger[F]
         .error(error)(
-          s"${logMessageCommon(triplesGeneratedEvent)} $message"
-        )
-        .map(_ => NonRecoverableError(triplesGeneratedEvent, error: Throwable))
-    case error @ InvalidUpdatesFailure(message) =>
-      Logger[F]
-        .error(error)(
-          s"${logMessageCommon(triplesGeneratedEvent)} $message"
+          s"${logMessageCommon(triplesGeneratedEvent)} ${error.message}"
         )
         .map(_ => NonRecoverableError(triplesGeneratedEvent, error: Throwable))
   }
@@ -208,14 +202,14 @@ private object EventProcessor {
       .buckets(.1, .5, 1, 5, 10, 50, 100, 500, 1000, 5000, 10000, 50000, 100000, 500000, 1000000, 5000000, 10000000,
                50000000, 100000000, 500000000)
 
-  def apply[F[_]: Async: Logger](
+  def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger](
       metricsRegistry: MetricsRegistry,
       gitLabThrottler: Throttler[F, GitLab],
       timeRecorder:    SparqlQueryTimeRecorder[F]
   ): F[EventProcessor[F]] = for {
     uploader              <- TransformationStepsRunner(timeRecorder)
     accessTokenFinder     <- AccessTokenFinder[F]
-    triplesCurator        <- TriplesCurator(timeRecorder)
+    triplesCurator        <- TransformationStepsCreator(timeRecorder)
     eventStatusUpdater    <- EventStatusUpdater(categoryName)
     eventsProcessingTimes <- metricsRegistry.register[F, Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
     executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = Some(eventsProcessingTimes))

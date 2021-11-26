@@ -18,13 +18,13 @@
 
 package io.renku.commiteventservice.events.categories.globalcommitsync
 
+import Generators._
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
-import io.renku.commiteventservice.events.categories.globalcommitsync.Generators.globalCommitSyncEventsNonZero
-import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.GlobalCommitEventSynchronizer
+import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.CommitsSynchronizer
 import io.renku.events.EventRequestContent
 import io.renku.events.consumers.ConcurrentProcessesLimiter
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
@@ -34,7 +34,6 @@ import io.renku.generators.Generators.{exceptions, jsons}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.IOSpec
-import io.renku.tinytypes.json.TinyTypeEncoders._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
@@ -51,31 +50,9 @@ class EventHandlerSpec
   "handle" should {
 
     "decode an event from the request, " +
-      "schedule commit synchronization " +
-      s"and return $Accepted - full commit sync event case" in new TestCase {
+      s"schedule commit synchronization and return $Accepted" in new TestCase {
 
-        val event = globalCommitSyncEventsNonZero.generateOne
-
-        (commitEventSynchronizer.synchronizeEvents _)
-          .expects(event)
-          .returning(().pure[IO])
-        handler
-          .createHandlingProcess(requestContent(event.asJson))
-          .unsafeRunSync()
-          .process
-          .value
-          .unsafeRunSync() shouldBe Right(
-          Accepted
-        )
-
-        logger.loggedOnly(Info(s"${logMessageCommon(event)} -> $Accepted"))
-      }
-
-    "decode an event from the request, " +
-      "schedule commit synchronization " +
-      s"and return $Accepted - minimal commit sync event case" in new TestCase {
-
-        val event = globalCommitSyncEventsNonZero.generateOne
+        val event = globalCommitSyncEvents().generateOne
 
         (commitEventSynchronizer.synchronizeEvents _)
           .expects(event)
@@ -86,16 +63,14 @@ class EventHandlerSpec
           .unsafeRunSync()
           .process
           .value
-          .unsafeRunSync() shouldBe Right(
-          Accepted
-        )
+          .unsafeRunSync() shouldBe Accepted.asRight
 
         logger.loggedOnly(Info(s"${logMessageCommon(event)} -> $Accepted"))
       }
 
     s"return $Accepted and log an error if scheduling event synchronization fails" in new TestCase {
 
-      val event = globalCommitSyncEventsNonZero.generateOne
+      val event = globalCommitSyncEvents().generateOne
 
       (commitEventSynchronizer.synchronizeEvents _)
         .expects(event)
@@ -106,7 +81,7 @@ class EventHandlerSpec
         .unsafeRunSync()
         .process
         .value
-        .unsafeRunSync() shouldBe Right(Accepted)
+        .unsafeRunSync() shouldBe Accepted.asRight
 
       logger.getMessages(Info).map(_.message) should contain only s"${logMessageCommon(event)} -> $Accepted"
 
@@ -123,16 +98,15 @@ class EventHandlerSpec
         }"""
       }
 
-      handler.createHandlingProcess(request).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(BadRequest)
+      handler.createHandlingProcess(request).unsafeRunSync().process.value.unsafeRunSync() shouldBe BadRequest.asLeft
 
       logger.expectNoLogs()
     }
-
   }
 
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val commitEventSynchronizer    = mock[GlobalCommitEventSynchronizer[IO]]
+    val commitEventSynchronizer    = mock[CommitsSynchronizer[IO]]
     val subscriptionMechanism      = mock[SubscriptionMechanism[IO]]
     val concurrentProcessesLimiter = mock[ConcurrentProcessesLimiter[IO]]
 
@@ -145,13 +119,16 @@ class EventHandlerSpec
   }
 
   private implicit def eventEncoder[E <: GlobalCommitSyncEvent]: Encoder[E] = Encoder.instance[E] {
-    case GlobalCommitSyncEvent(project, commitIds) => json"""{
+    case GlobalCommitSyncEvent(project, commits) => json"""{
       "categoryName": "GLOBAL_COMMIT_SYNC",
       "project": {
         "id":         ${project.id.value},
         "path":       ${project.path.value}
       },
-      "commits":    ${Json.arr(commitIds.map(_.asJson): _*)}
+      "commits": {
+        "count":  ${commits.count.value},
+        "latest": ${commits.latest.value}
+      }
     }"""
   }
 }

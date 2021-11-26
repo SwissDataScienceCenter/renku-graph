@@ -18,8 +18,10 @@
 
 package io.renku.eventlog.subscriptions.globalcommitsync
 
+import io.renku.eventlog.subscriptions.globalcommitsync.GlobalCommitSyncEvent.{CommitsCount, CommitsInfo}
 import io.renku.events.consumers.ConsumersModelGenerators._
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.positiveLongs
 import io.renku.graph.model.EventsGenerators.{commitIds, lastSyncedDates}
 import org.scalacheck.Gen
 
@@ -27,7 +29,8 @@ private object Generators {
 
   val globalCommitSyncEvents: Gen[GlobalCommitSyncEvent] = for {
     project             <- projectsGen
-    commits             <- commitIds.toGeneratorOfNonEmptyList().map(_.toList)
+    commitsCount        <- positiveLongs().map(_.value).toGeneratorOf(CommitsCount)
+    latestCommit        <- commitIds
     currentLastSyncDate <- lastSyncedDates.toGeneratorOfOptions
-  } yield GlobalCommitSyncEvent(project, commits, currentLastSyncDate)
+  } yield GlobalCommitSyncEvent(project, CommitsInfo(commitsCount, latestCommit), currentLastSyncDate)
 }

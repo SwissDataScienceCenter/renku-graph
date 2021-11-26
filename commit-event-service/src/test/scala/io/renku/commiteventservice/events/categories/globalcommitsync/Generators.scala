@@ -18,9 +18,8 @@
 
 package io.renku.commiteventservice.events.categories.globalcommitsync
 
-import eu.timepit.refined.api.Refined
+import io.renku.commiteventservice.events.categories.globalcommitsync.GlobalCommitSyncEvent.CommitsInfo
 import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.ProjectCommitStats
-import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.ProjectCommitStats.CommitCount
 import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -32,32 +31,24 @@ import org.scalacheck.Gen
 
 private object Generators {
 
-  lazy val globalCommitSyncEventsNonZero: Gen[GlobalCommitSyncEvent] = globalCommitSyncEvents(
-    CommitCount(positiveInts(max = 9999).generateOne.value)
-  )
+  lazy val commitsCounts: Gen[CommitsCount] = positiveLongs().map(_.value).toGeneratorOf(CommitsCount)
 
-  def globalCommitSyncEvents(commitCount: CommitCount): Gen[GlobalCommitSyncEvent] =
-    globalCommitSyncEvents(commitIdsGen =
-      listOf(commitIds,
-             minElements = Refined.unsafeApply(commitCount.value),
-             maxElements = Refined.unsafeApply(commitCount.value)
-      )
-    )
-
-  lazy val commitCounts: Gen[CommitCount] = positiveInts().map(_.value).toGeneratorOf(CommitCount)
-
-  def globalCommitSyncEvents(projectIdGen: Gen[projects.Id] = projectIds,
-                             commitIdsGen: Gen[List[CommitId]] = listOf(commitIds)
-  ): Gen[GlobalCommitSyncEvent] = for {
+  def globalCommitSyncEvents(projectIdGen: Gen[projects.Id] = projectIds): Gen[GlobalCommitSyncEvent] = for {
     projectId   <- projectIdGen
     projectPath <- projectPaths
-    commitIds   <- commitIdsGen
-  } yield GlobalCommitSyncEvent(Project(projectId, projectPath), commitIds)
+    commitsInfo <- commitsInfos
+  } yield GlobalCommitSyncEvent(Project(projectId, projectPath), commitsInfo)
+
+  lazy val commitsInfos: Gen[CommitsInfo] = for {
+    commitsCount   <- commitsCounts
+    latestCommitId <- commitIds
+  } yield CommitsInfo(commitsCount, latestCommitId)
 
   def projectCommitStats(commitId: CommitId): Gen[ProjectCommitStats] = projectCommitStats(Gen.const(Some(commitId)))
+
   def projectCommitStats(commitIdGen: Gen[Option[CommitId]] = commitIds.toGeneratorOfOptions): Gen[ProjectCommitStats] =
     for {
       maybeCommitId <- commitIdGen
       commitCount   <- nonNegativeInts(9999999)
-    } yield ProjectCommitStats(maybeCommitId, CommitCount(commitCount.value))
+    } yield ProjectCommitStats(maybeCommitId, CommitsCount(commitCount.value))
 }

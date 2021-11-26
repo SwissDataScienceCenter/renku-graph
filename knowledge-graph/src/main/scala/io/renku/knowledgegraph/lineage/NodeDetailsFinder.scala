@@ -54,7 +54,8 @@ private class NodeDetailsFinderImpl[F[_]: Async: Parallel: Logger](rdfStoreConfi
   )(implicit query: (T, ResourceId) => SparqlQuery): F[Set[Node]] =
     ids.toList
       .map { id =>
-        queryExpecting[Option[Node]](using = query(id, ResourceId(projectPath)(renkuBaseUrl))).flatMap(failIf(no = id))
+        queryExpecting[Option[Node]](using = query(id, ResourceId(projectPath)(renkuBaseUrl)))
+          .flatMap(failIf(no = id))
       }
       .parSequence
       .map(_.toSet)
@@ -140,14 +141,15 @@ private object NodeDetailsFinder {
     SparqlQuery.of(
       name = "lineage - plan details",
       Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema"),
-      s"""|SELECT DISTINCT  ?type (CONCAT(STR(?command), STR(' '), (GROUP_CONCAT(?commandParameter; separator=' '))) AS ?label) ?location
+      s"""|SELECT DISTINCT ?type (CONCAT(STR(?command), (GROUP_CONCAT(?commandParameter; separator=' '))) AS ?label) ?location
           |WHERE {
           |  {
           |    SELECT DISTINCT ?command ?type ?location
           |    WHERE {
           |      <$activityId> prov:qualifiedAssociation/prov:hadPlan ?planId;
           |                    a ?type.
-          |      ?planId renku:command ?command.
+          |      OPTIONAL { ?planId renku:command ?maybeCommand. }
+          |      BIND (IF(bound(?maybeCommand), CONCAT(STR(?maybeCommand), STR(' ')), '') AS ?command).
           |      BIND (<$activityId> AS ?location)
           |    }
           |  } {

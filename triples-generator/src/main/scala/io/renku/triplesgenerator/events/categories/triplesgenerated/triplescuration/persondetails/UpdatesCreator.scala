@@ -27,12 +27,50 @@ import io.renku.rdfstore.SparqlQuery.Prefixes
 
 private trait UpdatesCreator {
 
-  def prepareUpdates(kgPerson: Person, mergedPerson: Person): List[SparqlQuery] = List(
+  def preparePreDataUpdates(kgPerson: Person, mergedPerson: Person): List[SparqlQuery] = List(
     nameDeletion(kgPerson, mergedPerson),
     emailDeletion(kgPerson, mergedPerson),
     affiliationDeletion(kgPerson, mergedPerson),
     gitLabIdDeletion(kgPerson, mergedPerson)
   ).flatten
+
+  def preparePostDataUpdates(person: Person): List[SparqlQuery] =
+    person.maybeEmail match {
+      case None => List.empty
+      case Some(email) =>
+        List(
+          SparqlQuery.of(
+            name = "transformation - persons sharing email merge",
+            Prefixes.of(schema -> "schema"),
+            s"""|DELETE {
+                |  ?idToRelink ?propToRelink ?pIdToUnlink.
+                |  ?pIdToUnlink ?p ?o
+                |}
+                |INSERT {
+                |  ?idToRelink ?propToRelink ?pIdToLink.
+                |}
+                |WHERE {
+                |  SELECT ?pIdToLink ?pIdToUnlink ?idToRelink ?propToRelink ?p ?o
+                |  WHERE {
+                |    {
+                |      ?pIdToLink a schema:Person;
+                |                 schema:email '$email'.
+                |      ?pIdToLink schema:sameAs/schema:identifier ?gitlabId 
+                |    }
+                |    {
+                |      ?pIdToUnlink a schema:Person;
+                |                   schema:email '$email'.
+                |      FILTER NOT EXISTS { ?pIdToUnlink schema:sameAs/schema:identifier ?gitlabId }
+                |    }
+                |    {
+                |      ?idToRelink ?propToRelink ?pIdToUnlink.
+                |      ?pIdToUnlink ?p ?o
+                |    }
+                |  }
+                |}""".stripMargin
+          )
+        )
+    }
 
   private def nameDeletion(kgPerson: Person, mergedPerson: Person) =
     Option.when(kgPerson.name != mergedPerson.name) {
@@ -41,7 +79,7 @@ private trait UpdatesCreator {
         name = "transformation - person name delete",
         Prefixes.of(schema -> "schema"),
         s"""|DELETE { $resource schema:name ?name }
-            |WHERE { $resource schema:name ?name }
+            |WHERE  { $resource schema:name ?name }
             |""".stripMargin
       )
     }

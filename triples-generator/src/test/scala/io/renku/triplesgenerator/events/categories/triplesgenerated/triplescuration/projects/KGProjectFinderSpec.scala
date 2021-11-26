@@ -22,8 +22,8 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.{entities, projects}
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
@@ -41,7 +41,7 @@ class KGProjectFinderSpec
 
   "find" should {
 
-    "return name, derivedFrom, visibility and description for a given project ResourceId" in new TestCase {
+    "return name, derivedFrom, visibility, description and keywords for a given project ResourceId" in new TestCase {
       forAll(anyProjectEntities.map(_.to[entities.Project])) { project =>
         val maybeParent = project match {
           case projectWithParent: entities.ProjectWithParent    => Some(projectWithParent.parentResourceId)
@@ -53,7 +53,31 @@ class KGProjectFinderSpec
         finder.find(project.resourceId).unsafeRunSync() shouldBe (project.name,
                                                                   maybeParent,
                                                                   project.visibility,
-                                                                  project.maybeDescription
+                                                                  project.maybeDescription,
+                                                                  project.keywords
+        ).some
+      }
+    }
+
+    "return no keywords if there are any for the given project" in new TestCase {
+      forAll(anyProjectEntities.map(_.to[entities.Project])) { project =>
+        val maybeParent = project match {
+          case projectWithParent: entities.ProjectWithParent    => Some(projectWithParent.parentResourceId)
+          case _:                 entities.ProjectWithoutParent => None
+        }
+
+        val projectNoKeywords = project match {
+          case p: entities.ProjectWithParent    => p.copy(keywords = Set.empty)
+          case p: entities.ProjectWithoutParent => p.copy(keywords = Set.empty)
+        }
+
+        loadToStore(projectNoKeywords)
+
+        finder.find(project.resourceId).unsafeRunSync() shouldBe (project.name,
+                                                                  maybeParent,
+                                                                  project.visibility,
+                                                                  project.maybeDescription,
+                                                                  Set.empty[projects.Keyword]
         ).some
       }
     }

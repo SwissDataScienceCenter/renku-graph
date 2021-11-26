@@ -19,10 +19,13 @@
 package io.renku.stubbing
 
 import com.github.tomakehurst.wiremock.WireMockServer
-import com.github.tomakehurst.wiremock.client.WireMock
+import com.github.tomakehurst.wiremock.client.WireMock.equalTo
+import com.github.tomakehurst.wiremock.client.{MappingBuilder, WireMock}
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
+import io.renku.http.client.AccessToken
+import io.renku.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Suite}
 
 trait ExternalServiceStubbing extends BeforeAndAfterEach with BeforeAndAfterAll {
@@ -50,5 +53,15 @@ trait ExternalServiceStubbing extends BeforeAndAfterEach with BeforeAndAfterAll 
   override def afterAll(): Unit = {
     server.stop()
     server.shutdownServer()
+  }
+
+  protected implicit class MappingBuilderOps(mappingBuilder: MappingBuilder) {
+
+    def withAccessToken(maybeAccessToken: Option[AccessToken]): MappingBuilder =
+      maybeAccessToken match {
+        case Some(PersonalAccessToken(token)) => mappingBuilder.withHeader("PRIVATE-TOKEN", equalTo(token))
+        case Some(OAuthAccessToken(token))    => mappingBuilder.withHeader("Authorization", equalTo(s"Bearer $token"))
+        case None                             => mappingBuilder
+      }
   }
 }
