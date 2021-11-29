@@ -48,7 +48,7 @@ class CommitEventDeleterSpec extends AnyWordSpec with should.Matchers with MockF
           .returning(Deleted.pure[Try])
       }
 
-      commitEventDeleter.deleteExtraneousCommits(project, commitsToDelete) shouldBe
+      commitEventDeleter.deleteCommits(project, commitsToDelete) shouldBe
         SynchronizationSummary().updated(Deleted, commitsToDelete.length).pure[Try]
     }
 
@@ -64,7 +64,7 @@ class CommitEventDeleterSpec extends AnyWordSpec with should.Matchers with MockF
             .returning(failure.pure[Try])
         }
 
-        commitEventDeleter.deleteExtraneousCommits(project, commitsToDelete) shouldBe
+        commitEventDeleter.deleteCommits(project, commitsToDelete) shouldBe
           SynchronizationSummary().updated(failure, commitsToDelete.length).pure[Try]
       }
 
@@ -80,7 +80,7 @@ class CommitEventDeleterSpec extends AnyWordSpec with should.Matchers with MockF
             .returning(exception.raiseError[Try, UpdateResult])
         }
 
-        commitEventDeleter.deleteExtraneousCommits(project, commitsToDelete) shouldBe
+        commitEventDeleter.deleteCommits(project, commitsToDelete) shouldBe
           SynchronizationSummary()
             .updated(Failed(s"$categoryName Failed to delete commit", exception), commitsToDelete.length)
             .pure[Try]

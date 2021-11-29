@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.config.certificates
 
-import cats.{MonadError, MonadThrow}
+import cats.MonadThrow
 import org.typelevel.log4cats.Logger
 
 import java.nio.file.Path
@@ -28,16 +28,14 @@ private trait GitConfigModifier[F[_]] {
 }
 
 private object GitConfigModifier {
-  def apply[F[_]: MonadThrow: Logger](): GitConfigModifier[F] = new GitConfigModifierImpl[F]()
+  def apply[F[_]: MonadThrow: Logger]: GitConfigModifier[F] = new GitConfigModifierImpl[F]()
 }
 
-private class GitConfigModifierImpl[F[_]]()(implicit
-    ME: MonadError[F, Throwable]
-) extends GitConfigModifier[F] {
+private class GitConfigModifierImpl[F[_]: MonadThrow] extends GitConfigModifier[F] {
   import ammonite.ops.{%%, home}
   import cats.syntax.all._
 
-  override def makeGitTrust(certPath: Path): F[Unit] = ME.catchNonFatal {
+  override def makeGitTrust(certPath: Path): F[Unit] = MonadThrow[F].catchNonFatal {
     %%("git", "config", "--global", "http.sslCAInfo", certPath.toAbsolutePath.toString)(home)
   }.void
 }

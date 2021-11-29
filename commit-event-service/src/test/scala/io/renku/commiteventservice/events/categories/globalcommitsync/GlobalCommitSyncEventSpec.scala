@@ -18,20 +18,23 @@
 
 package io.renku.commiteventservice.events.categories.globalcommitsync
 
-import io.renku.commiteventservice.events.categories.globalcommitsync.Generators.globalCommitSyncEventsNonZero
+import Generators.globalCommitSyncEvents
+import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class GlobalCommitSyncEventSpec extends AnyWordSpec with should.Matchers {
 
-  "toString" should {
+  "show" should {
 
-    "print out the event id, project id, and path along with the last sync date" in {
-      val event = globalCommitSyncEventsNonZero.generateOne
-      event.toString shouldBe s"projectId = ${event.project.id}, " +
+    "print out the event id, project id, and path along with the number of commits and the latest commit id" in {
+      val event = globalCommitSyncEvents().generateOne
+
+      event.show shouldBe s"projectId = ${event.project.id}, " +
         s"projectPath = ${event.project.path}, " +
-        s"numberOfCommits = ${event.commits.length}"
+        s"numberOfCommits = ${event.commits.count}, " +
+        s"latestCommit = ${event.commits.latest}"
     }
   }
 }

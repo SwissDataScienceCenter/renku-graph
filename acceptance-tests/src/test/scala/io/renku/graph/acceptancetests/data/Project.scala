@@ -37,7 +37,6 @@ final case class Project(entitiesProject: testentities.Project,
                          id:              Id,
                          updatedAt:       DateUpdated,
                          urls:            Urls,
-                         tags:            Set[Tag],
                          starsCount:      StarsCount,
                          permissions:     Permissions,
                          statistics:      Statistics
@@ -47,8 +46,6 @@ final case class Project(entitiesProject: testentities.Project,
 }
 
 object Project {
-  final class Tag private (val value: String) extends AnyVal with StringTinyType
-  implicit object Tag                         extends TinyTypeFactory[Tag](new Tag(_)) with NonBlank
 
   final class StarsCount private (val value: Int) extends AnyVal with IntTinyType
   implicit object StarsCount extends TinyTypeFactory[StarsCount](new StarsCount(_)) with NonNegativeInt

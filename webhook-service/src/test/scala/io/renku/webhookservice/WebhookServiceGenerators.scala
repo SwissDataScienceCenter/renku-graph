@@ -23,6 +23,7 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import io.renku.webhookservice.hookcreation.project.ProjectInfo
+import io.renku.webhookservice.hookfetcher.ProjectHookFetcher.HookIdAndUrl
 import io.renku.webhookservice.model._
 import org.scalacheck.Gen
 
@@ -51,4 +52,15 @@ object WebhookServiceGenerators {
 
   implicit val selfUrls:        Gen[SelfUrl]        = validatedUrls map (url => SelfUrl.apply(url.value))
   implicit val projectHookUrls: Gen[ProjectHookUrl] = selfUrls map ProjectHookUrl.from
+
+  lazy val hookIdAndUrls: Gen[HookIdAndUrl] = for {
+    id      <- nonEmptyStrings()
+    hookUrl <- projectHookUrls
+  } yield HookIdAndUrl(id, hookUrl)
+
+  lazy val projectHookIds: Gen[HookIdentifier] = for {
+    projectId <- projectIds
+    hookUrl   <- projectHookUrls
+  } yield HookIdentifier(projectId, hookUrl)
+
 }

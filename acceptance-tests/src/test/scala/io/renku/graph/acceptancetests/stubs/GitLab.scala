@@ -82,13 +82,53 @@ trait GitLab {
     ()
   }
 
+  def `GET <gitlabApi>/users/:id/events/?action=pushed&page=1 returning OK`(
+      maybeAuthor:        Option[Person],
+      project:            data.Project,
+      commitId:           CommitId
+  )(implicit accessToken: AccessToken): Unit = {
+    stubFor {
+      val (authorId, authorName) = maybeAuthor
+        .flatMap(p => p.maybeGitLabId.map(_ -> p.name))
+        .getOrElse(userGitLabIds.generateOne -> userNames.generateOne)
+      get(s"/api/v4/users/$authorId/events/?action=pushed&page=1").withAccessTokenInHeader
+        .willReturn {
+          okJson {
+            json"""[{
+              "project_id": ${project.id.value},
+              "push_data": {
+                "commit_from": ${Json.Null},
+                "commit_to":   ${commitId.value}
+              },
+              "author": {
+                "id":   ${authorId.value},
+                "name": ${authorName.value}
+              }
+            }]""".noSpaces
+          }
+        }
+    }
+    ()
+  }
+
+  def `GET <gitlabApi>/users/:id/events/?action=pushed&page=1 returning NOT_FOUND`(
+      userId:             users.GitLabId
+  )(implicit accessToken: AccessToken): Unit = {
+    stubFor {
+      get(s"/api/v4/users/$userId/events/?action=pushed&page=1").withAccessTokenInHeader
+        .willReturn(notFound())
+    }
+    ()
+  }
+
   def `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(
       projectId:          Id
   )(implicit accessToken: AccessToken): Unit = {
+    val webhookId  = "1"
     val webhookUrl = s"${webhookServiceClient.baseUrl}/webhooks/events"
     stubFor {
       get(s"/api/v4/projects/$projectId/hooks").withAccessTokenInHeader
-        .willReturn(okJson(json"""[{"url": $webhookUrl}]""".noSpaces))
+        .willReturn(okJson(json"""[{"id": $webhookId, "url": $webhookUrl}]""".noSpaces))
     }
     ()
   }
@@ -128,6 +168,11 @@ trait GitLab {
         .willReturn(okJson(Json.arr(commitAsJson(commitIds.last, theMostRecentEventDate)).noSpaces))
         .withAccessTokenInHeader
     }
+    stubFor {
+      get(s"/api/v4/projects/$projectId/repository/commits?page=1&per_page=50")
+        .willReturn(okJson(commitIds.map(commitAsJson(_, theMostRecentEventDate)).asJson.noSpaces))
+        .withAccessTokenInHeader
+    }
     ()
   }
 
@@ -144,13 +189,14 @@ trait GitLab {
   """
 
   def `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(
-      projectId:              Id,
+      project:                data.Project,
       commitId:               CommitId,
       parentIds:              Set[CommitId] = Set.empty,
       theMostRecentEventDate: Instant = Instant.now()
-  )(implicit accessToken:     AccessToken): StubMapping = stubFor {
-    get(s"/api/v4/projects/$projectId/repository/commits/$commitId").withAccessTokenInHeader
-      .willReturn(okJson(json"""{
+  )(implicit accessToken:     AccessToken): StubMapping = {
+    stubFor {
+      get(s"/api/v4/projects/${project.id}/repository/commits/$commitId").withAccessTokenInHeader
+        .willReturn(okJson(json"""{
           "id":              ${commitId.value},
           "author_name":     ${nonEmptyStrings().generateOne},
           "author_email":    ${userEmails.generateOne.value},
@@ -160,6 +206,20 @@ trait GitLab {
           "committed_date":  ${theMostRecentEventDate.toString},
           "parent_ids":      ${parentIds.map(_.value).toList}
         }""".noSpaces))
+    }
+    stubFor {
+      get(s"/api/v4/projects/${urlEncode(project.path.show)}/repository/commits/$commitId").withAccessTokenInHeader
+        .willReturn(okJson(json"""{
+          "id":              ${commitId.value},
+          "author_name":     ${nonEmptyStrings().generateOne},
+          "author_email":    ${userEmails.generateOne.value},
+          "committer_name":  ${nonEmptyStrings().generateOne},
+          "committer_email": ${userEmails.generateOne.value},
+          "message":         ${nonEmptyStrings().generateOne},
+          "committed_date":  ${theMostRecentEventDate.toString},
+          "parent_ids":      ${parentIds.map(_.value).toList}
+        }""".noSpaces))
+    }
   }
 
   def `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(
@@ -181,7 +241,11 @@ trait GitLab {
       get(s"/api/v4/projects/${urlEncode(project.path.value)}/users").withAccessTokenInHeader
         .willReturn(okJson(project.entitiesProject.members.toList.asJson.noSpaces))
     }
-    ()
+    project.entitiesProject.members.foreach { member =>
+      `GET <gitlabApi>/users/:id/events/?action=pushed&page=1 returning NOT_FOUND`(
+        member.maybeGitLabId.getOrElse(throw new Exception("Project member should have GitLabId"))
+      )
+    }
   }
 
   def `GET <gitlabApi>/projects/:path AND :id returning OK with`(
@@ -221,7 +285,7 @@ trait GitLab {
       "web_url":              ${project.urls.web.value},
       "readme_url":           ${project.urls.maybeReadme.map(_.value)},
       "forks_count":          ${project.entitiesProject.forksCount.value},
-      "tag_list":             ${project.tags.map(_.value).toList},
+      "tag_list":             ${project.entitiesProject.keywords.map(_.value).toList},
       "star_count":           ${project.starsCount.value},
       "created_at":           ${project.entitiesProject.dateCreated.value},
       "creator_id":           ${project.entitiesProject.maybeCreator.flatMap(_.maybeGitLabId.map(_.value))},

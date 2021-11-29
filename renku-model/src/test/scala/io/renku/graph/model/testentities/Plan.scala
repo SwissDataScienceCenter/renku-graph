@@ -18,20 +18,21 @@
 
 package io.renku.graph.model.testentities
 
-import CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
-import Plan._
 import cats.syntax.all._
 import io.renku.graph.model._
 import io.renku.graph.model.commandParameters.Position
 import io.renku.graph.model.entityModel.Location
 import io.renku.graph.model.plans._
+import io.renku.graph.model.testentities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
+import io.renku.graph.model.testentities.Plan._
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints._
 
 case class Plan(id:                        Id,
                 name:                      Name,
                 maybeDescription:          Option[Description],
-                command:                   Command,
+                maybeCommand:              Option[Command],
+                dateCreated:               DateCreated,
                 maybeProgrammingLanguage:  Option[ProgrammingLanguage],
                 keywords:                  List[Keyword],
                 commandParameterFactories: List[Plan => CommandParameterBase],
@@ -50,15 +51,17 @@ object Plan {
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  def apply(
+  def of(
       name:                      Name,
-      command:                   Command,
+      maybeCommand:              Option[Command],
+      dateCreated:               DateCreated,
       commandParameterFactories: List[Position => Plan => CommandParameterBase]
   ): Plan = Plan(
     Id.generate,
     name,
     maybeDescription = None,
-    command,
+    maybeCommand,
+    dateCreated,
     maybeProgrammingLanguage = None,
     keywords = Nil,
     commandParameterFactories = commandParameterFactories.zipWithIndex.map { case (factory, idx) =>
@@ -85,7 +88,8 @@ object Plan {
         plans.ResourceId(plan.asEntityId.show),
         plan.name,
         plan.maybeDescription,
-        plan.command,
+        plan.maybeCommand,
+        plan.dateCreated,
         plan.maybeProgrammingLanguage,
         plan.keywords,
         plan.parameters.map(_.to[entities.CommandParameterBase.CommandParameter]),

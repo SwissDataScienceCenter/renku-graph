@@ -214,7 +214,7 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
   protected def runUpdate(query: SparqlQuery): IO[Unit] = queryRunner.runUpdate(query)
 
   protected implicit class UpdatesRunner(updates: List[SparqlQuery]) {
-    lazy val runAll: IO[Unit] = updates.map(runUpdate).sequence.void
+    lazy val runAll: IO[Unit] = (updates map runUpdate).sequence.void
   }
 
   protected def rdfStoreSize: Int =

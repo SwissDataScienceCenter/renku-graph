@@ -21,6 +21,7 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescura
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
+import io.circe.DecodingFailure
 import io.renku.graph.model.projects
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
@@ -48,25 +49,32 @@ private class KGProjectFinderImpl[F[_]: Async: Logger](rdfStoreConfig: RdfStoreC
   private def query(resourceId: projects.ResourceId) = SparqlQuery.of(
     name = "transformation - find project",
     Prefixes.of(schema -> "schema", renku -> "renku", prov -> "prov"),
-    s"""|SELECT DISTINCT ?name ?maybeParent ?visibility ?maybeDescription
+    s"""|SELECT DISTINCT ?name ?maybeParent ?visibility ?maybeDescription (GROUP_CONCAT(?keyword; separator=',') AS ?keywords)
         |WHERE {
         |  <$resourceId> a schema:Project;
         |                schema:name ?name;
         |                renku:projectVisibility ?visibility. 
         |  OPTIONAL { <$resourceId> schema:description ?maybeDescription . }
+        |  OPTIONAL { <$resourceId> schema:keywords ?keyword . }
         |  OPTIONAL { <$resourceId> prov:wasDerivedFrom ?maybeParent }            
         |}
+        |GROUP BY ?name ?maybeParent ?visibility ?maybeDescription
         |""".stripMargin
   )
 
   private implicit lazy val recordsDecoder: Decoder[List[KGProjectInfo]] = {
+    val toSetOfKeywords: Option[String] => Decoder.Result[Set[projects.Keyword]] =
+      _.map(_.split(',').toList.map(projects.Keyword.from).sequence.map(_.toSet)).sequence
+        .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
+        .map(_.getOrElse(Set.empty))
     val rowDecoder = Decoder.instance(cursor =>
       for {
         name             <- cursor.downField("name").downField("value").as[projects.Name]
         maybeParent      <- cursor.downField("maybeParent").downField("value").as[Option[projects.ResourceId]]
         visibility       <- cursor.downField("visibility").downField("value").as[projects.Visibility]
         maybeDescription <- cursor.downField("maybeDescription").downField("value").as[Option[projects.Description]]
-      } yield (name, maybeParent, visibility, maybeDescription)
+        keywords         <- cursor.downField("keywords").downField("value").as[Option[String]].flatMap(toSetOfKeywords)
+      } yield (name, maybeParent, visibility, maybeDescription, keywords)
     )
     _.downField("results").downField("bindings").as(decodeList(rowDecoder))
   }
@@ -74,8 +82,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger](rdfStoreConfig: RdfStoreC
   private def toSingleResult(resourceId: projects.ResourceId): List[KGProjectInfo] => F[Option[KGProjectInfo]] = {
     case Nil           => MonadThrow[F].pure(Option.empty[KGProjectInfo])
     case record +: Nil => MonadThrow[F].pure(Some(record))
-    case _ =>
-      MonadThrow[F].raiseError(new RuntimeException(s"More than one project found for resourceId: '$resourceId'"))
+    case _ => MonadThrow[F].raiseError(new Exception(s"More than one project found for resourceId: '$resourceId'"))
   }
 }
 
@@ -84,5 +91,10 @@ private object KGProjectFinder {
     config <- RdfStoreConfig[F]()
   } yield new KGProjectFinderImpl(config, timeRecorder)
 
-  type KGProjectInfo = (projects.Name, Option[projects.ResourceId], projects.Visibility, Option[projects.Description])
+  type KGProjectInfo = (projects.Name,
+                        Option[projects.ResourceId],
+                        projects.Visibility,
+                        Option[projects.Description],
+                        Set[projects.Keyword]
+  )
 }

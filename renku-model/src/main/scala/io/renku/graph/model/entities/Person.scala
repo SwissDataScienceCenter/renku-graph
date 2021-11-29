@@ -27,7 +27,6 @@ import io.renku.jsonld._
 final case class Person(
     resourceId:       ResourceId,
     name:             Name,
-    alternativeNames: Set[Name],
     maybeEmail:       Option[Email],
     maybeAffiliation: Option[Affiliation],
     maybeGitLabId:    Option[GitLabId]
@@ -41,7 +40,7 @@ object Person {
       maybeEmail:       Option[Email] = None,
       maybeAffiliation: Option[Affiliation] = None,
       maybeGitLabId:    Option[GitLabId] = None
-  ): Person = Person(resourceId, name, alternativeNames = Set(name), maybeEmail, maybeAffiliation, maybeGitLabId)
+  ): Person = new Person(resourceId, name, maybeEmail, maybeAffiliation, maybeGitLabId)
 
   import io.renku.graph.model.Schemas._
   import io.renku.jsonld.JsonLDDecoder.decodeOption
@@ -85,7 +84,7 @@ object Person {
       maybeAffiliation <- cursor.downField(schema / "affiliation").as[Option[Affiliation]]
       name <- if (names.isEmpty) DecodingFailure(s"No name on Person $resourceId", Nil).asLeft
               else names.reverse.head.asRight
-    } yield Person(resourceId, name, alternativeNames = names.toSet, maybeEmail, maybeAffiliation, maybeGitLabId)
+    } yield Person(resourceId, name, maybeEmail, maybeAffiliation, maybeGitLabId)
   }
 
   private lazy val gitLabIdDecoder: JsonLDDecoder[GitLabId] = JsonLDDecoder.entity(gitLabSameAsTypes) { cursor =>

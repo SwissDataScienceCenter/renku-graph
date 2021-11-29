@@ -20,8 +20,7 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescura
 
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas.{renku, schema}
-import io.renku.graph.model.datasets
-import io.renku.graph.model.datasets.{ResourceId, TopmostDerivedFrom, TopmostSameAs}
+import io.renku.graph.model.datasets.{ResourceId, TopmostSameAs}
 import io.renku.graph.model.entities.Dataset
 import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.rdfstore.SparqlQuery
@@ -43,11 +42,11 @@ private trait UpdatesCreator {
 
   def prepareUpdates(dataset:              Dataset[Dataset.Provenance.ImportedInternal],
                      maybeKGTopmostSameAs: Option[TopmostSameAs]
-  )(implicit ev:                           TopmostSameAs.type): List[SparqlQuery]
+  ): List[SparqlQuery]
 
-  def prepareUpdates(dataset:                   Dataset[Dataset.Provenance.Modified],
-                     maybeKGTopmostDerivedFrom: Option[TopmostDerivedFrom]
-  )(implicit ev:                                TopmostDerivedFrom.type): List[SparqlQuery]
+  def prepareTopmostSameAsCleanup(dataset:                  Dataset[Dataset.Provenance.ImportedInternal],
+                                  maybeParentTopmostSameAs: Option[TopmostSameAs]
+  ): List[SparqlQuery]
 }
 
 private object UpdatesCreator extends UpdatesCreator {
@@ -69,22 +68,19 @@ private object UpdatesCreator extends UpdatesCreator {
 
   override def prepareUpdates(dataset:              Dataset[Provenance.ImportedInternal],
                               maybeKGTopmostSameAs: Option[TopmostSameAs]
-  )(implicit ev:                                    datasets.TopmostSameAs.type): List[SparqlQuery] =
+  ): List[SparqlQuery] =
     Option
       .when(!(maybeKGTopmostSameAs contains dataset.provenance.topmostSameAs))(
         prepareSameAsUpdate(dataset.resourceId, dataset.provenance.topmostSameAs)
       )
       .toList
 
-  override def prepareUpdates(dataset:                   Dataset[Provenance.Modified],
-                              maybeKGTopmostDerivedFrom: Option[TopmostDerivedFrom]
-  )(implicit ev:                                         datasets.TopmostDerivedFrom.type): List[SparqlQuery] =
-    Option
-      .when(
-        !(maybeKGTopmostDerivedFrom contains dataset.provenance.topmostDerivedFrom) &&
-          dataset.provenance.maybeInvalidationTime.isEmpty
-      )(prepareDerivedFromUpdate(dataset.resourceId, dataset.provenance.topmostDerivedFrom))
-      .toList
+  override def prepareTopmostSameAsCleanup(dataset:                  Dataset[Dataset.Provenance.ImportedInternal],
+                                           maybeParentTopmostSameAs: Option[TopmostSameAs]
+  ): List[SparqlQuery] = maybeParentTopmostSameAs match {
+    case None    => Nil
+    case Some(_) => List(prepareTopmostSameAsCleanUp(dataset.resourceId, dataset.provenance.topmostSameAs))
+  }
 
   private def deleteSameAs(dataset: Dataset[Provenance.Internal]) = SparqlQuery.of(
     name = "transformation - delete sameAs",
@@ -166,16 +162,17 @@ private object UpdatesCreator extends UpdatesCreator {
         |""".stripMargin
   )
 
-  private def prepareDerivedFromUpdate(oldTopmostDerivedFrom: ResourceId, newTopmostDerivedFrom: TopmostDerivedFrom) =
-    SparqlQuery.of(
-      name = "transformation - topmostDerivedFrom update",
-      Prefixes.of(renku -> "renku", schema -> "schema"),
-      s"""|DELETE { ?dsId renku:topmostDerivedFrom <$oldTopmostDerivedFrom> }
-          |INSERT { ?dsId renku:topmostDerivedFrom <$newTopmostDerivedFrom> }
-          |WHERE {
-          |  ?dsId a schema:Dataset;
-          |        renku:topmostDerivedFrom <$oldTopmostDerivedFrom>
-          |}
-          |""".stripMargin
-    )
+  private def prepareTopmostSameAsCleanUp(dsId: ResourceId, modelTopmostSameAs: TopmostSameAs) = SparqlQuery.of(
+    name = "transformation - topmostSameAs clean-up",
+    Prefixes.of(renku -> "renku", schema -> "schema"),
+    s"""|DELETE { <$dsId> renku:topmostSameAs <$modelTopmostSameAs> }
+        |WHERE { 
+        |  {
+        |    SELECT (COUNT(?topmost) AS ?count)
+        |    WHERE { <$dsId> renku:topmostSameAs ?topmost }
+        |  }
+        |  FILTER (?count > 1)
+        |}
+        |""".stripMargin
+  )
 }

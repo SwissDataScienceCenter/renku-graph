@@ -23,14 +23,15 @@ import io.renku.generators.CommonGraphGenerators.{clientExceptions, connectivity
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.datasets.{DerivedFrom, InternalSameAs, ResourceId, TopmostDerivedFrom, TopmostSameAs}
+import io.renku.graph.model.datasets.{InternalSameAs, ResourceId, TopmostSameAs}
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
 import io.renku.http.client.RestClientError
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.rdfstore.SparqlQuery
 import io.renku.triplesgenerator.events.categories.triplesgenerated.ProjectFunctions
-import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
+import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.Queries
+import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TransformationStepsCreator.TransformationRecoverableError
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -44,7 +45,7 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
 
     "find all internally imported datasets, " +
       "find the topmostSameAs for their sameAs and resourceId, " +
-      "update the datasets with the topmostSameAs found for sameAs " +
+      "update the datasets with the topmostSameAs found for sameAs in KG " +
       "and create update queries" in new TestCase {
 
         val (dataset1 ::~ dataset2, project) = anyProjectEntities
@@ -58,84 +59,33 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
             _.to[entities.Project]
           )
 
-        val kgTopmostSameAs = datasetTopmostSameAs.generateOne
-        findingParentTopmostSameAsFor(dataset1.provenance.sameAs, returning = kgTopmostSameAs.some.pure[Try])
+        val parentTopmostSameAs = datasetTopmostSameAs.generateOne
+        findingParentTopmostSameAsFor(dataset1.provenance.sameAs, returning = parentTopmostSameAs.some.pure[Try])
         findingTopmostSameAsFor(dataset1.identification.resourceId, returning = Option.empty[TopmostSameAs].pure[Try])
         val dataset1Queries = sparqlQueries.generateList()
-        prepareQueriesForSameAs(dataset1 -> Option.empty[TopmostSameAs], returning = dataset1Queries)
+        prepareQueriesForSameAs(dataset1 -> None, returning = dataset1Queries)
+        val updatedDataset1        = dataset1.update(parentTopmostSameAs)
+        val dataset1CleanUpQueries = sparqlQueries.generateList()
+        prepareQueriesForTopmostSameAsCleanup(updatedDataset1 -> parentTopmostSameAs.some,
+                                              returning = dataset1CleanUpQueries
+        )
 
         findingParentTopmostSameAsFor(dataset2.provenance.sameAs, returning = None.pure[Try])
         val dataset2KgTopmostSameAs = datasetTopmostSameAs.generateSome
         findingTopmostSameAsFor(dataset2.identification.resourceId, returning = dataset2KgTopmostSameAs.pure[Try])
         val dataset2Queries = sparqlQueries.generateList()
         prepareQueriesForSameAs(dataset2 -> dataset2KgTopmostSameAs, returning = dataset2Queries)
+        val dataset2CleanUpQueries = sparqlQueries.generateList()
+        prepareQueriesForTopmostSameAsCleanup(dataset2 -> None, returning = dataset2CleanUpQueries)
 
         val step = transformer.createTransformationStep
-
         step.name.value shouldBe "Dataset Details Updates"
-        val Success(Right(updateResult)) = step.run(project).value
-        updateResult.project shouldBe ProjectFunctions.update(dataset1, dataset1.update(kgTopmostSameAs))(project)
-        updateResult.queries shouldBe (dataset1Queries ::: dataset2Queries)
-      }
 
-    "find all modified datasets, " +
-      "find the topmostDerivedFrom for them, " +
-      "update the datasets with the found topmostDerived if found " +
-      "and update the modified datasets in the metadata" in new TestCase {
-
-        val ((dataset1, dataset2, importedDataset, dataset3), project) = anyProjectEntities
-          .addDatasetAndModification(datasetEntities(provenanceInternal))
-          .addDatasetAndModification(datasetEntities(provenanceImportedExternal))
-          .addDatasetAndModification(datasetEntities(provenanceImportedInternal))
-          .generateOne
-          .leftMap { case _ ::~ dataset1 ::~ _ ::~ dataset2 ::~ importedDataset ::~ dataset3 =>
-            (
-              dataset1.to[entities.Dataset[entities.Dataset.Provenance.Modified]],
-              dataset2.to[entities.Dataset[entities.Dataset.Provenance.Modified]],
-              importedDataset.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]],
-              dataset3.to[entities.Dataset[entities.Dataset.Provenance.Modified]]
-            )
-          }
-          .map(_.to[entities.Project])
-
-        val kgTopmostDerivedFrom = datasetTopmostDerivedFroms.generateOne
-        findingParentTopmostDerivedFromFor(dataset1.provenance.derivedFrom,
-                                           returning = kgTopmostDerivedFrom.some.pure[Try]
+        val Success(Right((updatedProject, queries))) = (step run project).value
+        updatedProject shouldBe ProjectFunctions.update(dataset1, updatedDataset1)(project)
+        queries shouldBe Queries.postDataQueriesOnly(
+          dataset1Queries ::: dataset1CleanUpQueries ::: dataset2Queries ::: dataset2CleanUpQueries
         )
-        findingTopmostDerivedFromFor(dataset1.identification.resourceId,
-                                     returning = Option.empty[TopmostDerivedFrom].pure[Try]
-        )
-        val dataset1Queries = sparqlQueries.generateList()
-        prepareQueriesForDerivedFrom(dataset1 -> Option.empty[TopmostDerivedFrom], returning = dataset1Queries)
-
-        findingParentTopmostDerivedFromFor(dataset2.provenance.derivedFrom, returning = None.pure[Try])
-        val dataset2KgTopmostDerivedFrom = datasetTopmostDerivedFroms.generateSome
-        findingTopmostDerivedFromFor(dataset2.identification.resourceId,
-                                     returning = dataset2KgTopmostDerivedFrom.pure[Try]
-        )
-        val dataset2Queries = sparqlQueries.generateList()
-        prepareQueriesForDerivedFrom(dataset2 -> dataset2KgTopmostDerivedFrom, returning = dataset2Queries)
-
-        val kgTopmostSameAs = datasetTopmostSameAs.generateSome
-        findingParentTopmostSameAsFor(importedDataset.provenance.sameAs, returning = None.pure[Try])
-        findingTopmostSameAsFor(importedDataset.identification.resourceId, returning = kgTopmostSameAs.pure[Try])
-        val importedDatasetQueries = sparqlQueries.generateList()
-        prepareQueriesForSameAs(importedDataset -> kgTopmostSameAs, returning = importedDatasetQueries)
-
-        findingParentTopmostDerivedFromFor(dataset3.provenance.derivedFrom, returning = None.pure[Try])
-        val dataset3KgTopmostDerivedFrom = datasetTopmostDerivedFroms.generateSome
-        findingTopmostDerivedFromFor(dataset3.identification.resourceId,
-                                     returning = dataset3KgTopmostDerivedFrom.pure[Try]
-        )
-        val dataset3Queries = sparqlQueries.generateList()
-        prepareQueriesForDerivedFrom(dataset3 -> dataset3KgTopmostDerivedFrom, returning = dataset3Queries)
-
-        val step = transformer.createTransformationStep
-
-        step.name.value shouldBe "Dataset Details Updates"
-        val Success(Right(updateResult)) = step.run(project).value
-        updateResult.project shouldBe ProjectFunctions.update(dataset1, dataset1.update(kgTopmostDerivedFrom))(project)
-        updateResult.queries should contain theSameElementsAs (dataset1Queries ::: dataset2Queries ::: importedDatasetQueries ::: dataset3Queries)
       }
 
     "prepare updates for deleted datasets" in new TestCase {
@@ -190,10 +140,11 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
 
       val step = transformer.createTransformationStep
 
-      val Success(Right(updateResult)) = step.run(entitiesProjectWithAllDatasets).value
+      val Success(Right((updatedProject, queries))) = step.run(entitiesProjectWithAllDatasets).value
 
-      updateResult.project shouldBe entitiesProjectWithAllDatasets
-      updateResult.queries should contain theSameElementsAs (internalDsQueries ::: importedExternalDsQueries ::: ancestorInternalDsQueries ::: ancestorExternalDsQueries)
+      updatedProject shouldBe entitiesProjectWithAllDatasets
+      queries.postDataUploadQueries should contain theSameElementsAs (internalDsQueries ::: importedExternalDsQueries ::: ancestorInternalDsQueries ::: ancestorExternalDsQueries)
+      queries.preDataUploadQueries shouldBe List.empty[SparqlQuery]
     }
 
     "return the ProcessingRecoverableFailure if calls to KG fails with a network or HTTP error" in new TestCase {
@@ -231,7 +182,6 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       val Failure(nonRecoverableError) = step.run(project).value
       nonRecoverableError shouldBe exception
     }
-
   }
 
   private trait TestCase {
@@ -258,35 +208,20 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         ),
         returning: List[SparqlQuery]
     ) = (updatesCreator
-      .prepareUpdates(_: entities.Dataset[entities.Dataset.Provenance.ImportedInternal], _: Option[TopmostSameAs])(
-        _: TopmostSameAs.type
-      ))
-      .expects(dsAndMaybeTopmostSameAs._1, dsAndMaybeTopmostSameAs._2, *)
+      .prepareUpdates(_: entities.Dataset[entities.Dataset.Provenance.ImportedInternal], _: Option[TopmostSameAs]))
+      .expects(dsAndMaybeTopmostSameAs._1, dsAndMaybeTopmostSameAs._2)
       .returning(returning)
 
-    def findingParentTopmostDerivedFromFor(derivedFrom: DerivedFrom, returning: Try[Option[TopmostDerivedFrom]]) =
-      (kgDatasetInfoFinder
-        .findParentTopmostDerivedFrom(_: DerivedFrom)(_: DerivedFrom.type))
-        .expects(derivedFrom, *)
-        .returning(returning)
-
-    def findingTopmostDerivedFromFor(resourceId: ResourceId, returning: Try[Option[TopmostDerivedFrom]])(implicit
-        ev:                                      TopmostDerivedFrom.type
-    ) = (kgDatasetInfoFinder
-      .findTopmostDerivedFrom(_: ResourceId)(_: ResourceId.type))
-      .expects(resourceId, *)
-      .returning(returning)
-
-    def prepareQueriesForDerivedFrom(
-        dsAndMaybeTopmostDerivedFrom: (entities.Dataset[entities.Dataset.Provenance.Modified],
-                                       Option[TopmostDerivedFrom]
+    def prepareQueriesForTopmostSameAsCleanup(
+        dsAndMaybeTopmostSameAs: (entities.Dataset[entities.Dataset.Provenance.ImportedInternal],
+                                  Option[TopmostSameAs]
         ),
         returning: List[SparqlQuery]
     ) = (updatesCreator
-      .prepareUpdates(_: entities.Dataset[entities.Dataset.Provenance.Modified], _: Option[TopmostDerivedFrom])(
-        _: TopmostDerivedFrom.type
+      .prepareTopmostSameAsCleanup(_: entities.Dataset[entities.Dataset.Provenance.ImportedInternal],
+                                   _: Option[TopmostSameAs]
       ))
-      .expects(dsAndMaybeTopmostDerivedFrom._1, dsAndMaybeTopmostDerivedFrom._2, *)
+      .expects(dsAndMaybeTopmostSameAs._1, dsAndMaybeTopmostSameAs._2)
       .returning(returning)
   }
 

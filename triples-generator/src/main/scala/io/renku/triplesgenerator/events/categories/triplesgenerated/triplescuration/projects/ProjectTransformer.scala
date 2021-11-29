@@ -23,12 +23,13 @@ import cats.data.EitherT
 import cats.effect._
 import cats.syntax.all._
 import eu.timepit.refined.auto._
+import io.renku.graph.model.entities.Project
 import io.renku.http.client.RestClientError._
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep
-import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{ResultData, Transformation}
-import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
+import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{Queries, Transformation}
+import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TransformationStepsCreator.TransformationRecoverableError
 import org.typelevel.log4cats.Logger
 
 trait ProjectTransformer[F[_]] {
@@ -48,21 +49,20 @@ class ProjectTransformerImpl[F[_]: MonadThrow](
       kGProjectFinder
         .find(project.resourceId)
         .map {
-          case None => TransformationStep.ResultData(project, Nil).asRight[ProcessingRecoverableError]
+          case None => (project, Queries.empty).asRight[ProcessingRecoverableError]
           case Some(kgProjectInfo) =>
-            TransformationStep
-              .ResultData(project, updatesCreator.prepareUpdates(project, kgProjectInfo))
+            (project, Queries.preDataQueriesOnly(updatesCreator.prepareUpdates(project, kgProjectInfo)))
               .asRight[ProcessingRecoverableError]
         }
         .recoverWith(maybeToRecoverableError)
     }
 
   private lazy val maybeToRecoverableError
-      : PartialFunction[Throwable, F[Either[ProcessingRecoverableError, ResultData]]] = {
+      : PartialFunction[Throwable, F[Either[ProcessingRecoverableError, (Project, Queries)]]] = {
     case e @ (_: UnexpectedResponseException | _: ConnectivityException | _: ClientException |
         _: UnauthorizedException) =>
       TransformationRecoverableError("Problem finding project details in KG", e)
-        .asLeft[ResultData]
+        .asLeft[(Project, Queries)]
         .leftWiden[ProcessingRecoverableError]
         .pure[F]
   }
