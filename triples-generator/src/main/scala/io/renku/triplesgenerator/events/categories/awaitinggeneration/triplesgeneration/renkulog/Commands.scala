@@ -157,11 +157,13 @@ private object Commands {
       %%("git", "status")(repositoryDirectory.value).out.string
     }
 
-    private val recoverableErrors = Set("SSL_ERROR_SYSCALL",
-                                        "the remote end hung up unexpectedly",
-                                        "The requested URL returned error: 502",
-                                        "Could not resolve host:",
-                                        "Host is unreachable"
+    private val recoverableErrors = Set(
+      "SSL_ERROR_SYSCALL",
+      "the remote end hung up unexpectedly",
+      "The requested URL returned error: 502",
+      "Error in the HTTP2 framing layer",
+      "Could not resolve host:",
+      "Host is unreachable"
     )
     private lazy val relevantError: PartialFunction[Throwable, F[Either[GenerationRecoverableError, Unit]]] = {
       case ShelloutException(result) =>

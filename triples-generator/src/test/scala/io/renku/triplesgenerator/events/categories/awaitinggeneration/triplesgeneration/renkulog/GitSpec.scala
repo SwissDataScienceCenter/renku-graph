@@ -53,6 +53,7 @@ class GitSpec extends AnyWordSpec with IOSpec with MockFactory with should.Match
       Refined.unsafeApply(
         s"fatal: unable to access 'https://renkulab.io/gitlab/${projectPaths.generateOne}.git/': The requested URL returned error: 502"
       ),
+      "Error in the HTTP2 framing layer",
       "Could not resolve host: renkulab.io",
       "Failed to connect to renkulab.io port 443: Host is unreachable"
     )
