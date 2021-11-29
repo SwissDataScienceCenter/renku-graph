@@ -94,7 +94,7 @@ class EdgesFinderSpec
       val plan = planEntities(CommandInput.fromLocation(in1),
                               CommandInput.fromLocation(in2),
                               CommandOutput.fromLocation(out1)
-      )(project.dateCreated).generateOne
+      )(planCommands)(project.dateCreated).generateOne
 
       val activity1 = executionPlanners(_ => fixed(plan), project).generateOne
         .planInputParameterValuesFromChecksum(in1 -> entityChecksums.generateOne, in2 -> entityChecksums.generateOne)
