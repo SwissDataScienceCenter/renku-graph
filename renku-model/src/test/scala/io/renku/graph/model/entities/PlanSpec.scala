@@ -20,7 +20,7 @@ package io.renku.graph.model.entities
 
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.nonEmptyStrings
+import io.renku.generators.Generators.{nonEmptyStrings, timestampsNotInTheFuture}
 import io.renku.graph.model.commandParameters.Position
 import io.renku.graph.model.entities.Generators._
 import io.renku.graph.model.testentities._
@@ -57,6 +57,7 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
     name                     <- planNames
     maybeCommand             <- planCommands.toGeneratorOfOptions
     maybeDescription         <- planDescriptions.toGeneratorOfOptions
+    dateCreated              <- timestampsNotInTheFuture.toGeneratorOf(plans.DateCreated)
     maybeProgrammingLanguage <- planProgrammingLanguages.toGeneratorOfOptions
     keywords                 <- nonEmptyStrings().map(plans.Keyword).toGeneratorOfList()
     paramFactories           <- parameterFactoryLists
@@ -66,6 +67,7 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
     name,
     maybeDescription,
     maybeCommand,
+    dateCreated,
     maybeProgrammingLanguage,
     keywords,
     commandParameterFactories = paramFactories.zipWithIndex.map { case (factory, idx) =>
