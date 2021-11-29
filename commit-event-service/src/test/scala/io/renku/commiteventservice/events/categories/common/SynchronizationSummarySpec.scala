@@ -18,6 +18,7 @@
 
 package io.renku.commiteventservice.events.categories.common
 
+import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.commiteventservice.events.categories.common.UpdateResult._
 import io.renku.generators.Generators.Implicits._
@@ -60,6 +61,21 @@ class SynchronizationSummarySpec extends AnyWordSpec with should.Matchers with S
         val failed = Failed(nonEmptyStrings().generateOne, exceptions.generateOne)
         summary.get(failed) shouldBe initialSummary.get(failed) + results.count(_.isInstanceOf[Failed])
       }
+    }
+  }
+
+  "show" should {
+
+    "return a string listing counts for all the keys" in {
+      val results = updateResults.generateSet().toList.map(key => key -> nonNegativeInts().map(_.value).generateOne)
+      val summary = results.foldLeft(SynchronizationSummary()) { case (summary, (key, count)) =>
+        summary.updated(key, count)
+      }
+
+      summary.show shouldBe results
+        .sortBy(_._1.name)
+        .map { case (key, count) => s"$count ${key.name.toLowerCase}" }
+        .mkString(", ")
     }
   }
 

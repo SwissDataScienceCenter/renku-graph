@@ -46,7 +46,7 @@ private[triplesgenerated] class TransformationStepsCreatorImpl[F[_]: MonadThrow]
   )
 }
 
-private[triplesgenerated] object TriplesCurator {
+private[triplesgenerated] object TransformationStepsCreator {
 
   final case class TransformationRecoverableError(message: String, cause: Throwable)
       extends Exception(message, cause)

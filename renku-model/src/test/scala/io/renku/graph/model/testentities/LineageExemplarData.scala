@@ -88,7 +88,7 @@ object LineageExemplarData {
 
     val plan1 = Plan.of(
       plans.Name("plan1"),
-      Command("python"),
+      Command("python").some,
       planDatesCreated(after = project.dateCreated).generateOne,
       CommandParameters.of(CommandInput.fromLocation(cleanData),
                            CommandInput.fromLocation(zhbikesFolder),
@@ -107,7 +107,7 @@ object LineageExemplarData {
 
     val plan2 = Plan.of(
       plans.Name("plan2"),
-      Command("python"),
+      Command("python").some,
       planDatesCreated(after = project.dateCreated).generateOne,
       CommandParameters.of(
         CommandInput.fromLocation(plotData),
@@ -201,6 +201,10 @@ object NodeDef {
   )
 
   private implicit lazy val activityShow: Show[Activity] = Show.show { activity =>
+    val commandComponent = activity.association.plan.maybeCommand match {
+      case Some(command) => s"$command "
+      case None          => ""
+    }
     activity.parameters
       .collect {
         case parameter @ CommandInputValue(_, _, valueReference: ExplicitCommandParameter, _) =>
@@ -212,7 +216,7 @@ object NodeDef {
       }
       .sortBy(_._2)
       .map(_._1.show)
-      .mkString(s"${activity.association.plan.command} ", " ", "")
+      .mkString(start = commandComponent, sep = " ", end = "")
   }
 
   private implicit def parameterValueShow[P <: ParameterValue]: Show[P] = Show.show {

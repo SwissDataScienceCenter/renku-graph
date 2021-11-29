@@ -169,6 +169,7 @@ class StatusChangerSpec
 
   private def updateResultsGen(event: StatusChangeEvent): Gen[DBUpdateResults] = event match {
     case AllEventsToNew                           => Gen.const(DBUpdateResults.ForAllProjects)
+    case ProjectEventsToNew(project)              => genUpdateResult(project.path)
     case ToTriplesGenerated(_, projectPath, _, _) => genUpdateResult(projectPath)
     case ToTriplesStore(_, projectPath, _)        => genUpdateResult(projectPath)
     case ToFailure(_, projectPath, _, currentStatus, newStatus) =>

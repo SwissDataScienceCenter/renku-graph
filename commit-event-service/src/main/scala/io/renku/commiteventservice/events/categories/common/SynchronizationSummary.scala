@@ -23,43 +23,38 @@ import cats.data.StateT
 import cats.kernel.Semigroup
 import cats.syntax.all._
 import cats.{Applicative, Show}
-import io.renku.commiteventservice.events.categories.common.UpdateResult.Failed
 
 private[categories] final case class SynchronizationSummary(private val summary: Map[SummaryKey, Int]) {
 
   def get(key: String): Int = summary.getOrElse(key, 0)
 
-  def get(result: UpdateResult): Int = get(asKey(result))
+  def get(result: UpdateResult): Int = get(result.name)
 
   def updated(result: UpdateResult, newValue: Int): SynchronizationSummary =
-    new SynchronizationSummary(summary.updated(asKey(result), newValue))
+    new SynchronizationSummary(summary.updated(result.name, newValue))
 
   def incrementCount(result: UpdateResult): SynchronizationSummary = {
-    val key = asKey(result)
+    val key = result.name
     new SynchronizationSummary(summary.updated(key, get(key) + 1))
-  }
-
-  private def asKey(result: UpdateResult): String = result match {
-    case Failed(_, _) => "Failed"
-    case s            => s.toString
   }
 }
 
 private[categories] object SynchronizationSummary {
 
-  def apply() = new SynchronizationSummary(Map.empty[SummaryKey, Int])
-
-  type SummaryKey = String
-
+  type SummaryKey            = String
   type SummaryState[F[_], A] = StateT[F, SynchronizationSummary, A]
+
+  def apply(initialState: (SummaryKey, Int)*) = new SynchronizationSummary(initialState.toMap)
 
   def incrementCount[F[_]: Applicative](result: UpdateResult): SummaryState[F, Unit] = StateT { summaryMap =>
     (summaryMap.incrementCount(result), ()).pure[F]
   }
 
   implicit lazy val show: Show[SynchronizationSummary] = Show.show { summary =>
-    import summary._
-    s"${get("Created")} created, ${get("Existed")} existed, ${get("Skipped")} skipped, ${get("Deleted")} deleted, ${get("Failed")} failed"
+    summary.summary.toList
+      .sortBy(_._1)
+      .map { case (key, count) => s"$count ${key.toLowerCase}" }
+      .mkString(", ")
   }
 
   implicit val semigroup: Semigroup[SynchronizationSummary] =

@@ -28,7 +28,6 @@ import io.renku.generators.Generators._
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
 import io.renku.graph.acceptancetests.tooling.GraphServices
-import io.renku.graph.acceptancetests.tooling.ResponseTools._
 import io.renku.graph.acceptancetests.tooling.TestReadabilityTools._
 import io.renku.graph.model.datasets.{DatePublished, Identifier, ImageUri, Title}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
@@ -77,7 +76,7 @@ class DatasetsResourcesSpec
 
       Then("he should get OK response with project's datasets")
       projectDatasetsResponse.status shouldBe Ok
-      val Right(foundDatasets) = projectDatasetsResponse.bodyAsJson.as[List[Json]]
+      val Right(foundDatasets) = projectDatasetsResponse.jsonBody.as[List[Json]]
       foundDatasets should contain theSameElementsAs List(briefJson(dataset1, project.path),
                                                           briefJson(dataset2Modified, project.path)
       )
@@ -88,11 +87,13 @@ class DatasetsResourcesSpec
         .headOption
         .flatMap(_._links.get(Rel("details")))
         .getOrFail(message = "No link with rel 'details'")
-      val datasetDetailsResponse = restClient GET someDatasetDetailsLink.toString
+      val datasetDetailsResponse = (restClient GET someDatasetDetailsLink.toString)
+        .flatMap(response => response.as[Json].map(json => response.status -> json))
+        .unsafeRunSync()
 
       Then("he should get OK response with dataset details")
-      datasetDetailsResponse.status shouldBe Ok
-      val foundDatasetDetails = datasetDetailsResponse.bodyAsJson
+      datasetDetailsResponse._1 shouldBe Ok
+      val foundDatasetDetails = datasetDetailsResponse._2
       val expectedDataset = List(dataset1, dataset2Modified)
         .find(dataset => someDatasetDetailsLink.value contains urlEncode(dataset.identifier.value))
         .getOrFail(message = "Returned 'details' link does not point to any dataset in the RDF store")
@@ -114,11 +115,14 @@ class DatasetsResourcesSpec
         .get(Rel("project-details"))
         .getOrFail("No link with rel 'project-details'") shouldBe datasetUsedInProjectLink
 
-      val getProjectResponse = restClient.GET(datasetUsedInProjectLink.toString, user.accessToken)
+      val getProjectResponse = restClient
+        .GET(datasetUsedInProjectLink.toString, user.accessToken)
+        .flatMap(response => response.as[Json].map(json => response.status -> json))
+        .unsafeRunSync()
 
       Then("he should get OK response with project details")
-      getProjectResponse.status     shouldBe Ok
-      getProjectResponse.bodyAsJson shouldBe ProjectsResources.fullJson(project)
+      getProjectResponse._1 shouldBe Ok
+      getProjectResponse._2 shouldBe ProjectsResources.fullJson(project)
 
       When("user fetches initial version of the modified dataset with the link from the response")
       val modifiedDataset2Json = foundDatasets
@@ -128,11 +132,36 @@ class DatasetsResourcesSpec
       val modifiedDatasetInitialVersionLink = modifiedDataset2Json._links
         .get(Rel("initial-version"))
         .getOrFail("No link with rel 'initial-version'")
-      val getInitialVersionResponse = restClient GET modifiedDatasetInitialVersionLink.toString
+      val getInitialVersionResponse = (restClient GET modifiedDatasetInitialVersionLink.toString)
+        .flatMap(response => response.as[Json].map(json => response.status -> json))
+        .unsafeRunSync()
 
       Then("he should get OK response with project details")
-      getInitialVersionResponse.status                     shouldBe Ok
-      findIdentifier(getInitialVersionResponse.bodyAsJson) shouldBe dataset2.identifier
+      getInitialVersionResponse._1                 shouldBe Ok
+      findIdentifier(getInitialVersionResponse._2) shouldBe dataset2.identifier
+    }
+
+    Scenario("As a user I should not to be able to see project's datasets if I don't have rights to the project") {
+
+      val (_, testEntitiesNonPublicProject) = projectEntities(visibilityNonPublic)
+        .addDataset(datasetEntities(provenanceInternal))
+        .generateOne
+      val nonPublicProject = dataProjects(testEntitiesNonPublicProject).generateOne
+
+      Given("there's a non-public project in KG")
+      `data in the RDF store`(nonPublicProject, testEntitiesNonPublicProject.asJsonLD)
+      `wait for events to be processed`(nonPublicProject.id)
+
+      When("there's an authenticated user who is not a member of the project")
+      val nonMemberAccessToken = accessTokens.generateOne
+      `GET <gitlabApi>/user returning OK`()(nonMemberAccessToken)
+
+      And("he fetches project's details")
+      val projectDatasetsResponseForNonMember =
+        knowledgeGraphClient.GET(s"knowledge-graph/projects/${nonPublicProject.path}/datasets", nonMemberAccessToken)
+
+      Then("he should get NOT_FOUND response")
+      projectDatasetsResponseForNonMember.status shouldBe NotFound
     }
   }
 
@@ -179,7 +208,7 @@ class DatasetsResourcesSpec
       Then("he should get OK response with some matching datasets")
       datasetsSearchResponse.status shouldBe Ok
 
-      val Right(foundDatasets) = datasetsSearchResponse.bodyAsJson.as[List[Json]]
+      val Right(foundDatasets) = datasetsSearchResponse.jsonBody.as[List[Json]]
       foundDatasets.flatMap(sortCreators) should contain theSameElementsAs List(
         searchResultJson(dataset1, 1, project1.path, foundDatasets),
         searchResultJson(dataset2, 1, project2.path, foundDatasets),
@@ -194,7 +223,7 @@ class DatasetsResourcesSpec
       Then("he should get OK response with some matching datasets sorted by title ASC")
       searchSortedByName.status shouldBe Ok
 
-      val Right(foundDatasetsSortedByName) = searchSortedByName.bodyAsJson.as[List[Json]]
+      val Right(foundDatasetsSortedByName) = searchSortedByName.jsonBody.as[List[Json]]
       val datasetsSortedByName = List(
         searchResultJson(dataset1, 1, project1.path, foundDatasetsSortedByName),
         searchResultJson(dataset2, 1, project2.path, foundDatasetsSortedByName),
@@ -209,7 +238,7 @@ class DatasetsResourcesSpec
         knowledgeGraphClient GET s"knowledge-graph/datasets?query=${urlEncode(text.value)}&sort=title:asc&page=2&per_page=1"
 
       Then("he should get OK response with the dataset from the requested page")
-      val Right(foundDatasetsPage) = searchForPage.bodyAsJson.as[List[Json]]
+      val Right(foundDatasetsPage) = searchForPage.jsonBody.as[List[Json]]
       foundDatasetsPage.flatMap(sortCreators) should contain theSameElementsAs List(datasetsSortedByName(1))
         .flatMap(sortCreators)
 
@@ -217,7 +246,7 @@ class DatasetsResourcesSpec
       val searchWithoutPhrase = knowledgeGraphClient GET s"knowledge-graph/datasets?sort=title:asc"
 
       Then("he should get OK response with all the datasets")
-      val Right(foundDatasetsWithoutPhrase) = searchWithoutPhrase.bodyAsJson.as[List[Json]]
+      val Right(foundDatasetsWithoutPhrase) = searchWithoutPhrase.jsonBody.as[List[Json]]
       foundDatasetsWithoutPhrase.flatMap(sortCreators) should contain allElementsOf List(
         searchResultJson(dataset1, 1, project1.path, foundDatasetsWithoutPhrase),
         searchResultJson(dataset2, 1, project2.path, foundDatasetsWithoutPhrase),
@@ -232,23 +261,24 @@ class DatasetsResourcesSpec
       val firstPageResponse = restClient GET firstPageLink
 
       Then("he should get OK response with the datasets from the first page")
-      val Right(foundFirstPage) = firstPageResponse.bodyAsJson.as[List[Json]]
+      val foundFirstPage = firstPageResponse.flatMap(_.as[List[Json]]).unsafeRunSync()
       foundFirstPage.flatMap(sortCreators) should contain theSameElementsAs List(datasetsSortedByName.head)
         .flatMap(sortCreators)
 
       When("user uses 'details' link of one of the found datasets")
       val someDatasetJson = Random.shuffle(foundDatasets).head
 
-      val detailsLinkResponse = restClient GET someDatasetJson._links
+      val detailsLinkResponse = (restClient GET someDatasetJson._links
         .get(Rel("details"))
         .getOrFail(message = "No link with rel 'details'")
-        .toString
-      detailsLinkResponse.status shouldBe Ok
+        .toString).flatMap(response => response.as[Json].map(json => response.status -> json)).unsafeRunSync()
+
+      detailsLinkResponse._1 shouldBe Ok
 
       Then("he should get the same result as he'd call the knowledge-graph/datasets/:id endpoint directly")
       val datasetDetailsResponse =
         knowledgeGraphClient GET s"knowledge-graph/datasets/${urlEncode(findIdentifier(someDatasetJson).toString)}"
-      detailsLinkResponse.bodyAsJson shouldBe datasetDetailsResponse.bodyAsJson
+      detailsLinkResponse._2 shouldBe datasetDetailsResponse.jsonBody
     }
 
     Scenario("As an authenticated user I would like to be able to search for datasets by free-text search") {
@@ -285,7 +315,7 @@ class DatasetsResourcesSpec
       Then("he should get OK response with some matching datasets")
       datasetsSearchResponse.status shouldBe Ok
 
-      val Right(foundDatasets) = datasetsSearchResponse.bodyAsJson.as[List[Json]]
+      val Right(foundDatasets) = datasetsSearchResponse.jsonBody.as[List[Json]]
       foundDatasets.flatMap(sortCreators) should contain theSameElementsAs List(
         searchResultJson(dataset1, 1, project1.path, foundDatasets),
         searchResultJson(dataset3PrivateWithAccess, 1, project3PrivateWithAccess.path, foundDatasets)
@@ -295,6 +325,79 @@ class DatasetsResourcesSpec
     def pushToStore(project: testentities.Project)(implicit accessToken: AccessToken): Unit = {
       `data in the RDF store`(dataProjects(project).generateOne, project.asJsonLD)
       ()
+    }
+  }
+
+  Feature("GET knowledge-graph/datasets/:id to find dataset details") {
+
+    Scenario(
+      "As an unauthenticated and unauthorised user I should be able to see details of dataset on a public project"
+    ) {
+      implicit val accessToken: AccessToken = accessTokens.generateOne
+
+      val (dataset, testEntitiesProject) = projectEntities(visibilityPublic)
+        .addDataset(datasetEntities(provenanceInternal))
+        .generateOne
+
+      val project = dataProjects(testEntitiesProject).generateOne
+
+      Given("some data in the RDF Store")
+      `data in the RDF store`(project, testEntitiesProject.asJsonLD)
+      `wait for events to be processed`(project.id)
+
+      When("user fetches dataset details with GET knowledge-graph/datasets/:id")
+      val detailsResponse = knowledgeGraphClient GET s"knowledge-graph/datasets/${dataset.identifier}"
+
+      Then("he should get OK response with dataset's details")
+      detailsResponse.status            shouldBe Ok
+      detailsResponse.jsonBody.as[Json] shouldBe a[Right[_, _]]
+    }
+
+    Scenario(
+      "As an authenticated and authorised user I should be able to see details of a dataset on a non-public project " +
+        "and not see them if either not authorised or not authenticated"
+    ) {
+      val user = authUsers.generateOne
+      implicit val accessToken: AccessToken = user.accessToken
+
+      val (dataset, testEntitiesProject) = projectEntities(visibilityNonPublic)
+        .map(_.copy(members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some))))
+        .addDataset(datasetEntities(provenanceInternal))
+        .generateOne
+
+      val project = dataProjects(testEntitiesProject).generateOne
+
+      Given("I am authenticated")
+      `GET <gitlabApi>/user returning OK`(user)
+
+      Given("some data in the RDF Store")
+      `data in the RDF store`(project, testEntitiesProject.asJsonLD)
+      `wait for events to be processed`(project.id)
+
+      When("an authenticated and authorised user fetches dataset details through GET knowledge-graph/datasets/:id")
+      val detailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/datasets/${dataset.identifier}", accessToken)
+
+      Then("he should get OK response with the dataset details")
+      detailsResponse.status            shouldBe Ok
+      detailsResponse.jsonBody.as[Json] shouldBe a[Right[_, _]]
+
+      When("unauthenticated user tries to fetch details of the same dataset")
+      val unauthenticatedUser = authUsers.generateOne
+      `GET <gitlabApi>/user returning NOT_FOUND`(unauthenticatedUser)
+      val unauthenticatedResponse =
+        knowledgeGraphClient.GET(s"knowledge-graph/datasets/${dataset.identifier}", unauthenticatedUser.accessToken)
+
+      Then("he should get Unauthorized response")
+      unauthenticatedResponse.status shouldBe Unauthorized
+
+      When("authenticated but unauthorised user tries to do the same")
+      val unauthorisedUser = authUsers.generateOne
+      `GET <gitlabApi>/user returning OK`(unauthorisedUser)
+      val unauthorisedResponse =
+        knowledgeGraphClient.GET(s"knowledge-graph/datasets/${dataset.identifier}", unauthorisedUser.accessToken)
+
+      Then("he get NOT_FOUND response")
+      unauthorisedResponse.status shouldBe NotFound
     }
   }
 }

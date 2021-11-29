@@ -24,7 +24,6 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
 import io.renku.graph.acceptancetests.data.dataProjects
 import io.renku.graph.acceptancetests.flows.AccessTokenPresence
-import io.renku.graph.acceptancetests.tooling.ResponseTools._
 import io.renku.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
@@ -86,7 +85,7 @@ class WebhookCreationSpec
       givenAccessTokenPresentFor(project)
       val commitId = commitIds.generateOne
       `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(project.id, commitId)
-      `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project.id, commitId)
+      `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project, commitId)
 
       // making the triples generation be happy and not throwing exceptions to the logs
       `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
@@ -103,7 +102,7 @@ class WebhookCreationSpec
 
       tokenRepositoryClient
         .GET(s"projects/${project.id}/tokens")
-        .bodyAsJson shouldBe expectedAccessTokenJson
+        .jsonBody shouldBe expectedAccessTokenJson
     }
   }
 }

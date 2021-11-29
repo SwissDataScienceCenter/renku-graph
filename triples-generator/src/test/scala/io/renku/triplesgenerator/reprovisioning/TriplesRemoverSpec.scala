@@ -19,12 +19,12 @@
 package io.renku.triplesgenerator.reprovisioning
 
 import cats.effect.IO
+import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits.GenOps
 import io.renku.generators.Generators._
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{EntityTypes, JsonLD}
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
@@ -37,37 +37,28 @@ class TriplesRemoverSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
   "removeAllTriples" should {
 
     "remove all the triples from the storage except for CLI version" in new TestCase {
-      val versionPair = renkuVersionPairs.generateOne
-      val versionPairJsonLD = JsonLD.entity(
-        id = RenkuVersionPairJsonLD.id,
-        types = EntityTypes.of(RenkuVersionPairJsonLD.objectType),
-        RenkuVersionPairJsonLD.cliVersion    -> JsonLD.fromString(versionPair.cliVersion.toString),
-        RenkuVersionPairJsonLD.schemaVersion -> JsonLD.fromString(versionPair.schemaVersion.toString)
-      )
-
-      val reProvisioningJsonLD = JsonLD.entity(
-        id = ReProvisioningJsonLD.id,
-        types = EntityTypes.of(ReProvisioningJsonLD.objectType),
-        ReProvisioningJsonLD.reProvisioningStatus -> JsonLD.fromBoolean(true)
-      )
-
       loadToStore(
         anyProjectEntities.generateOne.asJsonLD,
         anyProjectEntities.generateOne.asJsonLD,
-        versionPairJsonLD,
-        reProvisioningJsonLD
+        renkuVersionPairs.generateOne.asJsonLD,
+        ReProvisioningInfo(ReProvisioningInfo.Status.Running, microserviceBaseUrls.generateOne).asJsonLD
       )
 
-      val versionRelatedTriplesCount =
-        versionPairJsonLD.properties.size + 1 + reProvisioningJsonLD.properties.size + 1 // +1 for rdf:type
+      val graphMetadataTriples = runQuery {
+        """|SELECT DISTINCT ?s ?p ?o 
+           |WHERE {
+           |  ?s a ?type
+           |  FILTER (?type IN (renku:VersionPair, renku:ReProvisioning))
+           |  ?s ?p ?o
+           |}
+           |""".stripMargin
+      }.unsafeRunSync()
 
-      rdfStoreSize should be > versionRelatedTriplesCount
+      rdfStoreSize should be > graphMetadataTriples.size
 
-      triplesRemover
-        .removeAllTriples()
-        .unsafeRunSync() shouldBe ((): Unit)
+      triplesRemover.removeAllTriples().unsafeRunSync() shouldBe ()
 
-      rdfStoreSize shouldBe versionRelatedTriplesCount
+      rdfStoreSize shouldBe graphMetadataTriples.size
     }
   }
 

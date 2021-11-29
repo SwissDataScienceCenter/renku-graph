@@ -16,22 +16,25 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.generators
+package io.renku.triplesgenerator
 
-import io.renku.generators.CommonGraphGenerators._
-import io.renku.generators.Generators._
-import io.renku.rdfstore.{DatasetName, FusekiBaseUrl}
-import io.renku.triplesgenerator.config.DatasetType.{Mem, TDB}
-import io.renku.triplesgenerator.config._
-import org.scalacheck.Gen
+import io.renku.graph.model.Schemas.renku
+import io.renku.graph.model.{RenkuBaseUrl, RenkuVersionPair}
+import io.renku.jsonld.syntax._
+import io.renku.jsonld.{EntityId, EntityTypes}
 
-object ServiceTypesGenerators {
+package object reprovisioning {
 
-  implicit val fusekiAdminConfigs: Gen[FusekiAdminConfig] = for {
-    fusekiUrl       <- httpUrls() map FusekiBaseUrl.apply
-    datasetName     <- nonEmptyStrings() map DatasetName.apply
-    datasetType     <- Gen.oneOf(Mem, TDB)
-    authCredentials <- basicAuthCredentials
-  } yield FusekiAdminConfig(fusekiUrl, datasetName, datasetType, authCredentials)
+  import io.renku.jsonld.{JsonLD, JsonLDEncoder}
 
+  private[reprovisioning] implicit def jsonLDEncoder(implicit
+      renkuBaseUrl: RenkuBaseUrl
+  ): JsonLDEncoder[RenkuVersionPair] = JsonLDEncoder.instance { entity =>
+    JsonLD.entity(
+      EntityId.of((renkuBaseUrl / "version-pair").toString),
+      EntityTypes of renku / "VersionPair",
+      renku / "schemaVersion" -> entity.schemaVersion.asJsonLD,
+      renku / "cliVersion"    -> entity.cliVersion.asJsonLD
+    )
+  }
 }

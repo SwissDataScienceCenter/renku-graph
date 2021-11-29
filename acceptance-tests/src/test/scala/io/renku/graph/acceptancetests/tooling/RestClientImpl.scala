@@ -32,19 +32,17 @@ import scala.language.postfixOps
 class RestClientImpl(implicit logger: Logger[IO])
     extends RestClient[IO, RestClientImpl](Throttler.noThrottling, retryInterval = 500 millis, maxRetries = 1) {
 
-  def GET(url: String)(implicit ioRuntime: IORuntime): Response[IO] = {
+  def GET(url: String)(implicit ioRuntime: IORuntime): IO[Response[IO]] =
     for {
       uri      <- validateUri(url)
       response <- send(request(Method.GET, uri))(mapResponse)
     } yield response
-  }.unsafeRunSync()
 
-  def GET(url: String, accessToken: AccessToken)(implicit ioRuntime: IORuntime): Response[IO] = {
+  def GET(url: String, accessToken: AccessToken)(implicit ioRuntime: IORuntime): IO[Response[IO]] =
     for {
       uri      <- validateUri(url)
       response <- send(request(Method.GET, uri, accessToken))(mapResponse)
     } yield response
-  }.unsafeRunSync()
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Response[IO]]] = {
     case (_, _, response) => IO.pure(response)

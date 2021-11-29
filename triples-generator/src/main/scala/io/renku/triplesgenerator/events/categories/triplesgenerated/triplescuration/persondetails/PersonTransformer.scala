@@ -23,11 +23,12 @@ import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
+import io.renku.graph.model.entities.{Person, Project}
 import io.renku.http.client.RestClientError._
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{ResultData, Transformation}
-import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
+import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{Queries, Transformation}
+import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TransformationStepsCreator.TransformationRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.{ProjectFunctions, TransformationStep}
 import org.typelevel.log4cats.Logger
 
@@ -42,7 +43,9 @@ private class PersonTransformerImpl[F[_]: MonadThrow](
     projectFunctions: ProjectFunctions
 ) extends PersonTransformer[F] {
 
+  import personMerger._
   import projectFunctions._
+  import updatesCreator._
 
   override def createTransformationStep: TransformationStep[F] =
     TransformationStep("Person Details Updates", createTransformation)
@@ -50,29 +53,39 @@ private class PersonTransformerImpl[F[_]: MonadThrow](
   private def createTransformation: Transformation[F] = project =>
     EitherT {
       findAllPersons(project)
-        .foldLeft(ResultData(project, List.empty).pure[F]) { (previousResultsF, person) =>
-          for {
-            previousResults   <- previousResultsF
-            maybeKGPerson     <- kgPersonFinder find person
-            maybeMergedPerson <- maybeKGPerson.map(personMerger.merge(person, _)).sequence
-          } yield (maybeKGPerson, maybeMergedPerson)
-            .mapN { (kgPerson, mergedPerson) =>
-              val updatedProjectMetadata = update(person, mergedPerson)(previousResults.project)
-              val queries                = updatesCreator.prepareUpdates(kgPerson, mergedPerson)
-              ResultData(updatedProjectMetadata, previousResults.queries ::: queries)
-            }
-            .getOrElse(previousResults)
+        .foldLeft((project -> Queries.empty).pure[F]) { (previousResultsF, person) =>
+          updateProjectAndPreDataQueries(previousResultsF, person) map addPostDataQueries(person)
         }
         .map(_.asRight[ProcessingRecoverableError])
         .recoverWith(maybeToRecoverableError)
     }
 
+  private lazy val updateProjectAndPreDataQueries: (F[(Project, Queries)], Person) => F[(Project, Queries)] = {
+    case (previousResultsF, person) =>
+      for {
+        previousResults   <- previousResultsF
+        maybeKGPerson     <- kgPersonFinder find person
+        maybeMergedPerson <- maybeKGPerson.map(merge(person, _)).sequence
+      } yield (maybeKGPerson, maybeMergedPerson)
+        .mapN { (kgPerson, mergedPerson) =>
+          val updatedProject = update(person, mergedPerson)(previousResults._1)
+          val queries        = preparePreDataUpdates(kgPerson, mergedPerson)
+          (updatedProject, previousResults._2 |+| Queries.preDataQueriesOnly(queries))
+        }
+        .getOrElse(previousResults)
+  }
+
+  private def addPostDataQueries(person: Person): ((Project, Queries)) => (Project, Queries) = {
+    case (project, queries) =>
+      project -> (queries |+| Queries.postDataQueriesOnly(preparePostDataUpdates(person)))
+  }
+
   private lazy val maybeToRecoverableError
-      : PartialFunction[Throwable, F[Either[ProcessingRecoverableError, ResultData]]] = {
+      : PartialFunction[Throwable, F[Either[ProcessingRecoverableError, (Project, Queries)]]] = {
     case e @ (_: UnexpectedResponseException | _: ConnectivityException | _: ClientException |
         _: UnauthorizedException) =>
       TransformationRecoverableError("Problem finding person details in KG", e)
-        .asLeft[ResultData]
+        .asLeft[(Project, Queries)]
         .leftWiden[ProcessingRecoverableError]
         .pure[F]
   }

@@ -27,7 +27,7 @@ import io.renku.jsonld.JsonLDDecoder
 final case class Plan(resourceId:               ResourceId,
                       name:                     Name,
                       maybeDescription:         Option[Description],
-                      command:                  Command,
+                      maybeCommand:             Option[Command],
                       dateCreated:              DateCreated,
                       maybeProgrammingLanguage: Option[ProgrammingLanguage],
                       keywords:                 List[Keyword],
@@ -63,7 +63,7 @@ object Plan {
       entityTypes,
       schema / "name"                -> plan.name.asJsonLD,
       schema / "description"         -> plan.maybeDescription.asJsonLD,
-      renku / "command"              -> plan.command.asJsonLD,
+      renku / "command"              -> plan.maybeCommand.asJsonLD,
       schema / "dateCreated"         -> plan.dateCreated.asJsonLD,
       schema / "programmingLanguage" -> plan.maybeProgrammingLanguage.asJsonLD,
       schema / "keywords"            -> plan.keywords.asJsonLD,
@@ -81,7 +81,7 @@ object Plan {
       resourceId            <- cursor.downEntityId.as[ResourceId]
       name                  <- cursor.downField(schema / "name").as[Name]
       maybeDescription      <- cursor.downField(schema / "description").as[Option[Description]]
-      command               <- cursor.downField(renku / "command").as[Command]
+      maybeCommand          <- cursor.downField(renku / "command").as[Option[Command]]
       dateCreated           <- cursor.downField(schema / "dateCreated").as[DateCreated]
       maybeProgrammingLang  <- cursor.downField(schema / "programmingLanguage").as[Option[ProgrammingLanguage]]
       keywords              <- cursor.downField(schema / "keywords").as[List[Keyword]]
@@ -93,7 +93,7 @@ object Plan {
     } yield Plan(resourceId,
                  name,
                  maybeDescription,
-                 command,
+                 maybeCommand,
                  dateCreated,
                  maybeProgrammingLang,
                  keywords,

@@ -30,8 +30,8 @@ import io.renku.http.client.AccessToken
 import org.typelevel.log4cats.Logger
 
 private[eventgeneration] trait MissingCommitEventCreator[F[_]] {
-  def createMissingCommits(project: Project, commitsToCreate: List[CommitId])(implicit
-      maybeAccessToken:             Option[AccessToken]
+  def createCommits(project: Project, commitsToCreate: List[CommitId])(implicit
+      maybeAccessToken:      Option[AccessToken]
   ): F[SynchronizationSummary]
 }
 
@@ -43,8 +43,8 @@ private[eventgeneration] class MissingCommitEventCreatorImpl[F[_]: MonadThrow](
 
   import commitInfoFinder._
 
-  override def createMissingCommits(project: Project, commitsToCreate: List[CommitId])(implicit
-      maybeAccessToken:                      Option[AccessToken]
+  override def createCommits(project: Project, commitsToCreate: List[CommitId])(implicit
+      maybeAccessToken:               Option[AccessToken]
   ): F[SynchronizationSummary] = for {
     commitInfos <- commitsToCreate.map(findCommitInfo(project.id, _)).sequence
     results     <- commitInfos.map(commitToEventLog.storeCommitInEventLog(project, _, BatchDate(clock))).sequence

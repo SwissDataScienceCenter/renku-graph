@@ -155,8 +155,8 @@ class ProjectDatasetsFinderSpec
   }
 
   private trait TestCase {
-    private implicit val logger = TestLogger[IO]()
-    private val timeRecorder    = new SparqlQueryTimeRecorder[IO](TestExecutionTimeRecorder[IO]())
-    val datasetsFinder          = new ProjectDatasetsFinderImpl[IO](rdfStoreConfig, renkuBaseUrl, timeRecorder)
+    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    private val timeRecorder = new SparqlQueryTimeRecorder[IO](TestExecutionTimeRecorder[IO]())
+    val datasetsFinder       = new ProjectDatasetsFinderImpl[IO](rdfStoreConfig, timeRecorder)
   }
 }

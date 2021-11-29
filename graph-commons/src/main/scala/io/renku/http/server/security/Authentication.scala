@@ -33,13 +33,10 @@ import org.typelevel.ci._
 
 private trait Authentication[F[_]] {
   def authenticateIfNeeded: Kleisli[F, Request[F], Either[EndpointSecurityException, Option[AuthUser]]]
-
-  def authenticate: Kleisli[F, Request[F], Either[EndpointSecurityException, AuthUser]]
+  def authenticate:         Kleisli[F, Request[F], Either[EndpointSecurityException, AuthUser]]
 }
 
-private class AuthenticationImpl[F[_]: MonadThrow](
-    authenticator: Authenticator[F]
-) extends Authentication[F] {
+private class AuthenticationImpl[F[_]: MonadThrow](authenticator: Authenticator[F]) extends Authentication[F] {
 
   import org.http4s.{Header, Request}
 

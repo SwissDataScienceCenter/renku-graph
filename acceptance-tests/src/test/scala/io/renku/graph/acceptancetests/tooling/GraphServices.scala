@@ -87,6 +87,7 @@ trait GraphServices extends GitLab with RemoteTriplesGenerator with IOSpec with 
     eventlog.Microservice,
     eventLogClient,
     preServiceStart = List(EventLog.startDB()),
+    postServiceStart = List(eventLogClient.waitForReadiness),
     serviceArgsList = List()
   )
   protected lazy val triplesGenerator: ServiceRun = ServiceRun(

@@ -27,38 +27,44 @@ import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
 import io.renku.http.client.RestClientError
 import io.renku.http.client.RestClientError.UnauthorizedException
-import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.ResultData
-import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TriplesCurator.TransformationRecoverableError
+import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.Queries
+import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TransformationStepsCreator.TransformationRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects.KGProjectFinder.KGProjectInfo
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.{Failure, Success, Try}
+import scala.util.{Success, Try}
 
 class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "createTransformationStep" should {
 
-    "create update queries when project is in KG" in new TestCase {
-      val kgProjectInfo = (projectNames.generateOne, projectResourceIds.generateOption, projectVisibilities.generateOne)
+    "create preDataUploadQueries when project is in KG" in new TestCase {
+      val kgProjectInfo = (projectNames.generateOne,
+                           projectResourceIds.generateOption,
+                           projectVisibilities.generateOne,
+                           projectDescriptions.generateOption,
+                           projectKeywords.generateSet()
+      )
 
       (kgProjectFinder.find _)
         .expects(project.resourceId)
         .returning(kgProjectInfo.some.pure[Try])
 
-      val updates = sparqlQueries.generateList()
+      val queries = sparqlQueries.generateList()
 
       (updatesCreator.prepareUpdates _)
         .expects(project, kgProjectInfo)
-        .returning(updates)
+        .returning(queries)
 
       val step = transformer.createTransformationStep
 
       step.name.value shouldBe "Project Details Updates"
       val Success(Right(updateResult)) = (step run project).value
-      updateResult shouldBe ResultData(project, updates)
+      updateResult shouldBe (project, Queries(queries, Nil))
     }
 
     "do nothing if no project found in KG" in new TestCase {
@@ -69,7 +75,7 @@ class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       val step = transformer.createTransformationStep
 
       val Success(Right(updateResult)) = step.run(project).value
-      updateResult shouldBe ResultData(project, Nil)
+      updateResult shouldBe (project, Queries.empty)
     }
 
     "return the ProcessingRecoverableFailure if calls to KG fails with a network or HTTP error" in new TestCase {
@@ -94,8 +100,7 @@ class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
 
       val step = transformer.createTransformationStep
 
-      val Failure(nonRecoverableError) = step.run(project).value
-      nonRecoverableError shouldBe exception
+      step.run(project).value shouldBe exception.raiseError[Try, Either[ProcessingRecoverableError, (Project, Queries)]]
     }
   }
 

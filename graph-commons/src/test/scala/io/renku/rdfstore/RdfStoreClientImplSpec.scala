@@ -25,12 +25,14 @@ import io.circe.Json
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.generators.jsonld.JsonLDGenerators._
 import io.renku.http.client.RestClient
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.http.rest.paging.Paging.PagedResultsFinder
 import io.renku.http.rest.paging._
 import io.renku.http.rest.paging.model.{Page, PerPage, Total}
 import io.renku.interpreters.TestLogger
+import io.renku.jsonld.JsonLD
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
@@ -280,7 +282,7 @@ class RdfStoreClientImplSpec
           .willReturn(ok())
       }
 
-      client.sendUpdate.unsafeRunSync() shouldBe ((): Unit)
+      client.sendUpdate.unsafeRunSync() shouldBe ()
     }
 
     "fail if remote responds with non-OK status" in new UpdateClientTestCase {
@@ -326,6 +328,39 @@ class RdfStoreClientImplSpec
     }
   }
 
+  "upload json-ld" should {
+
+    "store the given JsonLd object in the triples store" in new UpdateClientTestCase {
+      val entity = jsonLDEntities.generateOne
+
+      stubFor {
+        post(s"/${rdfStoreConfig.datasetName}/data")
+          .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
+          .withHeader("content-type", equalTo("application/ld+json"))
+          .withRequestBody(equalToJson(entity.toJson.toString()))
+          .willReturn(ok())
+      }
+
+      client.uploadJson(entity).unsafeRunSync() shouldBe ()
+    }
+
+    "fail if remote responds with non-OK status" in new UpdateClientTestCase {
+
+      stubFor {
+        post(s"/${rdfStoreConfig.datasetName}/data")
+          .willReturn(
+            aResponse
+              .withStatus(BadRequest.code)
+              .withBody("some message")
+          )
+      }
+
+      intercept[Exception] {
+        client.uploadJson(jsonLDEntities.generateOne).unsafeRunSync()
+      }.getMessage shouldBe s"POST $fusekiBaseUrl/${rdfStoreConfig.datasetName}/data returned $BadRequest; body: some message"
+    }
+  }
+
   private trait TestCase {
     val fusekiBaseUrl  = FusekiBaseUrl(externalServiceBaseUrl)
     val rdfStoreConfig = rdfStoreConfigs.generateOne.copy(fusekiBaseUrl = fusekiBaseUrl)
@@ -359,6 +394,8 @@ class RdfStoreClientImplSpec
     def sendUpdate[ResultType](
         mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[ResultType]]
     ): IO[ResultType] = updateWitMapping(query, mapResponse)
+
+    def uploadJson(json: JsonLD): IO[Unit] = upload(json)
   }
 
   private class TestRdfQueryClientImpl(val query: SparqlQuery, rdfStoreConfig: RdfStoreConfig)(implicit

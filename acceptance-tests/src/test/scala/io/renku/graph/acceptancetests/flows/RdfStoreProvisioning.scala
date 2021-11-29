@@ -22,7 +22,7 @@ import cats.effect.unsafe.IORuntime
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data
 import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
-import io.renku.graph.acceptancetests.tooling.ResponseTools._
+import io.renku.graph.acceptancetests.tooling.ServiceClient.ClientResponse
 import io.renku.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.CommitId
@@ -54,9 +54,14 @@ trait RdfStoreProvisioning
   )(implicit accessToken: AccessToken, ioRuntime: IORuntime): Assertion = {
     `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(project.id, commitId)
 
-    `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project.id, commitId)
+    `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project, commitId)
 
     `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
+
+    `GET <gitlabApi>/users/:id/events/?action=pushed&page=1 returning OK`(project.entitiesProject.maybeCreator,
+                                                                          project,
+                                                                          commitId
+    )
 
     `GET <triples-generator>/projects/:id/commits/:id returning OK`(project, commitId, triples)
 
@@ -72,8 +77,8 @@ trait RdfStoreProvisioning
   }
 
   def `wait for events to be processed`(projectId: projects.Id)(implicit ioRuntime: IORuntime): Assertion = eventually {
-    val response = eventLogClient.fetchProcessingStatus(projectId)
-    response.status                                              shouldBe Ok
-    response.bodyAsJson.hcursor.downField("progress").as[Double] shouldBe Right(100d)
+    val ClientResponse(status, jsonBody, _) = eventLogClient.fetchProcessingStatus(projectId)
+    status                                            shouldBe Ok
+    jsonBody.hcursor.downField("progress").as[Double] shouldBe Right(100d)
   }
 }

@@ -40,11 +40,11 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-private[commitsync] trait CommitEventSynchronizer[F[_]] {
+private[commitsync] trait CommitsSynchronizer[F[_]] {
   def synchronizeEvents(event: CommitSyncEvent): F[Unit]
 }
 
-private[commitsync] class CommitEventSynchronizerImpl[F[_]: MonadThrow: Logger](
+private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger](
     accessTokenFinder:     AccessTokenFinder[F],
     latestCommitFinder:    LatestCommitFinder[F],
     eventDetailsFinder:    EventDetailsFinder[F],
@@ -53,7 +53,7 @@ private[commitsync] class CommitEventSynchronizerImpl[F[_]: MonadThrow: Logger](
     commitEventsRemover:   CommitEventsRemover[F],
     executionTimeRecorder: ExecutionTimeRecorder[F],
     clock:                 java.time.Clock = java.time.Clock.systemUTC()
-) extends CommitEventSynchronizer[F] {
+) extends CommitsSynchronizer[F] {
 
   import accessTokenFinder._
   import commitEventsRemover._
@@ -196,7 +196,7 @@ private[commitsync] class CommitEventSynchronizerImpl[F[_]: MonadThrow: Logger](
     s"$categoryName: id = $eventId, projectId = ${project.id}, projectPath = ${project.path} -> $message"
 }
 
-private[commitsync] object CommitEventSynchronizer {
+private[commitsync] object CommitsSynchronizer {
   def apply[F[_]: Async: Temporal: Logger](gitLabThrottler: Throttler[F, GitLab],
                                            executionTimeRecorder: ExecutionTimeRecorder[F]
   ) = for {
@@ -206,12 +206,12 @@ private[commitsync] object CommitEventSynchronizer {
     commitInfoFinder    <- CommitInfoFinder(gitLabThrottler)
     commitToEventLog    <- CommitToEventLog[F]
     commitEventsRemover <- CommitEventsRemover[F]
-  } yield new CommitEventSynchronizerImpl[F](accessTokenFinder,
-                                             latestCommitFinder,
-                                             eventDetailsFinder,
-                                             commitInfoFinder,
-                                             commitToEventLog,
-                                             commitEventsRemover,
-                                             executionTimeRecorder
+  } yield new CommitsSynchronizerImpl[F](accessTokenFinder,
+                                         latestCommitFinder,
+                                         eventDetailsFinder,
+                                         commitInfoFinder,
+                                         commitToEventLog,
+                                         commitEventsRemover,
+                                         executionTimeRecorder
   )
 }

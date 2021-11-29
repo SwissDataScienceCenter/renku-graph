@@ -25,11 +25,12 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{fixed, nonNegativeInts, positiveInts}
-import io.renku.graph.model.GraphModelGenerators.{cliVersions, projectCreatedDates, projectNames, projectPaths, projectSchemaVersions, projectVisibilities, userGitLabIds, userNames, usernames}
+import io.renku.graph.model.GraphModelGenerators.{cliVersions, projectCreatedDates, projectDescriptions, projectIds, projectKeywords, projectNames, projectPaths, projectSchemaVersions, projectVisibilities, userEmails, userGitLabIds, userNames, usernames}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
+import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.projects.{ForksCount, Visibility}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{ActivityGenFactory, DatasetGenFactory}
-import io.renku.graph.model.{RenkuBaseUrl, projects}
+import io.renku.graph.model.{RenkuBaseUrl, projects, users}
 import monocle.Lens
 import org.scalacheck.Gen
 
@@ -45,6 +46,11 @@ trait ProjectEntitiesGenerators {
   lazy val anyProjectEntities: Gen[Project] = Gen.oneOf(
     projectEntities(anyVisibility),
     projectWithParentEntities(anyVisibility)
+  )
+
+  def anyProjectEntities(visibilityGen: Gen[Visibility]): Gen[Project] = Gen.oneOf(
+    projectEntities(visibilityGen),
+    projectWithParentEntities(visibilityGen)
   )
 
   lazy val projectEntitiesWithDatasetsAndActivities: Gen[Project] =
@@ -63,24 +69,28 @@ trait ProjectEntitiesGenerators {
       datasetsFactories:   List[DatasetGenFactory[Dataset.Provenance]] = Nil,
       forksCountGen:       Gen[ForksCount] = anyForksCount
   ): Gen[ProjectWithoutParent] = for {
-    path         <- projectPaths
-    name         <- Gen.const(path.toName)
-    agent        <- cliVersions
-    dateCreated  <- projectCreatedDates(minDateCreated.value)
-    maybeCreator <- personEntities(withGitLabId).toGeneratorOfOptions
-    visibility   <- visibilityGen
-    members      <- personEntities(withGitLabId).toGeneratorOfSet(minElements = 0)
-    version      <- projectSchemaVersions
-    forksCount   <- forksCountGen
-    activities   <- activitiesFactories.map(_.apply(dateCreated)).sequence
-    datasets     <- datasetsFactories.map(_.apply(dateCreated)).sequence
+    path             <- projectPaths
+    name             <- Gen.const(path.toName)
+    maybeDescription <- projectDescriptions.toGeneratorOfOptions
+    agent            <- cliVersions
+    dateCreated      <- projectCreatedDates(minDateCreated.value)
+    maybeCreator     <- personEntities(withGitLabId).toGeneratorOfOptions
+    visibility       <- visibilityGen
+    forksCount       <- forksCountGen
+    keywords         <- projectKeywords.toGeneratorOfSet(minElements = 0)
+    members          <- personEntities(withGitLabId).toGeneratorOfSet(minElements = 0)
+    version          <- projectSchemaVersions
+    activities       <- activitiesFactories.map(_.apply(dateCreated)).sequence
+    datasets         <- datasetsFactories.map(_.apply(dateCreated)).sequence
   } yield ProjectWithoutParent(path,
                                name,
+                               maybeDescription,
                                agent,
                                dateCreated,
                                maybeCreator,
                                visibility,
                                forksCount,
+                               keywords,
                                members ++ maybeCreator,
                                version,
                                activities,
@@ -98,20 +108,44 @@ trait ProjectEntitiesGenerators {
   def fixedForksCount(count: Int Refined Positive): Gen[ForksCount.NonZero] = ForksCount(count)
 
   implicit lazy val gitLabProjectInfos: Gen[GitLabProjectInfo] = for {
-    name            <- projectNames
-    path            <- projectPaths
-    dateCreated     <- projectCreatedDates()
-    maybeCreator    <- projectMemberObjects.toGeneratorOfOptions
-    members         <- projectMemberObjects.toGeneratorOfSet()
-    visibility      <- projectVisibilities
-    maybeParentPath <- projectPaths.toGeneratorOfOptions
-  } yield GitLabProjectInfo(name, path, dateCreated, maybeCreator, members, visibility, maybeParentPath)
+    id               <- projectIds
+    name             <- projectNames
+    path             <- projectPaths
+    maybeDescription <- projectDescriptions.toGeneratorOfOptions
+    dateCreated      <- projectCreatedDates()
+    maybeCreator     <- projectMembers.toGeneratorOfOptions
+    keywords         <- projectKeywords.toGeneratorOfSet(minElements = 0)
+    members          <- projectMembers.toGeneratorOfList(minElements = 1).map(_.toSet)
+    visibility       <- projectVisibilities
+    maybeParentPath  <- projectPaths.toGeneratorOfOptions
+  } yield GitLabProjectInfo(id,
+                            name,
+                            path,
+                            dateCreated,
+                            maybeDescription,
+                            maybeCreator,
+                            keywords,
+                            members,
+                            visibility,
+                            maybeParentPath
+  )
 
-  implicit lazy val projectMemberObjects: Gen[ProjectMember] = for {
+  implicit lazy val projectMembersNoEmail: Gen[ProjectMemberNoEmail] = for {
     name     <- userNames
     username <- usernames
     gitLabId <- userGitLabIds
-  } yield ProjectMember(name, username, gitLabId)
+  } yield ProjectMemberNoEmail(name, username, gitLabId)
+
+  implicit lazy val projectMembersWithEmail: Gen[ProjectMemberWithEmail] = for {
+    memberNoEmail <- projectMembersNoEmail
+    email         <- userEmails
+  } yield memberNoEmail add email
+
+  lazy val projectMembers: Gen[ProjectMember] = Gen.oneOf(projectMembersNoEmail, projectMembersWithEmail)
+
+  implicit class ProjectMemberGenOps(membersGen: Gen[ProjectMember]) {
+    def modify(f: ProjectMember => ProjectMember): Gen[ProjectMember] = membersGen.map(f)
+  }
 
   implicit class ProjectGenFactoryOps[FC <: ForksCount](projectGen: Gen[Project])(implicit renkuBaseUrl: RenkuBaseUrl) {
 
@@ -170,6 +204,10 @@ trait ProjectEntitiesGenerators {
       case project: ProjectWithParent    => f(project)
     }
 
+    def noEmailsOnMembers: Gen[Project] =
+      modify(membersLens.modify(_.map(_.copy(maybeEmail = None))))
+        .modify(creatorLens.modify(_.map(_.copy(maybeEmail = None))))
+
     def forkOnce(): Gen[(Project, ProjectWithParent)] = projectGen.map(_.forkOnce())
   }
 
@@ -212,6 +250,14 @@ trait ProjectEntitiesGenerators {
     def forkOnce(): Gen[(T, (Project, ProjectWithParent))] =
       tupleGen map { case (entities, project) => entities -> project.forkOnce() }
   }
+
+  lazy val memberGitLabIdLens: Lens[ProjectMember, users.GitLabId] =
+    Lens[ProjectMember, users.GitLabId](_.gitLabId) { gitLabId =>
+      {
+        case member: ProjectMember.ProjectMemberNoEmail   => member.copy(gitLabId = gitLabId)
+        case member: ProjectMember.ProjectMemberWithEmail => member.copy(gitLabId = gitLabId)
+      }
+    }
 
   lazy val membersLens: Lens[Project, Set[Person]] =
     Lens[Project, Set[Person]](_.members) { members =>

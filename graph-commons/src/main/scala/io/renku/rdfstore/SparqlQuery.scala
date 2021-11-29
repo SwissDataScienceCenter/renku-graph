@@ -76,6 +76,9 @@ object SparqlQuery {
   }
 
   object Prefixes {
+
+    lazy val empty: Set[Prefix] = Set.empty
+
     def of(first: (Schema, String Refined NonEmpty), other: (Schema, String Refined NonEmpty)*): Set[Prefix] =
       (first +: other).map { case (schema, name) => Prefix(name, schema) }.toSet
   }

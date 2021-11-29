@@ -30,6 +30,7 @@ import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.graph.tokenrepository.AccessTokenFinder.projectPathToPath
 import io.renku.http.client.AccessToken
+import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.projects.model
 import io.renku.knowledgegraph.projects.rest.Converters._
 import io.renku.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
@@ -45,13 +46,14 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
   "findProject" should {
 
     "merge the project metadata found in the KG and in GitLab" in new TestCase {
+      val maybeAuthUser = authUsers.generateSome
+
       val kgProject = anyProjectEntities.generateOne.to[KGProject]
       (kgProjectFinder
-        .findProject(_: Path))
-        .expects(kgProject.path)
+        .findProject(_: Path, _: Option[AuthUser]))
+        .expects(kgProject.path, maybeAuthUser)
         .returning(kgProject.some.pure[IO])
 
-      val maybeAuthUser = authUsers.generateSome
       val gitLabProject = gitLabProjects.generateOne
       (gitLabProjectFinder
         .findProject(_: Path, _: Option[AccessToken]))
@@ -67,8 +69,8 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
 
       val kgProject = anyProjectEntities.generateOne.to[KGProject]
       (kgProjectFinder
-        .findProject(_: Path))
-        .expects(kgProject.path)
+        .findProject(_: Path, _: Option[AuthUser]))
+        .expects(kgProject.path, None)
         .returning(kgProject.some.pure[IO])
 
       val accessToken = accessTokens.generateOne
@@ -89,14 +91,14 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
     }
 
     "return None if there's no project for the path in the KG" in new TestCase {
+      val maybeAuthUser = authUsers.generateSome
 
       val projectPath = projectPaths.generateOne
       (kgProjectFinder
-        .findProject(_: Path))
-        .expects(projectPath)
+        .findProject(_: Path, _: Option[AuthUser]))
+        .expects(projectPath, maybeAuthUser)
         .returning(Option.empty[KGProject].pure[IO])
 
-      val maybeAuthUser = authUsers.generateSome
       val gitLabProject = gitLabProjects.generateOne
       (gitLabProjectFinder
         .findProject(_: Path, _: Option[AccessToken]))
@@ -107,14 +109,14 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
     }
 
     "return None if there's no project for the path in GitLab" in new TestCase {
+      val maybeAuthUser = authUsers.generateSome
 
       val kgProject = anyProjectEntities.generateOne.to[KGProject]
       (kgProjectFinder
-        .findProject(_: Path))
-        .expects(kgProject.path)
+        .findProject(_: Path, _: Option[AuthUser]))
+        .expects(kgProject.path, maybeAuthUser)
         .returning(kgProject.some.pure[IO])
 
-      val maybeAuthUser = authUsers.generateSome
       (gitLabProjectFinder
         .findProject(_: Path, _: Option[AccessToken]))
         .expects(kgProject.path, maybeAuthUser.map(_.accessToken))
@@ -127,8 +129,8 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
 
       val kgProject = anyProjectEntities.generateOne.to[KGProject]
       (kgProjectFinder
-        .findProject(_: Path))
-        .expects(kgProject.path)
+        .findProject(_: Path, _: Option[AuthUser]))
+        .expects(kgProject.path, None)
         .returning(kgProject.some.pure[IO])
 
       (accessTokenFinder
@@ -140,15 +142,15 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
     }
 
     "fail if finding project in the KG failed" in new TestCase {
+      val maybeAuthUser = authUsers.generateSome
+      val projectPath   = projectPaths.generateOne
 
-      val projectPath = projectPaths.generateOne
-      val exception   = exceptions.generateOne
+      val exception = exceptions.generateOne
       (kgProjectFinder
-        .findProject(_: Path))
-        .expects(projectPath)
+        .findProject(_: Path, _: Option[AuthUser]))
+        .expects(projectPath, maybeAuthUser)
         .returning(exception.raiseError[IO, Option[KGProject]])
 
-      val maybeAuthUser = authUsers.generateSome
       (gitLabProjectFinder
         .findProject(_: Path, _: Option[AccessToken]))
         .expects(projectPath, maybeAuthUser.map(_.accessToken))
@@ -164,8 +166,8 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
 
       val kgProject = anyProjectEntities.generateOne.to[KGProject]
       (kgProjectFinder
-        .findProject(_: Path))
-        .expects(kgProject.path)
+        .findProject(_: Path, _: Option[AuthUser]))
+        .expects(kgProject.path, None)
         .returning(Some(kgProject).pure[IO])
 
       val exception = exceptions.generateOne
@@ -181,14 +183,15 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
 
     "fail if finding project in GitLab failed" in new TestCase {
 
-      val kgProject = anyProjectEntities.generateOne.to[KGProject]
+      val maybeAuthUser = authUsers.generateSome
+      val kgProject     = anyProjectEntities.generateOne.to[KGProject]
+
       (kgProjectFinder
-        .findProject(_: Path))
-        .expects(kgProject.path)
+        .findProject(_: Path, _: Option[AuthUser]))
+        .expects(kgProject.path, maybeAuthUser)
         .returning(Some(kgProject).pure[IO])
 
-      val maybeAuthUser = authUsers.generateSome
-      val exception     = exceptions.generateOne
+      val exception = exceptions.generateOne
       (gitLabProjectFinder
         .findProject(_: Path, _: Option[AccessToken]))
         .expects(kgProject.path, maybeAuthUser.map(_.accessToken))
@@ -212,7 +215,7 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
       id = gitLabProject.id,
       path = kgProject.path,
       name = kgProject.name,
-      maybeDescription = gitLabProject.maybeDescription,
+      maybeDescription = kgProject.maybeDescription,
       visibility = kgProject.visibility,
       created = model.Creation(
         date = kgProject.created.date,
@@ -232,7 +235,7 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
           )
         }
       ),
-      tags = gitLabProject.tags,
+      keywords = kgProject.keywords,
       starsCount = gitLabProject.starsCount,
       permissions = gitLabProject.permissions,
       statistics = gitLabProject.statistics,

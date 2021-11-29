@@ -193,7 +193,7 @@ abstract class RestClient[F[_]: Async: Logger, ThrottlingTarget](
       throttler.release() >> ClientException(LogMessage(request.request, exception), exception).raiseError[F, T]
   }
 
-  private type ResponseMapping[ResultType] =
+  protected type ResponseMapping[ResultType] =
     PartialFunction[(Status, Request[F], Response[F]), F[ResultType]]
 
   private implicit class HttpRequestOps(request: HttpRequest[F]) {
@@ -251,7 +251,7 @@ abstract class RestClient[F[_]: Async: Logger, ThrottlingTarget](
         val multipart = Multipart[F](parts)
         request
           .withEntity(multipart)
-          .withHeaders(multipart.headers.headers.filterNot(_.name == CIString("transfer-encoding")))
+          .withHeaders(multipart.headers.headers.filterNot(_.name == ci"transfer-encoding"))
       }
     }
   }
@@ -298,8 +298,8 @@ object RestClient {
 
     override def encode[F[_]](name: String, value: ByteArrayTinyType with ZippedContent): Part[F] = Part(
       Headers(
-        `Content-Disposition`("form-data", Map(CIString("name") -> name)),
-        Header.Raw(CIString("Content-Transfer-Encoding"), "binary"),
+        `Content-Disposition`("form-data", Map(ci"name" -> name)),
+        Header.Raw(ci"Content-Transfer-Encoding", "binary"),
         `Content-Type`(MediaType.application.zip)
       ),
       body = Stream.emits(value.value)

@@ -28,15 +28,13 @@ import io.renku.graph.acceptancetests.data.Project.{Urls, _}
 import io.renku.graph.acceptancetests.data.{Project, _}
 import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
 import io.renku.graph.acceptancetests.tooling.GraphServices
-import io.renku.graph.acceptancetests.tooling.ResponseTools._
-import io.renku.graph.acceptancetests.tooling.TestReadabilityTools._
 import io.renku.graph.model.projects.{DateCreated, ForksCount}
 import io.renku.graph.model.testentities
 import io.renku.graph.model.testentities.Project._
 import io.renku.graph.model.testentities._
 import io.renku.http.client.AccessToken
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
-import io.renku.http.server.EndpointTester._
+import io.renku.http.server.EndpointTester.{JsonOps, jsonEntityDecoder}
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
 import org.http4s.Status._
@@ -94,16 +92,21 @@ class ProjectsResourcesSpec
 
       Then("he should get OK response with project's details")
       projectDetailsResponse.status shouldBe Ok
-      val Right(projectDetails) = projectDetailsResponse.bodyAsJson.as[Json]
+      val projectDetails = projectDetailsResponse.jsonBody
       projectDetails shouldBe fullJson(project)
 
       When("user then fetches project's datasets using the link from the response")
-      val datasetsLink = projectDetails._links.get(Rel("datasets")) getOrFail (message = "No link with rel 'datasets'")
-      val datasetsResponse = restClient GET datasetsLink.toString
+      val datasetsLink = projectDetails._links.fold(throw _, identity).get(Rel("datasets")) getOrElse fail(
+        "No link with rel 'datasets'"
+      )
+      val datasetsResponse = restClient
+        .GET(datasetsLink.href.toString, accessToken)
+        .flatMap(response => response.as[Json].map(json => response.status -> json))
+        .unsafeRunSync()
 
       Then("he should get OK response with the projects datasets")
-      datasetsResponse.status shouldBe Ok
-      val Right(foundDatasets) = datasetsResponse.bodyAsJson.as[List[Json]]
+      datasetsResponse._1 shouldBe Ok
+      val Right(foundDatasets) = datasetsResponse._2.as[List[Json]]
       foundDatasets should contain theSameElementsAs List(briefJson(dataset, project.path))
 
       When("there's an authenticated user who is not project member")
@@ -115,7 +118,7 @@ class ProjectsResourcesSpec
         knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", nonMemberAccessToken)
 
       Then("he should get NOT_FOUND response")
-      projectDetailsResponseForNonMember.status shouldBe Ok // NotFound after the security is back
+      projectDetailsResponseForNonMember.status shouldBe NotFound
     }
   }
 }
@@ -131,7 +134,7 @@ object ProjectsResources {
     "updatedAt":   ${project.updatedAt.value},
     "urls":        ${project.urls.toJson},
     "forking":     ${project.entitiesProject.forksCount -> project.entitiesProject},
-    "tags":        ${project.tags.map(_.value).toList},
+    "keywords":    ${project.entitiesProject.keywords.map(_.value).toList.sorted},
     "starsCount":  ${project.starsCount.value},
     "permissions": ${toJson(project.permissions)},
     "statistics": {
@@ -148,15 +151,13 @@ object ProjectsResources {
       Link(Rel("datasets") -> Href(renkuResourcesUrl / "projects" / project.path / "datasets"))
     )
   } deepMerge {
-    project.maybeDescription
-      .map { description =>
-        json"""{"description": ${description.value} }"""
-      }
+    project.entitiesProject.maybeDescription
+      .map(description => json"""{"description": ${description.value} }""")
       .getOrElse(Json.obj())
   }
 
   private implicit class UrlsOps(urls: Urls) {
-    import io.renku.json.JsonOps._
+    import io.renku.json.JsonOps.JsonOps
 
     lazy val toJson: Json = json"""{
       "ssh":       ${urls.ssh.value},

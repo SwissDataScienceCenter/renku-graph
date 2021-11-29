@@ -38,7 +38,9 @@ private trait Converters {
         ),
         project.visibility,
         project.parent.to[Parent].some,
-        project.version
+        project.version,
+        project.maybeDescription,
+        project.keywords
       )
     case project: Project =>
       KGProject(
@@ -49,7 +51,9 @@ private trait Converters {
         ),
         project.visibility,
         maybeParent = None,
-        project.version
+        project.version,
+        project.maybeDescription,
+        project.keywords
       )
   }
 

@@ -31,7 +31,7 @@ import io.renku.tinytypes.constraints._
 case class Plan(id:                        Id,
                 name:                      Name,
                 maybeDescription:          Option[Description],
-                command:                   Command,
+                maybeCommand:              Option[Command],
                 dateCreated:               DateCreated,
                 maybeProgrammingLanguage:  Option[ProgrammingLanguage],
                 keywords:                  List[Keyword],
@@ -53,14 +53,14 @@ object Plan {
 
   def of(
       name:                      Name,
-      command:                   Command,
+      maybeCommand:              Option[Command],
       dateCreated:               DateCreated,
       commandParameterFactories: List[Position => Plan => CommandParameterBase]
   ): Plan = Plan(
     Id.generate,
     name,
     maybeDescription = None,
-    command,
+    maybeCommand,
     dateCreated,
     maybeProgrammingLanguage = None,
     keywords = Nil,
@@ -88,7 +88,7 @@ object Plan {
         plans.ResourceId(plan.asEntityId.show),
         plan.name,
         plan.maybeDescription,
-        plan.command,
+        plan.maybeCommand,
         plan.dateCreated,
         plan.maybeProgrammingLanguage,
         plan.keywords,

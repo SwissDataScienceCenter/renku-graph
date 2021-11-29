@@ -22,25 +22,47 @@ import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model._
+import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember, entityTypes}
-import io.renku.graph.model.projects.{DateCreated, ResourceId}
+import io.renku.graph.model.projects.{DateCreated, Description, Keyword, ResourceId}
+import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders.decodeBlankStringToNone
 import io.renku.jsonld.{Cursor, JsonLDDecoder}
 
 object ProjectJsonLDDecoder {
 
   def apply(gitLabInfo: GitLabProjectInfo)(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDDecoder[Project] =
     JsonLDDecoder.entity(entityTypes) { implicit cursor =>
+      val maybeDescriptionR = cursor
+        .downField(schema / "description")
+        .as[Option[Description]]
+        .map(_ orElse gitLabInfo.maybeDescription)
+      val keywordsR = cursor.downField(schema / "keywords").as[List[Option[Keyword]]].map(_.flatten.toSet).map {
+        case kwrds if kwrds.isEmpty => gitLabInfo.keywords
+        case kwrds                  => kwrds
+      }
+
       for {
-        agent         <- cursor.downField(schema / "agent").as[CliVersion]
-        schemaVersion <- cursor.downField(schema / "schemaVersion").as[SchemaVersion]
-        dateCreated   <- cursor.downField(schema / "dateCreated").as[DateCreated]
-        allPersons    <- findAllPersons(gitLabInfo)
-        activities    <- findAllActivities(gitLabInfo)
-        datasets      <- findAllDatasets(gitLabInfo)
-        resourceId    <- ResourceId(gitLabInfo.path).asRight
+        agent            <- cursor.downField(schema / "agent").as[CliVersion]
+        version          <- cursor.downField(schema / "schemaVersion").as[SchemaVersion]
+        dateCreated      <- cursor.downField(schema / "dateCreated").as[DateCreated]
+        maybeDescription <- maybeDescriptionR
+        keywords         <- keywordsR
+        allPersons       <- findAllPersons(gitLabInfo)
+        activities       <- findAllActivities(gitLabInfo)
+        datasets         <- findAllDatasets(gitLabInfo)
+        resourceId       <- ResourceId(gitLabInfo.path).asRight
         earliestDate = List(dateCreated, gitLabInfo.dateCreated).min
-        project <-
-          newProject(gitLabInfo, resourceId, earliestDate, agent, schemaVersion, allPersons, activities, datasets)
+        project <- newProject(gitLabInfo,
+                              resourceId,
+                              earliestDate,
+                              maybeDescription,
+                              agent,
+                              keywords,
+                              version,
+                              allPersons,
+                              activities,
+                              datasets
+                   )
       } yield project
     }
 
@@ -79,27 +101,13 @@ object ProjectJsonLDDecoder {
       )
     )
 
-  private def matchByNameOrUsername(member: ProjectMember): users.Name => Boolean =
-    name => name == member.name || name.value == member.username.value
-
-  private def byNameUsernameOrAlternateName(member: ProjectMember): Person => Boolean =
-    person =>
-      matchByNameOrUsername(member)(person.name) ||
-        person.alternativeNames.exists(matchByNameOrUsername(member))
-
-  private def toPerson(projectMember: ProjectMember)(implicit renkuBaseUrl: RenkuBaseUrl): Person = Person(
-    users.ResourceId(projectMember.gitLabId),
-    projectMember.name,
-    None,
-    None,
-    projectMember.gitLabId.some
-  )
-
   private def newProject(gitLabInfo:       GitLabProjectInfo,
                          resourceId:       ResourceId,
                          dateCreated:      DateCreated,
+                         maybeDescription: Option[Description],
                          agent:            CliVersion,
-                         schemaVersion:    SchemaVersion,
+                         keywords:         Set[Keyword],
+                         version:          SchemaVersion,
                          allJsonLdPersons: Set[Person],
                          activities:       List[Activity],
                          datasets:         List[Dataset[Dataset.Provenance]]
@@ -111,12 +119,14 @@ object ProjectJsonLDDecoder {
             resourceId,
             gitLabInfo.path,
             gitLabInfo.name,
+            maybeDescription,
             agent,
             dateCreated,
             maybeCreator(allJsonLdPersons)(gitLabInfo),
             gitLabInfo.visibility,
+            keywords,
             members(allJsonLdPersons)(gitLabInfo),
-            schemaVersion,
+            version,
             activities,
             datasets,
             parentResourceId = ResourceId(parentPath)
@@ -127,12 +137,14 @@ object ProjectJsonLDDecoder {
             resourceId,
             gitLabInfo.path,
             gitLabInfo.name,
+            maybeDescription,
             agent,
             dateCreated,
             maybeCreator(allJsonLdPersons)(gitLabInfo),
             gitLabInfo.visibility,
+            keywords,
             members(allJsonLdPersons)(gitLabInfo),
-            schemaVersion,
+            version,
             activities,
             datasets
           )
@@ -145,8 +157,8 @@ object ProjectJsonLDDecoder {
   )(gitLabInfo:         GitLabProjectInfo)(implicit renkuBaseUrl: RenkuBaseUrl): Option[Person] =
     gitLabInfo.maybeCreator.map { creator =>
       allJsonLdPersons
-        .find(byNameUsernameOrAlternateName(creator))
-        .map(_.copy(maybeGitLabId = Some(creator.gitLabId)))
+        .find(byEmailOrUsername(creator))
+        .map(merge(creator))
         .getOrElse(toPerson(creator))
     }
 
@@ -155,8 +167,39 @@ object ProjectJsonLDDecoder {
   )(gitLabInfo:         GitLabProjectInfo)(implicit renkuBaseUrl: RenkuBaseUrl): Set[Person] =
     gitLabInfo.members.map(member =>
       allJsonLdPersons
-        .find(byNameUsernameOrAlternateName(member))
-        .map(_.copy(maybeGitLabId = Some(member.gitLabId)))
+        .find(byEmailOrUsername(member))
+        .map(merge(member))
         .getOrElse(toPerson(member))
     )
+
+  private lazy val byEmailOrUsername: ProjectMember => Person => Boolean = {
+    case member: ProjectMemberWithEmail =>
+      person =>
+        person.maybeEmail match {
+          case Some(personEmail) => personEmail == member.email
+          case None              => person.name.value == member.username.value
+        }
+    case member: ProjectMemberNoEmail => person => person.name.value == member.username.value
+  }
+
+  private def merge(member: Project.ProjectMember)(implicit renkuBaseUrl: RenkuBaseUrl): Person => Person =
+    member match {
+      case ProjectMemberWithEmail(name, _, gitLabId, email) =>
+        person =>
+          person.copy(resourceId = users.ResourceId(gitLabId),
+                      name = name,
+                      maybeEmail = email.some,
+                      maybeGitLabId = gitLabId.some
+          )
+      case ProjectMemberNoEmail(name, _, gitLabId) =>
+        person => person.copy(name = name, maybeGitLabId = gitLabId.some)
+    }
+
+  private def toPerson(projectMember: ProjectMember)(implicit renkuBaseUrl: RenkuBaseUrl): Person =
+    projectMember match {
+      case ProjectMemberNoEmail(name, _, gitLabId) =>
+        Person(users.ResourceId(gitLabId), name, maybeGitLabId = gitLabId.some)
+      case ProjectMemberWithEmail(name, _, gitLabId, email) =>
+        Person(users.ResourceId(gitLabId), name, maybeGitLabId = gitLabId.some, maybeEmail = email.some)
+    }
 }

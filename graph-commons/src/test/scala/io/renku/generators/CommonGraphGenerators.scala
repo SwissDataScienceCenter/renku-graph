@@ -29,7 +29,8 @@ import io.renku.control.{RateLimit, RateLimitUnit}
 import io.renku.crypto.AesCrypto
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators.userGitLabIds
+import io.renku.graph.http.server.security.Authorizer.AuthContext
+import io.renku.graph.model.GraphModelGenerators.{projectPaths, userGitLabIds}
 import io.renku.graph.model.Schemas
 import io.renku.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import io.renku.http.client.RestClientError._
@@ -43,7 +44,7 @@ import io.renku.http.server.security.EndpointSecurityException.{AuthenticationFa
 import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.Schema
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
-import io.renku.microservices.MicroserviceBaseUrl
+import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}
 import io.renku.rdfstore._
 import org.http4s.Status
 import org.http4s.Status._
@@ -110,6 +111,9 @@ object CommonGraphGenerators {
     ip3  <- positiveInts(999)
     ip4  <- positiveInts(999)
   } yield MicroserviceBaseUrl(s"$protocol://$ip1$ip2$ip3$ip4:$port")
+
+  implicit val microserviceIdentifiers: Gen[MicroserviceIdentifier] =
+    Gen.uuid map (_ => MicroserviceIdentifier.generate)
 
   implicit val renkuResourcesUrls: Gen[renku.ResourcesUrl] = for {
     url  <- httpUrls()
@@ -253,4 +257,10 @@ object CommonGraphGenerators {
     gitLabId    <- userGitLabIds
     accessToken <- accessTokens
   } yield AuthUser(gitLabId, accessToken)
+
+  implicit def authContexts[Key](implicit keysGen: Gen[Key]): Gen[AuthContext[Key]] = for {
+    maybeAuthUser   <- authUsers.toGeneratorOfOptions
+    key             <- keysGen
+    allowedProjects <- projectPaths.toGeneratorOfSet(minElements = 0)
+  } yield AuthContext(maybeAuthUser, key, allowedProjects)
 }

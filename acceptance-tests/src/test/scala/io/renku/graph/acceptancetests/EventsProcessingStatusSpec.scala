@@ -27,7 +27,6 @@ import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.AccessTokenPresence
 import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
-import io.renku.graph.acceptancetests.tooling.ResponseTools._
 import io.renku.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.CommitId
@@ -71,7 +70,7 @@ class EventsProcessingStatusSpec
       Then("the status endpoint should return OK with done = total = 0")
       val noEventsResponse = webhookServiceClient GET s"projects/${project.id}/events/status"
       noEventsResponse.status shouldBe Ok
-      val noEventsResponseJson = noEventsResponse.bodyAsJson.hcursor
+      val noEventsResponseJson = noEventsResponse.jsonBody.hcursor
       noEventsResponseJson.downField("done").as[Int]        shouldBe Right(0)
       noEventsResponseJson.downField("total").as[Int]       shouldBe Right(0)
       noEventsResponseJson.downField("progress").as[Double] shouldBe a[Left[_, _]]
@@ -85,7 +84,7 @@ class EventsProcessingStatusSpec
 
         response.status shouldBe Ok
 
-        val responseJson = response.bodyAsJson.hcursor
+        val responseJson = response.jsonBody.hcursor
         val Right(done)  = responseJson.downField("done").as[Int]
         val Right(total) = responseJson.downField("total").as[Int]
         done                                            should (be <= numberOfEvents.value and be >= 1)
@@ -112,10 +111,15 @@ class EventsProcessingStatusSpec
     val theMostRecentEventDate = Instant.now()
     allCommitIds.foldLeft(Option.empty[CommitId]) { (maybePreviousCommitId, commitId) =>
       // GitLab to return commit info about all the parent commits
-      `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project.id,
+      `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project,
                                                                                           commitId,
                                                                                           maybePreviousCommitId.toSet,
                                                                                           theMostRecentEventDate
+      )
+
+      `GET <gitlabApi>/users/:id/events/?action=pushed&page=1 returning OK`(project.entitiesProject.maybeCreator,
+                                                                            project,
+                                                                            commitId
       )
 
       // making the triples generation process happy and not throwing exceptions to the logs

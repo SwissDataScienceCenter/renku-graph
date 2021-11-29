@@ -8,6 +8,12 @@
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
         "name": "Annotations & Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
         "type": "dashboard"
       }
     ]
@@ -16,7 +22,7 @@
   "gnetId": null,
   "graphTooltip": 0,
   "id": 20,
-  "iteration": 1632502542540,
+  "iteration": 1636045302833,
   "links": [],
   "panels": [
     {
@@ -66,7 +72,7 @@
       },
       "paceLength": 10,
       "percentage": false,
-      "pluginVersion": "8.0.5",
+      "pluginVersion": "8.1.6",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -200,7 +206,7 @@
       },
       "paceLength": 10,
       "percentage": false,
-      "pluginVersion": "8.0.5",
+      "pluginVersion": "8.1.6",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -308,7 +314,7 @@
       },
       "paceLength": 10,
       "percentage": false,
-      "pluginVersion": "8.0.5",
+      "pluginVersion": "8.1.6",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -414,7 +420,7 @@
       },
       "paceLength": 10,
       "percentage": false,
-      "pluginVersion": "8.0.5",
+      "pluginVersion": "8.1.6",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -522,7 +528,7 @@
       },
       "paceLength": 10,
       "percentage": false,
-      "pluginVersion": "8.0.5",
+      "pluginVersion": "8.1.6",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -630,7 +636,7 @@
       },
       "paceLength": 10,
       "percentage": false,
-      "pluginVersion": "8.0.5",
+      "pluginVersion": "8.1.6",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -734,7 +740,7 @@
       },
       "paceLength": 10,
       "percentage": false,
-      "pluginVersion": "8.0.5",
+      "pluginVersion": "8.1.6",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -881,7 +887,7 @@
       },
       "paceLength": 10,
       "percentage": false,
-      "pluginVersion": "8.0.5",
+      "pluginVersion": "8.1.6",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -987,7 +993,7 @@
       },
       "paceLength": 10,
       "percentage": false,
-      "pluginVersion": "8.0.5",
+      "pluginVersion": "8.1.6",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1088,7 +1094,7 @@
       },
       "paceLength": 10,
       "percentage": false,
-      "pluginVersion": "8.0.5",
+      "pluginVersion": "8.1.6",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1163,6 +1169,124 @@
         "align": false,
         "alignLevel": null
       }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
+      "fill": 0,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 54
+      },
+      "hiddenSeries": false,
+      "id": 23,
+      "legend": {
+        "alignAsTable": true,
+        "avg": false,
+        "current": true,
+        "max": false,
+        "min": false,
+        "rightSide": true,
+        "show": true,
+        "sideWidth": 430,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "8.1.6",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "rate(container_cpu_user_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"event-log\"}[5m])",
+          "interval": "",
+          "legendFormat": "User",
+          "refId": "C"
+        },
+        {
+          "exemplar": true,
+          "expr": "rate(container_cpu_system_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"event-log\"}[5m])",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "System",
+          "refId": "A"
+        },
+        {
+          "exemplar": true,
+          "expr": "rate(container_cpu_usage_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"event-log\"}[5m])",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "Total",
+          "refId": "B"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Event Log cpu",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "$$hashKey": "object:79",
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "$$hashKey": "object:80",
+          "decimals": null,
+          "format": "short",
+          "label": "",
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
     }
   ],
   "refresh": "1m",
@@ -1177,8 +1301,8 @@
         "allValue": null,
         "current": {
           "selected": false,
-          "text": "renku-ci-gr-738",
-          "value": "renku-ci-gr-738"
+          "text": "renku-kg-dev",
+          "value": "renku-kg-dev"
         },
         "datasource": "Prometheus",
         "definition": "server_request_count",
@@ -1206,7 +1330,7 @@
     ]
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-3h",
     "to": "now"
   },
   "timepicker": {
@@ -1236,5 +1360,5 @@
   "timezone": "",
   "title": "Renku Event Log",
   "uid": "cb9J1WBZz",
-  "version": 23
+  "version": 26
 }

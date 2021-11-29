@@ -20,10 +20,8 @@ package io.renku.knowledgegraph.datasets.rest
 
 import cats.MonadThrow
 import cats.effect.kernel.Async
-import io.renku.graph.model.RenkuBaseUrl
 import io.renku.graph.model.datasets.{DerivedFrom, Identifier, ImageUri, InitialVersion, Name, SameAs, Title}
-import io.renku.graph.model.projects.{Path, ResourceId}
-import io.renku.graph.model.views.RdfResource
+import io.renku.graph.model.projects.Path
 import io.renku.knowledgegraph.datasets.rest.ProjectDatasetsFinder.{ProjectDataset, SameAsOrDerived}
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
@@ -37,17 +35,14 @@ private object ProjectDatasetsFinder {
   type SameAsOrDerived = Either[SameAs, DerivedFrom]
   type ProjectDataset  = (Identifier, InitialVersion, Title, Name, SameAsOrDerived, List[ImageUri])
 
-  def apply[F[_]: Async: Logger](rdfStoreConfig: RdfStoreConfig,
-                                 renkuBaseUrl: RenkuBaseUrl,
-                                 timeRecorder: SparqlQueryTimeRecorder[F]
-  ) = MonadThrow[F].catchNonFatal(
-    new ProjectDatasetsFinderImpl[F](rdfStoreConfig, renkuBaseUrl, timeRecorder)
-  )
+  def apply[F[_]: Async: Logger](rdfStoreConfig: RdfStoreConfig, timeRecorder: SparqlQueryTimeRecorder[F]) =
+    MonadThrow[F].catchNonFatal(
+      new ProjectDatasetsFinderImpl[F](rdfStoreConfig, timeRecorder)
+    )
 }
 
 private class ProjectDatasetsFinderImpl[F[_]: Async: Logger](
     rdfStoreConfig: RdfStoreConfig,
-    renkuBaseUrl:   RenkuBaseUrl,
     timeRecorder:   SparqlQueryTimeRecorder[F]
 ) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
     with ProjectDatasetsFinder[F] {
@@ -64,8 +59,9 @@ private class ProjectDatasetsFinderImpl[F[_]: Async: Logger](
     Prefixes.of(renku -> "renku", schema -> "schema", prov -> "prov"),
     s"""|SELECT ?identifier ?name ?slug ?topmostSameAs ?maybeDerivedFrom ?initialVersion (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
         |WHERE {
-        |    ${ResourceId(path)(renkuBaseUrl).showAs[RdfResource]} a schema:Project;
-        |                                                          renku:hasDataset ?datasetId.
+        |   ?projectId a schema:Project;
+        |              renku:projectPath '$path';
+        |              renku:hasDataset ?datasetId.
         |    ?datasetId a schema:Dataset;
         |               schema:identifier ?identifier;
         |               schema:name ?name;

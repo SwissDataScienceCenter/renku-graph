@@ -83,12 +83,12 @@ private class AllEventsToNewUpdater[F[_]: MonadCancelThrow](
 
   private def removeAwaitingDeletionEvents() = measureExecutionTime {
     SqlStatement(name = "all_to_new - awaiting_deletions removal")
-      .command[skunk.Void](
+      .command[EventStatus](
         sql"""DELETE FROM event
-              WHERE event_id = '#${EventStatus.AwaitingDeletion.value}'
+              WHERE status = $eventStatusEncoder
         """.command
       )
-      .arguments(skunk.Void)
+      .arguments(EventStatus.AwaitingDeletion)
       .build
       .void
   }

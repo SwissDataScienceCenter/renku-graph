@@ -69,7 +69,7 @@ class AllEventsToNewUpdaterSpec
       val skippedEvent          = addEvent(EventStatus.Skipped, skippedEventProjectId)
 
       val awaitingDeletionEventProjectId = projectIds.generateOne
-      val awaitingDeletionEvent          = addEvent(EventStatus.AwaitingDeletion, skippedEventProjectId)
+      val awaitingDeletionEvent          = addEvent(EventStatus.AwaitingDeletion, awaitingDeletionEventProjectId)
 
       eventIds.foreach(upsertEventDelivery(_, subscriberId))
 

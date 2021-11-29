@@ -18,17 +18,14 @@
 
 package io.renku.webhookservice.hookvalidation
 
-import cats.Applicative
-import cats.effect.{Async, MonadCancelThrow}
+import cats.effect.Async
 import cats.syntax.all._
-import io.circe.Decoder.decodeList
 import io.renku.config.GitLab
 import io.renku.control.Throttler
-import io.renku.graph.model.GitLabUrl
-import io.renku.graph.model.projects.Id
 import io.renku.http.client.{AccessToken, RestClient}
-import io.renku.webhookservice.hookvalidation.ProjectHookVerifier.HookIdentifier
-import io.renku.webhookservice.model.ProjectHookUrl
+import io.renku.webhookservice.hookfetcher.ProjectHookFetcher
+import io.renku.webhookservice.hookfetcher.ProjectHookFetcher.HookIdAndUrl
+import io.renku.webhookservice.model.{HookIdentifier, ProjectHookUrl}
 import org.typelevel.log4cats.Logger
 
 private trait ProjectHookVerifier[F[_]] {
@@ -39,45 +36,23 @@ private trait ProjectHookVerifier[F[_]] {
 }
 
 private object ProjectHookVerifier {
-  final case class HookIdentifier(projectId: Id, projectHookUrl: ProjectHookUrl)
 
-  def apply[F[_]: Async: Logger](gitLabUrl: GitLabUrl, gitlabThrottler: Throttler[F, GitLab]) =
-    Applicative[F].pure(new ProjectHookVerifierImpl[F](gitLabUrl, gitlabThrottler))
+  def apply[F[_]: Async: Logger](gitlabThrottler: Throttler[F, GitLab]) = for {
+    projectHookFetcher <- ProjectHookFetcher(gitlabThrottler)
+  } yield new ProjectHookVerifierImpl[F](projectHookFetcher, gitlabThrottler)
 }
 
 private class ProjectHookVerifierImpl[F[_]: Async: Logger](
-    gitLabUrl:       GitLabUrl,
-    gitLabThrottler: Throttler[F, GitLab]
+    projectHookFetcher: ProjectHookFetcher[F],
+    gitLabThrottler:    Throttler[F, GitLab]
 ) extends RestClient(gitLabThrottler)
     with ProjectHookVerifier[F] {
 
-  import io.circe._
-  import io.renku.http.client.RestClientError.UnauthorizedException
-  import org.http4s.Method.GET
-  import org.http4s.Status.Unauthorized
-  import org.http4s._
-  import org.http4s.circe._
-  import org.http4s.dsl.io._
-
   override def checkHookPresence(projectHookId: HookIdentifier, accessToken: AccessToken): F[Boolean] =
-    for {
-      uri                <- validateUri(s"$gitLabUrl/api/v4/projects/${projectHookId.projectId}/hooks")
-      existingHooksNames <- send(request(GET, uri, accessToken))(mapResponse)
-    } yield checkProjectHookExists(existingHooksNames, projectHookId.projectHookUrl)
+    projectHookFetcher.fetchProjectHooks(projectHookId.projectId, accessToken) map checkProjectHookExists(
+      projectHookId.projectHookUrl
+    )
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[List[String]]] = {
-    case (Ok, _, response)    => response.as[List[String]]
-    case (Unauthorized, _, _) => MonadCancelThrow[F].raiseError(UnauthorizedException)
-  }
-
-  private implicit lazy val hooksUrlsDecoder: EntityDecoder[F, List[String]] = {
-    implicit val hookNameDecoder: Decoder[List[String]] = decodeList {
-      _.downField("url").as[String]
-    }
-
-    jsonOf[F, List[String]]
-  }
-
-  private def checkProjectHookExists(hooksNames: List[String], urlToFind: ProjectHookUrl): Boolean =
-    hooksNames contains urlToFind.value
+  private def checkProjectHookExists(urlToFind: ProjectHookUrl): List[HookIdAndUrl] => Boolean = hooksIdsAndUrls =>
+    hooksIdsAndUrls.map(_.url.value) contains urlToFind.value
 }

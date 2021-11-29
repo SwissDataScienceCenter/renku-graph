@@ -26,6 +26,7 @@ import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.config.renku
 import io.renku.graph.config.GitLabUrlLoader
+import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.datasets.{Date, DateCreated, DatePublished, Identifier, ImageUri}
 import io.renku.http.InfoMessage._
@@ -41,7 +42,7 @@ import org.typelevel.log4cats.Logger
 import scala.util.control.NonFatal
 
 trait DatasetEndpoint[F[_]] {
-  def getDataset(identifier: Identifier): F[Response[F]]
+  def getDataset(identifier: Identifier, authContext: AuthContext[Identifier]): F[Response[F]]
 }
 
 class DatasetEndpointImpl[F[_]: MonadThrow: Logger](
@@ -56,9 +57,9 @@ class DatasetEndpointImpl[F[_]: MonadThrow: Logger](
   import io.renku.tinytypes.json.TinyTypeEncoders._
   import org.http4s.circe._
 
-  def getDataset(identifier: Identifier): F[Response[F]] = measureExecutionTime {
+  def getDataset(identifier: Identifier, authContext: AuthContext[Identifier]): F[Response[F]] = measureExecutionTime {
     datasetFinder
-      .findDataset(identifier)
+      .findDataset(identifier, authContext)
       .flatMap(toHttpResult(identifier))
       .recoverWith(httpResult(identifier))
   } map logExecutionTimeWhen(finishedSuccessfully(identifier))

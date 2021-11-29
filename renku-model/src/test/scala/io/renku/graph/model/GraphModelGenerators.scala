@@ -68,11 +68,11 @@ object GraphModelGenerators {
   implicit val userNames: Gen[users.Name] = for {
     first <- nonBlankStrings(
                minLength = 3,
-               charsGenerator = frequency(9 -> alphaChar, 1 -> oneOf('-', '_', '\\', '/', '`'))
+               charsGenerator = frequency(9 -> alphaChar, 1 -> oneOf('-', '_', '\\', '`'))
              )
     second <- nonBlankStrings(
                 minLength = 3,
-                charsGenerator = frequency(9 -> alphaChar, 1 -> oneOf('-', '_', '\\', '/', '`'))
+                charsGenerator = frequency(9 -> alphaChar, 1 -> oneOf('-', '_', '\\', '`'))
               )
   } yield Name(s"$first $second")
 
@@ -114,6 +114,9 @@ object GraphModelGenerators {
       path <- projectPaths
     } yield ResourceId.from(s"$renkuBaseUrl/projects/$path").fold(throw _, identity)
 
+  implicit val projectKeywords: Gen[projects.Keyword] =
+    nonBlankStrings(minLength = 5).map(v => projects.Keyword(v.value))
+
   implicit val projectSchemaVersions: Gen[SchemaVersion] = Gen
     .listOfN(3, positiveInts(max = 50))
     .map(_.mkString("."))
@@ -154,9 +157,9 @@ object GraphModelGenerators {
   lazy val datasetDates: Gen[Date] =
     Gen.oneOf(datasetCreatedDates(), datasetPublishedDates(DatePublished(LocalDate.EPOCH)))
 
-  implicit val datasetKeywords: Gen[Keyword] = nonBlankStrings(minLength = 5) map (_.value) map Keyword.apply
-  implicit val datasetLicenses: Gen[License] = httpUrls() map License.apply
-  implicit val datasetVersions: Gen[Version] = semanticVersions map Version.apply
+  implicit val datasetKeywords: Gen[datasets.Keyword] = nonBlankStrings(minLength = 5) map (_.value) map Keyword.apply
+  implicit val datasetLicenses: Gen[datasets.License] = httpUrls() map License.apply
+  implicit val datasetVersions: Gen[datasets.Version] = semanticVersions map Version.apply
 
   implicit val datasetPartExternals: Gen[PartExternal] = booleans map PartExternal.apply
   implicit val datasetPartSources:   Gen[PartSource]   = httpUrls() map PartSource.apply

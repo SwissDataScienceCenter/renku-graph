@@ -31,6 +31,5 @@ trait AccessTokenPresence extends should.Matchers {
 
   def givenAccessTokenPresentFor(project: Project)(implicit accessToken: AccessToken): Assertion =
     tokenRepositoryClient
-      .PUT(s"projects/${project.id}/tokens", accessToken.asJson, None)
-      .status shouldBe NoContent
+      .PUT(s"projects/${project.id}/tokens", accessToken.asJson, None) shouldBe NoContent
 }
