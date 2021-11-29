@@ -21,14 +21,13 @@ package io.renku.triplesgenerator.events.categories.cleanup
 import cats.effect.{Async, Concurrent, Spawn}
 import cats.syntax.all._
 import cats.{MonadThrow, Show}
-import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
 import io.renku.events.{EventRequestContent, consumers}
 import io.renku.graph.model.events.CategoryName
-import io.renku.metrics.MetricsRegistry
+import io.renku.rdfstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 private[events] class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
@@ -38,7 +37,7 @@ private[events] class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
     subscriptionMechanism:      SubscriptionMechanism[F],
     concurrentProcessesLimiter: ConcurrentProcessesLimiter[F]
 ) extends consumers.EventHandlerWithProcessLimiter[F](concurrentProcessesLimiter) {
-
+  println(subscriptionMechanism.toString) // TODO remove
   import eventBodyDeserializer.toCleanUpEvent
 
   override def createHandlingProcess(
@@ -48,7 +47,7 @@ private[events] class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
   private def startCleanUp(requestContent: EventRequestContent) = for {
     cleanupEvent <- toCleanUpEvent(requestContent.event).toRightT(recoverTo = BadRequest)
     result <- Spawn[F]
-                .start(eventProcessor.process(cleanupEvent))
+                .start(eventProcessor.process(cleanupEvent.project))
                 .toRightT
                 .map(_ => Accepted)
                 .semiflatTap(Logger[F].log(cleanupEvent.project.path))
@@ -65,12 +64,11 @@ object EventHandler {
   private val singleProcess = 1
 
   def apply[F[_]: Async: Logger](
-      metricsRegistry:       MetricsRegistry,
-      subscriptionMechanism: SubscriptionMechanism[F],
-      config:                Config = ConfigFactory.load()
+      sparqlQueryTimeRecorder: SparqlQueryTimeRecorder[F],
+      subscriptionMechanism:   SubscriptionMechanism[F]
   ): F[EventHandler[F]] = for {
     concurrentProcessLimiter <- ConcurrentProcessesLimiter(Refined.unsafeApply(singleProcess))
-    eventProcessor           <- CleanUpEventProcessor[F]()
+    eventProcessor           <- CleanUpEventProcessor[F](sparqlQueryTimeRecorder)
   } yield new EventHandler[F](categoryName,
                               eventProcessor,
                               EventBodyDeserializer[F],

@@ -22,18 +22,18 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.categoryAndUrlPayloadsComposerFactory
-import io.renku.metrics.MetricsRegistry
+import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.Microservice
 import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
   def apply[F[_]: Async: Logger](
-      metricsRegistry: MetricsRegistry
+      sparqlQueryTimeRecorder: SparqlQueryTimeRecorder[F]
   ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
     subscriptionMechanism <- SubscriptionMechanism[F](
                                categoryName,
                                categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort, Microservice.Identifier)
                              )
-    handler <- EventHandler(metricsRegistry, subscriptionMechanism)
+    handler <- EventHandler(sparqlQueryTimeRecorder, subscriptionMechanism)
   } yield handler -> subscriptionMechanism
 }

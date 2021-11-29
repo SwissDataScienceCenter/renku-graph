@@ -32,11 +32,7 @@ private trait EventBodyDeserializer[F[_]] {
 private class EventBodyDeserializerImpl[F[_]: MonadThrow] extends EventBodyDeserializer[F] {
 
   override def toCleanUpEvent(event: Json): F[CleanUpEvent] =
-    MonadThrow[F].fromEither {
-      event
-        .as[CleanUpEvent]
-        .leftMap(toMeaningfulError(event))
-    }
+    MonadThrow[F].fromEither(event.as[CleanUpEvent].leftMap(toMeaningfulError(event)))
 
   private implicit val commitsDecoder: Decoder[CleanUpEvent] = cursor =>
     for {

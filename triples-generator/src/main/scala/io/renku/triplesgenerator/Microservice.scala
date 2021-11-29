@@ -72,10 +72,12 @@ object Microservice extends IOMicroservice {
     membersSyncSubscription <- events.categories.membersync.SubscriptionFactory(gitLabThrottler, sparqlTimeRecorder)
     triplesGeneratedSubscription <-
       events.categories.triplesgenerated.SubscriptionFactory(metricsRegistry, gitLabThrottler, sparqlTimeRecorder)
+    cleanUpSubscription <- events.categories.cleanup.SubscriptionFactory(sparqlTimeRecorder)
     eventConsumersRegistry <- consumers.EventConsumersRegistry(
                                 awaitingGenerationSubscription,
                                 membersSyncSubscription,
-                                triplesGeneratedSubscription
+                                triplesGeneratedSubscription,
+                                cleanUpSubscription
                               )
     reProvisioningStatus    <- ReProvisioningStatus(eventConsumersRegistry, sparqlTimeRecorder)
     reProvisioning          <- ReProvisioning(reProvisioningStatus, renkuVersionPairs, sparqlTimeRecorder)
