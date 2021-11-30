@@ -185,21 +185,16 @@ object ProjectJsonLDDecoder {
   private def merge(member: Project.ProjectMember)(implicit renkuBaseUrl: RenkuBaseUrl): Person => Person =
     member match {
       case ProjectMemberWithEmail(name, _, gitLabId, email) =>
-        person =>
-          person.copy(resourceId = users.ResourceId(gitLabId),
-                      name = name,
-                      maybeEmail = email.some,
-                      maybeGitLabId = gitLabId.some
-          )
+        _.add(gitLabId).copy(name = name, maybeEmail = email.some)
       case ProjectMemberNoEmail(name, _, gitLabId) =>
-        person => person.copy(name = name, maybeGitLabId = gitLabId.some)
+        _.add(gitLabId).copy(name = name)
     }
 
   private def toPerson(projectMember: ProjectMember)(implicit renkuBaseUrl: RenkuBaseUrl): Person =
     projectMember match {
       case ProjectMemberNoEmail(name, _, gitLabId) =>
-        Person(users.ResourceId(gitLabId), name, maybeGitLabId = gitLabId.some)
+        Person.WithGitLabId(users.ResourceId(gitLabId), gitLabId, name, maybeEmail = None, maybeAffiliation = None)
       case ProjectMemberWithEmail(name, _, gitLabId, email) =>
-        Person(users.ResourceId(gitLabId), name, maybeGitLabId = gitLabId.some, maybeEmail = email.some)
+        Person.WithGitLabId(users.ResourceId(gitLabId), gitLabId, name, email.some, maybeAffiliation = None)
     }
 }
