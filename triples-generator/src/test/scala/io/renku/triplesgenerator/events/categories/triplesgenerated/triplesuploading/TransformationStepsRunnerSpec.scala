@@ -31,7 +31,7 @@ import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableE
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{ProjectWithQueries, Queries}
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
-import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.Generators._
+import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.Generators._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
