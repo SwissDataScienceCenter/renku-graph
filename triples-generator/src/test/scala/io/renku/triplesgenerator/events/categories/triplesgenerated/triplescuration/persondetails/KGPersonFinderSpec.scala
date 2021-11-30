@@ -20,7 +20,6 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescura
 
 import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
@@ -34,82 +33,24 @@ class KGPersonFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
 
   "find" should {
 
-    "find a Person by gitLabId when exists" in new TestCase {
-      val person = personEntities(withGitLabId, withoutEmail).generateOne.to[entities.Person]
-
-      loadToStore(person)
-
-      finder
-        .find(person.copy(resourceId = userResourceIds.generateOne))
-        .unsafeRunSync() shouldBe Some(person)
-    }
-
-    "find a Person by email when exists" in new TestCase {
-      val person = personEntities(withoutGitLabId, withEmail).generateOne.to[entities.Person]
-
-      loadToStore(person)
-
-      finder.find(person.copy(resourceId = userResourceIds.generateOne)).unsafeRunSync() shouldBe Some(person)
-    }
-
-    "find a Person by resourceId if there's no gitLabId or email" in new TestCase {
-      val person = personEntities(withoutGitLabId, withoutEmail).generateOne.to[entities.Person]
+    "find a Person by its resourceId" in new TestCase {
+      val person = personEntities().generateOne.to[entities.Person]
 
       loadToStore(person)
 
       finder.find(person).unsafeRunSync() shouldBe Some(person)
     }
 
-    "find a Person by email if there's no gitLabId on it" in new TestCase {
-      val person = personEntities(withGitLabId, withEmail).generateOne.to[entities.Person]
-
-      loadToStore(person)
-
-      finder
-        .find(person.copy(maybeGitLabId = None))
-        .unsafeRunSync() shouldBe Some(person)
-    }
-
-    "find a Person by resourceId if there's no gitLabId or email on it" in new TestCase {
-      val person = personEntities(withGitLabId, withEmail).generateOne.to[entities.Person]
-
-      loadToStore(person)
-
-      finder
-        .find(person.copy(maybeGitLabId = None, maybeEmail = None))
-        .unsafeRunSync() shouldBe Some(person)
-    }
-
-    "find a Person by email if gitLabIds exist on model and KG but they are different" in new TestCase {
-      val person = personEntities(withGitLabId, withEmail).generateOne.to[entities.Person]
-
-      loadToStore(person)
-
-      finder
-        .find(person.copy(maybeGitLabId = userGitLabIds.generateSome))
-        .unsafeRunSync() shouldBe Some(person)
-    }
-
-    "find a Person by resourceId if both gitLabIds and emails exist on model and KG but they are different" in new TestCase {
-      val person = personEntities(withGitLabId, withEmail).generateOne.to[entities.Person]
-
-      loadToStore(person)
-
-      finder
-        .find(person.copy(maybeGitLabId = userGitLabIds.generateSome, maybeEmail = userEmails.generateSome))
-        .unsafeRunSync() shouldBe Some(person)
-    }
-
     "return no Person if it doesn't exist" in new TestCase {
       finder
-        .find(personEntities(withGitLabId, withEmail).generateOne.to[entities.Person])
+        .find(personEntities().generateOne.to[entities.Person])
         .unsafeRunSync() shouldBe None
     }
   }
 
   private trait TestCase {
-    private implicit val logger = TestLogger[IO]()
-    private val timeRecorder    = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO]())
-    val finder                  = new KGPersonFinderImpl(rdfStoreConfig, timeRecorder)
+    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO]())
+    val finder               = new KGPersonFinderImpl(rdfStoreConfig, timeRecorder)
   }
 }

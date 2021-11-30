@@ -27,7 +27,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import scala.util.{Failure, Random, Try}
+import scala.util.{Failure, Try}
 
 class PersonMergerSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
@@ -35,66 +35,67 @@ class PersonMergerSpec extends AnyWordSpec with should.Matchers with ScalaCheckP
 
   "merge" should {
 
-    "use model values if they don't exist in KG" in {
-      val model = personEntities(withGitLabId, withEmail).generateOne
-        .to[entities.Person]
-        .copy(maybeAffiliation = userAffiliations.generateSome)
-      val kg = model.copy(maybeGitLabId = None, maybeEmail = None, maybeAffiliation = None)
-
-      merge[Try](model, kg) shouldBe model.pure[Try]
-    }
-
-    "use model values event if they exist in KG" in {
-      val model = personEntities(withGitLabId, withEmail).generateOne
-        .to[entities.Person]
-        .copy(maybeAffiliation = userAffiliations.generateSome)
-      val kg = model.copy(maybeGitLabId = userGitLabIds.generateSome,
-                          maybeEmail = userEmails.generateSome,
-                          maybeAffiliation = userAffiliations.generateSome
-      )
-
-      merge[Try](model, kg) shouldBe model.pure[Try]
-    }
-
-    "prefer model values if exist" in {
-      forAll(personEntities().map(_.to[entities.Person])) { model =>
-        val kg = model.copy(
-          name = userNames.generateOne,
-          maybeGitLabId = userGitLabIds.generateOption,
-          maybeEmail = userEmails.generateOption,
-          maybeAffiliation = userAffiliations.generateOption
-        )
-
-        merge[Try](model, kg) shouldBe model
-          .copy(
-            maybeGitLabId = model.maybeGitLabId orElse kg.maybeGitLabId,
-            maybeEmail = model.maybeEmail orElse kg.maybeEmail,
-            maybeAffiliation = model.maybeAffiliation orElse kg.maybeAffiliation
-          )
-          .pure[Try]
-      }
-    }
-
-    "prefer KG resourceId instead of model resourceId" in {
-      val model          = personEntities(withGitLabId, withEmail).generateOne.to[entities.Person]
-      val emailDifferent = Random.nextBoolean()
-      val kg = model.copy(
-        resourceId = userResourceIds.generateOne,
-        maybeEmail = if (emailDifferent) userEmails.generateSome else model.maybeEmail,
-        maybeGitLabId = if (emailDifferent) model.maybeGitLabId else userGitLabIds.generateSome
-      )
-
-      merge[Try](model, kg) shouldBe model.copy(resourceId = kg.resourceId).pure[Try]
-    }
-
-    "fail for is all gitLabId, email or resourceId are different" in {
-      val model = personEntities(withGitLabId, withEmail).generateOne.to[entities.Person]
-      val kg    = personEntities(withGitLabId, withEmail).generateOne.to[entities.Person]
+    "fail if both objects have different ResourceIds" in {
+      val model = personEntities(withGitLabId).generateOne.to[entities.Person]
+      val kg    = model.add(userGitLabIds.generateOne)
 
       val Failure(error) = merge[Try](model, kg)
 
       error            shouldBe a[IllegalArgumentException]
       error.getMessage shouldBe s"Persons ${model.resourceId} and ${kg.resourceId} do not have matching identifiers"
+    }
+
+    "prefer model values if they exist in case of Person with GitLabId" in {
+      forAll(personEntities(withGitLabId) map (_.toMaybe[entities.Person.WithGitLabId])) {
+        case Some(model) =>
+          val kg = model.copy(
+            name = userNames.generateOne,
+            maybeEmail = userEmails.generateOption,
+            maybeAffiliation = userAffiliations.generateOption
+          )
+
+          merge[Try](model, kg) shouldBe model
+            .copy(
+              maybeEmail = model.maybeEmail orElse kg.maybeEmail,
+              maybeAffiliation = model.maybeAffiliation orElse kg.maybeAffiliation
+            )
+            .pure[Try]
+        case None => fail("Cannot convert to entities.person")
+      }
+    }
+
+    "prefer model values if they exist in case of Person with Email but no GitLabId" in {
+      forAll(personEntities(withoutGitLabId, withEmail) map (_.toMaybe[entities.Person.WithEmail])) {
+        case Some(model) =>
+          val kg = model.copy(
+            name = userNames.generateOne,
+            maybeAffiliation = userAffiliations.generateOption
+          )
+
+          merge[Try](model, kg) shouldBe model
+            .copy(
+              maybeAffiliation = model.maybeAffiliation orElse kg.maybeAffiliation
+            )
+            .pure[Try]
+        case None => fail("Cannot convert to entities.person")
+      }
+    }
+
+    "prefer model values if they exist in case of Person without Email and GitLabId" in {
+      forAll(personEntities(withoutGitLabId, withoutEmail) map (_.toMaybe[entities.Person.WithNameOnly])) {
+        case Some(model) =>
+          val kg = model.copy(
+            name = userNames.generateOne,
+            maybeAffiliation = userAffiliations.generateOption
+          )
+
+          merge[Try](model, kg) shouldBe model
+            .copy(
+              maybeAffiliation = model.maybeAffiliation orElse kg.maybeAffiliation
+            )
+            .pure[Try]
+        case None => fail("Cannot convert to entities.person")
+      }
     }
   }
 }

@@ -18,7 +18,6 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails
 
-import cats.data.OptionT
 import cats.effect.Async
 import cats.syntax.all._
 import io.circe.DecodingFailure
@@ -26,7 +25,7 @@ import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.users
 import io.renku.graph.model.users.{Email, GitLabId, ResourceId}
-import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
+import io.renku.graph.model.views.RdfResource
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
@@ -50,60 +49,14 @@ private class KGPersonFinderImpl[F[_]: Async: Logger](rdfStoreConfig: RdfStoreCo
   import io.circe.Decoder
 
   override def find(person: Person): F[Option[Person]] =
-    personFindingQueries(person)
-      .foldLeft(OptionT.none[F, Person]) { (maybePerson, query) =>
-        maybePerson.orElseF(queryExpecting(using = query)(recordsDecoder(person)))
-      }
-      .value
-
-  private def personFindingQueries(person: Person) = List(
-    person.maybeGitLabId.map(findByGitlabId),
-    person.maybeEmail.map(findByEmail),
-    findByResourceId(person.resourceId).some
-  ).flatten
-
-  private def findByGitlabId(gitLabId: GitLabId) = SparqlQuery.of(
-    name = "transformation - find person by gitLabId",
-    Prefixes.of(schema -> "schema"),
-    s"""|SELECT DISTINCT ?resourceId ?name ?maybeEmail ?maybeGitLabId ?maybeAffiliation
-        |WHERE {
-        |  ?sameAsId schema:additionalType  'GitLab';
-        |            schema:identifier      $gitLabId.
-        |  ?resourceId schema:sameAs ?sameAsId;
-        |              a schema:Person;
-        |              schema:name ?name.
-        |  OPTIONAL { ?resourceId schema:email ?maybeEmail }            
-        |  OPTIONAL { ?resourceId schema:affiliation ?maybeAffiliation }            
-        |  BIND ($gitLabId AS ?maybeGitLabId)          
-        |}
-        |""".stripMargin
-  )
-
-  private def findByEmail(email: Email) = SparqlQuery.of(
-    name = "transformation - find person by email",
-    Prefixes.of(schema -> "schema"),
-    s"""|SELECT DISTINCT ?resourceId ?name ?maybeEmail ?maybeGitLabId ?maybeAffiliation
-        |WHERE {
-        |  ?resourceId schema:email '${sparqlEncode(email.value)}';
-        |              a schema:Person;
-        |              schema:name ?name.
-        |  OPTIONAL {
-        |    ?resourceId schema:sameAs ?sameAsId.
-        |    ?sameAsId schema:additionalType  'GitLab';
-        |              schema:identifier      ?maybeGitLabId.
-        |  }
-        |  OPTIONAL { ?resourceId schema:affiliation ?maybeAffiliation }
-        |  BIND ('${sparqlEncode(email.value)}' AS ?maybeEmail)
-        |}
-        |""".stripMargin
-  )
+    queryExpecting[Option[Person]](using = findByResourceId(person.resourceId))(recordsDecoder(person))
 
   private def findByResourceId(resourceId: ResourceId) = SparqlQuery.of(
     name = "transformation - find person by resourceId",
-    Prefixes.of(schema -> "schema"),
+    Prefixes of schema -> "schema",
     s"""|SELECT DISTINCT ?resourceId ?name ?maybeEmail ?maybeGitLabId ?maybeAffiliation
         |WHERE {
-        |  BIND (<${sparqlEncode(resourceId.value)}> AS ?resourceId)
+        |  BIND (${resourceId.showAs[RdfResource]} AS ?resourceId)
         |  ?resourceId a schema:Person;
         |              schema:name ?name.
         |  OPTIONAL { ?resourceId schema:email ?maybeEmail }
@@ -128,13 +81,17 @@ private class KGPersonFinderImpl[F[_]: Async: Logger](rdfStoreConfig: RdfStoreCo
         maybeEmail       <- cursor.downField("maybeEmail").downField("value").as[Option[users.Email]]
         maybeGitLabId    <- cursor.downField("maybeGitLabId").downField("value").as[Option[users.GitLabId]]
         maybeAffiliation <- cursor.downField("maybeAffiliation").downField("value").as[Option[users.Affiliation]]
-      } yield Person(resourceId, name, maybeEmail, maybeAffiliation, maybeGitLabId)
+        person <- Person
+                    .from(resourceId, name, maybeEmail, maybeAffiliation, maybeGitLabId)
+                    .toEither
+                    .leftMap(errs => DecodingFailure(errs.nonEmptyIntercalate("; "), Nil))
+      } yield person
     }
 
-    cursor.downField("results").downField("bindings").as(decodeList(personEntities)).flatMap {
-      case Nil           => Option.empty[Person].asRight
-      case person :: Nil => Some(person).asRight
-      case _             => DecodingFailure(s"Multiple Person entities found for ${person.resourceId}", Nil).asLeft
+    cursor.downField("results").downField("bindings").as(decodeList(personEntities)) >>= {
+      case Nil      => Option.empty[Person].asRight
+      case p :: Nil => p.some.asRight
+      case _        => DecodingFailure(s"Multiple Person entities found for ${person.resourceId}", Nil).asLeft
     }
   }
 }

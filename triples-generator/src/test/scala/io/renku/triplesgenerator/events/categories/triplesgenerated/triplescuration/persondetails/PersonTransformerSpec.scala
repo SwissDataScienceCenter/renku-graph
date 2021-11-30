@@ -45,7 +45,7 @@ class PersonTransformerSpec extends AnyWordSpec with should.Matchers with MockFa
     "go through all the Person entities found in the project, " +
       "try to find matching Person in KG, " +
       "merge the data and update the project " +
-      "and generate relevant pre and post data upload queries" in new TestCase {
+      "and generate relevant pre data upload queries" in new TestCase {
         val persons = personEntities.generateSet()
         val project = anyProjectEntities
           .modify(membersLens.modify(_ => persons) andThen creatorLens.modify(_ => None))
@@ -65,15 +65,11 @@ class PersonTransformerSpec extends AnyWordSpec with should.Matchers with MockFa
                   .returning(mergedPerson.pure[Try])
                 val preDataQueries = sparqlQueries.generateList()
                 (updatesCreator.preparePreDataUpdates _).expects(kgPerson, mergedPerson).returning(preDataQueries)
-                val postDataQueries = sparqlQueries.generateList()
-                (updatesCreator.preparePostDataUpdates _).expects(person).returning(postDataQueries)
-                (update(person, mergedPerson)(resultData._1),
-                 resultData._2 |+| Queries(preDataQueries, postDataQueries)
+                (
+                  update(person, mergedPerson)(resultData._1),
+                  resultData._2 |+| Queries.preDataQueriesOnly(preDataQueries)
                 )
-              case None =>
-                val postDataQueries = sparqlQueries.generateList()
-                (updatesCreator.preparePostDataUpdates _).expects(person).returning(postDataQueries)
-                resultData._1 -> (resultData._2 |+| Queries.postDataQueriesOnly(postDataQueries))
+              case None => resultData
             }
           }
 

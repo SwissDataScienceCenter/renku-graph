@@ -26,25 +26,32 @@ private trait PersonMerger {
 
   def merge[F[_]: MonadThrow](modelPerson: Person, kgPerson: Person): F[Person] =
     validate(modelPerson, kgPerson) map { _ =>
-      Person(
-        kgPerson.resourceId,
-        modelPerson.name,
-        modelPerson.maybeEmail orElse kgPerson.maybeEmail,
-        modelPerson.maybeAffiliation orElse kgPerson.maybeAffiliation,
-        modelPerson.maybeGitLabId orElse kgPerson.maybeGitLabId
-      )
+      kgPerson match {
+        case p: Person.WithGitLabId =>
+          p.copy(
+            name = modelPerson.name,
+            maybeEmail = modelPerson.maybeEmail orElse kgPerson.maybeEmail,
+            maybeAffiliation = modelPerson.maybeAffiliation orElse kgPerson.maybeAffiliation
+          )
+        case p: Person.WithEmail =>
+          p.copy(
+            name = modelPerson.name,
+            maybeAffiliation = modelPerson.maybeAffiliation orElse kgPerson.maybeAffiliation
+          )
+        case p: Person.WithNameOnly =>
+          p.copy(
+            name = modelPerson.name,
+            maybeAffiliation = modelPerson.maybeAffiliation orElse kgPerson.maybeAffiliation
+          )
+      }
     }
 
   private def validate[F[_]: MonadThrow](modelPerson: Person, kgPerson: Person): F[Unit] =
-    if (
-      (modelPerson.maybeGitLabId -> kgPerson.maybeGitLabId).mapN(_ == _).getOrElse(false) ||
-      (modelPerson.maybeEmail    -> kgPerson.maybeEmail).mapN(_ == _).getOrElse(false) ||
-      (modelPerson.resourceId == kgPerson.resourceId)
-    ) ().pure[F]
-    else
+    MonadThrow[F].unlessA(modelPerson.resourceId == kgPerson.resourceId) {
       new IllegalArgumentException(
         s"Persons ${modelPerson.resourceId} and ${kgPerson.resourceId} do not have matching identifiers"
       ).raiseError[F, Unit]
+    }
 }
 
 private object PersonMerger extends PersonMerger

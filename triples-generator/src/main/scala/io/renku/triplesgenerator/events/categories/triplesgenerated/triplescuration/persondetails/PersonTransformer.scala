@@ -54,7 +54,7 @@ private class PersonTransformerImpl[F[_]: MonadThrow](
     EitherT {
       findAllPersons(project)
         .foldLeft((project -> Queries.empty).pure[F]) { (previousResultsF, person) =>
-          updateProjectAndPreDataQueries(previousResultsF, person) map addPostDataQueries(person)
+          updateProjectAndPreDataQueries(previousResultsF, person)
         }
         .map(_.asRight[ProcessingRecoverableError])
         .recoverWith(maybeToRecoverableError)
@@ -73,11 +73,6 @@ private class PersonTransformerImpl[F[_]: MonadThrow](
           (updatedProject, previousResults._2 |+| Queries.preDataQueriesOnly(queries))
         }
         .getOrElse(previousResults)
-  }
-
-  private def addPostDataQueries(person: Person): ((Project, Queries)) => (Project, Queries) = {
-    case (project, queries) =>
-      project -> (queries |+| Queries.postDataQueriesOnly(preparePostDataUpdates(person)))
   }
 
   private lazy val maybeToRecoverableError

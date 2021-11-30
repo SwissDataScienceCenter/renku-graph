@@ -30,54 +30,15 @@ private trait UpdatesCreator {
   def preparePreDataUpdates(kgPerson: Person, mergedPerson: Person): List[SparqlQuery] = List(
     nameDeletion(kgPerson, mergedPerson),
     emailDeletion(kgPerson, mergedPerson),
-    affiliationDeletion(kgPerson, mergedPerson),
-    gitLabIdDeletion(kgPerson, mergedPerson)
+    affiliationDeletion(kgPerson, mergedPerson)
   ).flatten
-
-  def preparePostDataUpdates(person: Person): List[SparqlQuery] =
-    person.maybeEmail match {
-      case None => List.empty
-      case Some(email) =>
-        List(
-          SparqlQuery.of(
-            name = "transformation - persons sharing email merge",
-            Prefixes.of(schema -> "schema"),
-            s"""|DELETE {
-                |  ?idToRelink ?propToRelink ?pIdToUnlink.
-                |  ?pIdToUnlink ?p ?o
-                |}
-                |INSERT {
-                |  ?idToRelink ?propToRelink ?pIdToLink.
-                |}
-                |WHERE {
-                |  SELECT ?pIdToLink ?pIdToUnlink ?idToRelink ?propToRelink ?p ?o
-                |  WHERE {
-                |    {
-                |      ?pIdToLink a schema:Person;
-                |                 schema:email '$email'.
-                |      ?pIdToLink schema:sameAs/schema:identifier ?gitlabId 
-                |    }
-                |    {
-                |      ?pIdToUnlink a schema:Person;
-                |                   schema:email '$email'.
-                |      FILTER NOT EXISTS { ?pIdToUnlink schema:sameAs/schema:identifier ?gitlabId }
-                |    }
-                |    {
-                |      ?idToRelink ?propToRelink ?pIdToUnlink.
-                |      ?pIdToUnlink ?p ?o
-                |    }
-                |  }
-                |}""".stripMargin
-          )
-        )
-    }
 
   private def nameDeletion(kgPerson: Person, mergedPerson: Person) =
     Option.when(kgPerson.name != mergedPerson.name) {
       val resource = kgPerson.resourceId.showAs[RdfResource]
       SparqlQuery.of(
         name = "transformation - person name delete",
-        Prefixes.of(schema -> "schema"),
+        Prefixes of schema -> "schema",
         s"""|DELETE { $resource schema:name ?name }
             |WHERE  { $resource schema:name ?name }
             |""".stripMargin
@@ -89,7 +50,7 @@ private trait UpdatesCreator {
       val resource = kgPerson.resourceId.showAs[RdfResource]
       SparqlQuery.of(
         name = "transformation - person email delete",
-        Prefixes.of(schema -> "schema"),
+        Prefixes of schema -> "schema",
         s"""|DELETE { $resource schema:email ?email }
             |WHERE  { $resource schema:email ?email }
             |""".stripMargin
@@ -101,30 +62,9 @@ private trait UpdatesCreator {
       val resource = kgPerson.resourceId.showAs[RdfResource]
       SparqlQuery.of(
         name = "transformation - person affiliation delete",
-        Prefixes.of(schema -> "schema"),
+        Prefixes of schema -> "schema",
         s"""|DELETE { $resource schema:affiliation ?affiliation }
             |WHERE  { $resource schema:affiliation ?affiliation }
-            |""".stripMargin
-      )
-    }
-
-  private def gitLabIdDeletion(kgPerson: Person, mergedPerson: Person) =
-    Option.when(kgPerson.maybeGitLabId exists (!mergedPerson.maybeGitLabId.contains(_))) {
-      val resource = kgPerson.resourceId.showAs[RdfResource]
-      SparqlQuery.of(
-        name = "transformation - gitLabId delete",
-        Prefixes.of(schema -> "schema"),
-        s"""|DELETE {
-            |  $resource schema:sameAs ?sameAsId.
-            |  ?sameAsId a schema:URL.
-            |  ?sameAsId schema:identifier ?gitLabId.
-            |  ?sameAsId schema:additionalType 'GitLab'.
-            |}
-            |WHERE  {
-            |  $resource schema:sameAs ?sameAsId.
-            |  ?sameAsId schema:additionalType 'GitLab';
-            |            schema:identifier ?gitLabId.
-            |}
             |""".stripMargin
       )
     }

@@ -20,7 +20,6 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuplo
 
 import cats.data.EitherT
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.renku.generators.CommonGraphGenerators.sparqlQueries
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -32,11 +31,11 @@ import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableE
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{ProjectWithQueries, Queries}
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
+import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.Generators._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.Generators._
 
 import scala.util.{Success, Try}
 
@@ -170,7 +169,7 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
       val step1Transformation = mockFunction[entities.Project, ProjectWithQueries[Try]]
 
       // preparing a project for which json-ld flattening fails
-      val person = personEntities(withGitLabId).generateOne.to[entities.Person]
+      val Some(person) = personEntities(withGitLabId).generateOne.toMaybe[entities.Person.WithGitLabId]
       val step1Project = projectEntities(anyVisibility).generateOne
         .to[entities.ProjectWithoutParent]
         .copy(
