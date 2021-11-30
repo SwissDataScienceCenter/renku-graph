@@ -163,6 +163,6 @@ private class MicroserviceRunner(
 
   private def startDBDependentProcesses() = for {
     _ <- metrics.run().start
-    _ <- gaugeScheduler.run().start
+    _ <- gaugeScheduler.run()
   } yield ()
 }
