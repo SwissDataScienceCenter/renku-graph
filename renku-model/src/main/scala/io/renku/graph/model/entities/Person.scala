@@ -134,10 +134,13 @@ object Person {
   private val gitLabSameAsTypes:          EntityTypes = EntityTypes.of(schema / "URL")
   private val gitLabSameAsAdditionalType: String      = "GitLab"
 
+  def toSameAsEntityId(gitLabId: GitLabId)(implicit gitLabApiUrl: GitLabApiUrl): EntityId =
+    EntityId of (gitLabApiUrl / "users" / gitLabId).show
+
   def gitLabIdEncoder(implicit gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[GitLabId] = JsonLDEncoder.instance {
     gitLabId =>
       JsonLD.entity(
-        EntityId of (gitLabApiUrl / "users" / gitLabId).toString,
+        toSameAsEntityId(gitLabId),
         gitLabSameAsTypes,
         schema / "identifier"     -> gitLabId.value.asJsonLD,
         schema / "additionalType" -> gitLabSameAsAdditionalType.asJsonLD
