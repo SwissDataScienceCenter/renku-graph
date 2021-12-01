@@ -24,7 +24,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.datasets.{InternalSameAs, ResourceId, TopmostSameAs}
-import io.renku.graph.model.entities
+import io.renku.graph.model.{entities, users}
 import io.renku.graph.model.testentities._
 import io.renku.http.client.RestClientError
 import io.renku.http.client.RestClientError.UnauthorizedException
@@ -64,7 +64,10 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         findingTopmostSameAsFor(dataset1.identification.resourceId, returning = Option.empty[TopmostSameAs].pure[Try])
         val dataset1Queries = sparqlQueries.generateList()
         prepareQueriesForSameAs(dataset1 -> None, returning = dataset1Queries)
-        val updatedDataset1        = dataset1.update(parentTopmostSameAs)
+        val updatedDataset1 = dataset1.update(parentTopmostSameAs)
+
+        val dataset1CreatorUnlinkingQueries = givenRelevantCreatorsUnlinking(updatedDataset1)
+
         val dataset1CleanUpQueries = sparqlQueries.generateList()
         prepareQueriesForTopmostSameAsCleanup(updatedDataset1 -> parentTopmostSameAs.some,
                                               returning = dataset1CleanUpQueries
@@ -75,6 +78,9 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         findingTopmostSameAsFor(dataset2.identification.resourceId, returning = dataset2KgTopmostSameAs.pure[Try])
         val dataset2Queries = sparqlQueries.generateList()
         prepareQueriesForSameAs(dataset2 -> dataset2KgTopmostSameAs, returning = dataset2Queries)
+
+        val dataset2CreatorUnlinkingQueries = givenRelevantCreatorsUnlinking(dataset2)
+
         val dataset2CleanUpQueries = sparqlQueries.generateList()
         prepareQueriesForTopmostSameAsCleanup(dataset2 -> None, returning = dataset2CleanUpQueries)
 
@@ -83,8 +89,10 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
 
         val Success(Right((updatedProject, queries))) = (step run project).value
         updatedProject shouldBe ProjectFunctions.update(dataset1, updatedDataset1)(project)
-        queries shouldBe Queries.postDataQueriesOnly(
-          dataset1Queries ::: dataset1CleanUpQueries ::: dataset2Queries ::: dataset2CleanUpQueries
+        queries shouldBe Queries(
+          preDataUploadQueries = dataset1CreatorUnlinkingQueries ::: dataset2CreatorUnlinkingQueries,
+          postDataUploadQueries =
+            dataset1Queries ::: dataset1CleanUpQueries ::: dataset2Queries ::: dataset2CleanUpQueries
         )
       }
 
@@ -122,6 +130,8 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         .expects(importedExternal.to[entities.Dataset[entities.Dataset.Provenance.ImportedExternal]], *)
         .returning(importedExternalDsQueries)
 
+      val creatorUnlinkingQueries = entitiesProjectWithAllDatasets.datasets >>= givenRelevantCreatorsUnlinking
+
       val ancestorInternalDsQueries = sparqlQueries.generateList()
       (updatesCreator
         .prepareUpdatesWhenInvalidated(_: entities.Dataset[entities.Dataset.Provenance.ImportedInternal])(
@@ -142,9 +152,9 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
 
       val Success(Right((updatedProject, queries))) = step.run(entitiesProjectWithAllDatasets).value
 
-      updatedProject shouldBe entitiesProjectWithAllDatasets
+      updatedProject               shouldBe entitiesProjectWithAllDatasets
+      queries.preDataUploadQueries shouldBe creatorUnlinkingQueries
       queries.postDataUploadQueries should contain theSameElementsAs (internalDsQueries ::: importedExternalDsQueries ::: ancestorInternalDsQueries ::: ancestorExternalDsQueries)
-      queries.preDataUploadQueries shouldBe List.empty[SparqlQuery]
     }
 
     "return the ProcessingRecoverableFailure if calls to KG fails with a network or HTTP error" in new TestCase {
@@ -189,6 +199,16 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
     val updatesCreator      = mock[UpdatesCreator]
     val transformer         = new DatasetTransformerImpl[Try](kgDatasetInfoFinder, updatesCreator, ProjectFunctions)
 
+    def givenRelevantCreatorsUnlinking(ds: entities.Dataset[entities.Dataset.Provenance]): List[SparqlQuery] = {
+      val creatorsInKG = userResourceIds.generateSet()
+      findingDatasetCreatorsFor(ds.identification.resourceId, returning = creatorsInKG.pure[Try])
+
+      val unlinkingQueries = sparqlQueries.generateList()
+      prepareQueriesUnlinkingRelevantCreators(ds, creatorsInKG, returning = unlinkingQueries)
+
+      unlinkingQueries
+    }
+
     def findingParentTopmostSameAsFor(sameAs: InternalSameAs, returning: Try[Option[TopmostSameAs]]) =
       (kgDatasetInfoFinder
         .findParentTopmostSameAs(_: InternalSameAs)(_: InternalSameAs.type))
@@ -202,6 +222,12 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       .expects(resourceId, *)
       .returning(returning)
 
+    def findingDatasetCreatorsFor(resourceId: ResourceId, returning: Try[Set[users.ResourceId]]) =
+      (kgDatasetInfoFinder
+        .findDatasetCreators(_: ResourceId))
+        .expects(resourceId)
+        .returning(returning)
+
     def prepareQueriesForSameAs(
         dsAndMaybeTopmostSameAs: (entities.Dataset[entities.Dataset.Provenance.ImportedInternal],
                                   Option[TopmostSameAs]
@@ -210,6 +236,15 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
     ) = (updatesCreator
       .prepareUpdates(_: entities.Dataset[entities.Dataset.Provenance.ImportedInternal], _: Option[TopmostSameAs]))
       .expects(dsAndMaybeTopmostSameAs._1, dsAndMaybeTopmostSameAs._2)
+      .returning(returning)
+
+    def prepareQueriesUnlinkingRelevantCreators(
+        dataset:    entities.Dataset[entities.Dataset.Provenance],
+        kgCreators: Set[users.ResourceId],
+        returning:  List[SparqlQuery]
+    ) = (updatesCreator
+      .unlinkingRemovedCreators(_: entities.Dataset[entities.Dataset.Provenance], _: Set[users.ResourceId]))
+      .expects(dataset, kgCreators)
       .returning(returning)
 
     def prepareQueriesForTopmostSameAsCleanup(

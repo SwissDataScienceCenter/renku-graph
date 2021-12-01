@@ -24,7 +24,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string
 import io.circe._
 import io.circe.syntax._
-import io.renku.graph.model.views.{EntityIdJsonLdOps, TinyTypeJsonLDOps}
+import io.renku.graph.model.views.{EntityIdJsonLdOps, RdfResource, TinyTypeJsonLDOps}
 import io.renku.jsonld.JsonLDDecoder.{decodeEntityId, decodeString}
 import io.renku.jsonld.JsonLDEncoder._
 import io.renku.jsonld._
@@ -40,7 +40,14 @@ object datasets {
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with UrlConstraint
-      with EntityIdJsonLdOps[ResourceId]
+      with EntityIdJsonLdOps[ResourceId] {
+
+    import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
+
+    implicit object RdfResourceRenderer extends Renderer[RdfResource, ResourceId] {
+      override def render(id: ResourceId): String = s"<${sparqlEncode(id.show)}>"
+    }
+  }
 
   sealed trait DatasetIdentifier extends Any with StringTinyType
 

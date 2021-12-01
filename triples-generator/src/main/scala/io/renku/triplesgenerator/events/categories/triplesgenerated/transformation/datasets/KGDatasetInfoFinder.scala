@@ -23,6 +23,8 @@ import cats.syntax.all._
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
 import io.renku.graph.model.datasets.{InternalSameAs, ResourceId, SameAs, TopmostSameAs}
+import io.renku.graph.model.users
+import io.renku.graph.model.views.RdfResource
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
@@ -30,6 +32,7 @@ import org.typelevel.log4cats.Logger
 private trait KGDatasetInfoFinder[F[_]] {
   def findParentTopmostSameAs(idSameAs: InternalSameAs)(implicit ev: InternalSameAs.type): F[Option[TopmostSameAs]]
   def findTopmostSameAs(resourceId:     ResourceId)(implicit ev:     ResourceId.type):     F[Option[TopmostSameAs]]
+  def findDatasetCreators(resourceId:   ResourceId): F[Set[users.ResourceId]]
 }
 
 private class KGDatasetInfoFinderImpl[F[_]: Async: Logger](
@@ -75,14 +78,31 @@ private class KGDatasetInfoFinderImpl[F[_]: Async: Logger](
   private def toOption[T, ID](id: ID)(implicit entityTypeInfo: ID => String): Set[T] => F[Option[T]] = {
     case set if set.isEmpty   => Option.empty[T].pure[F]
     case set if set.size == 1 => set.headOption.pure[F]
-    case _ =>
-      new Exception(
-        s"More than one ${entityTypeInfo(id)} found for dataset $id"
-      ).raiseError[F, Option[T]]
+    case _ => new Exception(s"More than one ${entityTypeInfo(id)} found for dataset $id").raiseError[F, Option[T]]
   }
 
   private implicit val topmostSameAsInfo: SameAs => String     = _ => "topmostSameAs"
   private implicit val resourceIdInfo:    ResourceId => String = _ => "resourceId"
+
+  def findDatasetCreators(resourceId: ResourceId): F[Set[users.ResourceId]] =
+    queryExpecting[Set[users.ResourceId]](using = queryFindingCreators(resourceId))
+
+  private def queryFindingCreators(resourceId: ResourceId) = SparqlQuery.of(
+    name = "transformation - find ds creators",
+    Prefixes of schema -> "schema",
+    s"""|SELECT ?personId
+        |WHERE {
+        |  ${resourceId.showAs[RdfResource]} a schema:Dataset;
+        |                                    schema:creator ?personId
+        |}
+        |""".stripMargin
+  )
+
+  private implicit val creatorsDecoder: Decoder[Set[users.ResourceId]] = {
+    val creatorId: Decoder[users.ResourceId] =
+      _.downField("personId").downField("value").as[users.ResourceId]
+    _.downField("results").downField("bindings").as(decodeList(creatorId)).map(_.toSet)
+  }
 }
 
 private object KGDatasetInfoFinder {

@@ -22,20 +22,23 @@ import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.datasets.{SameAs, TopmostSameAs}
-import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.views.RdfResource
+import io.renku.graph.model.{datasets, entities, users}
 import io.renku.rdfstore.InMemoryRdfStore
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
-import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+
+import scala.util.Random
 
 class UpdatesCreatorSpec
     extends AnyWordSpec
     with IOSpec
     with InMemoryRdfStore
     with should.Matchers
-    with TableDrivenPropertyChecks {
+    with ScalaCheckPropertyChecks {
 
   "prepareUpdatesWhenInvalidated" should {
 
@@ -320,6 +323,47 @@ class UpdatesCreatorSpec
     }
   }
 
+  "unlinkingRemovedCreators" should {
+
+    "prepare delete queries for all dataset creators existing in KG but not in the model" in {
+      forAll(
+        datasetEntities(provenanceNonModified)
+          .modify(provenanceLens.modify(creatorsLens.modify(_ => personEntities.generateSet())))
+          .decoupledFromProject
+      ) { kgDataset =>
+        val kgDatasetEntities = kgDataset.to[entities.Dataset[entities.Dataset.Provenance]]
+
+        loadToStore(kgDatasetEntities)
+
+        val creators = kgDataset.provenance.creators
+        findCreators(kgDatasetEntities.resourceId) shouldBe creators.map(_.resourceId)
+
+        val creatorsNotChanged = creators -- Random.shuffle(creators.toList).headOption.toSet
+        val newCreators        = creatorsNotChanged ++ personEntities.generateSet()
+        val model = provenanceLens[Dataset.Provenance.NonModified]
+          .modify(creatorsLens.modify(_ => newCreators))(kgDataset)
+          .to[entities.Dataset[entities.Dataset.Provenance]]
+
+        UpdatesCreator
+          .unlinkingRemovedCreators(model, creators.map(_.resourceId))
+          .runAll
+          .unsafeRunSync()
+
+        findCreators(kgDatasetEntities.resourceId) shouldBe creatorsNotChanged.map(_.resourceId)
+      }
+    }
+
+    "prepare no queries if there's no change in DS creators" in {
+      val ds = datasetEntities(provenanceNonModified)
+        .modify(provenanceLens.modify(creatorsLens.modify(_ => personEntities.generateSet())))
+        .decoupledFromProject
+        .generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance]]
+
+      UpdatesCreator.unlinkingRemovedCreators(ds, ds.provenance.creators.map(_.resourceId)) shouldBe Nil
+    }
+  }
+
   private def setTopmostSameAs[P <: entities.Dataset.Provenance.ImportedInternal](dataset:       entities.Dataset[P],
                                                                                   topmostSameAs: TopmostSameAs
   ) = {
@@ -361,4 +405,17 @@ class UpdatesCreatorSpec
   ) => (String, Option[String], Option[String]) = { case (resourceId, sameAs, maybeTopmostSameAs, _, _) =>
     (resourceId, sameAs, maybeTopmostSameAs)
   }
+
+  private def findCreators(resourceId: datasets.ResourceId): Set[users.ResourceId] =
+    runQuery(s"""|SELECT ?personId
+                 |WHERE {
+                 |  ${resourceId.showAs[RdfResource]} a schema:Dataset;
+                 |                                    schema:creator ?personId
+                 |}
+                 |""".stripMargin)
+      .unsafeRunSync()
+      .map(row => users.ResourceId.from(row("personId")))
+      .sequence
+      .fold(throw _, identity)
+      .toSet
 }

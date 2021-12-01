@@ -50,7 +50,7 @@ private[transformation] class DatasetTransformerImpl[F[_]: MonadThrow](
 
   private def createTransformation: Transformation[F] = project =>
     EitherT {
-      (updateTopmostSameAs((project, Queries.empty)) >>= updateHierarchyOnInvalidation)
+      (updateTopmostSameAs((project, Queries.empty)) >>= updatePersonLinks >>= updateHierarchyOnInvalidation)
         .map(_.asRight[ProcessingRecoverableError])
         .recoverWith(maybeToRecoverableError)
     }
@@ -71,6 +71,14 @@ private[transformation] class DatasetTransformerImpl[F[_]: MonadThrow](
           )
         )
       }
+  }
+
+  private lazy val updatePersonLinks: ((Project, Queries)) => F[(Project, Queries)] = { case (project, queries) =>
+    project.datasets
+      .map(ds => findDatasetCreators(ds.resourceId).map(updatesCreator.unlinkingRemovedCreators(ds, _)))
+      .sequence
+      .map(_.flatten)
+      .map(quers => project -> (queries |+| Queries.preDataQueriesOnly(quers)))
   }
 
   private lazy val updateHierarchyOnInvalidation: ((Project, Queries)) => F[(Project, Queries)] = {

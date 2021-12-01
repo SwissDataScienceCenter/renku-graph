@@ -23,6 +23,8 @@ import io.renku.graph.model.Schemas.{renku, schema}
 import io.renku.graph.model.datasets.{ResourceId, TopmostSameAs}
 import io.renku.graph.model.entities.Dataset
 import io.renku.graph.model.entities.Dataset.Provenance
+import io.renku.graph.model.users
+import io.renku.graph.model.views.RdfResource
 import io.renku.rdfstore.SparqlQuery
 import io.renku.rdfstore.SparqlQuery.Prefixes
 
@@ -47,21 +49,25 @@ private trait UpdatesCreator {
   def prepareTopmostSameAsCleanup(dataset:                  Dataset[Dataset.Provenance.ImportedInternal],
                                   maybeParentTopmostSameAs: Option[TopmostSameAs]
   ): List[SparqlQuery]
+
+  def unlinkingRemovedCreators(dataset:      Dataset[Dataset.Provenance],
+                               creatorsInKG: Set[users.ResourceId]
+  ): List[SparqlQuery]
 }
 
 private object UpdatesCreator extends UpdatesCreator {
 
-  def prepareUpdatesWhenInvalidated(
+  override def prepareUpdatesWhenInvalidated(
       dataset:   Dataset[Dataset.Provenance.Internal]
   )(implicit ev: Dataset.Provenance.Internal.type): List[SparqlQuery] =
     List(useTopmostSameAsFromTheOldestDeletedDSChildOnAncestors(dataset), deleteSameAs(dataset))
 
-  def prepareUpdatesWhenInvalidated(
+  override def prepareUpdatesWhenInvalidated(
       dataset:   Dataset[Dataset.Provenance.ImportedExternal]
   )(implicit ev: Dataset.Provenance.ImportedExternal.type): List[SparqlQuery] =
     List(useDeletedDSSameAsAsChildSameAs(dataset))
 
-  def prepareUpdatesWhenInvalidated(
+  override def prepareUpdatesWhenInvalidated(
       dataset:   Dataset[Dataset.Provenance.ImportedInternal]
   )(implicit ev: Dataset.Provenance.ImportedInternal.type): List[SparqlQuery] =
     List(useDeletedDSSameAsAsChildSameAs(dataset))
@@ -82,9 +88,32 @@ private object UpdatesCreator extends UpdatesCreator {
     case Some(_) => List(prepareTopmostSameAsCleanUp(dataset.resourceId, dataset.provenance.topmostSameAs))
   }
 
+  override def unlinkingRemovedCreators(dataset:      Dataset[Dataset.Provenance],
+                                        creatorsInKG: Set[users.ResourceId]
+  ): List[SparqlQuery] = {
+    val dsCreators = dataset.provenance.creators.map(_.resourceId)
+    Option
+      .when(dsCreators != creatorsInKG) {
+        SparqlQuery.of(
+          name = "transformation - delete removed ds creators",
+          Prefixes of schema -> "schema",
+          s"""|DELETE {
+              |  ${dataset.resourceId.showAs[RdfResource]} schema:creator ?personId
+              |}
+              |WHERE {
+              |  ${dataset.resourceId.showAs[RdfResource]} a schema:Dataset;
+              |                                            schema:creator ?personId.
+              |  FILTER (?personId NOT IN (${dsCreators.map(_.showAs[RdfResource]).mkString(", ")}))
+              |}
+              |""".stripMargin
+        )
+      }
+      .toList
+  }
+
   private def deleteSameAs(dataset: Dataset[Provenance.Internal]) = SparqlQuery.of(
     name = "transformation - delete sameAs",
-    Prefixes.of(schema -> "schema"),
+    Prefixes of schema -> "schema",
     s"""|DELETE { 
         |  ?dsId schema:sameAs ?sameAs.
         |  ?sameAs ?sameAsPredicate ?sameAsObject.
