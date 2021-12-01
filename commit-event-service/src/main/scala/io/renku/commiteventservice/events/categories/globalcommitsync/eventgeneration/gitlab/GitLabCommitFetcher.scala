@@ -23,10 +23,12 @@ import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.commiteventservice.events.categories.common.CommitInfo
 import io.renku.config.GitLab
 import io.renku.control.Throttler
+import io.renku.gitlab.GitLabClientImpl
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.{GitLabApiUrl, projects}
@@ -55,23 +57,18 @@ private[globalcommitsync] trait GitLabCommitFetcher[F[_]] {
 }
 
 private[globalcommitsync] class GitLabCommitFetcherImpl[F[_]: Async: Logger](
-    gitLabApiUrl:           GitLabApiUrl,
-    gitLabThrottler:        Throttler[F, GitLab],
-    retryInterval:          FiniteDuration = RestClient.SleepAfterConnectionIssue,
-    maxRetries:             Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
-    requestTimeoutOverride: Option[Duration] = None
-) extends RestClient(gitLabThrottler,
-                     retryInterval = retryInterval,
-                     maxRetries = maxRetries,
-                     requestTimeoutOverride = requestTimeoutOverride
-    )
-    with GitLabCommitFetcher[F] {
+    gitLabApiUrl:     GitLabApiUrl,
+    gitLabClientImpl: GitLabClientImpl[F]
+) extends GitLabCommitFetcher[F] {
+
+  import gitLabClientImpl._
 
   override def fetchLatestGitLabCommit(projectId: projects.Id)(implicit
       maybeAccessToken:                           Option[AccessToken]
   ): F[Option[CommitId]] = for {
-    uriString   <- s"$gitLabApiUrl/projects/$projectId/repository/commits".pure[F]
-    uri         <- validateUri(uriString).map(_.withQueryParam("per_page", "1"))
+    uriString <- s"$gitLabApiUrl/projects/$projectId/repository/commits".pure[F]
+    uri       <- validateUri(uriString).map(_.withQueryParam("per_page", "1"))
+
     maybeCommit <- send(request(GET, uri, maybeAccessToken))(mapSingleCommitResponse)
   } yield maybeCommit
 
@@ -79,14 +76,15 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[F[_]: Async: Logger](
       projectId:               projects.Id,
       pageRequest:             PagingRequest
   )(implicit maybeAccessToken: Option[AccessToken]): F[PageResult] = for {
-    uri        <- createUrl(projectId, pageRequest)
-    pageResult <- send(request(GET, uri, maybeAccessToken))(mapCommitResponse)
-  } yield pageResult
-
-  private def createUrl(projectId: projects.Id, pageRequest: PagingRequest) =
-    validateUri(s"$gitLabApiUrl/projects/$projectId/repository/commits").map(
-      _.withQueryParam("page", pageRequest.page.show).withQueryParam("per_page", pageRequest.perPage.show)
-    )
+    uri <- s"$gitLabApiUrl/projects/$projectId/repository/commits".pure[F] //  createUrl(projectId, pageRequest)
+    pagingResult <- send(GET,
+                         uri,
+                         maybeAccessToken,
+                         "commits",
+                         ("page", pageRequest.page.show),
+                         ("per_page", pageRequest.perPage.show)
+                    )(mapCommitResponse)
+  } yield pagingResult
 
   private implicit lazy val mapCommitResponse: PartialFunction[(Status, Request[F], Response[F]), F[PageResult]] = {
     case (Ok, _, response)    => (response.as[List[CommitId]] -> maybeNextPage(response)).mapN(PageResult(_, _))

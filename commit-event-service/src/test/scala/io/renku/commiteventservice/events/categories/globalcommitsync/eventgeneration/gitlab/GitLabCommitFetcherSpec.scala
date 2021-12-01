@@ -29,6 +29,7 @@ import io.renku.commiteventservice.events.categories.globalcommitsync.eventgener
 import io.renku.control.Throttler
 import io.renku.generators.CommonGraphGenerators.{oauthAccessTokens, pages, pagingRequests, personalAccessTokens}
 import io.renku.generators.Generators.Implicits._
+import io.renku.gitlab.GitLabClientImpl
 import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.http.client.AccessToken
@@ -179,8 +180,9 @@ class GitLabCommitFetcherSpec
     val commitInfoList = commitInfos.generateNonEmptyList().toList
 
     val gitLabApiUrl = GitLabUrl(externalServiceBaseUrl).apiV4
+    val gitLabClient = mock[GitLabClientImpl[IO]]
     private implicit val logger: TestLogger[IO] = TestLogger()
-    val gitLabCommitFetcher = new GitLabCommitFetcherImpl[IO](gitLabApiUrl, Throttler.noThrottling)
+    val gitLabCommitFetcher = new GitLabCommitFetcherImpl[IO](gitLabApiUrl, gitLabClient)
   }
 
   private def commitsJson(from: List[CommitInfo]) =
