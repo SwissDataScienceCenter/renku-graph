@@ -92,12 +92,12 @@ jobs:
     name: Deploy to renku-graph
     runs-on: ubuntu-20.04
     needs: [ unit-tests, acceptance-tests, formatter ]
-    if: "github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/hotfix-')"
+    if: "github.ref == 'refs/heads/development'"
     environment:
       name: renku-kg-dev
     steps:
-      - name: deploy-master
-        uses: SwissDataScienceCenter/renku-actions/deploy-renku@v0.3.0
+      - name: deploy-development
+        uses: SwissDataScienceCenter/renku-actions/deploy-renku@v0.3.2
         env:
           DOCKER_PASSWORD: ${{ secrets.RENKU_DOCKER_PASSWORD }}
           DOCKER_USERNAME: ${{ secrets.RENKU_DOCKER_USERNAME }}
@@ -135,7 +135,7 @@ jobs:
           helm test ${RENKU_RELEASE} --namespace ${RENKU_RELEASE} --timeout 140m --logs
       - name: Download artifact for packaging on failure
         if: failure()
-        uses: SwissDataScienceCenter/renku-actions/download-test-artifacts@v0.3.0
+        uses: SwissDataScienceCenter/renku-actions/download-test-artifacts@v0.3.2
         env:
           RENKU_VALUES: ${{ secrets.CI_RENKU_VALUES }}
           TEST_ARTIFACTS_PATH: "tests-artifacts-${{ github.sha }}"
