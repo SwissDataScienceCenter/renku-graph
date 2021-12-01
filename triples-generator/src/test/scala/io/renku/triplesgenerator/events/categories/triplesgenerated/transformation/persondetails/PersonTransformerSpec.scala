@@ -25,13 +25,11 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
-import io.renku.http.client.RestClientError
-import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.triplesgenerator.events.categories.triplesgenerated.ProjectFunctions
 import io.renku.triplesgenerator.events.categories.triplesgenerated.ProjectFunctions._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.Queries
+import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.Generators.recoverableClientErrors
 import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.TransformationStepsCreator.TransformationRecoverableError
-import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -125,7 +123,4 @@ class PersonTransformerSpec extends AnyWordSpec with should.Matchers with MockFa
     val personMerger   = mock[PersonMerger]
     val transformer    = new PersonTransformerImpl[Try](kgPersonFinder, personMerger, updatesCreator, ProjectFunctions)
   }
-
-  private lazy val recoverableClientErrors: Gen[RestClientError] =
-    Gen.oneOf(clientExceptions, connectivityExceptions, unexpectedResponseExceptions, Gen.const(UnauthorizedException))
 }

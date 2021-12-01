@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.datasets
+package io.renku.triplesgenerator.events.categories.triplesgenerated.transformation
+package datasets
 
 import cats.MonadThrow
 import cats.data.EitherT
@@ -24,11 +25,9 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.entities.{Dataset, Project}
-import io.renku.http.client.RestClientError._
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{Queries, Transformation}
-import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.TransformationStepsCreator.TransformationRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.{ProjectFunctions, TransformationStep}
 import org.typelevel.log4cats.Logger
 
@@ -52,7 +51,7 @@ private[transformation] class DatasetTransformerImpl[F[_]: MonadThrow](
     EitherT {
       (updateTopmostSameAs((project, Queries.empty)) >>= updatePersonLinks >>= updateHierarchyOnInvalidation)
         .map(_.asRight[ProcessingRecoverableError])
-        .recoverWith(maybeToRecoverableError)
+        .recoverWith(maybeToRecoverableError("Problem finding dataset details in KG"))
     }
 
   private lazy val updateTopmostSameAs: ((Project, Queries)) => F[(Project, Queries)] = { case (project, queries) =>
@@ -75,7 +74,7 @@ private[transformation] class DatasetTransformerImpl[F[_]: MonadThrow](
 
   private lazy val updatePersonLinks: ((Project, Queries)) => F[(Project, Queries)] = { case (project, queries) =>
     project.datasets
-      .map(ds => findDatasetCreators(ds.resourceId).map(updatesCreator.unlinkingRemovedCreators(ds, _)))
+      .map(ds => findDatasetCreators(ds.resourceId).map(updatesCreator.queriesUnlinkingCreators(ds, _)))
       .sequence
       .map(_.flatten)
       .map(quers => project -> (queries |+| Queries.preDataQueriesOnly(quers)))
@@ -104,16 +103,6 @@ private[transformation] class DatasetTransformerImpl[F[_]: MonadThrow](
             project -> (queries |+| Queries.postDataQueriesOnly(preDataUploadQueries))
           }
         }
-  }
-
-  private lazy val maybeToRecoverableError
-      : PartialFunction[Throwable, F[Either[ProcessingRecoverableError, (Project, Queries)]]] = {
-    case e @ (_: UnexpectedResponseException | _: ConnectivityException | _: ClientException |
-        _: UnauthorizedException) =>
-      TransformationRecoverableError("Problem finding dataset details in KG", e)
-        .asLeft[(Project, Queries)]
-        .leftWiden[ProcessingRecoverableError]
-        .pure[F]
   }
 }
 

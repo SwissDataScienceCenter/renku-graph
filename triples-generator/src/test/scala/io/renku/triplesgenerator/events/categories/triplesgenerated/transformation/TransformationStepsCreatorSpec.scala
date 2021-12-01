@@ -21,6 +21,7 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.transformat
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.Generators._
+import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.activities.ActivityTransformer
 import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.datasets.DatasetTransformer
 import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.persondetails.PersonTransformer
 import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.projects.ProjectTransformer
@@ -31,9 +32,10 @@ import org.scalatest.wordspec.AnyWordSpec
 import scala.util.Try
 
 class TransformationStepsCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers {
+
   "createSteps" should {
     "combine steps from person/dataset/project transformers" in {
-      val steps @ step1 :: step2 :: step3 :: Nil = transformationSteps[Try].generateFixedSizeList(3)
+      val steps @ step1 :: step2 :: step3 :: step4 :: Nil = transformationSteps[Try].generateFixedSizeList(4)
 
       val personTransformer = mock[PersonTransformer[Try]]
       (() => personTransformer.createTransformationStep).expects().returning(step1)
@@ -44,11 +46,14 @@ class TransformationStepsCreatorSpec extends AnyWordSpec with MockFactory with s
       val datasetTransformer = mock[DatasetTransformer[Try]]
       (() => datasetTransformer.createTransformationStep).expects().returning(step3)
 
+      val activityTransformer = mock[ActivityTransformer[Try]]
+      (() => activityTransformer.createTransformationStep).expects().returning(step4)
+
       new TransformationStepsCreatorImpl[Try](personTransformer,
                                               projectTransformer,
-                                              datasetTransformer
+                                              datasetTransformer,
+                                              activityTransformer
       ).createSteps shouldBe steps
-
     }
   }
 }

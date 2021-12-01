@@ -323,7 +323,7 @@ class UpdatesCreatorSpec
     }
   }
 
-  "unlinkingRemovedCreators" should {
+  "queriesUnlinkingCreators" should {
 
     "prepare delete queries for all dataset creators existing in KG but not in the model" in {
       forAll(
@@ -345,7 +345,7 @@ class UpdatesCreatorSpec
           .to[entities.Dataset[entities.Dataset.Provenance]]
 
         UpdatesCreator
-          .unlinkingRemovedCreators(model, creators.map(_.resourceId))
+          .queriesUnlinkingCreators(model, creators.map(_.resourceId))
           .runAll
           .unsafeRunSync()
 
@@ -360,7 +360,7 @@ class UpdatesCreatorSpec
         .generateOne
         .to[entities.Dataset[entities.Dataset.Provenance]]
 
-      UpdatesCreator.unlinkingRemovedCreators(ds, ds.provenance.creators.map(_.resourceId)) shouldBe Nil
+      UpdatesCreator.queriesUnlinkingCreators(ds, ds.provenance.creators.map(_.resourceId)) shouldBe Nil
     }
   }
 

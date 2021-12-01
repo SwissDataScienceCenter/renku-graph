@@ -19,20 +19,18 @@
 package io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.datasets
 
 import cats.syntax.all._
-import io.renku.generators.CommonGraphGenerators.{clientExceptions, connectivityExceptions, sparqlQueries, unexpectedResponseExceptions}
+import io.renku.generators.CommonGraphGenerators.sparqlQueries
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.datasets.{InternalSameAs, ResourceId, TopmostSameAs}
-import io.renku.graph.model.{entities, users}
 import io.renku.graph.model.testentities._
-import io.renku.http.client.RestClientError
-import io.renku.http.client.RestClientError.UnauthorizedException
+import io.renku.graph.model.{entities, users}
 import io.renku.rdfstore.SparqlQuery
 import io.renku.triplesgenerator.events.categories.triplesgenerated.ProjectFunctions
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.Queries
+import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.Generators.recoverableClientErrors
 import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.TransformationStepsCreator.TransformationRecoverableError
-import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -243,7 +241,7 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         kgCreators: Set[users.ResourceId],
         returning:  List[SparqlQuery]
     ) = (updatesCreator
-      .unlinkingRemovedCreators(_: entities.Dataset[entities.Dataset.Provenance], _: Set[users.ResourceId]))
+      .queriesUnlinkingCreators(_: entities.Dataset[entities.Dataset.Provenance], _: Set[users.ResourceId]))
       .expects(dataset, kgCreators)
       .returning(returning)
 
@@ -259,7 +257,4 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       .expects(dsAndMaybeTopmostSameAs._1, dsAndMaybeTopmostSameAs._2)
       .returning(returning)
   }
-
-  private lazy val recoverableClientErrors: Gen[RestClientError] =
-    Gen.oneOf(clientExceptions, connectivityExceptions, unexpectedResponseExceptions, Gen.const(UnauthorizedException))
 }

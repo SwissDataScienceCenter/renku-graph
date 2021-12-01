@@ -19,19 +19,17 @@
 package io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.projects
 
 import cats.syntax.all._
-import io.renku.generators.CommonGraphGenerators.{clientExceptions, connectivityExceptions, sparqlQueries, unexpectedResponseExceptions}
+import io.renku.generators.CommonGraphGenerators.sparqlQueries
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
-import io.renku.http.client.RestClientError
-import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.Queries
+import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.Generators.recoverableClientErrors
 import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.TransformationStepsCreator.TransformationRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.projects.KGProjectFinder.KGProjectInfo
-import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -112,7 +110,4 @@ class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
 
     val project = projectEntitiesWithDatasetsAndActivities.generateOne.to[entities.Project]
   }
-
-  private lazy val recoverableClientErrors: Gen[RestClientError] =
-    Gen.oneOf(clientExceptions, connectivityExceptions, unexpectedResponseExceptions, Gen.const(UnauthorizedException))
 }

@@ -17,47 +17,52 @@
  */
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated.transformation
-package projects
+package activities
 
 import cats.MonadThrow
 import cats.data.EitherT
-import cats.effect._
+import cats.effect.Async
 import cats.syntax.all._
-import eu.timepit.refined.auto._
+import io.renku.graph.model.entities.Project
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{Queries, Transformation}
 import org.typelevel.log4cats.Logger
 
-trait ProjectTransformer[F[_]] {
+private[transformation] trait ActivityTransformer[F[_]] {
   def createTransformationStep: TransformationStep[F]
 }
 
-class ProjectTransformerImpl[F[_]: MonadThrow](
-    kGProjectFinder: KGProjectFinder[F],
-    updatesCreator:  UpdatesCreator
-) extends ProjectTransformer[F] {
+private[transformation] object ActivityTransformer {
+  def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[ActivityTransformer[F]] = for {
+    kgInfoFinder <- KGInfoFinder(timeRecorder)
+  } yield new ActivityTransformerImpl[F](kgInfoFinder, UpdatesCreator)
+}
+
+private[transformation] class ActivityTransformerImpl[F[_]: MonadThrow](
+    kgInfoFinder:   KGInfoFinder[F],
+    updatesCreator: UpdatesCreator
+) extends ActivityTransformer[F] {
+
+  import eu.timepit.refined.auto._
+  import kgInfoFinder._
 
   override def createTransformationStep: TransformationStep[F] =
-    TransformationStep("Project Details Updates", createTransformation)
+    TransformationStep("Activity Updates", createTransformation)
 
   private def createTransformation: Transformation[F] = project =>
     EitherT {
-      kGProjectFinder
-        .find(project.resourceId)
-        .map {
-          case None => (project, Queries.empty).asRight[ProcessingRecoverableError]
-          case Some(kgProjectInfo) =>
-            (project, Queries.preDataQueriesOnly(updatesCreator.prepareUpdates(project, kgProjectInfo)))
-              .asRight[ProcessingRecoverableError]
-        }
-        .recoverWith(maybeToRecoverableError("Problem finding project details in KG"))
+      updatePersonLinks((project, Queries.empty))
+        .map(_.asRight[ProcessingRecoverableError])
+        .recoverWith(maybeToRecoverableError("Problem finding activity details in KG"))
     }
-}
 
-object ProjectTransformer {
-  def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[ProjectTransformer[F]] = for {
-    kgProjectFinder <- KGProjectFinder(timeRecorder)
-  } yield new ProjectTransformerImpl[F](kgProjectFinder, UpdatesCreator)
+  private lazy val updatePersonLinks: ((Project, Queries)) => F[(Project, Queries)] = { case (project, queries) =>
+    project.activities
+      .map(activity => findActivityAuthor(activity.resourceId).map(updatesCreator.queriesUnlinkingAuthor(activity, _)))
+      .sequence
+      .map(_.flatten)
+      .map(quers => project -> (queries |+| Queries.preDataQueriesOnly(quers)))
+  }
 }

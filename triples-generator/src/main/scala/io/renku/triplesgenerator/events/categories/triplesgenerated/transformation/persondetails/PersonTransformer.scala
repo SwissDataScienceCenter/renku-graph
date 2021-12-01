@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.persondetails
+package io.renku.triplesgenerator.events.categories.triplesgenerated.transformation
+package persondetails
 
 import cats.MonadThrow
 import cats.data.EitherT
@@ -24,11 +25,9 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.entities.{Person, Project}
-import io.renku.http.client.RestClientError._
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{Queries, Transformation}
-import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.TransformationStepsCreator.TransformationRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.{ProjectFunctions, TransformationStep}
 import org.typelevel.log4cats.Logger
 
@@ -57,7 +56,7 @@ private class PersonTransformerImpl[F[_]: MonadThrow](
           updateProjectAndPreDataQueries(previousResultsF, person)
         }
         .map(_.asRight[ProcessingRecoverableError])
-        .recoverWith(maybeToRecoverableError)
+        .recoverWith(maybeToRecoverableError("Problem finding person details in KG"))
     }
 
   private lazy val updateProjectAndPreDataQueries: (F[(Project, Queries)], Person) => F[(Project, Queries)] = {
@@ -73,16 +72,6 @@ private class PersonTransformerImpl[F[_]: MonadThrow](
           (updatedProject, previousResults._2 |+| Queries.preDataQueriesOnly(queries))
         }
         .getOrElse(previousResults)
-  }
-
-  private lazy val maybeToRecoverableError
-      : PartialFunction[Throwable, F[Either[ProcessingRecoverableError, (Project, Queries)]]] = {
-    case e @ (_: UnexpectedResponseException | _: ConnectivityException | _: ClientException |
-        _: UnauthorizedException) =>
-      TransformationRecoverableError("Problem finding person details in KG", e)
-        .asLeft[(Project, Queries)]
-        .leftWiden[ProcessingRecoverableError]
-        .pure[F]
   }
 }
 

@@ -50,7 +50,7 @@ private trait UpdatesCreator {
                                   maybeParentTopmostSameAs: Option[TopmostSameAs]
   ): List[SparqlQuery]
 
-  def unlinkingRemovedCreators(dataset:      Dataset[Dataset.Provenance],
+  def queriesUnlinkingCreators(dataset:      Dataset[Dataset.Provenance],
                                creatorsInKG: Set[users.ResourceId]
   ): List[SparqlQuery]
 }
@@ -88,14 +88,14 @@ private object UpdatesCreator extends UpdatesCreator {
     case Some(_) => List(prepareTopmostSameAsCleanUp(dataset.resourceId, dataset.provenance.topmostSameAs))
   }
 
-  override def unlinkingRemovedCreators(dataset:      Dataset[Dataset.Provenance],
+  override def queriesUnlinkingCreators(dataset:      Dataset[Dataset.Provenance],
                                         creatorsInKG: Set[users.ResourceId]
   ): List[SparqlQuery] = {
     val dsCreators = dataset.provenance.creators.map(_.resourceId)
     Option
       .when(dsCreators != creatorsInKG) {
         SparqlQuery.of(
-          name = "transformation - delete removed ds creators",
+          name = "transformation - delete ds creators link",
           Prefixes of schema -> "schema",
           s"""|DELETE {
               |  ${dataset.resourceId.showAs[RdfResource]} schema:creator ?personId

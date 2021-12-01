@@ -18,106 +18,36 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated
 
-import cats.data.{EitherT, OptionT}
+import cats.Applicative
+import cats.data.EitherT
 import cats.syntax.all._
-import cats.{MonadError, MonadThrow}
+import io.circe.Decoder
 import io.circe.Decoder.decodeString
-import io.circe.{Decoder, Json}
 import io.renku.graph.model.entities.Project
-import io.renku.jsonld.{EntityId, Property}
+import io.renku.http.client.RestClientError._
+import io.renku.jsonld.EntityId
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.Queries
+import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.TransformationStepsCreator.TransformationRecoverableError
 
 package object transformation {
 
-  private[triplesgenerated] type TransformationResults[F[_]] =
-    EitherT[F, ProcessingRecoverableError, Project]
-
-  implicit class JsonOps(json: Json) {
-
-    import io.circe.Decoder.decodeList
-    import io.circe.Encoder.encodeList
-    import io.circe.optics.JsonPath.root
-    import io.circe.{Decoder, Encoder}
-
-    def findTypes: List[String] = {
-      val t  = root.`@type`.each.string.getAll(json)
-      val tt = root.`@type`.string.getOption(json).toList
-      t ++ tt
-    }
-
-    def get[T](property: String)(implicit decode: Decoder[T], encode: Encoder[T]): Option[T] =
-      root.selectDynamic(property).as[T].getOption(json)
-
-    def getValue[F[_]: MonadThrow, T](implicit decode: Decoder[T]): OptionT[F, T] =
-      singleValueJson >>= {
-        _.hcursor
-          .downField("@value")
-          .as[Option[T]]
-          .fold(
-            fail("No @value property found in Json"),
-            OptionT.fromOption[F](_)
-          )
-      }
-
-    def getId[F[_]: MonadThrow, T](implicit decode: Decoder[T]): OptionT[F, T] =
-      singleValueJson >>= {
-        _.hcursor
-          .downField("@id")
-          .as[Option[T]]
-          .fold(
-            fail("No @id property found in Json"),
-            OptionT.fromOption[F](_)
-          )
-      }
-
-    private def singleValueJson[F[_]: MonadThrow]: OptionT[F, Json] =
-      if (json.isArray) toSingleValue[F, Json](json.asArray.map(_.toList))
-      else OptionT.some[F](json)
-
-    private def fail[F[_]: MonadThrow, T](message: String)(exception: Throwable): OptionT[F, T] =
-      OptionT.liftF(new IllegalStateException(message, exception).raiseError[F, T])
-
-    private def toSingleValue[F[_]: MonadThrow, T](maybeList: Option[List[T]]): OptionT[F, T] = maybeList match {
-      case Some(v +: Nil) => OptionT.some[F](v)
-      case Some(Nil)      => OptionT.none[F, T]
-      case None           => OptionT.none[F, T]
-      case _              => OptionT.liftF(new IllegalStateException(s"Multiple values found in Json").raiseError[F, T])
-    }
-
-    def getValues[T](
-        property:      String
-    )(implicit decode: Decoder[T], encode: Encoder[T]): List[T] = {
-      import io.circe.literal._
-
-      val valuesDecoder: Decoder[T] = _.downField("@value").as[T]
-      val valuesEncoder: Encoder[T] = Encoder.instance[T](value => json"""{"@value": $value}""")
-      val findListOfValues = root
-        .selectDynamic(property)
-        .as[List[T]](decodeList(valuesDecoder), encodeList(valuesEncoder))
-        .getOption(json)
-      val findSingleValue = root
-        .selectDynamic(property)
-        .as[T](valuesDecoder, valuesEncoder)
-        .getOption(json)
-
-      findListOfValues orElse findSingleValue.map(List(_)) getOrElse List.empty
-    }
-
-    def getValue[F[_], T](
-        property:      Property
-    )(implicit decode: Decoder[T], encode: Encoder[T], ME: MonadError[F, Throwable]): OptionT[F, T] =
-      getValues(property.toString)(decode, encode) match {
-        case Nil      => OptionT.none[F, T]
-        case x +: Nil => OptionT.some[F](x)
-        case _ => OptionT.liftF(new IllegalStateException(s"Multiple values found for $property").raiseError[F, T])
-      }
-
-    def remove(property: Property): Json = root.obj.modify(_.remove(property.toString))(json)
-  }
+  private[triplesgenerated] type TransformationResults[F[_]] = EitherT[F, ProcessingRecoverableError, Project]
 
   implicit val entityIdDecoder: Decoder[EntityId] =
     decodeString.emap { value =>
       if (value.trim.isEmpty) "Empty entityId found in the generated triples".asLeft[EntityId]
       else EntityId.of(value).asRight[String]
     }
+
+  private[transformation] def maybeToRecoverableError[F[_]: Applicative](
+      recoverableErrorMessage: String
+  ): PartialFunction[Throwable, F[Either[ProcessingRecoverableError, (Project, Queries)]]] = {
+    case e @ (_: UnexpectedResponseException | _: ConnectivityException | _: ClientException |
+        _: UnauthorizedException) =>
+      TransformationRecoverableError(recoverableErrorMessage, e)
+        .asLeft[(Project, Queries)]
+        .leftWiden[ProcessingRecoverableError]
+        .pure[F]
+  }
 }
