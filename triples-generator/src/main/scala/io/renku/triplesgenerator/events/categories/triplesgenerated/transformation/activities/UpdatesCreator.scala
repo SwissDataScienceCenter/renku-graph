@@ -38,7 +38,7 @@ private object UpdatesCreator extends UpdatesCreator {
     val activityAuthor = activity.author.resourceId
     Option
       .when(maybeKgAuthor.exists(_ != activityAuthor)) {
-        val d = SparqlQuery.of(
+        SparqlQuery.of(
           name = "transformation - delete activity author link",
           Prefixes of (schema -> "schema", prov -> "prov"),
           s"""|DELETE {
@@ -51,7 +51,6 @@ private object UpdatesCreator extends UpdatesCreator {
               |}
               |""".stripMargin
         )
-        d
       }
       .toList
   }
