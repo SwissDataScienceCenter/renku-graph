@@ -22,7 +22,7 @@ import io.renku.events.consumers.ConsumersModelGenerators._
 import io.renku.generators.Generators.{exceptions, nonEmptyStrings}
 import io.renku.generators.jsonld.JsonLDGenerators.jsonLDEntities
 import io.renku.graph.model.EventsGenerators._
-import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TransformationStepsCreator.TransformationRecoverableError
+import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.TransformationStepsCreator.TransformationRecoverableError
 import org.scalacheck.Gen
 
 private object TriplesGeneratedGenerators {
