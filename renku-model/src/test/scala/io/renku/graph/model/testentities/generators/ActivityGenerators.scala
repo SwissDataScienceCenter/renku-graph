@@ -127,6 +127,8 @@ trait ActivityGenerators {
     def generateList(projectDateCreated: projects.DateCreated): List[Activity] =
       factory(projectDateCreated).generateList()
 
+    def many: List[ActivityGenFactory] = List.fill(positiveInts(5).generateOne)(factory)
+
     def withDateBefore(max: InstantTinyType): Gen[Activity] =
       factory(projects.DateCreated(max.value))
         .map(_.copy(startTime = timestamps(max = max.value).generateAs[activities.StartTime]))
