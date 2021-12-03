@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events.categories.membersync
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.config.RenkuBaseUrlLoader
-import io.renku.graph.model.Schemas.{rdf, schema}
+import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model.projects.{Path, ResourceId}
 import io.renku.graph.model.users.GitLabId
 import io.renku.graph.model.views.RdfResource
@@ -63,10 +63,10 @@ private class KGProjectMembersFinderImpl[F[_]: Async: Logger](
 
   private def query(path: Path) = SparqlQuery.of(
     name = "members by project path",
-    Prefixes.of(schema -> "schema", rdf -> "rdf"),
+    Prefixes of schema -> "schema",
     s"""|SELECT DISTINCT ?memberId ?gitLabId
         |WHERE {
-        |  ${ResourceId(path)(renkuBaseUrl).showAs[RdfResource]} rdf:type      <http://schema.org/Project>;
+        |  ${ResourceId(path)(renkuBaseUrl).showAs[RdfResource]} a schema:Project;
         |                                                        schema:member ?memberId.                                                     
         |  ?sameAsId  schema:additionalType  'GitLab';
         |             schema:identifier      ?gitLabId ;

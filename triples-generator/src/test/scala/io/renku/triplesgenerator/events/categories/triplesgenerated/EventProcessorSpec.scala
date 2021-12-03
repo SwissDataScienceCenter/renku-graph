@@ -46,9 +46,9 @@ import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableE
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater
 import io.renku.triplesgenerator.events.categories.triplesgenerated.EventProcessor.eventsProcessingTimesBuilder
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
-import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.Generators._
-import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TransformationStepsCreator
-import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TransformationStepsCreator.TransformationRecoverableError
+import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.Generators._
+import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.TransformationStepsCreator
+import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.TransformationStepsCreator.TransformationRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.{TransformationStepsRunner, TriplesUploadResult}
 import org.scalacheck.Gen

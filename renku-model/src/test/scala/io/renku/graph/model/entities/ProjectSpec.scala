@@ -700,9 +700,14 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
 
     lazy val toPerson: entities.Person = gitLabPerson match {
       case ProjectMemberNoEmail(name, _, gitLabId) =>
-        entities.Person(users.ResourceId(gitLabId), name, maybeGitLabId = gitLabId.some)
+        entities.Person.WithGitLabId(users.ResourceId(gitLabId),
+                                     gitLabId,
+                                     name,
+                                     maybeEmail = None,
+                                     maybeAffiliation = None
+        )
       case ProjectMemberWithEmail(name, _, gitLabId, email) =>
-        entities.Person(users.ResourceId(gitLabId), name, maybeGitLabId = gitLabId.some, maybeEmail = email.some)
+        entities.Person.WithGitLabId(users.ResourceId(gitLabId), gitLabId, name, email.some, maybeAffiliation = None)
     }
 
     private def nameFromUsernameOrName(member: ProjectMember) =
@@ -743,9 +748,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     _.maybeEmail.contains(member.email)
 
   private def merge(person: entities.Person, member: ProjectMemberWithEmail): entities.Person =
-    person.copy(resourceId = users.ResourceId(member.gitLabId),
-                name = member.name,
-                maybeEmail = member.email.some,
-                maybeGitLabId = member.gitLabId.some
-    )
+    person
+      .add(member.gitLabId)
+      .copy(name = member.name, maybeEmail = member.email.some)
 }

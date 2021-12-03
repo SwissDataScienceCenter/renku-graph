@@ -34,7 +34,7 @@ import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater._
-import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TransformationStepsCreator
+import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.TransformationStepsCreator
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.{TransformationStepsRunner, TriplesUploadResult}
 import org.typelevel.log4cats.Logger

@@ -29,7 +29,6 @@ import org.scalacheck.Gen
 import org.scalacheck.Gen.{alphaChar, const, frequency, numChar, oneOf, uuid}
 
 import java.time.{Instant, LocalDate, ZoneOffset}
-import java.util.UUID
 import scala.util.Random
 
 object GraphModelGenerators {
@@ -76,15 +75,16 @@ object GraphModelGenerators {
               )
   } yield Name(s"$first $second")
 
-  implicit val userResourceIds: Gen[users.ResourceId] = userResourceIds(userEmails.toGeneratorOfOptions)
-  def userResourceIds(maybeEmail: Option[Email]): Gen[users.ResourceId] = userResourceIds(Gen.const(maybeEmail))
-  def userResourceIds(maybeEmailGen: Gen[Option[Email]]): Gen[users.ResourceId] = for {
-    maybeEmail <- maybeEmailGen
-  } yield users.ResourceId
-    .from(maybeEmail.map(email => s"mailto:$email").getOrElse(s"_:${UUID.randomUUID()}"))
-    .fold(throw _, identity)
+  def userGitLabResourceId(implicit renkuBaseUrl: RenkuBaseUrl): Gen[users.ResourceId.GitLabIdBased] =
+    userGitLabIds map users.ResourceId.apply
+  val userEmailResourceId: Gen[users.ResourceId.EmailBased] = userEmails map users.ResourceId.apply
+  def userNameResourceId(implicit renkuBaseUrl: RenkuBaseUrl): Gen[users.ResourceId.NameBased] =
+    userNames map users.ResourceId.apply
+  implicit def userResourceIds(implicit renkuBaseUrl: RenkuBaseUrl): Gen[users.ResourceId] =
+    Gen.oneOf(userGitLabResourceId, userEmailResourceId, userNameResourceId)
 
-  implicit val userGitLabIds: Gen[users.GitLabId] = Gen.uuid.map(_ => users.GitLabId(Random.nextInt(100000000) + 1))
+  implicit lazy val userGitLabIds: Gen[users.GitLabId] =
+    Gen.uuid.map(_ => users.GitLabId(Random.nextInt(100000000) + 1))
 
   implicit val projectIds:   Gen[Id]            = Gen.uuid.map(_ => Id(Random.nextInt(1000000) + 1))
   implicit val projectNames: Gen[projects.Name] = nonBlankStrings(minLength = 5) map (n => projects.Name(n.value))

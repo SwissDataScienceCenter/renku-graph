@@ -58,7 +58,7 @@ trait EntitiesGenerators extends ProjectEntitiesGenerators with ActivityGenerato
   implicit lazy val personEntities: Gen[Person] = personEntities()
 
   def personEntities(
-      maybeGitLabIds: Gen[Option[GitLabId]] = userGitLabIds.toGeneratorOfNones,
+      maybeGitLabIds: Gen[Option[GitLabId]] = userGitLabIds.toGeneratorOfOptions,
       maybeEmails:    Gen[Option[Email]] = userEmails.toGeneratorOfOptions
   ): Gen[Person] = for {
     name             <- userNames
