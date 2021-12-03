@@ -68,9 +68,24 @@ class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
         schema / "name" -> JsonLD.arr(firstName.asJsonLD, secondName.asJsonLD)
       )
 
-      val Right(personWithSingleName) = jsonLDPerson.cursor.as[entities.Person]
+      val Right(person) = jsonLDPerson.cursor.as[entities.Person]
 
-      personWithSingleName.name should (be(firstName) or be(secondName))
+      person.name should (be(firstName) or be(secondName))
+    }
+
+    "take the last Affiliation in case of multiple for a Person" in {
+      val resourceId   = userNameResourceId.generateOne
+      val name         = userNames.generateOne
+      val affiliation1 = userAffiliations.generateOne
+      val affiliation2 = userAffiliations.generateOne
+      val jsonLDPerson = JsonLD.entity(
+        resourceId.asEntityId,
+        entityTypes,
+        schema / "name"        -> name.asJsonLD,
+        schema / "affiliation" -> JsonLD.arr(affiliation1.asJsonLD, affiliation2.asJsonLD)
+      )
+
+      jsonLDPerson.cursor.as[entities.Person].map(_.maybeAffiliation) shouldBe affiliation2.some.asRight
     }
 
     "fail if there's no name for a Person" in {

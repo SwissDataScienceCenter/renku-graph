@@ -154,7 +154,7 @@ object Person {
       names            <- cursor.downField(schema / "name").as[List[Name]]
       maybeEmail       <- cursor.downField(schema / "email").as[Option[Email]]
       maybeGitLabId    <- cursor.downField(schema / "sameAs").as[Option[GitLabId]](decodeOption(gitLabIdDecoder))
-      maybeAffiliation <- cursor.downField(schema / "affiliation").as[Option[Affiliation]]
+      maybeAffiliation <- cursor.downField(schema / "affiliation").as[List[Affiliation]].map(_.reverse.headOption)
       name <- if (names.isEmpty) DecodingFailure(s"No name on Person $resourceId", Nil).asLeft
               else names.reverse.head.asRight
       person <- Person
