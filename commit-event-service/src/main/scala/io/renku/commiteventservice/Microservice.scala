@@ -28,9 +28,11 @@ import io.renku.config.sentry.SentryInitializer
 import io.renku.control.{RateLimit, Throttler}
 import io.renku.events.consumers
 import io.renku.events.consumers.EventConsumersRegistry
+import io.renku.graph.config.GitLabUrlLoader
+import io.renku.http.client.GitLabClient
 import io.renku.http.server.HttpServer
 import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder}
-import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
+import io.renku.metrics.{GitLabApiCallRecorder, MetricsRegistry, RoutesMetrics}
 import io.renku.microservices.IOMicroservice
 import org.typelevel.log4cats.Logger
 
@@ -43,14 +45,18 @@ object Microservice extends IOMicroservice {
     certificateLoader     <- CertificateLoader[IO]
     sentryInitializer     <- SentryInitializer[IO]
     gitLabRateLimit       <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
+    gitLabUrl           <- GitLabUrlLoader[IO]()
+    metricsRegistry        <- MetricsRegistry[IO]()
+    apiCallRecorder <- GitLabApiCallRecorder[IO](metricsRegistry)
     gitLabThrottler       <- Throttler[IO, GitLab](gitLabRateLimit)
+    gitLabClient <- GitLabClient[IO](gitLabUrl.apiV4, apiCallRecorder, gitLabThrottler)
     executionTimeRecorder <- ExecutionTimeRecorder[IO]()
     commitSyncCategory <-
       events.categories.commitsync.SubscriptionFactory(gitLabThrottler, executionTimeRecorder)
     globalCommitSyncCategory <-
-      events.categories.globalcommitsync.SubscriptionFactory(gitLabThrottler, executionTimeRecorder)
+      events.categories.globalcommitsync.SubscriptionFactory(gitLabClient, gitLabThrottler, executionTimeRecorder)
     eventConsumersRegistry <- consumers.EventConsumersRegistry(commitSyncCategory, globalCommitSyncCategory)
-    metricsRegistry        <- MetricsRegistry[IO]()
+//    gitLabApiCallRecorder <- GitLabApiCallRecorder[IO](metricsRegistry)
     microserviceRoutes     <- MicroserviceRoutes(eventConsumersRegistry, new RoutesMetrics[IO](metricsRegistry))
     exitcode <- microserviceRoutes.routes.use { routes =>
                   new MicroserviceRunner(
