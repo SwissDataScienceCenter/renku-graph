@@ -142,7 +142,7 @@ class VisibilitySpec extends AnyWordSpec with should.Matchers {
   }
 }
 
-class ResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class ProjectResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "ResourceId" should {
 

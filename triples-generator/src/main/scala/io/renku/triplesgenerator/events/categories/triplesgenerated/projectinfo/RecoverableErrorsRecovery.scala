@@ -22,7 +22,7 @@ import cats.MonadThrow
 import cats.syntax.all._
 import io.renku.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import io.renku.triplesgenerator.events.categories.triplesgenerated.triplescuration.TransformationStepsCreator.TransformationRecoverableError
+import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.TransformationStepsCreator.TransformationRecoverableError
 import org.http4s.Status.{Forbidden, ServiceUnavailable, Unauthorized}
 
 private trait RecoverableErrorsRecovery {
