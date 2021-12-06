@@ -46,7 +46,7 @@ object users {
         with EntityIdJsonLdOps[GitLabIdBased]
         with Constraints[String]
         with NonBlank {
-      private[users] val validator = "^http(s)?://.*/users/(\\d+)$"
+      private[users] val validator = "^http(s)?://.*/persons/(\\d+)$"
       addConstraint(
         check = _.trim.matches(validator),
         message = (v: String) => s"$v is not valid $typeName"
@@ -72,7 +72,7 @@ object users {
         with EntityIdJsonLdOps[NameBased]
         with Constraints[String]
         with NonBlank {
-      private[users] val validator = "^http(s)?://.*/users/.+$"
+      private[users] val validator = "^http(s)?://.*/persons/.+$"
       addConstraint(
         check = _.trim.matches(validator),
         message = (v: String) => s"$v is not valid $typeName"
@@ -80,12 +80,12 @@ object users {
     }
 
     def apply(gitLabId: GitLabId)(implicit renkuBaseUrl: RenkuBaseUrl): GitLabIdBased =
-      new GitLabIdBased((renkuBaseUrl / "users" / gitLabId).show)
+      new GitLabIdBased((renkuBaseUrl / "persons" / gitLabId).show)
 
     def apply(email: Email): EmailBased = new EmailBased(show"mailto:$email")
 
     def apply(name: Name)(implicit renkuBaseUrl: RenkuBaseUrl): NameBased =
-      new NameBased((renkuBaseUrl / "users" / name).show)
+      new NameBased((renkuBaseUrl / "persons" / name).show)
 
     implicit object UsersResourceIdRdfResourceRenderer extends Renderer[RdfResource, ResourceId] {
       private val localPartExtractor = "^mailto:(.*)@.*$".r
