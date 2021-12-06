@@ -202,7 +202,7 @@ private object Commands {
 
     override def migrate(commitEvent: CommitEvent)(implicit destinationDirectory: RepositoryPath): F[Unit] =
       MonadThrow[F]
-        .catchNonFatal(%%("renku", "migrate")(destinationDirectory.value))
+        .catchNonFatal(%%("renku", "migrate", "--preserve-identifiers")(destinationDirectory.value))
         .void
         .recoverWith { case NonFatal(exception) =>
           new Exception(
