@@ -380,7 +380,9 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       val dataset2 =
         datasetEntities(provenanceImportedInternalAncestorExternal).withDateBefore(projectInfo.dateCreated).generateOne
       val dataset3 =
-        datasetEntities(provenanceImportedInternalAncestorInternal).withDateBefore(projectInfo.dateCreated).generateOne
+        datasetEntities(provenanceImportedInternalAncestorInternal())
+          .withDateBefore(projectInfo.dateCreated)
+          .generateOne
       val jsonLD = cliLikeJsonLD(
         resourceId,
         cliVersion,

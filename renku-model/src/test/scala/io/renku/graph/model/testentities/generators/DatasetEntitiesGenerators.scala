@@ -25,7 +25,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{nonBlankStrings, sentences, timestamps}
 import io.renku.graph.model.GraphModelGenerators.{datasetCreatedDates, datasetDescriptions, datasetExternalSameAs, datasetIdentifiers, datasetImageUris, datasetInitialVersions, datasetInternalSameAs, datasetKeywords, datasetLicenses, datasetNames, datasetPartExternals, datasetPartSources, datasetPublishedDates, datasetTitles, datasetVersions, projectCreatedDates}
 import io.renku.graph.model._
-import io.renku.graph.model.datasets.{DerivedFrom, ExternalSameAs, Identifier, InitialVersion, PartId, TopmostSameAs}
+import io.renku.graph.model.datasets.{DerivedFrom, ExternalSameAs, Identifier, InitialVersion, InternalSameAs, PartId, TopmostSameAs}
 import io.renku.graph.model.testentities.Dataset.{AdditionalInfo, Identification, Provenance}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
 import io.renku.tinytypes.InstantTinyType
@@ -159,12 +159,14 @@ trait DatasetEntitiesGenerators {
                                                                     creators
         )
 
-  val provenanceImportedInternalAncestorInternal: ProvenanceGen[Dataset.Provenance.ImportedInternalAncestorInternal] =
+  def provenanceImportedInternalAncestorInternal(
+      sameAsGen: Gen[InternalSameAs] = datasetInternalSameAs
+  ): ProvenanceGen[Dataset.Provenance.ImportedInternalAncestorInternal] =
     (identifier, projectDateCreated) =>
       implicit renkuBaseUrl =>
         for {
           date     <- datasetCreatedDates(projectDateCreated.value)
-          sameAs   <- datasetInternalSameAs
+          sameAs   <- sameAsGen
           creators <- personEntities.toGeneratorOfSet(maxElements = 1)
         } yield Dataset.Provenance.ImportedInternalAncestorInternal(Dataset.entityId(identifier),
                                                                     sameAs,
@@ -174,10 +176,26 @@ trait DatasetEntitiesGenerators {
                                                                     creators
         )
 
+  def provenanceImportedInternalAncestorInternal(
+      sameAs:        InternalSameAs,
+      topmostSameAs: TopmostSameAs
+  ): ProvenanceGen[Dataset.Provenance.ImportedInternalAncestorInternal] =
+    (identifier, projectDateCreated) =>
+      implicit renkuBaseUrl =>
+        for {
+          date     <- datasetCreatedDates(projectDateCreated.value)
+          creators <- personEntities.toGeneratorOfSet(maxElements = 1)
+        } yield Dataset.Provenance.ImportedInternalAncestorInternal(Dataset.entityId(identifier),
+                                                                    sameAs,
+                                                                    topmostSameAs,
+                                                                    InitialVersion(identifier),
+                                                                    date,
+                                                                    creators
+        )
   val provenanceImportedInternal: ProvenanceGen[Dataset.Provenance.ImportedInternal] = Random.shuffle {
     List(
       provenanceImportedInternalAncestorExternal.asInstanceOf[ProvenanceGen[Dataset.Provenance.ImportedInternal]],
-      provenanceImportedInternalAncestorInternal.asInstanceOf[ProvenanceGen[Dataset.Provenance.ImportedInternal]]
+      provenanceImportedInternalAncestorInternal().asInstanceOf[ProvenanceGen[Dataset.Provenance.ImportedInternal]]
     )
   }.head
 

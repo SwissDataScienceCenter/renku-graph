@@ -28,6 +28,7 @@ import io.circe.{Decoder, HCursor, Json}
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
+import io.renku.http.client.{BasicAuthCredentials, BasicAuthPassword, BasicAuthUsername}
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.{JsonLD, JsonLDEncoder}
 import io.renku.logging.TestExecutionTimeRecorder
@@ -66,7 +67,8 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
   protected lazy val rdfStoreConfig: RdfStoreConfig = rdfStoreConfigs.generateOne.copy(
     fusekiBaseUrl = FusekiBaseUrl(s"http://localhost:$fusekiServerPort"),
     datasetName =
-      if (givenServerRunning) DatasetName("renku") else (nonEmptyStrings() map DatasetName.apply).generateOne
+      if (givenServerRunning) DatasetName("renku") else (nonEmptyStrings() map DatasetName.apply).generateOne,
+    authCredentials = BasicAuthCredentials(BasicAuthUsername("admin"), BasicAuthPassword("admin"))
   )
 
   protected implicit lazy val fusekiBaseUrl: FusekiBaseUrl = rdfStoreConfig.fusekiBaseUrl

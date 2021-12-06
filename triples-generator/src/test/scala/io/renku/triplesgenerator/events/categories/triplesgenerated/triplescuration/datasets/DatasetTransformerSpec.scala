@@ -94,7 +94,7 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       ) = anyProjectEntities
         .addDatasetAndInvalidation(datasetEntities(provenanceInternal))
         .addDatasetAndInvalidation(datasetEntities(provenanceImportedExternal))
-        .addDatasetAndInvalidation(datasetEntities(provenanceImportedInternalAncestorInternal))
+        .addDatasetAndInvalidation(datasetEntities(provenanceImportedInternalAncestorInternal()))
         .addDatasetAndInvalidation(datasetEntities(provenanceImportedInternalAncestorExternal))
         .generateOne
       val (beforeModification, modification, modificationInvalidated) =

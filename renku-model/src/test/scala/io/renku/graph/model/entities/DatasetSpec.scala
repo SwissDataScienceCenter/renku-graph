@@ -77,7 +77,7 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     "succeed if dataset parts are older than the modified or imported internal dataset" in {
       List(
         datasetAndModificationEntities(provenanceNonModified).map(_._2),
-        datasetEntities(provenanceImportedInternalAncestorInternal).decoupledFromProject
+        datasetEntities(provenanceImportedInternalAncestorInternal()).decoupledFromProject
       ) foreach { datasetGen =>
         val dataset = datasetGen.generateOne.to[entities.Dataset[entities.Dataset.Provenance]]
         val olderPart = updatePartDateAfter(
@@ -165,7 +165,7 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           provenanceImportedInternalAncestorExternal.asInstanceOf[ProvenanceGen[Dataset.Provenance.ImportedInternal]]
         ).decoupledFromProject.generateOne.to[entities.Dataset[Provenance.ImportedInternal]],
         datasetEntities(
-          provenanceImportedInternalAncestorInternal.asInstanceOf[ProvenanceGen[Dataset.Provenance.ImportedInternal]]
+          provenanceImportedInternalAncestorInternal().asInstanceOf[ProvenanceGen[Dataset.Provenance.ImportedInternal]]
         ).decoupledFromProject.generateOne.to[entities.Dataset[Provenance.ImportedInternal]]
       ) foreach { dataset =>
         val newTopmostSameAs = datasetTopmostSameAs.generateOne

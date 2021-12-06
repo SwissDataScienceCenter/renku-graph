@@ -6,6 +6,7 @@ import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.testtools.IOSpec
@@ -17,13 +18,13 @@ import org.scalatest.wordspec.AnyWordSpec
 class CleanUpEventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
   "processEvent" should {
     "remove the triples linked to the project and notify the eventlog when the process is done" in new TestCase {
-      (triplesRemover.removeTriples _).expects(project).returns(().pure[IO])
+      (triplesRemover.removeTriples _).expects(path).returns(().pure[IO])
       (eventLogNotifier.notifyEventLog _).expects(project).returns(().pure[IO])
       cleanUpEventProcessor.process(project).unsafeRunSync() shouldBe ()
     }
     "fail if the removal of the triples fail and log the error" in new TestCase {
       val exception = exceptions.generateOne
-      (triplesRemover.removeTriples _).expects(project).returns(exception.raiseError[IO, Unit])
+      (triplesRemover.removeTriples _).expects(path).returns(exception.raiseError[IO, Unit])
       intercept[Exception] {
         cleanUpEventProcessor.process(project).unsafeRunSync()
       }.getMessage shouldBe exception.getMessage
@@ -35,7 +36,7 @@ class CleanUpEventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory
     }
     "fail if the notification of the eventlog fails and log the error" in new TestCase {
       val exception = exceptions.generateOne
-      (triplesRemover.removeTriples _).expects(project).returns(().pure[IO])
+      (triplesRemover.removeTriples _).expects(path).returns(().pure[IO])
       (eventLogNotifier.notifyEventLog _).expects(project).returns(exception.raiseError[IO, Unit])
       intercept[Exception] {
         cleanUpEventProcessor.process(project).unsafeRunSync()
@@ -54,7 +55,8 @@ class CleanUpEventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory
     s"$categoryName: ${project.show}"
 
   private trait TestCase {
-    val project = Project(projectIds.generateOne, projectPaths.generateOne)
+    val path:    projects.Path = projectPaths.generateOne
+    val project: Project       = Project(projectIds.generateOne, path)
 
     implicit val logger = TestLogger[IO]()
 

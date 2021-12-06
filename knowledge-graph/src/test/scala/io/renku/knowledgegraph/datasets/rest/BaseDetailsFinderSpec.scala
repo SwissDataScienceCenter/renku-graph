@@ -53,7 +53,7 @@ class BaseDetailsFinderSpec
           .map { case (ds, project) => (ds, project, importedExternalToNonModified(ds, project)) }
           .generateOne,
         anyProjectEntities
-          .addDataset(datasetEntities(provenanceImportedInternalAncestorInternal))
+          .addDataset(datasetEntities(provenanceImportedInternalAncestorInternal()))
           .map { case (ds, project) => (ds, project, importedInternalToNonModified(ds, project)) }
           .generateOne,
         anyProjectEntities

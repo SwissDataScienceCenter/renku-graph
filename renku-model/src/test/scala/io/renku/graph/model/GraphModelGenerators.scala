@@ -135,10 +135,13 @@ object GraphModelGenerators {
   implicit val datasetImageUris:       Gen[ImageUri]       = Gen.oneOf(relativePaths(), httpUrls()) map ImageUri.apply
   implicit val datasetExternalSameAs: Gen[ExternalSameAs] =
     validatedUrls map SameAs.external map (_.fold(throw _, identity))
-  implicit val datasetInternalSameAs: Gen[InternalSameAs] = for {
-    url <- renkuBaseUrls
-    id  <- datasetIdentifiers
+  def datasetInternalSameAsFrom(renkuBaseUrlGen: Gen[RenkuBaseUrl] = renkuBaseUrls,
+                                datasetIdGen:    Gen[Identifier] = datasetIdentifiers
+  ): Gen[InternalSameAs] = for {
+    url <- renkuBaseUrlGen
+    id  <- datasetIdGen
   } yield SameAs.internal(url / "datasets" / id).fold(throw _, identity)
+  implicit val datasetInternalSameAs = datasetInternalSameAsFrom()
   implicit val datasetSameAs:        Gen[SameAs]        = Gen.oneOf(datasetExternalSameAs, datasetInternalSameAs)
   implicit val datasetTopmostSameAs: Gen[TopmostSameAs] = datasetSameAs.map(TopmostSameAs.apply)
   implicit val datasetDerivedFroms:  Gen[DerivedFrom]   = validatedUrls map (_.value) map DerivedFrom.apply
