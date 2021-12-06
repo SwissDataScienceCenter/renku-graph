@@ -32,9 +32,9 @@ object Association {
 
   implicit def toEntitiesAssociation(implicit renkuBaseUrl: RenkuBaseUrl): Association => entities.Association =
     association =>
-      entities.Association(associations.ResourceId(association.asEntityId.show),
-                           association.agent.to[entities.Agent],
-                           association.plan.to[entities.Plan]
+      entities.Association.WithRenkuAgent(associations.ResourceId(association.asEntityId.show),
+                                          association.agent.to[entities.Agent],
+                                          association.plan.to[entities.Plan]
       )
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[Association] =
