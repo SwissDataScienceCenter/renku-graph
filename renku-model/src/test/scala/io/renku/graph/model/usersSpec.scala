@@ -99,9 +99,9 @@ class UsersResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
   private implicit val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
 
   "apply(GitLabId)" should {
-    "generate 'renkuBaseUrl/users/gitLabId' ResourceId" in {
+    "generate 'renkuBaseUrl/persons/gitLabId' ResourceId" in {
       val gitLabId = userGitLabIds.generateOne
-      ResourceId(gitLabId).show shouldBe (renkuBaseUrl / "users" / gitLabId).show
+      ResourceId(gitLabId).show shouldBe (renkuBaseUrl / "persons" / gitLabId).show
     }
   }
 
@@ -113,9 +113,9 @@ class UsersResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
   }
 
   "apply(Name)" should {
-    "generate 'renkuBaseUrl/users/name' ResourceId" in {
+    "generate 'renkuBaseUrl/persons/name' ResourceId" in {
       val name = userNames.generateOne
-      ResourceId(name).show shouldBe (renkuBaseUrl / "users" / name).show
+      ResourceId(name).show shouldBe (renkuBaseUrl / "persons" / name).show
     }
   }
 
