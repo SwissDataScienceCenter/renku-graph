@@ -31,7 +31,8 @@ import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
 private trait KGInfoFinder[F[_]] {
-  def findActivityAuthor(resourceId: activities.ResourceId): F[Option[users.ResourceId]]
+  def findActivityAuthor(resourceId:         activities.ResourceId): F[Option[users.ResourceId]]
+  def findAssociationPersonAgent(resourceId: activities.ResourceId): F[Option[users.ResourceId]]
 }
 
 private object KGInfoFinder {
@@ -45,9 +46,13 @@ private class KGInfoFinderImpl[F[_]: Async: Logger](rdfStoreConfig: RdfStoreConf
 ) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
     with KGInfoFinder[F] {
 
-  def findActivityAuthor(resourceId: activities.ResourceId): F[Option[users.ResourceId]] =
+  override def findActivityAuthor(resourceId: activities.ResourceId): F[Option[users.ResourceId]] =
     queryExpecting[Set[users.ResourceId]](using = queryFindingAuthor(resourceId))
-      .flatMap(toOption[users.ResourceId, activities.ResourceId](resourceId))
+      .flatMap(toOption(resourceId, "author ResourceId"))
+
+  override def findAssociationPersonAgent(resourceId: activities.ResourceId): F[Option[users.ResourceId]] =
+    queryExpecting[Set[users.ResourceId]](using = queryFindingPersonAgent(resourceId))
+      .flatMap(toOption(resourceId, "person agent ResourceId"))
 
   private def queryFindingAuthor(resourceId: activities.ResourceId) = SparqlQuery.of(
     name = "transformation - find activity author",
@@ -56,6 +61,18 @@ private class KGInfoFinderImpl[F[_]: Async: Logger](rdfStoreConfig: RdfStoreConf
         |WHERE {
         |  ${resourceId.showAs[RdfResource]} a prov:Activity;
         |                                    prov:wasAssociatedWith ?personId.
+        |  ?personId a schema:Person.
+        |}
+        |""".stripMargin
+  )
+
+  private def queryFindingPersonAgent(resourceId: activities.ResourceId) = SparqlQuery.of(
+    name = "transformation - find association agent",
+    Prefixes of (schema -> "schema", prov -> "prov"),
+    s"""|SELECT ?personId
+        |WHERE {
+        |  ${resourceId.showAs[RdfResource]} a prov:Activity;
+        |                                    prov:qualifiedAssociation/prov:agent ?personId.
         |  ?personId a schema:Person.
         |}
         |""".stripMargin
@@ -70,11 +87,9 @@ private class KGInfoFinderImpl[F[_]: Async: Logger](rdfStoreConfig: RdfStoreConf
     _.downField("results").downField("bindings").as(decodeList(authorId)).map(_.toSet)
   }
 
-  private def toOption[T, ID](id: ID)(implicit entityTypeInfo: Set[T] => String): Set[T] => F[Option[T]] = {
+  private def toOption[T, ID](id: ID, entityTypeInfo: String): Set[T] => F[Option[T]] = {
     case set if set.isEmpty   => Option.empty[T].pure[F]
     case set if set.size == 1 => set.headOption.pure[F]
-    case set => new Exception(s"More than one ${entityTypeInfo(set)} found for activity $id").raiseError[F, Option[T]]
+    case _ => new Exception(s"More than one $entityTypeInfo found for activity $id").raiseError[F, Option[T]]
   }
-
-  private implicit val usersResourceIdInfo: Set[users.ResourceId] => String = _ => "author ResourceId"
 }

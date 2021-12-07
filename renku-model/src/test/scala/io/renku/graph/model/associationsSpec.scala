@@ -26,11 +26,11 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class activitiesSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers with Schemas {
+class associationsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers with Schemas {
 
   "ResourceId" should {
     "be renderable as RDF resource" in {
-      val id = httpUrls().generateAs[activities.ResourceId]
+      val id = httpUrls().generateAs[associations.ResourceId]
       id.showAs[RdfResource] shouldBe s"<${sparqlEncode(id.value)}>"
     }
   }
