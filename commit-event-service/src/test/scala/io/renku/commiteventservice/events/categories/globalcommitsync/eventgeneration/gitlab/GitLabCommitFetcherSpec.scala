@@ -20,10 +20,10 @@ package io.renku.commiteventservice.events.categories.globalcommitsync.eventgene
 
 import cats.effect.IO
 import cats.syntax.all._
-import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
+import eu.timepit.refined.numeric.Positive
 import io.circe.Json
 import io.circe.literal._
 import io.renku.commiteventservice.events.categories.common.CommitInfo
@@ -31,6 +31,7 @@ import io.renku.commiteventservice.events.categories.common.Generators.commitInf
 import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.PageResult
 import io.renku.generators.CommonGraphGenerators.{oauthAccessTokens, pages, pagingRequests, personalAccessTokens}
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.http.client.RestClient.ResponseMappingF
@@ -40,7 +41,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
 import org.http4s.Method.GET
 import org.http4s.implicits.http4sLiteralsSyntax
-import org.http4s.{Header, Method, Request, Response, Status, Uri}
+import org.http4s.{EmptyBody, Header, Method, Request, Response, Status, Uri}
 import org.scalamock.matchers.ArgCapture.CaptureOne
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -53,7 +54,7 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
 
     "fetch commits from the given page" in new TestCase {
 
-      val expectation = pageResults.generateOne
+      val expectation = pageResults().generateOne
 
       (gitLabClient
         .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, PageResult])(
@@ -63,7 +64,7 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
         .returning(expectation.pure[IO])
 
       gitLabCommitFetcher
-        .fetchGitLabCommits(projectId, pageRequest)(None)
+        .fetchGitLabCommits(projectId, pageRequest)(maybeAccessToken)
         .unsafeRunSync() shouldBe expectation
     }
 
@@ -71,7 +72,7 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
     "fetch commits using the given personal access token" in new TestCase {
       val personalAccessToken = personalAccessTokens.generateOne
 
-      val expectation = pageResults.generateOne
+      val expectation = pageResults().generateOne
 
       (gitLabClient
         .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, PageResult])(
@@ -88,7 +89,7 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
     "fetch commits using the given oauth token" in new TestCase {
       val authAccessToken = oauthAccessTokens.generateOne
 
-      val expectation = pageResults.generateOne
+      val expectation = pageResults().generateOne
 
       (gitLabClient
         .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, PageResult])(
@@ -114,7 +115,7 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
         .returning(expectation.pure[IO])
 
       gitLabCommitFetcher
-        .fetchGitLabCommits(projectId, pageRequest)(maybeAccessToken = None)
+        .fetchGitLabCommits(projectId, pageRequest)(maybeAccessToken )
         .unsafeRunSync() shouldBe expectation
     }
 
@@ -144,27 +145,30 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
         .value(
           (Status.NotFound, Request[IO](), Response[IO]())
         )
-        .unsafeRunSync() shouldBe PageResult.empty.pure[IO]
+        .unsafeRunSync() shouldBe PageResult.empty
     }
 
     "fetch commits from the given page - responseMapping Unauthorized" in new TestCase {
 
-      multiCommitResponseMapping
-        .value(
-          (Status.Unauthorized, Request[IO](), Response[IO]())
-        )
-        .unsafeRunSync() shouldBe UnauthorizedException.raiseError[IO, UnauthorizedException]
+      intercept[UnauthorizedException] {
+        multiCommitResponseMapping
+          .value(
+            (Status.Unauthorized, Request[IO](), Response[IO]())
+          )
+          .unsafeRunSync()
+      }.getMessage should startWith(s"Unauthorized")
     }
 
 
     "return an Exception if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
 
-      multiCommitResponseMapping
-        .value(
-          (Status.BadRequest, Request[IO](), Response[IO]())
-        )
-        .unsafeRunSync() shouldBe BadRequestException.raiseError
-
+      intercept[Exception] {
+        multiCommitResponseMapping
+          .value(
+            (Status.BadRequest, Request[IO](), Response[IO]())
+          )
+          .unsafeRunSync()
+      }.getMessage should startWith(s"(400 Bad Request")
     }
 
     "return an Exception if remote client responds with unexpected body" in new TestCase {
@@ -172,7 +176,7 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
       intercept[Exception] {
         multiCommitResponseMapping
           .value(
-            (Status.Unauthorized, Request[IO](), Response[IO]())
+            (Status.Ok, Request[IO](), Response[IO](body = EmptyBody))
           )
           .unsafeRunSync()
       }.getMessage should startWith(
@@ -187,12 +191,24 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
   "fetchLatestGitLabCommit" should {
 
     "return a single commit" in new TestCase {
-      stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits?per_page=1")
-          .willReturn(okJson(commitsJson(from = List(commitInfoList.head))))
-      }
-      gitLabCommitFetcher.fetchLatestGitLabCommit(projectId)(None).unsafeRunSync() shouldBe Some(commitInfoList.head.id)
+
+      val expectation = pageResults().generateOne
+
+      (gitLabClient
+        .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, PageResult])(
+          _: Option[AccessToken]
+        ))
+        .expects(GET, uri, endpointName, *, maybeAccessToken)
+        .returning(expectation.pure[IO])
+
+      gitLabCommitFetcher
+        .fetchLatestGitLabCommit(projectId)(maybeAccessToken)
+        .unsafeRunSync() shouldBe expectation
+
     }
+
+
+
 
     /////////////////// Single commit response mapper
 
@@ -285,15 +301,17 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
 
     lazy val singleCommitResponseMapping = responseMapping(false)
 
-    def responseMapping(isMulti: Boolean) = {
+    private def responseMapping(isMulti: Boolean) = {
       val responseMapping = CaptureOne[ResponseMappingF[IO, PageResult]]()
+
+      val results = if (isMulti) pageResults().generateOne else pageResults(1).generateOne
 
       (gitLabClient
         .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, PageResult])(
           _: Option[AccessToken]
         ))
         .expects(*, *, *, capture(responseMapping), *)
-        .returning(pageResults.generateOne.pure[IO])
+        .returning(results.pure[IO])
 
       if (isMulti) {
         gitLabCommitFetcher
@@ -311,8 +329,8 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
 
   }
 
-  private def pageResults = for {
-    commits       <- commitIds.toGeneratorOfList()
+  private def pageResults(maxCommitCount: Int Refined Positive = positiveInts().generateOne) = for {
+    commits       <- commitIds.toGeneratorOfList(0, maxCommitCount)
     maybeNextPage <- pages.toGeneratorOfOptions
   } yield PageResult(commits, maybeNextPage)
 
