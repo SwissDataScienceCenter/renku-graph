@@ -1,9 +1,11 @@
 package io.renku.http.client
 
 import cats.effect.IO
+import com.github.tomakehurst.wiremock.client.WireMock.{get, okJson, stubFor}
 import eu.timepit.refined.auto._
+import io.circe.Json
 import io.renku.control.Throttler
-import io.renku.generators.CommonGraphGenerators.personalAccessTokens
+import io.renku.generators.CommonGraphGenerators.{pages, pagingRequests, personalAccessTokens}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators._
@@ -33,15 +35,25 @@ class GitLabClientSpec extends AnyWordSpec with IOSpec with should.Matchers with
       }
 
 
-
-
-    // TODO: here we have to do all of the tests with the stubs which were previously in GitLabCommitFetcherSpec
-
-
+//    "" in new TestCase {
+//      val projectId      = projectIds.generateOne
+//      val commitInfoList = commitInfos.generateNonEmptyList().toList
+//      val maybeNextPage = pages.generateOption
+//
+//
+//      stubFor {
+//        get(s"/api/v4/projects/$projectId/repository/commits?page=${pageRequest.page}&per_page=${pageRequest.perPage}")
+//          .willReturn(
+//            okJson(commitsJson(from = commitInfoList))
+//              .withHeader("X-Next-Page", maybeNextPage.map(_.show).getOrElse(""))
+//          )
+//      }
+//    }
   }
 
   private trait TestCase {
     implicit val maybeAccessToken: Option[AccessToken] = personalAccessTokens.generateSome
+    val pageRequest    = pagingRequests.generateOne
 
     private implicit val logger: TestLogger[IO] = TestLogger()
     val apiCallRecorder = new GitLabApiCallRecorder( TestExecutionTimeRecorder[IO]())
