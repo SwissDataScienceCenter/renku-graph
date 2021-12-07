@@ -55,6 +55,48 @@ class KGInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore wit
     }
   }
 
+  "findAssociationPersonAgent" should {
+
+    "return activity association person agent resourceIds" in new TestCase {
+      val project = projectEntities(anyVisibility)
+        .withActivities(activityEntities(planEntities()).modify(toAssociationPersonAgent))
+        .generateOne
+        .to[entities.ProjectWithoutParent]
+
+      val activity = project.activities.headOption.getOrElse(fail("Activity expected"))
+
+      loadToStore(project)
+
+      val maybeAgentResourceId = activity.association match {
+        case assoc: entities.Association.WithPersonAgent => Some(assoc.agent.resourceId)
+        case _ => fail("expected Person agent")
+      }
+
+      kgInfoFinder.findAssociationPersonAgent(activity.resourceId).unsafeRunSync() shouldBe maybeAgentResourceId
+    }
+
+    "return no agent if there's no Activity with the given id" in new TestCase {
+      kgInfoFinder
+        .findAssociationPersonAgent(activities.ResourceId(httpUrls().generateOne))
+        .unsafeRunSync() shouldBe None
+    }
+
+    "return no agent if there's association with SoftwareAgent agent" in new TestCase {
+      val project = projectEntities(anyVisibility)
+        .withActivities(activityEntities(planEntities()))
+        .generateOne
+        .to[entities.ProjectWithoutParent]
+
+      val activity = project.activities.headOption.getOrElse(fail("Activity expected"))
+
+      loadToStore(project)
+
+      kgInfoFinder
+        .findAssociationPersonAgent(activity.resourceId)
+        .unsafeRunSync() shouldBe None
+    }
+  }
+
   private trait TestCase {
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
     private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO]())

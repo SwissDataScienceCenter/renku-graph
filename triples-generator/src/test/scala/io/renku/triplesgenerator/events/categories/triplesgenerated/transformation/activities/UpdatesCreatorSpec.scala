@@ -20,9 +20,10 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.transformat
 
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model._
+import GraphModelGenerators.userResourceIds
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.views.RdfResource
-import io.renku.graph.model.{activities, entities, users}
 import io.renku.rdfstore.InMemoryRdfStore
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
@@ -83,6 +84,68 @@ class UpdatesCreatorSpec
     }
   }
 
+  "queriesUnlinkingAgent" should {
+
+    "prepare delete query for association a person agent which exists in KG but not on the model" in {
+      val kgProject = projectEntities(anyVisibility)
+        .withActivities(activityEntities(planEntities()).modify(toAssociationPersonAgent))
+        .map(_.to[entities.ProjectWithoutParent])
+        .generateOne
+
+      loadToStore(kgProject)
+
+      val activity = kgProject.activities.headOption.getOrElse(fail("Expected activity"))
+      findPersonAgents(activity.association.resourceId) shouldBe activity.association.maybePersonAgentResourceId.toSet
+
+      val newAgent = personEntities.generateOne.to[entities.Person]
+      val modelActivity = activity.association match {
+        case assoc: entities.Association.WithPersonAgent => activity.copy(association = assoc.copy(agent = newAgent))
+        case _ => fail("Expected Association.WithPersonAgent")
+      }
+
+      UpdatesCreator
+        .queriesUnlinkingAgent(modelActivity, activity.association.maybePersonAgentResourceId)
+        .runAll
+        .unsafeRunSync()
+
+      findPersonAgents(activity.association.resourceId) shouldBe Set.empty
+    }
+
+    "prepare no queries for association with SoftwareAgent" in {
+      val kgProject = projectEntities(anyVisibility)
+        .withActivities(activityEntities(planEntities()))
+        .map(_.to[entities.ProjectWithoutParent])
+        .generateOne
+
+      val activity = kgProject.activities.headOption.getOrElse(fail("Expected activity"))
+
+      UpdatesCreator
+        .queriesUnlinkingAgent(activity, maybeKgAgent = userResourceIds.generateOne.some) shouldBe Nil
+    }
+
+    "prepare no queries if there's no Person agent in KG" in {
+      val kgProject = projectEntities(anyVisibility)
+        .withActivities(activityEntities(planEntities()).modify(toAssociationPersonAgent))
+        .map(_.to[entities.ProjectWithoutParent])
+        .generateOne
+
+      val activity = kgProject.activities.headOption.getOrElse(fail("Expected activity"))
+
+      UpdatesCreator.queriesUnlinkingAgent(activity, maybeKgAgent = None) shouldBe Nil
+    }
+
+    "prepare no queries if there's no change in association's person agent" in {
+      val kgProject = projectEntities(anyVisibility)
+        .withActivities(activityEntities(planEntities()).modify(toAssociationPersonAgent))
+        .map(_.to[entities.ProjectWithoutParent])
+        .generateOne
+
+      val activity = kgProject.activities.headOption.getOrElse(fail("Expected activity"))
+
+      UpdatesCreator.queriesUnlinkingAgent(activity, activity.association.maybePersonAgentResourceId) shouldBe Nil
+    }
+  }
+
   private def findAuthors(resourceId: activities.ResourceId): Set[users.ResourceId] =
     runQuery(s"""|SELECT ?personId
                  |WHERE {
@@ -96,4 +159,25 @@ class UpdatesCreatorSpec
       .sequence
       .fold(throw _, identity)
       .toSet
+
+  private def findPersonAgents(resourceId: associations.ResourceId): Set[users.ResourceId] =
+    runQuery(s"""|SELECT ?agentId
+                 |WHERE {
+                 |  ${resourceId.showAs[RdfResource]} a prov:Association;
+                 |                                    prov:agent ?agentId.
+                 |  ?agentId a schema:Person.
+                 |}
+                 |""".stripMargin)
+      .unsafeRunSync()
+      .map(row => users.ResourceId.from(row("agentId")))
+      .sequence
+      .fold(throw _, identity)
+      .toSet
+
+  private implicit class AssociationOps(association: entities.Association) {
+    lazy val maybePersonAgentResourceId: Option[users.ResourceId] = association match {
+      case assoc: entities.Association.WithPersonAgent => assoc.agent.resourceId.some
+      case _ => None
+    }
+  }
 }

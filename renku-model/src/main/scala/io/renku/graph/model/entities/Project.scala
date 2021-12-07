@@ -216,17 +216,32 @@ trait ProjectFactory {
                             activities:     List[Activity],
                             datasets:       List[Dataset[Provenance]]
   ): (List[Activity], List[Dataset[Provenance]]) =
-    activities.updateAuthors(from = projectPersons) -> datasets.updateCreators(from = projectPersons)
+    activities.updatePersons(from = projectPersons) -> datasets.updateCreators(from = projectPersons)
 
   private implicit class ActivitiesOps(activities: List[Activity]) {
 
-    def updateAuthors(from: Set[Person]): List[Activity] =
+    def updatePersons(from: Set[Person]): List[Activity] =
+      (updateAuthors(from) andThen updateAssociationAgents(from))(activities)
+
+    private def updateAuthors(from: Set[Person]): List[Activity] => List[Activity] =
       activitiesLens.modify { activity =>
         from
           .find(byEmail(activity.author))
           .map(person => activityAuthorLens.modify(_ => person)(activity))
           .getOrElse(activity)
-      }(activities)
+      }
+
+    private def updateAssociationAgents(from: Set[Person]): List[Activity] => List[Activity] =
+      activitiesLens.modify { activity =>
+        activity.association match {
+          case _:     Association.WithRenkuAgent => activity
+          case assoc: Association.WithPersonAgent =>
+            from
+              .find(byEmail(assoc.agent))
+              .map(person => activity.copy(association = assoc.copy(agent = person)))
+              .getOrElse(activity)
+        }
+      }
   }
 
   private implicit class DatasetsOps(datasets: List[Dataset[Provenance]]) {

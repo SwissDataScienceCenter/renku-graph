@@ -18,6 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated
 
+import cats.syntax.all._
 import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.entities.Dataset.Provenance.{ImportedInternal, Modified}
 import io.renku.graph.model.entities._
@@ -29,15 +30,20 @@ private trait ProjectFunctions {
   import ProjectFunctions._
 
   lazy val findAllPersons: Project => Set[Person] = project =>
-    project.members ++ project.maybeCreator ++ project.activities.map(_.author) ++ project.datasets.flatMap(
-      _.provenance.creators
-    )
+    project.members ++
+      project.maybeCreator ++
+      project.activities.map(_.author) ++
+      project.datasets.flatMap(_.provenance.creators) ++
+      project.activities.flatMap(_.association.agent match {
+        case p: Person => Option(p)
+        case _ => Option.empty[Person]
+      })
 
   def update(oldPerson: Person, newPerson: Person): Project => Project = project =>
     project
       .updateMember(oldPerson, newPerson)
       .updateCreator(oldPerson, newPerson)
-      .updateActivities(_.updateAuthors(oldPerson, newPerson))
+      .updateActivities(_.updateAuthorsAndAgents(oldPerson, newPerson))
       .updateDatasets(_.updateCreators(oldPerson, newPerson))
 
   def update(oldDataset: Dataset[Provenance], newDataset: Dataset[Provenance]): Project => Project = project =>
@@ -120,13 +126,27 @@ private object ProjectFunctions extends ProjectFunctions {
 
   private implicit class ActivitiesOps(activities: List[Activity]) {
 
-    def updateAuthors(oldPerson: Person, newPerson: Person): List[Activity] =
+    def updateAuthorsAndAgents(oldPerson: Person, newPerson: Person): List[Activity] =
       activitiesLens.modify {
-        activityAuthorLens.modify {
-          case `oldPerson` => newPerson
-          case p           => p
-        }
+        updateAuthor(oldPerson, newPerson) >>> updateAssociationAgents(oldPerson, newPerson)
       }(activities)
+
+    private def updateAuthor(oldPerson: Person, newPerson: Person) =
+      activityAuthorLens.modify {
+        case `oldPerson` => newPerson
+        case p           => p
+      }
+
+    private def updateAssociationAgents(oldPerson: Person, newPerson: Person): Activity => Activity = { activity =>
+      activity.association match {
+        case _:     Association.WithRenkuAgent => activity
+        case assoc: Association.WithPersonAgent =>
+          assoc.agent match {
+            case `oldPerson` => activity.copy(association = assoc.copy(agent = newPerson))
+            case _           => activity
+          }
+      }
+    }
   }
 
   private implicit class DatasetsOps(datasets: List[Dataset[Provenance]]) {
