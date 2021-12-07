@@ -49,7 +49,7 @@ private[transformation] class DatasetTransformerImpl[F[_]: MonadThrow](
 
   private def createTransformation: Transformation[F] = project =>
     EitherT {
-      (updateTopmostSameAs((project, Queries.empty)) >>= updatePersonLinks >>= updateHierarchyOnInvalidation)
+      (updateTopmostSameAs(project -> Queries.empty) >>= updatePersonLinks >>= updateHierarchyOnInvalidation)
         .map(_.asRight[ProcessingRecoverableError])
         .recoverWith(maybeToRecoverableError("Problem finding dataset details in KG"))
     }

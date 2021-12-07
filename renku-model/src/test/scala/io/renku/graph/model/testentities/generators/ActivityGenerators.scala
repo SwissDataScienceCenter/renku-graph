@@ -136,4 +136,16 @@ trait ActivityGenerators {
     def modify(f: Activity => Activity): ActivityGenFactory =
       projectCreationDate => factory(projectCreationDate).map(f)
   }
+
+  def toAssociationPersonAgent: Activity => Activity = toAssociationPersonAgent(personEntities.generateOne)
+
+  def toAssociationPersonAgent(person: Person): Activity => Activity = activity =>
+    activity.copy(associationFactory =
+      act =>
+        activity.associationFactory(act) match {
+          case Association.WithRenkuAgent(_, _, plan) =>
+            Association.WithPersonAgent(act, person, plan)
+          case assoc: Association.WithPersonAgent => assoc
+        }
+    )
 }

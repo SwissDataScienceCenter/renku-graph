@@ -40,52 +40,98 @@ class ActivityTransformerSpec extends AnyWordSpec with should.Matchers with Mock
 
   "createTransformationStep" should {
 
-    "create update queries for changed/deleted activities authors" in new TestCase {
-      val project = projectEntities(anyVisibility)
-        .withActivities(activityEntities(planEntities()).many: _*)
-        .generateOne
-        .to[entities.ProjectWithoutParent]
+    "create update queries for changed/deleted activities' authors " +
+      "and associations' agents" in new TestCase {
+        val project = projectEntities(anyVisibility)
+          .withActivities(activityEntities(planEntities()).modify(toAssociationPersonAgent).many: _*)
+          .generateOne
+          .to[entities.ProjectWithoutParent]
 
-      val authorUnlinkingQueries = project.activities >>= givenAuthorUnlinking
+        val authorUnlinkingQueries = project.activities >>= givenAuthorUnlinking
+        val agentUnlinkingQueries  = project.activities >>= givenAgentUnlinking
 
-      val step = transformer.createTransformationStep
+        val step = transformer.createTransformationStep
 
-      step.run(project).value shouldBe (project -> Queries.preDataQueriesOnly(authorUnlinkingQueries)).asRight.pure[Try]
-    }
+        step.run(project).value shouldBe (
+          project -> Queries.preDataQueriesOnly(authorUnlinkingQueries ::: agentUnlinkingQueries)
+        ).asRight.pure[Try]
+      }
 
-    "return the ProcessingRecoverableFailure if calls to KG fails with a network or HTTP error" in new TestCase {
-      val project = projectEntities(anyVisibility)
-        .withActivities(activityEntities(planEntities()))
-        .generateOne
-        .to[entities.ProjectWithoutParent]
+    "return the ProcessingRecoverableFailure if calls to KG fails with a network or HTTP error " +
+      "- failure in the author unlinking flow" in new TestCase {
+        val project = projectEntities(anyVisibility)
+          .withActivities(activityEntities(planEntities()))
+          .generateOne
+          .to[entities.ProjectWithoutParent]
 
-      val exception = recoverableClientErrors.generateOne
-      findingActivityAuthorFor(project.activities.head.resourceId,
-                               returning = exception.raiseError[Try, Option[users.ResourceId]]
-      )
+        val exception = recoverableClientErrors.generateOne
+        findingActivityAuthorFor(project.activities.head.resourceId,
+                                 returning = exception.raiseError[Try, Option[users.ResourceId]]
+        )
 
-      val step = transformer.createTransformationStep
+        val step = transformer.createTransformationStep
 
-      val Success(Left(recoverableError)) = step.run(project).value
+        val Success(Left(recoverableError)) = step.run(project).value
 
-      recoverableError            shouldBe a[TransformationRecoverableError]
-      recoverableError.getMessage shouldBe "Problem finding activity details in KG"
-    }
+        recoverableError            shouldBe a[TransformationRecoverableError]
+        recoverableError.getMessage shouldBe "Problem finding activity details in KG"
+      }
 
-    "fail with NonRecoverableFailure if calls to KG fails with an unknown exception" in new TestCase {
-      val project = projectEntities(anyVisibility)
-        .withActivities(activityEntities(planEntities()))
-        .generateOne
-        .to[entities.ProjectWithoutParent]
+    "return the ProcessingRecoverableFailure if calls to KG fails with a network or HTTP error " +
+      "- failure in the agent unlinking flow" in new TestCase {
+        val project = projectEntities(anyVisibility)
+          .withActivities(activityEntities(planEntities()))
+          .generateOne
+          .to[entities.ProjectWithoutParent]
 
-      val exception = exceptions.generateOne
-      findingActivityAuthorFor(project.activities.head.resourceId,
-                               returning = exception.raiseError[Try, Option[users.ResourceId]]
-      )
+        project.activities >>= givenAuthorUnlinking
 
-      transformer.createTransformationStep.run(project).value shouldBe
-        exception.raiseError[Try, Either[ProcessingRecoverableError, (Project, Queries)]]
-    }
+        val exception = recoverableClientErrors.generateOne
+        findingAssociationPersonAgentFor(project.activities.head.resourceId,
+                                         returning = exception.raiseError[Try, Option[users.ResourceId]]
+        )
+
+        val step = transformer.createTransformationStep
+
+        val Success(Left(recoverableError)) = step.run(project).value
+
+        recoverableError            shouldBe a[TransformationRecoverableError]
+        recoverableError.getMessage shouldBe "Problem finding activity details in KG"
+      }
+
+    "fail with NonRecoverableFailure if calls to KG fails with an unknown exception " +
+      "- failure in the author unlinking flow" in new TestCase {
+        val project = projectEntities(anyVisibility)
+          .withActivities(activityEntities(planEntities()))
+          .generateOne
+          .to[entities.ProjectWithoutParent]
+
+        val exception = exceptions.generateOne
+        findingActivityAuthorFor(project.activities.head.resourceId,
+                                 returning = exception.raiseError[Try, Option[users.ResourceId]]
+        )
+
+        transformer.createTransformationStep.run(project).value shouldBe
+          exception.raiseError[Try, Either[ProcessingRecoverableError, (Project, Queries)]]
+      }
+
+    "fail with NonRecoverableFailure if calls to KG fails with an unknown exception " +
+      "- failure in the agent unlinking flow" in new TestCase {
+        val project = projectEntities(anyVisibility)
+          .withActivities(activityEntities(planEntities()))
+          .generateOne
+          .to[entities.ProjectWithoutParent]
+
+        project.activities >>= givenAuthorUnlinking
+
+        val exception = exceptions.generateOne
+        findingAssociationPersonAgentFor(project.activities.head.resourceId,
+                                         returning = exception.raiseError[Try, Option[users.ResourceId]]
+        )
+
+        transformer.createTransformationStep.run(project).value shouldBe
+          exception.raiseError[Try, Either[ProcessingRecoverableError, (Project, Queries)]]
+      }
   }
 
   private trait TestCase {
@@ -103,9 +149,25 @@ class ActivityTransformerSpec extends AnyWordSpec with should.Matchers with Mock
       unlinkingQueries
     }
 
+    def givenAgentUnlinking(activity: entities.Activity): List[SparqlQuery] = {
+      val maybePersonAgentInKG = userResourceIds.generateOption
+      findingAssociationPersonAgentFor(activity.resourceId, returning = maybePersonAgentInKG.pure[Try])
+
+      val unlinkingQueries = sparqlQueries.generateList()
+      prepareQueriesUnlinkingAgent(activity, maybePersonAgentInKG, returning = unlinkingQueries)
+
+      unlinkingQueries
+    }
+
     def findingActivityAuthorFor(resourceId: activities.ResourceId, returning: Try[Option[users.ResourceId]]) =
       (kgInfoFinder
         .findActivityAuthor(_: activities.ResourceId))
+        .expects(resourceId)
+        .returning(returning)
+
+    def findingAssociationPersonAgentFor(resourceId: activities.ResourceId, returning: Try[Option[users.ResourceId]]) =
+      (kgInfoFinder
+        .findAssociationPersonAgent(_: activities.ResourceId))
         .expects(resourceId)
         .returning(returning)
 
@@ -115,6 +177,15 @@ class ActivityTransformerSpec extends AnyWordSpec with should.Matchers with Mock
         returning:     List[SparqlQuery]
     ) = (updatesCreator
       .queriesUnlinkingAuthor(_: entities.Activity, _: Option[users.ResourceId]))
+      .expects(activity, maybeKgAuthor)
+      .returning(returning)
+
+    def prepareQueriesUnlinkingAgent(
+        activity:      entities.Activity,
+        maybeKgAuthor: Option[users.ResourceId],
+        returning:     List[SparqlQuery]
+    ) = (updatesCreator
+      .queriesUnlinkingAgent(_: entities.Activity, _: Option[users.ResourceId]))
       .expects(activity, maybeKgAuthor)
       .returning(returning)
   }
