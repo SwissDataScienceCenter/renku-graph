@@ -11,6 +11,7 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.metrics.GitLabApiCallRecorder
+import io.renku.testtools.IOSpec
 import org.http4s.Method.GET
 import org.http4s.Uri
 import org.http4s.syntax.all._
@@ -19,30 +20,35 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class GitLabClientSpec extends AnyWordSpec with should.Matchers with MockFactory {
+class GitLabClientSpec extends AnyWordSpec with IOSpec with should.Matchers with MockFactory {
 
   "send" should {
-    "succeed and call RestClient.send" +
-      "and validate the URL" in new TestCase {
+    "succeed and call RestClient.send and validate the URL" in new TestCase {
         val expectation = commitIds.generateOne
 
         client.send(GET,
                     uris.generateOne,
                     nonBlankStrings().generateOne,
-        )(_ => IO(expectation)) shouldBe IO(expectation)
+        )(_ => IO(expectation)).unsafeRunSync() shouldBe expectation
       }
+
+
+
+
+    // TODO: here we have to do all of the tests with the stubs which were previously in GitLabCommitFetcherSpec
+
 
   }
 
   private trait TestCase {
     implicit val maybeAccessToken: Option[AccessToken] = personalAccessTokens.generateSome
 
-    val apiCallRecorder = new GitLabApiCallRecorder( TestExecutionTimeRecorder[IO]())
     private implicit val logger: TestLogger[IO] = TestLogger()
+    val apiCallRecorder = new GitLabApiCallRecorder( TestExecutionTimeRecorder[IO]())
 
     val client = new GitLabClientImpl[IO](gitLabApiUrls.generateOne, apiCallRecorder, Throttler.noThrottling)
 
-    lazy val uris: Gen[Uri] =
+     val uris: Gen[Uri] =
       Gen.const(uri"" / gitLabApiUrls.generateOne.value / nonBlankStrings().generateList().mkString("/"))
   }
 }

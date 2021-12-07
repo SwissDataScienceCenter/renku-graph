@@ -35,7 +35,7 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.http.client.RestClient.ResponseMappingF
-import io.renku.http.client.RestClientError.{BadRequestException, UnauthorizedException}
+import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
@@ -179,9 +179,7 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
             (Status.Ok, Request[IO](), Response[IO](body = EmptyBody))
           )
           .unsafeRunSync()
-      }.getMessage should startWith(
-        s"/projects/$projectId/repository/commits?page=${pageRequest.page}&per_page=${pageRequest.perPage} returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
-      )
+      }
     }
   }
 
@@ -191,6 +189,10 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
   "fetchLatestGitLabCommit" should {
 
     "return a single commit" in new TestCase {
+
+      override val uri = uri"/projects" / projectId.show / "repository" / "commits" withQueryParams Map(
+        "per_page" -> "1"
+      )
 
       val expectation = pageResults().generateOne
 
@@ -226,7 +228,7 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
               .withHeaders(Header.Raw(ci"X-Next-Page", maybeNextPage.map(_.show).getOrElse("")))
           )
         )
-        .unsafeRunSync() shouldBe PageResult(commitInfoList.map(_.id), maybeNextPage)
+        .unsafeRunSync() shouldBe Some(commitInfoList.head.id)
     }
 
     "fetch the latest commit from the given page - responseMapping NotFound" in new TestCase {
@@ -235,40 +237,42 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
         .value(
           (Status.NotFound, Request[IO](), Response[IO]())
         )
-        .unsafeRunSync() shouldBe PageResult.empty.pure[IO]
+        .unsafeRunSync() shouldBe None
     }
 
     "fetch the latest commit from the given page - responseMapping Unauthorized" in new TestCase {
 
-      singleCommitResponseMapping
-        .value(
-          (Status.Unauthorized, Request[IO](), Response[IO]())
-        )
-        .unsafeRunSync() shouldBe UnauthorizedException.raiseError[IO, UnauthorizedException]
-    }
+      intercept[UnauthorizedException] {
 
-
-    "return an Exception if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
-
-      singleCommitResponseMapping
-        .value(
-          (Status.BadRequest, Request[IO](), Response[IO]())
-        )
-        .unsafeRunSync() shouldBe BadRequestException.raiseError
-
-    }
-
-    "return an Exception if remote client responds with unexpected body" in new TestCase {
-
-      intercept[Exception] {
         singleCommitResponseMapping
           .value(
             (Status.Unauthorized, Request[IO](), Response[IO]())
           )
           .unsafeRunSync()
-      }.getMessage should startWith(
-        s"/projects/$projectId/repository/commits?page=${pageRequest.page}&per_page=${pageRequest.perPage} returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
-      )
+      }.getMessage should startWith("Unauthorized")
+    }
+
+
+    "return an Exception if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
+      intercept[Exception] {
+        singleCommitResponseMapping
+          .value(
+            (Status.BadRequest, Request[IO](), Response[IO]())
+          )
+          .unsafeRunSync()
+      }.getMessage should startWith(s"(400 Bad Request")
+    }
+
+    "return an Exception if remote client responds with unexpected body" in new TestCase {
+
+
+      intercept[Exception] {
+        singleCommitResponseMapping
+          .value(
+            (Status.Ok, Request[IO](), Response[IO](body = EmptyBody))
+          )
+          .unsafeRunSync()
+      }
     }
 
   }

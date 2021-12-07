@@ -60,7 +60,7 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[F[_]: Async](
   ): F[Option[CommitId]] =
     send(GET,
          uri"/projects" / projectId.show / "repository" / "commits" withQueryParam ("per_page", "1"),
-         "single commit"
+         "commits"
     )(mapSingleCommitResponse)
 
   override def fetchGitLabCommits(
