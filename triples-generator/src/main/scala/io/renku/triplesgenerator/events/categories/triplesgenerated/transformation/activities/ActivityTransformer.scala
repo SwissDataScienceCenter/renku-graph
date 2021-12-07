@@ -53,16 +53,27 @@ private[transformation] class ActivityTransformerImpl[F[_]: MonadThrow](
 
   private def createTransformation: Transformation[F] = project =>
     EitherT {
-      updatePersonLinks((project, Queries.empty))
+      (updateAuthorLinks(project -> Queries.empty) >>= updateAssociationAgentLinks)
         .map(_.asRight[ProcessingRecoverableError])
         .recoverWith(maybeToRecoverableError("Problem finding activity details in KG"))
     }
 
-  private lazy val updatePersonLinks: ((Project, Queries)) => F[(Project, Queries)] = { case (project, queries) =>
+  private lazy val updateAuthorLinks: ((Project, Queries)) => F[(Project, Queries)] = { case (project, queries) =>
     project.activities
       .map(activity => findActivityAuthor(activity.resourceId).map(updatesCreator.queriesUnlinkingAuthor(activity, _)))
       .sequence
       .map(_.flatten)
       .map(quers => project -> (queries |+| Queries.preDataQueriesOnly(quers)))
+  }
+
+  private lazy val updateAssociationAgentLinks: ((Project, Queries)) => F[(Project, Queries)] = {
+    case (project, queries) =>
+      project.activities
+        .map(activity =>
+          findAssociationPersonAgent(activity.resourceId).map(updatesCreator.queriesUnlinkingAgent(activity, _))
+        )
+        .sequence
+        .map(_.flatten)
+        .map(quers => project -> (queries |+| Queries.preDataQueriesOnly(quers)))
   }
 }
