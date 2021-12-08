@@ -22,11 +22,13 @@ import cats.effect._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger
-import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.{IOSpec, MockedRunnableCollaborators}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+
+import scala.concurrent.duration._
 
 class DbInitializerSpec
     extends AnyWordSpec
@@ -55,18 +57,33 @@ class DbInitializerSpec
         logger.loggedOnly(Info("Event Log database initialization success"))
       }
 
-    "fail if of the migrators fails" in new TestCase {
-      (isMigrating.update _)
-        .expects(where((f: Boolean => Boolean) => f(true) == true && f(false) == true))
-        .returning(IO.unit)
-
-      given(migrator1).succeeds(returning = ())
+    "retry if one of the migrators fails" in new TestCase {
       val exception = exceptions.generateOne
-      given(migrator2).fails(becauseOf = exception)
+      inSequence {
+        (isMigrating.update _)
+          .expects(where((f: Boolean => Boolean) => f(true) == true && f(false) == true))
+          .returning(IO.unit)
 
-      intercept[Exception] {
-        dbInitializer.run().unsafeRunSync()
-      } shouldBe exception
+        given(migrator1).succeeds(returning = ())
+        given(migrator2).fails(becauseOf = exception)
+
+        (isMigrating.update _)
+          .expects(where((f: Boolean => Boolean) => f(true) == true && f(false) == true))
+          .returning(IO.unit)
+
+        given(migrator1).succeeds(returning = ())
+        given(migrator2).succeeds(returning = ())
+
+        (isMigrating.update _)
+          .expects(where((f: Boolean => Boolean) => f(true) == false && f(false) == false))
+          .returning(IO.unit)
+
+      }
+      dbInitializer.run().unsafeRunSync()
+
+      logger.loggedOnly(Error("Event Log database initialization failed: retrying 1 time(s)", exception),
+                        Info("Event Log database initialization success")
+      )
     }
   }
 
@@ -80,6 +97,9 @@ class DbInitializerSpec
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
 
-    val dbInitializer = new DbInitializerImpl[IO](List[Runnable[IO, Unit]](migrator1, migrator2), isMigrating)
+    val dbInitializer = new DbInitializerImpl[IO](List[Runnable[IO, Unit]](migrator1, migrator2),
+                                                  isMigrating,
+                                                  retrySleepDuration = 0.5.seconds
+    )
   }
 }
