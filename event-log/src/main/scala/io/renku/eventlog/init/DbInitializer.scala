@@ -19,13 +19,14 @@
 package io.renku.eventlog.init
 
 import cats.effect.kernel.Ref
-import cats.effect.{IO, MonadCancelThrow}
+import cats.effect.{IO, Temporal}
 import cats.syntax.all._
 import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.init.DbInitializer._
 import org.typelevel.log4cats.Logger
 
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.language.reflectiveCalls
 import scala.util.control.NonFatal
 
@@ -33,11 +34,14 @@ trait DbInitializer[F[_]] {
   def run(): F[Unit]
 }
 
-class DbInitializerImpl[F[_]: MonadCancelThrow: Logger](migrators: List[Runnable[F, Unit]],
-                                                        isMigrating: Ref[F, Boolean]
+class DbInitializerImpl[F[_]: Temporal: Logger](migrators: List[Runnable[F, Unit]],
+                                                isMigrating:        Ref[F, Boolean],
+                                                retrySleepDuration: FiniteDuration = 20.seconds
 ) extends DbInitializer[F] {
 
-  override def run(): F[Unit] = {
+  override def run(): F[Unit] = runMigrations()
+
+  private def runMigrations(retryCount: Int = 0): F[Unit] = {
     for {
       _ <- isMigrating.update(_ => true)
       _ <- migrators.map(_.run()).sequence
@@ -45,12 +49,15 @@ class DbInitializerImpl[F[_]: MonadCancelThrow: Logger](migrators: List[Runnable
       _ <- isMigrating.update(_ => false)
     } yield ()
 
-  } recoverWith logAndResetMigrationStatus
+  } recoverWith logAndRetry(retryCount + 1)
 
-  private lazy val logAndResetMigrationStatus: PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
+  private def logAndRetry(retryCount: Int): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
     for {
-      _ <- Logger[F].error(exception)("Event Log database initialization failure")
-      _ <- exception.raiseError[F, Unit]
+      _ <- Temporal[F] sleep retrySleepDuration
+      _ <- Logger[F].error(exception)(
+             s"Event Log database initialization failed: retrying $retryCount time(s)"
+           )
+      _ <- runMigrations(retryCount)
     } yield ()
   }
 }
