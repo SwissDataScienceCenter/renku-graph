@@ -20,6 +20,7 @@ package io.renku.eventlog.events.categories.statuschange
 
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
+import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.ExecutionDate
@@ -27,6 +28,8 @@ import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.AllEventsToNew
 import io.renku.graph.model.events.EventStatus
 import io.renku.metrics.LabeledHistogram
+import skunk.Session
+import skunk.SqlState.DeadlockDetected
 import skunk.implicits._
 
 import java.time.Instant
@@ -37,15 +40,17 @@ private class AllEventsToNewUpdater[F[_]: MonadCancelThrow](
 ) extends DbClient(Some(queriesExecTimes))
     with DBUpdater[F, AllEventsToNew] {
 
-  override def updateDB(event: AllEventsToNew): UpdateResult[F] = for {
+  override def updateDB(event: AllEventsToNew): UpdateResult[F] = clearDB() recoverWith retryOnDeadlock()
+
+  override def onRollback(event: AllEventsToNew) = Kleisli.pure(())
+
+  private def clearDB(): Kleisli[F, Session[F], DBUpdateResults] = for {
     _ <- updateStatuses()
     _ <- removeAllProcessingTimes()
     _ <- removeAllPayloads()
     _ <- removeAllDeliveryInfos()
     _ <- removeAwaitingDeletionEvents()
   } yield DBUpdateResults.ForAllProjects
-
-  override def onRollback(event: AllEventsToNew) = Kleisli.pure(())
 
   private def updateStatuses() = measureExecutionTime {
     SqlStatement(name = "all_to_new - status update")
@@ -54,7 +59,7 @@ private class AllEventsToNewUpdater[F[_]: MonadCancelThrow](
               SET status = '#${EventStatus.New.value}', 
                   execution_date = $executionDateEncoder, 
                   message = NULL
-              WHERE #${`status IN`(EventStatus.all.diff(Set(EventStatus.Skipped, EventStatus.AwaitingDeletion)))} 
+              WHERE #${`status IN`(EventStatus.all diff Set(EventStatus.Skipped, EventStatus.AwaitingDeletion))} 
            """.command
       )
       .arguments(ExecutionDate(now()))
@@ -101,6 +106,10 @@ private class AllEventsToNewUpdater[F[_]: MonadCancelThrow](
       .arguments(skunk.Void)
       .build
       .void
+  }
+
+  private def retryOnDeadlock(): PartialFunction[Throwable, Kleisli[F, Session[F], DBUpdateResults]] = {
+    case DeadlockDetected(_) => clearDB()
   }
 
   private def `status IN`(statuses: Set[EventStatus]) =
