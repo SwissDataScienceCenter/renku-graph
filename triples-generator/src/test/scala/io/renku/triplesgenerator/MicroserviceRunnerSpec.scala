@@ -19,6 +19,7 @@
 package io.renku.triplesgenerator
 
 import cats.effect._
+import cats.syntax.all._
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.events.consumers.EventConsumersRegistry
@@ -27,6 +28,7 @@ import io.renku.generators.Generators._
 import io.renku.http.server.HttpServer
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
+import io.renku.microservices.ServiceReadinessChecker
 import io.renku.testtools.{IOSpec, MockedRunnableCollaborators}
 import io.renku.triplesgenerator.config.certificates.GitCertificateInstaller
 import io.renku.triplesgenerator.init.CliVersionCompatibilityVerifier
@@ -48,6 +50,7 @@ class MicroserviceRunnerSpec
       "Sentry and RDF dataset initialisation are fine " +
       "and subscription, re-provisioning and the http server start up" in new TestCase {
 
+        (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
         given(certificateLoader).succeeds(returning = ())
         given(gitCertificateInstaller).succeeds(returning = ())
         given(sentryInitializer).succeeds(returning = ())
@@ -122,6 +125,7 @@ class MicroserviceRunnerSpec
 
     "fail if starting the Http Server fails" in new TestCase {
 
+      (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
       given(certificateLoader).succeeds(returning = ())
       given(gitCertificateInstaller).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
@@ -140,8 +144,29 @@ class MicroserviceRunnerSpec
       )
     }
 
+    "fail if starting re-provisioning process fails" in new TestCase {
+
+      (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
+      given(certificateLoader).succeeds(returning = ())
+      given(gitCertificateInstaller).succeeds(returning = ())
+      given(sentryInitializer).succeeds(returning = ())
+      given(cliVersionCompatChecker).succeeds(returning = ())
+      val exception = exceptions.generateOne
+      given(reProvisioning).fails(becauseOf = exception)
+      given(httpServer).succeeds(returning = ExitCode.Success)
+
+      intercept[Exception] {
+        runner.run().unsafeRunSync()
+      } shouldBe exception
+
+      logger.loggedOnly(
+        Error(exception.getMessage, exception)
+      )
+    }
+
     "return Success ExitCode even if running subscriptionMechanismRegistry fails" in new TestCase {
 
+      (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
       given(certificateLoader).succeeds(returning = ())
       given(gitCertificateInstaller).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
@@ -152,23 +177,10 @@ class MicroserviceRunnerSpec
 
       runner.run().unsafeRunSync() shouldBe ExitCode.Success
     }
-
-    "return Success ExitCode even if starting re-provisioning process fails" in new TestCase {
-
-      given(certificateLoader).succeeds(returning = ())
-      given(gitCertificateInstaller).succeeds(returning = ())
-      given(sentryInitializer).succeeds(returning = ())
-      given(cliVersionCompatChecker).succeeds(returning = ())
-      given(eventConsumersRegistry).succeeds(returning = ())
-      given(reProvisioning).fails(becauseOf = exceptions.generateOne)
-      given(httpServer).succeeds(returning = ExitCode.Success)
-
-      runner.run().unsafeRunSync() shouldBe ExitCode.Success
-    }
-
   }
 
   private trait TestCase {
+    val serviceReadinessChecker = mock[ServiceReadinessChecker[IO]]
     val certificateLoader       = mock[CertificateLoader[IO]]
     val gitCertificateInstaller = mock[GitCertificateInstaller[IO]]
     val sentryInitializer       = mock[SentryInitializer[IO]]
@@ -179,6 +191,7 @@ class MicroserviceRunnerSpec
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
 
     val runner = new MicroserviceRunner(
+      serviceReadinessChecker,
       certificateLoader,
       gitCertificateInstaller,
       sentryInitializer,

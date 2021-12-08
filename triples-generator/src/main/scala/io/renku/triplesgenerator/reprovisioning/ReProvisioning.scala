@@ -64,7 +64,7 @@ class ReProvisioningImpl[F[_]: Temporal: Logger](
 
   private def triggerReProvisioning = measureExecutionTime {
     for {
-      _ <- Logger[F].info("Triples Store is not on the required schema version - kicking-off re-provisioning")
+      _ <- Logger[F].info("Kicking-off re-provisioning")
       _ <- setRunningStatusInTS()
       _ <- versionPairUpdater
              .update(versionCompatibilityPairs.head)
