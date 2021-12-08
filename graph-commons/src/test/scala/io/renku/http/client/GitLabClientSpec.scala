@@ -1,66 +1,81 @@
 package io.renku.http.client
 
 import cats.effect.IO
-import com.github.tomakehurst.wiremock.client.WireMock.{get, okJson, stubFor}
-import eu.timepit.refined.auto._
-import io.circe.Json
+import cats.implicits.toShow
+import com.github.tomakehurst.wiremock.client.MappingBuilder
+import com.github.tomakehurst.wiremock.client.WireMock.{delete, get, okJson, post, put, stubFor}
 import io.renku.control.Throttler
-import io.renku.generators.CommonGraphGenerators.{pages, pagingRequests, personalAccessTokens}
+import io.renku.generators.CommonGraphGenerators.{pages, personalAccessTokens}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.GitLabUrl
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.metrics.GitLabApiCallRecorder
+import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
-import org.http4s.Method.GET
-import org.http4s.Uri
+import org.http4s.Method._
 import org.http4s.syntax.all._
+import org.http4s.{Method, Uri}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class GitLabClientSpec extends AnyWordSpec with IOSpec with should.Matchers with MockFactory {
+class GitLabClientSpec
+    extends AnyWordSpec
+    with IOSpec
+    with ExternalServiceStubbing
+    with should.Matchers
+    with MockFactory {
 
   "send" should {
-    "succeed and call RestClient.send and validate the URL" in new TestCase {
-        val expectation = commitIds.generateOne
 
-        client.send(GET,
-                    uris.generateOne,
-                    nonBlankStrings().generateOne,
-        )(_ => IO(expectation)).unsafeRunSync() shouldBe expectation
+    "fetch json from a given page" in new TestCase {
+      val maybeNextPage = pages.generateOption
+
+      stubFor {
+        callMethod(method, uri)
+          .willReturn(
+            okJson(result)
+              .withHeader("X-Next-Page", maybeNextPage.map(_.show).getOrElse(""))
+          )
       }
 
+      client.send(method, uri, endpointName)(_ => IO(result)).unsafeRunSync() shouldBe result
+    }
 
-//    "" in new TestCase {
-//      val projectId      = projectIds.generateOne
-//      val commitInfoList = commitInfos.generateNonEmptyList().toList
-//      val maybeNextPage = pages.generateOption
-//
-//
-//      stubFor {
-//        get(s"/api/v4/projects/$projectId/repository/commits?page=${pageRequest.page}&per_page=${pageRequest.perPage}")
-//          .willReturn(
-//            okJson(commitsJson(from = commitInfoList))
-//              .withHeader("X-Next-Page", maybeNextPage.map(_.show).getOrElse(""))
-//          )
-//      }
-//    }
+    "fetch commits using the given personal access token" in new TestCase {}
+    "fetch commits using the given oauth token" in new TestCase {}
+    "Handle empty JSON" in new TestCase {}
+    "Handle 404 NOT FOUND without throwing" in new TestCase {}
+    "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {}
+    "return an Exception if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {}
+    "return an Exception if remote client responds with unexpected body" in new TestCase {}
+
+    //TODO: cases for post/delete/put/etc.
   }
 
   private trait TestCase {
     implicit val maybeAccessToken: Option[AccessToken] = personalAccessTokens.generateSome
-    val pageRequest    = pagingRequests.generateOne
 
     private implicit val logger: TestLogger[IO] = TestLogger()
-    val apiCallRecorder = new GitLabApiCallRecorder( TestExecutionTimeRecorder[IO]())
+    val apiCallRecorder = new GitLabApiCallRecorder(TestExecutionTimeRecorder[IO]())
+    val gitLabApiUrl    = GitLabUrl(externalServiceBaseUrl).apiV4
+    val client          = new GitLabClientImpl[IO](gitLabApiUrl, apiCallRecorder, Throttler.noThrottling)
 
-    val client = new GitLabClientImpl[IO](gitLabApiUrls.generateOne, apiCallRecorder, Throttler.noThrottling)
+    val method       = Gen.oneOf(GET, PUT, DELETE, POST).generateOne
+    val endpointName = nonBlankStrings().generateOne
+    val uri          = uri"" / nonBlankStrings().generateList().mkString("/")
 
-     val uris: Gen[Uri] =
-      Gen.const(uri"" / gitLabApiUrls.generateOne.value / nonBlankStrings().generateList().mkString("/"))
+    val result = jsons.generateOne.toString()
+
+  }
+
+  private def callMethod(method: Method, uri: Uri): MappingBuilder = method match {
+    case GET    => get(uri.show)
+    case PUT    => put(uri.show)
+    case DELETE => delete(uri.show)
+    case POST   => post(uri.show)
   }
 }
