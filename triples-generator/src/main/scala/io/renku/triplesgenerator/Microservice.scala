@@ -111,13 +111,12 @@ private class MicroserviceRunner[F[_]: Spawn: Logger](
 
   def run(): F[ExitCode] = {
     for {
-      _           <- certificateLoader.run()
-      _           <- gitCertificateInstaller.run()
-      _           <- sentryInitializer.run()
-      _           <- cliVersionCompatibilityVerifier.run()
-      serverFiber <- Spawn[F].start(httpServer.run())
-      _ <- serviceReadinessChecker.waitIfNotUp >> reProvisioning.run() >> Spawn[F].start(eventConsumersRegistry.run())
-      exitCode <- serverFiber.joinWith(new Exception("Http server canceled").raiseError)
+      _ <- certificateLoader.run()
+      _ <- gitCertificateInstaller.run()
+      _ <- sentryInitializer.run()
+      _ <- cliVersionCompatibilityVerifier.run()
+      _ <- Spawn[F].start(serviceReadinessChecker.waitIfNotUp >> reProvisioning.run() >> eventConsumersRegistry.run())
+      exitCode <- httpServer.run()
     } yield exitCode
   } recoverWith logAndThrow
 

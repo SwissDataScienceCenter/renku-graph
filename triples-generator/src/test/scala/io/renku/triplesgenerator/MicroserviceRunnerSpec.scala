@@ -144,7 +144,7 @@ class MicroserviceRunnerSpec
       )
     }
 
-    "fail if starting re-provisioning process fails" in new TestCase {
+    "return Success ExitCode even when starting re-provisioning process fails" in new TestCase {
 
       (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
       given(certificateLoader).succeeds(returning = ())
@@ -155,16 +155,10 @@ class MicroserviceRunnerSpec
       given(reProvisioning).fails(becauseOf = exception)
       given(httpServer).succeeds(returning = ExitCode.Success)
 
-      intercept[Exception] {
-        runner.run().unsafeRunSync()
-      } shouldBe exception
-
-      logger.loggedOnly(
-        Error(exception.getMessage, exception)
-      )
+      runner.run().unsafeRunSync() shouldBe ExitCode.Success
     }
 
-    "return Success ExitCode even if running subscriptionMechanismRegistry fails" in new TestCase {
+    "return Success ExitCode even when running eventConsumersRegistry fails" in new TestCase {
 
       (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
       given(certificateLoader).succeeds(returning = ())
