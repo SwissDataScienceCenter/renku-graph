@@ -16,12 +16,11 @@
  * limitations under the License.
  */
 
-package io.renku.microservice
+package io.renku.microservices
 
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.positiveInts
-import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinderImpl}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
