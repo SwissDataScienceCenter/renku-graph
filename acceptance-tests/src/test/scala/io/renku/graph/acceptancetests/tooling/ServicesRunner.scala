@@ -57,7 +57,7 @@ class ServicesRunner(semaphore: Semaphore[IO])(implicit
 
   private def start(serviceRun: ServiceRun)(implicit ioRuntime: IORuntime): IO[Unit] = {
     import serviceRun._
-    serviceClient.ping.flatMap {
+    serviceClient.ping >>= {
       case ServiceUp => IO.unit
       case _ =>
         for {
@@ -70,11 +70,10 @@ class ServicesRunner(semaphore: Semaphore[IO])(implicit
           _ <- verifyServiceReady(serviceRun)
         } yield ()
     }
-
   }
 
   private def verifyServiceReady(serviceRun: ServiceRun): IO[Unit] =
-    serviceRun.serviceClient.ping flatMap {
+    serviceRun.serviceClient.ping >>= {
       case ServiceUp => serviceRun.postServiceStart.sequence >> logger.info(s"Service ${serviceRun.name} started")
       case _         => Temporal[IO].delayBy(verifyServiceReady(serviceRun), 500 millis)
     }
@@ -83,8 +82,14 @@ class ServicesRunner(semaphore: Semaphore[IO])(implicit
     ServicesState.cancelTokens.asScala.find { case (key, _) => key.name == service.name } match {
       case None => throw new IllegalStateException(s"'${service.name}' service not found, it is already stopped")
       case Some((service, cancelToken)) =>
-        (service.onServiceStop.sequence >> cancelToken >> logger.info(s"${service.name} service stopping"))
-          .unsafeRunSync()
+        { service.onServiceStop.sequence >> cancelToken >> verifyServiceStopped(service) }.unsafeRunSync()
     }
 
+  private def verifyServiceStopped(serviceRun: ServiceRun): IO[Unit] =
+    serviceRun.serviceClient.ping >>= {
+      case ServiceDown => logger.info(s"Service ${serviceRun.name} stopped")
+      case _ =>
+        logger.info(s"Kill signal sent to ${serviceRun.name} but it's still running...") >>
+          Temporal[IO].delayBy(verifyServiceStopped(serviceRun), 500 millis)
+    }
 }
