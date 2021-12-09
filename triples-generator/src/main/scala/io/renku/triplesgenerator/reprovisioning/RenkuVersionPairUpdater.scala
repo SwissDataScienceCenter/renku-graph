@@ -48,8 +48,8 @@ private class RenkuVersionPairUpdaterImpl[F[_]: Async: Logger](
       Prefixes of renku -> "renku",
       s"""|DELETE { ?s ?p ?o }
           |WHERE {
-          | ?s ?p ?o;
-          |    a renku:VersionPair.
+          | ?s a renku:VersionPair;
+          |    ?p ?o;
           |}
           |""".stripMargin
     )
