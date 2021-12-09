@@ -20,42 +20,44 @@ import scala.concurrent.duration.{Duration, FiniteDuration}
 trait GitLabClient[F[_]] {
 
   def send[ResultType](method: Method, uriWithoutBase: Uri, endpointName: String Refined NonEmpty)(
-      mapResponse:             ResponseMappingF[F, ResultType]
+    mapResponse: ResponseMappingF[F, ResultType]
   )(implicit
-      maybeAccessToken: Option[AccessToken]
-  ): F[ResultType]
+    maybeAccessToken: Option[AccessToken]
+                      ): F[ResultType]
 }
 
-final class GitLabClientImpl[F[_]: Async: Logger](
-    gitLabApiUrl:           GitLabApiUrl,
-    apiCallRecorder:        GitLabApiCallRecorder[F],
-    gitLabThrottler:        Throttler[F, GitLab],
-    retryInterval:          FiniteDuration = RestClient.SleepAfterConnectionIssue,
-    maxRetries:             Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
-    requestTimeoutOverride: Option[Duration] = None
-) extends RestClient(gitLabThrottler,
-                     maybeTimeRecorder = Some(apiCallRecorder.instance),
-                     retryInterval = retryInterval,
-                     maxRetries = maxRetries,
-                     requestTimeoutOverride = requestTimeoutOverride
-    )
-    with GitLabClient[F] {
+final class GitLabClientImpl[F[_] : Async : Logger](
+                                                     gitLabApiUrl: GitLabApiUrl,
+                                                     apiCallRecorder: GitLabApiCallRecorder[F],
+                                                     gitLabThrottler: Throttler[F, GitLab],
+                                                     retryInterval: FiniteDuration = RestClient.SleepAfterConnectionIssue,
+                                                     maxRetries: Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
+                                                     requestTimeoutOverride: Option[Duration] = None
+                                                   ) extends RestClient(gitLabThrottler,
+  maybeTimeRecorder = Some(apiCallRecorder.instance),
+  retryInterval = retryInterval,
+  maxRetries = maxRetries,
+  requestTimeoutOverride = requestTimeoutOverride
+)
+  with GitLabClient[F] {
+
 
   def send[ResultType](method: Method, uriWithoutBase: Uri, endpointName: String Refined NonEmpty)(
-      mapResponse:             ResponseMapping[ResultType]
+    mapResponse: ResponseMapping[ResultType]
   )(implicit
-      maybeAccessToken: Option[AccessToken]
-  ): F[ResultType] = for {
-    uri     <- MonadThrow[F].fromEither(Uri.fromString(gitLabApiUrl.show).map(_.resolve(uriWithoutBase)))
+    maybeAccessToken: Option[AccessToken]
+                      ): F[ResultType] = for {
+    _ <- Logger[F].info("")
+    uri <- MonadThrow[F].fromEither(Uri.fromString(gitLabApiUrl.show).map(_.resolve(uriWithoutBase)))
     request <- request(method, uri, maybeAccessToken, endpointName)
-    result  <- super.send(request)(mapResponse)
+    result <- super.send(request)(mapResponse)
   } yield result
 
-  private def request(method:           Method,
-                      uri:              Uri,
+  private def request(method: Method,
+                      uri: Uri,
                       maybeAccessToken: Option[AccessToken],
-                      endpointName:     String Refined NonEmpty
-  ): F[NamedRequest[F]] = HttpRequest(
+                      endpointName: String Refined NonEmpty
+                     ): F[NamedRequest[F]] = HttpRequest(
     super.request(method, uri, maybeAccessToken),
     endpointName
   ).pure[F]
@@ -63,12 +65,14 @@ final class GitLabClientImpl[F[_]: Async: Logger](
 }
 
 object GitLabClient {
-  def apply[F[_]: Async: Logger](    gitLabApiUrl:           GitLabApiUrl,
-                apiCallRecorder: GitLabApiCallRecorder[F],
-                gitLabThrottler:        Throttler[F, GitLab],
-                retryInterval:          FiniteDuration = RestClient.SleepAfterConnectionIssue,
-                maxRetries:             Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
-                requestTimeoutOverride: Option[Duration] = None): F[GitLabClientImpl[F]] =
-    new GitLabClientImpl[F](gitLabApiUrl, apiCallRecorder, gitLabThrottler , retryInterval , maxRetries , requestTimeoutOverride ).pure[F  ]
+  def apply[F[_] : Async : Logger](gitLabApiUrl: GitLabApiUrl,
+                                   apiCallRecorder: GitLabApiCallRecorder[F],
+                                   gitLabThrottler: Throttler[F, GitLab],
+                                   retryInterval: FiniteDuration = RestClient.SleepAfterConnectionIssue,
+                                   maxRetries: Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
+                                   requestTimeoutOverride: Option[Duration] = None): F[GitLabClientImpl[F]] = for {
+
+    _ <- Logger[F].info("Creating GitLabClient")
+  } yield new GitLabClientImpl[F](gitLabApiUrl, apiCallRecorder, gitLabThrottler, retryInterval, maxRetries, requestTimeoutOverride)
 
 }
