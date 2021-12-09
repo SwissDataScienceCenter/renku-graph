@@ -95,8 +95,8 @@ private class ReProvisioningStatusImpl[F[_]: Async: Logger](
       Prefixes of renku -> "renku",
       s"""|DELETE { ?s ?p ?o }
           |WHERE {
-          | ?s ?p ?o;
-          |    a renku:ReProvisioning.
+          | ?s a renku:ReProvisioning;
+          |    ?p ?o.
           |}
           |""".stripMargin
     )

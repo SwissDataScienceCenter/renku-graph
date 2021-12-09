@@ -62,7 +62,7 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       reProvisioning.run().unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(
-        Info("Triples Store is not on the required schema version - kicking-off re-provisioning"),
+        Info("Kicking-off re-provisioning"),
         Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
     }
@@ -121,7 +121,7 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       reProvisioning.run().unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(
-        Info("Triples Store is not on the required schema version - kicking-off re-provisioning"),
+        Info("Kicking-off re-provisioning"),
         Error("Re-provisioning failure", exception),
         Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
@@ -151,7 +151,7 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       reProvisioning.run().unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(
-        Info("Triples Store is not on the required schema version - kicking-off re-provisioning"),
+        Info("Kicking-off re-provisioning"),
         Error("Re-provisioning failure", exception),
         Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
@@ -183,7 +183,7 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       reProvisioning.run().unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(
-        Info("Triples Store is not on the required schema version - kicking-off re-provisioning"),
+        Info("Kicking-off re-provisioning"),
         Error("Re-provisioning failure", exception),
         Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
@@ -214,7 +214,7 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       reProvisioning.run().unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(
-        Info("Triples Store is not on the required schema version - kicking-off re-provisioning"),
+        Info("Kicking-off re-provisioning"),
         Error("Re-provisioning failure", exception),
         Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
@@ -248,7 +248,7 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       reProvisioning.run().unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(
-        Info("Triples Store is not on the required schema version - kicking-off re-provisioning"),
+        Info("Kicking-off re-provisioning"),
         Error("Re-provisioning failure", exception1),
         Error("Re-provisioning failure", exception2),
         Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
@@ -279,7 +279,7 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       reProvisioning.run().unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(
-        Info("Triples Store is not on the required schema version - kicking-off re-provisioning"),
+        Info("Kicking-off re-provisioning"),
         Error("Re-provisioning failure", exception),
         Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
@@ -290,15 +290,14 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
     val controller = microserviceBaseUrls.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val configuredRenkuVersionPairs  = renkuVersionPairs.generateNonEmptyList(2)
-    val maybeCurrentRenkuVersionPair = renkuVersionPairs.generateOption
-    val reprovisionJudge             = mock[ReProvisionJudge[IO]]
-    val triplesRemover               = mock[TriplesRemover[IO]]
-    val eventsReScheduler            = mock[EventsReScheduler[IO]]
-    val renkuVersionPairUpdater      = mock[RenkuVersionPairUpdater[IO]]
-    val microserviceUrlFinder        = mock[MicroserviceUrlFinder[IO]]
-    val reProvisioningStatus         = mock[ReProvisioningStatus[IO]]
-    val executionTimeRecorder        = TestExecutionTimeRecorder[IO]()
+    val configuredRenkuVersionPairs = renkuVersionPairs.generateNonEmptyList(2)
+    val reprovisionJudge            = mock[ReProvisionJudge[IO]]
+    val triplesRemover              = mock[TriplesRemover[IO]]
+    val eventsReScheduler           = mock[EventsReScheduler[IO]]
+    val renkuVersionPairUpdater     = mock[RenkuVersionPairUpdater[IO]]
+    val microserviceUrlFinder       = mock[MicroserviceUrlFinder[IO]]
+    val reProvisioningStatus        = mock[ReProvisioningStatus[IO]]
+    val executionTimeRecorder       = TestExecutionTimeRecorder[IO]()
     val reProvisioning = new ReProvisioningImpl[IO](
       configuredRenkuVersionPairs,
       reprovisionJudge,
