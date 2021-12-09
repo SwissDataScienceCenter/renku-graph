@@ -174,6 +174,7 @@ class MicroserviceRunnerSpec
   }
 
   private trait TestCase {
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val serviceReadinessChecker = mock[ServiceReadinessChecker[IO]]
     val certificateLoader       = mock[CertificateLoader[IO]]
     val gitCertificateInstaller = mock[GitCertificateInstaller[IO]]
@@ -182,17 +183,15 @@ class MicroserviceRunnerSpec
     val eventConsumersRegistry  = mock[EventConsumersRegistry[IO]]
     val reProvisioning          = mock[ReProvisioning[IO]]
     val httpServer              = mock[HttpServer[IO]]
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
 
-    val runner = new MicroserviceRunner(
-      serviceReadinessChecker,
-      certificateLoader,
-      gitCertificateInstaller,
-      sentryInitializer,
-      cliVersionCompatChecker,
-      eventConsumersRegistry,
-      reProvisioning,
-      httpServer
+    val runner = new MicroserviceRunner(serviceReadinessChecker,
+                                        certificateLoader,
+                                        gitCertificateInstaller,
+                                        sentryInitializer,
+                                        cliVersionCompatChecker,
+                                        eventConsumersRegistry,
+                                        reProvisioning,
+                                        httpServer
     )
   }
 }
