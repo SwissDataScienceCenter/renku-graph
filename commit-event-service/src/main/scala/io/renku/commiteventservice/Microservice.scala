@@ -45,18 +45,17 @@ object Microservice extends IOMicroservice {
     certificateLoader     <- CertificateLoader[IO]
     sentryInitializer     <- SentryInitializer[IO]
     gitLabRateLimit       <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
-    gitLabUrl           <- GitLabUrlLoader[IO]()
-    metricsRegistry        <- MetricsRegistry[IO]()
-    apiCallRecorder <- GitLabApiCallRecorder[IO](metricsRegistry)
+    gitLabUrl             <- GitLabUrlLoader[IO]()
+    metricsRegistry       <- MetricsRegistry[IO]()
+    apiCallRecorder       <- GitLabApiCallRecorder[IO](metricsRegistry)
     gitLabThrottler       <- Throttler[IO, GitLab](gitLabRateLimit)
-    gitLabClient <- GitLabClient[IO](gitLabUrl.apiV4, apiCallRecorder, gitLabThrottler)
+    gitLabClient          <- GitLabClient[IO](gitLabUrl.apiV4, apiCallRecorder, gitLabThrottler)
     executionTimeRecorder <- ExecutionTimeRecorder[IO]()
     commitSyncCategory <-
       events.categories.commitsync.SubscriptionFactory(gitLabThrottler, executionTimeRecorder)
     globalCommitSyncCategory <-
       events.categories.globalcommitsync.SubscriptionFactory(gitLabClient, gitLabThrottler, executionTimeRecorder)
     eventConsumersRegistry <- consumers.EventConsumersRegistry(commitSyncCategory, globalCommitSyncCategory)
-//    gitLabApiCallRecorder <- GitLabApiCallRecorder[IO](metricsRegistry)
     microserviceRoutes     <- MicroserviceRoutes(eventConsumersRegistry, new RoutesMetrics[IO](metricsRegistry))
     exitcode <- microserviceRoutes.routes.use { routes =>
                   new MicroserviceRunner(
