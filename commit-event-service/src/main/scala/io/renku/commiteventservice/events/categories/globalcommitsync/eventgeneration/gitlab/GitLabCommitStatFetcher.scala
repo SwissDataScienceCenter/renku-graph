@@ -92,7 +92,9 @@ private[globalcommitsync] class GitLabCommitStatFetcherImpl[F[_]: Async: Logger]
 }
 
 private[globalcommitsync] object GitLabCommitStatFetcher {
-  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F], gitLabThrottler: Throttler[F, GitLab]): F[GitLabCommitStatFetcher[F]] = for {
+  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F],
+                                 gitLabThrottler: Throttler[F, GitLab]
+  ): F[GitLabCommitStatFetcher[F]] = for {
     gitLabCommitFetcher <- GitLabCommitFetcher(gitLabClient)
     gitLabUrl           <- GitLabUrlLoader[F]()
   } yield new GitLabCommitStatFetcherImpl[F](gitLabCommitFetcher, gitLabUrl.apiV4, gitLabThrottler)

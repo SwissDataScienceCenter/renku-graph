@@ -33,7 +33,7 @@ import org.typelevel.log4cats.Logger
 object SubscriptionFactory {
 
   def apply[F[_]: Async: NonEmptyParallel: Logger](
-      gitLabClient: GitLabClient[F],
+      gitLabClient:          GitLabClient[F],
       gitLabThrottler:       Throttler[F, GitLab],
       executionTimeRecorder: ExecutionTimeRecorder[F]
   ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {

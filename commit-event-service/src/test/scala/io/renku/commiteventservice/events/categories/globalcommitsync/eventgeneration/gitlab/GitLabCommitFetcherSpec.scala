@@ -68,7 +68,6 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
         .unsafeRunSync() shouldBe expectation
     }
 
-
     "fetch commits using the given personal access token" in new TestCase {
       val personalAccessToken = personalAccessTokens.generateOne
 
@@ -115,13 +114,11 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
         .returning(expectation.pure[IO])
 
       gitLabCommitFetcher
-        .fetchGitLabCommits(projectId, pageRequest)(maybeAccessToken )
+        .fetchGitLabCommits(projectId, pageRequest)(maybeAccessToken)
         .unsafeRunSync() shouldBe expectation
     }
 
-
     /////////////////// ResponseMapper tests
-
 
     "fetch commits from the given page - responseMapping OK" in new TestCase {
 
@@ -130,10 +127,10 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
       multiCommitResponseMapping
         .value(
           (Status.Ok,
-            Request[IO](),
-            Response[IO]()
-              .withEntity(commitsJson(commitInfoList))
-              .withHeaders(Header.Raw(ci"X-Next-Page", maybeNextPage.map(_.show).getOrElse("")))
+           Request[IO](),
+           Response[IO]()
+             .withEntity(commitsJson(commitInfoList))
+             .withHeaders(Header.Raw(ci"X-Next-Page", maybeNextPage.map(_.show).getOrElse("")))
           )
         )
         .unsafeRunSync() shouldBe PageResult(commitInfoList.map(_.id), maybeNextPage)
@@ -158,7 +155,6 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
           .unsafeRunSync()
       }.getMessage should startWith(s"Unauthorized")
     }
-
 
     "return an Exception if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
 
@@ -185,7 +181,6 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
 
   ///////////// Single commit tesst
 
-
   "fetchLatestGitLabCommit" should {
 
     "return a single commit" in new TestCase {
@@ -209,11 +204,7 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
 
     }
 
-
-
-
     /////////////////// Single commit response mapper
-
 
     "fetch the latest commit from the given page - responseMapping OK" in new TestCase {
 
@@ -222,10 +213,10 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
       singleCommitResponseMapping
         .value(
           (Status.Ok,
-            Request[IO](),
-            Response[IO]()
-              .withEntity(commitsJson(commitInfoList))
-              .withHeaders(Header.Raw(ci"X-Next-Page", maybeNextPage.map(_.show).getOrElse("")))
+           Request[IO](),
+           Response[IO]()
+             .withEntity(commitsJson(commitInfoList))
+             .withHeaders(Header.Raw(ci"X-Next-Page", maybeNextPage.map(_.show).getOrElse("")))
           )
         )
         .unsafeRunSync() shouldBe Some(commitInfoList.head.id)
@@ -252,7 +243,6 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
       }.getMessage should startWith("Unauthorized")
     }
 
-
     "return an Exception if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
       intercept[Exception] {
         singleCommitResponseMapping
@@ -265,7 +255,6 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
 
     "return an Exception if remote client responds with unexpected body" in new TestCase {
 
-
       intercept[Exception] {
         singleCommitResponseMapping
           .value(
@@ -276,13 +265,6 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
     }
 
   }
-
-
-
-
-
-
-
 
   private trait TestCase {
     implicit val maybeAccessToken: Option[AccessToken] = personalAccessTokens.generateSome
@@ -326,7 +308,6 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
           .fetchLatestGitLabCommit(projectId)(None)
           .unsafeRunSync()
       }
-
 
       responseMapping
     }

@@ -171,7 +171,8 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[_]: Async: NonEmptyPar
 }
 
 private[globalcommitsync] object CommitsSynchronizer {
-  def apply[F[_]: Async: NonEmptyParallel: Logger](gitLabClient: GitLabClient[F], gitLabThrottler: Throttler[F, GitLab],
+  def apply[F[_]: Async: NonEmptyParallel: Logger](gitLabClient: GitLabClient[F],
+                                                   gitLabThrottler:       Throttler[F, GitLab],
                                                    executionTimeRecorder: ExecutionTimeRecorder[F]
   ): F[CommitsSynchronizer[F]] = for {
     accessTokenFinder         <- AccessTokenFinder[F]

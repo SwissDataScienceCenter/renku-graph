@@ -101,7 +101,7 @@ private[events] object EventHandler {
 
   def apply[F[_]: Async: NonEmptyParallel: Logger](
       subscriptionMechanism: SubscriptionMechanism[F],
-      gitLabClient: GitLabClient[F],
+      gitLabClient:          GitLabClient[F],
       gitLabThrottler:       Throttler[F, GitLab],
       executionTimeRecorder: ExecutionTimeRecorder[F]
   ): F[EventHandler[F]] = for {
