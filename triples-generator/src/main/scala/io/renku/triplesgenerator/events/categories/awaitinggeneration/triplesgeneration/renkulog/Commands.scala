@@ -22,6 +22,7 @@ import ammonite.ops.Path
 import cats.MonadThrow
 import cats.data.EitherT
 import cats.effect.kernel.Async
+import cats.syntax.all._
 import io.renku.config.ServiceUrl
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.{GitLabUrl, projects}
@@ -33,6 +34,7 @@ import io.renku.tinytypes.{TinyType, TinyTypeFactory}
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.CommitEvent
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
+import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
@@ -84,19 +86,23 @@ private object Commands {
   }
 
   object File {
-    def apply[F[_]: MonadThrow]: File[F] = new FileImpl[F]
+    def apply[F[_]: MonadThrow: Logger]: File[F] = new FileImpl[F]
   }
 
-  class FileImpl[F[_]: MonadThrow] extends File[F] {
+  class FileImpl[F[_]: MonadThrow: Logger] extends File[F] {
 
     override def mkdir(newDir: Path): F[Path] = MonadThrow[F].catchNonFatal {
       ops.mkdir ! newDir
       newDir
     }
 
-    override def deleteDirectory(repositoryDirectory: Path): F[Unit] = MonadThrow[F].catchNonFatal {
-      ops.rm ! repositoryDirectory
-    }
+    override def deleteDirectory(repositoryDirectory: Path): F[Unit] = MonadThrow[F]
+      .catchNonFatal {
+        ops.rm ! repositoryDirectory
+      }
+      .recoverWith { case NonFatal(ex) =>
+        Logger[F].error(ex)("Error when deleting repo directory")
+      }
 
     override def exists(fileName: Path): F[Boolean] = MonadThrow[F].catchNonFatal {
       ops.exists(fileName)
@@ -157,11 +163,14 @@ private object Commands {
       %%("git", "status")(repositoryDirectory.value).out.string
     }
 
-    private val recoverableErrors = Set("SSL_ERROR_SYSCALL",
-                                        "the remote end hung up unexpectedly",
-                                        "The requested URL returned error: 502",
-                                        "Could not resolve host:",
-                                        "Host is unreachable"
+    private val recoverableErrors = Set(
+      "SSL_ERROR_SYSCALL",
+      "the remote end hung up unexpectedly",
+      "The requested URL returned error: 502",
+      "Error in the HTTP2 framing layer",
+      "HTTP/2 stream 3 was not closed cleanly before end of the underlying stream",
+      "Could not resolve host:",
+      "Host is unreachable"
     )
     private lazy val relevantError: PartialFunction[Throwable, F[Either[GenerationRecoverableError, Unit]]] = {
       case ShelloutException(result) =>
@@ -193,7 +202,7 @@ private object Commands {
 
     override def migrate(commitEvent: CommitEvent)(implicit destinationDirectory: RepositoryPath): F[Unit] =
       MonadThrow[F]
-        .catchNonFatal(%%("renku", "migrate")(destinationDirectory.value))
+        .catchNonFatal(%%("renku", "migrate", "--preserve-identifiers")(destinationDirectory.value))
         .void
         .recoverWith { case NonFatal(exception) =>
           new Exception(

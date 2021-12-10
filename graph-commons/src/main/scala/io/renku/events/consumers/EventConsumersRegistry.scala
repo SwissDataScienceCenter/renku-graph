@@ -18,7 +18,6 @@
 
 package io.renku.events.consumers
 
-import cats.effect.IO
 import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
 import io.renku.events.EventRequestContent
@@ -67,8 +66,9 @@ class EventConsumersRegistryImpl[F[_]: MonadThrow: Parallel](
 }
 
 object EventConsumersRegistry {
-  def apply(subscriptionFactories: (EventHandler[IO], SubscriptionMechanism[IO])*): IO[EventConsumersRegistry[IO]] =
-    IO {
-      new EventConsumersRegistryImpl[IO](subscriptionFactories.toList.map(_._1), subscriptionFactories.toList.map(_._2))
-    }
+  def apply[F[_]: MonadThrow: Parallel](
+      subscriptionFactories: (EventHandler[F], SubscriptionMechanism[F])*
+  ): F[EventConsumersRegistry[F]] = MonadThrow[F].catchNonFatal {
+    new EventConsumersRegistryImpl[F](subscriptionFactories.toList.map(_._1), subscriptionFactories.toList.map(_._2))
+  }
 }

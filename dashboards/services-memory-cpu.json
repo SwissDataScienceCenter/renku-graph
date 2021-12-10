@@ -22,7 +22,7 @@
   "gnetId": null,
   "graphTooltip": 0,
   "id": 38,
-  "iteration": 1636044984458,
+  "iteration": 1638267961596,
   "links": [],
   "panels": [
     {
@@ -76,18 +76,22 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "label_replace(jvm_memory_bytes_used{area='heap', kubernetes_name='[[kube_env_name]]-knowledge-graph'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "exemplar": true,
+          "expr": "label_replace(jvm_memory_bytes_used{area='heap', kubernetes_name='${kube_env_name}-knowledge-graph'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "interval": "",
           "legendFormat": "Heap used {{instance_label}}",
           "refId": "A"
         },
         {
-          "expr": "label_replace(jvm_memory_bytes_max{area='heap', kubernetes_name='[[kube_env_name]]-knowledge-graph'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "exemplar": true,
+          "expr": "label_replace(jvm_memory_bytes_max{area='heap', kubernetes_name='${kube_env_name}-knowledge-graph'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "interval": "",
           "legendFormat": "Heap max {{instance_label}}",
           "refId": "B"
         },
         {
           "exemplar": true,
-          "expr": "container_memory_working_set_bytes{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"knowledge-graph\"}",
+          "expr": "container_memory_working_set_bytes{container!=\"POD\", namespace=\"${env_namespace}\", container=\"knowledge-graph\"}",
           "interval": "",
           "legendFormat": "Container",
           "refId": "C"
@@ -189,14 +193,14 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "rate(container_cpu_user_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"knowledge-graph\"}[5m])",
+          "expr": "rate(container_cpu_user_seconds_total{container!=\"POD\", namespace=\"${env_namespace}\", container=\"knowledge-graph\"}[5m])",
           "interval": "",
           "legendFormat": "User",
           "refId": "C"
         },
         {
           "exemplar": true,
-          "expr": "rate(container_cpu_system_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"knowledge-graph\"}[5m])",
+          "expr": "rate(container_cpu_system_seconds_total{container!=\"POD\", namespace=\"${env_namespace}\", container=\"knowledge-graph\"}[5m])",
           "hide": false,
           "interval": "",
           "legendFormat": "System",
@@ -204,7 +208,7 @@
         },
         {
           "exemplar": true,
-          "expr": "rate(container_cpu_usage_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"knowledge-graph\"}[5m])",
+          "expr": "rate(container_cpu_usage_seconds_total{container!=\"POD\", namespace=\"${env_namespace}\", container=\"knowledge-graph\"}[5m])",
           "hide": false,
           "interval": "",
           "legendFormat": "Total",
@@ -306,17 +310,22 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "label_replace(jvm_memory_bytes_used{area='heap', kubernetes_name='[[kube_env_name]]-webhook-service'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "exemplar": true,
+          "expr": "label_replace(jvm_memory_bytes_used{area='heap', kubernetes_name='${kube_env_name}-webhook-service'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "interval": "",
           "legendFormat": "Heap used {{instance_label}}",
           "refId": "A"
         },
         {
-          "expr": "label_replace(jvm_memory_bytes_max{area='heap', kubernetes_name='[[kube_env_name]]-webhook-service'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "exemplar": true,
+          "expr": "label_replace(jvm_memory_bytes_max{area='heap', kubernetes_name='${kube_env_name}-webhook-service', kubernetes_namespace=\"${env_namespace}\"}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "interval": "",
           "legendFormat": "Heap max {{instance_label}}",
           "refId": "B"
         },
         {
-          "expr": "container_memory_working_set_bytes{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"webhook-service\"}",
+          "exemplar": true,
+          "expr": "container_memory_working_set_bytes{container!=\"POD\", namespace='${env_namespace}', container=\"webhook-service\"}",
           "interval": "",
           "legendFormat": "Container",
           "refId": "C"
@@ -416,14 +425,14 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "rate(container_cpu_user_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"webhook-service\"}[5m])",
+          "expr": "rate(container_cpu_user_seconds_total{container!=\"POD\", namespace=\"${env_namespace}\", container=\"webhook-service\"}[5m])",
           "interval": "",
           "legendFormat": "User",
           "refId": "C"
         },
         {
           "exemplar": true,
-          "expr": "rate(container_cpu_system_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"webhook-service\"}[5m])",
+          "expr": "rate(container_cpu_system_seconds_total{container!=\"POD\", namespace=\"${env_namespace}\", container=\"webhook-service\"}[5m])",
           "hide": false,
           "interval": "",
           "legendFormat": "System",
@@ -431,7 +440,7 @@
         },
         {
           "exemplar": true,
-          "expr": "rate(container_cpu_usage_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"webhook-service\"}[5m])",
+          "expr": "rate(container_cpu_usage_seconds_total{container!=\"POD\", namespace=\"${env_namespace}\", container=\"webhook-service\"}[5m])",
           "hide": false,
           "interval": "",
           "legendFormat": "Total",
@@ -533,19 +542,22 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "label_replace(jvm_memory_bytes_used{area='heap', kubernetes_name='[[kube_env_name]]-commit-event-service'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "exemplar": true,
+          "expr": "label_replace(jvm_memory_bytes_used{area='heap', kubernetes_name='${kube_env_name}-commit-event-service'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
           "interval": "",
           "legendFormat": "Heap used {{instance_label}}",
           "refId": "A"
         },
         {
-          "expr": "label_replace(jvm_memory_bytes_max{area='heap', kubernetes_name='[[kube_env_name]]-commit-event-service'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "exemplar": true,
+          "expr": "label_replace(jvm_memory_bytes_max{area='heap', kubernetes_name='${kube_env_name}-commit-event-service'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
           "interval": "",
           "legendFormat": "Heap max {{instance_label}}",
           "refId": "B"
         },
         {
-          "expr": "container_memory_working_set_bytes{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"commit-event-service\"}",
+          "exemplar": true,
+          "expr": "container_memory_working_set_bytes{container!=\"POD\", namespace=\"${env_namespace}\", container=\"commit-event-service\"}",
           "interval": "",
           "legendFormat": "Container",
           "refId": "C"
@@ -645,14 +657,14 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "rate(container_cpu_user_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"commit-event-service\"}[5m])",
+          "expr": "rate(container_cpu_user_seconds_total{container!=\"POD\", namespace=\"${env_namespace}\", container=\"commit-event-service\"}[5m])",
           "interval": "",
           "legendFormat": "User",
           "refId": "C"
         },
         {
           "exemplar": true,
-          "expr": "rate(container_cpu_system_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"commit-event-service\"}[5m])",
+          "expr": "rate(container_cpu_system_seconds_total{container!=\"POD\", namespace=\"${env_namespace}\", container=\"commit-event-service\"}[5m])",
           "hide": false,
           "interval": "",
           "legendFormat": "System",
@@ -660,7 +672,7 @@
         },
         {
           "exemplar": true,
-          "expr": "rate(container_cpu_usage_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"commit-event-service\"}[5m])",
+          "expr": "rate(container_cpu_usage_seconds_total{container!=\"POD\", namespace=\"${env_namespace}\", container=\"commit-event-service\"}[5m])",
           "hide": false,
           "interval": "",
           "legendFormat": "Total",
@@ -762,18 +774,22 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "label_replace(jvm_memory_bytes_used{area='heap', kubernetes_name='[[kube_env_name]]-event-log'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "exemplar": true,
+          "expr": "label_replace(jvm_memory_bytes_used{area='heap', kubernetes_name='${kube_env_name}-event-log'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "interval": "",
           "legendFormat": "Heap used {{instance_label}}",
           "refId": "A"
         },
         {
-          "expr": "label_replace(jvm_memory_bytes_max{area='heap', kubernetes_name='[[kube_env_name]]-event-log'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "exemplar": true,
+          "expr": "label_replace(jvm_memory_bytes_max{area='heap', kubernetes_name='${kube_env_name}-event-log'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
           "interval": "",
           "legendFormat": "Heap max {{instance_label}}",
           "refId": "B"
         },
         {
-          "expr": "container_memory_working_set_bytes{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"event-log\"}",
+          "exemplar": true,
+          "expr": "container_memory_working_set_bytes{container!=\"POD\", namespace=\"${env_namespace}\", container=\"event-log\"}",
           "interval": "",
           "legendFormat": "Container",
           "refId": "C"
@@ -873,14 +889,14 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "rate(container_cpu_user_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"event-log\"}[5m])",
+          "expr": "rate(container_cpu_user_seconds_total{container!=\"POD\", namespace=\"${env_namespace}\", container=\"event-log\"}[5m])",
           "interval": "",
           "legendFormat": "User",
           "refId": "C"
         },
         {
           "exemplar": true,
-          "expr": "rate(container_cpu_system_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"event-log\"}[5m])",
+          "expr": "rate(container_cpu_system_seconds_total{container!=\"POD\", namespace=\"${env_namespace}\", container=\"event-log\"}[5m])",
           "hide": false,
           "interval": "",
           "legendFormat": "System",
@@ -888,7 +904,7 @@
         },
         {
           "exemplar": true,
-          "expr": "rate(container_cpu_usage_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"event-log\"}[5m])",
+          "expr": "rate(container_cpu_usage_seconds_total{container!=\"POD\", namespace=\"${env_namespace}\", container=\"event-log\"}[5m])",
           "hide": false,
           "interval": "",
           "legendFormat": "Total",
@@ -990,17 +1006,22 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "label_replace(jvm_memory_bytes_used{area='heap', kubernetes_name='[[kube_env_name]]-triples-generator'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "exemplar": true,
+          "expr": "label_replace(jvm_memory_bytes_used{area='heap', kubernetes_name='${kube_env_name}-triples-generator'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "interval": "",
           "legendFormat": "Heap used {{instance_label}}",
           "refId": "A"
         },
         {
-          "expr": "label_replace(jvm_memory_bytes_max{area='heap', kubernetes_name='[[kube_env_name]]-triples-generator'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "exemplar": true,
+          "expr": "label_replace(jvm_memory_bytes_max{area='heap', kubernetes_name='${kube_env_name}-triples-generator'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "interval": "",
           "legendFormat": "Heap max {{instance_label}}",
           "refId": "B"
         },
         {
-          "expr": "container_memory_working_set_bytes{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"triples-generator\"}",
+          "exemplar": true,
+          "expr": "container_memory_working_set_bytes{container!=\"POD\", namespace=\"${env_namespace}\", container=\"triples-generator\"}",
           "interval": "",
           "legendFormat": "Container {{pod}}",
           "refId": "C"
@@ -1100,14 +1121,14 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "rate(container_cpu_user_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"triples-generator\"}[5m])",
+          "expr": "rate(container_cpu_user_seconds_total{container!=\"POD\", namespace=\"${env_namespace}\", container=\"triples-generator\"}[5m])",
           "interval": "",
           "legendFormat": "User",
           "refId": "C"
         },
         {
           "exemplar": true,
-          "expr": "rate(container_cpu_system_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"triples-generator\"}[5m])",
+          "expr": "rate(container_cpu_system_seconds_total{container!=\"POD\", namespace=\"${env_namespace}\", container=\"triples-generator\"}[5m])",
           "hide": false,
           "interval": "",
           "legendFormat": "System",
@@ -1115,7 +1136,7 @@
         },
         {
           "exemplar": true,
-          "expr": "rate(container_cpu_usage_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"triples-generator\"}[5m])",
+          "expr": "rate(container_cpu_usage_seconds_total{container!=\"POD\", namespace=\"${env_namespace}\", container=\"triples-generator\"}[5m])",
           "hide": false,
           "interval": "",
           "legendFormat": "Total",
@@ -1217,17 +1238,22 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "label_replace(jvm_memory_bytes_used{area='heap', kubernetes_name='[[kube_env_name]]-token-repository'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "exemplar": true,
+          "expr": "label_replace(jvm_memory_bytes_used{area='heap', kubernetes_name='${kube_env_name}-token-repository'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "interval": "",
           "legendFormat": "Heap used {{instance_label}}",
           "refId": "A"
         },
         {
-          "expr": "label_replace(jvm_memory_bytes_max{area='heap', kubernetes_name='[[kube_env_name]]-token-repository'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "exemplar": true,
+          "expr": "label_replace(jvm_memory_bytes_max{area='heap', kubernetes_name='${kube_env_name}-token-repository'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "interval": "",
           "legendFormat": "Heap max {{instance_label}}",
           "refId": "B"
         },
         {
-          "expr": "container_memory_working_set_bytes{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"token-repository\"}",
+          "exemplar": true,
+          "expr": "container_memory_working_set_bytes{container!=\"POD\", namespace=\"${env_namespace}\", container=\"token-repository\"}",
           "interval": "",
           "legendFormat": "Container",
           "refId": "C"
@@ -1327,14 +1353,14 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "rate(container_cpu_user_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"token-repository\"}[5m])",
+          "expr": "rate(container_cpu_user_seconds_total{container!=\"POD\", namespace=\"${env_namespace}\", container=\"token-repository\"}[5m])",
           "interval": "",
           "legendFormat": "User",
           "refId": "C"
         },
         {
           "exemplar": true,
-          "expr": "rate(container_cpu_system_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"token-repository\"}[5m])",
+          "expr": "rate(container_cpu_system_seconds_total{container!=\"POD\", namespace=\"${env_namespace}\", container=\"token-repository\"}[5m])",
           "hide": false,
           "interval": "",
           "legendFormat": "System",
@@ -1342,7 +1368,7 @@
         },
         {
           "exemplar": true,
-          "expr": "rate(container_cpu_usage_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"token-repository\"}[5m])",
+          "expr": "rate(container_cpu_usage_seconds_total{container!=\"POD\", namespace=\"${env_namespace}\", container=\"token-repository\"}[5m])",
           "hide": false,
           "interval": "",
           "legendFormat": "Total",
@@ -1444,10 +1470,19 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "container_memory_working_set_bytes{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"jena\"}",
+          "exemplar": true,
+          "expr": "container_memory_working_set_bytes{container!=\"POD\", namespace=\"${env_namespace}\", container=\"jena\"}",
           "interval": "",
           "legendFormat": "Container",
           "refId": "C"
+        },
+        {
+          "exemplar": true,
+          "expr": "label_replace(jvm_memory_bytes_used{area='heap', kubernetes_name='${kube_env_name}-jena'}, \"instance_label\", \"$1\", \"instance\", \"(.*)\")",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "Heap used",
+          "refId": "A"
         }
       ],
       "thresholds": [],
@@ -1546,14 +1581,14 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "rate(container_cpu_user_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"jena\"}[5m])",
+          "expr": "rate(container_cpu_user_seconds_total{container!=\"POD\", namespace=\"${env_namespace}\", container=\"jena\"}[5m])",
           "interval": "",
           "legendFormat": "User",
           "refId": "C"
         },
         {
           "exemplar": true,
-          "expr": "rate(container_cpu_system_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"jena\"}[5m])",
+          "expr": "rate(container_cpu_system_seconds_total{container!=\"POD\", namespace=\"${env_namespace}\", container=\"jena\"}[5m])",
           "hide": false,
           "interval": "",
           "legendFormat": "System",
@@ -1561,7 +1596,7 @@
         },
         {
           "exemplar": true,
-          "expr": "rate(container_cpu_usage_seconds_total{container!=\"POD\", namespace=\"[[kube_env_name]]\", container=\"jena\"}[5m])",
+          "expr": "rate(container_cpu_usage_seconds_total{container!=\"POD\", namespace=\"${env_namespace}\", container=\"jena\"}[5m])",
           "hide": false,
           "interval": "",
           "legendFormat": "Total",
@@ -1613,7 +1648,7 @@
       }
     }
   ],
-  "refresh": "1m",
+  "refresh": "",
   "schemaVersion": 30,
   "style": "dark",
   "tags": [],
@@ -1622,32 +1657,59 @@
       {
         "allValue": null,
         "current": {
-          "selected": false,
-          "text": "tasko-renku",
-          "value": "tasko-renku"
+          "selected": true,
+          "text": "david-renku",
+          "value": "david-renku"
         },
         "datasource": "Prometheus",
-        "definition": "server_request_count",
+        "definition": "server_request_count_total",
         "description": null,
         "error": null,
         "hide": 0,
-        "includeAll": false,
+        "includeAll": true,
         "label": "Env name",
         "multi": false,
         "name": "kube_env_name",
         "options": [],
         "query": {
-          "query": "server_request_count",
-          "refId": "Prometheus-kube_env_name-Variable-Query"
+          "query": "server_request_count_total",
+          "refId": "StandardVariableQuery"
         },
         "refresh": 1,
-        "regex": "/.*kubernetes_name=\"([\\w-]*)-knowledge-graph\".*/",
+        "regex": "/.*release=\"([\\w-]*)\".*/",
         "skipUrlSync": false,
         "sort": 2,
         "tagValuesQuery": "",
         "tagsQuery": "",
         "type": "query",
         "useTags": false
+      },
+      {
+        "allValue": null,
+        "current": {
+          "selected": false,
+          "text": "david",
+          "value": "david"
+        },
+        "datasource": null,
+        "definition": "server_request_count_total",
+        "description": null,
+        "error": null,
+        "hide": 0,
+        "includeAll": true,
+        "label": "Env namespace",
+        "multi": false,
+        "name": "env_namespace",
+        "options": [],
+        "query": {
+          "query": "server_request_count_total",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "/.*namespace=\"([\\w-]*)\".*/",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
       }
     ]
   },
@@ -1671,5 +1733,5 @@
   "timezone": "",
   "title": "Graph Services memory & cpu",
   "uid": "GrUiB8K7z",
-  "version": 3
+  "version": 49
 }

@@ -18,11 +18,11 @@
 
 package io.renku.triplesgenerator.reprovisioning
 
-import cats.MonadThrow
 import cats.data.NonEmptyList
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.graph.model.{CliVersion, RenkuBaseUrl, RenkuVersionPair, SchemaVersion}
+import cats.{MonadThrow, Show}
+import io.renku.graph.model._
 import io.renku.http.client.ServiceHealthChecker
 import io.renku.microservices.MicroserviceUrlFinder
 import io.renku.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
@@ -49,33 +49,54 @@ private object ReProvisionJudge {
   )
 }
 
-private class ReProvisionJudgeImpl[F[_]: MonadThrow](renkuVersionPairFinder: RenkuVersionPairFinder[F],
-                                                     reProvisioningStatus:      ReProvisioningStatus[F],
-                                                     microserviceUrlFinder:     MicroserviceUrlFinder[F],
-                                                     serviceHealthChecker:      ServiceHealthChecker[F],
-                                                     versionCompatibilityPairs: NonEmptyList[RenkuVersionPair]
+private class ReProvisionJudgeImpl[F[_]: MonadThrow: Logger](renkuVersionPairFinder: RenkuVersionPairFinder[F],
+                                                             reProvisioningStatus:      ReProvisioningStatus[F],
+                                                             microserviceUrlFinder:     MicroserviceUrlFinder[F],
+                                                             serviceHealthChecker:      ServiceHealthChecker[F],
+                                                             versionCompatibilityPairs: NonEmptyList[RenkuVersionPair]
 ) extends ReProvisionJudge[F] {
 
   import serviceHealthChecker._
 
   override def reProvisioningNeeded(): F[Boolean] =
-    renkuVersionPairFinder.find() map decide >>= checkForZombieReProvisioning
+    (renkuVersionPairFinder.find() flatTap logVersions map decide) >>= checkForZombieReProvisioning
 
-  private def decide(maybeCurrentVersionPair: Option[RenkuVersionPair]): Boolean =
-    `is current schema version different from latest`(
-      maybeCurrentVersionPair.map(_.schemaVersion)
-    ) || `are latest schema versions same but cli versions different`(maybeCurrentVersionPair.map(_.cliVersion))
+  private lazy val decide: Option[RenkuVersionPair] => Boolean = {
+    case None => true
+    case Some(tsVersionPair) =>
+      `is TS schema version different from latest`(tsVersionPair.schemaVersion) ||
+        `are latest schema versions same but CLI versions different`(tsVersionPair.cliVersion)
+  }
 
-  private def `is current schema version different from latest`(maybeCurrent: Option[SchemaVersion]) =
-    !(maybeCurrent contains versionCompatibilityPairs.head.schemaVersion)
+  private lazy val `is TS schema version different from latest`: SchemaVersion => Boolean =
+    _ != versionCompatibilityPairs.head.schemaVersion
 
-  private def `are latest schema versions same but cli versions different`(maybeCurrentCliVersion: Option[CliVersion]) =
+  private lazy val `are latest schema versions same but CLI versions different`: CliVersion => Boolean = tsCliVersion =>
     versionCompatibilityPairs.toList match {
       case RenkuVersionPair(latestCliVersion, latestSchemaVersion) :: RenkuVersionPair(_, oldSchemaVersion) :: _
           if latestSchemaVersion == oldSchemaVersion =>
-        !(maybeCurrentCliVersion contains latestCliVersion)
+        tsCliVersion != latestCliVersion
       case _ => false
     }
+
+  private def logVersions(maybeTSVersionPair: Option[RenkuVersionPair]) = {
+
+    implicit val show: Show[(CliVersion, SchemaVersion)] = Show.show { case (cli, schema) =>
+      show"Schema version $schema and CLI version $cli"
+    }
+
+    val expectedVersion = versionCompatibilityPairs.toList match {
+      case RenkuVersionPair(cliVersion, schemaVersion) :: _ => (cliVersion -> schemaVersion).show
+      case _                                                => "unknown"
+    }
+
+    maybeTSVersionPair match {
+      case Some(RenkuVersionPair(cliVersion, schemaVersion)) =>
+        Logger[F].info(show"Triples Store on ${cliVersion -> schemaVersion}; expected $expectedVersion")
+      case _ =>
+        Logger[F].info(show"Triples Store on unknown Schema and CLI version; expected $expectedVersion")
+    }
+  }
 
   private lazy val checkForZombieReProvisioning: Boolean => F[Boolean] = {
     case true => true.pure[F]
@@ -84,11 +105,16 @@ private class ReProvisionJudgeImpl[F[_]: MonadThrow](renkuVersionPairFinder: Ren
         case false => false.pure[F]
         case true =>
           reProvisioningStatus.findReProvisioningService() >>= {
-            case None => true.pure[F]
+            case None => Logger[F].info("No info about service controlling re-provisioning") >> true.pure[F]
             case Some(controllerUrl) =>
               microserviceUrlFinder.findBaseUrl() >>= {
-                case `controllerUrl` => true.pure[F]
-                case _               => ping(controllerUrl).map(!_)
+                case `controllerUrl` =>
+                  Logger[F].info("Re-provisioning started by this service did not finish") >> true.pure[F]
+                case _ =>
+                  ping(controllerUrl).map(!_) flatTap {
+                    case true  => Logger[F].info(show"Re-provisioning was started by $controllerUrl which is down")
+                    case false => Logger[F].info(show"Re-provisioning already running on $controllerUrl")
+                  }
               }
           }
       }

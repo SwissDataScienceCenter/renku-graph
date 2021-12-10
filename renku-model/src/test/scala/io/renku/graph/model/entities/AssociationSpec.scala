@@ -33,7 +33,7 @@ class AssociationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPr
 
   "decode" should {
 
-    "turn JsonLD Association entity into the Association object" in {
+    "turn JsonLD Association entity with Renku agent into the Association object" in {
       forAll(activityEntities(planEntities())(projectCreatedDates().generateOne).map(_.association)) { association =>
         JsonLD
           .arr(association.asJsonLD, association.plan.asJsonLD)
@@ -42,6 +42,27 @@ class AssociationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPr
           .cursor
           .as[List[entities.Association]] shouldBe List(association.to[entities.Association]).asRight
       }
+    }
+
+    "turn JsonLD Association entity with Person agent into the Association object" in {
+      val associationWithRenkuAgent =
+        activityEntities(planEntities())(projectCreatedDates().generateOne)
+          .map(_.association)
+          .generateOne
+          .to[entities.Association]
+
+      val association: entities.Association =
+        entities.Association.WithPersonAgent(associationWithRenkuAgent.resourceId,
+                                             personEntities.generateOne.to[entities.Person],
+                                             associationWithRenkuAgent.plan
+        )
+
+      JsonLD
+        .arr(association.asJsonLD, association.plan.asJsonLD)
+        .flatten
+        .fold(throw _, identity)
+        .cursor
+        .as[List[entities.Association]] shouldBe List(association).asRight
     }
   }
 }

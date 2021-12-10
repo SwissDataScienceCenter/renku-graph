@@ -96,29 +96,63 @@ class EmailSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Ma
 }
 
 class UsersResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+  private implicit val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
 
   "apply(GitLabId)" should {
-
-    "generate 'renkuBaseUrl/users/gitLabId' ResourceId" in {
-      implicit val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
+    "generate 'renkuBaseUrl/persons/gitLabId' ResourceId" in {
       val gitLabId = userGitLabIds.generateOne
+      ResourceId(gitLabId).show shouldBe (renkuBaseUrl / "persons" / gitLabId).show
+    }
+  }
 
-      ResourceId(gitLabId).show shouldBe (renkuBaseUrl / "users" / gitLabId).show
+  "apply(Email)" should {
+    "generate 'mailto:email' ResourceId" in {
+      val email = userEmails.generateOne
+      ResourceId(email).show shouldBe show"mailto:$email"
+    }
+  }
+
+  "apply(Name)" should {
+    "generate 'renkuBaseUrl/persons/name' ResourceId" in {
+      val name = userNames.generateOne
+      ResourceId(name).show shouldBe (renkuBaseUrl / "persons" / name).show
+    }
+  }
+
+  "from(String)" should {
+    "return ResourceId.GitLabIdBased for strings matching the url" in {
+      val resourceId = userGitLabResourceId.generateOne
+      ResourceId.from(resourceId.show) shouldBe resourceId.asRight
+    }
+    "return ResourceId.EmailBased for strings matching the url" in {
+      val resourceId = userEmailResourceId.generateOne
+      ResourceId.from(resourceId.show) shouldBe resourceId.asRight
+    }
+    "return ResourceId.NameBased for strings matching the url" in {
+      val resourceId = userNameResourceId.generateOne
+      ResourceId.from(resourceId.show) shouldBe resourceId.asRight
+    }
+    "fail for an unrecognised urls" in {
+      val resourceId    = httpUrls().generateOne
+      val Left(failure) = ResourceId.from(resourceId)
+
+      failure            shouldBe an[IllegalArgumentException]
+      failure.getMessage shouldBe s"$resourceId is not a valid ${ResourceId.typeName}"
     }
   }
 
   "showAs[RdfResource]" should {
 
     "wrap the ResourceId in <> if the id doesn't contain email" in {
-      forAll(userResourceIds(maybeEmail = None)) { resourceId =>
-        resourceId.showAs[RdfResource] shouldBe s"<${resourceId.value}>"
+      forAll(Gen.oneOf(userGitLabResourceId, userNameResourceId).widen[users.ResourceId]) { resourceId =>
+        resourceId.showAs[RdfResource] shouldBe s"<${sparqlEncode(resourceId.show)}>"
       }
     }
 
     "encrypt the local part of the email ResourceId and wrap it in <>" in {
       forAll { email: Email =>
         val username   = email.extractName.value
-        val resourceId = ResourceId(s"mailto:$email")
+        val resourceId = ResourceId(email)
 
         resourceId.showAs[RdfResource] shouldBe s"<${resourceId.value.replace(username, sparqlEncode(username))}>"
       }

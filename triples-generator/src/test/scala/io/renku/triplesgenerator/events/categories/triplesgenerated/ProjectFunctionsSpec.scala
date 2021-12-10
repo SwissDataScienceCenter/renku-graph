@@ -31,15 +31,23 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
   import ProjectFunctions._
 
   "findAllPersons" should {
-    "collect project members, project creator, activities' authors and datasets' creators" in {
+    "collect project members, project creator, activities' authors, associations' agents and datasets' creators" in {
       forAll(
         anyProjectEntities
-          .withActivities(activityEntities(planEntities()))
+          .withActivities(activityEntities(planEntities()),
+                          activityEntities(planEntities()).modify(toAssociationPersonAgent)
+          )
           .withDatasets(datasetEntities(provenanceNonModified))
           .map(_.to[entities.Project])
       ) { project =>
-        findAllPersons(project) shouldBe project.members ++ project.maybeCreator ++ project.activities
-          .map(_.author) ++ project.datasets.flatMap(_.provenance.creators)
+        findAllPersons(project) shouldBe project.members ++
+          project.maybeCreator ++
+          project.datasets.flatMap(_.provenance.creators) ++
+          project.activities.map(_.author) ++
+          project.activities.flatMap(_.association.agent match {
+            case p: entities.Person => List(p)
+            case _ => List.empty[entities.Person]
+          })
       }
     }
   }
@@ -86,6 +94,27 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
       update(entitiesOldPerson, newPerson)(project).activities shouldBe project.activities.map {
         case activity if activity.author == entitiesOldPerson => activity.copy(author = newPerson)
         case activity                                         => activity
+      }
+    }
+
+    "replace the old person with the new on all activities' associations" in {
+
+      val project = anyProjectEntities
+        .withActivities(
+          activityEntities(planEntities()).modify(toAssociationPersonAgent(oldPerson)),
+          activityEntities(planEntities())
+        )
+        .generateOne
+        .to[entities.Project]
+
+      val entitiesOldPerson = oldPerson.to[entities.Person]
+      val newPerson         = personEntities().generateOne.to[entities.Person]
+
+      update(entitiesOldPerson, newPerson)(project).activities shouldBe project.activities.map { activity =>
+        activity.association match {
+          case assoc: entities.Association.WithPersonAgent => activity.copy(association = assoc.copy(agent = newPerson))
+          case _ => activity
+        }
       }
     }
 

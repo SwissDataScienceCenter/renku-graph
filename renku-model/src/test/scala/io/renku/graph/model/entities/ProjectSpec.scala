@@ -68,10 +68,12 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           val member3    = projectMembersWithEmail.generateOne
           val info       = projectInfo.copy(maybeCreator = creator.some, members = Set(member1, member2, member3))
           val resourceId = projects.ResourceId(info.path)
-          val activity1  = activityWith(member2.toCLIPayloadPerson)(info.dateCreated)
+          val creatorAsCliPerson = creator.toCLIPayloadPerson
+          val activity1          = activityWith(member2.toCLIPayloadPerson)(info.dateCreated)
           val activity2 =
             activityWith(personEntities(withoutGitLabId).generateOne.to[entities.Person])(info.dateCreated)
-          val dataset1 = datasetWith(Set(creator, member3).map(_.toCLIPayloadPerson))(info.dateCreated)
+          val activity3 = activityWithAssociationAgent(creatorAsCliPerson)(info.dateCreated)
+          val dataset1  = datasetWith(Set(creatorAsCliPerson, member3.toCLIPayloadPerson))(info.dateCreated)
           val dataset2 =
             datasetWith(Set(personEntities(withoutGitLabId).generateOne.to[entities.Person]))(info.dateCreated)
 
@@ -81,11 +83,11 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
                                      info.maybeDescription,
                                      info.keywords,
                                      info.dateCreated,
-                                     activity1 :: activity2 :: Nil,
+                                     activity1 :: activity2 :: activity3 :: Nil,
                                      dataset1 :: dataset2 :: Nil
           )
 
-          val mergedCreator = dataset1.provenance.creators.find(byEmail(creator)).map(merge(_, creator))
+          val mergedCreator = merge(creatorAsCliPerson, creator)
           val mergedMember2 = merge(activity1.author, member2)
           val mergedMember3 = dataset1.provenance.creators.find(byEmail(member3)).map(merge(_, member3))
 
@@ -97,13 +99,14 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
               info.maybeDescription,
               cliVersion,
               info.dateCreated,
-              maybeCreator = mergedCreator,
+              maybeCreator = mergedCreator.some,
               info.visibility,
               info.keywords,
               members = Set(member1.toPerson.some, mergedMember2.some, mergedMember3).flatten,
               schemaVersion,
-              (activity1.copy(author = mergedMember2) :: activity2 :: Nil).sortBy(_.startTime),
-              addTo(dataset1, Set(mergedCreator, mergedMember3).flatten) :: dataset2 :: Nil
+              (activity1.copy(author = mergedMember2) :: activity2 :: replaceAgent(activity3, mergedCreator) :: Nil)
+                .sortBy(_.startTime),
+              addTo(dataset1, Set(mergedCreator.some, mergedMember3).flatten) :: dataset2 :: Nil
             )
           ).asRight
       }
@@ -114,16 +117,18 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
              cliVersions,
              projectSchemaVersions
       ) { (projectInfo, cliVersion, schemaVersion) =>
-        val creator    = projectMembersWithEmail.generateOne
-        val member1    = projectMembersNoEmail.generateOne
-        val member2    = projectMembersWithEmail.generateOne
-        val member3    = projectMembersWithEmail.generateOne
-        val info       = projectInfo.copy(maybeCreator = creator.some, members = Set(member1, member2, member3))
-        val resourceId = projects.ResourceId(info.path)
-        val activity1  = activityWith(member2.toCLIPayloadPerson)(info.dateCreated)
+        val creator            = projectMembersWithEmail.generateOne
+        val member1            = projectMembersNoEmail.generateOne
+        val member2            = projectMembersWithEmail.generateOne
+        val member3            = projectMembersWithEmail.generateOne
+        val info               = projectInfo.copy(maybeCreator = creator.some, members = Set(member1, member2, member3))
+        val resourceId         = projects.ResourceId(info.path)
+        val creatorAsCliPerson = creator.toCLIPayloadPerson
+        val activity1          = activityWith(member2.toCLIPayloadPerson)(info.dateCreated)
         val activity2 =
           activityWith(personEntities(withoutGitLabId).generateOne.to[entities.Person])(info.dateCreated)
-        val dataset1 = datasetWith(Set(creator, member3).map(_.toCLIPayloadPerson))(info.dateCreated)
+        val activity3 = activityWithAssociationAgent(creatorAsCliPerson)(info.dateCreated)
+        val dataset1  = datasetWith(Set(creatorAsCliPerson, member3.toCLIPayloadPerson))(info.dateCreated)
         val dataset2 =
           datasetWith(Set(personEntities(withoutGitLabId).generateOne.to[entities.Person]))(info.dateCreated)
 
@@ -133,11 +138,11 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
                                    info.maybeDescription,
                                    info.keywords,
                                    info.dateCreated,
-                                   activity1 :: activity2 :: Nil,
+                                   activity1 :: activity2 :: activity3 :: Nil,
                                    dataset1 :: dataset2 :: Nil
         )
 
-        val mergedCreator = dataset1.provenance.creators.find(byEmail(creator)).map(merge(_, creator))
+        val mergedCreator = merge(creatorAsCliPerson, creator)
         val mergedMember2 = merge(activity1.author, member2)
         val mergedMember3 = dataset1.provenance.creators.find(byEmail(member3)).map(merge(_, member3))
 
@@ -149,13 +154,14 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
             info.maybeDescription,
             cliVersion,
             info.dateCreated,
-            mergedCreator,
+            mergedCreator.some,
             info.visibility,
             info.keywords,
             members = Set(member1.toPerson.some, mergedMember2.some, mergedMember3).flatten,
             schemaVersion,
-            (activity1.copy(author = mergedMember2) :: activity2 :: Nil).sortBy(_.startTime),
-            addTo(dataset1, Set(mergedCreator, mergedMember3).flatten) :: dataset2 :: Nil,
+            (activity1.copy(author = mergedMember2) :: activity2 :: replaceAgent(activity3, mergedCreator) :: Nil)
+              .sortBy(_.startTime),
+            addTo(dataset1, Set(mergedCreator.some, mergedMember3).flatten) :: dataset2 :: Nil,
             projects.ResourceId(info.maybeParentPath.getOrElse(fail("No parent project")))
           )
         ).asRight
@@ -702,9 +708,14 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
 
     lazy val toPerson: entities.Person = gitLabPerson match {
       case ProjectMemberNoEmail(name, _, gitLabId) =>
-        entities.Person(users.ResourceId(gitLabId), name, maybeGitLabId = gitLabId.some)
+        entities.Person.WithGitLabId(users.ResourceId(gitLabId),
+                                     gitLabId,
+                                     name,
+                                     maybeEmail = None,
+                                     maybeAffiliation = None
+        )
       case ProjectMemberWithEmail(name, _, gitLabId, email) =>
-        entities.Person(users.ResourceId(gitLabId), name, maybeGitLabId = gitLabId.some, maybeEmail = email.some)
+        entities.Person.WithGitLabId(users.ResourceId(gitLabId), gitLabId, name, email.some, maybeAffiliation = None)
     }
 
     private def nameFromUsernameOrName(member: ProjectMember) =
@@ -714,6 +725,14 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
 
   private def activityWith(author: entities.Person): projects.DateCreated => entities.Activity = dateCreated =>
     activityEntities(planEntities())(dateCreated).generateOne.to[entities.Activity].copy(author = author)
+
+  private def activityWithAssociationAgent(agent: entities.Person): projects.DateCreated => entities.Activity =
+    dateCreated => {
+      val activity = activityEntities(planEntities())(dateCreated).generateOne.to[entities.Activity]
+      activity.copy(association =
+        entities.Association.WithPersonAgent(activity.association.resourceId, agent, activity.association.plan)
+      )
+    }
 
   private def datasetWith(
       creators: Set[entities.Person]
@@ -741,13 +760,17 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       case p: entities.Dataset.Provenance.Modified                         => p.copy(creators = creators)
     })
 
+  private def replaceAgent(activity: entities.Activity, newAgent: entities.Person): entities.Activity =
+    activity.association match {
+      case a: entities.Association.WithPersonAgent => activity.copy(association = a.copy(agent = newAgent))
+      case _ => activity
+    }
+
   private def byEmail(member: ProjectMemberWithEmail): entities.Person => Boolean =
     _.maybeEmail.contains(member.email)
 
   private def merge(person: entities.Person, member: ProjectMemberWithEmail): entities.Person =
-    person.copy(resourceId = users.ResourceId(member.gitLabId),
-                name = member.name,
-                maybeEmail = member.email.some,
-                maybeGitLabId = member.gitLabId.some
-    )
+    person
+      .add(member.gitLabId)
+      .copy(name = member.name, maybeEmail = member.email.some)
 }

@@ -60,7 +60,7 @@ class RenkuVersionPairFinderSpec extends AnyWordSpec with IOSpec with InMemoryRd
 
       intercept[IllegalStateException] {
         versionPairFinder.find().unsafeRunSync()
-      }.getMessage should startWith("Too many Version pair found:")
+      }.getMessage should startWith("Too many Version pairs found:")
     }
   }
 

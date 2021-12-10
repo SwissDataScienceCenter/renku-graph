@@ -127,6 +127,8 @@ trait ActivityGenerators {
     def generateList(projectDateCreated: projects.DateCreated): List[Activity] =
       factory(projectDateCreated).generateList()
 
+    def many: List[ActivityGenFactory] = List.fill(positiveInts(5).generateOne)(factory)
+
     def withDateBefore(max: InstantTinyType): Gen[Activity] =
       factory(projects.DateCreated(max.value))
         .map(_.copy(startTime = timestamps(max = max.value).generateAs[activities.StartTime]))
@@ -134,4 +136,16 @@ trait ActivityGenerators {
     def modify(f: Activity => Activity): ActivityGenFactory =
       projectCreationDate => factory(projectCreationDate).map(f)
   }
+
+  def toAssociationPersonAgent: Activity => Activity = toAssociationPersonAgent(personEntities.generateOne)
+
+  def toAssociationPersonAgent(person: Person): Activity => Activity = activity =>
+    activity.copy(associationFactory =
+      act =>
+        activity.associationFactory(act) match {
+          case Association.WithRenkuAgent(_, _, plan) =>
+            Association.WithPersonAgent(act, person, plan)
+          case assoc: Association.WithPersonAgent => assoc
+        }
+    )
 }
