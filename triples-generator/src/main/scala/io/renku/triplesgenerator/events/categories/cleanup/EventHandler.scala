@@ -50,8 +50,8 @@ private[events] class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
                 .start(eventProcessor.process(cleanupEvent.project))
                 .toRightT
                 .map(_ => Accepted)
-                .semiflatTap(Logger[F].log(cleanupEvent.project.path))
-                .leftSemiflatTap(Logger[F].log(cleanupEvent.project.path))
+                .semiflatTap(Logger[F].log(cleanupEvent))
+                .leftSemiflatTap(Logger[F].log(cleanupEvent))
   } yield result
 
   private implicit lazy val eventInfoToString: Show[CleanUpEvent] = Show.show { event =>
