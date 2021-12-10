@@ -4,6 +4,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.events.consumers.Project
 import io.renku.rdfstore.SparqlQueryTimeRecorder
+import io.renku.triplesgenerator.events.categories.EventStatusUpdater
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -13,12 +14,12 @@ private trait EventProcessor[F[_]] {
 }
 
 private class CleanUpEventProcessorImpl[F[_]: Async: Logger](triplesRemover: ProjectTriplesRemover[F],
-                                                             eventLogNotifier: EventLogNotifier[F]
+                                                             eventStatusUpdater: EventStatusUpdater[F]
 ) extends EventProcessor[F] {
   override def process(project: Project): F[Unit] = for {
     _ <- triplesRemover.removeTriples(of = project.path) recoverWith logErrorAndThrow(project, " failed")
     _ <-
-      eventLogNotifier.notifyEventLog(project) recoverWith logErrorAndThrow(project, ", event log notification failed")
+      eventStatusUpdater.projectToNew(project) recoverWith logErrorAndThrow(project, ", event log notification failed")
   } yield ()
 
   private def logErrorAndThrow(project: Project, message: String): PartialFunction[Throwable, F[Unit]] = {
@@ -34,7 +35,7 @@ private class CleanUpEventProcessorImpl[F[_]: Async: Logger](triplesRemover: Pro
 private object CleanUpEventProcessor {
   def apply[F[_]: Async: Logger](sparqlQueryTimeRecorder: SparqlQueryTimeRecorder[F]): F[EventProcessor[F]] =
     for {
-      eventLogNotifier <- EventLogNotifier[F]
-      triplesRemover   <- ProjectTriplesRemover(sparqlQueryTimeRecorder)
-    } yield new CleanUpEventProcessorImpl[F](triplesRemover, eventLogNotifier)
+      eventStatusUpdater <- EventStatusUpdater(categoryName)
+      triplesRemover     <- ProjectTriplesRemover(sparqlQueryTimeRecorder)
+    } yield new CleanUpEventProcessorImpl[F](triplesRemover, eventStatusUpdater)
 }
