@@ -25,5 +25,4 @@ object GitLabApiCallRecorder {
     histogram             <- metricsRegistry.register[F, Histogram, Histogram.Builder](apiCallCountsHistogram)
     executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = Some(histogram))
   } yield new GitLabApiCallRecorder(executionTimeRecorder)
-
 }
