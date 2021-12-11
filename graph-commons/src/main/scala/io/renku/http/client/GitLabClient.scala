@@ -46,7 +46,6 @@ final class GitLabClientImpl[F[_]: Async: Logger](
   )(implicit
       maybeAccessToken: Option[AccessToken]
   ): F[ResultType] = for {
-    _       <- Logger[F].info("")
     uri     <- MonadThrow[F].fromEither(Uri.fromString(gitLabApiUrl.show).map(_.resolve(uriWithoutBase)))
     request <- request(method, uri, maybeAccessToken, endpointName)
     result  <- super.send(request)(mapResponse)
@@ -70,15 +69,12 @@ object GitLabClient {
                                  retryInterval:   FiniteDuration = RestClient.SleepAfterConnectionIssue,
                                  maxRetries:      Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
                                  requestTimeoutOverride: Option[Duration] = None
-  ): F[GitLabClientImpl[F]] = for {
-
-    _ <- Logger[F].info("Creating GitLabClient")
-  } yield new GitLabClientImpl[F](gitLabApiUrl,
-                                  apiCallRecorder,
-                                  gitLabThrottler,
-                                  retryInterval,
-                                  maxRetries,
-                                  requestTimeoutOverride
-  )
+  ): F[GitLabClientImpl[F]] = new GitLabClientImpl[F](gitLabApiUrl,
+                                                      apiCallRecorder,
+                                                      gitLabThrottler,
+                                                      retryInterval,
+                                                      maxRetries,
+                                                      requestTimeoutOverride
+  ).pure[F]
 
 }
