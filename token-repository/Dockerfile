@@ -8,7 +8,10 @@ WORKDIR /work
 COPY . .
 
 RUN echo "http://dl-4.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories && \
-    apk add --no-cache --virtual .build-dependencies sbt && \
+    export PATH="/usr/local/sbt/bin:$PATH" && \
+    apk update && apk add --no-cache --virtual .build-dependencies bash wget tar && \
+    mkdir -p "/usr/local/sbt" && \
+    wget -qO - --no-check-certificate "https://github.com/sbt/sbt/releases/download/v1.5.6/sbt-1.5.6.tgz" | tar xz -C /usr/local/sbt --strip-components=1 && \
     sbt "project token-repository" stage && \
     apk del .build-dependencies
 
