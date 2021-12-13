@@ -69,7 +69,7 @@ trait DatasetEntitiesGenerators {
 
   def datasetAndModificationEntities[P <: Dataset.Provenance](
       provenance:          ProvenanceGen[P],
-      projectDateCreated:  projects.DateCreated = projectCreatedDates().generateOne
+      projectDateCreated:  projects.DateCreated = projects.DateCreated(Instant.EPOCH)
   )(implicit renkuBaseUrl: RenkuBaseUrl): Gen[(Dataset[P], Dataset[Dataset.Provenance.Modified])] = for {
     original <- datasetEntities(provenance)(renkuBaseUrl)(projectDateCreated)
     modified <- modifiedDatasetEntities(original, projectDateCreated)

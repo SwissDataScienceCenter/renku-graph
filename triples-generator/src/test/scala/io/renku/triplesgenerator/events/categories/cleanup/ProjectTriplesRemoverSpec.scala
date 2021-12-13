@@ -24,6 +24,7 @@ import io.renku.generators.Generators.fixed
 import io.renku.graph.model.GraphModelGenerators.datasetInternalSameAsFrom
 import io.renku.graph.model.datasets.{Identifier, TopmostSameAs}
 import io.renku.graph.model.projects
+import io.renku.graph.model.testentities._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.EntityId
@@ -34,6 +35,8 @@ import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks.forAll
+
+import java.time.Instant
 
 class ProjectTriplesRemoverSpec
     extends AnyWordSpec
@@ -132,15 +135,9 @@ class ProjectTriplesRemoverSpec
           projectEntities(anyVisibility).withDatasets(datasetEntities(provenanceInternal)).generateOne
         val topDataset = topProject.datasets.head
 
-        val (originalDataset, modifiedDataset) = datasetAndModificationEntities(
-          provenanceImportedInternalAncestorInternal(
-            datasetInternalSameAsFrom(fixed(renkuBaseUrl), fixed(topDataset.identification.identifier)).generateOne
-          )
-        ).generateOne
-        val projectToDelete =
-          projectEntities(anyVisibility)
-            .withDatasets(_ => fixed(originalDataset), _ => fixed(modifiedDataset))
-            .generateOne
+        val (_ ::~ modifiedDataset, projectToDelete) = projectEntities(anyVisibility)
+          .addDatasetAndModification(datasetEntities(provenanceInternal))
+          .generateOne
 
         val aProject = projectWithImportingDataset(modifiedDataset.identification.identifier)(
           topDataset.identification.identifier
@@ -164,8 +161,10 @@ class ProjectTriplesRemoverSpec
       }
   }
 
-  private def projectWithImportingDataset(sameAs: Identifier)(topmostSameAs: Identifier = sameAs) =
-    projectEntities(anyVisibility)
+  private def projectWithImportingDataset(sameAs:         Identifier,
+                                          minDateCreated: projects.DateCreated = projects.DateCreated(Instant.EPOCH)
+  )(topmostSameAs:                                        Identifier = sameAs) =
+    projectEntities(anyVisibility, minDateCreated)
       .withDatasets(
         datasetEntities(
           provenanceImportedInternalAncestorInternal(
