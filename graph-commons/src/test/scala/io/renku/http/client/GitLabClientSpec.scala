@@ -17,7 +17,6 @@ import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import org.http4s.Method._
 import org.http4s.Status.InternalServerError
-import org.http4s.syntax.all._
 import org.http4s.{Method, Uri}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -36,21 +35,21 @@ class GitLabClientSpec
     "fetch json from a given page" in new TestCase {
 
       stubFor {
-        callMethod(method, uri)
+        callMethod(method, s"api/v4/$path")
           .willReturn(
             okJson(result)
               .withHeader("X-Next-Page", maybeNextPage.map(_.show).getOrElse(""))
           )
       }
 
-      client.send(method, uri, endpointName)(_ => IO(result)).unsafeRunSync() shouldBe result
+      client.send(method, path, endpointName)(_ => IO(result)).unsafeRunSync() shouldBe result
     }
 
     "fetch commits using the given personal access token" in new TestCase {
       val personalAccessToken = personalAccessTokens.generateOne
 
       stubFor {
-        callMethod(method, uri)
+        callMethod(method, s"api/v4/$path")
           .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
           .willReturn(
             okJson(result)
@@ -58,14 +57,14 @@ class GitLabClientSpec
           )
       }
 
-      client.send(method, uri, endpointName)(_ => IO(result)).unsafeRunSync() shouldBe result
+      client.send(method, path, endpointName)(_ => IO(result)).unsafeRunSync() shouldBe result
     }
 
     "fetch commits using the given oauth token" in new TestCase {
       val authAccessToken = oauthAccessTokens.generateOne
 
       stubFor {
-        callMethod(method, uri)
+        callMethod(method, s"api/v4/$path")
           .withHeader("PRIVATE-TOKEN", equalTo(authAccessToken.value))
           .willReturn(
             okJson(result)
@@ -73,51 +72,51 @@ class GitLabClientSpec
           )
       }
 
-      client.send(method, uri, endpointName)(_ => IO(result)).unsafeRunSync() shouldBe result
+      client.send(method, path, endpointName)(_ => IO(result)).unsafeRunSync() shouldBe result
     }
 
     "Handle empty JSON" in new TestCase {
       override val result: String = "{}"
       stubFor {
-        callMethod(method, uri)
+        callMethod(method, s"api/v4/$path")
           .willReturn(
             okJson(result)
               .withHeader("X-Next-Page", maybeNextPage.map(_.show).getOrElse(""))
           )
       }
 
-      client.send(method, uri, endpointName)(_ => IO(result)).unsafeRunSync() shouldBe result
+      client.send(method, path, endpointName)(_ => IO(result)).unsafeRunSync() shouldBe result
 
     }
 
     "Handle 404 NOT FOUND without throwing" in new TestCase {
       stubFor {
-        callMethod(method, uri)
+        callMethod(method, s"api/v4/$path")
           .willReturn(
             notFound()
           )
       }
 
-      client.send(method, uri, endpointName)(_ => IO(())).unsafeRunSync() shouldBe ()
+      client.send(method, path, endpointName)(_ => IO(())).unsafeRunSync() shouldBe ()
 
     }
 
     "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
       stubFor {
-        callMethod(method, uri)
+        callMethod(method, s"api/v4/$path")
           .willReturn(
             unauthorized()
           )
       }
 
       intercept[Exception] {
-        client.send(method, uri, endpointName)(_ => UnauthorizedException.raiseError[IO, Unit]).unsafeRunSync()
+        client.send(method, path, endpointName)(_ => UnauthorizedException.raiseError[IO, Unit]).unsafeRunSync()
       } shouldBe UnauthorizedException
     }
 
     "return an Exception if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
       stubFor {
-        callMethod(method, uri)
+        callMethod(method, s"api/v4/$path")
           .willReturn(
             badRequest()
           )
@@ -125,7 +124,7 @@ class GitLabClientSpec
 
       intercept[Exception] {
         client
-          .send(method, uri, endpointName)(_ =>
+          .send(method, path, endpointName)(_ =>
             UnexpectedResponseException(InternalServerError, "Unexpected response").raiseError[IO, Unit]
           )
           .unsafeRunSync()
@@ -133,16 +132,16 @@ class GitLabClientSpec
     }
 
     "return an Exception if remote client responds with unexpected body" in new TestCase {
-      stubFor {
-        callMethod(method, uri)
+      val stub = stubFor {
+        callMethod(method, s"/api/v4/$path")
           .willReturn(okJson("{}"))
       }
 
       intercept[Exception] {
         client
-          .send(method, uri, endpointName)(_ => new Exception("Unexpected body").raiseError[IO, Unit])
+          .send(method, path, endpointName)(_ => new Exception("Unexpected body").raiseError[IO, Unit])
           .unsafeRunSync()
-      }.getMessage should startWith(s"$method $externalServiceBaseUrl$uri returned 200 OK; error: Unexpected body")
+      }.getMessage should startWith(s"$method $gitLabApiUrl/$path returned 200 OK; error: Unexpected body")
     }
   }
 
@@ -154,19 +153,25 @@ class GitLabClientSpec
     val gitLabApiUrl    = GitLabUrl(externalServiceBaseUrl).apiV4
     val client          = new GitLabClientImpl[IO](gitLabApiUrl, apiCallRecorder, Throttler.noThrottling)
 
-    val method        = Gen.oneOf(GET, PUT, DELETE, POST).generateOne
-    val endpointName  = nonBlankStrings().generateOne
-    val uri           = uri"" / nonBlankStrings().generateList().mkString("/")
+    val method       = Gen.oneOf(GET, PUT, DELETE, POST).generateOne
+    val endpointName = nonBlankStrings().generateOne
+    val queryParams =
+      nonBlankStrings().generateList().map(key => (key.value, nonBlankStrings().generateOne.value)).toMap
+    val path = Uri
+      .fromString(nonBlankStrings().generateNonEmptyList().toList.mkString("/"))
+      .fold(throw _, identity)
+      .withQueryParams(queryParams)
+
     val maybeNextPage = pages.generateOption
 
     val result = jsons.generateOne.toString()
 
   }
 
-  private def callMethod(method: Method, uri: Uri): MappingBuilder = method match {
-    case GET    => get(uri.show)
-    case PUT    => put(uri.show)
-    case DELETE => delete(uri.show)
-    case POST   => post(uri.show)
+  private def callMethod(method: Method, uri: String): MappingBuilder = method match {
+    case GET    => get(uri)
+    case PUT    => put(uri)
+    case DELETE => delete(uri)
+    case POST   => post(uri)
   }
 }

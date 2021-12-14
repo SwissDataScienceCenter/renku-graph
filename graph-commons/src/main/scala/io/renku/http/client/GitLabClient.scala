@@ -1,6 +1,5 @@
 package io.renku.http.client
 
-import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
@@ -19,7 +18,7 @@ import scala.concurrent.duration.{Duration, FiniteDuration}
 
 trait GitLabClient[F[_]] {
 
-  def send[ResultType](method: Method, uriWithoutBase: Uri, endpointName: String Refined NonEmpty)(
+  def send[ResultType](method: Method, path: Uri, endpointName: String Refined NonEmpty)(
       mapResponse:             ResponseMappingF[F, ResultType]
   )(implicit
       maybeAccessToken: Option[AccessToken]
@@ -27,7 +26,7 @@ trait GitLabClient[F[_]] {
 }
 
 final class GitLabClientImpl[F[_]: Async: Logger](
-    gitLabApiUrl:           GitLabApiUrl, // TODO: figure out why this isn't using api/v4 ???
+    gitLabApiUrl:           GitLabApiUrl,
     apiCallRecorder:        GitLabApiCallRecorder[F],
     gitLabThrottler:        Throttler[F, GitLab],
     retryInterval:          FiniteDuration = RestClient.SleepAfterConnectionIssue,
@@ -41,12 +40,12 @@ final class GitLabClientImpl[F[_]: Async: Logger](
     )
     with GitLabClient[F] {
 
-  def send[ResultType](method: Method, uriWithoutBase: Uri, endpointName: String Refined NonEmpty)(
+  def send[ResultType](method: Method, path: Uri, endpointName: String Refined NonEmpty)(
       mapResponse:             ResponseMapping[ResultType]
   )(implicit
       maybeAccessToken: Option[AccessToken]
   ): F[ResultType] = for {
-    uri     <- MonadThrow[F].fromEither(Uri.fromString(gitLabApiUrl.show).map(_.resolve(uriWithoutBase)))
+    uri     <- validateUri(show"$gitLabApiUrl/$path")
     request <- request(method, uri, maybeAccessToken, endpointName)
     result  <- super.send(request)(mapResponse)
   } yield result
