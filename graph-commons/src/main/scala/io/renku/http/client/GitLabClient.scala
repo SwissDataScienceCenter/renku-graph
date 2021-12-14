@@ -27,7 +27,7 @@ trait GitLabClient[F[_]] {
 }
 
 final class GitLabClientImpl[F[_]: Async: Logger](
-    gitLabApiUrl:           GitLabApiUrl,
+    gitLabApiUrl:           GitLabApiUrl, // TODO: figure out why this isn't using api/v4
     apiCallRecorder:        GitLabApiCallRecorder[F],
     gitLabThrottler:        Throttler[F, GitLab],
     retryInterval:          FiniteDuration = RestClient.SleepAfterConnectionIssue,
