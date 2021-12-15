@@ -20,7 +20,7 @@ package io.renku.graph.model.entities
 
 import cats.syntax.all._
 import io.circe.DecodingFailure
-import io.renku.graph.model.Schemas.schema
+import io.renku.graph.model.Schemas.{renku, schema}
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember, entityTypes}
@@ -48,8 +48,8 @@ object ProjectJsonLDDecoder {
         maybeDescription <- maybeDescriptionR
         keywords         <- keywordsR
         allPersons       <- findAllPersons(gitLabInfo)
-        activities       <- findAllActivities(gitLabInfo)
-        datasets         <- findAllDatasets(gitLabInfo)
+        activities       <- cursor.downField(renku / "hasActivity").as[List[Activity]].map(_.sortBy(_.startTime))
+        datasets         <- cursor.downField(renku / "hasDataset").as[List[Dataset[Dataset.Provenance]]]
         resourceId       <- ResourceId(gitLabInfo.path).asRight
         earliestDate = List(dateCreated, gitLabInfo.dateCreated).min
         project <- newProject(gitLabInfo,
@@ -66,37 +66,12 @@ object ProjectJsonLDDecoder {
       } yield project
     }
 
-  private def findAllPersons(gitLabInfo: GitLabProjectInfo)(implicit cursor: Cursor) = cursor.top
-    .map(_.cursor.as[List[Person]])
-    .sequence
-    .map(_ getOrElse Nil)
+  private def findAllPersons(gitLabInfo: GitLabProjectInfo)(implicit cursor: Cursor) = cursor.focusTop
+    .as[List[Person]]
     .map(_.toSet)
     .leftMap(failure =>
       DecodingFailure(
         s"Finding Person entities for project ${gitLabInfo.path} failed: ${failure.getMessage()}",
-        Nil
-      )
-    )
-
-  private def findAllActivities(gitLabInfo: GitLabProjectInfo)(implicit cursor: Cursor) = cursor.top
-    .map(_.cursor.as[List[Activity]])
-    .sequence
-    .map(_ getOrElse Nil)
-    .map(_.sortBy(_.startTime))
-    .leftMap(failure =>
-      DecodingFailure(
-        s"Finding Activity entities for project ${gitLabInfo.path} failed: ${failure.getMessage()}",
-        Nil
-      )
-    )
-
-  private def findAllDatasets(gitLabInfo: GitLabProjectInfo)(implicit cursor: Cursor) = cursor.top
-    .map(_.cursor.as[List[Dataset[Dataset.Provenance]]])
-    .sequence
-    .map(_ getOrElse Nil)
-    .leftMap(failure =>
-      DecodingFailure(
-        s"Finding Dataset entities for project ${gitLabInfo.path} failed: ${failure.getMessage()}",
         Nil
       )
     )
