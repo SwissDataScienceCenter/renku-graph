@@ -167,6 +167,7 @@ private object Commands {
       "SSL_ERROR_SYSCALL",
       "the remote end hung up unexpectedly",
       "The requested URL returned error: 502",
+      "The requested URL returned error: 504",
       "Error in the HTTP2 framing layer",
       "HTTP/2 stream 3 was not closed cleanly before end of the underlying stream",
       "Could not resolve host:",
