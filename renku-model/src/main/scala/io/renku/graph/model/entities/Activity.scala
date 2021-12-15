@@ -116,10 +116,8 @@ object Activity {
     import io.renku.jsonld.JsonLDDecoder.decodeList
 
     for {
-      resourceId <- cursor.downEntityId.as[ResourceId]
-      generations <- cursor.top
-                       .map(_.cursor.as(decodeList(Generation.decoder(resourceId))))
-                       .getOrElse(Right(List.empty[Generation]))
+      resourceId    <- cursor.downEntityId.as[ResourceId]
+      generations   <- cursor.focusTop.as(decodeList(Generation.decoder(resourceId)))
       startedAtTime <- cursor.downField(prov / "startedAtTime").as[StartTime]
       endedAtTime   <- cursor.downField(prov / "endedAtTime").as[EndTime]
       agent <- cursor.downField(prov / "wasAssociatedWith").as[List[Agent]] >>= {

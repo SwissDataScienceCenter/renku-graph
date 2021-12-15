@@ -39,7 +39,7 @@ object Agent {
     )
   }
 
-  implicit lazy val decoder: JsonLDDecoder[Agent] = JsonLDDecoder.entity(entityTypes) { cursor =>
+  implicit lazy val decoder: JsonLDDecoder[Agent] = JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
     for {
       resourceId <- cursor.downEntityId.as[ResourceId]
       label      <- cursor.downField(schema / "name").as[Name]

@@ -21,5 +21,6 @@ name := "generators"
 
 libraryDependencies += "eu.timepit"     %% "refined"    % "0.9.27"
 libraryDependencies += "io.circe"       %% "circe-core" % "0.14.1"
+libraryDependencies += "io.renku"       %% "jsonld4s"   % "0.1.28"
 libraryDependencies += "org.typelevel"  %% "cats-core"  % "2.6.1"
 libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.14.3" // version 1.15.1 is broken
