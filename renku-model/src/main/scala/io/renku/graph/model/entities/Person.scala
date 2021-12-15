@@ -147,7 +147,7 @@ object Person {
       )
   }
 
-  implicit lazy val decoder: JsonLDDecoder[Person] = JsonLDDecoder.entity(entityTypes) { cursor =>
+  implicit lazy val decoder: JsonLDDecoder[Person] = JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
     import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders._
     for {
       resourceId       <- cursor.downEntityId.as[ResourceId]

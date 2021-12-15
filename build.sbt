@@ -9,8 +9,6 @@ releaseVersionBump := sbtrelease.Version.Bump.Minor
 releaseIgnoreUntrackedFiles := true
 releaseTagName := (ThisBuild / version).value
 
-lazy val jsonLD = "io.renku" %% "jsonld4s" % "0.1.27"
-
 lazy val root = Project(
   id = "renku-graph",
   base = file(".")
@@ -34,8 +32,7 @@ lazy val generators = Project(
   id = "generators",
   base = file("generators")
 ).settings(
-  commonSettings,
-  libraryDependencies += jsonLD
+  commonSettings
 ).enablePlugins(
   AutomateHeaderPlugin
 )
@@ -55,9 +52,7 @@ lazy val renkuModel = Project(
   id = "renku-model",
   base = file("renku-model")
 ).settings(
-  commonSettings,
-  libraryDependencies += jsonLD,
-  libraryDependencies += jsonLD % Test
+  commonSettings
 ).dependsOn(
   tinyTypes % "compile->compile",
   tinyTypes % "test->test"
@@ -69,8 +64,7 @@ lazy val graphCommons = Project(
   id = "graph-commons",
   base = file("graph-commons")
 ).settings(
-  commonSettings,
-  libraryDependencies += jsonLD
+  commonSettings
 ).dependsOn(
   renkuModel % "compile->compile",
   renkuModel % "test->test"
