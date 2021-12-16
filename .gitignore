@@ -103,6 +103,10 @@ project/plugins/project/
 .lib/
 .bsp/
 
+### Metals ###
+
+project/project
+
 ### Scala ###
 *.class
 *.log

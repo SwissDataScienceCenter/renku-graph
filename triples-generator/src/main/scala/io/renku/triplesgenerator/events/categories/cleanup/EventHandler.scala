@@ -29,6 +29,7 @@ import io.renku.events.{EventRequestContent, consumers}
 import io.renku.graph.model.events.CategoryName
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
+import cats.effect.kernel.Deferred
 
 private[events] class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
     override val categoryName:  CategoryName,
@@ -37,17 +38,19 @@ private[events] class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
     subscriptionMechanism:      SubscriptionMechanism[F],
     concurrentProcessesLimiter: ConcurrentProcessesLimiter[F]
 ) extends consumers.EventHandlerWithProcessLimiter[F](concurrentProcessesLimiter) {
-  println(subscriptionMechanism.toString) // TODO remove
   import eventBodyDeserializer.toCleanUpEvent
 
   override def createHandlingProcess(
       requestContent: EventRequestContent
-  ): F[EventHandlingProcess[F]] = EventHandlingProcess[F](startCleanUp(requestContent))
+  ): F[EventHandlingProcess[F]] = EventHandlingProcess.withWaitingForCompletion[F](
+    deferred => startCleanUp(requestContent, deferred),
+    subscriptionMechanism.renewSubscription()
+  )
 
-  private def startCleanUp(requestContent: EventRequestContent) = for {
+  private def startCleanUp(requestContent: EventRequestContent, deferred: Deferred[F, Unit]) = for {
     cleanupEvent <- toCleanUpEvent(requestContent.event).toRightT(recoverTo = BadRequest)
     result <- Spawn[F]
-                .start(eventProcessor.process(cleanupEvent.project))
+                .start(eventProcessor.process(cleanupEvent.project) >> deferred.complete(()))
                 .toRightT
                 .map(_ => Accepted)
                 .semiflatTap(Logger[F].log(cleanupEvent))

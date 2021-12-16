@@ -50,6 +50,9 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with IOSpec with sho
 
         val eventJson: Json = project.asJson(eventEncoder)
         (eventBodyDeserializer.toCleanUpEvent _).expects(eventJson).returns(CleanUpEvent(project).pure[IO])
+
+        (subscriptionMechanism.renewSubscription _).expects().returns(().pure[IO])
+
         val request = requestContent(eventJson)
 
         handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Right(Accepted)
@@ -72,6 +75,9 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with IOSpec with sho
       val request   = requestContent(eventJson)
       val exception = exceptions.generateOne
       (eventBodyDeserializer.toCleanUpEvent _).expects(eventJson).returns(exception.raiseError[IO, CleanUpEvent])
+
+      (subscriptionMechanism.renewSubscription _).expects().returns(().pure[IO])
+
       handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Left(BadRequest)
 
       logger.expectNoLogs()

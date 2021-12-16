@@ -59,8 +59,8 @@ private class SubscriptionMechanismImpl[F[_]: MonadThrow: Temporal: Logger](
       _                   <- postToEventLog(subscriptionPayload)
     } yield ()
   } recoverWith { case NonFatal(exception) =>
-    Logger[F].error(exception)(s"$categoryName: Problem with notifying event-log")
-    exception.raiseError[F, Unit]
+    Logger[F].error(exception)(s"$categoryName: Problem with notifying event-log") >>
+      exception.raiseError[F, Unit]
   }
 
   override def run(): F[Unit] =
