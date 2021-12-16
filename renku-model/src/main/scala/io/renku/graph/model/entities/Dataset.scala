@@ -440,17 +440,13 @@ object Dataset {
     }
   }
 
-  implicit lazy val decoder: JsonLDDecoder[Dataset[Provenance]] = JsonLDDecoder.entity(entityTypes) { cursor =>
+  implicit lazy val decoder: JsonLDDecoder[Dataset[Provenance]] = JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
     for {
-      identification <- cursor.as[Identification]
-      provenance     <- cursor.as[Provenance](Provenance.decoder(identification))
-      additionalInfo <- cursor.as[AdditionalInfo]
-      parts          <- cursor.downField(schema / "hasPart").as[List[DatasetPart]]
-      publicationEvents <-
-        cursor.top
-          .map(_.cursor.as(decodeList(PublicationEvent.decoder(identification.resourceId))))
-          .sequence
-          .map(_ getOrElse Nil)
+      identification    <- cursor.as[Identification]
+      provenance        <- cursor.as[Provenance](Provenance.decoder(identification))
+      additionalInfo    <- cursor.as[AdditionalInfo]
+      parts             <- cursor.downField(schema / "hasPart").as[List[DatasetPart]]
+      publicationEvents <- cursor.focusTop.as(decodeList(PublicationEvent.decoder(identification.resourceId)))
       dataset <-
         Dataset
           .from(identification, provenance, additionalInfo, parts, publicationEvents)

@@ -77,8 +77,8 @@ object Entity {
     }
   }
 
-  implicit lazy val entityDecoder: JsonLDDecoder[Entity] =
-    JsonLDDecoder.entity(fileEntityTypes, withStrictEntityTypes) { cursor =>
+  implicit lazy val decoder: JsonLDDecoder[Entity] =
+    JsonLDDecoder.cacheableEntity(fileEntityTypes, withStrictEntityTypes) { cursor =>
       for {
         resourceId         <- cursor.downEntityId.as[ResourceId]
         entityTypes        <- cursor.getEntityTypes
