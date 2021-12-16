@@ -51,13 +51,13 @@ private class EventsSenderImpl[F[_]: Async: Logger, CategoryEvent](
   import org.http4s.Status._
   import org.http4s.{Request, Response, Status}
 
-  def sendEvent(subscriberUrl: SubscriberUrl, categoryEvent: CategoryEvent): F[SendingResult] = {
+  override def sendEvent(subscriberUrl: SubscriberUrl, event: CategoryEvent): F[SendingResult] = {
     for {
       uri <- validateUri(subscriberUrl.value)
       sendingResult <-
-        send(request(POST, uri).withParts(categoryEventEncoder.encodeParts(categoryEvent)))(mapResponse)
+        send(request(POST, uri).withParts(categoryEventEncoder.encodeParts(event)))(mapResponse)
     } yield sendingResult
-  } recoverWith exceptionToSendingResult
+  } recoverWith exceptionToSendingResult(subscriberUrl, event)
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[SendingResult]] = {
     case (Accepted, _, _)           => Delivered.pure[F].widen[SendingResult]
@@ -67,10 +67,12 @@ private class EventsSenderImpl[F[_]: Async: Logger, CategoryEvent](
     case (BadGateway, _, _)         => TemporarilyUnavailable.pure[F].widen[SendingResult] // to mitigate k8s problems
   }
 
-  private lazy val exceptionToSendingResult: PartialFunction[Throwable, F[SendingResult]] = {
+  private def exceptionToSendingResult(subscriberUrl: SubscriberUrl,
+                                       event:         CategoryEvent
+  ): PartialFunction[Throwable, F[SendingResult]] = {
     case _:         ConnectivityException => Misdelivered.pure[F].widen[SendingResult]
     case exception: ClientException =>
-      Logger[F].error(exception)(show"$categoryName: sending event failed") >> TemporarilyUnavailable
+      Logger[F].error(exception)(s"$categoryName: sending $event to $subscriberUrl failed") >> TemporarilyUnavailable
         .pure[F]
         .widen[SendingResult]
   }

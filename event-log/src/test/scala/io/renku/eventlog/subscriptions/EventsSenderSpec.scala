@@ -124,7 +124,7 @@ class EventsSenderSpec
 
       logger.getMessages(Error).map {
         case MessageAndThrowable(message, cause) =>
-          message shouldBe s"$categoryName: sending event failed"
+          message shouldBe s"$categoryName: sending $event to $subscriberUrl failed"
           cause   shouldBe a[ClientException]
         case other => fail(s"Did not expect log statement: $other")
       }
