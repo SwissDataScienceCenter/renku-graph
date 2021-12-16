@@ -118,8 +118,6 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
         .unsafeRunSync() shouldBe expectation
     }
 
-    /////////////////// ResponseMapper tests
-
     "fetch commits from the given page - responseMapping OK" in new TestCase {
 
       val maybeNextPage = pages.generateOption
@@ -127,10 +125,10 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
       multiCommitResponseMapping
         .value(
           (Status.Ok,
-           Request[IO](),
-           Response[IO]()
-             .withEntity(commitsJson(commitInfoList))
-             .withHeaders(Header.Raw(ci"X-Next-Page", maybeNextPage.map(_.show).getOrElse("")))
+            Request[IO](),
+            Response[IO]()
+              .withEntity(commitsJson(commitInfoList))
+              .withHeaders(Header.Raw(ci"X-Next-Page", maybeNextPage.map(_.show).getOrElse("")))
           )
         )
         .unsafeRunSync() shouldBe PageResult(commitInfoList.map(_.id), maybeNextPage)
@@ -179,8 +177,6 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
     }
   }
 
-  ///////////// Single commit tesst
-
   "fetchLatestGitLabCommit" should {
 
     "return a single commit" in new TestCase {
@@ -204,8 +200,6 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
 
     }
 
-    /////////////////// Single commit response mapper
-
     "fetch the latest commit from the given page - responseMapping OK" in new TestCase {
 
       val maybeNextPage = pages.generateOption
@@ -213,10 +207,10 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
       singleCommitResponseMapping
         .value(
           (Status.Ok,
-           Request[IO](),
-           Response[IO]()
-             .withEntity(commitsJson(commitInfoList))
-             .withHeaders(Header.Raw(ci"X-Next-Page", maybeNextPage.map(_.show).getOrElse("")))
+            Request[IO](),
+            Response[IO]()
+              .withEntity(commitsJson(commitInfoList))
+              .withHeaders(Header.Raw(ci"X-Next-Page", maybeNextPage.map(_.show).getOrElse("")))
           )
         )
         .unsafeRunSync() shouldBe Some(commitInfoList.head.id)
@@ -268,8 +262,8 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
 
   private trait TestCase {
     implicit val maybeAccessToken: Option[AccessToken] = personalAccessTokens.generateSome
-    val projectId      = projectIds.generateOne
-    val pageRequest    = pagingRequests.generateOne
+    val projectId = projectIds.generateOne
+    val pageRequest = pagingRequests.generateOne
     val commitInfoList = commitInfos.generateNonEmptyList().toList
 
     val gitLabClient = mock[GitLabClient[IO]]
@@ -277,7 +271,7 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
     val gitLabCommitFetcher = new GitLabCommitFetcherImpl[IO](gitLabClient)
 
     val uri = uri"/projects" / projectId.show / "repository" / "commits" withQueryParams Map(
-      "page"     -> pageRequest.page.show,
+      "page" -> pageRequest.page.show,
       "per_page" -> pageRequest.perPage.show
     )
 
@@ -315,14 +309,15 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
   }
 
   private def pageResults(maxCommitCount: Int Refined Positive = positiveInts().generateOne) = for {
-    commits       <- commitIds.toGeneratorOfList(0, maxCommitCount)
+    commits <- commitIds.toGeneratorOfList(0, maxCommitCount)
     maybeNextPage <- pages.toGeneratorOfOptions
   } yield PageResult(commits, maybeNextPage)
 
   private def commitsJson(from: List[CommitInfo]) =
     Json.arr(from.map(commitJson): _*).noSpaces
 
-  private def commitJson(commitInfo: CommitInfo) = json"""{
+  private def commitJson(commitInfo: CommitInfo) =
+    json"""{
     "id":              ${commitInfo.id.value},
     "author_name":     ${commitInfo.author.name.value},
     "author_email":    ${commitInfo.author.emailToJson},
