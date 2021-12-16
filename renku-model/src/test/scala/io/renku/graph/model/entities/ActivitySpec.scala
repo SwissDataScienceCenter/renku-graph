@@ -78,8 +78,8 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
         .cursor
         .as[List[entities.Activity]]
 
-      error              shouldBe a[DecodingFailure]
-      error.getMessage() shouldBe s"No Usage found for CommandInputValue with $location"
+      error            shouldBe a[DecodingFailure]
+      error.getMessage() should endWith(s"No Usage found for CommandInputValue with $location")
     }
 
     "fail if there are Output Parameter Values for non-existing Generation Entities" in {
@@ -112,8 +112,8 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
         .cursor
         .as[List[entities.Activity]]
 
-      error              shouldBe a[DecodingFailure]
-      error.getMessage() shouldBe s"No Generation found for CommandOutputValue with $location"
+      error            shouldBe a[DecodingFailure]
+      error.getMessage() should endWith(s"No Generation found for CommandOutputValue with $location")
     }
 
     "fail if there is no Agent entity" in {
@@ -142,8 +142,8 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
         .cursor
         .as[List[entities.Activity]]
 
-      error         shouldBe a[DecodingFailure]
-      error.message shouldBe s"Activity ${activity.resourceId} without or with multiple agents"
+      error       shouldBe a[DecodingFailure]
+      error.message should endWith(s"Activity ${activity.resourceId} without or with multiple agents")
     }
 
     "fail if there is no Author entity" in {
@@ -172,8 +172,8 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
         .cursor
         .as[List[entities.Activity]]
 
-      error         shouldBe a[DecodingFailure]
-      error.message shouldBe s"Activity ${activity.resourceId} without or with multiple authors"
+      error       shouldBe a[DecodingFailure]
+      error.message should endWith(s"Activity ${activity.resourceId} without or with multiple authors")
     }
   }
 }
