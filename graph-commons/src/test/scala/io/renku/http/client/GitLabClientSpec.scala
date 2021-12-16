@@ -1,8 +1,8 @@
 package io.renku.http.client
 
 import cats.effect.IO
-import cats.syntax.all._
 import cats.implicits.{catsSyntaxApplicativeErrorId, toShow}
+import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.MappingBuilder
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.renku.control.Throttler
@@ -10,22 +10,16 @@ import io.renku.generators.CommonGraphGenerators.{oauthAccessTokens, pages, pers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GitLabUrl
-import io.renku.graph.model.entities._
-import Person.decoder
-import io.renku.graph.model.events.CommitId
-import io.renku.http.client.RestClientError.{UnauthorizedException, UnexpectedResponseException}
+import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.metrics.GitLabApiCallRecorder
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
-import org.http4s.Method._
-import org.http4s.Status.InternalServerError
-import org.http4s.{Method, Request, Response, Status, Uri}
-import org.http4s.Method.GET
+import org.http4s.Method.{GET, _}
 import org.http4s.Status.{NotFound, Ok, Unauthorized}
-import org.http4s._
-import org.http4s.circe.jsonOf
+import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
+import org.http4s.{Method, Request, Response, Status, Uri}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -111,52 +105,57 @@ class GitLabClientSpec
 
     "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
       stubFor {
-        callMethod(method, s"api/v4/$path")
+        callMethod(method, s"/api/v4/$path")
           .willReturn(
             unauthorized()
           )
       }
 
+      private implicit lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[Int]]] = {
+        case (Ok, _, response)    => response.as[List[Int]].map(_.headOption)
+        case (NotFound, _, _)     => Option.empty[Int].pure[IO]
+        case (Unauthorized, _, _) => UnauthorizedException.raiseError[IO, Option[Int]]
+      }
+
       intercept[Exception] {
-        client.send(method, path, endpointName)(_ => UnauthorizedException.raiseError[IO, Unit]).unsafeRunSync()
+        client.send(method, path, endpointName)(mapResponse).unsafeRunSync()
       } shouldBe UnauthorizedException
     }
 
     "return an Exception if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
       stubFor {
-        callMethod(method, s"api/v4/$path")
+        callMethod(method, s"/api/v4/$path")
           .willReturn(
             badRequest()
           )
       }
 
-      intercept[Exception] {
-        client
-          .send(method, path, endpointName)(_ =>
-            UnexpectedResponseException(InternalServerError, "Unexpected response").raiseError[IO, Unit]
-          )
-          .unsafeRunSync()
+      private implicit lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[Int]]] = {
+        case (Ok, _, response)    => response.as[List[Int]].map(_.headOption)
+        case (NotFound, _, _)     => Option.empty[Int].pure[IO]
+        case (Unauthorized, _, _) => UnauthorizedException.raiseError[IO, Option[Int]]
       }
+
+      intercept[Exception](client.send(method, path, endpointName)(mapResponse).unsafeRunSync())
     }
 
     "return an Exception if remote client responds with unexpected body" in new TestCase {
-      val stub = stubFor {
+      stubFor {
         callMethod(method, s"/api/v4/$path")
           .willReturn(okJson("{}"))
       }
 
-      private implicit lazy val mapSingleCommitResponse
-          : PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[CommitId]]] = {
-        case (Ok, _, response)    => response.as[List[Project]].map(_.headOption)
-        case (NotFound, _, _)     => Option.empty[CommitId].pure[IO]
-        case (Unauthorized, _, _) => UnauthorizedException.raiseError
+      private implicit lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[Int]]] = {
+        case (Ok, _, response)    => response.as[List[Int]].map(_.headOption)
+        case (NotFound, _, _)     => Option.empty[Int].pure[IO]
+        case (Unauthorized, _, _) => UnauthorizedException.raiseError[IO, Option[Int]]
       }
 
       intercept[Exception] {
-        client
-          .send(method, path, endpointName) {}
-          .unsafeRunSync()
-      }.getMessage should startWith(s"$method $gitLabApiUrl/$path returned 200 OK; error: Unexpected body")
+        client.send(method, path, endpointName)(mapResponse).unsafeRunSync()
+      }.getMessage should startWith(
+        s"$method $gitLabApiUrl/$path returned 200 OK; error: Invalid message body: Could not decode JSON: {}; C[A]"
+      )
     }
   }
 
