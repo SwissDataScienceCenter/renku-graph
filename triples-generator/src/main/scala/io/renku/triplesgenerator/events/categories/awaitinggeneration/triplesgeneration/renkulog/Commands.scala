@@ -167,6 +167,7 @@ private object Commands {
       "SSL_ERROR_SYSCALL",
       "the remote end hung up unexpectedly",
       "The requested URL returned error: 502",
+      "The requested URL returned error: 503",
       "The requested URL returned error: 504",
       "Error in the HTTP2 framing layer",
       "HTTP/2 stream 3 was not closed cleanly before end of the underlying stream",
@@ -177,7 +178,7 @@ private object Commands {
       case ShelloutException(result) =>
         def errorMessage(message: String) = s"git clone failed with: $message"
 
-        MonadThrow[F].catchNonFatal(result.out.string) flatMap {
+        MonadThrow[F].catchNonFatal(result.toString()) flatMap {
           case out if recoverableErrors exists out.contains =>
             GenerationRecoverableError(errorMessage(result.toString())).asLeft[Unit].pure[F]
           case _ =>
