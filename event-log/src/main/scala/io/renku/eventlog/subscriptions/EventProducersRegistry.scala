@@ -86,6 +86,7 @@ object EventProducersRegistry {
                                                                       queriesExecTimes,
                                                                       subscriberTracker
                                 )
+    cleanUpEventCategory <- cleanup.SubscriptionCategory(subscriberTracker, queriesExecTimes)
     zombieEventsCategory <- zombieevents.SubscriptionCategory(sessionResource, queriesExecTimes, subscriberTracker)
   } yield new EventProducersRegistryImpl(
     Set[SubscriptionCategory[F]](
@@ -94,6 +95,7 @@ object EventProducersRegistry {
       commitSyncCategory,
       globalCommitSyncCategory,
       triplesGeneratedCategory,
+      cleanUpEventCategory,
       zombieEventsCategory
     )
   )
