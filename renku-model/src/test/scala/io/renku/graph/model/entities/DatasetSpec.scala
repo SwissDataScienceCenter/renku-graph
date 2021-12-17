@@ -155,8 +155,8 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
 
       errors.isInvalid shouldBe true
       errors.swap.fold(_ => fail("Errors expected"), identity) shouldBe NonEmptyList.one {
-        s"PublishingEvent ${otherDatasetPublicationEvent.resourceId} " +
-          s"refers to ${otherDatasetPublicationEvent.about} which is not ${dataset.resourceId}"
+        s"PublicationEvent ${otherDatasetPublicationEvent.resourceId} refers to ${otherDatasetPublicationEvent.about} " +
+          s"that points to ${otherDatasetPublicationEvent.datasetResourceId} but should be pointing to ${dataset.resourceId}"
       }
     }
   }
