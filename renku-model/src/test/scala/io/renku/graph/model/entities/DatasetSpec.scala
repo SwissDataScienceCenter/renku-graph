@@ -69,8 +69,10 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           .as[List[entities.Dataset[entities.Dataset.Provenance]]]
 
         error shouldBe a[DecodingFailure]
-        error.getMessage shouldBe s"Dataset ${invalidDataset.identification.identifier} " +
-          s"Part ${invalidPart.entity.location} startTime ${invalidPart.dateCreated} is older than Dataset ${invalidDataset.provenance.date.instant}"
+        error.getMessage should endWith(
+          s"Dataset ${invalidDataset.identification.identifier} " +
+            s"Part ${invalidPart.entity.location} startTime ${invalidPart.dateCreated} is older than Dataset ${invalidDataset.provenance.date.instant}"
+        )
       }
     }
 
@@ -107,8 +109,10 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         .as[List[entities.Dataset[entities.Dataset.Provenance]]]
 
       error shouldBe a[DecodingFailure]
-      error.getMessage shouldBe s"Dataset ${invalidatedDataset.identification.identifier} " +
-        s"invalidationTime $invalidationTime is older than Dataset ${invalidatedDataset.provenance.date}"
+      error.getMessage should endWith(
+        s"Dataset ${invalidatedDataset.identification.identifier} " +
+          s"invalidationTime $invalidationTime is older than Dataset ${invalidatedDataset.provenance.date}"
+      )
     }
 
     "skip publicationEvents that do not belong to a different dataset" in {

@@ -35,7 +35,6 @@ import io.renku.graph.model.testentities._
 import io.renku.http.client.AccessToken
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 import io.renku.http.server.EndpointTester.{JsonOps, jsonEntityDecoder}
-import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
@@ -54,16 +53,15 @@ class ProjectsResourcesSpec
   private val user = authUsers.generateOne
   private implicit val accessToken: AccessToken = user.accessToken
 
-  private val (dataset, parentProject, project) = {
+  private val (parentProject, project) = {
     val creator = personEntities(withGitLabId, withEmail).generateOne
-    val (parent, child) = projectEntities(visibilityPublic).generateOne
+    val (parent, child) = projectEntities(visibilityPublic)
+      .withDatasets(datasetEntities(provenanceInternal))
+      .generateOne
       .copy(maybeCreator = creator.some, members = personEntities(withGitLabId).generateFixedSizeSet() + creator)
       .forkOnce()
 
-    val (dataset, parentWithDataset) = parent.addDataset(datasetEntities(provenanceInternal))
-
-    (dataset,
-     dataProjects(parentWithDataset).generateOne,
+    (dataProjects(parent).generateOne,
      dataProjects(
        child.copy(visibility = visibilityNonPublic.generateOne,
                   members = child.members + personEntities.generateOne.copy(maybeGitLabId = user.id.some)
@@ -84,7 +82,7 @@ class ProjectsResourcesSpec
       `data in the RDF store`(parentProject, parentProject.entitiesProject.asJsonLD)
       `wait for events to be processed`(parentProject.id)
 
-      `data in the RDF store`(project, JsonLD.arr(dataset.asJsonLD, project.entitiesProject.asJsonLD))
+      `data in the RDF store`(project, project.entitiesProject.asJsonLD)
       `wait for events to be processed`(project.id)
 
       When("user fetches project's details with GET knowledge-graph/projects/<namespace>/<name>")
@@ -107,7 +105,7 @@ class ProjectsResourcesSpec
       Then("he should get OK response with the projects datasets")
       datasetsResponse._1 shouldBe Ok
       val Right(foundDatasets) = datasetsResponse._2.as[List[Json]]
-      foundDatasets should contain theSameElementsAs List(briefJson(dataset, project.path))
+      foundDatasets should contain theSameElementsAs project.entitiesProject.datasets.map(briefJson(_, project.path))
 
       When("there's an authenticated user who is not project member")
       val nonMemberAccessToken = accessTokens.generateOne
