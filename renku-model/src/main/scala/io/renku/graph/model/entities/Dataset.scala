@@ -92,9 +92,10 @@ object Dataset {
       identification:   Identification
   ): ValidatedNel[String, Unit] = publishingEvents
     .map {
-      case event if event.about == identification.resourceId => ().validNel[String]
+      case event if event.datasetResourceId == identification.resourceId => ().validNel[String]
       case event =>
-        s"PublishingEvent ${event.resourceId} refers to ${event.about} which is not ${identification.resourceId}".invalidNel
+        (show"PublicationEvent ${event.resourceId} refers to ${event.about} " +
+          show"that points to ${event.datasetResourceId} but should be pointing to ${identification.resourceId}").invalidNel
     }
     .sequence
     .void
@@ -446,7 +447,7 @@ object Dataset {
       provenance        <- cursor.as[Provenance](Provenance.decoder(identification))
       additionalInfo    <- cursor.as[AdditionalInfo]
       parts             <- cursor.downField(schema / "hasPart").as[List[DatasetPart]]
-      publicationEvents <- cursor.focusTop.as(decodeList(PublicationEvent.decoder(identification.resourceId)))
+      publicationEvents <- cursor.focusTop.as(decodeList(PublicationEvent.decoder(identification)))
       dataset <-
         Dataset
           .from(identification, provenance, additionalInfo, parts, publicationEvents)

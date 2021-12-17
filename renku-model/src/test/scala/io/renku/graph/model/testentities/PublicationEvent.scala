@@ -39,6 +39,7 @@ object PublicationEvent {
   ): PublicationEvent => entities.PublicationEvent = publicationEvent =>
     entities.PublicationEvent(
       publicationEvents.ResourceId(publicationEvent.asEntityId.show),
+      About((renkuBaseUrl / "urls" / "datasets" / publicationEvent.dataset.identifier).show),
       datasets.ResourceId(publicationEvent.dataset.asEntityId.show),
       publicationEvent.maybeDescription,
       publicationEvent.name,
