@@ -23,7 +23,6 @@ import eu.timepit.refined.auto._
 import io.circe.DecodingFailure
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.generators.jsonld.JsonLDGenerators.entityIds
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.graph.model._
@@ -195,7 +194,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         .as(decodeList(entities.Project.decoder(projectInfo)))
 
       error            shouldBe a[DecodingFailure]
-      error.getMessage() should startWith(s"Finding Person entities for project ${projectInfo.path} failed: ")
+      error.getMessage() should include(s"Finding Person entities for project ${projectInfo.path} failed: ")
     }
 
     "return a DecodingFailure when there's an Activity entity that cannot be decoded" in {
@@ -208,19 +207,20 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         projectInfo.maybeDescription,
         projectInfo.keywords,
         projectInfo.dateCreated,
-        activities = Nil,
+        activities = activityEntities(planEntities())
+          .withDateBefore(projectInfo.dateCreated)
+          .generateFixedSizeList(1)
+          .map(_.to[entities.Activity]),
         datasets = Nil
       )
 
-      val Left(error) = JsonLD
-        .arr(jsonLD, JsonLD.entity(entityIds.generateOne, entities.Activity.entityTypes, Map.empty[Property, JsonLD]))
-        .flatten
+      val Left(error) = jsonLD.flatten
         .fold(throw _, identity)
         .cursor
         .as(decodeList(entities.Project.decoder(projectInfo)))
 
       error            shouldBe a[DecodingFailure]
-      error.getMessage() should startWith(s"Finding Activity entities for project ${projectInfo.path} failed: ")
+      error.getMessage() should (include("Activity") and include("is older than project"))
     }
 
     "return a DecodingFailure when there's a Dataset entity that cannot be decoded" in {
@@ -234,18 +234,19 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         projectInfo.keywords,
         projectInfo.dateCreated,
         activities = Nil,
-        datasets = Nil
+        datasets = datasetEntities(provenanceInternal)
+          .withDateBefore(projectInfo.dateCreated)
+          .generateFixedSizeList(1)
+          .map(_.to[entities.Dataset[entities.Dataset.Provenance.Internal]].copy())
       )
 
-      val Left(error) = JsonLD
-        .arr(jsonLD, JsonLD.entity(entityIds.generateOne, entities.Dataset.entityTypes, Map.empty[Property, JsonLD]))
-        .flatten
+      val Left(error) = jsonLD.flatten
         .fold(throw _, identity)
         .cursor
         .as(decodeList(entities.Project.decoder(projectInfo)))
 
       error            shouldBe a[DecodingFailure]
-      error.getMessage() should startWith(s"Finding Dataset entities for project ${projectInfo.path} failed: ")
+      error.getMessage() should (include("Dataset") and include("is older than project"))
     }
 
     "return a DecodingFailure when there's an Activity entity created before project creation" in {
@@ -266,8 +267,10 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       val Left(error) = jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo)))
 
       error shouldBe a[DecodingFailure]
-      error.getMessage() shouldBe s"Activity ${activity.to[entities.Activity].resourceId} " +
-        s"startTime ${activity.startTime} is older than project ${projectInfo.dateCreated}"
+      error.getMessage() should endWith(
+        s"Activity ${activity.to[entities.Activity].resourceId} " +
+          s"startTime ${activity.startTime} is older than project ${projectInfo.dateCreated}"
+      )
     }
 
     "return a DecodingFailure when there's an internal Dataset entity created before project without parent" in {
@@ -288,9 +291,10 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       val Left(error) = jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo)))
 
       error shouldBe a[DecodingFailure]
-      error
-        .getMessage() shouldBe s"Dataset ${dataset.identification.identifier} " +
-        s"date ${dataset.provenance.date} is older than project ${projectInfo.dateCreated}"
+      error.getMessage() should endWith(
+        s"Dataset ${dataset.identification.identifier} " +
+          s"date ${dataset.provenance.date} is older than project ${projectInfo.dateCreated}"
+      )
     }
 
     "decode project when there's an internal or modified Dataset entity created before project with parent" in {
@@ -372,9 +376,10 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       val Left(error) = jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo)))
 
       error shouldBe a[DecodingFailure]
-      error
-        .getMessage() shouldBe s"Dataset ${datesetModified.identification.identifier} " +
-        s"date ${datesetModified.provenance.date} is older than project ${projectInfo.dateCreated}"
+      error.getMessage() should endWith(
+        s"Dataset ${datesetModified.identification.identifier} " +
+          s"date ${datesetModified.provenance.date} is older than project ${projectInfo.dateCreated}"
+      )
     }
 
     "decode project when there's a Dataset (neither internal nor modified) created before project creation" in {
@@ -443,8 +448,9 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         val Left(error) = jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo)))
 
         error shouldBe a[DecodingFailure]
-        error.getMessage() shouldBe
+        error.getMessage() should endWith(
           show"Dataset ${broken.identification.identifier} is derived from non-existing dataset ${broken.provenance.derivedFrom}"
+        )
       }
     }
 
