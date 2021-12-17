@@ -6,7 +6,7 @@ import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.MappingBuilder
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.renku.control.Throttler
-import io.renku.generators.CommonGraphGenerators.{oauthAccessTokens, pages, personalAccessTokens}
+import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GitLabUrl
@@ -47,27 +47,10 @@ class GitLabClientSpec
       client.send(method, path, endpointName)(_ => IO(result)).unsafeRunSync() shouldBe result
     }
 
-    "fetch commits using the given personal access token" in new TestCase {
-      val personalAccessToken = personalAccessTokens.generateOne
-
+    "fetch commits using the given access token" in new TestCase {
       stubFor {
         callMethod(method, s"api/v4/$path")
-          .withAccessToken(personalAccessToken.some)
-          .willReturn(
-            okJson(result)
-              .withHeader("X-Next-Page", maybeNextPage.map(_.show).getOrElse(""))
-          )
-      }
-
-      client.send(method, path, endpointName)(_ => IO(result)).unsafeRunSync() shouldBe result
-    }
-
-    "fetch commits using the given oauth token" in new TestCase {
-      val authAccessToken = oauthAccessTokens.generateOne
-
-      stubFor {
-        callMethod(method, s"api/v4/$path")
-          .withHeader("PRIVATE-TOKEN", equalTo(authAccessToken.value))
+          .withAccessToken(accessTokens.generateOne.some)
           .willReturn(
             okJson(result)
               .withHeader("X-Next-Page", maybeNextPage.map(_.show).getOrElse(""))
@@ -111,7 +94,7 @@ class GitLabClientSpec
           )
       }
 
-      intercept[Exception] {
+      intercept[UnauthorizedException] {
         client.send(method, path, endpointName)(mapResponse).unsafeRunSync()
       } shouldBe UnauthorizedException
     }
