@@ -111,12 +111,6 @@ class GitLabClientSpec
           )
       }
 
-      private implicit lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[Int]]] = {
-        case (Ok, _, response)    => response.as[List[Int]].map(_.headOption)
-        case (NotFound, _, _)     => Option.empty[Int].pure[IO]
-        case (Unauthorized, _, _) => UnauthorizedException.raiseError[IO, Option[Int]]
-      }
-
       intercept[Exception] {
         client.send(method, path, endpointName)(mapResponse).unsafeRunSync()
       } shouldBe UnauthorizedException
@@ -130,12 +124,6 @@ class GitLabClientSpec
           )
       }
 
-      private implicit lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[Int]]] = {
-        case (Ok, _, response)    => response.as[List[Int]].map(_.headOption)
-        case (NotFound, _, _)     => Option.empty[Int].pure[IO]
-        case (Unauthorized, _, _) => UnauthorizedException.raiseError[IO, Option[Int]]
-      }
-
       intercept[Exception](client.send(method, path, endpointName)(mapResponse).unsafeRunSync())
     }
 
@@ -143,12 +131,6 @@ class GitLabClientSpec
       stubFor {
         callMethod(method, s"/api/v4/$path")
           .willReturn(okJson("{}"))
-      }
-
-      private implicit lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[Int]]] = {
-        case (Ok, _, response)    => response.as[List[Int]].map(_.headOption)
-        case (NotFound, _, _)     => Option.empty[Int].pure[IO]
-        case (Unauthorized, _, _) => UnauthorizedException.raiseError[IO, Option[Int]]
       }
 
       intercept[Exception] {
@@ -175,6 +157,12 @@ class GitLabClientSpec
       .fromString(nonBlankStrings().generateNonEmptyList().toList.mkString("/"))
       .fold(throw _, identity)
       .withQueryParams(queryParams)
+
+    implicit lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[Int]]] = {
+      case (Ok, _, response)    => response.as[List[Int]].map(_.headOption)
+      case (NotFound, _, _)     => Option.empty[Int].pure[IO]
+      case (Unauthorized, _, _) => UnauthorizedException.raiseError[IO, Option[Int]]
+    }
 
     val maybeNextPage = pages.generateOption
 
