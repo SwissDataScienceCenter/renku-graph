@@ -304,11 +304,14 @@ object Dataset {
                                                                                           Option[InitialVersion],
                                                                                           Option[InvalidationTime]
     ) => Result[Provenance] = {
-      case (Some(dateCreated), None, None, None, None, _, None) =>
+      case (Some(dateCreated), None, None, None, None, maybeOriginalId, None)
+          if originalIdEqualCurrentId(maybeOriginalId, identification) =>
         Internal(identification.resourceId, identification.identifier, dateCreated, creators).asRight
-      case (None, Some(datePublished), None, Some(sameAs), None, _, None) =>
+      case (None, Some(datePublished), None, Some(sameAs), None, maybeOriginalId, None)
+          if originalIdEqualCurrentId(maybeOriginalId, identification) =>
         ImportedExternal(identification.resourceId, identification.identifier, sameAs, datePublished, creators).asRight
-      case (Some(dateCreated), None, Some(sameAs), None, None, _, None) =>
+      case (Some(dateCreated), None, Some(sameAs), None, None, maybeOriginalId, None)
+          if originalIdEqualCurrentId(maybeOriginalId, identification) =>
         ImportedInternalAncestorInternal(identification.resourceId,
                                          identification.identifier,
                                          sameAs,
@@ -316,7 +319,8 @@ object Dataset {
                                          dateCreated,
                                          creators
         ).asRight
-      case (None, Some(datePublished), Some(sameAs), None, None, _, None) =>
+      case (None, Some(datePublished), Some(sameAs), None, None, maybeOriginalId, None)
+          if originalIdEqualCurrentId(maybeOriginalId, identification) =>
         ImportedInternalAncestorExternal(identification.resourceId,
                                          identification.identifier,
                                          sameAs,
@@ -356,6 +360,11 @@ object Dataset {
 
     private implicit lazy val creatorsOrdering: Ordering[Person] = Ordering.by(_.name.value)
   }
+
+  private def originalIdEqualCurrentId(maybeOriginalIdentifier: Option[InitialVersion],
+                                       identification:          Identification
+  ): Boolean =
+    maybeOriginalIdentifier.isEmpty || maybeOriginalIdentifier.exists(_.value == identification.identifier.value)
 
   final case class AdditionalInfo(
       maybeDescription: Option[Description],
