@@ -58,7 +58,7 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[F[_]: Async](
   override def fetchLatestGitLabCommit(projectId: projects.Id)(implicit
       maybeAccessToken:                           Option[AccessToken]
   ): F[Option[CommitId]] =
-    send(GET, uri"/projects" / projectId.show / "repository" / "commits" withQueryParam ("per_page", "1"), "commits")(
+    send(GET, uri"projects" / projectId.show / "repository" / "commits" withQueryParam ("per_page", "1"), "commits")(
       mapSingleCommitResponse
     )
 
@@ -68,7 +68,7 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[F[_]: Async](
   )(implicit maybeAccessToken: Option[AccessToken]): F[PageResult] =
     send(
       GET,
-      uri"/projects" / projectId.show / "repository" / "commits" withQueryParams (Map(
+      uri"projects" / projectId.show / "repository" / "commits" withQueryParams (Map(
         "page"     -> pageRequest.page.show,
         "per_page" -> pageRequest.perPage.show
       )),
