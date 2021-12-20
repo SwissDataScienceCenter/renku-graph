@@ -32,6 +32,9 @@ object publicationEvents {
       with Url
       with EntityIdJsonLdOps[ResourceId]
 
+  class About private (val value: String) extends AnyVal with StringTinyType
+  implicit object About extends TinyTypeFactory[About](new About(_)) with Url with EntityIdJsonLdOps[About]
+
   final class Description private (val value: String) extends AnyVal with StringTinyType
   implicit object Description
       extends TinyTypeFactory[Description](new Description(_))
