@@ -11,7 +11,7 @@ RUN echo "http://dl-4.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositor
     export PATH="/usr/local/sbt/bin:$PATH" && \
     apk update && apk add --no-cache --virtual .build-dependencies bash wget tar && \
     mkdir -p "/usr/local/sbt" && \
-    wget -qO - --no-check-certificate "https://github.com/sbt/sbt/releases/download/v1.5.6/sbt-1.5.6.tgz" | tar xz -C /usr/local/sbt --strip-components=1 && \
+    wget -qO  "https://github.com/sbt/sbt/releases/download/v1.5.7/sbt-1.5.7.tgz" | tar xz -C /usr/local/sbt --strip-components=1 && \
     sbt "project event-log" stage && \
     apk del .build-dependencies
 
