@@ -5,6 +5,7 @@ import cats.implicits.{catsSyntaxApplicativeErrorId, toShow}
 import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.MappingBuilder
 import com.github.tomakehurst.wiremock.client.WireMock._
+import io.circe.Json
 import io.renku.control.Throttler
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
@@ -37,52 +38,53 @@ class GitLabClientSpec
     "fetch json from a given page" in new TestCase {
 
       stubFor {
-        callMethod(method, s"api/v4/$path")
+        callMethod(method, s"/api/v4/$path")
           .willReturn(
             okJson(result)
               .withHeader("X-Next-Page", maybeNextPage.map(_.show).getOrElse(""))
           )
       }
 
-      client.send(method, path, endpointName)(_ => IO(result)).unsafeRunSync() shouldBe result
+      client.send(method, path, endpointName)(mapResponse).unsafeRunSync().toString() shouldBe result
     }
 
     "fetch commits using the given access token" in new TestCase {
+      implicit val accessToken = accessTokens.generateOne.some
       stubFor {
-        callMethod(method, s"api/v4/$path")
-          .withAccessToken(accessTokens.generateOne.some)
+        callMethod(method, s"/api/v4/$path")
+          .withAccessToken(accessToken)
           .willReturn(
             okJson(result)
               .withHeader("X-Next-Page", maybeNextPage.map(_.show).getOrElse(""))
           )
       }
 
-      client.send(method, path, endpointName)(_ => IO(result)).unsafeRunSync() shouldBe result
+      client.send(method, path, endpointName)(mapResponse).unsafeRunSync().toString() shouldBe result
     }
 
     "Handle empty JSON" in new TestCase {
-      override val result: String = "{}"
+      override val result: String = Json.fromString("{}").toString()
       stubFor {
-        callMethod(method, s"api/v4/$path")
+        callMethod(method, s"/api/v4/$path")
           .willReturn(
             okJson(result)
               .withHeader("X-Next-Page", maybeNextPage.map(_.show).getOrElse(""))
           )
       }
 
-      client.send(method, path, endpointName)(_ => IO(result)).unsafeRunSync() shouldBe result
+      client.send(method, path, endpointName)(mapResponse).unsafeRunSync().toString() shouldBe result
 
     }
 
     "Handle 404 NOT FOUND without throwing" in new TestCase {
       stubFor {
-        callMethod(method, s"api/v4/$path")
+        callMethod(method, s"/api/v4/$path")
           .willReturn(
             notFound()
           )
       }
 
-      client.send(method, path, endpointName)(_ => IO(())).unsafeRunSync() shouldBe ()
+      client.send(method, path, endpointName)(mapResponse).unsafeRunSync().toString() shouldBe "\"Not Found\""
 
     }
 
@@ -113,13 +115,13 @@ class GitLabClientSpec
     "return an Exception if remote client responds with unexpected body" in new TestCase {
       stubFor {
         callMethod(method, s"/api/v4/$path")
-          .willReturn(okJson("{}"))
+          .willReturn(okJson("not json"))
       }
 
       intercept[Exception] {
         client.send(method, path, endpointName)(mapResponse).unsafeRunSync()
       }.getMessage should startWith(
-        s"$method $gitLabApiUrl/$path returned 200 OK; error: Invalid message body: Could not decode JSON: {}; C[A]"
+        s"$method $gitLabApiUrl/$path returned 200 OK; error: Malformed message body: Invalid JSON"
       )
     }
   }
@@ -141,10 +143,10 @@ class GitLabClientSpec
       .fold(throw _, identity)
       .withQueryParams(queryParams)
 
-    implicit lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[Int]]] = {
-      case (Ok, _, response)    => response.as[List[Int]].map(_.headOption)
-      case (NotFound, _, _)     => Option.empty[Int].pure[IO]
-      case (Unauthorized, _, _) => UnauthorizedException.raiseError[IO, Option[Int]]
+    implicit lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Json]] = {
+      case (Ok, _, response)    => response.as[Json]
+      case (NotFound, _, _)     => Json.fromString("Not Found").pure[IO]
+      case (Unauthorized, _, _) => UnauthorizedException.raiseError[IO, Json]
     }
 
     val maybeNextPage = pages.generateOption
