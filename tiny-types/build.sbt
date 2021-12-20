@@ -27,7 +27,7 @@ libraryDependencies += "io.circe" %% "circe-literal" % circeVersion
 libraryDependencies += "io.circe" %% "circe-optics"  % circeVersion
 libraryDependencies += "io.circe" %% "circe-parser"  % circeVersion
 
-libraryDependencies += "io.renku" %% "jsonld4s" % "0.1.28"
+libraryDependencies += "io.renku" %% "jsonld4s" % "0.1.30"
 
 val catsVersion = "2.6.1"
 libraryDependencies += "org.typelevel" %% "cats-core" % catsVersion
