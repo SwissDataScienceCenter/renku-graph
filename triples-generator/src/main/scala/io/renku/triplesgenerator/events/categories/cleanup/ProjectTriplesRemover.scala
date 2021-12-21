@@ -161,7 +161,7 @@ private class ProjectTriplesRemoverImpl[F[_]: Async: Logger](
               prov:qualifiedUsage | renku:hasPlan | renku:hasArguments | renku:hasInputs | renku:hasOutputs |
               renku:parameter | schema:valueReference |  ^prov:activity | ^prov:qualifiedGeneration | prov:agent |
               schema:creator | schema:member | schema:sameAs | prov:wasAssociatedWith | renku:hasDataset | 
-              schema:image |schema:hasPart | prov:entity | ^schema:about)* ?s .
+              schema:image |schema:hasPart | prov:entity | ^schema:url | ^schema:about)* ?s .
 
               OPTIONAL { ?ss (<>|!<>)* ?s.
                          ?ss a schema:Project . 
