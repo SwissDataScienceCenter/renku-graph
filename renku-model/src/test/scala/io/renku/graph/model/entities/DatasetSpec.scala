@@ -20,7 +20,8 @@ package io.renku.graph.model.entities
 
 import cats.data.NonEmptyList
 import cats.syntax.all._
-import io.circe.DecodingFailure
+import io.circe.literal._
+import io.circe.{DecodingFailure, Json}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model.GraphModelGenerators._
@@ -28,7 +29,9 @@ import io.renku.graph.model._
 import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.entities.Dataset.Provenance.{ImportedInternalAncestorExternal, ImportedInternalAncestorInternal}
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
 import io.renku.jsonld.JsonLD
+import io.renku.jsonld.parser._
 import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -48,6 +51,38 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           .as[List[entities.Dataset[entities.Dataset.Provenance]]] shouldBe List(
           dataset.to[entities.Dataset[entities.Dataset.Provenance]]
         ).asRight
+      }
+    }
+
+    forAll {
+      Table(
+        "DS generator"                                              -> "DS type",
+        datasetEntities(provenanceInternal)                         -> "Internal",
+        datasetEntities(provenanceImportedExternal)                 -> "Imported External",
+        datasetEntities(provenanceImportedInternalAncestorInternal) -> "Imported Internal Ancestor External",
+        datasetEntities(provenanceImportedInternalAncestorExternal) -> "Imported Internal Ancestor Internal"
+      )
+    } { case (dsGen: DatasetGenFactory[Dataset.Provenance], dsType: String) =>
+      s"fail if originalIdentifier on an $dsType dataset is different than its identifier" in {
+        val dataset = dsGen.decoupledFromProject.generateOne.to[entities.Dataset[entities.Dataset.Provenance]]
+
+        val illegalInitialVersion = datasetInitialVersions.generateOne
+
+        val Left(error) = parse {
+          dataset.asJsonLD.toJson
+            .deepMerge(
+              Json.obj((renku / "originalIdentifier").show -> json"""{"@value": ${illegalInitialVersion.value}}""")
+            )
+        }.fold(throw _, identity)
+          .flatten
+          .fold(throw _, identity)
+          .cursor
+          .as[List[entities.Dataset[entities.Dataset.Provenance]]]
+
+        error shouldBe a[DecodingFailure]
+        error.getMessage should startWith(
+          s"Cannot decode entity with ${dataset.resourceId}: DecodingFailure at : Invalid dataset data"
+        )
       }
     }
 
@@ -94,6 +129,25 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           .cursor
           .as[List[entities.Dataset[entities.Dataset.Provenance]]] shouldBe List(validDataset).asRight
       }
+    }
+
+    "succeed if originalIdentifier on a modified dataset is different than its identifier" in {
+      val dataset = {
+        val ds = datasetAndModificationEntities(provenanceNonModified)
+          .map(_._2)
+          .generateOne
+          .to[entities.Dataset[entities.Dataset.Provenance.Modified]]
+        ds.copy(provenance = ds.provenance.copy(initialVersion = datasetInitialVersions.generateOne))
+      }
+
+      assume(dataset.identification.identifier.value != dataset.provenance.initialVersion.value)
+
+      dataset.asJsonLD.flatten
+        .fold(throw _, identity)
+        .cursor
+        .as[List[entities.Dataset[entities.Dataset.Provenance]]] shouldBe List(
+        dataset.copy(publicationEvents = Nil)
+      ).asRight
     }
 
     "fail if invalidationTime is older than the dataset" in {
