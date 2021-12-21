@@ -181,7 +181,7 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
 
     "return a single commit" in new TestCase {
 
-      override val uri = uri"/projects" / projectId.show / "repository" / "commits" withQueryParams Map(
+      override val uri = uri"projects" / projectId.show / "repository" / "commits" withQueryParams Map(
         "per_page" -> "1"
       )
 
@@ -270,7 +270,7 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
     private implicit val logger: TestLogger[IO] = TestLogger()
     val gitLabCommitFetcher = new GitLabCommitFetcherImpl[IO](gitLabClient)
 
-    val uri = uri"/projects" / projectId.show / "repository" / "commits" withQueryParams Map(
+    val uri = uri"projects" / projectId.show / "repository" / "commits" withQueryParams Map(
       "page"     -> pageRequest.page.show,
       "per_page" -> pageRequest.perPage.show
     )
