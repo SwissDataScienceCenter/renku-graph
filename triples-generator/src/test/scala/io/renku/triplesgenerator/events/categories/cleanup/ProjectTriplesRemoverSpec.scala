@@ -190,7 +190,7 @@ class ProjectTriplesRemoverSpec
        """
   )
   private trait TestCase {
-    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
     val sparqlTimeRecorder    = new SparqlQueryTimeRecorder(executionTimeRecorder)
     val projectTriplesRemover = new ProjectTriplesRemoverImpl[IO](

@@ -56,11 +56,11 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
 
     forAll {
       Table(
-        "DS generator"                                              -> "DS type",
-        datasetEntities(provenanceInternal)                         -> "Internal",
-        datasetEntities(provenanceImportedExternal)                 -> "Imported External",
-        datasetEntities(provenanceImportedInternalAncestorInternal) -> "Imported Internal Ancestor External",
-        datasetEntities(provenanceImportedInternalAncestorExternal) -> "Imported Internal Ancestor Internal"
+        "DS generator"                                                -> "DS type",
+        datasetEntities(provenanceInternal)                           -> "Internal",
+        datasetEntities(provenanceImportedExternal)                   -> "Imported External",
+        datasetEntities(provenanceImportedInternalAncestorInternal()) -> "Imported Internal Ancestor External",
+        datasetEntities(provenanceImportedInternalAncestorExternal)   -> "Imported Internal Ancestor Internal"
       )
     } { case (dsGen: DatasetGenFactory[Dataset.Provenance], dsType: String) =>
       s"fail if originalIdentifier on an $dsType dataset is different than its identifier" in {
