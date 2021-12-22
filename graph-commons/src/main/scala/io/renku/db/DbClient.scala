@@ -25,9 +25,7 @@ import io.renku.db.SqlStatement.Name
 import io.renku.metrics.LabeledHistogram
 import skunk.Session
 
-abstract class DbClient[F[_]: Monad](
-    maybeHistogram: Option[LabeledHistogram[F, Name]]
-) {
+abstract class DbClient[F[_]: Monad](maybeHistogram: Option[LabeledHistogram[F, Name]]) {
 
   protected def measureExecutionTime[ResultType](
       query: SqlStatement[F, ResultType]
