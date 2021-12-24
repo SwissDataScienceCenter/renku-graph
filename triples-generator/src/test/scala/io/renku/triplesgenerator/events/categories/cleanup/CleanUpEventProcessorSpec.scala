@@ -36,17 +36,23 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class CleanUpEventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
   "processEvent" should {
+
     "remove the triples linked to the project and notify the eventlog when the process is done" in new TestCase {
+
       (triplesRemover.removeTriples _).expects(path).returns(().pure[IO])
       (eventStatusUpdater.projectToNew _).expects(project).returns(().pure[IO])
+
       cleanUpEventProcessor.process(project).unsafeRunSync() shouldBe ()
     }
+
     "fail if the removal of the triples fail and log the error" in new TestCase {
       val exception = exceptions.generateOne
       (triplesRemover.removeTriples _).expects(path).returns(exception.raiseError[IO, Unit])
+
       intercept[Exception] {
         cleanUpEventProcessor.process(project).unsafeRunSync()
       }.getMessage shouldBe exception.getMessage
+
       eventually {
         logger.loggedOnly(
           Error(s"${commonLogMessage(project)} - Triples removal failed ${exception.getMessage}", exception)
@@ -57,9 +63,11 @@ class CleanUpEventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory
       val exception = exceptions.generateOne
       (triplesRemover.removeTriples _).expects(path).returns(().pure[IO])
       (eventStatusUpdater.projectToNew _).expects(project).returns(exception.raiseError[IO, Unit])
+
       intercept[Exception] {
         cleanUpEventProcessor.process(project).unsafeRunSync()
       }.getMessage shouldBe exception.getMessage
+
       eventually {
         logger.loggedOnly(
           Error(

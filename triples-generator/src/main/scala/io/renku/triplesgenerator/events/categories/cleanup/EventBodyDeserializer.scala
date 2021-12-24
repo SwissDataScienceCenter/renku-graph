@@ -20,7 +20,7 @@ package io.renku.triplesgenerator.events.categories.cleanup
 
 import cats.MonadThrow
 import cats.syntax.all._
-import io.circe.{Decoder, DecodingFailure, Error, Json, ParsingFailure}
+import io.circe.{Decoder, DecodingFailure, Error, Json}
 import io.renku.events.consumers.Project
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.tinytypes.json.TinyTypeDecoders._
@@ -40,9 +40,8 @@ private class EventBodyDeserializerImpl[F[_]: MonadThrow] extends EventBodyDeser
       projectPath <- cursor.downField("project").downField("path").as[Path]
     } yield CleanUpEvent(Project(projectId, projectPath))
 
-  private def toMeaningfulError(event: Json): Error => Error = {
-    case failure: DecodingFailure => failure.withMessage(s"CleanUpEvent cannot be deserialised: '$event'")
-    case failure: ParsingFailure  => ParsingFailure(s"CleanUpEvent cannot be deserialised: '$event'", failure)
+  private def toMeaningfulError(event: Json): DecodingFailure => Error = { case failure =>
+    failure.withMessage(s"CleanUpEvent cannot be deserialised: '$event'")
   }
 }
 

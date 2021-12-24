@@ -19,6 +19,7 @@
 package io.renku.eventlog.subscriptions.cleanup
 
 import cats.implicits.toShow
+import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -29,7 +30,7 @@ class CleanUpEventSpec extends AnyWordSpec with should.Matchers {
 
     "print out the projectId and projectPath" in {
       val event = cleanupEvents.generateOne
-      event.show shouldBe s"CleanUpEvent projectId = ${event.project.id}, projectPath = ${event.project.path}"
+      event.show shouldBe show"CleanUpEvent projectId = ${event.project.id}, projectPath = ${event.project.path}"
     }
   }
 }
