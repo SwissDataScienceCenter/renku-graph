@@ -22,26 +22,21 @@ package gitlab
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.numeric.NonNegative
+import eu.timepit.refined.auto._
 import io.renku.commiteventservice.events.categories.common.CommitInfo
-import io.renku.config.GitLab
-import io.renku.control.Throttler
-import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.events.CommitId
-import io.renku.graph.model.{GitLabApiUrl, projects}
+import io.renku.graph.model.projects
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.client.RestClientError.UnauthorizedException
-import io.renku.http.client.{AccessToken, RestClient}
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model.Page
 import org.http4s.Method.GET
 import org.http4s.Status.{NotFound, Ok, Unauthorized}
 import org.http4s._
 import org.http4s.circe.jsonOf
+import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
-
-import scala.concurrent.duration.{Duration, FiniteDuration}
 
 private[globalcommitsync] trait GitLabCommitFetcher[F[_]] {
 
@@ -54,39 +49,31 @@ private[globalcommitsync] trait GitLabCommitFetcher[F[_]] {
   ): F[PageResult]
 }
 
-private[globalcommitsync] class GitLabCommitFetcherImpl[F[_]: Async: Logger](
-    gitLabApiUrl:           GitLabApiUrl,
-    gitLabThrottler:        Throttler[F, GitLab],
-    retryInterval:          FiniteDuration = RestClient.SleepAfterConnectionIssue,
-    maxRetries:             Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
-    requestTimeoutOverride: Option[Duration] = None
-) extends RestClient(gitLabThrottler,
-                     retryInterval = retryInterval,
-                     maxRetries = maxRetries,
-                     requestTimeoutOverride = requestTimeoutOverride
-    )
-    with GitLabCommitFetcher[F] {
+private[globalcommitsync] class GitLabCommitFetcherImpl[F[_]: Async](
+    gitLabClientImpl: GitLabClient[F]
+) extends GitLabCommitFetcher[F] {
+
+  import gitLabClientImpl._
 
   override def fetchLatestGitLabCommit(projectId: projects.Id)(implicit
       maybeAccessToken:                           Option[AccessToken]
-  ): F[Option[CommitId]] = for {
-    uriString   <- s"$gitLabApiUrl/projects/$projectId/repository/commits".pure[F]
-    uri         <- validateUri(uriString).map(_.withQueryParam("per_page", "1"))
-    maybeCommit <- send(request(GET, uri, maybeAccessToken))(mapSingleCommitResponse)
-  } yield maybeCommit
+  ): F[Option[CommitId]] =
+    send(GET, uri"projects" / projectId.show / "repository" / "commits" withQueryParam ("per_page", "1"), "commits")(
+      mapSingleCommitResponse
+    )
 
   override def fetchGitLabCommits(
       projectId:               projects.Id,
       pageRequest:             PagingRequest
-  )(implicit maybeAccessToken: Option[AccessToken]): F[PageResult] = for {
-    uri        <- createUrl(projectId, pageRequest)
-    pageResult <- send(request(GET, uri, maybeAccessToken))(mapCommitResponse)
-  } yield pageResult
-
-  private def createUrl(projectId: projects.Id, pageRequest: PagingRequest) =
-    validateUri(s"$gitLabApiUrl/projects/$projectId/repository/commits").map(
-      _.withQueryParam("page", pageRequest.page.show).withQueryParam("per_page", pageRequest.perPage.show)
-    )
+  )(implicit maybeAccessToken: Option[AccessToken]): F[PageResult] =
+    send(
+      GET,
+      uri"projects" / projectId.show / "repository" / "commits" withQueryParams (Map(
+        "page"     -> pageRequest.page.show,
+        "per_page" -> pageRequest.perPage.show
+      )),
+      "commits"
+    )(mapCommitResponse)
 
   private implicit lazy val mapCommitResponse: PartialFunction[(Status, Request[F], Response[F]), F[PageResult]] = {
     case (Ok, _, response)    => (response.as[List[CommitId]] -> maybeNextPage(response)).mapN(PageResult(_, _))
@@ -114,7 +101,6 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[F[_]: Async: Logger](
 }
 
 private[globalcommitsync] object GitLabCommitFetcher {
-  def apply[F[_]: Async: Logger](gitLabThrottler: Throttler[F, GitLab]): F[GitLabCommitFetcher[F]] = for {
-    gitLabUrl <- GitLabUrlLoader[F]()
-  } yield new GitLabCommitFetcherImpl[F](gitLabUrl.apiV4, gitLabThrottler)
+  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F]): F[GitLabCommitFetcher[F]] =
+    (new GitLabCommitFetcherImpl[F](gitLabClient)).pure[F].widen
 }

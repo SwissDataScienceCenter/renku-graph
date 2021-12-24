@@ -29,6 +29,7 @@ import io.renku.config.sentry.SentryInitializer
 import io.renku.control.{RateLimit, Throttler}
 import io.renku.events.consumers
 import io.renku.events.consumers.EventConsumersRegistry
+import io.renku.http.client.GitLabClient
 import io.renku.http.server.HttpServer
 import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
@@ -45,11 +46,12 @@ object Microservice extends IOMicroservice {
     sentryInitializer     <- SentryInitializer[IO]
     gitLabRateLimit       <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
     gitLabThrottler       <- Throttler[IO, GitLab](gitLabRateLimit)
+    gitLabClient          <- GitLabClient[IO](gitLabThrottler)
     executionTimeRecorder <- ExecutionTimeRecorder[IO]()
     commitSyncCategory <-
       events.categories.commitsync.SubscriptionFactory(gitLabThrottler, executionTimeRecorder)
     globalCommitSyncCategory <-
-      events.categories.globalcommitsync.SubscriptionFactory(gitLabThrottler, executionTimeRecorder)
+      events.categories.globalcommitsync.SubscriptionFactory(gitLabClient, gitLabThrottler, executionTimeRecorder)
     eventConsumersRegistry  <- consumers.EventConsumersRegistry(commitSyncCategory, globalCommitSyncCategory)
     metricsRegistry         <- MetricsRegistry[IO]()
     serviceReadinessChecker <- ServiceReadinessChecker[IO](ServicePort)
