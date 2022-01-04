@@ -45,7 +45,7 @@ import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.json.TinyTypeEncoders
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import org.http4s.Status.{Forbidden, ServiceUnavailable, Unauthorized}
+import org.http4s.Status.{BadGateway, Forbidden, ServiceUnavailable, Unauthorized}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -108,6 +108,7 @@ class ProjectFinderSpec
     Set(
       "connection problem" -> aResponse().withFault(CONNECTION_RESET_BY_PEER),
       "client problem"     -> aResponse().withFixedDelay((requestTimeout.toMillis + 500).toInt),
+      "BadGateway"         -> aResponse().withStatus(BadGateway.code),
       "ServiceUnavailable" -> aResponse().withStatus(ServiceUnavailable.code),
       "Forbidden"          -> aResponse().withStatus(Forbidden.code),
       "Unauthorized"       -> aResponse().withStatus(Unauthorized.code)
