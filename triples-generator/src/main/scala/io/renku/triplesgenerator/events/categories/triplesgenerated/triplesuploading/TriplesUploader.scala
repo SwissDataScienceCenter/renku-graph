@@ -31,7 +31,6 @@ import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploa
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
-import scala.language.postfixOps
 import scala.util.control.NonFatal
 
 private trait TriplesUploader[F[_]] {

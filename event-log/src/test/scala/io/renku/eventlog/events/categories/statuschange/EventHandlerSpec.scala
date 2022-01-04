@@ -144,8 +144,9 @@ class EventHandlerSpec
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val statusChanger       = mock[StatusChanger[IO]]
     val deliveryInfoRemover = mock[DeliveryInfoRemover[IO]]
+    val eventsQueue         = mock[StatusChangeEventsQueue[IO]]
     val queryExec           = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val handler             = new EventHandler[IO](categoryName, statusChanger, deliveryInfoRemover, queryExec)
+    val handler = new EventHandler[IO](categoryName, eventsQueue, statusChanger, deliveryInfoRemover, queryExec)
 
     def stubUpdateStatuses[E <: StatusChangeEvent](updateResult: IO[Unit])(implicit show: Show[E]): E => (E, String) =
       event => {

@@ -16,28 +16,20 @@
  * limitations under the License.
  */
 
-package io.renku.db
+package io.renku.eventlog.events.categories.statuschange
 
-import cats.Monad
+import cats.MonadThrow
 import cats.data.Kleisli
-import cats.syntax.all._
-import io.renku.db.SqlStatement.Name
-import io.renku.metrics.LabeledHistogram
+import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.ProjectEventsToNew
 import skunk.Session
 
-abstract class DbClient[F[_]: Monad](maybeHistogram: Option[LabeledHistogram[F, Name]]) {
+private class ProjectEventsToNewHandler[F[_]: MonadThrow](eventsQueue: StatusChangeEventsQueue[F])
+    extends DBUpdater[F, ProjectEventsToNew] {
 
-  protected def measureExecutionTime[ResultType](
-      query: SqlStatement[F, ResultType]
-  ): Kleisli[F, Session[F], ResultType] = Kleisli { session =>
-    maybeHistogram match {
-      case None => query.queryExecution.run(session)
-      case Some(histogram) =>
-        for {
-          timer  <- histogram.startTimer(query.name)
-          result <- query.queryExecution.run(session)
-          _      <- timer.observeDuration
-        } yield result
-    }
-  }
+  import ProjectEventsToNew._
+
+  override def updateDB(event: ProjectEventsToNew): UpdateResult[F] =
+    eventsQueue.offer[ProjectEventsToNew](event).map(_ => DBUpdateResults.ForProjects.empty)
+
+  override def onRollback(event: ProjectEventsToNew): Kleisli[F, Session[F], Unit] = Kleisli.pure(())
 }

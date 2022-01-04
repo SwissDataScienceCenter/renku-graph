@@ -32,6 +32,7 @@ import org.typelevel.log4cats.Logger
 object SubscriptionFactory {
   def apply[F[_]: MonadThrow: Async: Logger](
       sessionResource:                    SessionResource[F, EventLogDB],
+      eventsQueue:                        StatusChangeEventsQueue[F],
       awaitingTriplesGenerationGauge:     LabeledGauge[F, projects.Path],
       underTriplesGenerationGauge:        LabeledGauge[F, projects.Path],
       awaitingTriplesTransformationGauge: LabeledGauge[F, projects.Path],
@@ -40,6 +41,7 @@ object SubscriptionFactory {
   ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
     handler <- EventHandler(
                  sessionResource,
+                 eventsQueue,
                  queriesExecTimes,
                  awaitingTriplesGenerationGauge,
                  underTriplesGenerationGauge,
@@ -47,5 +49,4 @@ object SubscriptionFactory {
                  underTriplesTransformationGauge
                )
   } yield handler -> SubscriptionMechanism.noOpSubscriptionMechanism(categoryName)
-
 }

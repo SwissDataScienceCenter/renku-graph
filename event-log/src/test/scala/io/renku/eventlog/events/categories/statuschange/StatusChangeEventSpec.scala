@@ -16,28 +16,23 @@
  * limitations under the License.
  */
 
-package io.renku.db
+package io.renku.eventlog.events.categories.statuschange
 
-import cats.Monad
-import cats.data.Kleisli
-import cats.syntax.all._
-import io.renku.db.SqlStatement.Name
-import io.renku.metrics.LabeledHistogram
-import skunk.Session
+import Generators.projectEventToNewEvents
+import io.circe.syntax._
+import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.ProjectEventsToNew
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-abstract class DbClient[F[_]: Monad](maybeHistogram: Option[LabeledHistogram[F, Name]]) {
+class StatusChangeEventSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
-  protected def measureExecutionTime[ResultType](
-      query: SqlStatement[F, ResultType]
-  ): Kleisli[F, Session[F], ResultType] = Kleisli { session =>
-    maybeHistogram match {
-      case None => query.queryExecution.run(session)
-      case Some(histogram) =>
-        for {
-          timer  <- histogram.startTimer(query.name)
-          result <- query.queryExecution.run(session)
-          _      <- timer.observeDuration
-        } yield result
+  "ProjectEventsToNew" should {
+
+    "be serializable and deserializable to and from Json" in {
+      forAll(projectEventToNewEvents) { event =>
+        event.asJson.as[ProjectEventsToNew] shouldBe Right(event)
+      }
     }
   }
 }

@@ -25,7 +25,6 @@ import io.renku.metrics._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
-import scala.language.postfixOps
 import scala.util.control.NonFatal
 
 trait EventLogMetrics[F[_]] {

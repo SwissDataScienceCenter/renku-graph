@@ -37,7 +37,6 @@ import org.scalatest.matchers.should
 
 import java.lang.Thread.sleep
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 trait RdfStoreProvisioning
     extends ModelImplicits

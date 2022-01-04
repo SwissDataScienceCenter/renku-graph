@@ -35,7 +35,6 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant.now
 import scala.concurrent.duration._
-import scala.language.postfixOps
 import scala.util.Try
 
 private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers with MockFactory {

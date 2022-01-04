@@ -30,7 +30,6 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers {
   import ProjectPrioritisation._

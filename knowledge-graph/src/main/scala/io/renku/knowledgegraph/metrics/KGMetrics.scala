@@ -26,7 +26,6 @@ import io.renku.rdfstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.FiniteDuration
-import scala.language.postfixOps
 import scala.util.control.NonFatal
 
 trait KGMetrics[F[_]] {

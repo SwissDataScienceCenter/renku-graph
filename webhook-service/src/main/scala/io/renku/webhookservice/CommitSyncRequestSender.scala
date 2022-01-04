@@ -34,7 +34,6 @@ import org.http4s.{Status, Uri}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 private trait CommitSyncRequestSender[F[_]] {
   def sendCommitSyncRequest(commitSyncRequest: CommitSyncRequest): F[Unit]

@@ -39,7 +39,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import java.util.concurrent.{ConcurrentHashMap, ConcurrentLinkedQueue}
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
-import scala.language.{postfixOps, reflectiveCalls}
+import scala.language.reflectiveCalls
 
 class EventLogMetricsSpec
     extends AnyWordSpec

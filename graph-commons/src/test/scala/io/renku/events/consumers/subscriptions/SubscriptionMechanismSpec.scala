@@ -37,7 +37,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
-import scala.language.{postfixOps, reflectiveCalls}
+import scala.language.reflectiveCalls
 
 class SubscriptionMechanismSpec extends AnyWordSpec with IOSpec with Eventually with should.Matchers {
 

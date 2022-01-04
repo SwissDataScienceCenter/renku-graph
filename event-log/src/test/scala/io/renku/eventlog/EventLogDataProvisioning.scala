@@ -19,6 +19,7 @@
 package io.renku.eventlog
 
 import cats.data.Kleisli
+import io.circe.Json
 import io.renku.eventlog.EventContentGenerators.eventMessages
 import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl, subscriberIds, subscriberUrls}
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
@@ -32,7 +33,7 @@ import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Path
 import io.renku.microservices.MicroserviceBaseUrl
 import skunk._
-import skunk.codec.all.{timestamptz, varchar}
+import skunk.codec.all.{text, timestamptz, varchar}
 import skunk.implicits._
 
 import java.time.{Instant, OffsetDateTime, ZoneId}
@@ -279,9 +280,9 @@ trait EventLogDataProvisioning {
           )
         )
         .void
-
     }
   }
+
   protected def findAllDeliveries: List[(CompoundEventId, SubscriberId)] = execute {
     Kleisli { session =>
       val query: Query[Void, (CompoundEventId, SubscriberId)] =
@@ -290,6 +291,18 @@ trait EventLogDataProvisioning {
           .query(eventIdDecoder ~ projectIdDecoder ~ subscriberIdDecoder)
           .map { case eventId ~ projectId ~ subscriberId => (CompoundEventId(eventId, projectId), subscriberId) }
       session.execute(query)
+    }
+  }
+
+  def insertEventIntoEventsQueue(eventType: String, payload: Json): Unit = execute {
+    Kleisli { session =>
+      val query: Command[OffsetDateTime ~ String ~ String] =
+        sql"""INSERT INTO status_change_events_queue (date, event_type, payload)
+              VALUES ($timestamptz, $varchar, $text)""".command
+      session
+        .prepare(query)
+        .use(_.execute(OffsetDateTime.now() ~ eventType ~ payload.noSpaces))
+        .void
     }
   }
 }
