@@ -38,7 +38,6 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import java.lang.Thread.sleep
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 class EventsDistributorSpec extends AnyWordSpec with IOSpec with MockFactory with Eventually with should.Matchers {
 

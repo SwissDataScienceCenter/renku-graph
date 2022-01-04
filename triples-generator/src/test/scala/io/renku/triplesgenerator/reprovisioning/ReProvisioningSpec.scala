@@ -35,7 +35,6 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 

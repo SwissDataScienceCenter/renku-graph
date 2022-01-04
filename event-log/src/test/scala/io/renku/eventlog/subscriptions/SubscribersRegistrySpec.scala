@@ -37,7 +37,6 @@ import java.lang.Thread.sleep
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 class SubscribersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers with Eventually {
 

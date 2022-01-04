@@ -22,6 +22,7 @@ import cats.effect._
 import cats.syntax.all._
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
+import io.renku.eventlog.events.categories.statuschange.StatusChangeEventsQueue
 import io.renku.eventlog.init.DbInitializer
 import io.renku.eventlog.metrics.EventLogMetrics
 import io.renku.eventlog.subscriptions.EventProducersRegistry
@@ -39,7 +40,6 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 class MicroserviceRunnerSpec
     extends AnyWordSpec
@@ -65,6 +65,7 @@ class MicroserviceRunnerSpec
         (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
         given(eventProducersRegistry).succeeds(returning = ())
         given(eventConsumersRegistry).succeeds(returning = ())
+        given(eventsQueue).succeeds(returning = ())
         given(httpServer).succeeds(returning = ExitCode.Success)
 
         runner.run().unsafeRunAndForget()
@@ -113,6 +114,7 @@ class MicroserviceRunnerSpec
       (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
       given(eventProducersRegistry).succeeds(returning = ())
       given(eventConsumersRegistry).succeeds(returning = ())
+      given(eventsQueue).succeeds(returning = ())
       val exception = exceptions.generateOne
       given(httpServer).fails(becauseOf = exception)
 
@@ -135,6 +137,7 @@ class MicroserviceRunnerSpec
       (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
       given(eventProducersRegistry).fails(becauseOf = exceptions.generateOne)
       given(eventConsumersRegistry).succeeds(returning = ())
+      given(eventsQueue).succeeds(returning = ())
       given(httpServer).succeeds(returning = ExitCode.Success)
 
       runner.run().unsafeRunSync() shouldBe ExitCode.Success
@@ -156,6 +159,7 @@ class MicroserviceRunnerSpec
       (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
       given(eventProducersRegistry).succeeds(returning = ())
       given(eventConsumersRegistry).fails(becauseOf = exceptions.generateOne)
+      given(eventsQueue).succeeds(returning = ())
       given(httpServer).succeeds(returning = ExitCode.Success)
 
       runner.run().unsafeRunSync() shouldBe ExitCode.Success
@@ -177,6 +181,28 @@ class MicroserviceRunnerSpec
       (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
       given(eventProducersRegistry).succeeds(returning = ())
       given(eventConsumersRegistry).succeeds(returning = ())
+      given(eventsQueue).succeeds(returning = ())
+      given(httpServer).succeeds(returning = ExitCode.Success)
+
+      runner.run().unsafeRunAndForget() shouldBe ()
+
+      eventually {
+        gaugeScheduler.counter.get.unsafeRunSync() should be > 1
+      }
+    }
+
+    "return Success ExitCode even if StatusChangeEventQueue initialisation fails" in new TestCase {
+
+      override val gaugeScheduler = new Gauge()
+
+      given(certificateLoader).succeeds(returning = ())
+      given(sentryInitializer).succeeds(returning = ())
+      given(dbInitializer).succeeds(returning = ())
+      given(metrics).succeeds(returning = ())
+      (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
+      given(eventProducersRegistry).succeeds(returning = ())
+      given(eventConsumersRegistry).succeeds(returning = ())
+      given(eventsQueue).fails(becauseOf = exceptions.generateOne)
       given(httpServer).succeeds(returning = ExitCode.Success)
 
       runner.run().unsafeRunAndForget() shouldBe ()
@@ -196,6 +222,7 @@ class MicroserviceRunnerSpec
       (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
       given(eventProducersRegistry).succeeds(returning = ())
       given(eventConsumersRegistry).succeeds(returning = ())
+      given(eventsQueue).succeeds(returning = ())
       given(gaugeScheduler).fails(becauseOf = exceptions.generateOne)
       given(httpServer).succeeds(returning = ExitCode.Success)
 
@@ -216,6 +243,7 @@ class MicroserviceRunnerSpec
     val eventProducersRegistry  = mock[EventProducersRegistry[IO]]
     val eventConsumersRegistry  = mock[EventConsumersRegistry[IO]]
     val metrics                 = mock[EventLogMetrics[IO]]
+    val eventsQueue             = mock[StatusChangeEventsQueue[IO]]
     val httpServer              = mock[HttpServer[IO]]
     val gaugeScheduler          = mock[GaugeResetScheduler[IO]]
     lazy val runner = new MicroserviceRunner(serviceReadinessChecker,
@@ -223,6 +251,7 @@ class MicroserviceRunnerSpec
                                              sentryInitializer,
                                              dbInitializer,
                                              metrics,
+                                             eventsQueue,
                                              eventProducersRegistry,
                                              eventConsumersRegistry,
                                              gaugeScheduler,

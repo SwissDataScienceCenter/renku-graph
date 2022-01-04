@@ -35,7 +35,6 @@ import org.http4s._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 trait EventSender[F[_]] {
   def sendEvent(eventContent: EventRequestContent.NoPayload, errorMessage: String): F[Unit]

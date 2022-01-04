@@ -35,7 +35,6 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import java.lang.Thread.sleep
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 class KGMetricsSpec
     extends AnyWordSpec

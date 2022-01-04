@@ -27,7 +27,6 @@ import io.renku.config.ConfigLoader
 import io.renku.tinytypes.TypeName
 
 import scala.concurrent.duration._
-import scala.language.postfixOps
 import scala.util.Try
 
 case class RateLimit[Target](items: Long Refined Positive, per: RateLimitUnit) {

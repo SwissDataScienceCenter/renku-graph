@@ -30,7 +30,6 @@ import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
-import scala.language.postfixOps
 import scala.util.Random
 
 private trait SubscribersRegistry[F[_]] {

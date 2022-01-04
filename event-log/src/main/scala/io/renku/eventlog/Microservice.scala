@@ -28,6 +28,7 @@ import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.db.{SessionPoolResource, SessionResource}
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
+import io.renku.eventlog.events.categories.statuschange.StatusChangeEventsQueue
 import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
 import io.renku.eventlog.init.DbInitializer
 import io.renku.eventlog.metrics._
@@ -62,6 +63,7 @@ object Microservice extends IOMicroservice {
         dbInitializer               <- DbInitializer(sessionResource, isMigrating)
         metricsRegistry             <- MetricsRegistry[IO]()
         queriesExecTimes            <- QueriesExecutionTimes(metricsRegistry)
+        eventsQueue                 <- StatusChangeEventsQueue[IO](sessionResource, queriesExecTimes)
         statsFinder                 <- StatsFinder(sessionResource, queriesExecTimes)
         eventLogMetrics             <- EventLogMetrics(metricsRegistry, statsFinder)
         awaitingGenerationGauge     <- AwaitingGenerationGauge(metricsRegistry, statsFinder)
@@ -92,6 +94,7 @@ object Microservice extends IOMicroservice {
                                          )
         statusChangeEventSubscription <- events.categories.statuschange.SubscriptionFactory(
                                            sessionResource,
+                                           eventsQueue,
                                            awaitingGenerationGauge,
                                            underTriplesGenerationGauge,
                                            awaitingTransformationGauge,
@@ -133,6 +136,7 @@ object Microservice extends IOMicroservice {
                                              sentryInitializer,
                                              dbInitializer,
                                              eventLogMetrics,
+                                             eventsQueue,
                                              eventProducersRegistry,
                                              eventConsumersRegistry,
                                              metricsResetScheduler,
@@ -149,6 +153,7 @@ private class MicroserviceRunner[F[_]: Spawn: Logger](
     sentryInitializer:       SentryInitializer[F],
     dbInitializer:           DbInitializer[F],
     metrics:                 EventLogMetrics[F],
+    eventsQueue:             StatusChangeEventsQueue[F],
     eventProducersRegistry:  EventProducersRegistry[F],
     eventConsumersRegistry:  EventConsumersRegistry[F],
     gaugeScheduler:          GaugeResetScheduler[F],
@@ -167,6 +172,7 @@ private class MicroserviceRunner[F[_]: Spawn: Logger](
     _ <- serviceReadinessChecker.waitIfNotUp
     _ <- Spawn[F].start(eventProducersRegistry.run())
     _ <- Spawn[F].start(eventConsumersRegistry.run())
+    _ <- Spawn[F].start(eventsQueue.run())
     _ <- gaugeScheduler.run()
   } yield ()
 }

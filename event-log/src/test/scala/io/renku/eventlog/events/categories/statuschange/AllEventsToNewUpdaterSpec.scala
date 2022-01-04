@@ -19,19 +19,22 @@
 package io.renku.eventlog.events.categories.statuschange
 
 import cats.effect.IO
+import cats.syntax.all._
 import eu.timepit.refined.auto._
+import io.circe.literal._
 import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators.eventMessages
+import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages}
 import io.renku.eventlog._
-import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.AllEventsToNew
-import io.renku.events.consumers.subscriptions.{subscriberIds, subscriberUrls}
-import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
+import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.{AllEventsToNew, ProjectEventsToNew}
+import io.renku.events.EventRequestContent
+import io.renku.events.consumers.Project
+import io.renku.events.producers.EventSender
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
-import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventProcessingTimes, zippedEventPayloads}
+import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus}
-import io.renku.graph.model.projects
+import io.renku.graph.model.events.{EventId, EventStatus}
+import io.renku.interpreters.TestLogger
 import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
@@ -39,7 +42,6 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import java.time.Instant
 import scala.util.Random
 
 class AllEventsToNewUpdaterSpec
@@ -52,60 +54,42 @@ class AllEventsToNewUpdaterSpec
 
   "updateDB" should {
 
-    "change the status of all events to NEW except SKIPPED events" in new TestCase {
+    "send ProjectEventsToNew events for all the projects" in new TestCase {
 
-      val eventIds = projectIdentifiers
-        .generateNonEmptyList(2)
-        .flatMap { case (projectId, projectPath) =>
-          Gen
-            .oneOf(EventStatus.all.diff(Set(EventStatus.Skipped, EventStatus.AwaitingDeletion)))
-            .generateNonEmptyList(2)
-            .map(addEvent(_, projectId, projectPath))
-            .map(CompoundEventId(_, projectId))
-        }
-        .toList
+      val projects = projectObjects.generateNonEmptyList().toList
 
-      val skippedEventProjectId = projectIds.generateOne
-      val skippedEvent          = addEvent(EventStatus.Skipped, skippedEventProjectId)
-
-      val awaitingDeletionEventProjectId = projectIds.generateOne
-      val awaitingDeletionEvent          = addEvent(EventStatus.AwaitingDeletion, awaitingDeletionEventProjectId)
-
-      eventIds.foreach(upsertEventDelivery(_, subscriberId))
-
-      sessionResource
-        .useK(dbUpdater.updateDB(AllEventsToNew))
-        .unsafeRunSync() shouldBe DBUpdateResults.ForAllProjects
-
-      eventIds.flatMap(findFullEvent) shouldBe eventIds.map { eventId =>
-        (eventId.id, EventStatus.New, None, None, List())
+      projects foreach { project =>
+        if (Random.nextBoolean()) addEvent(project)
+        else upsertProject(project.id, project.path, eventDates.generateOne)
       }
 
-      findEvent(CompoundEventId(skippedEvent, skippedEventProjectId)).map(_._2) shouldBe Some(EventStatus.Skipped)
-      findEvent(CompoundEventId(awaitingDeletionEvent, awaitingDeletionEventProjectId)).map(_._2) shouldBe None
-      findAllDeliveries                                                                           shouldBe Nil
+      projects foreach { project =>
+        (eventSender
+          .sendEvent(_: EventRequestContent.NoPayload, _: String))
+          .expects(EventRequestContent.NoPayload(toEventJson(project)),
+                   show"$categoryName: Generating ${ProjectEventsToNew.eventType} for $project failed"
+          )
+          .returning(().pure[IO])
+      }
+
+      sessionResource.useK(dbUpdater updateDB AllEventsToNew).unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
+    }
+
+    "do not send any events if there are no projects in the DB" in new TestCase {
+      sessionResource.useK(dbUpdater updateDB AllEventsToNew).unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
     }
   }
 
   private trait TestCase {
 
-    val subscriberId          = subscriberIds.generateOne
-    private val subscriberUrl = subscriberUrls.generateOne
-    private val sourceUrl     = microserviceBaseUrls.generateOne
-    upsertSubscriber(subscriberId, subscriberUrl, sourceUrl)
-
-    val currentTime      = mockFunction[Instant]
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val eventSender      = mock[EventSender[IO]]
     val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val dbUpdater        = new AllEventsToNewUpdater[IO](queriesExecTimes, currentTime)
+    val dbUpdater        = new AllEventsToNewUpdater[IO](eventSender, queriesExecTimes)
 
-    val now = Instant.now()
-    currentTime.expects().returning(now)
-
-    def addEvent(status:      EventStatus,
-                 projectId:   projects.Id = projectIds.generateOne,
-                 projectPath: projects.Path = projectPaths.generateOne
-    ): EventId = {
-      val eventId = compoundEventIds.generateOne.copy(projectId = projectId)
+    def addEvent(project: Project): EventId = {
+      val eventId = compoundEventIds.generateOne.copy(projectId = project.id)
+      val status  = eventStatuses.generateOne
       storeEvent(
         eventId,
         status,
@@ -121,7 +105,7 @@ class AllEventsToNewUpdaterSpec
           case EventStatus.AwaitingDeletion                            => zippedEventPayloads.generateOption
           case _                                                       => zippedEventPayloads.generateNone
         },
-        projectPath = projectPath
+        projectPath = project.path
       )
 
       status match {
@@ -136,20 +120,16 @@ class AllEventsToNewUpdaterSpec
 
       eventId.id
     }
-
-    def findFullEvent(eventId: CompoundEventId) = {
-      val maybeEvent     = findEvent(eventId)
-      val maybePayload   = findPayload(eventId).map(_._2)
-      val processingTime = findProcessingTime(eventId)
-      maybeEvent.map { case (_, status, maybeMessage) =>
-        (eventId.id, status, maybeMessage, maybePayload, processingTime.map(_._2))
-      }
-    }
-
-    lazy val projectIdentifiers = for {
-      id   <- projectIds
-      path <- projectPaths
-    } yield (id, path)
-
   }
+
+  private lazy val projectObjects: Gen[Project] = (projectIds -> projectPaths).mapN(Project.apply)
+
+  private def toEventJson(project: Project) = json"""{
+    "categoryName": "EVENTS_STATUS_CHANGE",
+    "project": {
+      "id":   ${project.id.value},
+      "path": ${project.path.value}
+    },
+    "newStatus": ${EventStatus.New.value}
+  }"""
 }

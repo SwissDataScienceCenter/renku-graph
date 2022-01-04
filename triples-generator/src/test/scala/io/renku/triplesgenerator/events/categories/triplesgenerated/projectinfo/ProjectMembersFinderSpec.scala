@@ -48,7 +48,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.concurrent.duration._
-import scala.language.{postfixOps, reflectiveCalls}
+import scala.language.reflectiveCalls
 import scala.util.Random
 
 class ProjectMembersFinderSpec
