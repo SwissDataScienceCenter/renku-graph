@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -37,6 +37,7 @@ import io.renku.http.rest.paging.model.{Page, PerPage}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import org.typelevel.log4cats.Logger
+import io.renku.http.client.GitLabClient
 
 import scala.util.control.NonFatal
 
@@ -170,12 +171,13 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[_]: Async: NonEmptyPar
 }
 
 private[globalcommitsync] object CommitsSynchronizer {
-  def apply[F[_]: Async: NonEmptyParallel: Logger](gitLabThrottler: Throttler[F, GitLab],
+  def apply[F[_]: Async: NonEmptyParallel: Logger](gitLabClient: GitLabClient[F],
+                                                   gitLabThrottler:       Throttler[F, GitLab],
                                                    executionTimeRecorder: ExecutionTimeRecorder[F]
   ): F[CommitsSynchronizer[F]] = for {
     accessTokenFinder         <- AccessTokenFinder[F]
-    gitLabCommitStatFetcher   <- GitLabCommitStatFetcher(gitLabThrottler)
-    gitLabCommitFetcher       <- GitLabCommitFetcher(gitLabThrottler)
+    gitLabCommitStatFetcher   <- GitLabCommitStatFetcher(gitLabClient, gitLabThrottler)
+    gitLabCommitFetcher       <- GitLabCommitFetcher[F](gitLabClient)
     elCommitFetcher           <- ELCommitFetcher[F]
     commitEventDeleter        <- CommitEventDeleter[F]
     missingCommitEventCreator <- MissingCommitEventCreator(gitLabThrottler)

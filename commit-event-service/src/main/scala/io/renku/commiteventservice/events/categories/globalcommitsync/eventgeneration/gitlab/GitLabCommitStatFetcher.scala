@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -31,7 +31,7 @@ import io.renku.control.Throttler
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.{GitLabApiUrl, projects}
 import io.renku.http.client.RestClientError.UnauthorizedException
-import io.renku.http.client.{AccessToken, RestClient}
+import io.renku.http.client.{AccessToken, GitLabClient, RestClient}
 import org.http4s.Method.GET
 import org.http4s.Status.{NotFound, Ok, Unauthorized}
 import org.http4s._
@@ -92,8 +92,10 @@ private[globalcommitsync] class GitLabCommitStatFetcherImpl[F[_]: Async: Logger]
 }
 
 private[globalcommitsync] object GitLabCommitStatFetcher {
-  def apply[F[_]: Async: Logger](gitLabThrottler: Throttler[F, GitLab]): F[GitLabCommitStatFetcher[F]] = for {
-    gitLabCommitFetcher <- GitLabCommitFetcher(gitLabThrottler)
+  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F],
+                                 gitLabThrottler: Throttler[F, GitLab]
+  ): F[GitLabCommitStatFetcher[F]] = for {
+    gitLabCommitFetcher <- GitLabCommitFetcher(gitLabClient)
     gitLabUrl           <- GitLabUrlLoader[F]()
   } yield new GitLabCommitStatFetcherImpl[F](gitLabCommitFetcher, gitLabUrl.apiV4, gitLabThrottler)
 }

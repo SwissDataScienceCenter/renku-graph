@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,156 +20,244 @@ package io.renku.commiteventservice.events.categories.globalcommitsync.eventgene
 
 import cats.effect.IO
 import cats.syntax.all._
-import com.github.tomakehurst.wiremock.client.WireMock._
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
+import eu.timepit.refined.collection.NonEmpty
+import eu.timepit.refined.numeric.Positive
 import io.circe.Json
 import io.circe.literal._
 import io.renku.commiteventservice.events.categories.common.CommitInfo
 import io.renku.commiteventservice.events.categories.common.Generators.commitInfos
 import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.PageResult
-import io.renku.control.Throttler
 import io.renku.generators.CommonGraphGenerators.{oauthAccessTokens, pages, pagingRequests, personalAccessTokens}
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GitLabUrl
+import io.renku.generators.Generators._
+import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators.projectIds
-import io.renku.http.client.AccessToken
+import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.RestClientError.UnauthorizedException
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.interpreters.TestLogger
-import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
-import org.http4s.Status
+import org.http4s.Method.GET
+import org.http4s.implicits.http4sLiteralsSyntax
+import org.http4s.{EmptyBody, Header, Method, Request, Response, Status, Uri}
+import org.scalamock.matchers.ArgCapture.CaptureOne
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.typelevel.ci.CIStringSyntax
 
-class GitLabCommitFetcherSpec
-    extends AnyWordSpec
-    with IOSpec
-    with MockFactory
-    with ExternalServiceStubbing
-    with should.Matchers {
+class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "fetchGitLabCommits" should {
 
     "fetch commits from the given page" in new TestCase {
 
-      val maybeNextPage = pages.generateOption
-      stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits?page=${pageRequest.page}&per_page=${pageRequest.perPage}")
-          .willReturn(
-            okJson(commitsJson(from = commitInfoList))
-              .withHeader("X-Next-Page", maybeNextPage.map(_.show).getOrElse(""))
-          )
-      }
+      val expectation = pageResults().generateOne
+
+      (gitLabClient
+        .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, PageResult])(
+          _: Option[AccessToken]
+        ))
+        .expects(GET, uri, endpointName, *, maybeAccessToken)
+        .returning(expectation.pure[IO])
 
       gitLabCommitFetcher
-        .fetchGitLabCommits(projectId, pageRequest)(None)
-        .unsafeRunSync() shouldBe PageResult(commitInfoList.map(_.id), maybeNextPage)
+        .fetchGitLabCommits(projectId, pageRequest)(maybeAccessToken)
+        .unsafeRunSync() shouldBe expectation
     }
 
     "fetch commits using the given personal access token" in new TestCase {
       val personalAccessToken = personalAccessTokens.generateOne
 
-      stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits?page=${pageRequest.page}&per_page=${pageRequest.perPage}")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
-          .willReturn(okJson(commitsJson(from = commitInfoList)))
-      }
+      val expectation = pageResults().generateOne
+
+      (gitLabClient
+        .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, PageResult])(
+          _: Option[AccessToken]
+        ))
+        .expects(GET, uri, endpointName, *, Some(personalAccessToken))
+        .returning(expectation.pure[IO])
 
       gitLabCommitFetcher
         .fetchGitLabCommits(projectId, pageRequest)(Some(personalAccessToken))
-        .unsafeRunSync() shouldBe PageResult(commitInfoList.map(_.id), maybeNextPage = None)
+        .unsafeRunSync() shouldBe expectation
     }
 
     "fetch commits using the given oauth token" in new TestCase {
       val authAccessToken = oauthAccessTokens.generateOne
 
-      stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits?page=${pageRequest.page}&per_page=${pageRequest.perPage}")
-          .withHeader("Authorization", equalTo(s"Bearer ${authAccessToken.value}"))
-          .willReturn(okJson(commitsJson(from = commitInfoList)))
-      }
+      val expectation = pageResults().generateOne
+
+      (gitLabClient
+        .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, PageResult])(
+          _: Option[AccessToken]
+        ))
+        .expects(GET, uri, endpointName, *, authAccessToken.some)
+        .returning(expectation.pure[IO])
 
       gitLabCommitFetcher
         .fetchGitLabCommits(projectId, pageRequest)(Some(authAccessToken))
-        .unsafeRunSync() shouldBe PageResult(commitInfoList.map(_.id), maybeNextPage = None)
+        .unsafeRunSync() shouldBe expectation
     }
 
     "return no commits if there aren't any" in new TestCase {
 
-      stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits?page=${pageRequest.page}&per_page=${pageRequest.perPage}")
-          .willReturn(okJson("[]"))
-      }
+      val expectation = PageResult(commits = Nil, maybeNextPage = None)
+
+      (gitLabClient
+        .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, PageResult])(
+          _: Option[AccessToken]
+        ))
+        .expects(GET, uri, endpointName, *, maybeAccessToken)
+        .returning(expectation.pure[IO])
 
       gitLabCommitFetcher
-        .fetchGitLabCommits(projectId, pageRequest)(maybeAccessToken = None)
-        .unsafeRunSync() shouldBe PageResult(commits = Nil, maybeNextPage = None)
+        .fetchGitLabCommits(projectId, pageRequest)(maybeAccessToken)
+        .unsafeRunSync() shouldBe expectation
     }
 
-    "return an empty list if project for NOT_FOUND" in new TestCase {
+    "fetch commits from the given page - responseMapping OK" in new TestCase {
 
-      stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits?page=${pageRequest.page}&per_page=${pageRequest.perPage}")
-          .willReturn(notFound())
-      }
+      val maybeNextPage = pages.generateOption
 
-      gitLabCommitFetcher
-        .fetchGitLabCommits(projectId, pageRequest)(maybeAccessToken = None)
-        .unsafeRunSync() shouldBe PageResult(commits = Nil, maybeNextPage = None)
+      multiCommitResponseMapping
+        .value(
+          (Status.Ok,
+           Request[IO](),
+           Response[IO]()
+             .withEntity(commitsJson(commitInfoList))
+             .withHeaders(Header.Raw(ci"X-Next-Page", maybeNextPage.map(_.show).getOrElse("")))
+          )
+        )
+        .unsafeRunSync() shouldBe PageResult(commitInfoList.map(_.id), maybeNextPage)
     }
 
-    "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
+    "fetch commits from the given page - responseMapping NotFound" in new TestCase {
 
-      stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits?page=${pageRequest.page}&per_page=${pageRequest.perPage}")
-          .willReturn(unauthorized())
-      }
+      multiCommitResponseMapping
+        .value(
+          (Status.NotFound, Request[IO](), Response[IO]())
+        )
+        .unsafeRunSync() shouldBe PageResult.empty
+    }
 
-      intercept[Exception] {
-        gitLabCommitFetcher.fetchGitLabCommits(projectId, pageRequest)(maybeAccessToken = None).unsafeRunSync()
-      } shouldBe UnauthorizedException
+    "fetch commits from the given page - responseMapping Unauthorized" in new TestCase {
+
+      intercept[UnauthorizedException] {
+        multiCommitResponseMapping
+          .value(
+            (Status.Unauthorized, Request[IO](), Response[IO]())
+          )
+          .unsafeRunSync()
+      }.getMessage should startWith(s"Unauthorized")
     }
 
     "return an Exception if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
 
-      stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits?page=${pageRequest.page}&per_page=${pageRequest.perPage}")
-          .willReturn(badRequest().withBody("some error"))
-      }
-
       intercept[Exception] {
-        gitLabCommitFetcher
-          .fetchGitLabCommits(projectId, pageRequest)(maybeAccessToken = None)
+        multiCommitResponseMapping
+          .value(
+            (Status.BadRequest, Request[IO](), Response[IO]())
+          )
           .unsafeRunSync()
-      }.getMessage shouldBe s"GET $gitLabApiUrl/projects/$projectId/repository/commits?page=${pageRequest.page}&per_page=${pageRequest.perPage} returned ${Status.BadRequest}; body: some error"
+      }.getMessage should startWith(s"(400 Bad Request")
     }
 
     "return an Exception if remote client responds with unexpected body" in new TestCase {
 
-      stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits?page=${pageRequest.page}&per_page=${pageRequest.perPage}")
-          .willReturn(okJson("{}"))
-      }
-
       intercept[Exception] {
-        gitLabCommitFetcher
-          .fetchGitLabCommits(projectId, pageRequest)(maybeAccessToken = None)
+        multiCommitResponseMapping
+          .value(
+            (Status.Ok, Request[IO](), Response[IO](body = EmptyBody))
+          )
           .unsafeRunSync()
-      }.getMessage should startWith(
-        s"GET $gitLabApiUrl/projects/$projectId/repository/commits?page=${pageRequest.page}&per_page=${pageRequest.perPage} returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
-      )
+      }
     }
   }
 
   "fetchLatestGitLabCommit" should {
 
     "return a single commit" in new TestCase {
-      stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits?per_page=1")
-          .willReturn(okJson(commitsJson(from = List(commitInfoList.head))))
-      }
-      gitLabCommitFetcher.fetchLatestGitLabCommit(projectId)(None).unsafeRunSync() shouldBe Some(commitInfoList.head.id)
+
+      override val uri = uri"projects" / projectId.show / "repository" / "commits" withQueryParams Map(
+        "per_page" -> "1"
+      )
+
+      val expectation = pageResults().generateOne
+
+      (gitLabClient
+        .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, PageResult])(
+          _: Option[AccessToken]
+        ))
+        .expects(GET, uri, endpointName, *, maybeAccessToken)
+        .returning(expectation.pure[IO])
+
+      gitLabCommitFetcher
+        .fetchLatestGitLabCommit(projectId)(maybeAccessToken)
+        .unsafeRunSync() shouldBe expectation
+
     }
+
+    "fetch the latest commit from the given page - responseMapping OK" in new TestCase {
+
+      val maybeNextPage = pages.generateOption
+
+      singleCommitResponseMapping
+        .value(
+          (Status.Ok,
+           Request[IO](),
+           Response[IO]()
+             .withEntity(commitsJson(commitInfoList))
+             .withHeaders(Header.Raw(ci"X-Next-Page", maybeNextPage.map(_.show).getOrElse("")))
+          )
+        )
+        .unsafeRunSync() shouldBe Some(commitInfoList.head.id)
+    }
+
+    "fetch the latest commit from the given page - responseMapping NotFound" in new TestCase {
+
+      singleCommitResponseMapping
+        .value(
+          (Status.NotFound, Request[IO](), Response[IO]())
+        )
+        .unsafeRunSync() shouldBe None
+    }
+
+    "fetch the latest commit from the given page - responseMapping Unauthorized" in new TestCase {
+
+      intercept[UnauthorizedException] {
+
+        singleCommitResponseMapping
+          .value(
+            (Status.Unauthorized, Request[IO](), Response[IO]())
+          )
+          .unsafeRunSync()
+      }.getMessage should startWith("Unauthorized")
+    }
+
+    "return an Exception if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
+      intercept[Exception] {
+        singleCommitResponseMapping
+          .value(
+            (Status.BadRequest, Request[IO](), Response[IO]())
+          )
+          .unsafeRunSync()
+      }.getMessage should startWith(s"(400 Bad Request")
+    }
+
+    "return an Exception if remote client responds with unexpected body" in new TestCase {
+
+      intercept[Exception] {
+        singleCommitResponseMapping
+          .value(
+            (Status.Ok, Request[IO](), Response[IO](body = EmptyBody))
+          )
+          .unsafeRunSync()
+      }
+    }
+
   }
 
   private trait TestCase {
@@ -178,15 +266,58 @@ class GitLabCommitFetcherSpec
     val pageRequest    = pagingRequests.generateOne
     val commitInfoList = commitInfos.generateNonEmptyList().toList
 
-    val gitLabApiUrl = GitLabUrl(externalServiceBaseUrl).apiV4
+    val gitLabClient = mock[GitLabClient[IO]]
     private implicit val logger: TestLogger[IO] = TestLogger()
-    val gitLabCommitFetcher = new GitLabCommitFetcherImpl[IO](gitLabApiUrl, Throttler.noThrottling)
+    val gitLabCommitFetcher = new GitLabCommitFetcherImpl[IO](gitLabClient)
+
+    val uri = uri"projects" / projectId.show / "repository" / "commits" withQueryParams Map(
+      "page"     -> pageRequest.page.show,
+      "per_page" -> pageRequest.perPage.show
+    )
+
+    val endpointName: String Refined NonEmpty = "commits"
+
+    lazy val multiCommitResponseMapping = responseMapping(true)
+
+    lazy val singleCommitResponseMapping = responseMapping(false)
+
+    private def responseMapping(isMulti: Boolean) = {
+      val responseMapping = CaptureOne[ResponseMappingF[IO, PageResult]]()
+
+      val results = if (isMulti) pageResults().generateOne else pageResults(1).generateOne
+
+      (gitLabClient
+        .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, PageResult])(
+          _: Option[AccessToken]
+        ))
+        .expects(*, *, *, capture(responseMapping), *)
+        .returning(results.pure[IO])
+
+      if (isMulti) {
+        gitLabCommitFetcher
+          .fetchGitLabCommits(projectId, pageRequest)(None)
+          .unsafeRunSync()
+      } else {
+        gitLabCommitFetcher
+          .fetchLatestGitLabCommit(projectId)(None)
+          .unsafeRunSync()
+      }
+
+      responseMapping
+    }
+
   }
+
+  private def pageResults(maxCommitCount: Int Refined Positive = positiveInts().generateOne) = for {
+    commits       <- commitIds.toGeneratorOfList(0, maxCommitCount)
+    maybeNextPage <- pages.toGeneratorOfOptions
+  } yield PageResult(commits, maybeNextPage)
 
   private def commitsJson(from: List[CommitInfo]) =
     Json.arr(from.map(commitJson): _*).noSpaces
 
-  private def commitJson(commitInfo: CommitInfo) = json"""{
+  private def commitJson(commitInfo: CommitInfo) =
+    json"""{
     "id":              ${commitInfo.id.value},
     "author_name":     ${commitInfo.author.name.value},
     "author_email":    ${commitInfo.author.emailToJson},
