@@ -70,8 +70,6 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
       (reprovisionJudge.reProvisioningNeeded _).expects().returning(false.pure[IO])
 
-      (renkuVersionPairUpdater.update _).expects(configuredRenkuVersionPairs.head).returning(IO.unit)
-
       reProvisioning.run().unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("Triples Store up to date"))
@@ -81,11 +79,8 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       val exception = exceptions.generateOne
 
       inSequence {
-
         (reprovisionJudge.reProvisioningNeeded _).expects().returning(exception.raiseError[IO, Boolean])
         (reprovisionJudge.reProvisioningNeeded _).expects().returning(false.pure[IO])
-
-        (renkuVersionPairUpdater.update _).expects(configuredRenkuVersionPairs.head).returning(IO.unit)
       }
 
       reProvisioning.run().unsafeRunSync() shouldBe ()
